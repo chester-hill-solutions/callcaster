@@ -49,6 +49,22 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Conference connect voice URL |
 | POST | `/api/caller-id/status` | Caller ID verification status |
 
+`POST /api/auto-dial/status` handles a signed `participant-leave` event with
+`ReasonParticipantLeft=participant_hung_up` before ordinary call-status events.
+It completes the participant's conference for both agent and callee legs,
+including agent rows with no outreach attempt. An already-ended conference is
+acknowledged. A provider stop failure returns 500 so Twilio can retry.
+
+After the stop, the route emits a `predictive_broadcast` with `conference_id`
+and `conference_ended=true`. Only the matching call screen ends its conference.
+Ordinary contact status events also include the stored conference ID when it
+is available, so their later completion events stay within that conference.
+Ordinary call completion has no conference-end marker and keeps the conference
+available for the next dialer turn.
+Call end metadata is saved on a best-effort basis. The participant event does
+not claim `call.status`; the ordinary terminal callback retains its billing
+and outcome work. See [Twilio's conference callback parameters](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
 ## Stripe
 
 | Method | Path | Purpose |

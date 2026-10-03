@@ -195,6 +195,16 @@ export function useCallScreen() {
   // meter reflects the same input the call will use.
   const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream });
 
+  const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
+    {
+      userId: user.id,
+      campaignId: campaign?.id?.toString() || "",
+      workspaceId,
+      callerId: campaign?.caller_id || "",
+      selectedDevice: phoneVerification.selectedDevice,
+    },
+  );
+
   const {
     status: liveStatus,
     users: onlineUsers,
@@ -203,6 +213,7 @@ export function useCallScreen() {
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,
+    conference,
   });
 
   const {
@@ -290,16 +301,6 @@ export function useCallScreen() {
     isPredictive: campaign?.dial_type === "predictive",
     hangUp,
   });
-
-  const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
-    {
-      userId: user.id,
-      campaignId: campaign?.id?.toString() || "",
-      workspaceId,
-      callerId: campaign?.caller_id || "",
-      selectedDevice: phoneVerification.selectedDevice,
-    },
-  );
 
   const fetcher = useFetcher<{ creditsError?: boolean; error?: string }>();
   const submit = fetcher.submit;
@@ -475,6 +476,7 @@ export function useCallScreen() {
     setNextRecipient,
     setUpdate,
     conference,
+    setConference,
   });
 
   const handleDeviceSelect = useCallback(

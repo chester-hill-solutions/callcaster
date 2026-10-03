@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { logger } from "@/lib/logger.client";
 import { toDialerStatus } from "@/lib/call-status";
-import { parseWorkspaceEventData } from "@/lib/workspace-events.shared";
+import { parseWorkspaceEventData, type PredictiveBroadcastPayload } from "@/lib/workspace-events.shared";
 import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
 
 const PRESENCE_UPDATE_INTERVAL = 5 * 60 * 1000;
@@ -11,21 +11,17 @@ interface PresenceUser {
   [key: string]: unknown;
 }
 
-interface PredictiveState {
-  contact_id: number | null;
-  status: string;
-}
-
 interface UseCallRoomParams {
   workspace: string;
   campaign: number | undefined;
   userId: string;
+  conference?: string | null;
 }
 
 interface UseCallRoomReturn {
   status: "offline" | "online" | "error";
   users: PresenceUser[];
-  predictiveState: PredictiveState;
+  predictiveState: PredictiveBroadcastPayload;
 }
 
 /** Campaign room: predictive broadcasts and presence sync via workspace SSE. */
@@ -33,15 +29,17 @@ const useCallRoom = ({
   workspace,
   campaign,
   userId,
+  conference = null,
 }: UseCallRoomParams): UseCallRoomReturn => {
   const [status, setStatus] = useState<"offline" | "online" | "error">("offline");
   const [users, setUsers] = useState<PresenceUser[]>([]);
-  const [predictiveState, setPredictiveState] = useState<PredictiveState>({
+  const [predictiveState, setPredictiveState] = useState<PredictiveBroadcastPayload>({
     contact_id: null,
     status: "idle",
   });
   const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusRef = useRef<"offline" | "online" | "error">("offline");
+  const conferenceRef = useRef(conference);
 
   const updatePresence = useCallback(
     async (newStatus: "online" | "offline") => {
@@ -67,17 +65,17 @@ const useCallRoom = ({
   );
 
   /**
-   * @effect Mirror the latest connection `status` into a ref so the presence
-   * heartbeat interval (set up once per SSE connection) can read the current
-   * value without needing to be recreated on every status change.
-   * @effect-deps status (re-syncs the ref whenever the SSE-driven status changes)
+   * @effect Mirror the latest connection status and conference into refs so
+   * the heartbeat and SSE handler read current values without resubscribing.
+   * @effect-deps status, conference (re-sync the current connection and target)
    * @effect-side-effects none (plain ref assignment, no timer/subscription/DOM)
    * @effect-why-not-loader Not data fetching; this is the "latest ref" pattern for
    * reading current state inside a longer-lived closure (the heartbeat interval below).
    */
   useEffect(() => {
     statusRef.current = status;
-  }, [status]);
+    conferenceRef.current = conference;
+  }, [status, conference]);
 
   /**
    * @effect Join this call room via the shared workspace SSE connection: relay
@@ -105,12 +103,17 @@ const useCallRoom = ({
       try {
         const record = parseWorkspaceEventData(message.data);
         if (record.event_type === "predictive_broadcast") {
-          const payload = record.payload as unknown as PredictiveState;
+          const payload = record.payload;
+          const targetConference = typeof payload.conference_id === "string"
+            ? payload.conference_id : undefined;
+          if (targetConference && targetConference !== conferenceRef.current) return;
           // Broadcasts carry raw Twilio statuses (see runCallStatusSideEffects);
           // translate them to the dialer vocabulary the consumers switch on.
           setPredictiveState({
-            contact_id: payload.contact_id ?? null,
+            contact_id: typeof payload.contact_id === "number" ? payload.contact_id : null,
             status: toDialerStatus(String(payload.status ?? "")),
+            ...(targetConference ? { conference_id: targetConference } : {}),
+            ...(payload.conference_ended === true ? { conference_ended: true } : {}),
           });
           return;
         }

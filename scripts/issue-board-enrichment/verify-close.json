@@ -1219,7 +1219,7 @@
     "issueNumber": 1713,
     "verdict": "verify-close",
     "recommendedTitle": "Workspace invites: email-first (invite by email without requiring an account)",
-    "summary": "IMPLEMENTED on dev (#1985, merged 2026-09-21): email-first invites (SEC-03) landed end-to-end — invite writers no longer require a pre-existing account, pending invites live on workspace_invitation by email, acceptance is token-gated through the emailed link, email sent via Resend, members API / settings / admin lists and cancel/resend moved to the new table. Verify the invitee flow on the review env (invite unknown email -> accept link -> signup -> workspace membership), then close.",
+    "summary": "IMPLEMENTED on dev (#1985, merged 2026-09-21): email-first invites (SEC-03) landed end-to-end \u2014 invite writers no longer require a pre-existing account, pending invites live on workspace_invitation by email, acceptance is token-gated through the emailed link, email sent via Resend, members API / settings / admin lists and cancel/resend moved to the new table. Verify the invitee flow on the review env (invite unknown email -> accept link -> signup -> workspace membership), then close.",
     "currentBehavior": "Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).",
     "rootCause": "Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.",
     "resolution": "Shipped in PR #1985. Follow-ups (tracked separately, do not block this close): Phase D drop of legacy workspace_invite; #1714 same-'User not found'-error verify-and-close against the new writer.",
@@ -1328,7 +1328,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Implemented on dev (PR #1994, merged). Run `npm run tools:gen-wav-sidecars -- --apply` against the review env first, then prod; verify sidecars appear (\\`ivr-wav/<ws>/…\\`) and IVR playback uses them, then close."
+    "trackerRecommendation": "Implemented on dev (PR #1994, merged). Run `npm run tools:gen-wav-sidecars -- --apply` against the review env first, then prod; verify sidecars appear (\\`ivr-wav/<ws>/\u2026\\`) and IVR playback uses them, then close."
   },
   {
     "issueNumber": 1846,
@@ -1465,7 +1465,7 @@
     "trackerRecommendation": "Implemented on dev (PR #1991, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.",
     "recommendedTitle": "IVR editor routing validation + terminal-hangup guarantee",
     "summary": "IMPLEMENTED on dev (#1991 merged 2026-09-22). Runtime half largely shipped (#1975): ou...",
-    "currentBehavior": "Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs — no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.",
+    "currentBehavior": "Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs \u2014 no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.",
     "rootCause": "The runtime parses next as an opaque string with no terminal/validation contract.",
     "resolution": "Add app/lib/ivr-script-validation.ts: build an edge graph (page/block -> option.next targets) and run a DFS for (a) dangling targets (next refers to a nonexistent page/block), (b) reachable cycles (A->B->A), (c) terminal guarantee (every reachable path ends at hangup/end). Surface errors in ScriptEditorShell.tsx alongside editor.validation. Wire into validateScriptSteps (call-script-service.ts) and add a script_routing_invalid CampaignReadinessCode + readiness-action entry (campaign-readiness.ts:14-35 + campaign-readiness-actions.ts:35-144) so launch blocks (launchCampaign readiness gate campaign-execution.server.ts:86-95 surfaces it automatically). Inbound: make renderTerminalTarget treat 'end' explicitly and render <Hangup/> for dangling/terminal.",
     "lookIn": [
@@ -1716,7 +1716,7 @@
     "summary": "The sign-in page shows a \"Sign Up\" link at the top as well as a \"Create an Account\" button, so the same destination is offered twice under two different labels. Grouped under the auth-pages epic (#2057).",
     "currentBehavior": "Two distinct labels both lead to sign-up.",
     "rootCause": "Copy was added over time without a single naming decision.",
-    "resolution": "Remove the top \"Sign Up\" link and change the button to read \"Sign Up\". Verify the result against the live routes before closing — this may already be fixed in which case it closes with a link to the current code.",
+    "resolution": "Remove the top \"Sign Up\" link and change the button to read \"Sign Up\". Verify the result against the live routes before closing \u2014 this may already be fixed in which case it closes with a link to the current code.",
     "lookIn": [
       "app/routes/account.sign-in.*",
       "app/components/shared/AuthCard.tsx"
@@ -1730,7 +1730,7 @@
     "blockedBy": [],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Smallest item in the cluster. Check the live route first — if it already reads this way, close it as already done rather than writing a change."
+    "trackerRecommendation": "Smallest item in the cluster. Check the live route first \u2014 if it already reads this way, close it as already done rather than writing a change."
   },
   {
     "issueNumber": 2001,
@@ -1739,7 +1739,7 @@
     "summary": "Shipped. PR #2018 (0ee4766a) merged to dev and the automation comment says this closes when it reaches master. Verified in the working tree: the route module exists (app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts, both dated 2026-09-24), the sidebar links to it (app/components/workspace/WorkspaceNav.tsx:140, path 'phone-numbers'), the URL is in the verified route-tree baseline (scripts/baselines/route-tree.txt:153), and the purchase sub-route is split out (app/routes/workspaces+/$id/phone-numbers/purchase.route.tsx).",
     "currentBehavior": "Phone Numbers is its own sidebar page; the settings page no longer carries a Phone Numbers section.",
     "rootCause": "It was a section inside Settings rather than a top-level destination, which put a daily-use surface three clicks deep.",
-    "resolution": "No code. Verify on the review environment that /phone-numbers loads with numbers listed, that the Settings page has no Phone Numbers section, and that the e2e RBAC-04 assertion (e2e/specs/rbac.spec.ts:29-32, a caller is redirected away from /phone-numbers) still holds — that test is the only thing guarding the role gate on the new page. Then close when the fix is promoted to master.",
+    "resolution": "No code. Verify on the review environment that /phone-numbers loads with numbers listed, that the Settings page has no Phone Numbers section, and that the e2e RBAC-04 assertion (e2e/specs/rbac.spec.ts:29-32, a caller is redirected away from /phone-numbers) still holds \u2014 that test is the only thing guarding the role gate on the new page. Then close when the fix is promoted to master.",
     "lookIn": [
       "app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts",
       "app/components/workspace/WorkspaceNav.tsx:140",
@@ -1772,7 +1772,7 @@
     "summary": "Shipped in PR #2026 (3d091ce5), which is an ancestor of the current dev HEAD, and every acceptance criterion in the issue body is satisfied in the working tree. .github/projects.yaml lists on-prod (2f691958) alongside the other six options. The board how-to in scripts/issue-board-lib.mjs:353-365 describes the corrected flow, including 'Never move a CLOSED issue by hand' and the not_planned/duplicate-is-the-one-manual-move rule. .agents/skills/project-on-dev-status/SKILL.md:114-140 carries the same rule and the option ids. The lane repair is done: verify-close.json holds #1883, #1884, #1846, #1980, #1981, #1982, #1830, #1844, #1845, #1886, #1936, and fix-now.json holds none of them. The validation error the issue quoted (#780 blockedBy unknown issue 1884) cannot occur now, because #1884 is present.",
     "currentBehavior": "The Status flow is documented in the three places an agent will actually read, and the lanes match what has shipped.",
     "rootCause": "The 2026-09-21 release session bulk-archived 260+ closed items, which exposed that the documented flow described a hand-move process the automation had replaced, and that PR #1995 had dropped two enrichment records.",
-    "resolution": "No code. Confirm the fix reaches master and close. If the board is regenerated and any lane claim here turns out to be stale, correct the enrichment files rather than reopening this issue — the repair itself is done.",
+    "resolution": "No code. Confirm the fix reaches master and close. If the board is regenerated and any lane claim here turns out to be stale, correct the enrichment files rather than reopening this issue \u2014 the repair itself is done.",
     "lookIn": [
       ".github/projects.yaml (on-prod option present)",
       "scripts/issue-board-lib.mjs:353-365 (corrected Status-flow how-to)",
@@ -1780,7 +1780,7 @@
       "scripts/issue-board-enrichment/verify-close.json and fix-now.json (the lane moves)"
     ],
     "existingTests": [
-      "scripts/issue-board-lib.mjs validateEnrichmentFiles (fails on a duplicate issueNumber, an unknown blockedBy target, or a cycle — this is what caught the dropped #1883/#1884 records)"
+      "scripts/issue-board-lib.mjs validateEnrichmentFiles (fails on a duplicate issueNumber, an unknown blockedBy target, or a cycle \u2014 this is what caught the dropped #1883/#1884 records)"
     ],
     "missingTests": [
       "no test asserts that an on-prod option exists in .github/projects.yaml, so removing it again would not fail any check",
@@ -1804,7 +1804,7 @@
     "summary": "Shipped in PR #1999 (27601c58), which is in the dev history. The split is real: app/lib/platform-media.server.ts:79-80 documents that caller voicemails live under voicemail/<ws>/ and Twilio recordings under call-recordings/<ws>/, outside the library prefix, and the migration tool exists at scripts/migrate-media-namespaces.ts with the npm script tools:media-namespace-migrate (dry-run by default, --apply to move). Tests were added alongside: test/media-namespace-migrate.server.test.ts, test/voicemail-media.server.test.ts, and test/call-recording-storage.server.test.ts was extended.",
     "currentBehavior": "Library audio, caller voicemails and call recordings live in three different key prefixes, so the filename-prefix heuristics the issue listed are gone.",
     "rootCause": "One bucket and one key prefix for three different kinds of media, which forced every consumer to guess from a filename and produced junk like voicemail-undefined.",
-    "resolution": "No code. The one remaining step is operational and is what makes this verifiable: run tools:media-namespace-migrate in dry-run on the review environment, check the counts, then --apply, then confirm the voicemails page and call-history playback still resolve their objects. Then repeat on prod. If the dry-run reports objects it cannot classify, that is a real gap — file it rather than forcing them across. Close when the review environment passes, since the code half is already merged.",
+    "resolution": "No code. The one remaining step is operational and is what makes this verifiable: run tools:media-namespace-migrate in dry-run on the review environment, check the counts, then --apply, then confirm the voicemails page and call-history playback still resolve their objects. Then repeat on prod. If the dry-run reports objects it cannot classify, that is a real gap \u2014 file it rather than forcing them across. Close when the review environment passes, since the code half is already merged.",
     "lookIn": [
       "app/lib/platform-media.server.ts:75-85 (the prefix split and the comment replacing the heuristics)",
       "scripts/migrate-media-namespaces.ts and package.json tools:media-namespace-migrate (dry-run default, --apply)",
@@ -1831,7 +1831,7 @@
     "blockedBy": [],
     "size": "XS",
     "risk": "medium",
-    "trackerRecommendation": "Verify and close, after the migration dry-run on the review environment. The code and the tests are merged; the only thing outstanding is running the tool, and that run is the verification rather than new work. Risk is medium only because the tool moves objects — which is why the dry-run default exists and why it should be run on review first."
+    "trackerRecommendation": "Verify and close, after the migration dry-run on the review environment. The code and the tests are merged; the only thing outstanding is running the tool, and that run is the verification rather than new work. Risk is medium only because the tool moves objects \u2014 which is why the dry-run default exists and why it should be run on review first."
   },
   {
     "issueNumber": 2006,
@@ -1840,9 +1840,9 @@
     "summary": "Diagnosed and remediated by wra-sol in the issue comments, and the repo-side half is done. The mover was never this repository: nothing under .github/workflows/ writes project Status at all (a grep for 'archive' across the workflows returns nothing), and the board scripts never touch GitHub Projects. It was agent tooling doing a bulk sweep on the shared board, which overreached and put 48 OPEN issues into the terminal lane; all 48 were restored to Backlog and verified. The durable prevention is now written into the two places an agent will read: scripts/issue-board-lib.mjs:353-365 (the board how-to states the corrected flow, that closed items go to on-qa by automation, and that archive is only the one manual move for not_planned/duplicate) and .agents/skills/project-on-dev-status/SKILL.md:114-140 (never set a terminal lane, with the option ids). The bulk-sweep warning that was added to session memory is now in the repo instead of in one person's memory.",
     "currentBehavior": "No repo automation can move a project item. The rule that prevents a repeat is documented in the board generator and the skill.",
     "rootCause": "A terminal Status option named archive exists on a project shared by several CHS products, and a bulk 'archive the closed items' cleanup ran without checking item state. Open items in a terminal lane is a contradiction that nothing detected.",
-    "resolution": "No code. Verify on the shared board that no OPEN issue sits in a terminal lane (the check the fix claimed, re-run it), and that the corrected flow is still in the two documented places. Then close. If a repeat happens, the missing piece is an out-of-repo guard, not a repo change — a script that lists open items in a terminal lane would be worth its own issue if this recurs.",
+    "resolution": "No code. Verify on the shared board that no OPEN issue sits in a terminal lane (the check the fix claimed, re-run it), and that the corrected flow is still in the two documented places. Then close. If a repeat happens, the missing piece is an out-of-repo guard, not a repo change \u2014 a script that lists open items in a terminal lane would be worth its own issue if this recurs.",
     "lookIn": [
-      ".github/workflows/ (no project Status writes — the negative result is the evidence)",
+      ".github/workflows/ (no project Status writes \u2014 the negative result is the evidence)",
       "scripts/issue-board-lib.mjs:353-365 (the corrected Status-flow section, including the never-hand-move-a-closed-item rule)",
       ".agents/skills/project-on-dev-status/SKILL.md:114-140 (the same rule plus the option ids)",
       ".github/projects.yaml (the terminal option is literally named archive)"
@@ -1851,7 +1851,7 @@
       "scripts/issue-board-lib.mjs validateEnrichmentFiles (structural validation of the enrichment, not of the project board)"
     ],
     "missingTests": [
-      "no check anywhere fails when an OPEN item is left in a terminal lane — the failure mode that produced this incident is still undetectable",
+      "no check anywhere fails when an OPEN item is left in a terminal lane \u2014 the failure mode that produced this incident is still undetectable",
       "no script lists project items in a terminal lane on demand, so the verification is manual"
     ],
     "acceptanceCriteria": [
@@ -1869,10 +1869,10 @@
     "issueNumber": 2048,
     "verdict": "verify-close",
     "recommendedTitle": "Block SMS campaign completion while messages are unsettled at Twilio",
-    "summary": "DONE — the settled-message gate shipped on 2026-09-27 as PR #2050 (d032c0c9), a day before this record was written. Message campaigns no longer flip to complete on dequeue: try_complete_campaign_if_drained now refuses while any message is unsettled. Measured on the Eric Lombardi blast (2026-09-24) the old behaviour reported complete at 6:29pm EDT while Twilio still held 5,382 messages, releasing them between 11:59pm and 1:46am — a median lag of 7.3 hours.",
+    "summary": "DONE \u2014 the settled-message gate shipped on 2026-09-27 as PR #2050 (d032c0c9), a day before this record was written. Message campaigns no longer flip to complete on dequeue: try_complete_campaign_if_drained now refuses while any message is unsettled. Measured on the Eric Lombardi blast (2026-09-24) the old behaviour reported complete at 6:29pm EDT while Twilio still held 5,382 messages, releasing them between 11:59pm and 1:46am \u2014 a median lag of 7.3 hours.",
     "currentBehavior": "Verified against the live dev database, not just the migration file: campaign_has_unsettled_messages, campaign_ids_with_unsettled_messages and try_complete_campaign_if_drained all exist in public, and the deployed body of try_complete_campaign_if_drained does call campaign_has_unsettled_messages. A completion re-check exists (app/lib/campaign-settle-recheck.server.ts) because the gate would otherwise strand every message campaign at running forever once the local queue empties.",
-    "rootCause": "campaign_has_unsettled_calls had no message counterpart, and campaign_queue_has_pending_work treats a row as done at dequeue time — handed to Twilio, not delivered. The re-check module's own comment records that a TypeScript re-implementation of the settled rule shipped once and broke the recovery path in two ways no test caught, which is why both the filter and the gate now live only in SQL.",
-    "resolution": "No code work outstanding. The residual is the expired-campaign bypass at app/lib/worker/handlers/campaign.server.ts, which writes status=complete directly and never calls the gate — that is issue #2051, DECLINED by the maintainer on 2026-09-25 ('no 2051') and deliberately left with a code comment marking it a known gap. Do not reopen it here. What remains is a verification pass: confirm on a real campaign that a message sitting at Twilio keeps the campaign at running, and that the re-check promotes it once the provider settles. That pass belongs on a real database, which is the tier #2174 tracks.",
+    "rootCause": "campaign_has_unsettled_calls had no message counterpart, and campaign_queue_has_pending_work treats a row as done at dequeue time \u2014 handed to Twilio, not delivered. The re-check module's own comment records that a TypeScript re-implementation of the settled rule shipped once and broke the recovery path in two ways no test caught, which is why both the filter and the gate now live only in SQL.",
+    "resolution": "No code work outstanding. The residual is the expired-campaign bypass at app/lib/worker/handlers/campaign.server.ts, which writes status=complete directly and never calls the gate \u2014 that is issue #2051, DECLINED by the maintainer on 2026-09-25 ('no 2051') and deliberately left with a code comment marking it a known gap. Do not reopen it here. What remains is a verification pass: confirm on a real campaign that a message sitting at Twilio keeps the campaign at running, and that the re-check promotes it once the provider settles. That pass belongs on a real database, which is the tier #2174 tracks.",
     "lookIn": [
       "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
       "app/lib/twilio-open-sync.server.ts",
@@ -1881,9 +1881,9 @@
       "app/lib/worker/handlers/campaign.server.ts"
     ],
     "existingTests": [
-      "test/campaign-completion-rpc-contract.test.ts — extracts the live migration bodies and pins the settled list and the ::text casts (9 tests, runs in ci:local)",
-      "test/campaign-settle-recheck.server.test.ts — the re-check sweep and its best-effort contract (7 tests, runs in ci:local)",
-      "test/integration-db/campaign-completion-gate.test.ts — 14 tests against a real database; this tier is not wired to any workflow (#2174), so these do not run in CI today"
+      "test/campaign-completion-rpc-contract.test.ts \u2014 extracts the live migration bodies and pins the settled list and the ::text casts (9 tests, runs in ci:local)",
+      "test/campaign-settle-recheck.server.test.ts \u2014 the re-check sweep and its best-effort contract (7 tests, runs in ci:local)",
+      "test/integration-db/campaign-completion-gate.test.ts \u2014 14 tests against a real database; this tier is not wired to any workflow (#2174), so these do not run in CI today"
     ],
     "missingTests": [
       "an end-to-end real-Postgres pass: a message unsettled at the provider keeps the campaign at running, and the re-check promotes it once settled (#2174)"
@@ -1897,7 +1897,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Verify and close — this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined."
+    "trackerRecommendation": "Verify and close \u2014 this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined."
   },
   {
     "issueNumber": 1896,
@@ -1968,21 +1968,21 @@
     "issueNumber": 2172,
     "verdict": "verify-close",
     "recommendedTitle": "Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load",
-    "summary": "runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.",
+    "summary": "runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load \u2014 precisely when rate limiting matters \u2014 campaign SMS pacing silently stops pacing.",
     "currentBehavior": "test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.",
-    "rootCause": "The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.",
-    "resolution": "Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.",
+    "rootCause": "The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps \u2014 the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.",
+    "resolution": "Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path \u2014 check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.",
     "lookIn": [
       "app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)",
       "app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)",
-      "app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)",
+      "app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember \u2014 async work before the RPC)",
       "test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)"
     ],
     "existingTests": [
-      "campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it"
+      "campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' \u2014 catches the collapse, but only when the run is loaded enough to trigger it"
     ],
     "missingTests": [
-      "a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code",
+      "a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval \u2014 this must FAIL against current code",
       "a test proving pacing holds under simulated event-loop contention"
     ],
     "acceptanceCriteria": [
@@ -2000,18 +2000,18 @@
     "issueNumber": 2185,
     "verdict": "verify-close",
     "recommendedTitle": "Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once",
-    "summary": "Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.",
+    "summary": "Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken \u2014 but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.",
     "risk": "low",
     "size": "S",
-    "trackerRecommendation": "Fixed and merged as PR #2188 (8f1952bfd). createSemaphore gates the preparation phase at ceil(QUERY_POOL_MAX / 2), leaving half the pool for interactive traffic. The permit is released BEFORE the pacing wait, so the pool is never gated on the rate limit — holding it across waitForTurn would be the #2172 defect in a different hat. Verified: measured peak in-flight prep dropped from 25 to the bound; 5 semaphore unit tests with 2 kill-checks (off-by-one on handoff -> 2 fail, one reporting inFlight -17; release removed -> 4 fail, 2 by timeout); 2 dispatch tests asserted from both sides so neither degenerate fix passes (gate removed -> 25 > 5; bound of 1 -> 1 > 1). An off-by-one in the first semaphore implementation was found and fixed during the work, and the test written for it initially passed against the bug because it never queued — it now uses more callers than permits. check:unscoped-db-imports correctly rejected importing @/server/db for the constant; fixed in code by moving QUERY_POOL_MAX to app/server/db-pool-size.ts, no baseline change. Left OPEN: merge to dev is not a release, and no CI tier runs against real Postgres (#2174)."
+    "trackerRecommendation": "Fixed and merged as PR #2188 (8f1952bfd). createSemaphore gates the preparation phase at ceil(QUERY_POOL_MAX / 2), leaving half the pool for interactive traffic. The permit is released BEFORE the pacing wait, so the pool is never gated on the rate limit \u2014 holding it across waitForTurn would be the #2172 defect in a different hat. Verified: measured peak in-flight prep dropped from 25 to the bound; 5 semaphore unit tests with 2 kill-checks (off-by-one on handoff -> 2 fail, one reporting inFlight -17; release removed -> 4 fail, 2 by timeout); 2 dispatch tests asserted from both sides so neither degenerate fix passes (gate removed -> 25 > 5; bound of 1 -> 1 > 1). An off-by-one in the first semaphore implementation was found and fixed during the work, and the test written for it initially passed against the bug because it never queued \u2014 it now uses more callers than permits. check:unscoped-db-imports correctly rejected importing @/server/db for the constant; fixed in code by moving QUERY_POOL_MAX to app/server/db-pool-size.ts, no baseline change. Left OPEN: merge to dev is not a release, and no CI tier runs against real Postgres (#2174)."
   },
   {
     "issueNumber": 2097,
     "verdict": "verify-close",
     "recommendedTitle": "PATCH /api/campaigns/:campaignId/queue never checks that the referenced audience or contacts belong to the caller's workspace",
     "summary": "`patchCampaignQueueApi` proves the **campaign** is the caller's, then resolves `add_audience` / `add_contact_ids` against **any** id in the platform. The trigger stamps the attacker's workspace onto the resulting queue rows, so `GET /api/campaigns/:id/queue` then returns another tenant's contacts in full.",
-    "currentBehavior": "`PATCH /api/campaigns/57/queue` with `{\"add_audience\": {\"audience_id\": \"<ws-B audience>\"}}` → the campaign is the attacker's → the audience is workspace B's → every B contact id is inserted into campaign 57's queue with `workspace = <attacker's workspace>` → `GET /api/campaigns/57/queue` returns B's contact records.",
-    "resolution": "1. Resolve the target ids through the caller's tenant client before enqueuing. For `add_audience`: `createTenantDb(workspaceId).audience.findFirst({ where: eq(audienceTable.id, body.audience_id) })` → 404 when it is not in the workspace. 2. For `add_contact_ids`: filter the id list to `tdb.contact` rows, or reject with a 400 naming the foreign ids. Do not enqueue a partial set silently. 3. Return the same uniform 404 the rest of the data plane uses for another tenant's resource, so the endpoint is not an existence oracle. 4. Sweep the other `api+` write endpoints for the same shape: a request that references a tenant-scoped id must resolve it through the tenant client. `check:route-membership` cannot catch this class — it checks the route, not the referenced ids — so say so in the issue and consider a helper the write paths must use.",
+    "currentBehavior": "`PATCH /api/campaigns/57/queue` with `{\"add_audience\": {\"audience_id\": \"<ws-B audience>\"}}` \u2192 the campaign is the attacker's \u2192 the audience is workspace B's \u2192 every B contact id is inserted into campaign 57's queue with `workspace = <attacker's workspace>` \u2192 `GET /api/campaigns/57/queue` returns B's contact records.",
+    "resolution": "1. Resolve the target ids through the caller's tenant client before enqueuing. For `add_audience`: `createTenantDb(workspaceId).audience.findFirst({ where: eq(audienceTable.id, body.audience_id) })` \u2192 404 when it is not in the workspace. 2. For `add_contact_ids`: filter the id list to `tdb.contact` rows, or reject with a 400 naming the foreign ids. Do not enqueue a partial set silently. 3. Return the same uniform 404 the rest of the data plane uses for another tenant's resource, so the endpoint is not an existence oracle. 4. Sweep the other `api+` write endpoints for the same shape: a request that references a tenant-scoped id must resolve it through the tenant client. `check:route-membership` cannot catch this class \u2014 it checks the route, not the referenced ids \u2014 so say so in the issue and consider a helper the write paths must use.",
     "lookIn": [
       "app/routes/api+/campaigns/$campaignId/queue.action.server.ts:60-62",
       "the `patchCampaignQueueApi` implementation (the `add_audience` / `add_contact_ids` branches)",
@@ -2021,14 +2021,14 @@
     ],
     "existingTests": [],
     "missingTests": [
-      "`add_audience` with a foreign audience → 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).",
-      "`add_contact_ids` with a foreign contact → rejected, no rows enqueued.",
+      "`add_audience` with a foreign audience \u2192 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).",
+      "`add_contact_ids` with a foreign contact \u2192 rejected, no rows enqueued.",
       "A permitted-path positive control."
     ],
     "acceptanceCriteria": [
       "`add_audience` with another workspace's `audience_id` returns 404 and enqueues nothing.",
       "`add_contact_ids` with a foreign `contact_id` returns 404 (or a 400 naming it) and enqueues nothing.",
-      "A mixed list is handled explicitly: either all-or-nothing or a named rejection — documented and tested.",
+      "A mixed list is handled explicitly: either all-or-nothing or a named rejection \u2014 documented and tested.",
       "The permitted path (ids from the caller's own workspace) still enqueues, with a positive-control test.",
       "Every `api+` write endpoint that accepts a tenant-scoped id has been swept and the sweep is recorded in the issue."
     ],
@@ -2042,8 +2042,8 @@
     "verdict": "verify-close",
     "recommendedTitle": "The chats loader-to-state sync can permanently discard a fresh page-1 response",
     "summary": "When the agent has scrolled the conversation list and triggered \"load more\" (page 4 is in `paginationFetcher.data`), a realtime message on a page-1 conversation causes a loader revalidation that produces a **new** `chats` array with fresh `message_count` / `conversation_last_update` for a page-1 row. The sync effect returns early because `fetchedPage (4) > pagination.page (1)`, so the fresh data is dropped.",
-    "currentBehavior": "Page numbers are not an identity. Comparing them is a proxy for \"have I already folded this response in?\" that fails as soon as the agent paginates — and then fails **permanently**, not transiently.",
-    "resolution": "1. Track which loader response has been folded in with a **monotonic token** — a ref holding the `pagination` object last applied, or a request sequence — rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity — that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the \"accumulated pagination vs revalidation\" class and should share one merge helper.",
+    "currentBehavior": "Page numbers are not an identity. Comparing them is a proxy for \"have I already folded this response in?\" that fails as soon as the agent paginates \u2014 and then fails **permanently**, not transiently.",
+    "resolution": "1. Track which loader response has been folded in with a **monotonic token** \u2014 a ref holding the `pagination` object last applied, or a request sequence \u2014 rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity \u2014 that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the \"accumulated pagination vs revalidation\" class and should share one merge helper.",
     "lookIn": [
       "app/hooks/chats/useChatsPage.ts (the loader-to-state sync effect)",
       "app/hooks/chats/useChatRealtime.ts",
@@ -2057,7 +2057,7 @@
       "No duplicate conversation rows."
     ],
     "acceptanceCriteria": [
-      "With pages 1–4 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).",
+      "With pages 1\u20134 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).",
       "The loaded pages are not lost.",
       "A conversation appearing on two pages is not duplicated.",
       "A fresh page-1 response is applied even after pagination (the permanent-staleness case)."
@@ -2065,15 +2065,15 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Fixed and merged as PR #2191 (e3a10624). Page numbers are not an identity; the filter is. The sync effect now discriminates on accumulatedFilterKeyRef, so a different filter resets the list and the same filter merges the response in. Two changes were needed, not one: mergeConversationPages already deduped by conversation phone and applied the fresh row over the existing one, AND the cursor had to become monotonic — the old effect also reset paginationState and requestedPageRef to the loader's page 1, so deleting the guard alone would have made the next load-more re-request a page already held. Verified: 4 tests in test/ui/use-chats-page-pagination.test.tsx; 2 reproduce the defect and failed on current code with a fresh unread count of 9 and 7 arriving as 1; 2 guard behaviour a naive fix breaks. 4 kill-checks each fail exactly one test — page-number guard reinstated, replace-not-merge, cursor rewind, always-merge-never-reset — so neither 'always replace' nor 'always merge' passes. ci:local exit 0, node 441/441, ui 150/150. The max-lines-per-function warning is pre-existing at 450 lines, now 462; splitting the hook is a refactor and does not belong here. NOT done: the useChatRealtime re-seed defect this issue suggests fixing alongside — no revalidator call or page reset that wipes loaded pages could be found in app/hooks/realtime/useChatRealtime.ts. Left OPEN: merge to dev is not a release, and no CI tier covers accumulated-pagination behaviour against a live revalidation."
+    "trackerRecommendation": "Fixed and merged as PR #2191 (e3a10624). Page numbers are not an identity; the filter is. The sync effect now discriminates on accumulatedFilterKeyRef, so a different filter resets the list and the same filter merges the response in. Two changes were needed, not one: mergeConversationPages already deduped by conversation phone and applied the fresh row over the existing one, AND the cursor had to become monotonic \u2014 the old effect also reset paginationState and requestedPageRef to the loader's page 1, so deleting the guard alone would have made the next load-more re-request a page already held. Verified: 4 tests in test/ui/use-chats-page-pagination.test.tsx; 2 reproduce the defect and failed on current code with a fresh unread count of 9 and 7 arriving as 1; 2 guard behaviour a naive fix breaks. 4 kill-checks each fail exactly one test \u2014 page-number guard reinstated, replace-not-merge, cursor rewind, always-merge-never-reset \u2014 so neither 'always replace' nor 'always merge' passes. ci:local exit 0, node 441/441, ui 150/150. The max-lines-per-function warning is pre-existing at 450 lines, now 462; splitting the hook is a refactor and does not belong here. NOT done: the useChatRealtime re-seed defect this issue suggests fixing alongside \u2014 no revalidator call or page reset that wipes loaded pages could be found in app/hooks/realtime/useChatRealtime.ts. Left OPEN: merge to dev is not a release, and no CI tier covers accumulated-pagination behaviour against a live revalidation."
   },
   {
     "issueNumber": 2156,
     "verdict": "verify-close",
     "recommendedTitle": "useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater",
-    "summary": "A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.",
-    "currentBehavior": "Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.",
-    "resolution": "1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is \"advance to the newly assigned contact\", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.",
+    "summary": "A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater \u2014 a state update during another state update.",
+    "currentBehavior": "Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening \u2014 the branch that was supposed to set the newly assigned contact never runs.",
+    "resolution": "1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is \"advance to the newly assigned contact\", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) \u2014 fix both together, or the effect dependency churn remains.",
     "lookIn": [
       "app/hooks/call/useQueue.ts:88-89,157",
       "the predictive FSM bridge in the same area",
@@ -2120,7 +2120,7 @@
     "acceptanceCriteria": [
       "A documented-format script with `content`/`next` options routes correctly on a key press (kill-check: remove the normalisation and confirm the test goes red).",
       "The Results screen and the CSV export show the option label, not the raw digit.",
-      "A script whose options have no recognisable value is either normalised or rejected with a clear message — decided and tested.",
+      "A script whose options have no recognisable value is either normalised or rejected with a clear message \u2014 decided and tested.",
       "The launch gate can detect a script whose options cannot be matched (a validation that exercises the matcher)."
     ],
     "blockedBy": [],
@@ -2132,9 +2132,9 @@
     "issueNumber": 2143,
     "verdict": "verify-close",
     "recommendedTitle": "syncWorkspaceA2pStatus seeds both statuses from the same stored value and reverts to the old value, so a stale approved A2P state survives a brand re-review",
-    "summary": "The A2P status sync seeds the brand and campaign status from the **aggregate** stored status rather than from the provider. A workspace whose A2P was `approved` and whose brand re-enters review keeps reading `approved`, and the sync writes that back while bumping `lastSyncedAt` — so the record looks freshly verified and the SMS send gate stays open.",
-    "currentBehavior": "A per-resource status is never seeded from an aggregate status. The aggregate is a *derived* value; deriving from it inverts the direction of truth and makes the state monotonic — it can only move toward `approved`, never away.",
-    "resolution": "Never seed a per-resource status from the aggregate. Track which resources were actually fetched and compute the aggregate from the **authoritative** per-resource values, defaulting an unfetched resource to the most conservative value that keeps the gate closed: const brandStatus = brandSid ? await fetchBrand() : \"pending\"; const campaignStatus = campaignSid ? await fetchCampaign() : \"pending\"; const mergedStatus = brandStatus === \"approved\" && campaignStatus === \"approved\" ? \"approved\" : (brandStatus === \"rejected\" || campaignStatus === \"rejected\") ? \"rejected\" : \"in_review\"; and delete the `?? onboarding.a2p10dlc.status` fallback. Add a test per transition direction — `approved → in_review` and `approved → rejected` are the two that fail today.",
+    "summary": "The A2P status sync seeds the brand and campaign status from the **aggregate** stored status rather than from the provider. A workspace whose A2P was `approved` and whose brand re-enters review keeps reading `approved`, and the sync writes that back while bumping `lastSyncedAt` \u2014 so the record looks freshly verified and the SMS send gate stays open.",
+    "currentBehavior": "A per-resource status is never seeded from an aggregate status. The aggregate is a *derived* value; deriving from it inverts the direction of truth and makes the state monotonic \u2014 it can only move toward `approved`, never away.",
+    "resolution": "Never seed a per-resource status from the aggregate. Track which resources were actually fetched and compute the aggregate from the **authoritative** per-resource values, defaulting an unfetched resource to the most conservative value that keeps the gate closed: const brandStatus = brandSid ? await fetchBrand() : \"pending\"; const campaignStatus = campaignSid ? await fetchCampaign() : \"pending\"; const mergedStatus = brandStatus === \"approved\" && campaignStatus === \"approved\" ? \"approved\" : (brandStatus === \"rejected\" || campaignStatus === \"rejected\") ? \"rejected\" : \"in_review\"; and delete the `?? onboarding.a2p10dlc.status` fallback. Add a test per transition direction \u2014 `approved \u2192 in_review` and `approved \u2192 rejected` are the two that fail today.",
     "lookIn": [
       "app/lib/twilio-a2p.server.ts (`syncWorkspaceA2pStatus`, `mapBrandStatus` at line 19, lines 71-80)",
       "app/lib/messaging-onboarding/predicates.ts:380-390",
@@ -2143,15 +2143,15 @@
     ],
     "existingTests": [],
     "missingTests": [
-      "`approved → in_review` (kill-check).",
-      "`approved → rejected`.",
-      "`in_review → approved` with both resources fetched (positive control).",
+      "`approved \u2192 in_review` (kill-check).",
+      "`approved \u2192 rejected`.",
+      "`in_review \u2192 approved` with both resources fetched (positive control).",
       "An unfetched resource never yields `approved`."
     ],
     "acceptanceCriteria": [
-      "`approved → in_review` demotes the stored status (kill-check: restore the seed and confirm the test goes red).",
-      "`approved → rejected` demotes.",
-      "`in_review → approved` promotes when **both** resources are fetched as approved.",
+      "`approved \u2192 in_review` demotes the stored status (kill-check: restore the seed and confirm the test goes red).",
+      "`approved \u2192 rejected` demotes.",
+      "`in_review \u2192 approved` promotes when **both** resources are fetched as approved.",
       "An unfetched resource never contributes `approved`.",
       "The send gate closes on a re-review."
     ],
@@ -2164,7 +2164,7 @@
     "issueNumber": 2187,
     "verdict": "verify-close",
     "recommendedTitle": "One contact's preparation failure aborts the whole campaign SMS batch",
-    "summary": "handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.",
+    "summary": "handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws \u2014 a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss \u2014 unstarted rows are never dequeued and a later tick retries them \u2014 but a whole batch of prepared work is discarded for one bad contact.",
     "risk": "medium",
     "size": "S",
     "trackerRecommendation": "Fixed and merged as PR #2198 (a3ab6cf0e). The send path had a per-row failure boundary (sendSingleCampaignSms rejects, and its .then(_,onError) releases the credit, counts the failure, records the attempt and returns a per-contact result); preparation had none, so a throw in any of its four database round trips propagated into await Promise.all in runPacedSendBatches and rejected the whole batch. Blast radius, and the third is the one that mattered: batch siblings' responses were discarded even though they had already sent and been counted; every remaining batch was abandoned; and rpcFailExhaustedCampaignQueueContacts was skipped, so the failed row never dead-lettered, stayed eligible, failed again on the next run, and the campaign could not drain. That is a permanent outage from one bad contact, and it is invisible in the logs, which show a successful dispatch. Fix is three parts: a row boundary in handleMember wrapping the whole body (the await on its last statement is load-bearing, because the phone-claim handler rethrows and returning its promise would put the rejection outside the try); the reservation released wherever a row fails after reserving (the release previously lived ONLY in the send's rejection handler, so a SYNCHRONOUS throw out of sendSingleCampaignSms - invisible to .then - kept the credits for the rest of the dispatch, so failRow now takes the cost to release and a new throw site cannot forget it); and Promise.allSettled so no future row path can abort a campaign. Six tests, four kill-checks each failing exactly one: remove the row boundary -> the dead-letter test; allSettled back to all -> the recorder-down test; drop the post-prepare release -> the credit-release test; failRow stops recording -> the dead-letter test. Note removing the row boundary fails ONLY the dead-letter test, because the loop backstop alone already keeps the batch alive - the boundary earns its place by RECORDING the attempt, which is what lets the campaign drain. Read that as the general shape: a per-row boundary usually earns its keep through a side effect (a recorded failure, a released resource), not through preventing the cascade, which something else prevents too. The recorder-down test caught a double-count in the fix itself: failRow counted before awaiting the record, so a failed record made the loop count the same row again (failed:2 for one contact); counting after the await makes the two mutually exclusive, and that test is also what makes the loop backstop reachable rather than dead code, since recording a failure is itself a database write against the same database that has just failed. The file-size guard forced an extraction rather than a baseline: the credit budget and start pacer are pure, dependency-free and imported by nothing else, so they moved to campaign-sms-dispatch-primitives.server.ts, taking the file 860 -> 784. NOT fixed, deliberately: when the record write itself fails the row stays queued and eligible, because nothing is recorded to dead-letter it on - retrying is honest but a persistently broken recorder keeps that row alive, and that deserves its own issue rather than a guess here. ci:local exit 0, node 442/442 files 3560 tests, ui 151/151 924 tests."
@@ -2173,9 +2173,9 @@
     "issueNumber": 2133,
     "verdict": "verify-close",
     "recommendedTitle": "The workspace SSE event stream admits any workspace API key with no scope, though the surface and the public OpenAPI both declare it session-only",
-    "summary": "The workspace event stream wires only `dataPlaneMiddleware`, which admits any key bound to the workspace regardless of scope. The loader adds no capability gate. A key minted with **zero** scopes — or with only `campaigns.read` — can open the long-lived SSE stream and read every workspace event, which the route's own comment describes as including verbatim call transcripts. It is also an unbounded connection multiplier: each connection registers a `directPool.listen` subscription and is held open indefinitely. The published contract says this endpoint is **session-only**, so neither the operator nor the integrator knows the key works.",
+    "summary": "The workspace event stream wires only `dataPlaneMiddleware`, which admits any key bound to the workspace regardless of scope. The loader adds no capability gate. A key minted with **zero** scopes \u2014 or with only `campaigns.read` \u2014 can open the long-lived SSE stream and read every workspace event, which the route's own comment describes as including verbatim call transcripts. It is also an unbounded connection multiplier: each connection registers a `directPool.listen` subscription and is held open indefinitely. The published contract says this endpoint is **session-only**, so neither the operator nor the integrator knows the key works.",
     "currentBehavior": "Two defects compound: an unscoped privileged stream, and a surface guard that failed to fire on a declared/implemented mismatch. The second is why the first is invisible.",
-    "resolution": "1. Gate the loader on a capability: `dataPlaneCapabilityAuth(\"audit.read\")` — the event log is the same class of privileged audit surface as `/audit-events`, which already requires it. 2. If a key must be allowed, require `requireDataPlaneWorkspaceUser` **and** declare `apiKeyOrSession` in the annotation, so the spec matches. 3. **Fix `scripts/lib/api-surface-derive.mjs:155-159`** and find out why `check:api:surface:check` accepted a declared `\"session\"` on a route whose context admits `apiKeyOrSession`. That guard gap is its own finding — a surface check that cannot detect an auth-class mismatch is not a check. 4. Bound concurrent SSE connections per workspace so a key cannot hold N open streams.",
+    "resolution": "1. Gate the loader on a capability: `dataPlaneCapabilityAuth(\"audit.read\")` \u2014 the event log is the same class of privileged audit surface as `/audit-events`, which already requires it. 2. If a key must be allowed, require `requireDataPlaneWorkspaceUser` **and** declare `apiKeyOrSession` in the annotation, so the spec matches. 3. **Fix `scripts/lib/api-surface-derive.mjs:155-159`** and find out why `check:api:surface:check` accepted a declared `\"session\"` on a route whose context admits `apiKeyOrSession`. That guard gap is its own finding \u2014 a surface check that cannot detect an auth-class mismatch is not a check. 4. Bound concurrent SSE connections per workspace so a key cannot hold N open streams.",
     "lookIn": [
       "app/routes/api+/workspaces+/$workspaceId.middleware.server.ts:4",
       "app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts:75,173",
@@ -2194,7 +2194,7 @@
       "A key with zero scopes is refused on the events stream (kill-check: remove the capability gate and confirm the test goes red).",
       "A key with only `campaigns.read` is refused.",
       "A session with `audit.read` is allowed (positive control).",
-      "The annotation and the published spec agree with the implemented auth class, and `check:api:surface:check` **fails** when they do not — with a fixture test proving the guard can fail."
+      "The annotation and the published spec agree with the implemented auth class, and `check:api:surface:check` **fails** when they do not \u2014 with a fixture test proving the guard can fail."
     ],
     "blockedBy": [],
     "size": "M",
@@ -2207,7 +2207,7 @@
     "recommendedTitle": "splitMessageCampaign is non-atomic across clone, enqueue and dequeue, so a mid-run failure leaves a partially split campaign",
     "summary": "`splitMessageCampaign` cloned the campaign, distributed the queued contacts across the clones and dequeued the source in three separate steps. A failure between them left contacts in two campaigns at once, and the source un-dequeued, so the next dispatch dialled them twice. Fixed: all three phases now run in one transaction.",
     "currentBehavior": "All three phases commit together. A failure in any phase rolls the whole split back, leaving the source exactly as it was.",
-    "resolution": "DONE. Wrapped in `withAppCurrentUser` rather than `db.transaction` — the dequeue path calls SECURITY DEFINER plpgsql that reads `app.current_user_id`, so the setting must be transaction-local or it leaks between requests on the pooled connection. The SSE publish is **deferred to after the commit** rather than merely moved inside the transaction: an emit issued pre-commit tells a subscriber about rows a rollback erases, and never tells it the change was undone. Two other points from the original record dissolved or moved: *idempotency on retry* is now unnecessary, because with atomicity there is no partial state for a retry to double against; and the *clone roll-up* question is a product decision about how clones are presented, not a defect, and is not part of this fix. The in-flight-send question in point 3 became a separate issue (#2208) once it turned out the split has no in-flight marker to condition on.",
+    "resolution": "DONE. Wrapped in `withAppCurrentUser` rather than `db.transaction` \u2014 the dequeue path calls SECURITY DEFINER plpgsql that reads `app.current_user_id`, so the setting must be transaction-local or it leaks between requests on the pooled connection. The SSE publish is **deferred to after the commit** rather than merely moved inside the transaction: an emit issued pre-commit tells a subscriber about rows a rollback erases, and never tells it the change was undone. Two other points from the original record dissolved or moved: *idempotency on retry* is now unnecessary, because with atomicity there is no partial state for a retry to double against; and the *clone roll-up* question is a product decision about how clones are presented, not a defect, and is not part of this fix. The in-flight-send question in point 3 became a separate issue (#2208) once it turned out the split has no in-flight marker to condition on.",
     "lookIn": [
       "app/lib/database/campaign.server.ts (splitMessageCampaign, now in withAppCurrentUser)",
       "app/lib/campaign-queue-db.server.ts (DeferredEmit / QueueWriteExecutor seam)",
@@ -2215,13 +2215,13 @@
       "test/integration-db/split-campaign-atomic.test.ts (six real-database tests, two kill-checks)"
     ],
     "existingTests": [
-      "test/integration-db/split-campaign-atomic.test.ts — six tests against a real Postgres. The unit tier mocks the db client wholesale, so nothing there would notice if the withAppCurrentUser call were deleted; that is why this is the integration tier."
+      "test/integration-db/split-campaign-atomic.test.ts \u2014 six tests against a real Postgres. The unit tier mocks the db client wholesale, so nothing there would notice if the withAppCurrentUser call were deleted; that is why this is the integration tier."
     ],
     "missingTests": [],
     "acceptanceCriteria": [
-      "Met: a failure in the dequeue phase leaves the campaign exactly as it was (kill-check executed — removing withAppCurrentUser turns exactly this test red).",
-      "Met: nothing is published to subscribers unless the split commits (kill-check executed — publishing inline turns exactly this test red).",
-      "Met: contacts are distributed across the clones with the requested segment count — no test asserted this before.",
+      "Met: a failure in the dequeue phase leaves the campaign exactly as it was (kill-check executed \u2014 removing withAppCurrentUser turns exactly this test red).",
+      "Met: nothing is published to subscribers unless the split commits (kill-check executed \u2014 publishing inline turns exactly this test red).",
+      "Met: contacts are distributed across the clones with the requested segment count \u2014 no test asserted this before.",
       "NOT DONE, and deliberately: the in-flight-send case. It is #2208, and it is severe."
     ],
     "blockedBy": [],
@@ -2233,7 +2233,7 @@
     "issueNumber": 2174,
     "verdict": "verify-close",
     "recommendedTitle": "Wire test/integration-db into a CI workflow",
-    "summary": "The premise is false: the tier already runs in CI. Its summary proved `grep -rln 'integration-db' .github/workflows/` returns nothing, which is a true observation and the wrong place to look — the workflow YAML never names the tier because the invocation lives in a script. `scripts/e2e/run-compose-e2e.mjs:108` runs `npm run test:integration-db`, and the e2e job runs that script, so the tier executes on every CI run. Implementing the requested remedy would duplicate an existing run rather than add coverage.",
+    "summary": "The premise is false: the tier already runs in CI. Its summary proved `grep -rln 'integration-db' .github/workflows/` returns nothing, which is a true observation and the wrong place to look \u2014 the workflow YAML never names the tier because the invocation lives in a script. `scripts/e2e/run-compose-e2e.mjs:108` runs `npm run test:integration-db`, and the e2e job runs that script, so the tier executes on every CI run. Implementing the requested remedy would duplicate an existing run rather than add coverage.",
     "currentBehavior": "The real-Postgres tier runs on every CI run inside the e2e compose job. Confirmed from a real log, not only from the source: PR #2207's e2e output contains `Test Files 6 passed (6)` / `Tests 60 passed (60)`, which is this tier exactly on dev before #2209 added its sixth file.",
     "resolution": "No code change. The tier is already gated. The issue's residual observation is narrower than claimed and is filed as #2211: the tier's only gate is the pipeline's least reliable job, so a genuine database regression and an unrelated compose flake arrive as the same red check, and the standing 'rerun a red e2e first' reflex would discard the real failure. Separately, `ci:local` omits the tier, so a green local gate says nothing about it.",
     "lookIn": [
@@ -2241,7 +2241,7 @@
       "#2211 (the real residual: signal mixing, not missing coverage)"
     ],
     "existingTests": [
-      "test/integration-db/ — runs in CI today via the e2e compose job"
+      "test/integration-db/ \u2014 runs in CI today via the e2e compose job"
     ],
     "missingTests": [],
     "acceptanceCriteria": [
@@ -2347,7 +2347,7 @@
     "recommendedTitle": "Admins can only grant credits by direct database write; add an audited manual credit load on the admin workspace page",
     "summary": "PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.",
     "currentBehavior": "PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.",
-    "rootCause": "The billing ledger was designed around automated, provider-keyed writes. There is no human-initiated grant concept, no key namespace for one, and no UI for one — and the guard that would catch an unsafe write (check:credit-writes, scripts/check-credit-write-paths.mjs) treats any direct workspace.credits write as a violation, which is the correct default and the reason a supported path is needed rather than a bypass.",
+    "rootCause": "The billing ledger was designed around automated, provider-keyed writes. There is no human-initiated grant concept, no key namespace for one, and no UI for one \u2014 and the guard that would catch an unsafe write (check:credit-writes, scripts/check-credit-write-paths.mjs) treats any direct workspace.credits write as a violation, which is the correct default and the reason a supported path is needed rather than a bypass.",
     "resolution": "Verify an admin credit load and a replay of the same form on dev. Check the balance, audit note and ledger row. Keep open until release.",
     "lookIn": [
       "app/routes/admin+/workspaces/$workspaceId/credits.action.server.ts",
@@ -2377,7 +2377,7 @@
   {
     "issueNumber": 2013,
     "verdict": "verify-close",
-    "recommendedTitle": "auth pages: one shared form container — same width, padding, centring",
+    "recommendedTitle": "auth pages: one shared form container \u2014 same width, padding, centring",
     "summary": "PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.",
     "currentBehavior": "PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.",
     "rootCause": "No shared container component; each page sets its own geometry.",
@@ -2409,7 +2409,7 @@
     "recommendedTitle": "Quit This Workspace posts a self-leave that always 403s for the role it is shown to; remove the button and the self-leave path behind it",
     "summary": "PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.",
     "currentBehavior": "PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.",
-    "rootCause": "deleteSelf was never a domain operation — it is a thin adapter over member removal — and member removal is a management-of-others operation. Because it exists as a named intent, the UI could offer it to a role the underlying service forbids, and the same intent is reachable through the public member-delete endpoint, where a same-rank actor can currently target their own user_id.",
+    "rootCause": "deleteSelf was never a domain operation \u2014 it is a thin adapter over member removal \u2014 and member removal is a management-of-others operation. Because it exists as a named intent, the UI could offer it to a role the underlying service forbids, and the same intent is reachable through the public member-delete endpoint, where a same-rank actor can currently target their own user_id.",
     "resolution": "Verify the workspace settings page has no self-leave control. Verify the member API refuses self-removal and still permits authorized removal of another member.",
     "lookIn": [
       "app/components/workspace/TeamMember.tsx",
@@ -2783,7 +2783,7 @@
   {
     "issueNumber": 2095,
     "verdict": "verify-close",
-    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed",
+    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode \u2014 the conference and the dialer keep running and real calls keep being placed",
     "summary": "Predictive Leave waits for a confirmed conference stop and preserves the queue; deployed calling verification remains.",
     "resolution": "Verify predictive Leave on deployed dev with browser and phone devices, pending calls and an idle conference. Confirm that the next turn stops, failed stops permit retry, other users remain connected and live Leave keeps its behavior. Promote the tested fix before closing.",
     "lookIn": [
@@ -2848,5 +2848,45 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix."
+  },
+  {
+    "issueNumber": 2094,
+    "verdict": "verify-close",
+    "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down \u2014 Twilio retries forever and the dialer keeps dialling",
+    "summary": "Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.",
+    "currentBehavior": "This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.",
+    "resolution": "Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.",
+    "lookIn": [
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/hooks/call/useCallRoom.ts",
+      "app/hooks/call/usePredictiveCallSync.ts",
+      "app/lib/workspace-events.shared.ts",
+      "test/auto-dial-agent-leave.route.test.ts",
+      "test/ui/predictive-conference-ended.test.tsx"
+    ],
+    "existingTests": [
+      "test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection)",
+      "test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events)",
+      "test/auto-dial-status.test.ts (ordinary status and callee controls)",
+      "test/auto-dial.server.test.ts (ended conference stops the next turn)",
+      "test/ui/use-call-room.test.tsx",
+      "test/ui/use-predictive-call-sync.test.ts",
+      "test/ui/hooks-call-screen.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed browser and phone calling verification, callback retries and billing verification."
+    ],
+    "acceptanceCriteria": [
+      "An agent hang-up returns 200 and completes the conference.",
+      "A callee hang-up still records the attempt outcome (the existing behaviour must stay green).",
+      "The predictive dialer stops when the last conference ends.",
+      "The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.",
+      "Twilio receives no retry (no 500) for the agent leg."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
+    "rootCause": "The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference."
   }
 ]

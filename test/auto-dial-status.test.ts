@@ -810,7 +810,7 @@ describe("api.auto-dial.status", () => {
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
-  test("participant-leave outreach fetch error returns 500", async () => {
+  test("participant-leave does not need a successful outreach lookup", async () => {
     postgresStub = await usePostgresStub({ outreachFetchError: new Error("out") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -830,7 +830,8 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(telephonyDbMocks.findOutreachAttemptById).not.toHaveBeenCalled();
   });
 
   test("participant-leave catch branch returns 500 when conferences.list throws", async () => {
@@ -1011,6 +1012,7 @@ describe("api.auto-dial.status", () => {
     expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
       contact_id: 1,
       status: "ringing",
+      conference_id: "conf1",
     });
   });
 
@@ -1034,6 +1036,7 @@ describe("api.auto-dial.status", () => {
     expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
       contact_id: 1,
       status: "completed",
+      conference_id: "conf1",
     });
   });
 
@@ -1221,4 +1224,3 @@ describe("api.auto-dial.status", () => {
     );
   });
 });
-

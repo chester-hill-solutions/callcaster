@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gt , sql } from "drizzle-orm";
 import { workspace_events } from "@/db/schema";
-import type { PostgresChangePayload } from "@/lib/workspace-events.shared";
+import type { PostgresChangePayload, PredictiveBroadcastPayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.server";
 import { dbDirect } from "@/server/db";
 
@@ -179,7 +179,7 @@ export async function emitTransactionHistoryInsertEvent(
 
 export async function emitPredictiveBroadcast(
   workspaceId: string,
-  payload: { contact_id: number | null; status: string },
+  payload: PredictiveBroadcastPayload,
 ): Promise<WorkspaceEventRow | null> {
   // Best-effort: a failed broadcast must not break the committed call/webhook
   // side-effect that triggered it.
