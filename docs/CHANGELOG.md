@@ -17,6 +17,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Inbound IVR voicemail now plays the number's selected greeting and uses the actual called phone when no greeting file is available ([PR #2270](https://github.com/chester-hill-solutions/callcaster/pull/2270), [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088)).
+
 - SMS opt-out now honours every standard keyword and keeps them active when a workspace adds custom keywords ([PR #2265](https://github.com/chester-hill-solutions/callcaster/pull/2265), [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090)).
 
 - Expired campaigns now show a launch blocker and point to the date pickers before an operator presses Start ([PR #2262](https://github.com/chester-hill-solutions/callcaster/pull/2262), [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092)).

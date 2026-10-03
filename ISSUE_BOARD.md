@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@2d25f309 + source fix for #2089` · 285 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f6d02f91 + source fix for #2088` · 287 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,9 +31,32 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 75
+## Fix now — 76
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Platform and form attachment paths accept inbound_script_id without routing validation; later edits can invalidate an attached script.
+- Current behavior: Source audit dev@f6d02f91: patchWorkspaceNumber copies inbound_script_id, the phone-number form writes it directly, and shared script persistence stores changed steps. Campaign launch validation does not cover inbound number activation.
+- Root cause: Inbound activation and attached-script editing have no shared ownership/routing validation boundary.
+- Resolution: Use one inbound validator at both attachment writes and saves of attached scripts. Reuse graph validation and extend it for documented queue, forward and voicemail email targets. Check script/queue workspace ownership, reject before writes and preserve the last valid configuration. Clearing an attachment remains valid.
+- Look in: `app/lib/platform-workspace-numbers.server.ts`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/lib/script-persistence.server.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `docs/contact-center-platform-plan.md`
+- Missing tests: Both real attachment boundaries and attached-script saves: foreign/missing scripts, dangling references, malformed targets, valid targets and clearing controls.
+- Done when: Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.; Valid targets and clearing remain usable.; API, editor and target docs agree; real write-boundary regressions and deployed checks pass.
+- Tracker: Independent Task split from #2088. No blocking edge to playback or email delivery: the target grammar is documented.
+
+### [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268) Deliver inbound IVR voicemail to the script recipient
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The documented voicemail email target is dropped; delivery reads the number default instead.
+- Current behavior: Source audit dev@f6d02f91: the terminal branch discards the voicemail target payload. The recording callback uses number.inbound_action. The platform plan documents a voicemail email destination and builder picker; no ADR found changes that contract.
+- Root cause: No trusted recipient metadata is carried from the selected IVR target into recording delivery.
+- Resolution: Bind the validated target email to trusted workspace-scoped call metadata before recording. Read that recipient after callback signature, call and workspace checks. Preserve legacy number/queue delivery and processed-recording retry protection. Verify storage field and migration/bootstrap coverage if needed; do not trust an arbitrary callback field or URL override.
+- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/inbound-voicemail-twiml.server.ts`, `app/routes/api+/email-vm.action.server.ts`, `app/lib/telephony-db.server.ts`, `docs/contact-center-platform-plan.md`
+- Existing tests: test/email-vm.route.test.ts (existing number-recipient and recording controls)
+- Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
+- Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
+- Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
 
 ### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) A claimed inbound ACD offer is never released when the workspace's Twilio credentials are missing, so the caller holds for an hour and every agent shows busy
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -447,17 +470,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
 - Tracker: Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
 
-### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) The inbound IVR voicemail: terminal target hard-codes inboundAudio: null and speaks the number row id as the caller's dialled number
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Inbound IVR voicemail still passes no greeting audio and speaks the number-row ID. The voicemail target payload is ignored while email uses the number row.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Inbound IVR voicemail still passes no greeting audio and speaks the number-row ID. The voicemail target payload is ignored while email uses the number row.
-- Resolution: Fix the greeting and dialled number first. Decide whether voicemail:{email} overrides the number recipient, then align runtime and docs.
-- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:113`, `app/routes/api+/email-vm.action.server.ts:119`, `app/lib/ivr-block-runtime.server.ts (the `voicemail:` branch) / the inbound IVR response route`, `app/routes/api+/email-vm.action.server.ts:102-120`, `docs/contact-center-platform-plan.md:134`, `app/lib/campaign-execution.server.ts:53-59,66-96`, `app/lib/platform-workspace-numbers.server.ts:373-374`, `app/lib/inbound-voicemail-twiml.server.ts`
-- Existing tests: test/inbound-ivr-block-response.route.test.ts
-- Missing tests: Assert configured greeting and actual called number; cover the selected recipient contract.
-- Done when: A caller routed to `voicemail:` hears the number's configured inbound greeting recording when one is set, and TTS only when it is not.; The spoken dialled number is the number the caller called, never the row id.; Either the `{email}` payload is honoured or it is removed from `docs/contact-center-platform-plan.md:134` — one of the two, with a test.; A number whose `inbound_script_id` has an invalid `voicemail:` target is rejected before it can be attached.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2067](https://github.com/chester-hill-solutions/callcaster/issues/2067) check:effects never verifies @effect-deps against the real dependency array
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.
@@ -868,7 +880,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 109
+## Verify and close — 110
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -883,6 +895,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed verification through API, chat form and campaign test sender before promotion.
 - Done when: Destination phone and unique workspace contact agree before sending; supplied IDs cannot bypass opt-out or landline protection.; Ambiguous and failed verification block sends with an error distinct from opt-out and landline.; Eligible normalized recipients use verified template data and attribution; legacy manual new-number and campaign test policies remain.; Public API contract and generated artifacts describe recipient verification.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close.
+
+### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The inbound IVR terminal renderer now uses the configured greeting and actual called phone. Recording capture remains intact; deployed playback verification remains.
+- Current behavior: Source fix from dev@f6d02f91: the terminal renderer passes number.inbound_audio to the existing workspace audio resolver and the verified call.to to the voicemail renderer. Three new regressions passed with ten original response-route controls. All 49 focused node cases passed across inbound IVR, inbound routing, IVR runtime and voicemail delivery. All four isolated playback and availability mutations failed and were restored. The audio resolver checks object existence before direct and listed playback; real adapter regressions cover deleted keys, storage failure and a stale listing.
+- Root cause: The route already loaded inbound_audio and phoneNumber but passed null for the greeting and the number row ID for fallback speech.
+- Resolution: Verify selected greeting playback, actual-phone fallback speech and voicemail recording capture on deployed dev, then promote before closing. Script recipient delivery and attachment validation remain open in #2268 and #2269; this playback fix does not resolve them.
+- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `app/lib/inbound-voicemail-twiml.server.ts`
+- Existing tests: test/inbound-voicemail-audio.test.ts (real storage adapter with S3 boundaries: availability, failures and retry controls); test/inbound-ivr-block-response.route.test.ts (actual greeting Play, real called phone in speech, unavailable-audio fallback, recording attributes, existing call mismatch and navigation controls); test/inbound-ivr-block.route.test.ts, test/inbound.route.test.ts, test/ivr-block-runtime.test.ts and test/email-vm.route.test.ts (surrounding IVR and recording controls)
+- Missing tests: Deployed greeting playback, actual-phone speech and recording capture before promotion.
+- Done when: Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.; Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.
 
 ### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Retain all required SMS opt-out keywords when workspace settings add custom keywords
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

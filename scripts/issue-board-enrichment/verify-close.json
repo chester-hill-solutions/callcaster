@@ -3082,5 +3082,35 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Verify deployed behavior after merge, then promote and close.",
     "rootCause": "The guards trusted the supplied ID and allowed ambiguous matches or lookup failures. Later template and attribution code reused the unverified ID. The general search helper can omit formatted phones and hide ambiguity."
+  },
+  {
+    "issueNumber": 2088,
+    "verdict": "verify-close",
+    "recommendedTitle": "Use the number settings for inbound IVR voicemail playback",
+    "summary": "The inbound IVR terminal renderer now uses the configured greeting and actual called phone. Recording capture remains intact; deployed playback verification remains.",
+    "resolution": "Verify selected greeting playback, actual-phone fallback speech and voicemail recording capture on deployed dev, then promote before closing. Script recipient delivery and attachment validation remain open in #2268 and #2269; this playback fix does not resolve them.",
+    "lookIn": [
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/inbound-ivr-db.server.ts",
+      "app/lib/inbound-voicemail-twiml.server.ts"
+    ],
+    "existingTests": [
+      "test/inbound-voicemail-audio.test.ts (real storage adapter with S3 boundaries: availability, failures and retry controls); test/inbound-ivr-block-response.route.test.ts (actual greeting Play, real called phone in speech, unavailable-audio fallback, recording attributes, existing call mismatch and navigation controls)",
+      "test/inbound-ivr-block.route.test.ts, test/inbound.route.test.ts, test/ivr-block-runtime.test.ts and test/email-vm.route.test.ts (surrounding IVR and recording controls)"
+    ],
+    "missingTests": [
+      "Deployed greeting playback, actual-phone speech and recording capture before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.",
+      "Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.",
+      "Deployed verification and promotion are complete before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.",
+    "currentBehavior": "Source fix from dev@f6d02f91: the terminal renderer passes number.inbound_audio to the existing workspace audio resolver and the verified call.to to the voicemail renderer. Three new regressions passed with ten original response-route controls. All 49 focused node cases passed across inbound IVR, inbound routing, IVR runtime and voicemail delivery. All four isolated playback and availability mutations failed and were restored. The audio resolver checks object existence before direct and listed playback; real adapter regressions cover deleted keys, storage failure and a stale listing.",
+    "rootCause": "The route already loaded inbound_audio and phoneNumber but passed null for the greeting and the number row ID for fallback speech."
   }
 ]
