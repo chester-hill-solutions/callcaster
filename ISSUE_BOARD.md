@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@dff1ac66 + source fix for #2087` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@48a29230 + source fix for #2079` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 74
+## Fix now — 73
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -260,17 +260,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/platform-api.test.ts covers rate limiting using a supplied X-Forwarded-For header.; test/auth-catch-all-rate-limit.route.test.ts covers auth throttling; neither test proves the production proxy trust contract or database retention.
 - Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
 - Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Transferring workspace ownership to yourself silently demotes you owner to admin and reports success
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Self-transfer still passes membership and MFA checks, then promotes and demotes the same row inside one transaction.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Self-transfer still passes membership and MFA checks, then promotes and demotes the same row inside one transaction.
-- Resolution: Reject equal owner ids before transaction and return a clear 400 from API/product adapters.
-- Look in: `app/lib/workspace-members-db.server.ts:190`, `app/lib/workspace-members-db.server.ts:198`, `app/lib/platform-workspace.server.ts:211`, `test/workspace-members-rbac.test.ts:368`, `app/lib/workspace-members-db.server.ts:178-205`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:164-171`, `app/lib/platform-workspace.server.ts:180-215`, `app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts:22-27`, `app/lib/schemas/api/platform-auth.ts:63-65`, `app/routes/workspaces+/$id/settings.action.server.ts:68`
-- Existing tests: test/workspace-members-rbac.test.ts:322-385 covers missing target membership, failed updates, target MFA and distinct-user orchestration; it does not test self-transfer.
-- Missing tests: Add self-target API and settings regressions asserting zero membership writes, plus a real distinct-row successful transfer.
-- Done when: `POST /api/workspaces/:id/transfer-ownership` with the caller's own id returns 400 with a clear message and the membership row is unchanged.; The product route with `formName=transferWorkspaceOwnership&user_id=<own id>` returns a user-visible error and the role is unchanged.; Transferring to a *different* existing member still promotes and demotes correctly (the permitted path must stay green).; The two statements can no longer target the same row: a test asserts the promoted and demoted row ids differ.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) /accept-invite resend has no ownership check — any signed-in user can rotate and re-send any invitation by id
@@ -858,9 +847,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 113
+## Verify and close — 114
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Caller entry and next-page flow use saved start and order; deployed outbound/manual/inbound flow checks remain.
+- Current behavior: Merged to dev in PR #2274 at 48a29230. Signed campaign entry and both dispatch paths use the saved start; inbound entry and shared prompt/response flow use saved start and order. Raw campaign launch rejects a missing declared start before migration can repair it. All 139 focused tests passed; seven isolated mutations failed and were restored. Full local CI passed 4,981 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on e7d35344. Deployed caller-flow verification and promotion remain; #2269 owns inbound attachment/save validation.
+- Root cause: Outbound dispatch hard-coded page_1, inbound entry used object key order, and three next-block helpers ignored saved order. Launch validation migrated first and silently repaired dangling saved entries.
+- Resolution: Verify saved entry and order in manual, machine and inbound calls, machine-answer controls and clear launch rejection on deployed dev; promote before closure. Inbound attachment/save validation remains separate in #2269.
+- Look in: `app/lib/ivr-page-order.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/campaign-ivr-page.server.ts`, `app/lib/call-script-service.ts`, `app/lib/twilio-ivr-runtime.server.ts`, `app/routes/api+/ivr/$campaignId.action.server.ts`, `app/routes/api+/inbound.action.server.ts`
+- Existing tests: test/page-order.test.ts and test/page-flow.route.test.ts (entry, ordering, real TwiML, legacy/explicit-page, auth and machine controls); test/ivr.route.test.ts and test/campaign-ivr-dispatch.test.ts (manual/machine dispatch with real URL resolver); test/campaign-readiness-expiry.test.ts (raw entry rejects before status/job writes for all three machine voice types); Existing page, block response, inbound response, script service and shared runtime controls
+- Missing tests: Deployed caller-flow and launch-error verification before promotion.
+- Done when: Both outbound dispatch paths and inbound entry use the declared start.; Prompt and response fall-through use saved page order; explicit navigation and legacy behavior remain intact.; Unknown/repeated order IDs are reconciled and omitted pages remain reachable.; A dangling raw start is rejected before campaign launch; entry cannot silently choose another page.; Signature and stored campaign checks, machine-answer policy, deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.
+
+### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.
+- Current behavior: Source fix from dev@48a29230: one canonical target rule rejects the session owner as the incoming owner before MFA or transactions. Both real API and form routes return a clear 400 error with no write or successful audit. The API calls the domain transfer service directly and cannot misread a React Router form response as success. All 65 focused Node and three real Postgres cases passed; the original source failed five route cases and one real-row self-transfer case while distinct-transfer and rollback controls passed. Seven isolated mutations failed and were restored.
+- Root cause: The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful.
+- Resolution: Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.
+- Look in: `app/lib/workspace-members-db.server.ts`, `app/lib/platform-workspace.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-ownership-transfer.test.ts (real API/form, shared service, error/audit, MFA and owner-role controls); test/integration-db/workspace-ownership-transfer.test.ts (real distinct rows, self rejection, workspace isolation and rollback); Existing workspace membership, settings RBAC, form-helper and OpenAPI controls
+- Missing tests: Deployed ownership-transfer verification before promotion.
+- Done when: The canonical service rejects equal owner IDs before MFA or a transaction.; API and product self transfers return a clear error and leave ownership unchanged.; Session identity, owner authorization and distinct-target MFA remain enforced.; A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.; A failed transfer cannot return API success or record a success audit.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.
 
 ### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -873,18 +886,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed configuration, failed setup, release and retry behavior before promotion.
 - Done when: Missing credentials or required call URL configuration cannot create a new offer.; Validated credentials are reused; failed SDK setup or create releases the exact offered entry.; Actual release makes its agent available while accepted calls and other-workspace offers remain intact.; Logs identify the affected context without credentials; existing signatures, limits, active-entry and stale-sweep controls pass.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed ACD behavior after merge, then promote and close.
-
-### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
-- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Caller entry and next-page flow use saved start and order; deployed outbound/manual/inbound flow checks remain.
-- Current behavior: Source fix from dev@dff1ac66: manual and machine dispatch use a signed campaign entry route with stored call/campaign checks and existing machine-answer handling. Inbound entry resolves the declared start. Prompt and both response flows share ordered next-page logic; unknown/repeated order IDs are reconciled and omitted pages appended. Launch checks the raw declared entry before migration can heal it. All 125 focused cases passed; old source failed 16 regressions with 109 controls retained. Seven isolated mutations failed and were restored.
-- Root cause: Outbound dispatch hard-coded page_1, inbound entry used object key order, and three next-block helpers ignored saved order. Launch validation migrated first and silently repaired dangling saved entries.
-- Resolution: Verify saved entry and order in manual, machine and inbound calls, machine-answer controls and clear launch rejection on deployed dev; promote before closure. Inbound attachment/save validation remains separate in #2269.
-- Look in: `app/lib/ivr-page-order.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/campaign-ivr-page.server.ts`, `app/lib/call-script-service.ts`, `app/lib/twilio-ivr-runtime.server.ts`, `app/routes/api+/ivr/$campaignId.action.server.ts`, `app/routes/api+/inbound.action.server.ts`
-- Existing tests: test/page-order.test.ts and test/page-flow.route.test.ts (entry, ordering, real TwiML, legacy/explicit-page, auth and machine controls); test/ivr.route.test.ts and test/campaign-ivr-dispatch.test.ts (manual/machine dispatch with real URL resolver); test/campaign-readiness-expiry.test.ts (raw entry rejects before status/job writes for all three machine voice types); Existing page, block response, inbound response, script service and shared runtime controls
-- Missing tests: Deployed caller-flow and launch-error verification before promotion.
-- Done when: Both outbound dispatch paths and inbound entry use the declared start.; Prompt and response fall-through use saved page order; explicit navigation and legacy behavior remain intact.; Unknown/repeated order IDs are reconciled and omitted pages remain reachable.; A dangling raw start is rejected before campaign launch; entry cannot silently choose another page.; Signature and stored campaign checks, machine-answer policy, deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.
 
 ### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

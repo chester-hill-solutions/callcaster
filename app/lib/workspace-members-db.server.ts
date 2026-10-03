@@ -164,11 +164,26 @@ export async function removeWorkspaceInviteForUser(args: {
   return invites;
 }
 
+export function workspaceOwnershipTransferTargetError(
+  currentOwnerUserId: string,
+  newOwnerUserId: string,
+) {
+  return currentOwnerUserId === newOwnerUserId
+    ? "Choose a different member to transfer workspace ownership."
+    : null;
+}
+
 export async function transferWorkspaceOwnership(args: {
   workspaceId: string;
   currentOwnerUserId: string;
   newOwnerUserId: string;
 }) {
+  const targetError = workspaceOwnershipTransferTargetError(
+    args.currentOwnerUserId,
+    args.newOwnerUserId,
+  );
+  if (targetError) throw new Error(targetError);
+
   if (!(await isTwoFactorEnabled(args.newOwnerUserId))) {
     throw new Error(
       "The new owner must enroll in two-factor authentication before ownership can be transferred.",

@@ -14,6 +14,15 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · Auth: [auth matrix](./api-auth
 
 Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
 
+### Ownership transfer
+
+`POST /api/workspaces/:workspaceId/transfer-ownership` requires an owner session
+and a JSON body with `new_owner_user_id`. Choose a different existing workspace
+member who has enrolled in MFA. Self transfer returns 400 with a clear error
+before any ownership change. A failed transfer also returns an error; it cannot
+return success or record a successful transfer audit event. A successful transfer
+promotes the chosen member to owner and changes the previous owner to admin.
+
 ## API keys
 
 | Method | Path | Purpose |

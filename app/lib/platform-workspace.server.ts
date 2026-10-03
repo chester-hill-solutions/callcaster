@@ -5,10 +5,7 @@ import {
   getWorkspaceInfo,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import {
-  handleDeleteWorkspace,
-  handleTransferWorkspace,
-} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { handleDeleteWorkspace } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import type { Database } from "@/lib/db-types";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
@@ -17,7 +14,11 @@ import { hasMinRole } from "@/lib/workspace-route.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
 import { timestampToIsoString } from "@/lib/parse-utils.server";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
-import { listUserWorkspaceMembershipsForProfile } from "@/lib/workspace-members-db.server";
+import {
+  listUserWorkspaceMembershipsForProfile,
+  transferWorkspaceOwnership,
+  workspaceOwnershipTransferTargetError,
+} from "@/lib/workspace-members-db.server";
 
 export async function listUserWorkspaces(
   userId: string,
@@ -161,7 +162,6 @@ export async function transferWorkspaceOwnershipApi(
   userId: string,
   workspaceId: string,
   newOwnerUserId: string,
-  headers: Headers,
 ) {
   const role = await getUserRole({
     user: { id: userId },
@@ -170,6 +170,11 @@ export async function transferWorkspaceOwnershipApi(
 
   if (!role || role.role !== MemberRole.Owner) {
     return { ok: false as const, error: "Only workspace owners can transfer", status: 403 };
+  }
+
+  const targetError = workspaceOwnershipTransferTargetError(userId, newOwnerUserId);
+  if (targetError) {
+    return { ok: false as const, error: targetError, status: 400 };
   }
 
   const newOwnerEnrolled = await isTwoFactorEnabled(newOwnerUserId);
@@ -182,19 +187,18 @@ export async function transferWorkspaceOwnershipApi(
     };
   }
 
-  const formData = new FormData();
-  formData.set("workspace_owner_id", userId);
-  formData.set("user_id", newOwnerUserId);
-
-  const result = await handleTransferWorkspace(
-    formData,
-    workspaceId,
-    headers,
-    userId,
-  );
-
-  if (result && typeof result === "object" && "error" in result && result.error) {
-    return { ok: false as const, error: String(result.error), status: 400 };
+  try {
+    await transferWorkspaceOwnership({
+      workspaceId,
+      currentOwnerUserId: userId,
+      newOwnerUserId,
+    });
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Transfer failed",
+      status: 400,
+    };
   }
 
   await safeRecordWorkspaceAuditEvent({

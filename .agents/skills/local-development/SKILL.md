@@ -29,6 +29,13 @@ The node suite installs a shared `api-auth.server` mock in
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
 
+## API and form response adapters
+
+API services should call the domain service, then map its result or exception to
+JSON. A React Router form helper returns a data wrapper; checking a top-level
+`error` can miss `result.data.error` and falsely return success. Verify the real
+API error response and absence of a success audit when the domain write fails.
+
 ## Table-driven tests
 
 Use object rows when a `test.each` case contains an array input, for example

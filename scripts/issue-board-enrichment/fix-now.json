@@ -663,42 +663,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2079,
-    "verdict": "fix-now",
-    "recommendedTitle": "Transferring workspace ownership to yourself silently demotes you owner to admin and reports success",
-    "summary": "Self-transfer still passes membership and MFA checks, then promotes and demotes the same row inside one transaction.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Self-transfer still passes membership and MFA checks, then promotes and demotes the same row inside one transaction.",
-    "resolution": "Reject equal owner ids before transaction and return a clear 400 from API/product adapters.",
-    "lookIn": [
-      "app/lib/workspace-members-db.server.ts:190",
-      "app/lib/workspace-members-db.server.ts:198",
-      "app/lib/platform-workspace.server.ts:211",
-      "test/workspace-members-rbac.test.ts:368",
-      "app/lib/workspace-members-db.server.ts:178-205",
-      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:164-171",
-      "app/lib/platform-workspace.server.ts:180-215",
-      "app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts:22-27",
-      "app/lib/schemas/api/platform-auth.ts:63-65",
-      "app/routes/workspaces+/$id/settings.action.server.ts:68"
-    ],
-    "existingTests": [
-      "test/workspace-members-rbac.test.ts:322-385 covers missing target membership, failed updates, target MFA and distinct-user orchestration; it does not test self-transfer."
-    ],
-    "missingTests": [
-      "Add self-target API and settings regressions asserting zero membership writes, plus a real distinct-row successful transfer."
-    ],
-    "acceptanceCriteria": [
-      "`POST /api/workspaces/:id/transfer-ownership` with the caller's own id returns 400 with a clear message and the membership row is unchanged.",
-      "The product route with `formName=transferWorkspaceOwnership&user_id=<own id>` returns a user-visible error and the role is unchanged.",
-      "Transferring to a *different* existing member still promotes and demotes correctly (the permitted path must stay green).",
-      "The two statements can no longer target the same row: a test asserts the promoted and demoted row ids differ."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2080,
     "verdict": "fix-now",
     "recommendedTitle": "/api/test-webhook is an authenticated open egress relay — any signed-in user can POST to any public host with chosen headers and read the response",

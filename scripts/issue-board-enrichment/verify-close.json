@@ -3215,7 +3215,43 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.",
-    "currentBehavior": "Source fix from dev@dff1ac66: manual and machine dispatch use a signed campaign entry route with stored call/campaign checks and existing machine-answer handling. Inbound entry resolves the declared start. Prompt and both response flows share ordered next-page logic; unknown/repeated order IDs are reconciled and omitted pages appended. Launch checks the raw declared entry before migration can heal it. All 125 focused cases passed; old source failed 16 regressions with 109 controls retained. Seven isolated mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2274 at 48a29230. Signed campaign entry and both dispatch paths use the saved start; inbound entry and shared prompt/response flow use saved start and order. Raw campaign launch rejects a missing declared start before migration can repair it. All 139 focused tests passed; seven isolated mutations failed and were restored. Full local CI passed 4,981 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on e7d35344. Deployed caller-flow verification and promotion remain; #2269 owns inbound attachment/save validation.",
     "rootCause": "Outbound dispatch hard-coded page_1, inbound entry used object key order, and three next-block helpers ignored saved order. Launch validation migrated first and silently repaired dangling saved entries."
+  },
+  {
+    "issueNumber": 2079,
+    "verdict": "verify-close",
+    "recommendedTitle": "Reject workspace ownership transfer to the current owner",
+    "summary": "Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.",
+    "currentBehavior": "Source fix from dev@48a29230: one canonical target rule rejects the session owner as the incoming owner before MFA or transactions. Both real API and form routes return a clear 400 error with no write or successful audit. The API calls the domain transfer service directly and cannot misread a React Router form response as success. All 65 focused Node and three real Postgres cases passed; the original source failed five route cases and one real-row self-transfer case while distinct-transfer and rollback controls passed. Seven isolated mutations failed and were restored.",
+    "resolution": "Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.",
+    "lookIn": [
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/platform-workspace.server.ts",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts",
+      "app/routes/workspaces+/$id/settings.action.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-ownership-transfer.test.ts (real API/form, shared service, error/audit, MFA and owner-role controls)",
+      "test/integration-db/workspace-ownership-transfer.test.ts (real distinct rows, self rejection, workspace isolation and rollback)",
+      "Existing workspace membership, settings RBAC, form-helper and OpenAPI controls"
+    ],
+    "missingTests": [
+      "Deployed ownership-transfer verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "The canonical service rejects equal owner IDs before MFA or a transaction.",
+      "API and product self transfers return a clear error and leave ownership unchanged.",
+      "Session identity, owner authorization and distinct-target MFA remain enforced.",
+      "A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.",
+      "A failed transfer cannot return API success or record a success audit.",
+      "Deployed verification and promotion are complete before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.",
+    "rootCause": "The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful."
   }
 ]
