@@ -143,6 +143,12 @@ and still accept a send-failure update. Keep a valid saved-row precision control
 
 ## SQL query regressions
 
+For a target-user check, membership does not prove that the global user still
+exists. Canonical `workspace_member` keys are text and have no global-user FK.
+Test missing users both with and without a stale membership row through each
+real route. Both must return a validation error before insert; keep a separate
+database-failure control so infrastructure failures do not become validation.
+
 For an owned native Postgres fixture, initialize with `--no-locale
 --encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
 fixture in a temporary directory and bind only loopback on an unused port;
