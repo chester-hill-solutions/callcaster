@@ -760,7 +760,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/survey-responses.server.ts:buildSurveyResponsesCsv`, `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/lib/survey-format.ts`, `test/survey-responses.route.test.ts`
 - Existing tests: test/ui/survey-response-columns.test.tsx: five page cases and duplicate-key fault proof.; test/integration-db/survey-response-columns.test.ts: seven real-Postgres CSV cases, two selected-URL configurations, original-lookup fault proof.
 - Missing tests: Deployed response-page and CSV attachment acceptance for repeated labels and unanswered columns; release promotion.
-- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question stays empty; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
+- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question retains its existing placeholder and CSV sanitizer escape; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
 - Tracker: PR #2319 merged to dev at 5af3f675. Keep native issue open pending deployed acceptance and promotion. The separate export-click defect is #2320; historical response assessment remains #2292.
 
 ### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page

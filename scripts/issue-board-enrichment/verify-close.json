@@ -4041,7 +4041,7 @@
     ],
     "acceptanceCriteria": [
       "Repeated-label columns show the answers for their distinct saved questions in both table and CSV.",
-      "An unanswered question stays empty; single-page/checkbox behavior and access controls remain.",
+      "An unanswered question retains its existing placeholder and CSV sanitizer escape; single-page/checkbox behavior and access controls remain.",
       "Use unique internal question identities for header and cell keys."
     ],
     "blockedBy": [],
