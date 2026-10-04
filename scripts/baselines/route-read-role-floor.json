@@ -1,0 +1,68 @@
+[
+  {
+    "route": "$id/audios/$fileName.edit.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/audios/new.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/audios/record.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/campaigns/$campaign_id/audiences/new.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/campaigns/$selected_id/queue.loader.server.ts",
+    "loaderFloor": null,
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/campaigns/$selected_id/script/edit.loader.server.ts",
+    "loaderFloor": null,
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/campaigns/$selected_id/settings.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "admin",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/contacts/$contactId.loader.server.ts",
+    "loaderFloor": null,
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/onboarding.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/scripts/$scriptId.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  },
+  {
+    "route": "$id/scripts/new.loader.server.ts",
+    "loaderFloor": "caller",
+    "actionFloor": "member",
+    "reason": "Existing read/write asymmetry at dev@61ae48de; separate authorization audit required."
+  }
+]

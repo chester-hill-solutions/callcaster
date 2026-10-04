@@ -16,6 +16,7 @@ import {
   type BillingActivityItem,
 } from "@/lib/billing-activity-rollup";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { MemberRole } from "@/lib/member-role";
 import type { TransactionType } from "@/lib/transaction-history-display";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -195,7 +196,11 @@ export async function getWorkspaceBillingActivity(
   workspaceId: string,
   query: BillingActivityQuery = {},
 ): Promise<WorkspaceBillingActivity | WorkspaceBillingActivityError> {
-  await requireWorkspaceAccess({ user: { id: userId }, workspaceId });
+  await requireWorkspaceAccess({
+    user: { id: userId },
+    workspaceId,
+    minRole: MemberRole.Admin,
+  });
 
   const balance = await getWorkspaceCreditsBalance(workspaceId);
   if (balance == null) {

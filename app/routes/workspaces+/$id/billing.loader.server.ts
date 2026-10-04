@@ -3,13 +3,21 @@ import { getWorkspaceBillingActivity } from "@/lib/billing-activity.server";
 import { env, getStripeKeyMode } from "@/lib/env.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 
 export const loader = defineLoader({
   auth: workspaceLoaderAuth,
   sideEffects: ["db-read"],
   handler: async ({ auth: result, url }) => {
     if (!result.ok) return result.response;
-    const { user, workspaceId } = result.ctx;
+    const { user, workspaceId, userRole, headers } = result.ctx;
+
+    if (!hasMinRole(userRole.role, MemberRole.Admin)) {
+      throw new Response("You don't have permission to view billing.", {
+        headers,
+        status: 403,
+      });
+    }
 
     const filterParam = url.searchParams.get("filter");
     const filter =
