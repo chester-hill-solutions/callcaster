@@ -46,23 +46,23 @@
     "verdict": "duplicate",
     "duplicateOf": 2032,
     "recommendedTitle": "Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast",
-    "summary": "Same surface as #2032, and #2032 removes it. The invite acceptance renders through QueryParamBanner (app/routes/workspaces+/index.tsx:272-280), which draws a dismissible Alert with no variant (app/components/shared/QueryParamBanner.tsx:43-56). The Alert default is `border-brand-tertiary bg-brand-wash`, and in dark mode --brand-wash is hsl(340 28% 18%), a maroon, so a success message reads as a red error banner. That is the 'should be green' report exactly. Doing it as a colour change would only make the banner green and leave it persistent, shareable through the URL, and inconsistent with the toast pattern the rest of the app uses. One extra finding from the same code: the banner is an Alert, so it carries role=\"alert\" and is beaconed by app/lib/flash-telemetry.client.ts to /api/workspaces/:id/client-flash as an error flash, so a successful invite acceptance is currently logged as an error.",
-    "currentBehavior": "A maroon, dismissible, URL-replayable inline banner on the workspaces page announcing a successful invite acceptance.",
-    "rootCause": "One-time success state is carried in a shareable query parameter because there is no server-owned flash mechanism, and the tone is left to a primitive default that happens to be crimson in dark mode.",
-    "resolution": "Do not implement separately. Fold the tone question into #2032 and close this one. #2032 replaces the banner with a server-owned, signed, one-time session flash that renders as toast.success, which is green by construction and drops the URL-replay and the false error-flash beacon at the same time. A colour-only fix here would be thrown away when #2032 lands. If #2032 is deprioritised and the banner has to stay for a while, the minimal correct interim is variant=\"success\" on that Alert plus removing the role=\"alert\" beacon pollution, and it should be filed as a comment on #2032 rather than a second PR.",
+    "summary": "Duplicate of #2032. PR #2362 removes the invitation banner and uses the existing root success toast. Tone, deployed geometry and telemetry acceptance remain to verify with the canonical report.",
+    "currentBehavior": "Source verified on dev@46ba4b7e, 2026-10-04: the invitation-only QueryParamBanner row is removed. The root toast consumes a signed finite receipt; deployed acceptance remains pending.",
+    "rootCause": "The historical invitation confirmation used replayable URL state and an inline Alert. The source fix in #2032 replaces that transport and removes the invitation-specific Alert surface.",
+    "resolution": "Do not implement a separate colour patch. Verify the original tone, replay, layout and telemetry criteria with #2032. Retain the native parent relation and keep this report open for deployed QA and release.",
     "lookIn": [
-      "app/routes/workspaces+/index.tsx:272-280 (the invite QueryParamBanner)",
-      "app/components/shared/QueryParamBanner.tsx:43-56 (the Alert with no variant)",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash)",
-      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))",
-      "app/lib/flash-telemetry.client.ts (role=alert surfaces are beaconed as error flashes)"
+      "app/routes/workspaces+/index.tsx",
+      "app/lib/invitation-flash.server.ts",
+      "app/lib/flash-telemetry.client.ts",
+      "app/root.tsx",
+      "test/ui/workspaces-invitation-feedback.test.tsx"
     ],
     "existingTests": [
-      "test/accept-invite.route.test.ts:172 (asserts the current redirect URL, updated by #2032)"
+      "test/accept-invite.route.test.ts (clean redirect and signed receipt)",
+      "test/ui/workspaces-invitation-feedback.test.tsx (root toast, nonce suppression and no invitation banner row)"
     ],
     "missingTests": [
-      "no test asserts the invite success surface is a toast rather than a banner, so it can regress back without failing anything",
-      "no test asserts that a success surface is not beaconed to client-flash as an error"
+      "Deployed success tone and absence of an error-surface beacon remain to verify."
     ],
     "acceptanceCriteria": [
       "Invite acceptance shows a green one-time success toast",
@@ -73,6 +73,6 @@
     "blockedBy": [],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Duplicate of #2032. Same component, same redirect, same root cause, and #2032 deletes the surface rather than recolouring it. Implement once, in #2032, and close this."
+    "trackerRecommendation": "Duplicate of #2032; its source fix is merged in PR #2362. Verify the original acceptance criteria together, preserve the native parent, and wait for QA and default-branch release before closure."
   }
 ]

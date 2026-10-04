@@ -4477,5 +4477,77 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "All source and real large-PR acceptance checks passed. Source fixes are on dev under #2359 and #2301. Keep the issue open until default-branch release."
+  },
+  {
+    "issueNumber": 2015,
+    "verdict": "verify-close",
+    "recommendedTitle": "auth pages: sign-in hides the real error behind \"We couldn't sign you in, Try again shortly\"",
+    "summary": "Safe sign-in messages are merged in PR #2361. Known provider codes are mapped; unknown failures remain generic. Deployed QA and default-branch release remain open.",
+    "currentBehavior": "Source verified on dev@46ba4b7e, 2026-10-04. PR #2361 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.",
+    "rootCause": "Fixed: the shared login helper previously masked the real invalid-credentials exception as a temporary server failure. Its finite mapping now checks known codes and expected statuses; browser and JSON paths use it.",
+    "resolution": "Verify deployed wrong-password, rate-limit and provider-failure copy; confirm one root toast, retained form values, no layout movement, successful sign-in and two-factor routing. Release to the default branch before closure.",
+    "lookIn": [
+      "app/lib/platform-auth.server.ts",
+      "app/routes/signin.action.server.ts",
+      "test/platform-auth.test.ts",
+      "test/ui/signin-feedback.test.tsx"
+    ],
+    "existingTests": [
+      "test/platform-auth.test.ts (real APIError codes and statuses, safe fallback and actual browser/token paths)",
+      "test/ui/signin-feedback.test.tsx (real root toast, form retention and revalidation)",
+      "Mutation checks rejected the old generic catch and raw provider-message disclosure."
+    ],
+    "missingTests": [
+      "Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior."
+    ],
+    "acceptanceCriteria": [
+      "The UI distinguishes invalid credentials from a provider outage or rate limit",
+      "A wrong password no longer reads as a generic temporary failure",
+      "The raw provider payload is mapped, not passed through to the user",
+      "The error is surfaced through the toast pattern, not inline text"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after deployed QA and default-branch release. PR #2361 is merged into dev; keep the issue open until the remaining verification is complete."
+  },
+  {
+    "issueNumber": 2032,
+    "verdict": "verify-close",
+    "recommendedTitle": "Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast",
+    "summary": "Both invitation paths now use a clean redirect and signed finite receipt for the existing root success toast in PR #2362. Deployed QA and default-branch release remain open.",
+    "currentBehavior": "Source verified on dev@46ba4b7e, 2026-10-04. PR #2362 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.",
+    "rootCause": "Fixed: invitation success previously used shareable URL state. A signed five-minute allow-listed receipt now carries the success code and nonce, and the loader clears it on success, failure and auth redirects. Separate auth cookies are preserved.",
+    "resolution": "Verify normal redemption and signup plus acceptance on the deployed environment: session cookies, clean redirect, one readable root success toast, no list movement, refresh replay or error warning, and invalid/expired receipt clearing. Release to the default branch before closure. Concurrent-tab delivery remains the original permitted best-effort limitation.",
+    "lookIn": [
+      "app/lib/invitation-flash.server.ts",
+      "app/lib/better-auth-headers.server.ts",
+      "app/routes/accept-invite.action.server.ts",
+      "app/routes/workspaces+/index.loader.server.ts",
+      "app/routes/workspaces+/index.tsx"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts (both redirects, signed receipt and separate auth cookies)",
+      "test/invitation-flash.test.ts (real signing, expiry, malformed/unknown/unsigned receipt rejection)",
+      "test/workspaces-invitation-flash.loader.test.ts (success, failure and thrown auth redirects clear receipt)",
+      "test/ui/workspaces-invitation-feedback.test.tsx (real root toast, revalidation nonce, no inline invitation row)",
+      "Five mutations rejected: expiry, signing, cookie separation, clearing and nonce suppression."
+    ],
+    "missingTests": [
+      "Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior."
+    ],
+    "acceptanceCriteria": [
+      "Invite acceptance shows a one-time success toast, not an inline banner",
+      "The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message",
+      "The Better Auth session cookie survives the redirect in both redemption paths",
+      "An unknown, malformed or expired flash payload produces no client-visible output and is still cleared",
+      "A loader revalidation does not fire the toast twice",
+      "Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.",
+      "No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after deployed QA and default-branch release. PR #2362 is merged into dev; keep the issue open until the remaining verification is complete."
   }
 ]

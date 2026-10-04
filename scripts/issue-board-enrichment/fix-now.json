@@ -135,39 +135,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2015,
-    "verdict": "fix-now",
-    "recommendedTitle": "auth pages: sign-in hides the real error behind \"We couldn't sign you in, Try again shortly\"",
-    "summary": "The actual Better Auth invalid-credentials exception is still reduced to the generic server-failure message. The path is now signin.action.server.ts and platform-auth.server.ts, not account.sign-in.*.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The shared login helper masks thrown INVALID_EMAIL_OR_PASSWORD errors as temporary server failures; only a resolved missing user/token yields Invalid credentials.",
-    "rootCause": "loginWithPassword in app/lib/platform-auth.server.ts catches the provider exception and returns a fixed generic message without reading its known error code. signin.action.server.ts forwards that result.",
-    "resolution": "Map known safe backend error codes to shared user copy, preserve the generic fallback for unknown/driver failures, and test the real invalid-credentials exception shape. Use the same map for browser and JSON login.",
-    "lookIn": [
-      "app/lib/platform-auth.server.ts:140",
-      "app/routes/signin.action.server.ts:28",
-      "test/platform-auth.test.ts:104",
-      "app/lib/platform-auth.server.ts",
-      "app/routes/signin.action.server.ts",
-      "test/platform-auth.test.ts"
-    ],
-    "existingTests": [
-      "test/platform-auth.test.ts"
-    ],
-    "missingTests": [
-      "Add a thrown APIError with body.code INVALID_EMAIL_OR_PASSWORD, unknown-code fallback, and infrastructure-message non-disclosure tests."
-    ],
-    "acceptanceCriteria": [
-      "The UI distinguishes invalid credentials from a provider outage or rate limit",
-      "A wrong password no longer reads as a generic temporary failure",
-      "The raw provider payload is mapped, not passed through to the user",
-      "The error is surfaced through the toast pattern, not inline text"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2042,
     "verdict": "fix-now",
     "recommendedTitle": "Side Sheet has no default padding, so any body between header and footer renders flush to the edge",
@@ -238,45 +205,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2032,
-    "verdict": "fix-now",
-    "recommendedTitle": "Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast",
-    "summary": "Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.",
-    "rootCause": "One-time state is being carried in a shareable URL because there is no server-owned flash mechanism to carry it instead. AGENTS.md names toast() from sonner as the single feedback pattern and a single root Toaster already exists (app/root.tsx:123), so the app has the right tool and the wrong transport.",
-    "resolution": "Implement the allow-listed signed flash cookie, preserve all Better Auth Set-Cookie headers, read/clear it in the loader on success and failure, and consume it once with toast.success.",
-    "lookIn": [
-      "app/routes/accept-invite.action.server.ts:62",
-      "app/routes/workspaces+/index.tsx:272",
-      "app/routes/workspaces+/index.loader.server.ts:1",
-      "app/routes/accept-invite.action.server.ts:58 and :183 (the two redirects to /workspaces?invite=accepted)",
-      "app/routes/workspaces+/index.tsx:272-280 (the QueryParamBanner invite configuration)",
-      "app/components/shared/QueryParamBanner.tsx:16-57 (unchanged by this issue; note the Alert inside it)",
-      "app/routes/workspaces+/index.loader.server.ts:32-72 (where the flash is read and cleared)",
-      "app/lib/flash-telemetry.client.ts (beacons role=alert surfaces, so the success banner is logged as an error flash today)",
-      "app/root.tsx:123 (the single root Toaster, so no infrastructure change is needed)"
-    ],
-    "existingTests": [
-      "test/accept-invite.route.test.ts:231 (asserts /workspaces?invite=accepted and must be updated)"
-    ],
-    "missingTests": [
-      "Both redeem paths, mixed Set-Cookie preservation, invalid/expired payload clearing, loader-failure clearing, and exactly-once UI toast tests are missing."
-    ],
-    "acceptanceCriteria": [
-      "Invite acceptance shows a one-time success toast, not an inline banner",
-      "The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message",
-      "The Better Auth session cookie survives the redirect in both redemption paths",
-      "An unknown, malformed or expired flash payload produces no client-visible output and is still cleared",
-      "A loader revalidation does not fire the toast twice",
-      "Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.",
-      "No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior."
   },
   {
     "issueNumber": 2045,

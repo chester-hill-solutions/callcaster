@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@ec3d87f1; media source fixes, review pagination and current Sai report evidence (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@46ba4b7e; sign-in and invitation source fixes with deployed QA pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the media fixes, review pagination repair and current Sai source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the sign-in and invitation source fixes. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 59
+## Fix now — 57
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -200,18 +200,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link.
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
-
-### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
-- Root cause: One-time state is being carried in a shareable URL because there is no server-owned flash mechanism to carry it instead. AGENTS.md names toast() from sonner as the single feedback pattern and a single root Toaster already exists (app/root.tsx:123), so the app has the right tool and the wrong transport.
-- Resolution: Implement the allow-listed signed flash cookie, preserve all Better Auth Set-Cookie headers, read/clear it in the loader on success and failure, and consume it once with toast.success.
-- Look in: `app/routes/accept-invite.action.server.ts:62`, `app/routes/workspaces+/index.tsx:272`, `app/routes/workspaces+/index.loader.server.ts:1`, `app/routes/accept-invite.action.server.ts:58 and :183 (the two redirects to /workspaces?invite=accepted)`, `app/routes/workspaces+/index.tsx:272-280 (the QueryParamBanner invite configuration)`, `app/components/shared/QueryParamBanner.tsx:16-57 (unchanged by this issue; note the Alert inside it)`, `app/routes/workspaces+/index.loader.server.ts:32-72 (where the flash is read and cleared)`, `app/lib/flash-telemetry.client.ts (beacons role=alert surfaces, so the success banner is logged as an error flash today)`, `app/root.tsx:123 (the single root Toaster, so no infrastructure change is needed)`
-- Existing tests: test/accept-invite.route.test.ts:231 (asserts /workspaces?invite=accepted and must be updated)
-- Missing tests: Both redeem paths, mixed Set-Cookie preservation, invalid/expired payload clearing, loader-failure clearing, and exactly-once UI toast tests are missing.
-- Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
-- Tracker: Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
 
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -484,18 +472,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A contents-equal but freshly built `initial` does not re-seed the thread; The effect converges under StrictMode double-rendering; The live pagination-wipe symptom has its own tracked fix; A changed conversation resets the thread, while loader updates for the same conversation retain valid accumulated history.
 - Tracker: Fix now as defensive hook-contract work. Do not report a reproduced current production infinite loop.
 
-### [#2015](https://github.com/chester-hill-solutions/callcaster/issues/2015) auth pages: sign-in hides the real error behind "We couldn't sign you in, Try again shortly"
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-02
-- The actual Better Auth invalid-credentials exception is still reduced to the generic server-failure message. The path is now signin.action.server.ts and platform-auth.server.ts, not account.sign-in.*.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The shared login helper masks thrown INVALID_EMAIL_OR_PASSWORD errors as temporary server failures; only a resolved missing user/token yields Invalid credentials.
-- Root cause: loginWithPassword in app/lib/platform-auth.server.ts catches the provider exception and returns a fixed generic message without reading its known error code. signin.action.server.ts forwards that result.
-- Resolution: Map known safe backend error codes to shared user copy, preserve the generic fallback for unknown/driver failures, and test the real invalid-credentials exception shape. Use the same map for browser and JSON login.
-- Look in: `app/lib/platform-auth.server.ts:140`, `app/routes/signin.action.server.ts:28`, `test/platform-auth.test.ts:104`, `app/lib/platform-auth.server.ts`, `app/routes/signin.action.server.ts`, `test/platform-auth.test.ts`
-- Existing tests: test/platform-auth.test.ts
-- Missing tests: Add a thrown APIError with body.code INVALID_EMAIL_OR_PASSWORD, unknown-code fallback, and infrastructure-message non-disclosure tests.
-- Done when: The UI distinguishes invalid credentials from a provider outage or rate limit; A wrong password no longer reads as a generic temporary failure; The raw provider payload is mapped, not passed through to the user; The error is surfaced through the toast pattern, not inline text
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148) The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Inbound IVR still renders synthesized audio from audioFile only, while content may contain the spoken text. Recorded audio also bypasses the shared WAV-sidecar renderer.
@@ -702,9 +678,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 150
+## Verify and close — 152
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Both invitation paths now use a clean redirect and signed finite receipt for the existing root success toast in PR #2362. Deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04. PR #2362 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.
+- Root cause: Fixed: invitation success previously used shareable URL state. A signed five-minute allow-listed receipt now carries the success code and nonce, and the loader clears it on success, failure and auth redirects. Separate auth cookies are preserved.
+- Resolution: Verify normal redemption and signup plus acceptance on the deployed environment: session cookies, clean redirect, one readable root success toast, no list movement, refresh replay or error warning, and invalid/expired receipt clearing. Release to the default branch before closure. Concurrent-tab delivery remains the original permitted best-effort limitation.
+- Look in: `app/lib/invitation-flash.server.ts`, `app/lib/better-auth-headers.server.ts`, `app/routes/accept-invite.action.server.ts`, `app/routes/workspaces+/index.loader.server.ts`, `app/routes/workspaces+/index.tsx`
+- Existing tests: test/accept-invite.route.test.ts (both redirects, signed receipt and separate auth cookies); test/invitation-flash.test.ts (real signing, expiry, malformed/unknown/unsigned receipt rejection); test/workspaces-invitation-flash.loader.test.ts (success, failure and thrown auth redirects clear receipt); test/ui/workspaces-invitation-feedback.test.tsx (real root toast, revalidation nonce, no inline invitation row); Five mutations rejected: expiry, signing, cookie separation, clearing and nonce suppression.
+- Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
+- Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
+- Tracker: Verify and close after deployed QA and default-branch release. PR #2362 is merged into dev; keep the issue open until the remaining verification is complete.
+
+### [#2015](https://github.com/chester-hill-solutions/callcaster/issues/2015) auth pages: sign-in hides the real error behind "We couldn't sign you in, Try again shortly"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- Safe sign-in messages are merged in PR #2361. Known provider codes are mapped; unknown failures remain generic. Deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04. PR #2361 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.
+- Root cause: Fixed: the shared login helper previously masked the real invalid-credentials exception as a temporary server failure. Its finite mapping now checks known codes and expected statuses; browser and JSON paths use it.
+- Resolution: Verify deployed wrong-password, rate-limit and provider-failure copy; confirm one root toast, retained form values, no layout movement, successful sign-in and two-factor routing. Release to the default branch before closure.
+- Look in: `app/lib/platform-auth.server.ts`, `app/routes/signin.action.server.ts`, `test/platform-auth.test.ts`, `test/ui/signin-feedback.test.tsx`
+- Existing tests: test/platform-auth.test.ts (real APIError codes and statuses, safe fallback and actual browser/token paths); test/ui/signin-feedback.test.tsx (real root toast, form retention and revalidation); Mutation checks rejected the old generic catch and raw provider-message disclosure.
+- Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
+- Done when: The UI distinguishes invalid credentials from a provider outage or rate limit; A wrong password no longer reads as a generic temporary failure; The raw provider payload is mapped, not passed through to the user; The error is surfaced through the toast pattern, not inline text
+- Tracker: Verify and close after deployed QA and default-branch release. PR #2361 is merged into dev; keep the issue open until the remaining verification is complete.
 
 ### [#2358](https://github.com/chester-hill-solutions/callcaster/issues/2358) Sum all file pages in the structural review check
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -3386,17 +3386,17 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
 ### [#2000](https://github.com/chester-hill-solutions/callcaster/issues/2000) Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast
-- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-27
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-04
 - Duplicate of: [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032)
-- Same surface as #2032, and #2032 removes it. The invite acceptance renders through QueryParamBanner (app/routes/workspaces+/index.tsx:272-280), which draws a dismissible Alert with no variant (app/components/shared/QueryParamBanner.tsx:43-56). The Alert default is `border-brand-tertiary bg-brand-wash`, and in dark mode --brand-wash is hsl(340 28% 18%), a maroon, so a success message reads as a red error banner. That is the 'should be green' report exactly. Doing it as a colour change would only make the banner green and leave it persistent, shareable through the URL, and inconsistent with the toast pattern the rest of the app uses. One extra finding from the same code: the banner is an Alert, so it carries role="alert" and is beaconed by app/lib/flash-telemetry.client.ts to /api/workspaces/:id/client-flash as an error flash, so a successful invite acceptance is currently logged as an error.
-- Current behavior: A maroon, dismissible, URL-replayable inline banner on the workspaces page announcing a successful invite acceptance.
-- Root cause: One-time success state is carried in a shareable query parameter because there is no server-owned flash mechanism, and the tone is left to a primitive default that happens to be crimson in dark mode.
-- Resolution: Do not implement separately. Fold the tone question into #2032 and close this one. #2032 replaces the banner with a server-owned, signed, one-time session flash that renders as toast.success, which is green by construction and drops the URL-replay and the false error-flash beacon at the same time. A colour-only fix here would be thrown away when #2032 lands. If #2032 is deprioritised and the banner has to stay for a while, the minimal correct interim is variant="success" on that Alert plus removing the role="alert" beacon pollution, and it should be filed as a comment on #2032 rather than a second PR.
-- Look in: `app/routes/workspaces+/index.tsx:272-280 (the invite QueryParamBanner)`, `app/components/shared/QueryParamBanner.tsx:43-56 (the Alert with no variant)`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash)`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))`, `app/lib/flash-telemetry.client.ts (role=alert surfaces are beaconed as error flashes)`
-- Existing tests: test/accept-invite.route.test.ts:172 (asserts the current redirect URL, updated by #2032)
-- Missing tests: no test asserts the invite success surface is a toast rather than a banner, so it can regress back without failing anything; no test asserts that a success surface is not beaconed to client-flash as an error
+- Duplicate of #2032. PR #2362 removes the invitation banner and uses the existing root success toast. Tone, deployed geometry and telemetry acceptance remain to verify with the canonical report.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04: the invitation-only QueryParamBanner row is removed. The root toast consumes a signed finite receipt; deployed acceptance remains pending.
+- Root cause: The historical invitation confirmation used replayable URL state and an inline Alert. The source fix in #2032 replaces that transport and removes the invitation-specific Alert surface.
+- Resolution: Do not implement a separate colour patch. Verify the original tone, replay, layout and telemetry criteria with #2032. Retain the native parent relation and keep this report open for deployed QA and release.
+- Look in: `app/routes/workspaces+/index.tsx`, `app/lib/invitation-flash.server.ts`, `app/lib/flash-telemetry.client.ts`, `app/root.tsx`, `test/ui/workspaces-invitation-feedback.test.tsx`
+- Existing tests: test/accept-invite.route.test.ts (clean redirect and signed receipt); test/ui/workspaces-invitation-feedback.test.tsx (root toast, nonce suppression and no invitation banner row)
+- Missing tests: Deployed success tone and absence of an error-surface beacon remain to verify.
 - Done when: Invite acceptance shows a green one-time success toast; The message does not replay on refresh or revisit; The success surface is no longer beaconed to client-flash as an error; No colour-only change is shipped on its own
-- Tracker: Duplicate of #2032. Same component, same redirect, same root cause, and #2032 deletes the surface rather than recolouring it. Implement once, in #2032, and close this.
+- Tracker: Duplicate of #2032; its source fix is merged in PR #2362. Verify the original acceptance criteria together, preserve the native parent, and wait for QA and default-branch release before closure.
 
 ### [#1843](https://github.com/chester-hill-solutions/callcaster/issues/1843) IVR step no-input wait + next/goto (folds into #1883 and #1884)
 - Verdict: **Duplicates** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-25
