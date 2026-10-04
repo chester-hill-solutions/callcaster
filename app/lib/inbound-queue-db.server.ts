@@ -1,7 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   inbound_queue as inboundQueueTable,
   inbound_queue_member as inboundQueueMemberTable,
+  user as userTable,
 } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { findWorkspaceMembership, listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
@@ -123,6 +124,11 @@ export async function addInboundQueueMember(args: {
   const membership = await findWorkspaceMembership(args.workspaceId, args.userId, tdb);
   if (!membership) {
     handleValidationError("User is not a member of this workspace.");
+  }
+  const users = await tdb.execute(sql`select ${userTable.id} from ${userTable}
+    where ${userTable.id}::text = ${args.userId} limit 1`);
+  if (users.length === 0) {
+    handleValidationError("User does not exist.");
   }
   const now = new Date().toISOString();
   await tdb.inbound_queue_member.insert({

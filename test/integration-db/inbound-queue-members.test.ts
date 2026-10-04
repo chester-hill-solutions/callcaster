@@ -118,6 +118,17 @@ suite("queue assignment validates real target rows (#2141)", () => {
       });
     });
 
+    test(`${route}: stale membership for a nonexistent user receives 400 without an insert`, async () => {
+      await withRows(async ({ tx, queueId }) => {
+        await tx.execute(sql`insert into public.workspace_member (id, workspace_id, user_id, role_id)
+          values ('queue-stale-member', ${workspace}, ${missingUser}, 'caller')`);
+        const response = await add(route, queueId, missingUser);
+        expect(response.status).toBe(400);
+        expect(await response.json()).toMatchObject({ error: "User does not exist." });
+        expect(await assignments(tx)).toEqual([]);
+      });
+    });
+
     test(`${route}: valid same-workspace caller is assigned to the requested queue`, async () => {
       await withRows(async ({ tx, queueId }) => {
         const response = await add(route, queueId, member);
