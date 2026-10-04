@@ -6,7 +6,7 @@ Load this when the user passed one or more `https://github.com/...` URLs, or nam
 
 **Single repo:**
 ```bash
-LOCAL_PATH=$(graphify clone <github-url> [--branch <branch>])
+LOCAL_PATH=$(.opencode/.graphify-venv/bin/graphify clone <github-url> [--branch <branch>])
 # Use LOCAL_PATH as the target for all subsequent steps
 ```
 
@@ -43,4 +43,4 @@ The skill pipeline writes all intermediate and final outputs to `graphify-out/` 
   --out graphify-out/graph.json
 ```
 
-Once `graphify-out/graph.json` exists, the fast path above takes over: any codebase question runs `graphify query` directly on the merged graph — no re-extraction, no size gate.
+Once `graphify-out/graph.json` exists, the fast path above takes over: explicit graph queries use the pinned project CLI after its availability check. Confirm behavior claims in current source.
