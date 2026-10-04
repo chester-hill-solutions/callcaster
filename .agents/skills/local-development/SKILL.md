@@ -65,6 +65,15 @@ The node suite installs a shared `api-auth.server` mock in
 `vi.unmock("@/lib/api-auth.server")` and mock only the session/provider boundary.
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
+For route-to-service call checks, wrap the original service with `vi.fn` in an
+additive module factory. A namespace spy installed after import can miss a
+route's bound service call. Keep the real service logic and database access.
+Weaken each route and service role check separately and require a failing test;
+a service denial can hide a missing route check. An always-zero call counter
+does not prove that the route stopped before the service.
+When a canonical guard lets the API surface generator derive the auth class,
+remove the route's manual `authClass` annotation. Regenerate the API files and
+run `tools:api:surface:check`; matching duplicate declarations also fail the guard.
 Use `setJsonAuthSession` for a shared default that a case must replace. A default
 queued with `queueJsonAuthSession` runs before a later queued denial; use queues
 only when the test needs multiple calls in that exact order.

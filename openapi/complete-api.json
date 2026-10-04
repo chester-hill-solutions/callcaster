@@ -9977,7 +9977,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_billing_checkout_session",
         "summary": "POST /api/workspaces/:workspaceId/billing/checkout-session",
-        "description": "",
+        "description": "Requires an Admin or Owner user session before checkout replay or Stripe calls. Member and Caller receive 403; non-members receive 404; workspace API keys without a user session receive 401.",
         "tags": [
           "Workspace Admin",
           "billing"
@@ -10112,7 +10112,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
         "summary": "GET /api/workspaces/:workspaceId/billing/sessions/:sessionId",
-        "description": "",
+        "description": "Requires an Admin or Owner user session before Stripe retrieval or credit confirmation. Member and Caller receive 403; non-members receive 404; workspace API keys without a user session receive 401.",
         "tags": [
           "Workspace Admin",
           "billing"

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { transaction_history as transactionHistoryTable, workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { MemberRole } from "@/lib/member-role";
 import type { Database } from "@/lib/db-types";
 import {
   CREDIT_PRICE_CAD,
@@ -127,6 +128,7 @@ export async function createBillingCheckoutSession(args: {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: MemberRole.Admin,
   });
 
   if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
@@ -215,6 +217,7 @@ export async function pollBillingCheckoutSession(args: {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: MemberRole.Admin,
   });
 
   const stripe = createStripeClient();

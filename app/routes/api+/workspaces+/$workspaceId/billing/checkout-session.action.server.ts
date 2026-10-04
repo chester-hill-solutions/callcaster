@@ -3,11 +3,12 @@ import { createBillingCheckoutSession } from "@/lib/platform-billing.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { withIdempotency } from "@/lib/platform-idempotency.server";
 import { checkoutSessionBodySchema } from "@/lib/schemas/api/platform-billing";
-import { requireDataPlaneWorkspaceUser } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionMinRoleAuth } from "@/lib/capability-guard.server";
+import { MemberRole } from "@/lib/member-role";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: requireDataPlaneWorkspaceUser,
+  auth: dataPlaneSessionMinRoleAuth(MemberRole.Admin),
   sideEffects: ["db-write", "external"],
   handler: async ({ request, auth, url }) => {
     if (request.method !== "POST") {

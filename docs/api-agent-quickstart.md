@@ -70,9 +70,11 @@ See [Telephony provisioning](./api-telephony-provisioning.md) for the full compl
 
 ## Billing
 
-`GET /api/workspaces/:workspaceId/billing` requires the workspace `admin` role or
-above; members and callers receive 403. Like the rest of this section it is
-session-only — `$TOKEN` must be a user bearer token, not a workspace API key.
+Balance, checkout creation and checkout-session polling require the workspace
+`admin` role or above. Members and callers receive 403 before checkout replay,
+Stripe calls or credit changes. Non-members receive 404. These routes are
+session-only — `$TOKEN` must be a user bearer token, not a workspace API key;
+a workspace key without a user session receives 401.
 
 ```bash
 # Balance
