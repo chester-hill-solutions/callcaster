@@ -17,7 +17,7 @@ subcommand manual and installed `gh <command> --help` before using a command.
 5. Build long PR descriptions in a file and pass `--body-file`. Do not pass a body containing Markdown backticks, shell substitutions, `$` expressions, or unescaped apostrophes as an inline shell argument. Backticks can trigger command substitution and corrupt the description. Never let PR prose execute as shell commands.
 6. After `gh pr create` or `gh pr edit`, query the PR body and metadata with `gh pr view --json number,title,body,labels,state,baseRefName,headRefName,url`. Confirm that code spans, links, labels, and the full intended description are preserved.
 7. If a body is corrupted, inspect the current PR, reconstruct the intended text from the task and repository state, rewrite it through a body file, and verify the returned body before continuing. Do not treat a successful `gh` exit status as proof that the content is correct.
-8. Check required CI with `gh pr checks <number> --watch`; inspect failed checks before merging.
+8. Check CI and deployment contexts for the exact tested head with REST checks/status reads. Derive expected jobs from the current diff and workflow path filters; a schema-only job from an earlier PR may not run for this change. Inspect failed checks before merging.
 9. Merge only when the user requested the merge or explicitly approved it. Select the merge strategy deliberately, then verify `state`, `mergedAt`, `mergeCommit`, and the base branch.
 10. If `--delete-branch` is used, verify the remote branch no longer exists. A checked-out local branch may remain.
 

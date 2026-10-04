@@ -82,6 +82,8 @@ When closing an issue you intend as wontfix, pass `--reason "not planned"` expli
 ## Issue Board Source Audits
 
 For an audit, update the existing enrichment records and regenerate `ISSUE_BOARD.md`.
+Preserve the enrichment files' UTF-8 characters and existing rendering. Review
+the diff for unrelated serialization changes before staging.
 Trace the affected route or worker to its actual helper before moving an issue to
 Verify and close. A merged PR that changes another parser does not fix the upload
 path. For SQL, check bootstrap inclusion and later function definitions; a file
