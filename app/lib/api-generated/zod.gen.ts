@@ -2,6 +2,14 @@
 
 import { z } from 'zod';
 
+export const zConversationSummaryMode = z.enum([
+    'unread'
+]);
+
+export const zWorkspaceUnreadCountResponse = z.object({
+    unread_count: z.number().int().gte(0).lte(9007199254740991)
+});
+
 export const zError = z.object({
     error: z.string()
 });

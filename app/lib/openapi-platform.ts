@@ -12,6 +12,49 @@ import {
 } from "@/lib/openapi-integrator";
 
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
+  "/api/workspaces/{workspaceId}/conversations": {
+    get: {
+      operationId: "getWorkspaces_workspaceId_conversations",
+      tags: ["Messaging", "Integrator API"],
+      "x-callcaster-supported": true,
+      "x-callcaster-exposure": "sessionOnly",
+      "x-callcaster-auth-class": "apiKeyOrSession",
+      "x-callcaster-docs-guide": "docs/api-data-plane.md",
+      "x-callcaster-capability": "campaigns.read",
+      summary: "List conversations or read the workspace unread total",
+      description: "Requires campaigns.read. With summary=unread, returns the complete workspace unread message total using the conversation list's received/inbound definition. This count ignores list pagination, search, sort and campaign filters. Without summary, returns the existing conversation page.",
+      security: [...apiKeyOrSessionSecurity],
+      parameters: [
+        { name: "workspaceId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        { name: "summary", in: "query", required: false, schema: { $ref: "#/components/schemas/ConversationSummaryMode" } },
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+        { name: "page_size", in: "query", schema: { type: "integer", minimum: 10, maximum: 100, default: 20 } },
+        { name: "campaign_id", in: "query", schema: { type: "integer" } },
+        { name: "search", in: "query", schema: { type: "string" } },
+        { name: "sort", in: "query", schema: { type: "string", enum: ["recent", "hasReplied", "hasUnreadReply"] } },
+      ],
+      responses: {
+        "200": {
+          description: "Conversation page, or complete workspace unread total when summary=unread",
+          content: { "application/json": { schema: { oneOf: [
+            { $ref: "#/components/schemas/WorkspaceUnreadCountResponse" },
+            { type: "object", required: ["conversations", "pagination"], properties: {
+              conversations: { type: "array", items: { type: "object", additionalProperties: true } },
+              pagination: { type: "object", required: ["page", "page_size", "has_more"], properties: {
+                page: { type: "integer" }, page_size: { type: "integer" }, has_more: { type: "boolean" },
+              } },
+            } },
+          ] } } },
+        },
+        "400": errorResponse("Unknown summary mode"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Missing campaigns.read capability"),
+        "404": errorResponse("Workspace membership or scope mismatch"),
+        "405": errorResponse("Method not allowed"),
+        "500": errorResponse("Unread count unavailable"),
+      },
+    },
+  },
   "/api/auth/register": {
     post: {
       summary: "Register a new user account",

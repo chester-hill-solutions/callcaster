@@ -10,10 +10,32 @@ import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-s
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
 import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
+import { zConversationSummaryMode, zWorkspaceUnreadCountResponse } from "../app/lib/api-generated/zod.gen";
 
 const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
+  test("documents the optional workspace unread mode and validates its count contract", () => {
+    const operation = openApiSpec.paths["/api/workspaces/{workspaceId}/conversations"].get;
+    expect(operation?.operationId).toBe("getWorkspaces_workspaceId_conversations");
+    expect(operation?.["x-callcaster-capability"]).toBe("campaigns.read");
+    expect(operation?.["x-callcaster-exposure"]).toBe("sessionOnly");
+    expect(operation?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "summary", in: "query", required: false,
+        schema: { $ref: "#/components/schemas/ConversationSummaryMode" } }),
+    ]));
+    expect(operation?.responses?.["200"]?.content?.["application/json"]?.schema?.oneOf).toEqual(
+      expect.arrayContaining([{ $ref: "#/components/schemas/WorkspaceUnreadCountResponse" }]),
+    );
+    expect(zConversationSummaryMode.safeParse("unread").success).toBe(true);
+    expect(zConversationSummaryMode.safeParse("other").success).toBe(false);
+    expect(zWorkspaceUnreadCountResponse.safeParse({ unread_count: 107 }).success).toBe(true);
+    expect(zWorkspaceUnreadCountResponse.safeParse({ unread_count: 0 }).success).toBe(true);
+    for (const unread_count of [-1, 1.5, "107", Number.MAX_SAFE_INTEGER + 1]) {
+      expect(zWorkspaceUnreadCountResponse.safeParse({ unread_count }).success).toBe(false);
+    }
+    expect(zWorkspaceUnreadCountResponse.safeParse({}).success).toBe(false);
+  });
   test("has basic OpenAPI structure", () => {
     expect(openApiSpec.openapi).toBe("3.0.3");
     expect(openApiSpec.info.title).toBe("CallCaster API");

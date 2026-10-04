@@ -8967,8 +8967,6 @@
     "/api/workspaces/{workspaceId}/conversations": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations",
-        "summary": "GET /api/workspaces/:workspaceId/conversations",
-        "description": "",
         "tags": [
           "Messaging",
           "Integrator API"
@@ -8978,6 +8976,8 @@
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
         "x-callcaster-capability": "campaigns.read",
+        "summary": "List conversations or read the workspace unread total",
+        "description": "Requires campaigns.read. With summary=unread, returns the complete workspace unread message total using the conversation list's received/inbound definition. This count ignores list pagination, search, sort and campaign filters. Without summary, returns the existing conversation page.",
         "security": [
           {
             "sessionCookie": []
@@ -8991,23 +8991,124 @@
         ],
         "parameters": [
           {
-            "name": "workspace_id",
-            "in": "query",
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationSummaryMode"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "hasReplied",
+                "hasUnreadReply"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Conversation page, or complete workspace unread total when summary=unread",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkspaceUnreadCountResponse"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "conversations",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "conversations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "required": [
+                            "page",
+                            "page_size",
+                            "has_more"
+                          ],
+                          "properties": {
+                            "page": {
+                              "type": "integer"
+                            },
+                            "page_size": {
+                              "type": "integer"
+                            },
+                            "has_more": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown summary mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -9017,17 +9118,47 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Missing campaigns.read capability",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace membership or scope mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unread count unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -10830,6 +10961,26 @@
         "properties": {
           "error": {
             "type": "string"
+          }
+        }
+      },
+      "ConversationSummaryMode": {
+        "type": "string",
+        "enum": [
+          "unread"
+        ],
+        "description": "Return the complete workspace unread message total instead of a conversation page."
+      },
+      "WorkspaceUnreadCountResponse": {
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         }
       },

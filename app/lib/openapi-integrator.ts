@@ -47,6 +47,18 @@ const securitySchemes = {
 };
 
 const schemas = {
+  ConversationSummaryMode: {
+    type: "string" as const,
+    enum: ["unread"] as const,
+    description: "Return the complete workspace unread message total instead of a conversation page.",
+  },
+  WorkspaceUnreadCountResponse: {
+    type: "object" as const,
+    required: ["unread_count"] as const,
+    properties: {
+      unread_count: { type: "integer" as const, minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    },
+  },
   Error: {
     type: "object" as const,
     required: ["error"] as const,
