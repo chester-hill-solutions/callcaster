@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- **Fixed:** Admin users, workspaces and campaigns remain populated when rows per page changes; pagination stays within available records. ([#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109), [PR #2326](https://github.com/chester-hill-solutions/callcaster/pull/2326))
+
 - Fixed: SMS status webhooks use durable retries and separate worker capacity, so slow integrations do not block other jobs ([PR #2324](https://github.com/chester-hill-solutions/callcaster/pull/2324), [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117)).
 
 - Fixed survey CSV exports needing a second click and returning an older response snapshot ([PR #2322](https://github.com/chester-hill-solutions/callcaster/pull/2322), [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320)).

@@ -30,8 +30,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
         type: "all",
         workspace: "all",
     });
-    const filterKey = JSON.stringify(filter);
-    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
+    const filterKey = JSON.stringify({ filter, itemsPerPage });
 
     const filteredCampaigns = campaigns.filter((campaign) => {
         let matchesSearch = true;
@@ -68,7 +67,8 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
         return matchesSearch && matchesStatus && matchesType && matchesWorkspace;
     });
 
-    const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(filteredCampaigns.length / itemsPerPage));
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey, 1, totalPages);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedCampaigns = filteredCampaigns.slice(startIndex, startIndex + itemsPerPage);
 

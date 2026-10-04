@@ -28,8 +28,7 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
         search: "",
         accessLevel: "all",
     });
-    const filterKey = `${filter.search}:${filter.accessLevel}`;
-    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
+    const filterKey = JSON.stringify({ filter, itemsPerPage });
 
     const filteredUsers =
         users?.filter((user) => {
@@ -61,7 +60,8 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
             return matchesSearch && matchesAccessLevel;
         }) || [];
 
-    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey, 1, totalPages);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
