@@ -25,6 +25,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { loadSurveyDetailByPublicId } from "@/lib/survey-db.server";
 import { formatSurveyAnswer } from "@/lib/survey-format";
+import { surveyAnswerKey } from "@/lib/survey-answer-state";
 
 export async function loadActiveSurveysForWorkspace(workspaceId: string) {
   const tdb = createTenantDb(workspaceId);
@@ -314,15 +315,20 @@ export async function loadExistingResponseWithAnswers(args: {
       answer_value: responseAnswerTable.answer_value,
       question_id: surveyQuestionTable.question_id,
       question_type: surveyQuestionTable.question_type,
+      page_id: surveyPageTable.page_id,
     })
     .from(responseAnswerTable)
     .innerJoin(
       surveyQuestionTable,
       eq(responseAnswerTable.question_id, surveyQuestionTable.id),
     )
-    .where(eq(responseAnswerTable.response_id, response.id));
+    .innerJoin(surveyPageTable, eq(surveyQuestionTable.page_id, surveyPageTable.id))
+    .where(and(
+      eq(responseAnswerTable.response_id, response.id),
+      eq(surveyPageTable.survey_id, args.surveyInternalId),
+    ));
 
-  const answersByQuestionId = answers.reduce<Record<string, string | string[]>>(
+  const scopedAnswers = answers.reduce<Record<string, string | string[]>>(
     (acc, answer) => {
       let value: string | string[] = answer.answer_value;
       if (answer.question_type === "checkbox") {
@@ -335,11 +341,11 @@ export async function loadExistingResponseWithAnswers(args: {
           // Preserve legacy scalar answers rather than inventing a selection.
         }
       }
-      acc[answer.question_id] = value;
+      acc[surveyAnswerKey(answer.page_id, answer.question_id)] = value;
       return acc;
     },
     {},
   );
 
-  return { response, answers: answersByQuestionId };
+  return { response, answers: scopedAnswers };
 }
