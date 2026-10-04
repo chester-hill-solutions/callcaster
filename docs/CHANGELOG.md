@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Workspace billing pages require an administrator or owner. Callers and members cannot read the credit ledger or lifetime spend. ([#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137))
+- Security: Workspace billing pages require an administrator or owner. Callers and members cannot read the credit ledger or lifetime spend. ([#2370](https://github.com/chester-hill-solutions/callcaster/pull/2370), [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137))
 
 - Fixed: Pages that require sign-in or workspace permission explain how to continue, with a sign-in or workspace link. ([#2368](https://github.com/chester-hill-solutions/callcaster/pull/2368), [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004))
 
