@@ -121,6 +121,7 @@ function assemble(
     supported,
     specTarget,
     docsGuide: annotation.docsGuide,
+    requestBodyLimit: annotation.requestBodyLimit,
     notes: annotation.notes,
     securityWarning: annotation.securityWarning,
     duplicate: annotation.duplicate,
