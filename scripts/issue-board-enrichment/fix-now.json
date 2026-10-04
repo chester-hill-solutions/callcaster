@@ -911,40 +911,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2141,
-    "verdict": "fix-now",
-    "recommendedTitle": "addInboundQueueMember accepts any user_id, including non-members of the workspace",
-    "summary": "Add-member service still checks neither target membership nor queue ownership. Existing-user ids from another workspace can be written. Fresh bootstrap already has a user FK, so nonexistent users do not insert successfully.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Service inserts caller-selected existing user/queue ids without workspace membership/queue ownership checks. A fresh database FK already rejects nonexistent user ids, but error maps to 500 instead of clear 400.",
-    "resolution": "Validate target workspace membership and queue belongs to workspace inside the shared service. A DB membership constraint must reference composite (workspace_id,user_id), not bare workspace_member(user_id), which is not unique. Preserve existing global user FK. Audit existing rows with authorized database access.",
-    "lookIn": [
-      "app/lib/inbound-queue-db.server.ts:103",
-      "app/routes/api+/inbound-queue.action.server.ts:89",
-      "app/routes/workspaces+/$id/settings/queues.action.server.ts:88",
-      "drizzle/0006_app_schema_tail.sql:147",
-      "app/lib/inbound-queue-db.server.ts:97",
-      "drizzle/0006_app_schema_tail.sql:144",
-      "app/db/schema-inbound-queue.ts:25"
-    ],
-    "existingTests": [
-      "test/inbound-queue.test.ts covers queue-name helpers; it does not cover add-member target membership or queue ownership."
-    ],
-    "missingTests": [
-      "Existing foreign user refused/no insert, nonexistent user gives clear 400, foreign queue refused, and valid same-workspace member accepted; live-row audit count unknown."
-    ],
-    "acceptanceCriteria": [
-      "Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.",
-      "Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.",
-      "The shared service rejects a queue belonging to another workspace.",
-      "A valid member and queue in the same workspace succeed.",
-      "An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2142,
     "verdict": "fix-now",
     "recommendedTitle": "rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned",
