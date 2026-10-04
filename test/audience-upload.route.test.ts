@@ -77,7 +77,8 @@ vi.mock("@/server/db", () => ({
     insert: () => ({ values: processDbMocks.insertValues }),
   },
 }));
-vi.mock("@/lib/audience-upload-db.server", () => ({
+vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/audience-upload-db.server")>()),
   // processAudienceUpload dedupes against phones already in the audience.
   listAudiencePhones: vi.fn(async () => new Set<string>()),
   findAudienceInWorkspace: (...args: unknown[]) => dbMocks.findAudienceInWorkspace(...args),
