@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@128d0499 + admin pagination state refresh (2026-10-04 UTC)` · 307 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@9edfb271 + runtime security source refresh (2026-10-04 UTC)` · 310 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified admin pagination merge and native issue update. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the native runtime security Epic and child-task updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 60
+## Fix now — 61
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -562,6 +562,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334) security(deps): upgrade csv-parse to a patched release
+- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-04
+- csv-parse 5.6.0 remains affected by runtime alert #220. The patched line starts at 7.0.2. Current parser paths do not enable grouped duplicate columns; package exposure is confirmed without an application exploit claim.
+- Root cause: The direct ^5.5.6 dependency excludes the patched major release, so a lock-only update cannot resolve this finding.
+- Resolution: Upgrade to a supported patched release in both install paths. Preserve the actual server and sync/async audience parsing contracts through regression cases and full local/remote gates.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/csv.ts`, `app/lib/csv-contacts.ts`, `app/components/audience/audience-upload-csv.ts`
+- Existing tests: test/csv.test.ts; test/audience-upload-csv.test.ts; test/csv-opt-out-parsing.test.ts
+- Missing tests: Patched duplicate __proto__ advisory control plus parser parity across quoted/BOM/headerless/duplicate/malformed input.
+- Done when: Both install paths resolve csv-parse >=7.0.2 and support its import/type contract.; Actual parser behavior and upload mapping remain correct.; Advisory regression and valid controls pass; production audit no longer reports csv-parse.; Full ci:local, remote gates, deployed upload verification and release promotion are complete.
+- Tracker: Native Task under #1802. Keep Scalar compatibility work in #2335.
+
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
@@ -714,9 +725,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 138
+## Verify and close — 139
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2333](https://github.com/chester-hill-solutions/callcaster/issues/2333) security(deps): patch Axios in runtime install paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Axios source is merged to dev in PR #2336 (9edfb271). Both npm and Bun resolve 1.20.0 while their existing Twilio versions remain unchanged. Six real HTTP/SDK cases pass in each installed tree; the old Axios redirect fault fails with five passing controls. No production exploit path is claimed.
+- Resolution: Verify deployed Twilio request authentication, form serialization, errors and retry behavior, then promote the source fix to the release branch. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-axios.test.ts`
+- Existing tests: test/runtime-axios.test.ts; test/twilio-client.server.test.ts
+- Tracker: PR #2336 passed full ci:local on final head 68832c47 and all applicable remote gates plus both deployments. Remote quality executed all six HTTP cases. Task #2333 remains a child of runtime Epic #1802; deployed acceptance and release promotion remain open.
 
 ### [#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109) Changing "rows per page" in the admin portal blanks the table — the page number is never reset
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2765,6 +2784,13 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
+### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Runtime security work is a native Epic with Tasks #2333 (Axios), #2334 (csv-parse) and #2335 (Scalar AI SDK chain). Axios source is on dev after PR #2336; deployed acceptance and promotion remain open. #1809 is closed. The production npm audit now reports eight affected package nodes across CSV and Scalar.
+- Resolution: Implement the remaining children as separate package concerns and PRs. Verify npm and Bun independently because their locked versions differ. Complete each child’s deployed behavior checks and release promotion before completing the Epic.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Keep Nano ID #1805 and closed qs #1809 as existing history. Do not recreate their work. Default-branch Dependabot reports two runtime alerts (#220, #218), a different snapshot from the dev npm affected-node count.
+
 ### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
 - Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - Onboarding hides the name form before save acceptance and duplicates returned action failure. Preserve the entered name, retry and genuine field validation.
@@ -3209,13 +3235,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
 - Tracker: The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope.
 
-### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
-- Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.
-- Resolution: Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Do not duplicate Nano ID #1805 or the active qs #1809 work.
-
 ---
 
 ## Duplicates — 3
@@ -3255,15 +3274,19 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 8
+## Needs triage — 9
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#2330](https://github.com/chester-hill-solutions/callcaster/issues/2330) Use verified client identity for public rate limits
+### [#2335](https://github.com/chester-hill-solutions/callcaster/issues/2335) security(deps): patch the Scalar AI SDK dependency chain
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2330](https://github.com/chester-hill-solutions/callcaster/issues/2330) Use verified client identity for public rate limits
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
