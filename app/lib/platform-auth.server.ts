@@ -1,3 +1,4 @@
+import { isAPIError } from "better-auth/api";
 import { logger } from "@/lib/logger.server";
 import { isSignupOpen } from "@/lib/env.server";
 import { auth } from "@/server/auth-instance";
@@ -104,6 +105,27 @@ function mapTokenResponse(args: {
   };
 }
 
+const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
+
+const PASSWORD_LOGIN_ERRORS: Readonly<Record<string, { status: number; message: string }>> = {
+  INVALID_EMAIL_OR_PASSWORD: { status: 401, message: INVALID_CREDENTIALS_MESSAGE },
+  EMAIL_NOT_VERIFIED: { status: 403, message: "Verify your email before signing in." },
+};
+
+function passwordLoginErrorMessage(error: unknown): string {
+  if (isAPIError(error)) {
+    if (error.statusCode === 429) {
+      return "Too many sign-in attempts. Wait a minute and try again.";
+    }
+    const code = error.body?.code;
+    if (typeof code === "string" && Object.hasOwn(PASSWORD_LOGIN_ERRORS, code)) {
+      const known = PASSWORD_LOGIN_ERRORS[code];
+      if (known && error.statusCode === known.status) return known.message;
+    }
+  }
+  return "We couldn't sign you in. Try again shortly.";
+}
+
 /** Shared email/password login used by HTML sign-in and JSON token API. */
 export async function loginWithPassword(
   request: Request,
@@ -128,7 +150,7 @@ export async function loginWithPassword(
     }
 
     if (!body?.token || !body?.user) {
-      return { ok: false, error: "Invalid credentials" };
+      return { ok: false, error: INVALID_CREDENTIALS_MESSAGE };
     }
 
     return {
@@ -139,12 +161,9 @@ export async function loginWithPassword(
     };
   } catch (error) {
     logger.error("loginWithPassword failed", error);
-    // Never surface the underlying error to the browser: a DB/network failure
-    // can otherwise leak schema details (e.g. "relation auth_user does not
-    // exist" on an un-bootstrapped preview DB) as a plain "Failed query"
-    // message. Wrong credentials are already handled by the success-path check
-    // above, so reaching here means the server failed — say so generically.
-    return { ok: false, error: "We couldn't sign you in. Try again shortly." };
+    // Provider denials throw too. Map only known codes and expected statuses;
+    // keep unknown provider, database and network details out of user feedback.
+    return { ok: false, error: passwordLoginErrorMessage(error) };
   }
 }
 
