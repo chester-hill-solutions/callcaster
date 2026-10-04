@@ -1,6 +1,6 @@
 export { loader } from "./responses.loader.server";
 
-import { type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
+import { type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 import { formatSurveyAnswer } from "@/lib/survey-format";
@@ -28,7 +28,6 @@ import {
   Clock,
 } from "lucide-react";
 import { useState } from "react";
-import { downloadBlobPart } from "@/lib/download-blob.client";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/db-types";
 
@@ -63,17 +62,6 @@ export default function SurveyResponsesPage() {
   const { survey, responses, workspaceId, stats } =
     useLoaderData();
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
-  const exportFetcher = useFetcher();
-  const handleExport = async () => {
-    await exportFetcher.load("./export");
-    if (typeof exportFetcher.data === "string") {
-      downloadBlobPart({
-        data: exportFetcher.data,
-        filename: `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`,
-        mimeType: "text/csv",
-      });
-    }
-  };
 
   const allQuestions =
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
@@ -124,15 +112,11 @@ export default function SurveyResponsesPage() {
             {survey.title} - Response Analysis
           </Text>
         </div>
-        <Button 
-          variant="outline"
-          onClick={() => {
-            void handleExport();
-          }}
-          disabled={exportFetcher.state === "loading"}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {exportFetcher.state === "loading" ? "Exporting..." : "Export Data"}
+        <Button variant="outline" asChild>
+          <a href={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/responses/export`}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Data
+          </a>
         </Button>
       </div>
 
