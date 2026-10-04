@@ -115,6 +115,7 @@ describe("getWorkspaceBillingActivity", () => {
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({
       user: { id: "u1" },
       workspaceId: "w1",
+      minRole: "admin",
     });
     if (!result.ok) throw new Error("expected ok");
     expect(result.balance).toBe(250);

@@ -79,6 +79,32 @@ test.describe("RBAC @rbac @security", () => {
     await expect(page.getByRole("heading", { name: "Access denied" })).toHaveCount(0);
   });
 
+  for (const [role, roleTest] of [["caller", callerTest], ["member", memberTest]] as const) {
+    roleTest(`RBAC-19 ${role} cannot read billing directly`, async ({ page }) => {
+      const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "billing"));
+      expect(response?.status()).toBe(403);
+      await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+      await expect(page.getByText("You don't have permission to view billing.")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Credits", exact: true })).toHaveCount(0);
+      const api = await page.request.get(`/api/workspaces/${E2E_WORKSPACES.ready.id}/billing`);
+      expect(api.status()).toBe(403);
+      const body = await api.json();
+      expect(body).not.toHaveProperty("balance");
+      expect(body).not.toHaveProperty("transactions");
+    });
+  }
+
+  for (const [role, roleTest] of [["admin", adminTest], ["owner", ownerTest]] as const) {
+    roleTest(`RBAC-19 ${role} can read billing directly`, async ({ page }) => {
+      const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "billing"));
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { name: "Credits", exact: true })).toBeVisible();
+      const api = await page.request.get(`/api/workspaces/${E2E_WORKSPACES.ready.id}/billing`);
+      expect(api.status()).toBe(200);
+      expect(await api.json()).toHaveProperty("balance");
+    });
+  }
+
   callerTest("RBAC-18 caller zero credits dialog", async ({ page }) => {
     // #1435: try/finally guarantees the credit restore runs even when
     // the banner assertion fails. Previously the trailing
