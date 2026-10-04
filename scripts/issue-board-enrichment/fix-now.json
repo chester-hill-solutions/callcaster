@@ -135,42 +135,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2004,
-    "verdict": "fix-now",
-    "recommendedTitle": "A 403 renders as \"Something went wrong\" with a Reload Page button and the raw status text",
-    "summary": "The nested boundary still treats a 403 as a generic failure with a destructive alert and Reload Page. Permissions cannot be repaired by reload.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The nested boundary still treats a 403 as a generic failure with a destructive alert and Reload Page. Permissions cannot be repaired by reload.",
-    "rootCause": "The boundary was written around 404 and 500 and treats every other status as an unexpected crash. There is no map from status to user-facing meaning, so a deliberate authorization decision is presented as a system fault.",
-    "resolution": "Add a dedicated access-denied state with a useful navigation action; preserve 404 and internal-error protections. Coordinate with #2123 message extraction without merging unrelated scopes.",
-    "lookIn": [
-      "app/components/shared/RouteErrorBoundary.tsx:13",
-      "app/components/shared/RouteErrorBoundary.tsx:34",
-      "test/ui/components-shared-smoke.test.tsx:238",
-      "app/components/shared/RouteErrorBoundary.tsx:13-32 (the 404 branch to copy), :34-56 (the generic 403 fallthrough)",
-      "app/lib/workspace-middleware.server.ts:62-75 (createWorkspaceMiddlewareWithMinRole returning 403 with a real message)",
-      "app/lib/workspace-membership.server.ts:158-187 (requireWorkspaceAccess, 403 AppError, 81 call sites)",
-      "app/routes/workspaces+/$id.tsx:303 (the workspace layout re-exports this boundary, so every workspace page inherits it)"
-    ],
-    "existingTests": [
-      "test/ui/components-shared-smoke.test.tsx"
-    ],
-    "missingTests": [
-      "403 copy/navigation/call-to-action behavior is untested; current status assertion preserves the faulty behavior."
-    ],
-    "acceptanceCriteria": [
-      "A 403 tells the user they lack access, in the app's voice, with the server's message where one exists",
-      "No 403 renders the generic crash heading or a Reload Page action",
-      "The boundary offers a next step the user can actually take",
-      "401 gets the same treatment",
-      "404 and 5xx behaviour is unchanged",
-      "A test covers each status branch, including one on a real min-role-gated route"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2062,
     "verdict": "fix-now",
     "recommendedTitle": "Flash telemetry infers Alert severity from its ARIA role",

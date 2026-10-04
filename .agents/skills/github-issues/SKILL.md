@@ -7,6 +7,13 @@ description: "Use when creating or editing GitHub issues, especially issue types
 
 This skill extends `github-cli`; apply its authentication, repository-targeting, mutation, and general verification rules first. This skill owns only issue classification and relationships for `chester-hill-solutions/callcaster`.
 
+## User-limited issue queues
+
+For a user-limited issue queue, read live native assignees before selecting,
+editing or publishing work. Use the assignee field, not the author or cached
+board. Skip issues owned by someone the user excluded, including co-assigned
+issues; do not reassign an issue to make it eligible.
+
 ## Issue Types
 
 Use a GitHub issue type for primary work classification. Do not use a label such as `bug` as a substitute for the `Bug` type. Labels remain appropriate for orthogonal metadata, such as component, priority, status, or team ownership.
