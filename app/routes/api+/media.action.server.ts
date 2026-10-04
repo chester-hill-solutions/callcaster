@@ -8,6 +8,7 @@ import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server
 import { MAX_MEDIA_BODY_BYTES, validateMediaFile } from "@/lib/media-upload.server";
 import { FormBodyError, readBoundedFormData } from "@/lib/bounded-form-data.server";
 import { defineAction } from "@/lib/handler.server";
+import { AppError } from "@/lib/errors.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -64,6 +65,7 @@ export const action = defineAction({
         return routeData(signedUrl, { status: 201 });
     }
     catch (error) {
+        if (error instanceof AppError) throw error;
         logger.error("Error uploading media:", error);
         return routeData({ error }, { status: 500 });
     }
