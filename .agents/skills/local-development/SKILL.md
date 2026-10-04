@@ -50,6 +50,9 @@ missing tool into a read-only audit.
 
 ## Route authentication tests
 
+React Router 8 action and loader fixtures must include `url: new URL(request.url)`
+with `request`. Missing `url` can trigger the error handler before login runs.
+
 The node suite installs a shared `api-auth.server` mock in
 `test/setup-route-auth-mock.ts`. To test real route authentication, opt out with
 `vi.unmock("@/lib/api-auth.server")` and mock only the session/provider boundary.
