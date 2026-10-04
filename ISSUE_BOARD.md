@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@befe20fa + verified runtime closure source refresh (2026-10-04 UTC)` · 313 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@3c623739 + #2348 normalization source (2026-10-04 UTC)` · 314 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the six native runtime package-task source merges and parent audit updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after native normalization Task #2348 and its parent-scope updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 60
+## Fix now — 59
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,18 +45,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
-
-### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
-- PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.
-- Current behavior: Fresh audit: dev@9c834837 on 2026-10-04; affected app source is identical at current dev@befe20fa. The actual upload processor imports generic lib/csv and writes mapped opt_out strings into contact.insertMany. The private boolean parser repaired in #2250 is not called here.
-- Root cause: PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path.
-- Resolution: Reuse the existing total opt-out parser at the actual server upload mapping boundary, preserving its current documented value semantics, with real upload-level regression controls. Split normalization into an atomic child Task. Keep #1771 for existing per-row reporting and plan the parent’s insert/link/progress failure and re-upload guarantees separately.
-- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts`
-- Existing tests: test/csv-opt-out-parsing.test.ts covers the separate standalone contact parser.; test/audience-upload.route.test.ts does not prove normalization at the real contact insert boundary.; test/audience-upload-dedupe.test.ts covers within-file and already-linked audience phones; it does not prove recovery after contact insertion succeeds and membership insertion fails.
-- Missing tests: Actual server upload mapping with opt-out, opt-in, blank and unknown CSV values; verify boolean values at the contact insert boundary.; Insert/link/progress failure and re-upload controls, including rows without a mapped phone; normalization alone does not prove recovery.; Unknown-value review reporting and dispatch exclusion remain part of the broad parent acceptance.
-- Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
-- Tracker: The normalization defect remains Fix now. Create one native child Task before implementation. #1771 already tracks per-row import reporting; do not duplicate it. Existing phone dedupe reads through audience membership and cannot prove rollback or retry safety after a linking failure. Keep all broad acceptance visible; a normalization-only PR cannot close #2128.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -714,9 +702,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 144
+## Verify and close — 145
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348) Normalize opt-out values in the audience upload path
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- This source change reuses the standalone opt-out parser at the actual audience-upload mapping boundary. Mapped cells are boolean before insertion; permitted, blank and pending behavior is preserved. Deployed upload acceptance and release remain required.
+- Root cause: The real upload uses generic lib/csv and previously wrote mapped opt-out values as raw strings, bypassing the standalone parser fixed in #2250.
+- Resolution: Verify the applicable deployed import behavior and release promotion. Keep broader reporting and failure/re-upload acceptance under parent #2128 and existing #1771; do not close the parent from this normalization-only Task.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/csv-contacts.ts`, `test/audience-upload-opt-out.test.ts`, `test/csv-opt-out-parsing.test.ts`
+- Existing tests: 25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.; 111 focused upload, standalone parser, route and phone dedupe cases pass.; Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25.
+- Missing tests: Applicable deployed upload acceptance and release/default-branch verification.
+- Done when: Mapped opt-out cells reach contact insertion as expected literal booleans through one canonical parser.; Existing value policy, unmapped default, other fields, custom data, phone normalization and completion remain correct.; Full local CI, both independent reviews, applicable remote gates and both deployments pass before merge.; Applicable deployed upload behavior and release promotion are verified.
+- Tracker: Native Task under #2128; one normalization concern. This source is ready for its required gates and deployed verification. The parent’s per-row reporting and durable recovery requirements remain open.
 
 ### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
 - Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2815,9 +2814,22 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 40
+## Blocked / split first — 41
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
+- Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Complete audience upload recovery after opt-out normalization**
+- The #2348 source change normalizes mapped opt-out values through the existing total boolean parser. The parent’s unknown-value review reporting and failure/re-upload requirements remain unfinished; normalization alone cannot complete this Bug.
+- Current behavior: Mapped opt-out values now reach the contact insert boundary as booleans with the existing parser policy. Contact and audience-membership insertion remain separate writes. Phone dedupe reads only already-linked audience phones and does not prove rollback or retry safety after membership or progress failures.
+- Root cause: The upload previously wrote mapped opt-out strings without calling the standalone parser. #2348 addresses that boundary. Remaining recovery requirements involve separate contact/link/progress writes and no precise persisted per-row outcome report.
+- Resolution: Verify the normalization child’s deployed acceptance and release. Reuse existing #1771 for per-row and unknown-value review reporting. Pin insert/link/progress failure and re-upload behavior, including rows without a mapped phone, then split the remaining recovery work into atomic Tasks before implementation.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts`
+- Existing tests: #2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.; Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.; Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.
+- Missing tests: Unknown-value review reporting and exact per-row landed outcomes, retained under #1771.; Insert/link/progress failure and re-upload controls, including rows without a mapped phone, with a pinned atomicity or idempotency contract.; Applicable deployed upload acceptance and release/default-branch verification remain open.
+- Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
+- Tracker: Native normalization Task #2348 is a verified child of #2128. Keep this parent open for all original acceptance criteria. #1771 already owns per-row import reporting; do not duplicate it. The parent’s failure/re-upload guarantees still need a separate reviewed fault contract and atomic work split; source normalization does not prove them.
 
 ### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
 - Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04

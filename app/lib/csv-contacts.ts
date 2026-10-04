@@ -137,7 +137,7 @@ const OPT_IN_VALUES = new Set([
  *
  * Total by construction: it never throws, for any string.
  */
-const parseOptOut = (value: string | null): boolean => {
+export const parseOptOut = (value: string | null): boolean => {
   const normalised = normaliseConsentValue(value);
   if (!normalised) return false;
   return !OPT_IN_VALUES.has(normalised);

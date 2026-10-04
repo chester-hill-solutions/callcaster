@@ -1,4 +1,5 @@
 import { parseCSV } from "@/lib/csv";
+import { parseOptOut } from "@/lib/csv-contacts";
 import { logger } from "@/lib/logger.server";
 import { uploadObject } from "@/lib/object-storage.server";
 import {
@@ -386,25 +387,19 @@ export const processAudienceUpload = async (
           }
 
           const value = contact[actualHeader];
-            //console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
+          if (dbField === "name" || dbField === "ignore" || value === undefined) {
+            return;
+          }
 
-          // `name` is handled above; `ignore` means the user dropped this column
-          //so nothing is imported for it.
-          if (dbField !== 'name' && dbField !== 'ignore') {
-            if (dbField === 'other_data') {
-              // Keep custom values in the same object-per-column shape used by
-              // the other canonical CSV contact parser.
-              if (value !== undefined) {
-                mappedContact.other_data?.push({ [actualHeader]: value });
-              }
-            } else if (dbField === "phone") {
-              const normalizedPhone = parsePhoneNumber(value ?? null);
-              if (normalizedPhone) mappedContact.phone = normalizedPhone;
-            } else {
-              if (value !== undefined) {
-                mappedContact[dbField] = value;
-              }
-            }
+          if (dbField === "other_data") {
+            mappedContact.other_data?.push({ [actualHeader]: value });
+          } else if (dbField === "phone") {
+            const normalizedPhone = parsePhoneNumber(value);
+            if (normalizedPhone) mappedContact.phone = normalizedPhone;
+          } else if (dbField === "opt_out") {
+            mappedContact.opt_out = parseOptOut(value);
+          } else {
+            mappedContact[dbField] = value;
           }
         });
 

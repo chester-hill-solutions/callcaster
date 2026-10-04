@@ -4277,5 +4277,36 @@
       "Required deployed acceptance and release promotion are complete."
     ],
     "trackerRecommendation": "Native Task under #1802 remains open; development copies share this package task under #1803. Final head d28fecdf passed full local CI, all applicable remote gates and both deployments; remote quality executed all 38 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Compiler package presence does not prove a live untrusted-CSS service or app file-disclosure exploit."
+  },
+  {
+    "issueNumber": 2348,
+    "verdict": "verify-close",
+    "summary": "This source change reuses the standalone opt-out parser at the actual audience-upload mapping boundary. Mapped cells are boolean before insertion; permitted, blank and pending behavior is preserved. Deployed upload acceptance and release remain required.",
+    "rootCause": "The real upload uses generic lib/csv and previously wrote mapped opt-out values as raw strings, bypassing the standalone parser fixed in #2250.",
+    "resolution": "Verify the applicable deployed import behavior and release promotion. Keep broader reporting and failure/re-upload acceptance under parent #2128 and existing #1771; do not close the parent from this normalization-only Task.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/lib/csv-contacts.ts",
+      "test/audience-upload-opt-out.test.ts",
+      "test/csv-opt-out-parsing.test.ts"
+    ],
+    "existingTests": [
+      "25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.",
+      "111 focused upload, standalone parser, route and phone dedupe cases pass.",
+      "Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25."
+    ],
+    "missingTests": [
+      "Applicable deployed upload acceptance and release/default-branch verification."
+    ],
+    "acceptanceCriteria": [
+      "Mapped opt-out cells reach contact insertion as expected literal booleans through one canonical parser.",
+      "Existing value policy, unmapped default, other fields, custom data, phone normalization and completion remain correct.",
+      "Full local CI, both independent reviews, applicable remote gates and both deployments pass before merge.",
+      "Applicable deployed upload behavior and release promotion are verified."
+    ],
+    "trackerRecommendation": "Native Task under #2128; one normalization concern. This source is ready for its required gates and deployed verification. The parent’s per-row reporting and durable recovery requirements remain open.",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high"
   }
 ]

@@ -1028,46 +1028,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2128,
-    "verdict": "fix-now",
-    "recommendedTitle": "An opt-out column value like \"unsubscribe\" crashes the audience import mid-run and leaves a partial import committed",
-    "summary": "PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.",
-    "currentBehavior": "Fresh audit: dev@9c834837 on 2026-10-04; affected app source is identical at current dev@befe20fa. The actual upload processor imports generic lib/csv and writes mapped opt_out strings into contact.insertMany. The private boolean parser repaired in #2250 is not called here.",
-    "resolution": "Reuse the existing total opt-out parser at the actual server upload mapping boundary, preserving its current documented value semantics, with real upload-level regression controls. Split normalization into an atomic child Task. Keep #1771 for existing per-row reporting and plan the parent’s insert/link/progress failure and re-upload guarantees separately.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/lib/audience-upload-db.server.ts",
-      "app/routes/api+/audience-upload.action.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/components/audience/AudienceUploadMapStep.tsx",
-      "shared/contact-import-headers.ts",
-      "app/lib/csv-contacts.ts",
-      "app/lib/chat-opt-out.ts"
-    ],
-    "existingTests": [
-      "test/csv-opt-out-parsing.test.ts covers the separate standalone contact parser.",
-      "test/audience-upload.route.test.ts does not prove normalization at the real contact insert boundary.",
-      "test/audience-upload-dedupe.test.ts covers within-file and already-linked audience phones; it does not prove recovery after contact insertion succeeds and membership insertion fails."
-    ],
-    "missingTests": [
-      "Actual server upload mapping with opt-out, opt-in, blank and unknown CSV values; verify boolean values at the contact insert boundary.",
-      "Insert/link/progress failure and re-upload controls, including rows without a mapped phone; normalization alone does not prove recovery.",
-      "Unknown-value review reporting and dispatch exclusion remain part of the broad parent acceptance."
-    ],
-    "acceptanceCriteria": [
-      "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
-      "An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.",
-      "A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).",
-      "Re-uploading the same file does not duplicate the rows that already landed.",
-      "An opt-out value is never dropped on the floor: the contact is excluded from dispatch."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "The normalization defect remains Fix now. Create one native child Task before implementation. #1771 already tracks per-row import reporting; do not duplicate it. Existing phone dedupe reads through audience membership and cannot prove rollback or retry safety after a linking failure. Keep all broad acceptance visible; a normalization-only PR cannot close #2128.",
-    "rootCause": "PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path."
-  },
-  {
     "issueNumber": 2131,
     "verdict": "fix-now",
     "recommendedTitle": "Predictive \"Start Dialing\" is a silent no-op when the campaign has no caller ID, and the error is discarded",
