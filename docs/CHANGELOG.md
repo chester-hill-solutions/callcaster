@@ -28,7 +28,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
-- Patched the CSV parser while preserving audience import and contact consent mapping ([#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334)).
+- Patched the CSV parser while preserving audience import and contact consent mapping ([#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334), [PR #2338](https://github.com/chester-hill-solutions/callcaster/pull/2338)).
 
 - Patched Axios in both runtime install paths while preserving Twilio request handling ([#2333](https://github.com/chester-hill-solutions/callcaster/issues/2333), [PR #2336](https://github.com/chester-hill-solutions/callcaster/pull/2336)).
 
