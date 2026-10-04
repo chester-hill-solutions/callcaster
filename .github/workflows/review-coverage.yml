@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Assess the risk surface
         id: risk
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

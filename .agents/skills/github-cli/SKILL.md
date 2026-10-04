@@ -59,6 +59,8 @@ executed cases and a completed successful job.
 pages, pipe `gh api --paginate` to `jq -s` and aggregate the collected pages.
 Older gh versions reject combining `--slurp` with `--jq`. Check the installed
 help and require one numeric output before writing a count to GITHUB_OUTPUT.
+Use `pipefail` so a failed or incomplete API read cannot become a successful
+zero or partial count. In GitHub Actions, declare `shell: bash` for this pipeline.
 
 ## Empty REST Responses
 
