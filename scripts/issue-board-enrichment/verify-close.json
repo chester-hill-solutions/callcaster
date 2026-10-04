@@ -4590,5 +4590,46 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Verify and close after original browser-flow triage, deployed QA and default-branch release. PR #2364 is merged into dev; the native issue preserves all acceptance criteria and remains open."
+  },
+  {
+    "issueNumber": 2042,
+    "verdict": "verify-close",
+    "recommendedTitle": "Side Sheet has no default padding, so any body between header and footer renders flush to the edge",
+    "summary": "The merged local SheetBody contract fixes all 12 consumers; measured normal, edge-to-edge and compact navigation layouts pass. Deployed acceptance and release remain pending.",
+    "currentBehavior": "Source audit: dev@1a5d463f, 2026-10-04. PR #2366 merged with source-equivalent cleanup. Normal body insets match the padded header/footer; mobile chats and workspace navigation keep explicit edge-to-edge bodies; the site menu keeps compact spacing.",
+    "rootCause": "The original content slot did not declare body padding. The local body slot now owns padding, with deliberate edge-to-edge and navigation variants.",
+    "resolution": "Verify affected flows on deployed dev, including forms, normal and edge-to-edge layouts, then promote through the default-branch release. Keep the issue open until required acceptance is complete.",
+    "lookIn": [
+      "app/components/ui/sheet.tsx",
+      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx",
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "app/components/workspace/WorkspaceNav.tsx",
+      "app/routes/workspaces+/$id/chats.route.tsx",
+      "app/components/layout/Navbar.MobileMenu.tsx",
+      "scripts/lib/sheet-body-contract.mjs",
+      "e2e/specs/sheet-insets.spec.ts"
+    ],
+    "existingTests": [
+      "test/sheet-body-contract.test.ts: 26 AST contract cases; missing/flush body, imports, forms and padding controls.",
+      "test/ui/split-campaign-override.test.tsx: eight confirmation and form behavior cases.",
+      "e2e/specs/sheet-insets.spec.ts: seven real built-app geometry cases at mobile/desktop widths and light/dark themes; page bounds, both edge-to-edge layouts and compact navigation.",
+      "Four browser geometry cases on the actual reported split component; removing its default horizontal inset failed all four.",
+      "Final full ci:local: 4,570 node, 1,039 UI and 33 Bun cases passed; remote browser gate: 131 cases passed."
+    ],
+    "missingTests": [
+      "Deployed acceptance for the affected normal, edge-to-edge and compact navigation sheets.",
+      "Default-branch release and required acceptance before issue closure."
+    ],
+    "acceptanceCriteria": [
+      "Body content in a side Sheet has the same horizontal inset as its header and footer",
+      "The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge",
+      "Padding is defined in one place, and hand-compensating padding at call sites is removed",
+      "A test fails if a new SheetContent call site reintroduces flush body content",
+      "The vendored shad-cc package is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "PR #2366 merged to dev with clear independent reviews, final exact-head local/remote gates and both deployments green. Native issue retains all five original acceptance criteria and remains open; issue-on-dev workflow actually moved one item. Local browser proof does not replace deployed acceptance."
   }
 ]

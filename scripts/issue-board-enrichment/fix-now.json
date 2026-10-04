@@ -135,42 +135,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2042,
-    "verdict": "fix-now",
-    "recommendedTitle": "Side Sheet has no default padding, so any body between header and footer renders flush to the edge",
-    "summary": "The local sheet wrapper still adds no padding. The reported split-campaign sheet body has vertical padding only, while upstream padding applies to header/footer.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The reported sheet still has no horizontal body inset. Header/footer use upstream p-6.",
-    "rootCause": "SheetContent adds no body inset. Upstream header/footer slots have p-6, while the reported split-campaign body has only py-4. Other consumers require a separate audit; not every sheet should receive padding.",
-    "resolution": "Add a deliberate body-padding contract and check existing consumers rather than blindly adding outer padding.",
-    "lookIn": [
-      "app/components/ui/sheet.tsx:50",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx:81",
-      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:273",
-      "app/components/ui/sheet.tsx:50-54 (the local SheetContent wrapper, where the default belongs)",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx:81 (no padding on the content slot), :132 and :142 (p-6 on header and footer only)",
-      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:262-263 (the sheet in the screenshot)",
-      "the 9 other SheetContent call sites: CallScreen.Layout.tsx:253,274,302; NumberSummaryList.tsx:467; CallerIdVerificationDialog.tsx:44; ChatAddContactDialog.tsx:72; TeamMember.tsx:128; Navbar.MobileMenu.tsx:44; AddAudioSheet.tsx:125"
-    ],
-    "existingTests": [
-      "test/ui/components-ui-primitives.test.tsx (sheet render smoke test; no body-inset assertion)",
-      "test/ui/add-audio-sheet.test.tsx (upload behavior; no padding assertion)"
-    ],
-    "missingTests": [
-      "No sheet inset regression test or browser measurement was found. Header/footer already have padding, so a naive content p-6 risks doubled insets."
-    ],
-    "acceptanceCriteria": [
-      "Body content in a side Sheet has the same horizontal inset as its header and footer",
-      "The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge",
-      "Padding is defined in one place, and hand-compensating padding at call sites is removed",
-      "A test fails if a new SheetContent call site reintroduces flush body content",
-      "The vendored shad-cc package is unchanged"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2004,
     "verdict": "fix-now",
     "recommendedTitle": "A 403 renders as \"Something went wrong\" with a Reload Page button and the raw status text",
