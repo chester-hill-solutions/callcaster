@@ -1193,5 +1193,45 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
+  },
+  {
+    "issueNumber": 2128,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Complete audience upload recovery after opt-out normalization",
+    "summary": "The #2348 source change normalizes mapped opt-out values through the existing total boolean parser. The parent’s unknown-value review reporting and failure/re-upload requirements remain unfinished; normalization alone cannot complete this Bug.",
+    "currentBehavior": "Mapped opt-out values now reach the contact insert boundary as booleans with the existing parser policy. Contact and audience-membership insertion remain separate writes. Phone dedupe reads only already-linked audience phones and does not prove rollback or retry safety after membership or progress failures.",
+    "resolution": "Verify the normalization child’s deployed acceptance and release. Reuse existing #1771 for per-row and unknown-value review reporting. Pin insert/link/progress failure and re-upload behavior, including rows without a mapped phone, then split the remaining recovery work into atomic Tasks before implementation.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/lib/audience-upload-db.server.ts",
+      "app/routes/api+/audience-upload.action.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "shared/contact-import-headers.ts",
+      "app/lib/csv-contacts.ts",
+      "app/lib/chat-opt-out.ts"
+    ],
+    "existingTests": [
+      "#2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.",
+      "Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.",
+      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure."
+    ],
+    "missingTests": [
+      "Unknown-value review reporting and exact per-row landed outcomes, retained under #1771.",
+      "Insert/link/progress failure and re-upload controls, including rows without a mapped phone, with a pinned atomicity or idempotency contract.",
+      "Applicable deployed upload acceptance and release/default-branch verification remain open."
+    ],
+    "acceptanceCriteria": [
+      "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
+      "An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.",
+      "A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).",
+      "Re-uploading the same file does not duplicate the rows that already landed.",
+      "An opt-out value is never dropped on the floor: the contact is excluded from dispatch."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native normalization Task #2348 is a verified child of #2128. Keep this parent open for all original acceptance criteria. #1771 already owns per-row import reporting; do not duplicate it. The parent’s failure/re-upload guarantees still need a separate reviewed fault contract and atomic work split; source normalization does not prove them.",
+    "rootCause": "The upload previously wrote mapped opt-out strings without calling the standalone parser. #2348 addresses that boundary. Remaining recovery requirements involve separate contact/link/progress writes and no precise persisted per-row outcome report."
   }
 ]

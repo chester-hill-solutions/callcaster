@@ -3,37 +3,8 @@ import { describe, expect, test } from "vitest";
 import { parseCSV } from "@/lib/csv-contacts";
 
 /**
- * #2128 — the opt-out column parser.
- *
- * ## The issue's premise is wrong, and the real defect is worse
- *
- * The issue reported that a value like `unsubscribe` **throws mid-run** and leaves
- * a partial import committed. Verified against `parseOptOut`: it does not throw.
- * `unsubscribe` was already in the accepted list and parsed to `true`. There is no
- * enum coercion anywhere on this path — `contact.opt_out` is a plain `boolean` and
- * `parseOptOut` was total by construction.
- *
- * What is real is more serious. `contact.opt_out` gates dispatch:
- * `campaign-ivr-dispatch.server.ts` dequeues a member *only* when `opt_out` is
- * truthy, and `chat-sms-guards.server.ts` blocks a send on the same flag. So
- * `opt_out === false` means **contactable**.
- *
- * The old list was `yes | true | 1 | opt-out | unsubscribe`. Everything else was
- * `false` — contactable. That includes `opted out` and `opted-out`, which
- * `shared/contact-import-headers.ts` explicitly advertises as recognised opt-out
- * column names. So a customer's own compliance file, using a spelling the product
- * invited, produced a dispatchable audience.
- *
- * ## What these tests pin
- *
- * The accepted set, one case per value, and the *direction* of the unrecognised
- * fallback. A test that only asserted "does not throw" would have passed against
- * the original code — it already did not throw.
- *
- * Nothing is asserted about logging: `csv-contacts.ts` is re-exported from
- * `@/lib/utils`, which client components import, so it cannot reach
- * `@/lib/logger.server`. Reporting unrecognised values belongs with the per-row
- * import report, which is a server-side change not in this PR.
+ * These standalone parser cases do not prove the server upload path, which uses
+ * lib/csv. Its write-boundary coverage is in audience-upload-opt-out.test.ts.
  */
 
 /** Build a one-column CSV so each case names its own value in the failure. */

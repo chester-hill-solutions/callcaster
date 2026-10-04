@@ -61,6 +61,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Normalize mapped audience upload opt-out values with the existing CSV value rules before contact insertion ([#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348)).
+
 - Loaded chat history stays available after replies and filter refreshes; saved and live rows reconcile without duplicate messages, and each workspace/contact retains its own pagination lifetime ([#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106)).
 
 - Call-in verification returns the feature-unavailable response when its optional phone number is missing or empty; configured sessions retain their normal flow ([#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105)).
