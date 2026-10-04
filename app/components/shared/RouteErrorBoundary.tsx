@@ -44,7 +44,7 @@ export function RouteErrorBoundary() {
     );
 
     return (
-      <div className="flex min-h-[12rem] items-center justify-center p-6">
+      <div className="flex min-h-48 items-center justify-center p-6">
         <div className="w-full max-w-md text-center">
           <Heading as="h3" level={4}>
             {signIn ? "Sign in required" : "Access denied"}
