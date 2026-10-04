@@ -4048,5 +4048,38 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "PR #2319 merged to dev at 5af3f675. Keep native issue open pending deployed acceptance and promotion. The separate export-click defect is #2320; historical response assessment remains #2292."
+  },
+  {
+    "issueNumber": 2320,
+    "verdict": "verify-close",
+    "recommendedTitle": "Download the current survey CSV on the first export click",
+    "summary": "The first-click and stale survey-download fix merged into dev through PR #2322. Deployed acceptance and promotion remain pending.",
+    "currentBehavior": "Source fix at dev@96229009: the shared shad-cc outline Button links to the protected CSV attachment route. Full local CI passed on final head f513f4e5; remote quality, bundle, browser checks and both deployments succeeded. The real local production browser passes first download, a changed answer on a later export, attachment headers and foreign-workspace 404. The original page fails the first download while its direct CSV control passes.",
+    "rootCause": "The old async export handler read the captured render value of exportFetcher.data after load(), which did not replace that value.",
+    "resolution": "Verify first and repeated protected CSV downloads with changed saved data on the deployed review environment. Retain the shared Button position and styling, authorization, attachment filename, CSV protection and no-store policy. Promote through the release process after acceptance.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx",
+      "app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts",
+      "app/lib/csv.ts:csvResponse",
+      "app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx"
+    ],
+    "existingTests": [
+      "test/ui/survey-export-link.test.tsx: two actual-page link cases, original-action fault proof.",
+      "e2e/specs/survey-admin.spec.ts SURV-11: real first and repeated download, fresh saved answer, attachment/no-store headers, foreign-workspace 404; original first-download failure and restored pass.",
+      "test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls."
+    ],
+    "missingTests": [
+      "Deployed review-browser protected-download acceptance for the first click and a later changed answer; release promotion."
+    ],
+    "acceptanceCriteria": [
+      "The first click downloads current survey data; a later click requests current data again.",
+      "Keep the shared Button geometry and action position.",
+      "Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.",
+      "Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "PR #2322 merged to dev at 96229009. Keep the native issue open until deployed browser acceptance and release promotion are verified. The separate response-column fix is #2317; historical response assessment remains #2292."
   }
 ]

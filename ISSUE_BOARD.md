@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@b6a00f60 + webhook delivery plan audit (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@4dd7c3b8 + survey download state refresh (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified webhook delivery acceptance update. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey export merge and native issue update. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 63
+## Fix now — 62
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -335,18 +335,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block.
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320) Download the current survey CSV on the first export click
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
-- The first export click downloads nothing; the next click downloads the previous CSV request.
-- Current behavior: Actual page/fetcher reproduction at 5707c2f5, with the export handler unchanged from dev@71f86986: first-click and fresh-second-click cases fail; one control confirms the second click downloads the first CSV revision. No skips. No deployed respondent data read or changed.
-- Root cause: The async export handler reads the captured render value of exportFetcher.data after load(), which does not replace that value.
-- Resolution: Use the existing protected CSV attachment resource through the shared shad-cc Button link pattern. Remove the stale fetcher/blob copy; keep styling, action position, authorization, server filename, CSV protection and no-store policy.
-- Look in: `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts`, `app/lib/csv.ts:csvResponse`, `app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx`
-- Existing tests: Isolated actual-page reproduction: two regression failures and one positive control.; test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls.
-- Missing tests: Actual-page protected native action coverage; real-browser first and repeated download with changed CSV data.; Deployed protected-download acceptance after source merge.
-- Done when: The first click downloads current survey data; a later click requests current data again.; Keep the shared Button geometry and action position.; Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.; Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit.
-- Tracker: Native Bug #2320 assigned to wra-sol. Implement as an independent atomic PR from clean dev; do not bundle with #2317 or historical assessment #2292.
 
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -747,9 +735,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 135
+## Verify and close — 136
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320) Download the current survey CSV on the first export click
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The first-click and stale survey-download fix merged into dev through PR #2322. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@96229009: the shared shad-cc outline Button links to the protected CSV attachment route. Full local CI passed on final head f513f4e5; remote quality, bundle, browser checks and both deployments succeeded. The real local production browser passes first download, a changed answer on a later export, attachment headers and foreign-workspace 404. The original page fails the first download while its direct CSV control passes.
+- Root cause: The old async export handler read the captured render value of exportFetcher.data after load(), which did not replace that value.
+- Resolution: Verify first and repeated protected CSV downloads with changed saved data on the deployed review environment. Retain the shared Button position and styling, authorization, attachment filename, CSV protection and no-store policy. Promote through the release process after acceptance.
+- Look in: `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts`, `app/lib/csv.ts:csvResponse`, `app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx`
+- Existing tests: test/ui/survey-export-link.test.tsx: two actual-page link cases, original-action fault proof.; e2e/specs/survey-admin.spec.ts SURV-11: real first and repeated download, fresh saved answer, attachment/no-store headers, foreign-workspace 404; original first-download failure and restored pass.; test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls.
+- Missing tests: Deployed review-browser protected-download acceptance for the first click and a later changed answer; release promotion.
+- Done when: The first click downloads current survey data; a later click requests current data again.; Keep the shared Button geometry and action position.; Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.; Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit.
+- Tracker: PR #2322 merged to dev at 96229009. Keep the native issue open until deployed browser acceptance and release promotion are verified. The separate response-column fix is #2317; historical response assessment remains #2292.
 
 ### [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317) Keep survey response columns tied to saved questions
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
