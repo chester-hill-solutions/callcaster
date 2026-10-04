@@ -235,7 +235,7 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
     ).toBeInTheDocument();
   });
 
-  test("shows status and statusText for a route error response", async () => {
+  test("keeps status and reload for a server error without exposing its body", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { RouteErrorBoundary } = await import(
       "@/components/shared/RouteErrorBoundary"
@@ -245,9 +245,9 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
         {
           path: "/",
           loader: () => {
-            throw new Response("denied", {
-              status: 403,
-              statusText: "Forbidden",
+            throw new Response("Internal database detail", {
+              status: 500,
+              statusText: "Internal Server Error",
             });
           },
           element: <div>never shown</div>,
@@ -257,7 +257,9 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
       { initialEntries: ["/"] },
     );
     render(<RouterProvider router={router} />);
-    expect(await screen.findByText("403 Forbidden")).toBeInTheDocument();
+    expect(await screen.findByText("500 Internal Server Error")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload Page" })).toBeInTheDocument();
+    expect(screen.queryByText("Internal database detail")).not.toBeInTheDocument();
   });
 });
 

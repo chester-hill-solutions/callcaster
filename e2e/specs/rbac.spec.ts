@@ -63,6 +63,20 @@ test.describe("RBAC @rbac @security", () => {
   callerTest("RBAC-06 caller surveys new forbidden", async ({ page }) => {
     const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "surveys/new"));
     expect(response?.status()).toBe(403);
+    await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+    await expect(page.getByText(/You don't have permission to view this page/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reload Page" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Go to workspaces" }).click();
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(page.getByRole("heading", { name: "Your Workspaces", exact: true })).toBeVisible();
+  });
+
+  ownerTest("RBAC-06 owner can open the new survey form", async ({ page }) => {
+    const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "surveys/new"));
+    expect(response?.status()).toBe(200);
+    await expect(page.getByLabel("Survey ID")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Access denied" })).toHaveCount(0);
   });
 
   callerTest("RBAC-18 caller zero credits dialog", async ({ page }) => {
