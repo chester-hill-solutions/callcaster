@@ -1,6 +1,7 @@
 import type { Contact } from "@/lib/types";
 import type { ConversationSummary } from "@/lib/chat-conversation-sort";
 import type { Tables } from "@/lib/db-types";
+import { zWorkspaceUnreadCountResponse } from "@/lib/api-generated/zod.gen";
 
 type LatestMessage = Pick<
   Tables<"message">,
@@ -61,10 +62,7 @@ export async function fetchWorkspaceUnreadCount(workspaceId: string): Promise<nu
   const response = await fetch(
     `/api/workspaces/${encodeURIComponent(workspaceId)}/conversations?summary=unread`,
   );
-  const payload = await parseJsonResponse<{ unread_count: number }>(response);
-  if (!Number.isSafeInteger(payload.unread_count) || payload.unread_count < 0) {
-    throw new Error("Invalid workspace unread count");
-  }
+  const payload = zWorkspaceUnreadCountResponse.parse(await parseJsonResponse<unknown>(response));
   return payload.unread_count;
 }
 

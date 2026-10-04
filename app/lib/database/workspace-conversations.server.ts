@@ -117,8 +117,15 @@ function buildSearchPredicate(workspaceId: string, search: string | undefined): 
   )`;
 }
 
+type ConversationScope = {
+  workspaceId: string;
+  workspacePhoneKeys: Set<string>;
+  campaignId: number | null;
+};
+
 /**
- * Builds the conversation-summary aggregation. Conversation identity mirrors
+ * Shared message scope and participant identity for list and unread queries.
+ * Conversation identity mirrors
  * `getConversationParticipantPhones`/`getConversationPhoneKey`
  * (app/lib/chat-conversation-sort.ts): the "contact" side of a message is
  * whichever of from/to is NOT a workspace-owned number (falling back to
@@ -127,18 +134,7 @@ function buildSearchPredicate(workspaceId: string, search: string | undefined): 
  * (`public.normalise_phone_key`, the same function backing
  * idx_contact_workspace_normalised_phone — verified equivalent to
  * getConversationPhoneKey).
- *
- * Per-conversation scalar fields (contact_phone/user_phone/last_inbound_body)
- * use `array_agg(... ORDER BY date_created DESC) FILTER (...)` to take the
- * most-recent non-null value, matching the JS reference's "scan newest-first,
- * first non-null value wins" behavior.
  */
-type ConversationScope = {
-  workspaceId: string;
-  workspacePhoneKeys: Set<string>;
-  campaignId: number | null;
-};
-
 function buildConversationParticipantsCte(params: ConversationScope): SQL {
   const { workspaceId, workspacePhoneKeys, campaignId } = params;
   const campaignFilter =
@@ -214,6 +210,10 @@ function buildConversationParticipantsCte(params: ConversationScope): SQL {
   `;
 }
 
+/**
+ * Groups participants into conversations. Scalar fields use newest-first
+ * array aggregation to preserve the reference's first non-null value rule.
+ */
 function buildConversationSummaryQuery(params: ConversationScope & {
   sort: ChatSortOption;
   search: string | undefined;

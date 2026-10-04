@@ -162,6 +162,24 @@ describe("useChatsPage — accumulated pages survive a loader revalidation (#215
     );
   });
 
+  test("keeps all 105 conversations through repeated page-1 revalidation", () => {
+    const rows = Array.from({ length: 105 }, (_, i) => summary(
+      `+1555${String(i).padStart(7, "0")}`, 1, "2026-09-01T00:00:00Z",
+    ));
+    routerMocks.loaderData = loaderResponse(rows.slice(0, 25), 1, true);
+    const hook = rendered();
+    setFetcher(hook, loaderResponse(rows.slice(25), 5, false));
+    for (const count of [7, 8]) {
+      setLoader(hook, loaderResponse([
+        { ...rows[0], unread_count: count }, ...rows.slice(1, 25),
+      ], 1, true));
+      expect(hook.result.current.sidebarProps.chats).toHaveLength(105);
+      expect(hook.result.current.sidebarProps.chats.find(row => row.contact_phone === rows[0].contact_phone)?.unread_count).toBe(count);
+      expect(hook.result.current.sidebarProps.chats).toContainEqual(rows[104]);
+      expect(hook.result.current.sidebarProps.paginationState.page).toBe(5);
+    }
+  });
+
   test("applies a fresh page-1 response after pages 2-4 were loaded", () => {
     const hook = rendered();
     const { result } = hook;

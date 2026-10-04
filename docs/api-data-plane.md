@@ -50,11 +50,14 @@ Legacy: `GET/PATCH/DELETE /api/audiences`, `POST /api/audience-upload`.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/workspaces/:workspaceId/conversations` | Thread list |
+| GET | `/api/workspaces/:workspaceId/conversations?summary=unread` | Complete workspace unread message total |
 | GET | `/api/workspaces/:workspaceId/conversations/:contactNumber` | Messages |
 | POST | `/api/workspaces/:workspaceId/conversations/:contactNumber` | Mark received messages as read |
 | POST | `/api/chat_sms` | Send message (integrator) |
 
 Conversation GET and acknowledgment POST both require `campaigns.read`. A workspace API key must have that scope. Session users must be workspace members whose role has that capability, including the caller role. A key with no scopes or only unrelated scopes receives 403 and causes no message write. A non-member or a workspace mismatch receives 404.
+
+The list GET accepts `summary=unread` to return `{ "unread_count": 106 }` instead of a conversation page. The total counts received inbound messages across the entire workspace, including conversations beyond the newest 100. It uses the same message and phone-matching rules as the per-conversation unread pills. Pagination, campaign, search and sort parameters do not narrow this workspace total. The count mode uses the same `campaigns.read` authorization as the list. Unknown summary modes return 400; database failures return a safe 500 error, not a false zero. Without `summary`, the list response and pagination are unchanged.
 
 The acknowledgment POST accepts JSON `{ "sid": "SM..." }` for one received message. Without `sid`, it marks received messages for the URL's contact number as read. The stored status changes from `received` to `delivered` for these incoming messages; this operation does not set outbound provider delivery receipts. It returns `{ "ok": true }` on success. Other methods receive 405 after authorization.
 
