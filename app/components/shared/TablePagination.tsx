@@ -94,7 +94,10 @@ const TablePagination = ({
           {pageSizeOptions && onPageSizeChange ? (
             <Select
               value={String(pageSize)}
-              onValueChange={(value) => onPageSizeChange(Number(value))}
+              onValueChange={(value) => {
+                onPageSizeChange(Number(value));
+                onPageChange(1);
+              }}
             >
               <SelectTrigger className="w-[100px]" aria-label="Rows per page">
                 <SelectValue placeholder="Per page" />
