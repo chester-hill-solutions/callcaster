@@ -587,41 +587,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2109,
-    "verdict": "fix-now",
-    "recommendedTitle": "Changing \"rows per page\" in the admin portal blanks the table — the page number is never reset",
-    "summary": "The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.",
-    "resolution": "Make size changes reset page 1 in the shared contract and include size/clamp in admin state. Add populated page-2 to size-50 scenarios for users/workspaces/campaigns and true-empty-state checks.",
-    "lookIn": [
-      "app/components/shared/TablePagination.tsx:97",
-      "app/hooks/utils/useFilterPagination.ts:3",
-      "app/routes/admin+/panels/AdminUsersPanel.tsx:32",
-      "test/ui/table-pagination-page-size.test.tsx:43",
-      "app/hooks/utils/useFilterPagination.ts",
-      "app/components/shared/TablePagination.tsx",
-      "app/routes/admin+/panels/AdminUsersPanel.tsx",
-      "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
-      "app/routes/admin+/panels/AdminCampaignsPanel.tsx"
-    ],
-    "existingTests": [
-      "test/ui/table-pagination-page-size.test.tsx"
-    ],
-    "missingTests": [
-      "The existing page-size test stays green while the bug remains. Needs table row outcomes, invariant, normal paging positive control, and empty filtered results."
-    ],
-    "acceptanceCriteria": [
-      "Changing the page size on page 2 shows the first page of the new size, not an empty table (kill-check: remove the `onPageChange(1)` call and confirm the test goes red).",
-      "The invariant `currentPage <= totalPages` holds after any page-size change, in all three admin panels.",
-      "An empty result shows a real empty state.",
-      "The permitted path (paging with an unchanged page size) is unchanged."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2110,
     "verdict": "fix-now",
     "recommendedTitle": "Chat composer segment counter and credit estimate desync from the message text after a failed send",

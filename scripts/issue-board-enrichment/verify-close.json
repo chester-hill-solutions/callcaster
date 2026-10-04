@@ -4115,5 +4115,39 @@
     "risk": "high",
     "trackerRecommendation": "PR #2324 merged to dev at d376fd88. Keep the native issue open until deployed review-worker acceptance and release promotion are verified.",
     "rootCause": "The old SMS side-effect handler awaited the customer POST on the serial general worker loop and swallowed delivery failures."
+  },
+  {
+    "issueNumber": 2109,
+    "verdict": "verify-close",
+    "recommendedTitle": "Changing \"rows per page\" in the admin portal blanks the table — the page number is never reset",
+    "summary": "Admin page-size changes reset to page 1; all three panels retain records and clamp pages after record counts fall. Source merged in PR #2326; deployed acceptance and promotion remain.",
+    "currentBehavior": "Source verified at dev@e3f3d49a (PR #2326, tested bce315ff). TablePagination resets page size changes; admin filters include size, and the shared hook clamps to available pages. Full local and remote gates plus both deployments passed on that head.",
+    "resolution": "Verify all three deployed admin panels for page 2 to size 50, normal paging, true empty filters and record-count reduction, then promote through the release workflow. Keep #2109 open until that acceptance is complete.",
+    "lookIn": [
+      "app/components/shared/TablePagination.tsx",
+      "app/hooks/utils/useFilterPagination.ts",
+      "app/routes/admin+/panels/AdminUsersPanel.tsx",
+      "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
+      "app/routes/admin+/panels/AdminCampaignsPanel.tsx",
+      "test/ui/admin-pagination.test.tsx",
+      "test/ui/table-pagination-page-size.test.tsx"
+    ],
+    "existingTests": [
+      "16 shared/admin UI cases pass; original source fails 7, removing the shared reset fails 1, and removing the clamp fails 3; restored source passes all 16.",
+      "Full npm run ci:local passed on final head bce315ff; final quality, bundle, E2E, metadata and both deployment contexts passed."
+    ],
+    "missingTests": [
+      "Deployed acceptance across users, workspaces and campaigns, plus release promotion; deployment success does not prove those UI interactions."
+    ],
+    "acceptanceCriteria": [
+      "Changing the page size on page 2 shows the first page of the new size, not an empty table (kill-check: remove the `onPageChange(1)` call and confirm the test goes red).",
+      "The invariant `currentPage <= totalPages` holds after any page-size change, in all three admin panels.",
+      "An empty result shows a real empty state.",
+      "The permitted path (paging with an unchanged page size) is unchanged."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Source fix merged in PR #2326. Retain the native issue open for deployed verification and promotion."
   }
 ]
