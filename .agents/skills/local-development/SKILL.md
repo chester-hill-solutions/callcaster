@@ -26,6 +26,11 @@ temporary worktrees whose readers have stopped; keep source, proof artifacts
 and user files. A disk-space failure is not a green gate: rerun the full gate
 after recovery.
 
+Full `ci:local` must run where the vendor guard can restore its generated
+files through Git and Bun can write its temporary files. A permission failure
+is not lockfile drift: retain the dependency files, restore only the owned
+generated output, then rerun the full gate with the required permissions.
+
 ## Locked project tools
 
 After the worktree's locked install completes, run project tools with
