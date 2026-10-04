@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@eaac477e; access denial source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@486de78e; billing read source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the access denial fix. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the billing read fix. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 54
+## Fix now — 53
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -483,17 +483,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137) The billing/ledger loader has no role gate — any member, including caller, reads the full credit history
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.
-- Resolution: Apply Admin minimum role to loader and shared billing read service; verify API read parity.
-- Look in: `app/routes/workspaces+/$id/billing.loader.server.ts:8`, `app/lib/billing-activity.server.ts:198`, `app/lib/billing-activity.server.ts:221`, `test/billing-loader.route.test.ts:113`, `app/routes/workspaces+/$id/billing.loader.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions`, `app/lib/workspace-middleware.server.ts:60-76`, `app/components/workspace/WorkspaceNav.tsx:96-120`, `e2e/specs/rbac.spec.ts:14-22`
-- Existing tests: test/billing-loader.route.test.ts covers page/filter forwarding and missing workspace access; it does not cover a valid caller or member being refused.; e2e/specs/rbac.spec.ts checks navigation visibility rather than direct billing-loader status.
-- Missing tests: Caller and member refusal with no billing read, admin/owner allowed, direct URL e2e status assertions.
-- Done when: A `caller` and a `member` receive 403 on the billing loader (kill-check: remove the gate and confirm the test goes red).; An `admin` and the `owner` receive 200.; The API path enforces the same floor.; The e2e RBAC spec asserts a loader status, not only nav visibility.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131) Predictive "Start Dialing" is a silent no-op when the campaign has no caller ID, and the error is discarded
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Predictive begin sets an error for missing caller ID/device, but useCallScreen does not read that error or loading state. The button does not explain these preconditions.
@@ -642,9 +631,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 155
+## Verify and close — 156
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137) The billing/ledger loader has no role gate — any member, including caller, reads the full credit history
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify administrator-only workspace billing reads**
+- The billing page and activity service require Admin on dev. Direct document and JSON checks refuse caller/member roles and permit admin/owner roles.
+- Current behavior: PR #2370 merged to dev as 486de78e on 2026-10-04. The page throws 403 before billing reads for caller/member roles; the activity service also requires Admin. The existing JSON read stays session-only Admin, with non-member 404. Final full local CI and both reviews passed; the isolated production browser run passed 5/5. Remote CI, E2E and both deployment checks were green for the tested head. Deployed acceptance and default-branch promotion remain.
+- Root cause: The page loader and activity service proved membership without an Admin floor. The server now enforces the existing billing policy before reads. The new sibling role guard records 11 exact pre-existing permission gaps for separate work.
+- Resolution: Verify direct billing page and JSON requests on deployed dev for caller/member refusal and admin/owner access, then promote before closing. Existing baseline gaps remain separate audits; the JSON checkout role gap is tracked in #2371.
+- Look in: `app/routes/workspaces+/$id/billing.loader.server.ts:15`, `app/lib/billing-activity.server.ts:202`, `app/routes/api+/workspaces+/$workspaceId/billing.loader.server.ts:11`, `scripts/lib/route-read-role-floor.mjs`, `scripts/baselines/route-read-role-floor.json`, `test/billing-read-access.test.ts`, `test/route-read-role-floor.test.ts`, `e2e/specs/rbac.spec.ts:83`
+- Existing tests: Actual auth and membership controls: caller/member 403, admin/owner 200, non-member 404 and session-only JSON reads.; 64 focused cases passed. Nine faults made regressions fail; restored source passed again.; Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, build, bundle check and codegen verification.; Isolated production browser checks passed 5/5, including document and JSON status assertions for all four roles; no retry or skipped case.
+- Missing tests: Deployed dev browser acceptance for direct page and JSON requests with all four roles.; Default-branch promotion and release verification before closure.
+- Done when: A `caller` and a `member` receive 403 on the billing loader (kill-check: remove the gate and confirm the test goes red).; An `admin` and the `owner` receive 200.; The API path enforces the same floor.; The e2e RBAC spec asserts a loader status, not only nav visibility.
+- Tracker: Source fix merged and reviewed on dev. Run deployed acceptance and promote before closing; do not implement the billing read gate again.
 
 ### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-04
@@ -3418,9 +3420,13 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 5
+## Needs triage — 6
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371) Require Admin access for JSON billing checkout
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04

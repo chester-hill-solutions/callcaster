@@ -4671,5 +4671,44 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Source fix is merged in PR #2368. Keep #2004 OPEN for deployed acceptance and default-branch release. Preserve all six original acceptance criteria; do not treat green deployment contexts as acceptance proof."
+  },
+  {
+    "issueNumber": 2137,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify administrator-only workspace billing reads",
+    "summary": "The billing page and activity service require Admin on dev. Direct document and JSON checks refuse caller/member roles and permit admin/owner roles.",
+    "currentBehavior": "PR #2370 merged to dev as 486de78e on 2026-10-04. The page throws 403 before billing reads for caller/member roles; the activity service also requires Admin. The existing JSON read stays session-only Admin, with non-member 404. Final full local CI and both reviews passed; the isolated production browser run passed 5/5. Remote CI, E2E and both deployment checks were green for the tested head. Deployed acceptance and default-branch promotion remain.",
+    "resolution": "Verify direct billing page and JSON requests on deployed dev for caller/member refusal and admin/owner access, then promote before closing. Existing baseline gaps remain separate audits; the JSON checkout role gap is tracked in #2371.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/billing.loader.server.ts:15",
+      "app/lib/billing-activity.server.ts:202",
+      "app/routes/api+/workspaces+/$workspaceId/billing.loader.server.ts:11",
+      "scripts/lib/route-read-role-floor.mjs",
+      "scripts/baselines/route-read-role-floor.json",
+      "test/billing-read-access.test.ts",
+      "test/route-read-role-floor.test.ts",
+      "e2e/specs/rbac.spec.ts:83"
+    ],
+    "existingTests": [
+      "Actual auth and membership controls: caller/member 403, admin/owner 200, non-member 404 and session-only JSON reads.",
+      "64 focused cases passed. Nine faults made regressions fail; restored source passed again.",
+      "Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, build, bundle check and codegen verification.",
+      "Isolated production browser checks passed 5/5, including document and JSON status assertions for all four roles; no retry or skipped case."
+    ],
+    "missingTests": [
+      "Deployed dev browser acceptance for direct page and JSON requests with all four roles.",
+      "Default-branch promotion and release verification before closure."
+    ],
+    "acceptanceCriteria": [
+      "A `caller` and a `member` receive 403 on the billing loader (kill-check: remove the gate and confirm the test goes red).",
+      "An `admin` and the `owner` receive 200.",
+      "The API path enforces the same floor.",
+      "The e2e RBAC spec asserts a loader status, not only nav visibility."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix merged and reviewed on dev. Run deployed acceptance and promote before closing; do not implement the billing read gate again.",
+    "rootCause": "The page loader and activity service proved membership without an Admin floor. The server now enforces the existing billing policy before reads. The new sibling role guard records 11 exact pre-existing permission gaps for separate work."
   }
 ]
