@@ -4166,5 +4166,59 @@
       "test/twilio-client.server.test.ts"
     ],
     "trackerRecommendation": "PR #2336 passed full ci:local on final head 68832c47 and all applicable remote gates plus both deployments. Remote quality executed all six HTTP cases. Task #2333 remains a child of runtime Epic #1802; deployed acceptance and release promotion remain open."
+  },
+  {
+    "issueNumber": 2334,
+    "verdict": "verify-close",
+    "summary": "csv-parse source is merged to dev in PR #2338 (42aa7957). Both installed trees resolve 7.0.3 and pass 103 parser/mapping cases, including 13 runtime cases. Old 5.6.0 fails the advisory case while twelve controls pass. Package exposure was confirmed without an application exploit claim.",
+    "resolution": "Verify actual deployed audience/contact uploads, then promote the source fix. Keep this Task open until its full acceptance is met.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/lib/csv-contacts.ts",
+      "test/runtime-csv.test.ts"
+    ],
+    "existingTests": [
+      "test/runtime-csv.test.ts",
+      "test/csv.test.ts",
+      "test/audience-upload-csv.test.ts",
+      "test/csv-opt-out-parsing.test.ts"
+    ],
+    "trackerRecommendation": "PR #2338 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all 13 runtime cases. Task #2334 remains a child of #1802; deployed upload acceptance and release promotion remain open."
+  },
+  {
+    "issueNumber": 2335,
+    "verdict": "verify-close",
+    "summary": "Scalar SDK source is merged to dev in PR #2339 (364d8d5b). Both install paths resolve provider-utils 4.0.33 without changing Scalar. Nine real response/stream cases pass; old 4.0.5 fails three handler guards while three valid controls pass. The actual JSON handler default remains 2 GiB.",
+    "resolution": "Verify actual deployed public/complete docs with the existing theme, auth controls and examples, then promote the source fix. Keep local browser proof separate from deployed acceptance.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "test/runtime-scalar-sdk.test.ts",
+      "app/routes/docs.tsx"
+    ],
+    "existingTests": [
+      "test/runtime-scalar-sdk.test.ts",
+      "test/ui/docs.route.test.tsx"
+    ],
+    "trackerRecommendation": "PR #2339 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all nine runtime cases. The actual Scalar widget was built and checked independently for both local installed graphs, including spec selection, operation auth, examples and unmount/remount. Task #2335 remains a child of #1802; deployed docs acceptance and release promotion remain open."
+  },
+  {
+    "issueNumber": 2340,
+    "verdict": "verify-close",
+    "summary": "ws source is merged to dev in PR #2343 (3228e89f). Both locks resolve only 8.21.0; npm package entries stay unchanged and Bun deduplicates the old jsdom copy. Ten real cases pass for each installed tree; old 8.18.0 fails four rejection cases while six valid controls pass. No app exploit is claimed.",
+    "resolution": "Verify applicable deployed WebSocket behavior and promote the source fix. Keep this Task open until its full acceptance is met.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "test/runtime-ws.test.ts"
+    ],
+    "existingTests": [
+      "test/runtime-ws.test.ts"
+    ],
+    "trackerRecommendation": "PR #2343 passed full local CI on final head 95ea1c17, all applicable remote gates and both deployments. Remote quality executed all ten cases. The verified worktree and local/remote refs are removed with a recovery bundle. Task #2340 remains a child of #1802; applicable deployed acceptance and release promotion remain open."
   }
 ]

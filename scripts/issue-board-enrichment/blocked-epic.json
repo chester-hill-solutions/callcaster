@@ -278,26 +278,26 @@
   {
     "issueNumber": 1802,
     "verdict": "blocked-epic",
-    "summary": "Runtime security work is a native Epic with Tasks #2333 (Axios), #2334 (csv-parse) and #2335 (Scalar AI SDK chain). Axios source is on dev after PR #2336; deployed acceptance and promotion remain open. #1809 is closed. The production npm audit now reports eight affected package nodes across CSV and Scalar.",
-    "resolution": "Implement the remaining children as separate package concerns and PRs. Verify npm and Bun independently because their locked versions differ. Complete each child’s deployed behavior checks and release promotion before completing the Epic.",
+    "summary": "Runtime security is a native Epic with separate package Tasks. Axios, csv-parse, Scalar and ws source are merged through PRs #2336, #2338, #2339 and #2343; deployed acceptance and release promotion remain open. Dev npm production audit is clear. The independently resolved Bun runtime graph has two affected nodes: jws and PostCSS, tracked by #2341 and #2342.",
+    "resolution": "Complete the remaining package tasks as atomic PRs. Verify both locked install paths, each child’s real behavior controls, deployed acceptance and release promotion. No package exposure is a proved app exploit by itself.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "Keep Nano ID #1805 and closed qs #1809 as existing history. Do not recreate their work. Default-branch Dependabot reports two runtime alerts (#220, #218), a different snapshot from the dev npm affected-node count."
+    "trackerRecommendation": "Bun runtime trace resolves 594 nodes with no missing required edges and excludes vendor devDependencies/optional peer integrations. Fresh master Dependabot still has two runtime alerts (#220, #218) plus 37 development alerts; source fixes on dev do not prove alert resolution. Keep #1805 and closed #1809 as existing history."
   },
   {
     "issueNumber": 1803,
     "verdict": "blocked-epic",
-    "summary": "The development-scope dependency findings span multiple package families and need separate remediation slices.",
-    "resolution": "Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.",
+    "summary": "Development security is now a native Epic. A fresh complete npm audit reports 23 affected package families (17 high, five moderate and one low), while npm production is clear. Bun has separate affected development copies. The live master snapshot has 37 development alerts; this is a different source/release view.",
+    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope."
+    "trackerRecommendation": "Keep runtime fixes under #1802. PostCSS copies are already tracked in #2342; do not duplicate that package work. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, deployed acceptance and release promotion remain required."
   },
   {
     "issueNumber": 1892,
