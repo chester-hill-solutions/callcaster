@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Audio uploads retain the expected workspace access response and stop before media work when access is denied. ([#2354](https://github.com/chester-hill-solutions/callcaster/issues/2354), [PR #2357](https://github.com/chester-hill-solutions/callcaster/pull/2357))
+
 - Security: PostCSS updates reject source-map annotations outside their CSS directory and retain valid maps and styles. ([#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342), [PR #2346](https://github.com/chester-hill-solutions/callcaster/pull/2346))
 
 - Security: WebSocket dependency updates limit buffered fragments and reject unsupported close-reason types. ([#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340), [PR #2343](https://github.com/chester-hill-solutions/callcaster/pull/2343))
