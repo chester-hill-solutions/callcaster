@@ -245,10 +245,8 @@ export async function buildSurveyResponsesCsv(args: {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (response: ResponseRow, questionId: string) => {
-    const question = allQuestions.find((q) => q.question_id === questionId);
-    if (!question) return "-";
-    const answer = response.response_answer?.find((a) => a.question_id === question.id);
+  const getAnswerForQuestion = (response: ResponseRow, questionId: number) => {
+    const answer = response.response_answer?.find((a) => a.question_id === questionId);
     return answer ? formatSurveyAnswer(answer) : "-";
   };
 
@@ -268,7 +266,7 @@ export async function buildSurveyResponsesCsv(args: {
     response.completed_at ? formatDateUtc(response.completed_at) : "-",
     response.last_page_completed || "-",
     ...allQuestions.map((question) =>
-      getAnswerForQuestion(response, question.question_id),
+      getAnswerForQuestion(response, question.id),
     ),
   ]);
 

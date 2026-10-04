@@ -92,15 +92,9 @@ export default function SurveyResponsesPage() {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
-    const question = allQuestions.find(
-      (q) => q.question_id === questionId,
-    );
-    if (!question) return "-";
-
-    // Find the answer by the database question ID
+  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: number) => {
     const answer = response.response_answer?.find(
-      (a) => a.question_id === question.id,
+      (a) => a.question_id === questionId,
     );
     return answer ? formatSurveyAnswer(answer) : "-";
   };
@@ -295,7 +289,7 @@ export default function SurveyResponsesPage() {
                           </TableHead>
                           {allQuestions.map((question) => (
                             <TableHead
-                              key={question.question_id}
+                              key={question.id}
                               className="w-48 border border-border px-4 py-2"
                             >
                               {question.question_text}
@@ -331,12 +325,12 @@ export default function SurveyResponsesPage() {
                               </TableCell>
                               {allQuestions.map((question) => (
                                 <TableCell
-                                  key={question.question_id}
+                                  key={question.id}
                                   className="truncate border border-border px-4 py-2"
                                 >
                                   {getAnswerForQuestion(
                                     response,
-                                    question.question_id,
+                                    question.id,
                                   )}
                                 </TableCell>
                               ))}
