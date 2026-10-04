@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@46ba4b7e; sign-in and invitation source fixes with deployed QA pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5be1f2c6; workspace unread aggregate source fix with original browser-flow triage and deployed QA pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the sign-in and invitation source fixes. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the workspace unread aggregate fix. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 57
+## Fix now — 56
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -585,18 +585,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-02
-- The newest-100 cap is still explicit in both client badge and server unread total. A sidebar revalidation fix landed separately, but it does not remove this cap.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Both unread totals remain capped at 100 conversations. Sidebar response-merging was fixed by PR #2191 but that does not resolve this count cap.
-- Root cause: Both the client badge and server Today count sum a newest-100-conversation page instead of a workspace-wide aggregate. An optimistic inbound increment can disappear at the next capped poll.
-- Resolution: Provide a scoped aggregate using the current unread definition, consume it for both server and badge, and test a conversation beyond the newest 100. Retest the screenshot list symptom separately.
-- Look in: `app/hooks/chats/useUnreadConversationsCount.ts:15`, `app/lib/database/workspace-conversations.server.ts:489`, `app/hooks/chats/useUnreadConversationsCount.ts:89`, `app/hooks/chats/useUnreadConversationsCount.ts:15-22 (the documented 100-conversation limit), :39-61 (page fetch and sum), :78-91 (optimistic inbound bump), :13 (30s poll)`, `app/lib/database/workspace-conversations.server.ts:486-505 (getWorkspaceUnreadConversationCount and its 'agree with the badge' comment)`, `app/lib/database/workspace-conversations.server.ts:223-241 (the agg CTE: unread_count definition and conv_key grouping)`, `app/lib/chats/unread-count.ts:1-11 (UNREAD_CONVERSATION_PAGE_SIZE = 100)`, `app/routes/workspaces+/$id.loader.server.ts:73 (the server-rendered unread count, workspace root only)`, `app/hooks/chats/useChatsPage.ts:153-164 (the setLoadedChats reset path — the unconfirmed list symptom)`
-- Existing tests: test/workspace-conversations-sql-parity.test.ts (conversation-query parity; no complete unread aggregate assertion); test/ui/hooks-realtime.test.tsx (conversation summary refresh/unread behavior; no useUnreadConversationsCount coverage)
-- Missing tests: No >100-conversation aggregate parity test exists. The list symptom is not established by this cap alone, and #2191 addresses a different sidebar revalidation loss.
-- Done when: The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations; For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.; A Postgres test proves the aggregate equals the per-conversation sum beyond the first page; Per-conversation unread pills are unchanged; The comments asserting the 100-conversation window is by design are corrected; The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior.
-
 ### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-02
 - The nested boundary still treats a 403 as a generic failure with a destructive alert and Reload Page. Permissions cannot be repaired by reload.
@@ -678,9 +666,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 152
+## Verify and close — 153
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-04
+- PR #2364 removes the newest-100 cap from the badge and Today total. The original browser list flow, deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@5be1f2c6, 2026-10-04. Badge and Today use the same complete workspace aggregate; ordinary list requests and per-conversation pills keep their existing behavior. Full local and final-head remote checks and both deployments passed.
+- Root cause: Fixed: both totals previously summed a newest-100 conversation page. They now share a SQL aggregate with the list’s workspace scope, message exclusions and participant identity. Failed badge refreshes retain the last known total.
+- Resolution: Verify deployed badge/Today parity beyond 100 conversations and repeat polling after an inbound reply. Retest the original screenshot list flow in the browser: the 105-row hook control retained every loaded row through repeated page-1 revalidation, but that does not settle the live report. Reproduce and file a separate concern, or record a scoped not-reproducible result with browser evidence. Release to the default branch before closure.
+- Look in: `app/lib/database/workspace-conversations.server.ts`, `app/hooks/chats/useUnreadConversationsCount.ts`, `app/lib/chats/messaging-client.ts`, `app/routes/api+/workspaces+/$workspaceId/conversations.loader.server.ts`, `app/routes/workspaces+/$id.loader.server.ts`, `app/hooks/chats/useChatsPage.ts`
+- Existing tests: test/integration-db/workspace-unread-count.test.ts (six real PostgreSQL cases: 105 conversations, full 107 total vs capped-page 100; parity, foreign scope, exclusions, number identity, legacy phone text and repeated reads); test/workspace-conversations-sql-parity.test.ts (six existing real SQL/JS list parity cases passed without skips); test/workspace-unread-count.route.test.ts (count mode, ordinary list, safe failure, capability and scope boundary); test/ui/workspace-unread-count.test.tsx (real client/parser, repeated polling, malformed responses, workspace switch and late response/event); test/ui/components-workspace-nav.test.tsx (zero, numeric, 99+ badge display and realtime changes through real client); test/ui/use-chats-page-pagination.test.tsx (105 loaded rows and page cursor retained through repeated page-1 revalidation); Eight genuine mutations rejected; source restored and verified. The remote e2e log confirms all six new real database cases ran.
+- Missing tests: The screenshot’s original live browser flow remains to reproduce or rule out with evidence. Deployed badge/Today acceptance and default-branch release remain pending.
+- Done when: The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations; For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.; A Postgres test proves the aggregate equals the per-conversation sum beyond the first page; Per-conversation unread pills are unchanged; The comments asserting the 100-conversation window is by design are corrected; The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence
+- Tracker: Verify and close after original browser-flow triage, deployed QA and default-branch release. PR #2364 is merged into dev; the native issue preserves all acceptance criteria and remains open.
 
 ### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
