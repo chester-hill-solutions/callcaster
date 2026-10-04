@@ -4,6 +4,7 @@ import type postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+const previousDatabaseUrl = process.env.DATABASE_URL;
 const suite = databaseUrl ? describe : describe.skip;
 if (!databaseUrl) process.stderr.write("Survey CSV column proof skipped: INTEGRATION_DB_URL is required.\n");
 
@@ -36,6 +37,8 @@ suite("survey CSV columns use saved question identity (#2317)", () => {
   }
 
   beforeAll(async () => {
+    if (!databaseUrl) throw new Error("Missing isolated test database URL");
+    process.env.DATABASE_URL = databaseUrl;
     ({ pool: client } = await import("@/server/db"));
     ({ buildSurveyResponsesCsv: buildCsv } = await import("@/lib/survey-responses.server"));
     const rows = await client<{ id: string }[]>`insert into workspace (name, credits, twilio_data, feature_flags, disabled)
@@ -60,6 +63,8 @@ suite("survey CSV columns use saved question identity (#2317)", () => {
   });
 
   afterAll(async () => {
+    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabaseUrl;
     if (!client) return;
     try {
       if (workspaceId) await client`delete from workspace where id in (${workspaceId}::uuid, ${foreignWorkspaceId}::uuid)`;

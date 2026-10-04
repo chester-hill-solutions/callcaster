@@ -31,6 +31,10 @@ files through Git and Bun can write its temporary files. A permission failure
 is not lockfile drift: retain the dependency files, restore only the owned
 generated output, then rerun the full gate with the required permissions.
 
+For process checks on macOS, use PID/parent-ID fields and an exact `lsof`
+working-directory check. Do not use `pgrep -fl`: it can print environment
+credentials with the process command. Stop only a verified owned process tree.
+
 ## Locked project tools
 
 After the worktree's locked install completes, run project tools with
