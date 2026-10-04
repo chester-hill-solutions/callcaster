@@ -57,6 +57,17 @@ export async function markConversationRead(
   await parseJsonResponse<{ ok: boolean }>(response);
 }
 
+export async function fetchWorkspaceUnreadCount(workspaceId: string): Promise<number> {
+  const response = await fetch(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/conversations?summary=unread`,
+  );
+  const payload = await parseJsonResponse<{ unread_count: number }>(response);
+  if (!Number.isSafeInteger(payload.unread_count) || payload.unread_count < 0) {
+    throw new Error("Invalid workspace unread count");
+  }
+  return payload.unread_count;
+}
+
 export async function fetchConversationSummaries(
   workspaceId: string,
   searchParams?: URLSearchParams,

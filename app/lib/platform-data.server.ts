@@ -20,6 +20,7 @@ import {
   fetchConversationSummary,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
+import { readWorkspaceUnreadConversationCount } from "@/lib/database/workspace-conversations.server";
 import type { Database } from "@/lib/db-types";
 import { AppError } from "@/lib/errors.server";
 import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
@@ -838,6 +839,15 @@ export async function exportSurveyResponsesCsv(
     return result;
   }
   return { ok: true as const, data: csvResponse({ filename: result.filename, csv: result.csv }) };
+}
+
+export async function getWorkspaceUnreadConversationCountApi(workspaceId: string) {
+  try {
+    return { ok: true as const, unreadCount: await readWorkspaceUnreadConversationCount(workspaceId) };
+  } catch (error) {
+    logger.error("Failed to load workspace unread count", { workspaceId, error });
+    return { ok: false as const, error: "Failed to load unread count", status: 500 };
+  }
 }
 
 export async function listWorkspaceConversationsApi(
