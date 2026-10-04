@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -468,10 +469,11 @@ export function NumberSummaryList({
           <SheetHeader>
             <SheetTitle>Advanced number settings</SheetTitle>
             <SheetDescription>
-              Edit individual routing fields, handset behavior, caller ID, and release controls.
+              Edit individual routing fields, handset behavior, caller ID, and
+              release controls.
             </SheetDescription>
           </SheetHeader>
-          <div className="mt-6 min-w-0">
+          <SheetBody>
             <NumbersTable
               title={advancedNumber?.phone_number ?? "Phone number"}
               phoneNumbers={advancedNumber ? [advancedNumber] : []}
@@ -484,7 +486,7 @@ export function NumberSummaryList({
               hideEmptyState
               {...tableCallbacks}
             />
-          </div>
+          </SheetBody>
         </SheetContent>
       </Sheet>
     </>

@@ -1,6 +1,7 @@
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -105,17 +106,17 @@ const ChatAddContactDialog = ({
             Contact details form
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-1 flex-col items-center py-4">
+        <SheetBody className="flex flex-1 flex-col items-center">
           <ContactForm
-            isNew={!(contact?.id)}
+            isNew={!contact?.id}
             newContact={contact}
             handleInputChange={handleUpdateContact}
             handleSaveContact={handleSaveContact}
             workspace_id={workspace_id}
             audience_id={null}
-            assignToDefaultSmsAudience={!(contact?.id)}
+            assignToDefaultSmsAudience={!contact?.id}
           />
-        </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

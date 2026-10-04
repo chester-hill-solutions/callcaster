@@ -19,6 +19,12 @@ The app still imports `@chester-hill-solutions/shad-cc/theme.css` from [app/tail
 - **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired. Legacy classes `font-Zilla-Slab` / `font-Tabac-Slab` still resolve via `@theme` aliases to `font-heading` / `font-brand`.
 - **Loading:** Use `Skeleton` from [app/components/ui/skeleton.tsx](app/components/ui/skeleton.tsx) for table rows, cards, and form placeholders while data loads.
 
+### Sheet body spacing
+
+Use `SheetBody` from the local sheet adapter for content between `SheetHeader` and `SheetFooter`. It applies the same horizontal inset as the shared header/footer. Keep those slots outside the body, including inside a form, to prevent doubled padding.
+
+Use `inset="none"` only for deliberate edge-to-edge content, such as workspace navigation or the mobile chat list. `inset="navigation"` preserves the site menu's existing compact spacing. Use static layout and gap classes on the body; keep padding in the inset variants. Padding overrides, spread props and dynamic inset choices are rejected. `npm run check:sheet-bodies` rejects new undeclared bodies and nested padded slots.
+
 ## Form layout
 
 - **Use `FormField`** from [app/components/ui/form-field.tsx](app/components/ui/form-field.tsx) for every form field. It provides label, optional description, optional error message, and consistent spacing. Put the control (Input, Select, Textarea, Switch, etc.) as the child of `FormField`.

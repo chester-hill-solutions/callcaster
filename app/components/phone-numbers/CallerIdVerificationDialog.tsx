@@ -1,6 +1,7 @@
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -58,32 +59,35 @@ export function CallerIdVerificationDialog({
                 : "We're calling your number to confirm it — keep this code handy."}
           </SheetDescription>
         </SheetHeader>
-        <div className="space-y-4 py-4 text-center">
+        <SheetBody className="space-y-4 text-center">
           {/* Pending: the confirmation token + call status */}
           {!resolved && !failed ? (
             <>
-              <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-current" aria-hidden />
+              <div className="border-border bg-muted/40 text-muted-foreground mx-auto flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs">
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full bg-current"
+                  aria-hidden
+                />
                 Pending confirmation
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {phoneNumber
                   ? `You will receive a verification call at ${phoneNumber}.`
                   : "You will receive a verification call at the number you submitted."}
               </p>
-              <div className="rounded-md border bg-muted/30 px-6 py-4">
-                <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <div className="bg-muted/30 rounded-md border px-6 py-4">
+                <p className="text-muted-foreground mb-2 text-xs uppercase tracking-wider">
                   Confirmation token
                 </p>
                 {code ? (
                   <p className="font-mono text-4xl tracking-widest">{code}</p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     Check the verification call for your code.
                   </p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Enter the confirmation token when the call prompts you. This
                 sheet updates automatically once the number is verified.
               </p>
@@ -103,7 +107,7 @@ export function CallerIdVerificationDialog({
               {resolved ? "✓ Verified" : "✕ Not verified"}
             </div>
           ) : null}
-        </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

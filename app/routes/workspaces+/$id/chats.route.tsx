@@ -6,6 +6,7 @@ import type { MetaFunction } from "react-router";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetHeader as MobileSheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -123,9 +124,9 @@ export default function ChatsList() {
           <MobileSheetHeader className="border-b px-4 py-3">
             <SheetTitle>Chats</SheetTitle>
           </MobileSheetHeader>
-          <div className="h-[calc(100%-57px)]">
+          <SheetBody inset="none" className="h-[calc(100%-57px)]">
             <ConversationSidebar {...sidebarProps} />
-          </div>
+          </SheetBody>
         </SheetContent>
       </Sheet>
       <ChatAddContactDialog
