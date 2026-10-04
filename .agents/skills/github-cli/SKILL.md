@@ -39,6 +39,12 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 4. When `gh pr create` / `gh pr merge` hit `graphql_rate_limit`, fall back to REST: `POST /repos/{owner}/{repo}/pulls` (create; ensure the head branch has commits ahead of base first — "No commits between base and head" is the failure when it does not), `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `-f merge_method=squash`, and `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}`.
 5. Verify REST fallbacks the same as any mutation: query the remote state and report it.
 
+## Empty REST Responses
+
+A successful REST deletion can return HTTP 204 with no response body. Check the
+command result, then read the target again to verify deletion. Parse JSON only
+when the response body is non-empty; an empty success response is not a failure.
+
 ## REST Version And Commit Evidence
 
 Choose a verified API version for each endpoint contract. Do not copy a version
