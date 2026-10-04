@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@1a5d463f; sheet body inset source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@eaac477e; access denial source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the sheet body inset fix. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the access denial fix. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 55
+## Fix now — 54
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -585,18 +585,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-02
-- The nested boundary still treats a 403 as a generic failure with a destructive alert and Reload Page. Permissions cannot be repaired by reload.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The nested boundary still treats a 403 as a generic failure with a destructive alert and Reload Page. Permissions cannot be repaired by reload.
-- Root cause: The boundary was written around 404 and 500 and treats every other status as an unexpected crash. There is no map from status to user-facing meaning, so a deliberate authorization decision is presented as a system fault.
-- Resolution: Add a dedicated access-denied state with a useful navigation action; preserve 404 and internal-error protections. Coordinate with #2123 message extraction without merging unrelated scopes.
-- Look in: `app/components/shared/RouteErrorBoundary.tsx:13`, `app/components/shared/RouteErrorBoundary.tsx:34`, `test/ui/components-shared-smoke.test.tsx:238`, `app/components/shared/RouteErrorBoundary.tsx:13-32 (the 404 branch to copy), :34-56 (the generic 403 fallthrough)`, `app/lib/workspace-middleware.server.ts:62-75 (createWorkspaceMiddlewareWithMinRole returning 403 with a real message)`, `app/lib/workspace-membership.server.ts:158-187 (requireWorkspaceAccess, 403 AppError, 81 call sites)`, `app/routes/workspaces+/$id.tsx:303 (the workspace layout re-exports this boundary, so every workspace page inherits it)`
-- Existing tests: test/ui/components-shared-smoke.test.tsx
-- Missing tests: 403 copy/navigation/call-to-action behavior is untested; current status assertion preserves the faulty behavior.
-- Done when: A 403 tells the user they lack access, in the app's voice, with the server's message where one exists; No 403 renders the generic crash heading or a Reload Page action; The boundary offers a next step the user can actually take; 401 gets the same treatment; 404 and 5xx behaviour is unchanged; A test covers each status branch, including one on a real min-role-gated route
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Finish the raw-button cursor migration and prevention guard
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
 - Partial fix: PR #1963 added the shared Button cursor. The raw-button migration and prevention guard in the issue inventory are still absent. The board wrongly says the shared fix is unmerged.
@@ -654,9 +642,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 154
+## Verify and close — 155
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- Merged access states explain 401 and 403 and offer sign-in or workspace navigation. Source and local browser verification are complete; deployed acceptance and release remain pending.
+- Current behavior: Source audit: dev@eaac477e, 2026-10-04. PR #2368 is merged. The shared boundary preserves safe string and message/error response copy, replaces missing or technical copy, and removes the generic crash/reload UI for access failures. The existing 404 and server-error behavior is unchanged.
+- Root cause: Before PR #2368, the boundary treated all non-404 route responses as generic crashes, including deliberate access denials. The merged change gives 401 and 403 a dedicated access state in that canonical component.
+- Resolution: Verify 401/403 copy and recovery navigation on deployed dev. Keep the original acceptance criteria and the default-branch release pending; do not close the issue on source proof alone.
+- Look in: `app/components/shared/RouteErrorBoundary.tsx:38`, `app/components/shared/RouteErrorBoundary.tsx:10`, `test/ui/route-error-access.test.tsx:31`, `test/survey-create-access.route.test.ts:16`, `e2e/specs/rbac.spec.ts:63`, `test/ui/components-shared-smoke.test.tsx:238`
+- Existing tests: 15 access-state UI cases cover safe copy, fallback copy and real navigation; disabling the access-status branch fails all 15.; Existing shared smoke tests retain 404 and internal-error protections, including server status/reload without response-body leakage.; Four cases use the actual survey creation loader: caller 403 and member/admin/owner 200.; Final production-build browser run: authentication setup, actual caller denial/recovery and owner access all passed.; Full final-head ci:local, independent spec/standards/strict reviews, all remote checks and both PR deployments passed before merge. Remote browser suite: 132 cases passed.; Merged dev deployment contexts passed. The existing issue-on-dev workflow succeeded and moved #2004; deployed acceptance is still separate.
+- Missing tests: Deployed acceptance of 401/403 copy and recovery navigation; default-branch release remains pending.
+- Done when: A 403 tells the user they lack access, in the app's voice, with the server's message where one exists; No 403 renders the generic crash heading or a Reload Page action; The boundary offers a next step the user can actually take; 401 gets the same treatment; 404 and 5xx behaviour is unchanged; A test covers each status branch, including one on a real min-role-gated route
+- Tracker: Source fix is merged in PR #2368. Keep #2004 OPEN for deployed acceptance and default-branch release. Preserve all six original acceptance criteria; do not treat green deployment contexts as acceptance proof.
 
 ### [#2042](https://github.com/chester-hill-solutions/callcaster/issues/2042) Side Sheet has no default padding, so any body between header and footer renders flush to the edge
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-04

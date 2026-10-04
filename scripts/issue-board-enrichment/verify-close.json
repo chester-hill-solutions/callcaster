@@ -4631,5 +4631,45 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "PR #2366 merged to dev with clear independent reviews, final exact-head local/remote gates and both deployments green. Native issue retains all five original acceptance criteria and remains open; issue-on-dev workflow actually moved one item. Local browser proof does not replace deployed acceptance."
+  },
+  {
+    "issueNumber": 2004,
+    "verdict": "verify-close",
+    "recommendedTitle": "A 403 renders as \"Something went wrong\" with a Reload Page button and the raw status text",
+    "summary": "Merged access states explain 401 and 403 and offer sign-in or workspace navigation. Source and local browser verification are complete; deployed acceptance and release remain pending.",
+    "currentBehavior": "Source audit: dev@eaac477e, 2026-10-04. PR #2368 is merged. The shared boundary preserves safe string and message/error response copy, replaces missing or technical copy, and removes the generic crash/reload UI for access failures. The existing 404 and server-error behavior is unchanged.",
+    "rootCause": "Before PR #2368, the boundary treated all non-404 route responses as generic crashes, including deliberate access denials. The merged change gives 401 and 403 a dedicated access state in that canonical component.",
+    "resolution": "Verify 401/403 copy and recovery navigation on deployed dev. Keep the original acceptance criteria and the default-branch release pending; do not close the issue on source proof alone.",
+    "lookIn": [
+      "app/components/shared/RouteErrorBoundary.tsx:38",
+      "app/components/shared/RouteErrorBoundary.tsx:10",
+      "test/ui/route-error-access.test.tsx:31",
+      "test/survey-create-access.route.test.ts:16",
+      "e2e/specs/rbac.spec.ts:63",
+      "test/ui/components-shared-smoke.test.tsx:238"
+    ],
+    "existingTests": [
+      "15 access-state UI cases cover safe copy, fallback copy and real navigation; disabling the access-status branch fails all 15.",
+      "Existing shared smoke tests retain 404 and internal-error protections, including server status/reload without response-body leakage.",
+      "Four cases use the actual survey creation loader: caller 403 and member/admin/owner 200.",
+      "Final production-build browser run: authentication setup, actual caller denial/recovery and owner access all passed.",
+      "Full final-head ci:local, independent spec/standards/strict reviews, all remote checks and both PR deployments passed before merge. Remote browser suite: 132 cases passed.",
+      "Merged dev deployment contexts passed. The existing issue-on-dev workflow succeeded and moved #2004; deployed acceptance is still separate."
+    ],
+    "missingTests": [
+      "Deployed acceptance of 401/403 copy and recovery navigation; default-branch release remains pending."
+    ],
+    "acceptanceCriteria": [
+      "A 403 tells the user they lack access, in the app's voice, with the server's message where one exists",
+      "No 403 renders the generic crash heading or a Reload Page action",
+      "The boundary offers a next step the user can actually take",
+      "401 gets the same treatment",
+      "404 and 5xx behaviour is unchanged",
+      "A test covers each status branch, including one on a real min-role-gated route"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Source fix is merged in PR #2368. Keep #2004 OPEN for deployed acceptance and default-branch release. Preserve all six original acceptance criteria; do not treat green deployment contexts as acceptance proof."
   }
 ]
