@@ -8,6 +8,7 @@ import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
 import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
 import { recheckCampaignsWithUnsettledMessages } from "@/lib/campaign-settle-recheck.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
+import { pruneExpiredRateLimitBuckets } from "@/lib/platform-rate-limit-db.server";
 import { pruneCompletedJobs, pruneWorkspaceEvents } from "@/lib/worker/job-retention.server";
 import {
   auditWorkspaceTwilioWebhooks,
@@ -243,6 +244,15 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
         }
       } catch (error) {
         logger.error("worker.maintenance.workspace_events_prune_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const pruned = await pruneExpiredRateLimitBuckets();
+        logger.info("worker.maintenance.rate_limit_buckets_pruned", { pruned });
+      } catch (error) {
+        logger.error("worker.maintenance.rate_limit_bucket_prune_failed", {
           error: error instanceof Error ? error.message : String(error),
         });
       }
