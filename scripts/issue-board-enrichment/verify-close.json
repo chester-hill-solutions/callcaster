@@ -3946,5 +3946,39 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Verify and close. Native Development link to PR #2310 and successful issue-on-dev workflow were verified; no deployed browser acceptance is claimed."
+  },
+  {
+    "issueNumber": 2129,
+    "verdict": "verify-close",
+    "recommendedTitle": "The inbound-queue duplicate-offer guard is wired as \"already in the baseline\" but exists in no baseline, and both database lineages behave wrongly",
+    "summary": "The active-offer guard is repaired on dev. Repeated requests return no new offer; timeout and decline permit a new offer. Deployed caller behavior and promotion remain to verify.",
+    "currentBehavior": "PR #2314 merged at dev@eaaffaf4. Both bootstrap paths apply the later guard after the unguarded claim definition. The partial index and RPC use queued/offered/accepted; duplicate claims reserve no extra agent or dial.",
+    "resolution": "Verify the deployed final RPC, partial index, concurrent wait callbacks and release/retry behavior, then promote the tested source. Review existing duplicate active rows before an upgrade; the migration rejects them without ending calls.",
+    "lookIn": [
+      "client/migrations/20261003231500_guard_active_inbound_offers.sql",
+      "app/db/schema-inbound-queue.ts",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "app/lib/acd/acd-router.server.ts",
+      "test/integration-db/inbound-offer-guard.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/inbound-offer-guard.test.ts: thirteen real-Postgres cases on production fresh, compose fresh and legacy text-status/index upgrade fixtures.",
+      "Full real-database tier: 169 passed locally and in final PR E2E CI. Full local CI, remote quality/E2E/bundle/guards and both app/worker deployments passed at eb9019c4.",
+      "Fault proof: original runtime nine failures/four controls; caller serialization removed one/twelve; wrong terminal predicate three/ten; queue ownership removed one/twelve; restored thirteen pass. Dirty upgrade preserves rows, agent state, previous RPC and index state."
+    ],
+    "missingTests": [
+      "Deployed real-caller concurrent wait and timeout/decline retry verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Concurrent claims for the same queue and CallSid produce at most one active offer.",
+      "After timeout/release, a later claim can create a new offer; any different-agent preference is an explicit policy rather than assumed behavior.",
+      "The final claim definition and duplicate-offer constraint are applied on each supported database lineage.",
+      "A real-Postgres test fails when active-offer protection is removed."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Source repair verified on dev in PR #2314. Issue remains open until promotion and required deployed verification. No change to retry-agent preference."
   }
 ]
