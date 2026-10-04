@@ -32,7 +32,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
-- Bound media upload requests before multipart parsing, enforce the shared 10 MiB file limit, and generate safe audio object keys ([#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136)).
+- Bound media upload requests before multipart parsing, enforce the shared 10 MiB file limit, and generate safe audio object keys ([#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136), [PR #2353](https://github.com/chester-hill-solutions/callcaster/pull/2353)).
 
 - Patch the Twilio JWT dependency path in both install methods while preserving voice token identity, grants and expiry ([#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341), [PR #2345](https://github.com/chester-hill-solutions/callcaster/pull/2345)).
 
