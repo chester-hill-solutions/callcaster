@@ -14,6 +14,7 @@ import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
+import { AppError } from "@/lib/errors.server";
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -99,6 +100,9 @@ export const action = defineAction({
           });
           return routeData({ ok: true }, { headers });
         } catch (error) {
+          if (error instanceof AppError && error.statusCode === 400) {
+            return routeData({ error: error.message }, { status: 400, headers });
+          }
           logger.error("Failed to add member", error);
           return routeData(
             { error: toUserMessage(error, "We could not add that member to the queue.") },
