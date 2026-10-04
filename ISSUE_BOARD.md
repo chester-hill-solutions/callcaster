@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@7da6dd52 + webhook delivery state refresh (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@128d0499 + admin pagination state refresh (2026-10-04 UTC)` · 307 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified webhook delivery merge and native issue update. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified admin pagination merge and native issue update. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 61
+## Fix now — 60
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -145,6 +145,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address**
+- Production rate buckets still have no deletion path and use the first X-Forwarded-For entry as the key. Existing SQL index is present; trusted proxy behavior is not established by this source audit.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. No source path prunes production rate buckets. Rate keys read the leftmost X-Forwarded-For value; whether an external client can control that position depends on deployment ingress and remains unverified here.
+- Resolution: Add an indexed retention prune to daily maintenance and log row count. Validate the Railway ingress header contract and derive client identity from a trusted source; the reset_at index already exists.
+- Look in: `app/lib/platform-rate-limit.server.ts:40`, `client/migrations/20260714120000_rate_limit_bucket.sql:8`, `app/lib/worker/handlers/cron.server.ts:214`, `app/lib/platform-rate-limit.server.ts:39-43`, `app/lib/platform-auth-rate-limit.server.ts:22-33,56-73`, `client/migrations/20260714120000_rate_limit_bucket.sql:35`, `app/lib/worker/handlers/cron.server.ts:190-225`, `app/lib/platform-rate-limit-db.server.ts`, `app/lib/platform-rate-limit-window.ts`
+- Existing tests: test/platform-api.test.ts covers rate limiting using a supplied X-Forwarded-For header.; test/auth-catch-all-rate-limit.route.test.ts covers auth throttling; neither test proves the production proxy trust contract or database retention.
+- Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
+- Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
 - Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
@@ -176,17 +188,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Oversized upload must reject before application buffer allocation; boundary allowed test and a request streaming limit test are needed. Peak memory has not been measured.
 - Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
 - Tracker: Keep Fix now for absent upload limits. Correct the triple-copy/OOM claims; no production memory reproduction was performed.
-
-### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Production rate buckets still have no deletion path and use the first X-Forwarded-For entry as the key. Existing SQL index is present; trusted proxy behavior is not established by this source audit.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. No source path prunes production rate buckets. Rate keys read the leftmost X-Forwarded-For value; whether an external client can control that position depends on deployment ingress and remains unverified here.
-- Resolution: Add an indexed retention prune to daily maintenance and log row count. Validate the Railway ingress header contract and derive client identity from a trusted source; the reset_at index already exists.
-- Look in: `app/lib/platform-rate-limit.server.ts:40`, `client/migrations/20260714120000_rate_limit_bucket.sql:8`, `app/lib/worker/handlers/cron.server.ts:214`, `app/lib/platform-rate-limit.server.ts:39-43`, `app/lib/platform-auth-rate-limit.server.ts:22-33,56-73`, `client/migrations/20260714120000_rate_limit_bucket.sql:35`, `app/lib/worker/handlers/cron.server.ts:190-225`, `app/lib/platform-rate-limit-db.server.ts`, `app/lib/platform-rate-limit-window.ts`
-- Existing tests: test/platform-api.test.ts covers rate limiting using a supplied X-Forwarded-For header.; test/auth-catch-all-rate-limit.route.test.ts covers auth throttling; neither test proves the production proxy trust contract or database retention.
-- Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
-- Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -699,17 +700,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Each of the two buttons either navigates to a real route or is removed (kill-check: remove the `to` and confirm the test goes red).; A guard test asserts that creation controls in app/routes/admin+/panels/ have a reachable action, or are absent.; If the routes do not exist yet, the button is absent rather than inert.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109) Changing "rows per page" in the admin portal blanks the table — the page number is never reset
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
-- The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.
-- Resolution: Make size changes reset page 1 in the shared contract and include size/clamp in admin state. Add populated page-2 to size-50 scenarios for users/workspaces/campaigns and true-empty-state checks.
-- Look in: `app/components/shared/TablePagination.tsx:97`, `app/hooks/utils/useFilterPagination.ts:3`, `app/routes/admin+/panels/AdminUsersPanel.tsx:32`, `test/ui/table-pagination-page-size.test.tsx:43`, `app/hooks/utils/useFilterPagination.ts`, `app/components/shared/TablePagination.tsx`, `app/routes/admin+/panels/AdminUsersPanel.tsx`, `app/routes/admin+/panels/AdminWorkspacesPanel.tsx`, `app/routes/admin+/panels/AdminCampaignsPanel.tsx`
-- Existing tests: test/ui/table-pagination-page-size.test.tsx
-- Missing tests: The existing page-size test stays green while the bug remains. Needs table row outcomes, invariant, normal paging positive control, and empty filtered results.
-- Done when: Changing the page size on page 2 shows the first page of the new size, not an empty table (kill-check: remove the `onPageChange(1)` call and confirm the test goes red).; The invariant `currentPage <= totalPages` holds after any page-size change, in all three admin panels.; An empty result shows a real empty state.; The permitted path (paging with an unchanged page size) is unchanged.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2042](https://github.com/chester-hill-solutions/callcaster/issues/2042) Side Sheet has no default padding, so any body between header and footer renders flush to the edge
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-02
 - The local sheet wrapper still adds no padding. The reported split-campaign sheet body has vertical padding only, while upstream padding applies to header/footer.
@@ -724,9 +714,31 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 137
+## Verify and close — 138
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109) Changing "rows per page" in the admin portal blanks the table — the page number is never reset
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
+- Admin page-size changes reset to page 1; all three panels retain records and clamp pages after record counts fall. Source merged in PR #2326; deployed acceptance and promotion remain.
+- Current behavior: Source verified at dev@e3f3d49a (PR #2326, tested bce315ff). TablePagination resets page size changes; admin filters include size, and the shared hook clamps to available pages. Full local and remote gates plus both deployments passed on that head.
+- Resolution: Verify all three deployed admin panels for page 2 to size 50, normal paging, true empty filters and record-count reduction, then promote through the release workflow. Keep #2109 open until that acceptance is complete.
+- Look in: `app/components/shared/TablePagination.tsx`, `app/hooks/utils/useFilterPagination.ts`, `app/routes/admin+/panels/AdminUsersPanel.tsx`, `app/routes/admin+/panels/AdminWorkspacesPanel.tsx`, `app/routes/admin+/panels/AdminCampaignsPanel.tsx`, `test/ui/admin-pagination.test.tsx`, `test/ui/table-pagination-page-size.test.tsx`
+- Existing tests: 16 shared/admin UI cases pass; original source fails 7, removing the shared reset fails 1, and removing the clamp fails 3; restored source passes all 16.; Full npm run ci:local passed on final head bce315ff; final quality, bundle, E2E, metadata and both deployment contexts passed.
+- Missing tests: Deployed acceptance across users, workspaces and campaigns, plus release promotion; deployment success does not prove those UI interactions.
+- Done when: Changing the page size on page 2 shows the first page of the new size, not an empty table (kill-check: remove the `onPageChange(1)` call and confirm the test goes red).; The invariant `currentPage <= totalPages` holds after any page-size change, in all three admin panels.; An empty result shows a real empty state.; The permitted path (paging with an unchanged page size) is unchanged.
+- Tracker: Source fix merged in PR #2326. Retain the native issue open for deployed verification and promotion.
+
+### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Signup responses are not cached or replayed on dev; deployed verification remains.
+- Current behavior: PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.
+- Resolution: Verify registration success, validation, rate limits and absence of response replay on deployed dev. The remaining replay namespaces are user-scoped workspace creation and authorized workspace-scoped billing checkout. Promote the tested fix before closing.
+- Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
+- Existing tests: test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter); test/platform-api.test.ts (public auth API contract)
+- Missing tests: Confirm the registration behavior on the deployed dev environment before promotion.
+- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; The remaining replay call sites are scoped to the verified user for workspace creation and to the authorized workspace for billing checkout.
+- Tracker: The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix.
 
 ### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -1188,17 +1200,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Confirm workspace creation and retry behavior on the deployed dev environment.
 - Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
 - Tracker: The source fix is on dev in PR #2254. Verify it on the deployed dev environment; close after production promotion. Do not start a duplicate fix.
-
-### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
-- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Signup responses are not cached or replayed on dev; deployed verification remains.
-- Current behavior: PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.
-- Resolution: Verify registration success, validation, rate limits and absence of response replay on deployed dev. The remaining replay namespaces are user-scoped workspace creation and authorized workspace-scoped billing checkout. Promote the tested fix before closing.
-- Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
-- Existing tests: test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter); test/platform-api.test.ts (public auth API contract)
-- Missing tests: Confirm the registration behavior on the deployed dev environment before promotion.
-- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; The remaining replay call sites are scoped to the verified user for workspace creation and to the authorized workspace for billing checkout.
-- Tracker: The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix.
 
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) Verify the disabled-workspace billing split and continued number release
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -3254,9 +3255,17 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 6
+## Needs triage — 8
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#2330](https://github.com/chester-hill-solutions/callcaster/issues/2330) Use verified client identity for public rate limits
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2303](https://github.com/chester-hill-solutions/callcaster/issues/2303) Extract safe-outbound-url to a shared package — three repos now need it, and two have written their own half
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-03
