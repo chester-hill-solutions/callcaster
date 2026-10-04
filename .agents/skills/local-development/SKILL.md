@@ -78,6 +78,11 @@ the test, which can create a false failure or an unintended second effect.
 
 ## UI fixture contracts
 
+For a focused temporary Vitest config, replace `test.include` explicitly after
+loading the base config. `mergeConfig` appends arrays, which can run the full
+suite alongside the intended fixture. Check the collected test count before
+accepting a focused regression report.
+
 Read the component export and prop contract before building a UI fixture.
 Tests are excluded from the app TypeScript program, so a green typecheck does
 not detect a wrong default/named import or a wrong event field in a test.
