@@ -187,7 +187,7 @@ else:
 "
 ```
 
-#### Part B - Semantic extraction (parallel subagents)
+#### Part B - Semantic extraction
 
 **Fast path:** If detection found zero docs, papers, and images (code-only corpus), skip Part B entirely and go straight to Part C. AST handles code - there is nothing for semantic subagents to do. **First write an empty semantic file** so Part C's merge has its input (it reads `.graphify_semantic.json` unconditionally; without this a code-only run hits `FileNotFoundError`):
 
@@ -199,7 +199,7 @@ Path('graphify-out/.graphify_semantic.json').write_text(json.dumps({'nodes':[],'
 "
 ```
 
-**MANDATORY: You MUST use the Agent tool here. Reading files yourself one-by-one is forbidden - it is 5-10x slower. If you do not use the Agent tool you are doing this wrong.**
+Use the host task mechanism only when it supports subagents and project instructions permit them. In OpenCode, use the named `general` subagent. Otherwise extract each chunk in series and save its JSON. Do not emit assistant `@agent` mentions as tool calls.
 
 Before dispatching subagents, print a timing estimate:
 - Load `total_words` and file counts from `graphify-out/.graphify_detect.json`
@@ -244,19 +244,12 @@ Only dispatch subagents for files listed in `graphify-out/.graphify_uncached.txt
 
 Load files from `graphify-out/.graphify_uncached.txt`. Split into chunks of 20-25 files each. Each image gets its own chunk (vision needs separate context). When splitting, group files from the same directory together so related artifacts land in the same chunk and cross-file relationships are more likely to be extracted.
 
-**Step B2 - Dispatch ALL subagents in a single message (OpenCode)**
+**Step B2 - Extract each chunk with the available host mechanism**
 
-> **OpenCode platform:** Uses `@mention` dispatch instead of the Agent tool. All mentions in a single message run in parallel.
-
-Dispatch one `@mention` per chunk — ALL in the same response:
-
-```
-@agent Chunk CHUNK_NUM of TOTAL_CHUNKS: [extraction prompt with FILE_LIST, CHUNK_NUM, TOTAL_CHUNKS, DEEP_MODE substituted]
-
-@agent Chunk 2 of TOTAL_CHUNKS: [next chunk]
-```
-
-Wait for all agents to return. Parse each response as JSON. Accumulate nodes/edges/hyperedges across all results and write to `graphify-out/.graphify_semantic_new.json`. If the `@agent` path cannot write chunk files, fall back to the serial path that writes each `graphify-out/.graphify_chunk_NN.json` before merge.
+Use an available task tool with OpenCode's `general` subagent, or process
+chunks in series. Give each chunk the extraction prompt and output file below.
+An assistant message with an `@mention` does not dispatch a task.
+Wait for each successful result and validate its written chunk file.
 
 Subagent prompt template:
 
@@ -267,12 +260,16 @@ See `references/extraction-spec.md` for the exact subagent prompt (JSON schema, 
 Wait for all subagents. For each result:
 - Check that `graphify-out/.graphify_chunk_NN.json` exists on disk — this is the success signal
 - If the file exists and contains valid JSON with `nodes` and `edges`, include it and save to cache
-- If the file is missing, the subagent was likely dispatched as read-only (Explore type) — print a warning: "chunk N missing from disk — subagent may have been read-only. Re-run with general-purpose agent." Do not silently skip.
+- If the file is missing, the subagent was likely dispatched as read-only (Explore type) — print a warning: "chunk N missing from disk — extraction did not write the chunk. Retry with a writable general task or extract it in series." Do not silently skip.
 - If a subagent failed or returned invalid JSON, print a warning and skip that chunk - do not abort
 
-If more than half the chunks failed or are missing, stop and tell the user to re-run and ensure `subagent_type="general-purpose"` is used.
+If more than half the chunks failed or are missing, stop and report an incomplete scan. Do not replace a verified graph with partial output.
 
-Merge all chunk files into `.graphify_semantic_new.json`. **After each Agent call completes, read the real token counts from the Agent tool result's `usage` field and write them back into the chunk JSON before merging** — the chunk JSON itself always has placeholder zeros. Then run:
+Merge all valid chunk files into `.graphify_semantic_new.json`. Use real token
+counts only when the host returns them. If usage is unavailable, write an
+ignored `graphify-out/.graphify_usage_unknown` marker. Numeric zeros required
+by the extraction format are placeholders, not measured zero usage. When that
+marker exists, report token use and cost as unknown. Then run:
 ```bash
 $(cat graphify-out/.graphify_python) -c "
 import json, glob
@@ -581,28 +578,32 @@ _cleared = _dispatched - _stamped
 _scan = {f for fl in _corpus.values() for f in fl}
 save_manifest(_manifest_files, root='INPUT_PATH', scan_corpus=_scan, clear_semantic=_cleared or None)
 
-# Update cumulative cost tracker
-input_tok = extract.get('input_tokens', 0)
-output_tok = extract.get('output_tokens', 0)
-
-cost_path = Path('graphify-out/cost.json')
-if cost_path.exists():
-    cost = json.loads(cost_path.read_text(encoding=\"utf-8\"))
+# Keep unsupported host usage out of cumulative cost claims.
+if Path('graphify-out/.graphify_usage_unknown').exists():
+    print('Token use and cost: unknown; host did not return usage.')
 else:
-    cost = {'runs': [], 'total_input_tokens': 0, 'total_output_tokens': 0}
+    # Update cumulative cost tracker
+    input_tok = extract.get('input_tokens', 0)
+    output_tok = extract.get('output_tokens', 0)
 
-cost['runs'].append({
-    'date': datetime.now(timezone.utc).isoformat(),
-    'input_tokens': input_tok,
-    'output_tokens': output_tok,
-    'files': detect.get('total_files', 0),
-})
-cost['total_input_tokens'] += input_tok
-cost['total_output_tokens'] += output_tok
-cost_path.write_text(json.dumps(cost, indent=2, ensure_ascii=False), encoding=\"utf-8\")
+    cost_path = Path('graphify-out/cost.json')
+    if cost_path.exists():
+        cost = json.loads(cost_path.read_text(encoding=\"utf-8\"))
+    else:
+        cost = {'runs': [], 'total_input_tokens': 0, 'total_output_tokens': 0}
 
-print(f'This run: {input_tok:,} input tokens, {output_tok:,} output tokens')
-print(f'All time: {cost[\"total_input_tokens\"]:,} input, {cost[\"total_output_tokens\"]:,} output ({len(cost[\"runs\"])} runs)')
+    cost['runs'].append({
+        'date': datetime.now(timezone.utc).isoformat(),
+        'input_tokens': input_tok,
+        'output_tokens': output_tok,
+        'files': detect.get('total_files', 0),
+    })
+    cost['total_input_tokens'] += input_tok
+    cost['total_output_tokens'] += output_tok
+    cost_path.write_text(json.dumps(cost, indent=2, ensure_ascii=False), encoding=\"utf-8\")
+
+    print(f'This run: {input_tok:,} input tokens, {output_tok:,} output tokens')
+    print(f'All time: {cost[\"total_input_tokens\"]:,} input, {cost[\"total_output_tokens\"]:,} output ({len(cost[\"runs\"])} runs)')
 "
 rm -f graphify-out/.graphify_detect.json graphify-out/.graphify_extract.json graphify-out/.graphify_ast.json graphify-out/.graphify_semantic.json graphify-out/.graphify_analysis.json
 find graphify-out -maxdepth 1 -name '.graphify_chunk_*.json' -delete 2>/dev/null
@@ -644,20 +645,15 @@ The graph is the map. Your job after the pipeline is to be the guide.
 
 ## Interpreter guard for subcommands
 
-Before running any subcommand below (`--update`, `--cluster-only`, `query`, `path`, `explain`, `add`), check that `.graphify_python` exists. If it's missing (e.g. user deleted `graphify-out/`), re-resolve the interpreter first:
+Use only the pinned environment for update, cluster, query, path, explain,
+and add. If it is absent, use Step 1 for an explicit build request; for a
+normal source question, use current source searches. Do not select global Python.
 
 ```bash
-if [ ! -f graphify-out/.graphify_python ]; then
-    GRAPHIFY_BIN=$(which graphify 2>/dev/null)
-    if [ -n "$GRAPHIFY_BIN" ]; then
-        PYTHON=$(head -1 "$GRAPHIFY_BIN" | tr -d '#!')
-        case "$PYTHON" in *[!a-zA-Z0-9/_.@-]*) PYTHON="python3" ;; esac
-    else
-        PYTHON="python3"
-    fi
-    mkdir -p graphify-out
-    "$PYTHON" -c "import sys; open('graphify-out/.graphify_python', 'w', encoding='utf-8').write(sys.executable)"
-fi
+set -e
+.opencode/.graphify-venv/bin/python -c "import graphify"
+mkdir -p graphify-out
+.opencode/.graphify-venv/bin/python -c "import sys; open('graphify-out/.graphify_python', 'w', encoding='utf-8').write(sys.executable)"
 ```
 
 ## For --update and --cluster-only

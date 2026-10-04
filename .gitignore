@@ -54,3 +54,5 @@ scripts/dev/certs/
 
 # Isolated optional Graphify tool
 /.opencode/.graphify-venv/
+
+/graphify-out/.graphify_usage_unknown
