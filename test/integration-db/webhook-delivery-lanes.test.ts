@@ -1,5 +1,6 @@
-import type postgres from "postgres";
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { randomUUID } from "node:crypto";
+import postgres from "postgres";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 const transport = vi.hoisted(() => ({ fetch: vi.fn() }));
 vi.mock("@/lib/safe-outbound-url.server", async (importOriginal) => ({
@@ -8,12 +9,17 @@ vi.mock("@/lib/safe-outbound-url.server", async (importOriginal) => ({
 }));
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+const previousDatabaseUrl = process.env.DATABASE_URL;
+const previousDirectUrl = process.env.DATABASE_DIRECT_URL;
 const suite = databaseUrl ? describe : describe.skip;
 if (!databaseUrl) process.stderr.write("Webhook lane proof skipped: INTEGRATION_DB_URL is required.\n");
 
 suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
   let client: postgres.Sql;
+  let fixture: postgres.Sql;
+  const schemaName = `webhook_lane_${randomUUID().replaceAll("-", "")}`;
   let workspaceId: string;
+  let publicJobId: number;
   let enqueue: typeof import("@/lib/worker/job-params.server").enqueueRegisteredJob;
   let runLanes: typeof import("@/lib/worker/run-worker.server").runWorkerJobLanes;
   let deliver: typeof import("@/lib/worker/handlers/campaign.server").webhookDeliveryHandler;
@@ -22,6 +28,15 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Missing isolated test database URL");
+    fixture = postgres(databaseUrl, { max: 1 });
+    await fixture.unsafe(`create schema "${schemaName}"`);
+    await fixture.unsafe(`create table "${schemaName}".job (like public.job including all)`);
+    await fixture.unsafe(`create sequence "${schemaName}".job_id_seq owned by "${schemaName}".job.id`);
+    await fixture.unsafe(`alter table "${schemaName}".job alter column id set default nextval('"${schemaName}".job_id_seq')`);
+    const scopedUrl = new URL(databaseUrl);
+    scopedUrl.searchParams.set("search_path", `${schemaName},public`);
+    process.env.DATABASE_URL = scopedUrl.toString();
+    process.env.DATABASE_DIRECT_URL = scopedUrl.toString();
     ({ pool: client } = await import("@/server/db"));
     ({ enqueueRegisteredJob: enqueue, webhookDeliveryParams: parseParams } = await import("@/lib/worker/job-params.server"));
     ({ runWorkerJobLanes: runLanes } = await import("@/lib/worker/run-worker.server"));
@@ -30,6 +45,15 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
     const [row] = await client<{ id: string }[]>`insert into workspace (name, credits, twilio_data, feature_flags, disabled)
       values ('Webhook worker proof', 100, '{}'::jsonb, '{}'::jsonb, false) returning id::text`;
     workspaceId = row.id;
+    const [publicJob] = await fixture<{ id: number }[]>`insert into public.job (type, workspace_id)
+      values ('general_probe', ${workspaceId}::uuid) returning id`;
+    publicJobId = publicJob.id;
+  });
+
+  afterEach(async () => {
+    if (!fixture || !publicJobId) return;
+    const [control] = await fixture`select status, attempt_count from public.job where id = ${publicJobId}`;
+    expect(control).toMatchObject({ status: "queued", attempt_count: 0 });
   });
 
   beforeEach(async () => {
@@ -43,16 +67,26 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
   });
 
   afterAll(async () => {
-    if (!client) return;
+    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabaseUrl;
+    if (previousDirectUrl === undefined) delete process.env.DATABASE_DIRECT_URL;
+    else process.env.DATABASE_DIRECT_URL = previousDirectUrl;
     try {
       if (workspaceId) {
-        await client`delete from job where workspace_id = ${workspaceId}::uuid`;
-        await client`delete from webhook where workspace = ${workspaceId}::uuid`;
-        await client`delete from workspace where id = ${workspaceId}::uuid`;
+        await fixture`delete from public.job where workspace_id = ${workspaceId}::uuid`;
+        await fixture`delete from public.webhook where workspace = ${workspaceId}::uuid`;
+        await fixture`delete from public.workspace where id = ${workspaceId}::uuid`;
       }
     } finally {
-      const { directPool } = await import("@/server/db");
-      await Promise.all([client.end(), directPool.end()]);
+      try {
+        if (client) {
+          const { directPool } = await import("@/server/db");
+          await Promise.all([client.end(), directPool.end()]);
+        }
+        if (fixture) await fixture.unsafe(`drop schema if exists "${schemaName}" cascade`);
+      } finally {
+        if (fixture) await fixture.end();
+      }
     }
   });
 
