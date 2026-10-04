@@ -132,8 +132,8 @@ type ConversationScope = {
  * direction when neither side matches a workspace number), and the grouping
  * key is that contact phone's digit-normalised key
  * (`public.normalise_phone_key`, the same function backing
- * idx_contact_workspace_normalised_phone — verified equivalent to
- * getConversationPhoneKey).
+ * idx_contact_workspace_normalised_phone). Legacy nonblank phone text with
+ * no digits keeps the SQL normalizer's empty key so list and count agree.
  */
 function buildConversationParticipantsCte(params: ConversationScope): SQL {
   const { workspaceId, workspacePhoneKeys, campaignId } = params;

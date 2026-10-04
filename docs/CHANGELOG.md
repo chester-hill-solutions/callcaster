@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: The unread badge and Today total include all workspace conversations. Failed count refreshes keep the last known badge total. ([#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045))
+- Fixed: The unread badge and Today total include all workspace conversations. Failed count refreshes keep the last known badge total. ([#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045), [PR #2364](https://github.com/chester-hill-solutions/callcaster/pull/2364))
 
 - Fixed: Invitation acceptance shows one success toast without moving the workspace list or leaving a replayable success URL. Sign-in cookies survive both acceptance paths. ([#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032), [PR #2362](https://github.com/chester-hill-solutions/callcaster/pull/2362))
 
