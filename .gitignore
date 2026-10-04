@@ -24,6 +24,10 @@ pnpm-debug.log*
 # Local generated files
 /public/exports/
 .repl/
+/graphify-out/cost.json
+/graphify-out/cache/
+/graphify-out/.graphify_python
+/graphify-out/.graphify_root
 
 # Playwright E2E
 /e2e/.auth/
@@ -47,3 +51,8 @@ scripts/dev/certs/
 # Object storage (stow) — downloaded release binary, pidfile and bucket data
 /.stow-bin/
 /.stow/
+
+# Isolated optional Graphify tool
+/.opencode/.graphify-venv/
+
+/graphify-out/.graphify_usage_unknown
