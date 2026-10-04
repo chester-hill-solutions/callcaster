@@ -4017,5 +4017,36 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Source fix in PR #2316; keep open for deployed acceptance and promotion. Project Status remains unverified by the local token."
+  },
+  {
+    "issueNumber": 2317,
+    "verdict": "verify-close",
+    "recommendedTitle": "Keep survey response columns tied to saved questions",
+    "summary": "The saved-question response-column fix merged into dev through PR #2319. Deployed acceptance and promotion remain pending.",
+    "currentBehavior": "Source fix at dev@5af3f675: response table and CSV columns match saved numeric question IDs. Header and cell keys use those IDs. Five actual-page and seven real-Postgres cases pass; original lookups fail four cases in each suite. Final-head full local CI, remote quality/bundle/deployments and E2E passed (181 database, 123 browser cases).",
+    "rootCause": "Response columns use a page-local public label instead of the saved question identity.",
+    "resolution": "Verify distinct repeated-label columns and an unanswered column on the deployed response page and direct CSV attachment route. Preserve headers, order, checkbox formatting, formula protection and workspace isolation. Promote through the release process after acceptance.",
+    "lookIn": [
+      "app/lib/survey-responses.server.ts:buildSurveyResponsesCsv",
+      "app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx",
+      "app/lib/survey-format.ts",
+      "test/survey-responses.route.test.ts"
+    ],
+    "existingTests": [
+      "test/ui/survey-response-columns.test.tsx: five page cases and duplicate-key fault proof.",
+      "test/integration-db/survey-response-columns.test.ts: seven real-Postgres CSV cases, two selected-URL configurations, original-lookup fault proof."
+    ],
+    "missingTests": [
+      "Deployed response-page and CSV attachment acceptance for repeated labels and unanswered columns; release promotion."
+    ],
+    "acceptanceCriteria": [
+      "Repeated-label columns show the answers for their distinct saved questions in both table and CSV.",
+      "An unanswered question retains its existing placeholder and CSV sanitizer escape; single-page/checkbox behavior and access controls remain.",
+      "Use unique internal question identities for header and cell keys."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "PR #2319 merged to dev at 5af3f675. Keep native issue open pending deployed acceptance and promotion. The separate export-click defect is #2320; historical response assessment remains #2292."
   }
 ]

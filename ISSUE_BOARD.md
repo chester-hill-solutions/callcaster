@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@ec6ff792 + survey source audit (2026-10-04 UTC)` · 304 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5af3f675 + survey export audit (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey issue updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey export issue updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -336,17 +336,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317) Keep survey response columns tied to saved questions
+### [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320) Download the current survey CSV on the first export click
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
-- Repeated page-local question labels select the first question in response table and CSV columns.
-- Current behavior: Source audit dev@bbc136e6: both response table and CSV find the first allQuestions entry with a public question_id. Header/cell keys repeat the same label. Correct stored answers already carry distinct internal question IDs.
-- Root cause: Response columns use a page-local public label instead of the saved question identity.
-- Resolution: Match and key columns by internal question identity. Preserve headers, order, checkbox formatting, permissions and tenant scope. No editor-label or stored-data changes.
-- Look in: `app/lib/survey-responses.server.ts:buildSurveyResponsesCsv`, `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/lib/survey-format.ts`, `test/survey-responses.route.test.ts`
-- Existing tests: test/survey-responses.route.test.ts; no repeated-label table/CSV control confirmed.
-- Missing tests: Actual-page distinct response columns with repeated labels and an unanswered question.; Real-Postgres CSV with distinct repeated-label answers and single-page/checkbox controls.; Restoring first-public-label lookup must fail the new controls.
-- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question stays empty; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
-- Tracker: Independent atomic response-column fix. Public respondent state is #2294; historical assessment is #2292. Native Bug type and assignee wra-sol verified.
+- The first export click downloads nothing; the next click downloads the previous CSV request.
+- Current behavior: Actual page/fetcher reproduction at 5707c2f5, with the export handler unchanged from dev@71f86986: first-click and fresh-second-click cases fail; one control confirms the second click downloads the first CSV revision. No skips. No deployed respondent data read or changed.
+- Root cause: The async export handler reads the captured render value of exportFetcher.data after load(), which does not replace that value.
+- Resolution: Use the existing protected CSV attachment resource through the shared shad-cc Button link pattern. Remove the stale fetcher/blob copy; keep styling, action position, authorization, server filename, CSV protection and no-store policy.
+- Look in: `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts`, `app/lib/csv.ts:csvResponse`, `app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx`
+- Existing tests: Isolated actual-page reproduction: two regression failures and one positive control.; test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls.
+- Missing tests: Actual-page protected native action coverage; real-browser first and repeated download with changed CSV data.; Deployed protected-download acceptance after source merge.
+- Done when: The first click downloads current survey data; a later click requests current data again.; Keep the shared Button geometry and action position.; Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.; Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit.
+- Tracker: Native Bug #2320 assigned to wra-sol. Implement as an independent atomic PR from clean dev; do not bundle with #2317 or historical assessment #2292.
 
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -747,9 +747,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 134
+## Verify and close — 135
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317) Keep survey response columns tied to saved questions
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The saved-question response-column fix merged into dev through PR #2319. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@5af3f675: response table and CSV columns match saved numeric question IDs. Header and cell keys use those IDs. Five actual-page and seven real-Postgres cases pass; original lookups fail four cases in each suite. Final-head full local CI, remote quality/bundle/deployments and E2E passed (181 database, 123 browser cases).
+- Root cause: Response columns use a page-local public label instead of the saved question identity.
+- Resolution: Verify distinct repeated-label columns and an unanswered column on the deployed response page and direct CSV attachment route. Preserve headers, order, checkbox formatting, formula protection and workspace isolation. Promote through the release process after acceptance.
+- Look in: `app/lib/survey-responses.server.ts:buildSurveyResponsesCsv`, `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/lib/survey-format.ts`, `test/survey-responses.route.test.ts`
+- Existing tests: test/ui/survey-response-columns.test.tsx: five page cases and duplicate-key fault proof.; test/integration-db/survey-response-columns.test.ts: seven real-Postgres CSV cases, two selected-URL configurations, original-lookup fault proof.
+- Missing tests: Deployed response-page and CSV attachment acceptance for repeated labels and unanswered columns; release promotion.
+- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question retains its existing placeholder and CSV sanitizer escape; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
+- Tracker: PR #2319 merged to dev at 5af3f675. Keep native issue open pending deployed acceptance and promotion. The separate export-click defect is #2320; historical response assessment remains #2292.
 
 ### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
@@ -1633,16 +1645,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
-### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
-- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The shared guard encoded one route's requirement as an untyped string list.
-- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
-- Look in: `app/lib/survey-public-action.server.ts`
-- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
-- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
 ### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
@@ -1651,6 +1653,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
 - Existing tests: test/ui/campaign-export-button.test.tsx
 - Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The shared guard encoded one route's requirement as an untyped string list.
+- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
+- Look in: `app/lib/survey-public-action.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
+- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
 ### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) verify-close: admin pagination consolidated onto TablePagination (#1920)
@@ -2558,6 +2570,17 @@ Product, security, or operations decision required before implementation can be 
 - Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
 - Tracker: Co-ordinate with #1770.
 
+### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
+- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
+- Root cause: Feature gap.
+- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
+- Missing tests: preview plays selected voice text; membership enforced
+- Done when: Speak step previews audibly; voice matches the block; workspace-gated
+- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
+
 ### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) feature(audience): client-side preview + column-mapping step (gocanvass parity)
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
@@ -2569,17 +2592,6 @@ Product, security, or operations decision required before implementation can be 
 - Missing tests: preview renders parsed headers/rows; mapping submitted with upload
 - Done when: parsed preview before start; columns mappable; server validation still gates
 - Tracker: Scope with #1771 (can ship together or split).
-
-### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
-- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
-- Root cause: Feature gap.
-- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
-- Missing tests: preview plays selected voice text; membership enforced
-- Done when: Speak step previews audibly; voice matches the block; workspace-gated
-- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
 
 ### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) change(ivr): make simple/complex a script property, not a campaign type
 - Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
