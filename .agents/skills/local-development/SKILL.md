@@ -69,6 +69,11 @@ Use `setJsonAuthSession` for a shared default that a case must replace. A defaul
 queued with `queueJsonAuthSession` runs before a later queued denial; use queues
 only when the test needs multiple calls in that exact order.
 
+For static role guards, trace the checked role to the handler's authenticated
+context. A role-shaped identifier or enum constant is not actor proof. Include
+constant, unrelated-field, changed-role and shadowed-helper rejection controls,
+plus a permitted renamed auth binding, before trusting a guard's floor result.
+
 ## API and form response adapters
 
 `asRouteResponse` normalizes thrown Responses. To verify that an auth redirect

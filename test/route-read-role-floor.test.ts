@@ -21,9 +21,12 @@ const imports = `
 `;
 
 function source(name: string, body: string) {
+  const isLoader = name === "loader";
+  if (isLoader)
+    body = body.replaceAll("hasMinRole(userRole,", "hasMinRole(userRole.role,");
   return `${imports} export const ${name} = ${name === "loader" ? "defineLoader" : "defineAction"}({
     auth: ${name === "loader" ? "workspaceLoaderAuth" : "workspaceRouteAuth"},
-    handler: async ({auth}) => { const {userRole} = auth; ${body} }
+    handler: async ({auth}) => { const {userRole} = auth${isLoader ? ".ctx" : ""}; ${body} }
   });`;
 }
 
@@ -95,6 +98,27 @@ describe("sibling read/write role guard (#2137)", () => {
     },
     { name: "comment lookalike", body: `/* ${deny} */` },
     {
+      name: "shadowed role helper",
+      body: `const hasMinRole = () => true; ${deny}`,
+    },
+    {
+      name: "shadowed role enum",
+      body: `const MemberRole = {Admin: 'caller'}; ${deny}`,
+    },
+    {
+      name: "enum constant allowed role",
+      body: deny.replace("userRole,", "MemberRole.Owner,"),
+    },
+    {
+      name: "unrelated role variable",
+      body: `const displayedRole = 'owner'; ${deny.replace("userRole,", "displayedRole,")}`,
+    },
+    {
+      name: "different auth property",
+      body: deny.replace("userRole,", "auth.displayedRole,"),
+    },
+    { name: "mutated role row", body: `userRole.role = 'owner'; ${deny}` },
+    {
       name: "string lookalike",
       body: `const example = ${JSON.stringify(deny)};`,
     },
@@ -145,6 +169,17 @@ describe("sibling read/write role guard (#2137)", () => {
       .replace("!hasMinRole(", "!permits(")
       .replace("MemberRole.Admin", "Roles.Admin");
     expect(checkReadRoleFloors(fixture(aliased)).offenders).toEqual([]);
+  });
+
+  test("traces renamed bindings back to the authenticated role row", () => {
+    const renamed = source("loader", deny)
+      .replace("({auth})", "({auth: result})")
+      .replace(
+        "const {userRole} = auth.ctx",
+        "const {userRole: membership} = result.ctx",
+      )
+      .replace("userRole.role,", "membership.role,");
+    expect(checkReadRoleFloors(fixture(renamed)).offenders).toEqual([]);
   });
 
   test("recognizes the min-role auth strategy and rejects weakening it", () => {

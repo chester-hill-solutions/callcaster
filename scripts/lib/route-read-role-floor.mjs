@@ -37,6 +37,60 @@ function containsCall(node) {
   return ts.forEachChild(node, containsCall) === true;
 }
 
+function expressionPath(node, bindings) {
+  if (!node) return null;
+  if (ts.isIdentifier(node)) return bindings.get(node.text) ?? null;
+  if (ts.isPropertyAccessExpression(node)) {
+    const base = expressionPath(node.expression, bindings);
+    return base ? `${base}.${node.name.text}` : null;
+  }
+  return null;
+}
+
+function bindNames(pattern, source, bindings) {
+  if (ts.isIdentifier(pattern)) {
+    bindings.delete(pattern.text);
+    if (source) bindings.set(pattern.text, source);
+  } else if (ts.isObjectBindingPattern(pattern)) {
+    for (const element of pattern.elements) {
+      if (element.dotDotDotToken || element.initializer) continue;
+      const name = element.propertyName ?? element.name;
+      if (!ts.isIdentifier(name)) continue;
+      bindNames(
+        element.name,
+        source ? `${source}.${name.text}` : null,
+        bindings,
+      );
+    }
+  }
+}
+
+function boundNames(pattern) {
+  if (ts.isIdentifier(pattern)) return [pattern.text];
+  if (ts.isObjectBindingPattern(pattern) || ts.isArrayBindingPattern(pattern)) {
+    return pattern.elements.flatMap((element) =>
+      ts.isBindingElement(element) ? boundNames(element.name) : [],
+    );
+  }
+  return [];
+}
+
+function changesAuthRole(node, bindings) {
+  if (ts.isFunctionLike(node)) return false;
+  if (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+    node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+  ) {
+    return (
+      expressionPath(node.left, bindings)?.startsWith("args.auth") === true
+    );
+  }
+  return (
+    ts.forEachChild(node, (child) => changesAuthRole(child, bindings)) === true
+  );
+}
+
 function terminatesDenied(statement, isRouteData) {
   const last = ts.isBlock(statement) ? statement.statements.at(-1) : statement;
   if (!last || (!ts.isThrowStatement(last) && !ts.isReturnStatement(last)))
@@ -71,6 +125,7 @@ export function readRoleFloor(source, name) {
     true,
   );
   const imports = new Map();
+  const shadowed = new Set();
   for (const statement of parsed.statements) {
     if (
       !ts.isImportDeclaration(statement) ||
@@ -88,6 +143,7 @@ export function readRoleFloor(source, name) {
   }
   const isImport = (node, symbol, modules) =>
     ts.isIdentifier(node) &&
+    !shadowed.has(node.text) &&
     imports.get(node.text)?.name === symbol &&
     modules.includes(imports.get(node.text)?.module);
   const role = (node) => {
@@ -148,9 +204,43 @@ export function readRoleFloor(source, name) {
   const handler = property(config, "handler");
   if (!handler || !ts.isArrowFunction(handler) || !ts.isBlock(handler.body))
     return floor;
+  const bindings = new Map();
+  if (handler.parameters[0])
+    bindNames(handler.parameters[0].name, "args", bindings);
+  const actorRolePath =
+    auth &&
+    isImport(auth, "workspaceLoaderAuth", ["@/lib/workspace-route.server"])
+      ? "args.auth.ctx.userRole.role"
+      : auth &&
+          isImport(auth, "workspaceRouteAuth", ["@/lib/workspace-route.server"])
+        ? "args.auth.userRole"
+        : null;
+  for (const parameter of handler.parameters) {
+    for (const local of boundNames(parameter.name)) shadowed.add(local);
+  }
+  for (const statement of handler.body.statements) {
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        for (const local of boundNames(declaration.name)) shadowed.add(local);
+      }
+    } else if (ts.isFunctionDeclaration(statement) && statement.name)
+      shadowed.add(statement.name.text);
+  }
   for (const statement of handler.body.statements) {
     // Once async work starts, a later denial cannot prove that no read leaked.
     if (containsAwait(statement)) break;
+    if (changesAuthRole(statement, bindings)) break;
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        bindNames(
+          declaration.name,
+          statement.declarationList.flags & ts.NodeFlags.Const
+            ? expressionPath(declaration.initializer, bindings)
+            : null,
+          bindings,
+        );
+      }
+    }
     const call =
       ts.isIfStatement(statement) &&
       ts.isPrefixUnaryExpression(statement.expression) &&
@@ -167,9 +257,8 @@ export function readRoleFloor(source, name) {
     ) {
       const actorRole = call.arguments[0];
       if (
-        actorRole &&
-        (ts.isIdentifier(actorRole) ||
-          ts.isPropertyAccessExpression(actorRole)) &&
+        actorRolePath &&
+        expressionPath(actorRole, bindings) === actorRolePath &&
         terminatesDenied(statement.thenStatement, (node) =>
           isImport(node, "data", ["react-router"]),
         )
