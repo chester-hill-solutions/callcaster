@@ -32,6 +32,13 @@ describe("runtime CSV security", () => {
 });
 
 describe("runtime CSV import compatibility", () => {
+  test("retains empty preview results and empty contact-file rejection", async () => {
+    expect(parseServer("")).toEqual({ headers: [], contacts: [] });
+    expect(parseAudience("")).toEqual({ headers: [], contacts: [] });
+    expect(await parseCSVAsync("")).toEqual({ headers: [], contacts: [] });
+    expect(() => parseContacts("")).toThrow("Failed to parse CSV file");
+  });
+
   test.each([
     { name: "quoted comma", cell: '"Jane, Doe"', expected: "Jane, Doe" },
     { name: "escaped quotes", cell: '"Jane ""JD"" Doe"', expected: 'Jane "JD" Doe' },

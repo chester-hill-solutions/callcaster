@@ -229,7 +229,9 @@ const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
 export const parseCSV = (csvString: string) => {
   try {
     const records = parse(csvString);
-    const headers = parseCSVHeaders(records[0]);
+    const firstRow = records[0];
+    if (!firstRow) throw new Error("CSV file is empty");
+    const headers = parseCSVHeaders(firstRow);
     const contacts = parseCSVData(records, headers);
 
     return { headers, contacts };
