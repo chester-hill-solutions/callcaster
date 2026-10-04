@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5be1f2c6; workspace unread aggregate source fix with original browser-flow triage and deployed QA pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@1a5d463f; sheet body inset source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the workspace unread aggregate fix. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the sheet body inset fix. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 56
+## Fix now — 55
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -652,23 +652,23 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Each of the two buttons either navigates to a real route or is removed (kill-check: remove the `to` and confirm the test goes red).; A guard test asserts that creation controls in app/routes/admin+/panels/ have a reachable action, or are absent.; If the routes do not exist yet, the button is absent rather than inert.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2042](https://github.com/chester-hill-solutions/callcaster/issues/2042) Side Sheet has no default padding, so any body between header and footer renders flush to the edge
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-02
-- The local sheet wrapper still adds no padding. The reported split-campaign sheet body has vertical padding only, while upstream padding applies to header/footer.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The reported sheet still has no horizontal body inset. Header/footer use upstream p-6.
-- Root cause: SheetContent adds no body inset. Upstream header/footer slots have p-6, while the reported split-campaign body has only py-4. Other consumers require a separate audit; not every sheet should receive padding.
-- Resolution: Add a deliberate body-padding contract and check existing consumers rather than blindly adding outer padding.
-- Look in: `app/components/ui/sheet.tsx:50`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx:81`, `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:273`, `app/components/ui/sheet.tsx:50-54 (the local SheetContent wrapper, where the default belongs)`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx:81 (no padding on the content slot), :132 and :142 (p-6 on header and footer only)`, `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:262-263 (the sheet in the screenshot)`, `the 9 other SheetContent call sites: CallScreen.Layout.tsx:253,274,302; NumberSummaryList.tsx:467; CallerIdVerificationDialog.tsx:44; ChatAddContactDialog.tsx:72; TeamMember.tsx:128; Navbar.MobileMenu.tsx:44; AddAudioSheet.tsx:125`
-- Existing tests: test/ui/components-ui-primitives.test.tsx (sheet render smoke test; no body-inset assertion); test/ui/add-audio-sheet.test.tsx (upload behavior; no padding assertion)
-- Missing tests: No sheet inset regression test or browser measurement was found. Header/footer already have padding, so a naive content p-6 risks doubled insets.
-- Done when: Body content in a side Sheet has the same horizontal inset as its header and footer; The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge; Padding is defined in one place, and hand-compensating padding at call sites is removed; A test fails if a new SheetContent call site reintroduces flush body content; The vendored shad-cc package is unchanged
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ---
 
-## Verify and close — 153
+## Verify and close — 154
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2042](https://github.com/chester-hill-solutions/callcaster/issues/2042) Side Sheet has no default padding, so any body between header and footer renders flush to the edge
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-04
+- The merged local SheetBody contract fixes all 12 consumers; measured normal, edge-to-edge and compact navigation layouts pass. Deployed acceptance and release remain pending.
+- Current behavior: Source audit: dev@1a5d463f, 2026-10-04. PR #2366 merged with source-equivalent cleanup. Normal body insets match the padded header/footer; mobile chats and workspace navigation keep explicit edge-to-edge bodies; the site menu keeps compact spacing.
+- Root cause: The original content slot did not declare body padding. The local body slot now owns padding, with deliberate edge-to-edge and navigation variants.
+- Resolution: Verify affected flows on deployed dev, including forms, normal and edge-to-edge layouts, then promote through the default-branch release. Keep the issue open until required acceptance is complete.
+- Look in: `app/components/ui/sheet.tsx`, `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx`, `app/components/workspace/WorkspaceNav.tsx`, `app/routes/workspaces+/$id/chats.route.tsx`, `app/components/layout/Navbar.MobileMenu.tsx`, `scripts/lib/sheet-body-contract.mjs`, `e2e/specs/sheet-insets.spec.ts`
+- Existing tests: test/sheet-body-contract.test.ts: 26 AST contract cases; missing/flush body, imports, forms and padding controls.; test/ui/split-campaign-override.test.tsx: eight confirmation and form behavior cases.; e2e/specs/sheet-insets.spec.ts: seven real built-app geometry cases at mobile/desktop widths and light/dark themes; page bounds, both edge-to-edge layouts and compact navigation.; Four browser geometry cases on the actual reported split component; removing its default horizontal inset failed all four.; Final full ci:local: 4,570 node, 1,039 UI and 33 Bun cases passed; remote browser gate: 131 cases passed.
+- Missing tests: Deployed acceptance for the affected normal, edge-to-edge and compact navigation sheets.; Default-branch release and required acceptance before issue closure.
+- Done when: Body content in a side Sheet has the same horizontal inset as its header and footer; The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge; Padding is defined in one place, and hand-compensating padding at call sites is removed; A test fails if a new SheetContent call site reintroduces flush body content; The vendored shad-cc package is unchanged
+- Tracker: PR #2366 merged to dev with clear independent reviews, final exact-head local/remote gates and both deployments green. Native issue retains all five original acceptance criteria and remains open; issue-on-dev workflow actually moved one item. Local browser proof does not replace deployed acceptance.
 
 ### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-04
