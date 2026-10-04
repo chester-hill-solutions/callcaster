@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed public survey answers and write-in text resuming on the wrong page when question labels repeat ([#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294)).
+- Fixed public survey answers and write-in text resuming on the wrong page when question labels repeat ([#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294), [PR #2316](https://github.com/chester-hill-solutions/callcaster/pull/2316)).
 
 - Fixed: Inbound calls receive one active queue offer at a time; timed-out or declined offers can retry without dialling an existing offer again ([#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129), [PR #2314](https://github.com/chester-hill-solutions/callcaster/pull/2314)).
 
