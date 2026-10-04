@@ -154,8 +154,7 @@ const allMigrationFiles = readdirSync(path.join(rootDir, "client/migrations"))
   .filter((file) => file.endsWith(".sql"))
   .sort();
 
-// Same drift guard as the compose bootstrap: a migration wired into neither
-// list is a mistake that would silently diverge this tool from the schema.
+// An unlisted migration with no explicit coverage would diverge fresh schemas.
 // The later guard replaces the legacy index and final claim function.
 const coveredByLaterMigration = new Set([
   "20260705000200_acd_duplicate_offer_guard.sql",
