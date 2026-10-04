@@ -207,45 +207,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2045,
-    "verdict": "fix-now",
-    "recommendedTitle": "Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows",
-    "summary": "The newest-100 cap is still explicit in both client badge and server unread total. A sidebar revalidation fix landed separately, but it does not remove this cap.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Both unread totals remain capped at 100 conversations. Sidebar response-merging was fixed by PR #2191 but that does not resolve this count cap.",
-    "rootCause": "Both the client badge and server Today count sum a newest-100-conversation page instead of a workspace-wide aggregate. An optimistic inbound increment can disappear at the next capped poll.",
-    "resolution": "Provide a scoped aggregate using the current unread definition, consume it for both server and badge, and test a conversation beyond the newest 100. Retest the screenshot list symptom separately.",
-    "lookIn": [
-      "app/hooks/chats/useUnreadConversationsCount.ts:15",
-      "app/lib/database/workspace-conversations.server.ts:489",
-      "app/hooks/chats/useUnreadConversationsCount.ts:89",
-      "app/hooks/chats/useUnreadConversationsCount.ts:15-22 (the documented 100-conversation limit), :39-61 (page fetch and sum), :78-91 (optimistic inbound bump), :13 (30s poll)",
-      "app/lib/database/workspace-conversations.server.ts:486-505 (getWorkspaceUnreadConversationCount and its 'agree with the badge' comment)",
-      "app/lib/database/workspace-conversations.server.ts:223-241 (the agg CTE: unread_count definition and conv_key grouping)",
-      "app/lib/chats/unread-count.ts:1-11 (UNREAD_CONVERSATION_PAGE_SIZE = 100)",
-      "app/routes/workspaces+/$id.loader.server.ts:73 (the server-rendered unread count, workspace root only)",
-      "app/hooks/chats/useChatsPage.ts:153-164 (the setLoadedChats reset path — the unconfirmed list symptom)"
-    ],
-    "existingTests": [
-      "test/workspace-conversations-sql-parity.test.ts (conversation-query parity; no complete unread aggregate assertion)",
-      "test/ui/hooks-realtime.test.tsx (conversation summary refresh/unread behavior; no useUnreadConversationsCount coverage)"
-    ],
-    "missingTests": [
-      "No >100-conversation aggregate parity test exists. The list symptom is not established by this cap alone, and #2191 addresses a different sidebar revalidation loss."
-    ],
-    "acceptanceCriteria": [
-      "The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations",
-      "For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.",
-      "A Postgres test proves the aggregate equals the per-conversation sum beyond the first page",
-      "Per-conversation unread pills are unchanged",
-      "The comments asserting the 100-conversation window is by design are corrected",
-      "The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2062,
     "verdict": "fix-now",
     "recommendedTitle": "Flash telemetry infers Alert severity from its ARIA role",

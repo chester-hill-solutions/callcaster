@@ -4549,5 +4549,46 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Verify and close after deployed QA and default-branch release. PR #2362 is merged into dev; keep the issue open until the remaining verification is complete."
+  },
+  {
+    "issueNumber": 2045,
+    "verdict": "verify-close",
+    "recommendedTitle": "Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows",
+    "summary": "PR #2364 removes the newest-100 cap from the badge and Today total. The original browser list flow, deployed QA and default-branch release remain open.",
+    "currentBehavior": "Source verified on dev@5be1f2c6, 2026-10-04. Badge and Today use the same complete workspace aggregate; ordinary list requests and per-conversation pills keep their existing behavior. Full local and final-head remote checks and both deployments passed.",
+    "rootCause": "Fixed: both totals previously summed a newest-100 conversation page. They now share a SQL aggregate with the list’s workspace scope, message exclusions and participant identity. Failed badge refreshes retain the last known total.",
+    "resolution": "Verify deployed badge/Today parity beyond 100 conversations and repeat polling after an inbound reply. Retest the original screenshot list flow in the browser: the 105-row hook control retained every loaded row through repeated page-1 revalidation, but that does not settle the live report. Reproduce and file a separate concern, or record a scoped not-reproducible result with browser evidence. Release to the default branch before closure.",
+    "lookIn": [
+      "app/lib/database/workspace-conversations.server.ts",
+      "app/hooks/chats/useUnreadConversationsCount.ts",
+      "app/lib/chats/messaging-client.ts",
+      "app/routes/api+/workspaces+/$workspaceId/conversations.loader.server.ts",
+      "app/routes/workspaces+/$id.loader.server.ts",
+      "app/hooks/chats/useChatsPage.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/workspace-unread-count.test.ts (six real PostgreSQL cases: 105 conversations, full 107 total vs capped-page 100; parity, foreign scope, exclusions, number identity, legacy phone text and repeated reads)",
+      "test/workspace-conversations-sql-parity.test.ts (six existing real SQL/JS list parity cases passed without skips)",
+      "test/workspace-unread-count.route.test.ts (count mode, ordinary list, safe failure, capability and scope boundary)",
+      "test/ui/workspace-unread-count.test.tsx (real client/parser, repeated polling, malformed responses, workspace switch and late response/event)",
+      "test/ui/components-workspace-nav.test.tsx (zero, numeric, 99+ badge display and realtime changes through real client)",
+      "test/ui/use-chats-page-pagination.test.tsx (105 loaded rows and page cursor retained through repeated page-1 revalidation)",
+      "Eight genuine mutations rejected; source restored and verified. The remote e2e log confirms all six new real database cases ran."
+    ],
+    "missingTests": [
+      "The screenshot’s original live browser flow remains to reproduce or rule out with evidence. Deployed badge/Today acceptance and default-branch release remain pending."
+    ],
+    "acceptanceCriteria": [
+      "The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations",
+      "For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.",
+      "A Postgres test proves the aggregate equals the per-conversation sum beyond the first page",
+      "Per-conversation unread pills are unchanged",
+      "The comments asserting the 100-conversation window is by design are corrected",
+      "The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after original browser-flow triage, deployed QA and default-branch release. PR #2364 is merged into dev; the native issue preserves all acceptance criteria and remains open."
   }
 ]
