@@ -39,12 +39,40 @@ function containsCall(node) {
 
 function expressionPath(node, bindings) {
   if (!node) return null;
+  if (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isTypeAssertionExpression(node) ||
+    ts.isNonNullExpression(node)
+  )
+    return expressionPath(node.expression, bindings);
   if (ts.isIdentifier(node)) return bindings.get(node.text) ?? null;
   if (ts.isPropertyAccessExpression(node)) {
     const base = expressionPath(node.expression, bindings);
     return base ? `${base}.${node.name.text}` : null;
   }
+  if (
+    ts.isElementAccessExpression(node) &&
+    ts.isStringLiteral(node.argumentExpression)
+  ) {
+    const base = expressionPath(node.expression, bindings);
+    return base ? `${base}.${node.argumentExpression.text}` : null;
+  }
   return null;
+}
+
+function targetsAuth(node, bindings) {
+  if (expressionPath(node, bindings)?.startsWith("args.auth")) return true;
+  if (
+    ts.isPropertyAccessExpression(node) ||
+    ts.isElementAccessExpression(node) ||
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isTypeAssertionExpression(node) ||
+    ts.isNonNullExpression(node)
+  )
+    return targetsAuth(node.expression, bindings);
+  return false;
 }
 
 function bindNames(pattern, source, bindings) {
@@ -82,9 +110,7 @@ function changesAuthRole(node, bindings) {
     node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
     node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
   ) {
-    return (
-      expressionPath(node.left, bindings)?.startsWith("args.auth") === true
-    );
+    return targetsAuth(node.left, bindings);
   }
   return (
     ts.forEachChild(node, (child) => changesAuthRole(child, bindings)) === true

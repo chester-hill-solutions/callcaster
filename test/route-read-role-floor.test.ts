@@ -98,6 +98,22 @@ describe("sibling read/write role guard (#2137)", () => {
     },
     { name: "comment lookalike", body: `/* ${deny} */` },
     {
+      name: "indexed role mutation",
+      body: `userRole['role'] = 'owner'; ${deny}`,
+    },
+    {
+      name: "dynamic role mutation",
+      body: `const key = 'role'; userRole[key] = 'owner'; ${deny}`,
+    },
+    {
+      name: "asserted role mutation",
+      body: `(userRole as {role:string}).role = 'owner'; ${deny}`,
+    },
+    {
+      name: "dynamic context mutation",
+      body: `const key = 'userRole'; auth.ctx[key].role = 'owner'; ${deny}`,
+    },
+    {
       name: "shadowed role helper",
       body: `const hasMinRole = () => true; ${deny}`,
     },
