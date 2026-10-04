@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@9edfb271 + runtime security source refresh (2026-10-04 UTC)` · 310 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@3228e89f + dependency audit source refresh (2026-10-04 UTC)` · 313 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the native runtime security Epic and child-task updates. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 61
+## Fix now — 62
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -562,16 +562,27 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334) security(deps): upgrade csv-parse to a patched release
+### [#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341) security(deps): patch the Twilio jws dependency path
 - Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-04
-- csv-parse 5.6.0 remains affected by runtime alert #220. The patched line starts at 7.0.2. Current parser paths do not enable grouped duplicate columns; package exposure is confirmed without an application exploit claim.
-- Root cause: The direct ^5.5.6 dependency excludes the patched major release, so a lock-only update cannot resolve this finding.
-- Resolution: Upgrade to a supported patched release in both install paths. Preserve the actual server and sync/async audience parsing contracts through regression cases and full local/remote gates.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/csv.ts`, `app/lib/csv-contacts.ts`, `app/components/audience/audience-upload-csv.ts`
-- Existing tests: test/csv.test.ts; test/audience-upload-csv.test.ts; test/csv-opt-out-parsing.test.ts
-- Missing tests: Patched duplicate __proto__ advisory control plus parser parity across quoted/BOM/headerless/duplicate/malformed input.
-- Done when: Both install paths resolve csv-parse >=7.0.2 and support its import/type contract.; Actual parser behavior and upload mapping remain correct.; Advisory regression and valid controls pass; production audit no longer reports csv-parse.; Full ci:local, remote gates, deployed upload verification and release promotion are complete.
-- Tracker: Native Task under #1802. Keep Scalar compatibility work in #2335.
+- Bun resolves jws 3.2.2 through Twilio 5.4.4 and jsonwebtoken 9.0.2. npm already resolves jsonwebtoken 9.0.3 and patched jws 4.0.1. The maintainer explicitly excludes jsonwebtoken users from the exploit conditions; no token bypass is claimed.
+- Root cause: Bun’s older permitted JWT patch keeps an affected installed jws range. Twilio’s ^9.0.2 range permits the verified npm 9.0.3 dependency contract.
+- Resolution: Verify a compatible scoped jsonwebtoken 9.0.3 path in both installers, preserving Twilio versions and unrelated dependencies. Exercise the real app token generators and real signature verification with valid and rejected-token controls.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/twilio-token.server.ts`, `app/lib/handset/handset-token.server.ts`
+- Existing tests: test/handset-token.server.test.ts
+- Missing tests: Both real installed trees: issuer, subject, identity, expiry and grants through actual token generators; wrong key/algorithm, altered claims and expired-token rejection controls.
+- Done when: Every jws resolution excludes <=3.2.2 and 4.0.0.; App token contracts stay correct without provider calls or real credentials.; Both installers, full local CI, remote checks and both deployments pass.; Deployed token acceptance and release promotion are complete.
+- Tracker: Native Task under #1802. Package exposure and app exploit reachability remain separate claims.
+
+### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
+- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Bun resolves PostCSS 8.5.16 through Scalar, Vue and compiler-sfc. The root and npm resolution are already 8.5.25. Both source-map advisories require a resolution at least 8.5.23. Compiler package presence does not prove a live API that processes untrusted CSS.
+- Root cause: Bun retains an older nested PostCSS 8.x copy despite compatible consumer ranges and a patched direct development dependency.
+- Resolution: Verify a matching PostCSS root spec/override for every copy, keeping Scalar, Vue and app theme intact. Use only owned CSS/map marker fixtures for traversal and missing-from regressions with valid CSS/source-map controls.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/tailwind.css`, `app/routes/docs.tsx`
+- Existing tests: test/ui/docs.route.test.tsx
+- Missing tests: Real installed parser rejection and positive controls for source-map loading, including with/without from; old-version fault proof; both installed Scalar widget/build compatibility checks.
+- Done when: All PostCSS copies are >=8.5.23 and compatible with their consumers.; Outside marker maps are not read; valid CSS and supported source maps still work.; Both installers, full local CI, real docs render and remote gates pass.; Required deployed acceptance and release promotion are complete.
+- Tracker: Native Task under #1802. Cover development copies in the same PostCSS task to avoid duplicate work under #1803.
 
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -725,9 +736,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 139
+## Verify and close — 142
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340) security(deps): patch ws in both locked install paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- ws source is merged to dev in PR #2343 (3228e89f). Both locks resolve only 8.21.0; npm package entries stay unchanged and Bun deduplicates the old jsdom copy. Ten real cases pass for each installed tree; old 8.18.0 fails four rejection cases while six valid controls pass. No app exploit is claimed.
+- Resolution: Verify applicable deployed WebSocket behavior and promote the source fix. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-ws.test.ts`
+- Existing tests: test/runtime-ws.test.ts
+- Tracker: PR #2343 passed full local CI on final head 95ea1c17, all applicable remote gates and both deployments. Remote quality executed all ten cases. The verified worktree and local/remote refs are removed with a recovery bundle. Task #2340 remains a child of #1802; applicable deployed acceptance and release promotion remain open.
 
 ### [#2333](https://github.com/chester-hill-solutions/callcaster/issues/2333) security(deps): patch Axios in runtime install paths
 - Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -736,6 +755,22 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-axios.test.ts`
 - Existing tests: test/runtime-axios.test.ts; test/twilio-client.server.test.ts
 - Tracker: PR #2336 passed full ci:local on final head 68832c47 and all applicable remote gates plus both deployments. Remote quality executed all six HTTP cases. Task #2333 remains a child of runtime Epic #1802; deployed acceptance and release promotion remain open.
+
+### [#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334) security(deps): upgrade csv-parse to a patched release
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- csv-parse source is merged to dev in PR #2338 (42aa7957). Both installed trees resolve 7.0.3 and pass 103 parser/mapping cases, including 13 runtime cases. Old 5.6.0 fails the advisory case while twelve controls pass. Package exposure was confirmed without an application exploit claim.
+- Resolution: Verify actual deployed audience/contact uploads, then promote the source fix. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/csv-contacts.ts`, `test/runtime-csv.test.ts`
+- Existing tests: test/runtime-csv.test.ts; test/csv.test.ts; test/audience-upload-csv.test.ts; test/csv-opt-out-parsing.test.ts
+- Tracker: PR #2338 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all 13 runtime cases. Task #2334 remains a child of #1802; deployed upload acceptance and release promotion remain open.
+
+### [#2335](https://github.com/chester-hill-solutions/callcaster/issues/2335) security(deps): patch the Scalar AI SDK dependency chain
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Scalar SDK source is merged to dev in PR #2339 (364d8d5b). Both install paths resolve provider-utils 4.0.33 without changing Scalar. Nine real response/stream cases pass; old 4.0.5 fails three handler guards while three valid controls pass. The actual JSON handler default remains 2 GiB.
+- Resolution: Verify actual deployed public/complete docs with the existing theme, auth controls and examples, then promote the source fix. Keep local browser proof separate from deployed acceptance.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-scalar-sdk.test.ts`, `app/routes/docs.tsx`
+- Existing tests: test/runtime-scalar-sdk.test.ts; test/ui/docs.route.test.tsx
+- Tracker: PR #2339 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all nine runtime cases. The actual Scalar widget was built and checked independently for both local installed graphs, including spec selection, operation auth, examples and unmount/remount. Task #2335 remains a child of #1802; deployed docs acceptance and release promotion remain open.
 
 ### [#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109) Changing "rows per page" in the admin portal blanks the table — the page number is never reset
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2786,10 +2821,17 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
 - Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Runtime security work is a native Epic with Tasks #2333 (Axios), #2334 (csv-parse) and #2335 (Scalar AI SDK chain). Axios source is on dev after PR #2336; deployed acceptance and promotion remain open. #1809 is closed. The production npm audit now reports eight affected package nodes across CSV and Scalar.
-- Resolution: Implement the remaining children as separate package concerns and PRs. Verify npm and Bun independently because their locked versions differ. Complete each child’s deployed behavior checks and release promotion before completing the Epic.
+- Runtime security is a native Epic with separate package Tasks. Axios, csv-parse, Scalar and ws source are merged through PRs #2336, #2338, #2339 and #2343; deployed acceptance and release promotion remain open. Dev npm production audit is clear. The independently resolved Bun runtime graph has two affected nodes: jws and PostCSS, tracked by #2341 and #2342.
+- Resolution: Complete the remaining package tasks as atomic PRs. Verify both locked install paths, each child’s real behavior controls, deployed acceptance and release promotion. No package exposure is a proved app exploit by itself.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Keep Nano ID #1805 and closed qs #1809 as existing history. Do not recreate their work. Default-branch Dependabot reports two runtime alerts (#220, #218), a different snapshot from the dev npm affected-node count.
+- Tracker: Bun runtime trace resolves 594 nodes with no missing required edges and excludes vendor devDependencies/optional peer integrations. Fresh master Dependabot still has two runtime alerts (#220, #218) plus 37 development alerts; source fixes on dev do not prove alert resolution. Keep #1805 and closed #1809 as existing history.
+
+### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Development security is now a native Epic. A fresh complete npm audit reports 23 affected package families (17 high, five moderate and one low), while npm production is clear. Bun has separate affected development copies. The live master snapshot has 37 development alerts; this is a different source/release view.
+- Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Keep runtime fixes under #1802. PostCSS copies are already tracked in #2342; do not duplicate that package work. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, deployed acceptance and release promotion remain required.
 
 ### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
 - Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -3228,13 +3270,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: clones/duplicatedLines drop and the baseline is lowered to lock it; One implementation per clone; call sites behave the same
 - Tracker: Umbrella/tracker; do not pick directly. Work the open children #1912-#1919.
 
-### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
-- The development-scope dependency findings span multiple package families and need separate remediation slices.
-- Resolution: Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope.
-
 ---
 
 ## Duplicates — 3
@@ -3274,13 +3309,9 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 9
+## Needs triage — 8
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
-
-### [#2335](https://github.com/chester-hill-solutions/callcaster/issues/2335) security(deps): patch the Scalar AI SDK dependency chain
-- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
