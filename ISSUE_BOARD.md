@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@3c623739 + #2348 normalization source (2026-10-04 UTC)` · 314 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@ee225fc3; merged #2348/#2350 source and current recovery/media evidence (2026-10-04 UTC)` · 315 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after native normalization Task #2348 and its parent-scope updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after merged original-file Task #2350 and current parent/media-scope updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -133,6 +133,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136) POST /api/media lacks the file-size limit enforced by its sibling route
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- POST /api/media has no file-size guard before buffering, while /api/message_media has a 10 MiB file policy. The reported three independent buffer copies are not supported by the implementation.
+- Current behavior: Source still lacks the audio file cap and both routes materialize multipart before file validation. Five native multipart/actual-route cases at dev@0b72f37d reproduce audio accepting 10 MiB + 1 byte (201) and campaign text entering the storage-call key. Both exact-cap controls and the message-media oversize rejection pass. Buffer.from(ArrayBuffer) shares its allocation and existing Buffer conversion adds no copy; no production OOM/peak-memory claim is made.
+- Resolution: Share the size/type validation and run it before file.arrayBuffer. Add a bounded request/multipart reader where needed because request.formData has already read the part. Sanitize generated storage keys and measure memory before asserting copy count.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `test/media.route.test.ts`, `test/message-media.route.test.ts`
+- Existing tests: test/media.route.test.ts covers upload success, authentication refusal and upload/update failure.; test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media.; Five actual-route/native multipart cases: two expected regression failures (audio cap and campaign-derived key) plus three passing sibling/exact-cap controls. Only authentication/session, access, DB writes and storage I/O are stubbed; no provider/application DB calls.
+- Missing tests: A repaired oversized audio upload must reject before application File.arrayBuffer, storage or update. Both routes need literal exact-cap controls.; An actual streamed multipart request must enforce a byte budget with no or false Content-Length and cancel upstream on overflow; a post-formData check alone does not prove this.; Invalid type/name and foreign-tenant controls; removal/delay of the cap, stream limit or generated-key guard must fail relevant tests. Peak memory remains unmeasured.
+- Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
+- Tracker: Keep Fix now for absent upload limits. Correct the triple-copy/OOM claims; no production memory reproduction was performed.
+
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
 - Recommended title: **Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address**
@@ -165,17 +176,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Negated verbal workflow, every exact valid enum passthrough, invalid explicit type, absent legacy field. No live provider registration audit was performed.
 - Done when: Free-text workflow descriptions never determine optInType.; Each supported explicit enum value passes through exactly; invalid explicit values are refused.; Missing selections follow an explicit recorded product policy and cannot silently produce an unsupported consent statement.; Any allowed legacy fallback logs the workspace and reason.; Tests cover negated verbal prose, explicit enum values, invalid values and missing selections.; The provisioning sweep result is recorded; any live registration audit is tracked separately.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136) POST /api/media lacks the file-size limit enforced by its sibling route
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- POST /api/media has no file-size guard before buffering, while /api/message_media has a 10 MiB file policy. The reported three independent buffer copies are not supported by the implementation.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Multipart is materialized, then file.arrayBuffer is read. Buffer.from(ArrayBuffer) shares its allocation, and uploadObject.toBuffer returns an existing Buffer without a copy. Unbounded route file-size policy remains the defect.
-- Resolution: Share the size/type validation and run it before file.arrayBuffer. Add a bounded request/multipart reader where needed because request.formData has already read the part. Sanitize generated storage keys and measure memory before asserting copy count.
-- Look in: `app/routes/api+/media.action.server.ts:25`, `app/lib/object-storage.server.ts:136`, `app/routes/api+/message_media.action.server.ts:15`, `test/media.route.test.ts:50`, `app/routes/api+/media.action.server.ts:35`, `the sibling media route with the 10 MB cap`, `app/lib/object-storage.server.ts:180-220`, `app/components/file-assets/`, `app/lib/audio-upload.ts`, `app/lib/user-audio.server.ts`
-- Existing tests: test/media.route.test.ts covers upload success, authentication refusal and upload/update failure.; test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media.
-- Missing tests: Oversized upload must reject before application buffer allocation; boundary allowed test and a request streaming limit test are needed. Peak memory has not been measured.
-- Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
-- Tracker: Keep Fix now for absent upload limits. Correct the triple-copy/OOM claims; no production memory reproduction was performed.
 
 ### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -702,20 +702,32 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 145
+## Verify and close — 146
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
+### [#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350) Retain the original audience CSV before import starts
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- PR #2351 merged original audience CSV retention into dev at ee225fc3. Store exact private immutable bytes before campaign linking, existing-audience status changes and job enqueue. Storage failure persists the failed upload without those effects. Deployed acceptance and release remain.
+- Current behavior: Original BOM/UTF-8/CRLF/multiline bytes are stored at {workspaceId}/{uploadId}/original.csv, separate from status sidecars and job retention. Reuses existing storage, tenant failure update and typed enqueue APIs. No report UI or whole-run recovery is introduced.
+- Root cause: The route previously queued imports without a durable original file; completed job payloads are pruned after seven days.
+- Resolution: Verify applicable deployed private original storage, failed-upload behavior and release promotion. Keep #1771 per-row reporting and #2128 recovery open.
+- Look in: `app/routes/api+/audience-upload.action.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/lib/object-storage.server.ts`, `test/audience-upload-original.test.ts`
+- Existing tests: 11 actual-route/real-CSV artifact cases and 50 focused upload/route cases pass. Byte equality, immutable concrete path/options, held acknowledgement, failure ID/tenant predicate, campaign link and denied/foreign controls are covered.; Original source/removing storage and early enqueue each fail five cases; altered bytes/wrong failed-upload ID each fail one; early campaign link fails two. Restored source passes 11.; Both full local gates, both independent reviews, all applicable exact-head remote checks and both app/worker deployments passed. Successful remote quality ran all 11 cases; branch/worktree cleanup verified source equivalence and recovery bundle.
+- Missing tests: Applicable deployed storage/upload functional acceptance and default-branch release promotion.
+- Done when: Exact original bytes retained privately and immutably at server-created workspace/upload path before enqueue.; Storage failure truthfully persists failed upload; no campaign link, existing-audience status change or queued import.; Denied/foreign and invalid input perform no artifact or queued import; valid own-workspace control succeeds.; Original is separate from status sidecar and completed-job pruning; no public/unauthenticated retrieval.; Full local CI per pushed head, independent reviews, remote gates, both deploys, deployed acceptance and release verified.
+- Tracker: Verified native Task under #1771, source completed in PR #2351. Keep open for deployed acceptance and release; does not complete parent reporting or #2128 recovery.
+
 ### [#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348) Normalize opt-out values in the audience upload path
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
-- This source change reuses the standalone opt-out parser at the actual audience-upload mapping boundary. Mapped cells are boolean before insertion; permitted, blank and pending behavior is preserved. Deployed upload acceptance and release remain required.
+- PR #2349 merged normalization into dev at 0b72f37d after both full local gates, both reviews, applicable remote checks and both deployments passed. Mapped opt-out cells reach insertion as booleans through the existing total parser. Deployed acceptance and release remain required.
 - Root cause: The real upload uses generic lib/csv and previously wrote mapped opt-out values as raw strings, bypassing the standalone parser fixed in #2250.
 - Resolution: Verify the applicable deployed import behavior and release promotion. Keep broader reporting and failure/re-upload acceptance under parent #2128 and existing #1771; do not close the parent from this normalization-only Task.
 - Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/csv-contacts.ts`, `test/audience-upload-opt-out.test.ts`, `test/csv-opt-out-parsing.test.ts`
-- Existing tests: 25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.; 111 focused upload, standalone parser, route and phone dedupe cases pass.; Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25.
+- Existing tests: 25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.; 111 focused upload, standalone parser, route and phone dedupe cases pass.; Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25.; Successful final-head remote quality job executed all 25 server upload cases; both full local gates, reviews, applicable remote checks and both deployments passed.
 - Missing tests: Applicable deployed upload acceptance and release/default-branch verification.
 - Done when: Mapped opt-out cells reach contact insertion as expected literal booleans through one canonical parser.; Existing value policy, unmapped default, other fields, custom data, phone normalization and completion remain correct.; Full local CI, both independent reviews, applicable remote gates and both deployments pass before merge.; Applicable deployed upload behavior and release promotion are verified.
-- Tracker: Native Task under #2128; one normalization concern. This source is ready for its required gates and deployed verification. The parent’s per-row reporting and durable recovery requirements remain open.
+- Tracker: Native Task under #2128; source completed and merged in PR #2349. Keep this Task open for deployed acceptance and release. Parent reporting and durable recovery requirements remain open.
 
 ### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
 - Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2380,7 +2392,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 46
+## Needs decision — 45
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -2614,17 +2626,6 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
 - Tracker: Keeps blocking #1316 until the state is decided.
 
-### [#1771](https://github.com/chester-hill-solutions/callcaster/issues/1771) feature(audience): per-row import error report + original CSV artifact
-- Verdict: **Needs decision** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.
-- Current behavior: Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.
-- Root cause: No per-row capture or artifact retention, unlike gocanvass.
-- Resolution: Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.
-- Look in: `app/lib/audience-upload-process.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/object-storage.server.ts`
-- Missing tests: per-row errors persisted + listed; original retained under workspace prefix
-- Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
-- Tracker: Co-ordinate with #1770.
-
 ### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) feature(audience): client-side preview + column-mapping step (gocanvass parity)
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
@@ -2814,22 +2815,34 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 41
+## Blocked / split first — 42
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
 ### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
 - Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
 - Recommended title: **Complete audience upload recovery after opt-out normalization**
-- The #2348 source change normalizes mapped opt-out values through the existing total boolean parser. The parent’s unknown-value review reporting and failure/re-upload requirements remain unfinished; normalization alone cannot complete this Bug.
-- Current behavior: Mapped opt-out values now reach the contact insert boundary as booleans with the existing parser policy. Contact and audience-membership insertion remain separate writes. Phone dedupe reads only already-linked audience phones and does not prove rollback or retry safety after membership or progress failures.
-- Root cause: The upload previously wrote mapped opt-out strings without calling the standalone parser. #2348 addresses that boundary. Remaining recovery requirements involve separate contact/link/progress writes and no precise persisted per-row outcome report.
-- Resolution: Verify the normalization child’s deployed acceptance and release. Reuse existing #1771 for per-row and unknown-value review reporting. Pin insert/link/progress failure and re-upload behavior, including rows without a mapped phone, then split the remaining recovery work into atomic Tasks before implementation.
+- Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.
+- Current behavior: Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.
+- Root cause: Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed.
+- Resolution: Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.
 - Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts`
-- Existing tests: #2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.; Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.; Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.
-- Missing tests: Unknown-value review reporting and exact per-row landed outcomes, retained under #1771.; Insert/link/progress failure and re-upload controls, including rows without a mapped phone, with a pinned atomicity or idempotency contract.; Applicable deployed upload acceptance and release/default-branch verification remain open.
+- Existing tests: #2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.; Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.; Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.; Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.; Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.; #2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green.
+- Missing tests: Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.; Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.; Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification.
 - Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
-- Tracker: Native normalization Task #2348 is a verified child of #2128. Keep this parent open for all original acceptance criteria. #1771 already owns per-row import reporting; do not duplicate it. The parent’s failure/re-upload guarantees still need a separate reviewed fault contract and atomic work split; source normalization does not prove them.
+- Tracker: Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.
+
+### [#1771](https://github.com/chester-hill-solutions/callcaster/issues/1771) feature(audience): per-row import error report + original CSV artifact
+- Verdict: **Blocked / split first** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.
+- Current behavior: The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.
+- Root cause: Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.
+- Resolution: Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/object-storage.server.ts`
+- Existing tests: #2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.; Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance.
+- Missing tests: Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.; Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.; Applicable deployed original-file/reporting acceptance and release verification.
+- Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
+- Tracker: Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.
 
 ### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
 - Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04

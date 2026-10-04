@@ -1198,9 +1198,9 @@
     "issueNumber": 2128,
     "verdict": "blocked-epic",
     "recommendedTitle": "Complete audience upload recovery after opt-out normalization",
-    "summary": "The #2348 source change normalizes mapped opt-out values through the existing total boolean parser. The parent’s unknown-value review reporting and failure/re-upload requirements remain unfinished; normalization alone cannot complete this Bug.",
-    "currentBehavior": "Mapped opt-out values now reach the contact insert boundary as booleans with the existing parser policy. Contact and audience-membership insertion remain separate writes. Phone dedupe reads only already-linked audience phones and does not prove rollback or retry safety after membership or progress failures.",
-    "resolution": "Verify the normalization child’s deployed acceptance and release. Reuse existing #1771 for per-row and unknown-value review reporting. Pin insert/link/progress failure and re-upload behavior, including rows without a mapped phone, then split the remaining recovery work into atomic Tasks before implementation.",
+    "summary": "Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.",
+    "currentBehavior": "Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.",
+    "resolution": "Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.",
     "lookIn": [
       "app/lib/audience-upload-process.server.ts",
       "app/lib/audience-upload-db.server.ts",
@@ -1214,12 +1214,15 @@
     "existingTests": [
       "#2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.",
       "Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.",
-      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure."
+      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.",
+      "Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.",
+      "Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.",
+      "#2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green."
     ],
     "missingTests": [
-      "Unknown-value review reporting and exact per-row landed outcomes, retained under #1771.",
-      "Insert/link/progress failure and re-upload controls, including rows without a mapped phone, with a pinned atomicity or idempotency contract.",
-      "Applicable deployed upload acceptance and release/default-branch verification remain open."
+      "Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.",
+      "Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.",
+      "Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification."
     ],
     "acceptanceCriteria": [
       "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
@@ -1231,7 +1234,39 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Native normalization Task #2348 is a verified child of #2128. Keep this parent open for all original acceptance criteria. #1771 already owns per-row import reporting; do not duplicate it. The parent’s failure/re-upload guarantees still need a separate reviewed fault contract and atomic work split; source normalization does not prove them.",
-    "rootCause": "The upload previously wrote mapped opt-out strings without calling the standalone parser. #2348 addresses that boundary. Remaining recovery requirements involve separate contact/link/progress writes and no precise persisted per-row outcome report."
+    "trackerRecommendation": "Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.",
+    "rootCause": "Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed."
+  },
+  {
+    "issueNumber": 1771,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
+    "summary": "Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.",
+    "currentBehavior": "The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.",
+    "rootCause": "Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.",
+    "resolution": "Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "#2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.",
+      "Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance."
+    ],
+    "missingTests": [
+      "Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.",
+      "Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.",
+      "Applicable deployed original-file/reporting acceptance and release verification."
+    ],
+    "acceptanceCriteria": [
+      "reviewable per-row failure list or download",
+      "original CSV retained safely",
+      "aggregate counts unchanged"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.",
+    "blockedBy": []
   }
 ]

@@ -4281,7 +4281,7 @@
   {
     "issueNumber": 2348,
     "verdict": "verify-close",
-    "summary": "This source change reuses the standalone opt-out parser at the actual audience-upload mapping boundary. Mapped cells are boolean before insertion; permitted, blank and pending behavior is preserved. Deployed upload acceptance and release remain required.",
+    "summary": "PR #2349 merged normalization into dev at 0b72f37d after both full local gates, both reviews, applicable remote checks and both deployments passed. Mapped opt-out cells reach insertion as booleans through the existing total parser. Deployed acceptance and release remain required.",
     "rootCause": "The real upload uses generic lib/csv and previously wrote mapped opt-out values as raw strings, bypassing the standalone parser fixed in #2250.",
     "resolution": "Verify the applicable deployed import behavior and release promotion. Keep broader reporting and failure/re-upload acceptance under parent #2128 and existing #1771; do not close the parent from this normalization-only Task.",
     "lookIn": [
@@ -4293,7 +4293,8 @@
     "existingTests": [
       "25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.",
       "111 focused upload, standalone parser, route and phone dedupe cases pass.",
-      "Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25."
+      "Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25.",
+      "Successful final-head remote quality job executed all 25 server upload cases; both full local gates, reviews, applicable remote checks and both deployments passed."
     ],
     "missingTests": [
       "Applicable deployed upload acceptance and release/default-branch verification."
@@ -4304,7 +4305,40 @@
       "Full local CI, both independent reviews, applicable remote gates and both deployments pass before merge.",
       "Applicable deployed upload behavior and release promotion are verified."
     ],
-    "trackerRecommendation": "Native Task under #2128; one normalization concern. This source is ready for its required gates and deployed verification. The parent’s per-row reporting and durable recovery requirements remain open.",
+    "trackerRecommendation": "Native Task under #2128; source completed and merged in PR #2349. Keep this Task open for deployed acceptance and release. Parent reporting and durable recovery requirements remain open.",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2350,
+    "verdict": "verify-close",
+    "summary": "PR #2351 merged original audience CSV retention into dev at ee225fc3. Store exact private immutable bytes before campaign linking, existing-audience status changes and job enqueue. Storage failure persists the failed upload without those effects. Deployed acceptance and release remain.",
+    "currentBehavior": "Original BOM/UTF-8/CRLF/multiline bytes are stored at {workspaceId}/{uploadId}/original.csv, separate from status sidecars and job retention. Reuses existing storage, tenant failure update and typed enqueue APIs. No report UI or whole-run recovery is introduced.",
+    "rootCause": "The route previously queued imports without a durable original file; completed job payloads are pruned after seven days.",
+    "resolution": "Verify applicable deployed private original storage, failed-upload behavior and release promotion. Keep #1771 per-row reporting and #2128 recovery open.",
+    "lookIn": [
+      "app/routes/api+/audience-upload.action.server.ts",
+      "app/lib/audience-upload-db.server.ts",
+      "app/lib/object-storage.server.ts",
+      "test/audience-upload-original.test.ts"
+    ],
+    "existingTests": [
+      "11 actual-route/real-CSV artifact cases and 50 focused upload/route cases pass. Byte equality, immutable concrete path/options, held acknowledgement, failure ID/tenant predicate, campaign link and denied/foreign controls are covered.",
+      "Original source/removing storage and early enqueue each fail five cases; altered bytes/wrong failed-upload ID each fail one; early campaign link fails two. Restored source passes 11.",
+      "Both full local gates, both independent reviews, all applicable exact-head remote checks and both app/worker deployments passed. Successful remote quality ran all 11 cases; branch/worktree cleanup verified source equivalence and recovery bundle."
+    ],
+    "missingTests": [
+      "Applicable deployed storage/upload functional acceptance and default-branch release promotion."
+    ],
+    "acceptanceCriteria": [
+      "Exact original bytes retained privately and immutably at server-created workspace/upload path before enqueue.",
+      "Storage failure truthfully persists failed upload; no campaign link, existing-audience status change or queued import.",
+      "Denied/foreign and invalid input perform no artifact or queued import; valid own-workspace control succeeds.",
+      "Original is separate from status sidecar and completed-job pruning; no public/unauthenticated retrieval.",
+      "Full local CI per pushed head, independent reviews, remote gates, both deploys, deployed acceptance and release verified."
+    ],
+    "trackerRecommendation": "Verified native Task under #1771, source completed in PR #2351. Keep open for deployed acceptance and release; does not complete parent reporting or #2128 recovery.",
     "blockedBy": [],
     "size": "S",
     "risk": "high"
