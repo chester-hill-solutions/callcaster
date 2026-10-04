@@ -53,6 +53,13 @@ Normalize both forms before matching a test file and collected count. A failed
 raw-string match does not prove that the suite was skipped. Require the expected
 executed cases and a completed successful job.
 
+## Aggregating REST Pages
+
+`gh api --paginate --jq` filters each page separately. For one total across
+pages, pipe `gh api --paginate` to `jq -s` and aggregate the collected pages.
+Older gh versions reject combining `--slurp` with `--jq`. Check the installed
+help and require one numeric output before writing a count to GITHUB_OUTPUT.
+
 ## Empty REST Responses
 
 A successful REST deletion can return HTTP 204 with no response body. Check the
