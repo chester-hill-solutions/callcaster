@@ -102,8 +102,9 @@ and still accept a send-failure update. Keep a valid saved-row precision control
 For an owned native Postgres fixture, initialize with `--no-locale
 --encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
 fixture in a temporary directory and bind only loopback on an unused port;
-do not change `.env` or the machine locale. Stop only the owned server after
-verification.
+do not change `.env` or the machine locale. Use the fixture's recorded database
+superuser rather than assuming it matches the shell user. Require setup to
+succeed before starting a bootstrap. Stop only the owned server after verification.
 
 If sandbox process checks say a fixture stopped, verify the same PID and port
 with the required permissions before restarting. A failed process probe does

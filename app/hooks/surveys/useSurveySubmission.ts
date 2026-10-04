@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { submitForm } from "@/lib/api-client";
 import { isObject } from "@/lib/type-safety-utils";
+import { surveyAnswerKey } from "@/lib/survey-answer-state";
 
 type AnswerStatus = "pending" | "saving" | "saved" | "error";
 type PendingAnswer = { questionId: string; pageId: string; value: string | string[] };
@@ -41,12 +42,8 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     timer.current = null;
   }
 
-  function answerKey(pageId: string, questionId: string) {
-    return JSON.stringify([pageId, questionId]);
-  }
-
   function setStatus(entry: PendingAnswer, status: AnswerStatus) {
-    const key = answerKey(entry.pageId, entry.questionId);
+    const key = surveyAnswerKey(entry.pageId, entry.questionId);
     if (alive.current) setStatuses(current => ({ ...current, [key]: status }));
   }
 
@@ -86,8 +83,8 @@ export function useSurveySubmission(identity: SurveyIdentity) {
         if (alive.current) setError(failure instanceof Error ? failure.message : "Your answer could not be saved. Try again.");
         throw failure;
       }
-      if (pending.current.get(answerKey(entry.pageId, entry.questionId)) === entry) {
-        pending.current.delete(answerKey(entry.pageId, entry.questionId));
+      if (pending.current.get(surveyAnswerKey(entry.pageId, entry.questionId)) === entry) {
+        pending.current.delete(surveyAnswerKey(entry.pageId, entry.questionId));
         setStatus(entry, "saved");
       }
     }
@@ -101,7 +98,7 @@ export function useSurveySubmission(identity: SurveyIdentity) {
 
   function queueAnswer(entry: PendingAnswer) {
     if (!alive.current || busy.current) return;
-    pending.current.set(answerKey(entry.pageId, entry.questionId), entry);
+    pending.current.set(surveyAnswerKey(entry.pageId, entry.questionId), entry);
     setStatus(entry, "pending");
     setError(null);
     clearTimer();
@@ -133,5 +130,5 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     }
   }
 
-  return { queueAnswer, savePage, statusFor: (pageId: string, questionId: string) => statuses[answerKey(pageId, questionId)], error, isBusy, isCompleted };
+  return { queueAnswer, savePage, statusFor: (pageId: string, questionId: string) => statuses[surveyAnswerKey(pageId, questionId)], error, isBusy, isCompleted };
 }

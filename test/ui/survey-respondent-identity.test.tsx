@@ -10,7 +10,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 function surveyData(resultId = "respondent-a", token = "signed-a") {
   return {
-    resultId, respondentToken: token, contact: null, existingResponse: null, existingAnswers: { Q1: "Saved answer" },
+    resultId, respondentToken: token, contact: null, existingResponse: null, existingAnswers: { '["page-1","Q1"]': "Saved answer" },
     survey: { id: 1, survey_id: "public-survey", title: "Public survey", survey_page: [{ page_id: "page-1", title: "Questions", survey_question: [{ id: 1, question_id: "Q1", question_text: "Your answer", question_type: "text", is_required: false }] }] },
   };
 }
@@ -51,7 +51,7 @@ describe("public survey signed identity", () => {
     const { router, setData } = setup();
     fireEvent.click(await screen.findByRole("button", { name: "Submit" }));
     await screen.findByText("Thank You!");
-    setData({ ...surveyData("respondent-b", "signed-b"), existingAnswers: { Q1: "Other respondent" } });
+    setData({ ...surveyData("respondent-b", "signed-b"), existingAnswers: { '["page-1","Q1"]': "Other respondent" } });
     await act(async () => { router.revalidate(); });
     expect(await screen.findByLabelText("Your answer")).toHaveValue("Other respondent");
     expect(screen.queryByText("Thank You!")).not.toBeInTheDocument();

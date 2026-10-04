@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SurveyQuestionType } from "@/lib/types";
 import { useSurveySubmission } from "@/hooks/surveys/useSurveySubmission";
+import { hydrateSurveyAnswers, surveyAnswerKey, withSurveyWriteIn } from "@/lib/survey-answer-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type LoaderQuestionOption = {
@@ -50,7 +51,7 @@ function SurveyRespondentPage({ data }: {
   });
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>(existingAnswers);
+  const [{ answers, writeIns }, setAnswerState] = useState(() => hydrateSurveyAnswers(survey.survey_page ?? [], existingAnswers));
 
   const currentPage = survey.survey_page?.[currentPageIndex];
   const totalPages = survey.survey_page?.length || 0;
@@ -72,19 +73,18 @@ function SurveyRespondentPage({ data }: {
     queueAnswer({ questionId, value, pageId: currentPage.page_id });
   };
 
-  const handleAnswerChange = (questionId: string, value: string | string[]) => {
+  const handleAnswerChange = (question: LoaderQuestion, value: string | string[]) => {
     if (isBusy) return;
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
+    const key = surveyAnswerKey(currentPage.page_id, question.question_id);
+    setAnswerState(prev => ({ ...prev, answers: { ...prev.answers, [key]: value } }));
+    queuePageAnswer(question.question_id, withSurveyWriteIn(value, writeIns[key] ?? "", question.question_option ?? []));
+  };
 
-    // Don't save write-in fields separately
-    if (questionId.endsWith('_writein')) {
-      return;
-    }
-
-    queuePageAnswer(questionId, value);
+  const handleWriteInChange = (question: LoaderQuestion, value: string) => {
+    if (isBusy) return;
+    const key = surveyAnswerKey(currentPage.page_id, question.question_id);
+    setAnswerState(prev => ({ ...prev, writeIns: { ...prev.writeIns, [key]: value } }));
+    queuePageAnswer(question.question_id, withSurveyWriteIn(answers[key] ?? "", value, question.question_option ?? []));
   };
 
   const handleNext = async () => {
@@ -100,7 +100,8 @@ function SurveyRespondentPage({ data }: {
 
   const renderQuestion = (question: LoaderQuestion) => {
     const questionId = question.question_id;
-    const currentAnswer = answers[questionId] as string | string[] | undefined;
+    const key = surveyAnswerKey(currentPage.page_id, questionId);
+    const currentAnswer = answers[key];
     
     const status = statusFor(currentPage.page_id, questionId);
 
@@ -144,7 +145,7 @@ function SurveyRespondentPage({ data }: {
               className="bg-background text-foreground"
               id={questionId}
               value={currentAnswer || ""}
-              onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+              onChange={(e) => handleAnswerChange(question, e.target.value)}
               required={question.is_required}
             />
             {renderStatusIndicator()}
@@ -159,7 +160,7 @@ function SurveyRespondentPage({ data }: {
               className="bg-background text-foreground"
               id={questionId}
               value={currentAnswer || ""}
-              onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+              onChange={(e) => handleAnswerChange(question, e.target.value)}
               required={question.is_required}
               rows={4}
             />
@@ -184,7 +185,7 @@ function SurveyRespondentPage({ data }: {
                       name={questionId}
                       value={option.option_value}
                       checked={currentAnswer === option.option_value}
-                      onChange={(e) => handleAnswerChange(questionId, e.target.value)}
+                      onChange={(e) => handleAnswerChange(question, e.target.value)}
                       required={question.is_required}
                       className="w-4 h-4 text-primary bg-muted border-input focus:ring-ring"
                     />
@@ -199,18 +200,8 @@ function SurveyRespondentPage({ data }: {
                 <div className="ml-6 mt-2">
                   <Input
                     placeholder="Please specify..."
-                    value={answers[`${questionId}_writein`] || ""}
-                    onChange={(e) => {
-                      setAnswers(prev => ({
-                        ...prev,
-                        [`${questionId}_writein`]: e.target.value
-                      }));
-                      // Trigger debounced save of the main answer with the write-in text
-                      const writeInText = e.target.value;
-                      const answerValue = writeInText ? `${currentAnswer}: ${writeInText}` : currentAnswer;
-                      
-                      queuePageAnswer(questionId, answerValue);
-                    }}
+                    value={writeIns[key] ?? ""}
+                    onChange={(e) => handleWriteInChange(question, e.target.value)}
                     className="w-full bg-background text-foreground"
                   />
                 </div>
@@ -238,9 +229,9 @@ function SurveyRespondentPage({ data }: {
                       onCheckedChange={(checked) => {
                         const currentValues = Array.isArray(currentAnswer) ? currentAnswer : [];
                         if (checked) {
-                          handleAnswerChange(questionId, [...currentValues, option.option_value]);
+                          handleAnswerChange(question, [...currentValues, option.option_value]);
                         } else {
-                          handleAnswerChange(questionId, currentValues.filter((v: string) => v !== option.option_value));
+                          handleAnswerChange(question, currentValues.filter((v: string) => v !== option.option_value));
                         }
                       }}
                     />
@@ -255,26 +246,8 @@ function SurveyRespondentPage({ data }: {
                 <div className="ml-6 mt-2">
                   <Input
                     placeholder="Please specify..."
-                    value={answers[`${questionId}_writein`] || ""}
-                    onChange={(e) => {
-                      setAnswers(prev => ({
-                        ...prev,
-                        [`${questionId}_writein`]: e.target.value
-                      }));
-                      // Trigger debounced save of the main answer with the write-in text
-                      const writeInText = e.target.value;
-                      const currentValues = Array.isArray(currentAnswer) ? currentAnswer : [];
-                      const processedValues = currentValues.map((v: string) => {
-                        // Find if any selected option has (write in)
-                        const selectedOption = question.question_option?.find((opt) => opt.option_value === v);
-                        if (selectedOption?.option_label?.toLowerCase().includes("(write in)")) {
-                          return `${v}: ${writeInText}`;
-                        }
-                        return v;
-                      });
-                      
-                      queuePageAnswer(questionId, processedValues);
-                    }}
+                    value={writeIns[key] ?? ""}
+                    onChange={(e) => handleWriteInChange(question, e.target.value)}
                     className="w-full bg-background text-foreground"
                   />
                 </div>
