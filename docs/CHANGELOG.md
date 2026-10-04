@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: PostCSS updates reject source-map annotations outside their CSS directory and retain valid maps and styles. ([#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342))
+- Security: PostCSS updates reject source-map annotations outside their CSS directory and retain valid maps and styles. ([#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342), [PR #2346](https://github.com/chester-hill-solutions/callcaster/pull/2346))
 
 - Security: WebSocket dependency updates limit buffered fragments and reject unsupported close-reason types. ([#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340), [PR #2343](https://github.com/chester-hill-solutions/callcaster/pull/2343))
 
