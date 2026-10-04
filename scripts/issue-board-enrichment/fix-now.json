@@ -1064,24 +1064,24 @@
     "verdict": "fix-now",
     "recommendedTitle": "POST /api/media lacks the file-size limit enforced by its sibling route",
     "summary": "POST /api/media has no file-size guard before buffering, while /api/message_media has a 10 MiB file policy. The reported three independent buffer copies are not supported by the implementation.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Multipart is materialized, then file.arrayBuffer is read. Buffer.from(ArrayBuffer) shares its allocation, and uploadObject.toBuffer returns an existing Buffer without a copy. Unbounded route file-size policy remains the defect.",
+    "currentBehavior": "Source still lacks the audio file cap and both routes materialize multipart before file validation. Five native multipart/actual-route cases at dev@0b72f37d reproduce audio accepting 10 MiB + 1 byte (201) and campaign text entering the storage-call key. Both exact-cap controls and the message-media oversize rejection pass. Buffer.from(ArrayBuffer) shares its allocation and existing Buffer conversion adds no copy; no production OOM/peak-memory claim is made.",
     "resolution": "Share the size/type validation and run it before file.arrayBuffer. Add a bounded request/multipart reader where needed because request.formData has already read the part. Sanitize generated storage keys and measure memory before asserting copy count.",
     "lookIn": [
-      "app/routes/api+/media.action.server.ts:25",
-      "app/lib/object-storage.server.ts:136",
-      "app/routes/api+/message_media.action.server.ts:15",
-      "test/media.route.test.ts:50",
-      "app/routes/api+/media.action.server.ts:35",
-      "the sibling media route with the 10 MB cap",
-      "app/lib/object-storage.server.ts:180-220",
-      "app/components/file-assets/`, `app/lib/audio-upload.ts`, `app/lib/user-audio.server.ts"
+      "app/routes/api+/media.action.server.ts",
+      "app/routes/api+/message_media.action.server.ts",
+      "app/lib/object-storage.server.ts",
+      "test/media.route.test.ts",
+      "test/message-media.route.test.ts"
     ],
     "existingTests": [
       "test/media.route.test.ts covers upload success, authentication refusal and upload/update failure.",
-      "test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media."
+      "test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media.",
+      "Five actual-route/native multipart cases: two expected regression failures (audio cap and campaign-derived key) plus three passing sibling/exact-cap controls. Only authentication/session, access, DB writes and storage I/O are stubbed; no provider/application DB calls."
     ],
     "missingTests": [
-      "Oversized upload must reject before application buffer allocation; boundary allowed test and a request streaming limit test are needed. Peak memory has not been measured."
+      "A repaired oversized audio upload must reject before application File.arrayBuffer, storage or update. Both routes need literal exact-cap controls.",
+      "An actual streamed multipart request must enforce a byte budget with no or false Content-Length and cancel upstream on overflow; a post-formData check alone does not prove this.",
+      "Invalid type/name and foreign-tenant controls; removal/delay of the cap, stream limit or generated-key guard must fail relevant tests. Peak memory remains unmeasured."
     ],
     "acceptanceCriteria": [
       "An oversized file is rejected before file.arrayBuffer or storage work runs.",

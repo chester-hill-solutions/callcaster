@@ -243,33 +243,6 @@
     "trackerRecommendation": "Scope with #1771 (can ship together or split)."
   },
   {
-    "issueNumber": 1771,
-    "verdict": "needs-decision",
-    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
-    "summary": "Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.",
-    "currentBehavior": "Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.",
-    "rootCause": "No per-row capture or artifact retention, unlike gocanvass.",
-    "resolution": "Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "per-row errors persisted + listed",
-      "original retained under workspace prefix"
-    ],
-    "acceptanceCriteria": [
-      "reviewable per-row failure list or download",
-      "original CSV retained safely",
-      "aggregate counts unchanged"
-    ],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Co-ordinate with #1770."
-  },
-  {
     "issueNumber": 1699,
     "verdict": "needs-decision",
     "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
