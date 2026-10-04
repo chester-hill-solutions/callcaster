@@ -843,42 +843,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2137,
-    "verdict": "fix-now",
-    "recommendedTitle": "The billing/ledger loader has no role gate — any member, including caller, reads the full credit history",
-    "summary": "Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.",
-    "resolution": "Apply Admin minimum role to loader and shared billing read service; verify API read parity.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/billing.loader.server.ts:8",
-      "app/lib/billing-activity.server.ts:198",
-      "app/lib/billing-activity.server.ts:221",
-      "test/billing-loader.route.test.ts:113",
-      "app/routes/workspaces+/$id/billing.loader.server.ts",
-      "app/routes/api+/workspaces+/$workspaceId/billing/sessions",
-      "app/lib/workspace-middleware.server.ts:60-76",
-      "app/components/workspace/WorkspaceNav.tsx:96-120",
-      "e2e/specs/rbac.spec.ts:14-22"
-    ],
-    "existingTests": [
-      "test/billing-loader.route.test.ts covers page/filter forwarding and missing workspace access; it does not cover a valid caller or member being refused.",
-      "e2e/specs/rbac.spec.ts checks navigation visibility rather than direct billing-loader status."
-    ],
-    "missingTests": [
-      "Caller and member refusal with no billing read, admin/owner allowed, direct URL e2e status assertions."
-    ],
-    "acceptanceCriteria": [
-      "A `caller` and a `member` receive 403 on the billing loader (kill-check: remove the gate and confirm the test goes red).",
-      "An `admin` and the `owner` receive 200.",
-      "The API path enforces the same floor.",
-      "The e2e RBAC spec asserts a loader status, not only nav visibility."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2138,
     "verdict": "fix-now",
     "recommendedTitle": "Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards",
