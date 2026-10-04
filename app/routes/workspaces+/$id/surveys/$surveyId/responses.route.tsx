@@ -2,13 +2,7 @@ export { loader } from "./responses.loader.server";
 
 import { type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 
-import type {
-  User,
-  Survey,
-  SurveyResponse,
-  ResponseAnswer,
-  Contact,
-} from "@/lib/types";
+import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 import { formatSurveyAnswer } from "@/lib/survey-format";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
@@ -65,14 +59,13 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
 };
 
 export default function SurveyResponsesPage() {
-  const { survey, responses, workspaceId, stats } = useLoaderData();
-  const [selectedResponse, setSelectedResponse] =
-    useState<SurveyResponseWithContact | null>(null);
+  const { survey, responses, workspaceId, stats } =
+    useLoaderData();
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
 
   const allQuestions =
-    (survey as SurveyWithPages).survey_page?.flatMap(
-      (page) => page.survey_question || [],
-    ) || [];
+    (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
+    [];
 
   const getContactName = (response: SurveyResponseWithContact) => {
     if (response.contact?.firstname && response.contact?.surname) {
@@ -87,10 +80,7 @@ export default function SurveyResponsesPage() {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (
-    response: SurveyResponseWithContact,
-    questionId: number,
-  ) => {
+  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: number) => {
     const answer = response.response_answer?.find(
       (a) => a.question_id === questionId,
     );
@@ -118,12 +108,12 @@ export default function SurveyResponsesPage() {
           <Heading as="h1" level={2} branded={false}>
             Survey Responses
           </Heading>
-          <Text variant="muted">{survey.title} - Response Analysis</Text>
+          <Text variant="muted">
+            {survey.title} - Response Analysis
+          </Text>
         </div>
         <Button variant="outline" asChild>
-          <a
-            href={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/responses/export`}
-          >
+          <a href={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/responses/export`}>
             <Download className="mr-2 h-4 w-4" />
             Export Data
           </a>
@@ -132,52 +122,60 @@ export default function SurveyResponsesPage() {
 
       {/* Statistics tiles */}
       <div className="mb-6 grid gap-6 md:grid-cols-4">
-        <div className="border-border/60 rounded-lg border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Text variant="small">Total Responses</Text>
-              <p className="text-2xl font-bold">{stats.total}</p>
+        <div className="rounded-lg border border-border/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Text variant="small">
+                  Total Responses
+                </Text>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+              <Users className="h-8 w-8 text-muted-foreground" />
             </div>
-            <Users className="text-muted-foreground h-8 w-8" />
-          </div>
         </div>
 
-        <div className="border-border/60 rounded-lg border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Text variant="small">Completed</Text>
-              <p className="text-success-text text-2xl font-bold">
-                {stats.completed}
-              </p>
+        <div className="rounded-lg border border-border/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Text variant="small">
+                  Completed
+                </Text>
+                <p className="text-2xl font-bold text-success-text">
+                  {stats.completed}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-success-text" />
             </div>
-            <CheckCircle className="text-success-text h-8 w-8" />
-          </div>
         </div>
 
-        <div className="border-border/60 rounded-lg border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Text variant="small">In Progress</Text>
-              <p className="text-warning-text text-2xl font-bold">
-                {stats.inProgress}
-              </p>
+        <div className="rounded-lg border border-border/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Text variant="small">
+                  In Progress
+                </Text>
+                <p className="text-2xl font-bold text-warning-text">
+                  {stats.inProgress}
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-warning-text" />
             </div>
-            <Clock className="text-warning-text h-8 w-8" />
-          </div>
         </div>
 
-        <div className="border-border/60 rounded-lg border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Text variant="small">Completion Rate</Text>
-              <p className="text-2xl font-bold">
-                {stats.completionRate.toFixed(1)}%
-              </p>
+        <div className="rounded-lg border border-border/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Text variant="small">
+                  Completion Rate
+                </Text>
+                <p className="text-2xl font-bold">
+                  {stats.completionRate.toFixed(1)}%
+                </p>
+              </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                <span className="text-sm font-bold text-primary">%</span>
+              </div>
             </div>
-            <div className="bg-primary/10 flex h-8 w-8 items-center justify-center rounded-full">
-              <span className="text-primary text-sm font-bold">%</span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -195,15 +193,14 @@ export default function SurveyResponsesPage() {
                 title="All Responses"
                 description={`${responses.length} total responses`}
               />
-              {responses.length === 0 ? (
-                <Text variant="muted">No responses yet</Text>
-              ) : (
-                <div className="space-y-4">
-                  {(responses as SurveyResponseWithContact[]).map(
-                    (response) => (
+                {responses.length === 0 ? (
+                  <Text variant="muted">No responses yet</Text>
+                ) : (
+                  <div className="space-y-4">
+                    {(responses as SurveyResponseWithContact[]).map((response) => (
                       <div
                         key={response.id}
-                        className="hover:bg-muted/50 flex items-center justify-between rounded-lg border p-4"
+                        className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-4">
@@ -211,7 +208,7 @@ export default function SurveyResponsesPage() {
                               <p className="font-medium">
                                 {getContactName(response)}
                               </p>
-                              <p className="text-muted-foreground text-sm">
+                              <p className="text-sm text-muted-foreground">
                                 {new Date(response.created_at).toLocaleString()}
                               </p>
                             </div>
@@ -244,10 +241,9 @@ export default function SurveyResponsesPage() {
                           View Details
                         </Button>
                       </div>
-                    ),
-                  )}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
             </Section>
           </div>
         </TabsContent>
@@ -259,73 +255,76 @@ export default function SurveyResponsesPage() {
                 title="Response Chart"
                 description="All responses in table format"
               />
-              {responses.length === 0 ? (
-                <Text variant="muted">No responses yet</Text>
-              ) : (
-                <div className="w-full overflow-x-auto">
-                  <Table className="border-border table-fixed border">
-                    <TableHeader>
-                      <TableRow className="bg-muted">
-                        <TableHead className="border-border w-32 border px-4 py-2">
-                          Respondent
-                        </TableHead>
-                        <TableHead className="border-border w-32 border px-4 py-2">
-                          Status
-                        </TableHead>
-                        <TableHead className="border-border w-24 border px-4 py-2">
-                          Started
-                        </TableHead>
-                        {allQuestions.map((question) => (
-                          <TableHead
-                            key={question.id}
-                            className="border-border w-48 border px-4 py-2"
-                          >
-                            {question.question_text}
+                {responses.length === 0 ? (
+                  <Text variant="muted">No responses yet</Text>
+                ) : (
+                  <div className="w-full overflow-x-auto">
+                    <Table className="table-fixed border border-border">
+                      <TableHeader>
+                        <TableRow className="bg-muted">
+                          <TableHead className="w-32 border border-border px-4 py-2">
+                            Respondent
                           </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(responses as SurveyResponseWithContact[]).map(
-                        (response) => (
-                          <TableRow key={response.id}>
-                            <TableCell className="border-border truncate border px-4 py-2 font-medium">
-                              {getContactName(response)}
-                            </TableCell>
-                            <TableCell className="border-border border px-4 py-2">
-                              <Badge
-                                variant={
-                                  response.completed_at
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {response.completed_at
-                                  ? "Completed"
-                                  : "In Progress"}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="border-border truncate border px-4 py-2 text-sm">
-                              {new Date(
-                                response.started_at,
-                              ).toLocaleDateString()}
-                            </TableCell>
-                            {allQuestions.map((question) => (
-                              <TableCell
-                                key={question.id}
-                                className="border-border truncate border px-4 py-2"
-                              >
-                                {getAnswerForQuestion(response, question.id)}
+                          <TableHead className="w-32 border border-border px-4 py-2">
+                            Status
+                          </TableHead>
+                          <TableHead className="w-24 border border-border px-4 py-2">
+                            Started
+                          </TableHead>
+                          {allQuestions.map((question) => (
+                            <TableHead
+                              key={question.id}
+                              className="w-48 border border-border px-4 py-2"
+                            >
+                              {question.question_text}
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(responses as SurveyResponseWithContact[]).map(
+                          (response) => (
+                            <TableRow key={response.id}>
+                              <TableCell className="truncate border border-border px-4 py-2 font-medium">
+                                {getContactName(response)}
                               </TableCell>
-                            ))}
-                          </TableRow>
-                        ),
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
+                              <TableCell className="border border-border px-4 py-2">
+                                <Badge
+                                  variant={
+                                    response.completed_at
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {response.completed_at
+                                    ? "Completed"
+                                    : "In Progress"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="truncate border border-border px-4 py-2 text-sm">
+                                {new Date(
+                                  response.started_at,
+                                ).toLocaleDateString()}
+                              </TableCell>
+                              {allQuestions.map((question) => (
+                                <TableCell
+                                  key={question.id}
+                                  className="truncate border border-border px-4 py-2"
+                                >
+                                  {getAnswerForQuestion(
+                                    response,
+                                    question.id,
+                                  )}
+                                </TableCell>
+                              ))}
+                            </TableRow>
+                          ),
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
             </Section>
           </div>
         </TabsContent>
@@ -338,77 +337,82 @@ export default function SurveyResponsesPage() {
                   title="Response Details"
                   description={`${getContactName(selectedResponse)} - ${new Date(selectedResponse.created_at).toLocaleString()}`}
                 />
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium">Status</Label>
-                      <p>
-                        <Badge
-                          variant={
-                            selectedResponse.completed_at
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {selectedResponse.completed_at
-                            ? "Completed"
-                            : "In Progress"}
-                        </Badge>
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Started</Label>
-                      <p>
-                        {new Date(selectedResponse.started_at).toLocaleString()}
-                      </p>
-                    </div>
-                    {selectedResponse.completed_at && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium">Completed</Label>
+                        <Label className="text-sm font-medium">Status</Label>
+                        <p>
+                          <Badge
+                            variant={
+                              selectedResponse.completed_at
+                                ? "default"
+                                : "secondary"
+                            }
+                          >
+                            {selectedResponse.completed_at
+                              ? "Completed"
+                              : "In Progress"}
+                          </Badge>
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Started</Label>
                         <p>
                           {new Date(
-                            selectedResponse.completed_at,
+                            selectedResponse.started_at,
                           ).toLocaleString()}
                         </p>
                       </div>
-                    )}
-                    {selectedResponse.last_page_completed && (
-                      <div>
-                        <Label className="text-sm font-medium">Last Page</Label>
-                        <p>{selectedResponse.last_page_completed}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Answers</Label>
-                    <div className="mt-2 space-y-4">
-                      {selectedResponse.response_answer?.map((answer) => (
-                        <div key={answer.id} className="rounded-lg border p-4">
-                          <Heading
-                            as="h4"
-                            level={4}
-                            branded={false}
-                            className="mb-2"
-                          >
-                            {answer.survey_question?.question_text}
-                          </Heading>
-                          <Text variant="muted">
-                            Type: {answer.survey_question?.question_type}
-                          </Text>
-                          <p className="mt-2">
-                            <strong>Answer:</strong>{" "}
-                            {formatSurveyAnswer(answer)}
+                      {selectedResponse.completed_at && (
+                        <div>
+                          <Label className="text-sm font-medium">
+                            Completed
+                          </Label>
+                          <p>
+                            {new Date(
+                              selectedResponse.completed_at,
+                            ).toLocaleString()}
                           </p>
                         </div>
-                      ))}
+                      )}
+                      {selectedResponse.last_page_completed && (
+                        <div>
+                          <Label className="text-sm font-medium">
+                            Last Page
+                          </Label>
+                          <p>{selectedResponse.last_page_completed}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">Answers</Label>
+                      <div className="mt-2 space-y-4">
+                        {selectedResponse.response_answer?.map(
+                          (answer) => (
+                            <div
+                              key={answer.id}
+                              className="rounded-lg border p-4"
+                            >
+                              <Heading as="h4" level={4} branded={false} className="mb-2">
+                                {answer.survey_question?.question_text}
+                              </Heading>
+                              <Text variant="muted">
+                                Type: {answer.survey_question?.question_type}
+                              </Text>
+                              <p className="mt-2">
+                                <strong>Answer:</strong> {formatSurveyAnswer(answer)}
+                              </p>
+                            </div>
+                          ),
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
               </Section>
             ) : (
-              <div className="border-border/60 rounded-lg border p-8 text-center">
-                <Eye className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
+              <div className="rounded-lg border border-border/60 p-8 text-center">
+                <Eye className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
                 <Heading as="h3" level={4} branded={false} className="mb-2">
                   No Response Selected
                 </Heading>
