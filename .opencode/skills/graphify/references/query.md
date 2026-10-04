@@ -1,6 +1,9 @@
 # graphify reference: query, path, explain
 
-Load this when the user asks a question against an existing graph, or runs `/graphify path` or `/graphify explain`. The core's query stub points here for the full traversal flow. These flows use the `graphify query` CLI when it is available and fall back to an inline NetworkX traversal otherwise.
+Load this for an explicit Graphify query. Check the pinned project CLI and
+saved interpreter before any block below. If either is absent, use current
+source searches. The imported graph is unverified: use graph results to find
+files, then confirm claims in current source.
 
 Two traversal modes - choose based on the question:
 
@@ -64,8 +67,8 @@ Build the **expanded query string** by joining the selected tokens with spaces. 
 
 Prefer the CLI when it is installed:
 ```bash
-graphify query "QUESTION"
-# or: graphify query "QUESTION" --dfs --budget 3000
+.opencode/.graphify-venv/bin/graphify query "QUESTION"
+# or: .opencode/.graphify-venv/bin/graphify query "QUESTION" --dfs --budget 3000
 ```
 
 If the CLI is unavailable, load `graphify-out/graph.json` and run the traversal inline:
@@ -73,7 +76,7 @@ If the CLI is unavailable, load `graphify-out/graph.json` and run the traversal 
 1. Find the 1-3 nodes whose label best matches the expanded tokens.
 2. Run the appropriate traversal from each starting node.
 3. Read the subgraph - node labels, edge relations, confidence tags, source locations.
-4. Answer using **only** what the graph contains. Quote `source_location` when citing a specific fact.
+4. Confirm facts in current source and cite those source locations.
 5. If the graph lacks enough information, say so - do not hallucinate edges.
 
 ```bash
@@ -188,7 +191,7 @@ At the **start** of graph work, refresh and read the lessons: run `graphify refl
 Find the shortest path between two named concepts in the graph. Prefer the CLI when installed:
 
 ```bash
-graphify path "NODE_A" "NODE_B"
+.opencode/.graphify-venv/bin/graphify path "NODE_A" "NODE_B"
 ```
 
 If the CLI is unavailable, run it inline:
@@ -256,7 +259,7 @@ $(cat graphify-out/.graphify_python) -m graphify save-result --question "Path fr
 Give a plain-language explanation of a single node - everything connected to it. Prefer the CLI when installed:
 
 ```bash
-graphify explain "NODE_NAME"
+.opencode/.graphify-venv/bin/graphify explain "NODE_NAME"
 ```
 
 If the CLI is unavailable, run it inline:

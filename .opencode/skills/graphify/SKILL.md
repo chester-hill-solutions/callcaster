@@ -55,7 +55,14 @@ Drop any folder of code, docs, papers, images, or video into graphify and get a 
 
 If the user invoked `/graphify --help` or `/graphify -h` (with no other arguments), print the contents of the `## Usage` section above verbatim and stop. Do not run any commands, do not detect files, do not default the path to `.`. Just print the Usage block and return.
 
-**Fast path — existing graph:** Before doing anything else, check whether `graphify-out/graph.json` exists. The expected location is `graphify-out/graph.json` relative to the **current working directory** (i.e. the project root where you are running commands). If it exists AND the user's request is a natural-language question about the codebase (e.g. "How does X work?", "What calls Y?", "Trace the data flow through Z") and NOT an explicit rebuild command (`--update`, `--cluster-only`, or a bare path/URL that implies fresh extraction): **skip Steps 1–5 entirely and jump straight to `## For /graphify query`.** Run `graphify query "<question>"` immediately. Do not run detect. Do not check corpus size. Do not ask the user to narrow. The graph is already built — use it.
+**Fast path — existing graph:** For a query against an existing graph, first
+check that `.opencode/.graphify-venv/bin/graphify` is executable and its version
+matches `.opencode/skills/graphify/.graphify_version`. If the pinned tool or
+saved interpreter is absent, use current source searches. Do not auto-install
+for a normal codebase question. If the tool is available, load
+`references/query.md` and use the graph to find candidate source files.
+Confirm all behavior claims in current source. The imported snapshot has
+unverified provenance; its presence does not prove it is current.
 
 If no path was given, use `.` (current directory). Do not ask the user for a path.
 
@@ -88,7 +95,7 @@ GRAPHIFY_ROOT_EOF
 ```
 
 Replace INPUT_PATH with the scan root. Use the saved interpreter in subsequent
-steps. If installation fails, report that limit and use current source searches.
+steps. Use `.opencode/.graphify-venv/bin/graphify` for every CLI command. If installation fails, report that limit and use current source searches.
 Do not update or commit graph output as verified until the scan completes.
 
 ### Step 2 - Detect files
@@ -516,14 +523,14 @@ If `--obsidian` was given:
 - If `--obsidian-dir <path>` was also given, pass it via `--dir`. Otherwise defaults to `graphify-out/obsidian`.
 
 ```bash
-graphify export obsidian
+.opencode/.graphify-venv/bin/graphify export obsidian
 # or with custom dir: graphify export obsidian --dir ~/vaults/my-project
 ```
 
 Generate the HTML graph (always, unless `--no-viz`):
 
 ```bash
-graphify export html  # auto-aggregates to community view if graph > 5000 nodes
+.opencode/.graphify-venv/bin/graphify export html  # auto-aggregates to community view if graph > 5000 nodes
 # or: graphify export html --no-viz
 ```
 
@@ -664,10 +671,10 @@ Both are non-default subcommands. `--update` re-extracts only new or changed fil
 When `graphify-out/graph.json` already exists and the user asks a question about the corpus, answer from the graph rather than rebuilding it:
 
 ```bash
-graphify query "<question>"
+.opencode/.graphify-venv/bin/graphify query "<question>"
 ```
 
-Before traversal, expand the question against the graph's own vocabulary so a wording mismatch does not collapse the answer to noise. If the `graphify query` CLI is unavailable, fall back to an inline NetworkX traversal of `graphify-out/graph.json`. Answer using only what the graph output contains, and quote `source_location` when citing a specific fact. For that vocab-expansion step, the BFS/DFS traversal modes, the `--budget` cap, the NetworkX fallback, `save-result` feedback, and the `/graphify path` and `/graphify explain` flows, see `references/query.md`.
+Before traversal, expand the question against the graph's own vocabulary so a wording mismatch does not collapse the answer to noise. If the pinned CLI or saved interpreter is unavailable, use current source searches. Treat graph output as navigation hints, confirm each fact in current source, and cite the current source. For that vocab-expansion step, the BFS/DFS traversal modes, the `--budget` cap, the NetworkX fallback, `save-result` feedback, and the `/graphify path` and `/graphify explain` flows, see `references/query.md`.
 
 ---
 

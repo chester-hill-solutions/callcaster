@@ -204,7 +204,7 @@ Clean up after: `rm -f graphify-out/.graphify_old.json`
 Skip Steps 1–3. Re-run clustering on the existing graph:
 
 ```bash
-graphify cluster-only .
+.opencode/.graphify-venv/bin/graphify cluster-only .
 ```
 
 `graphify cluster-only .` is **self-contained**: it re-clusters, names communities, and regenerates `GRAPH_REPORT.md`, `graph.json`, and `graph.html` from the existing graph. **Do not re-run Steps 5–9** — they read intermediate files (`.graphify_extract.json`, `.graphify_detect.json`, `.graphify_analysis.json`) that a prior build's cleanup (Step 9) already deleted, so they raise `FileNotFoundError` (#1392). When it finishes, present the refreshed `GRAPH_REPORT.md` summary as usual.

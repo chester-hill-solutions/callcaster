@@ -13,11 +13,11 @@ LOCAL_PATH=$(graphify clone <github-url> [--branch <branch>])
 **Multiple repos (cross-repo graph):**
 ```bash
 # Clone each repo, run the full pipeline on each, then merge
-graphify clone <url1>   # → ~/.graphify/repos/<owner1>/<repo1>
-graphify clone <url2>   # → ~/.graphify/repos/<owner2>/<repo2>
+.opencode/.graphify-venv/bin/graphify clone <url1>   # → ~/.graphify/repos/<owner1>/<repo1>
+.opencode/.graphify-venv/bin/graphify clone <url2>   # → ~/.graphify/repos/<owner2>/<repo2>
 # Run /graphify on each local path to produce their graph.json files
 # Then merge:
-graphify merge-graphs \
+.opencode/.graphify-venv/bin/graphify merge-graphs \
   ~/.graphify/repos/<owner1>/<repo1>/graphify-out/graph.json \
   ~/.graphify/repos/<owner2>/<repo2>/graphify-out/graph.json \
   --out graphify-out/cross-repo-graph.json
@@ -30,13 +30,13 @@ Graphify clones into `~/.graphify/repos/<owner>/<repo>` and reuses existing clon
 The skill pipeline writes all intermediate and final outputs to `graphify-out/` in the current working directory. Running the skill on each subfolder separately will clobber the same output dir. Instead, use the CLI directly for each subfolder — it places `graphify-out/` *inside* the scanned path:
 
 ```bash
-graphify extract ./core/     # → ./core/graphify-out/graph.json
-graphify extract ./service/  # → ./service/graphify-out/graph.json
-graphify extract ./platform/ # → ./platform/graphify-out/graph.json
+.opencode/.graphify-venv/bin/graphify extract ./core/     # → ./core/graphify-out/graph.json
+.opencode/.graphify-venv/bin/graphify extract ./service/  # → ./service/graphify-out/graph.json
+.opencode/.graphify-venv/bin/graphify extract ./platform/ # → ./platform/graphify-out/graph.json
 # Add --backend gemini|kimi|openai|deepseek|claude-cli depending on which API key you have set
 
 # Then merge at the project root:
-graphify merge-graphs \
+.opencode/.graphify-venv/bin/graphify merge-graphs \
   ./core/graphify-out/graph.json \
   ./service/graphify-out/graph.json \
   ./platform/graphify-out/graph.json \
