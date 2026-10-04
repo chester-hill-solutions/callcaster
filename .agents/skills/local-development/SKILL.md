@@ -37,6 +37,12 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+After running both npm and Bun for a dependency change, finish with `npm ci`
+before Node checks. This restores npm links for local `file:` packages. A Bun
+copy of a vendored package can prevent CSS import analysis from finding its
+theme tokens and produce false design-system lint warnings. Keep both lockfiles;
+do not raise the lint baseline to work around a package-resolution failure.
+
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
 checkout has no dependencies. Use the prepared worktree instead of fetching a
