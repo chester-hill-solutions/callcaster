@@ -19,11 +19,11 @@ vi.mock("@/lib/worker/job-retention.server", async (importOriginal) => ({
   pruneWorkspaceEvents: async () => 0,
 }));
 
-const databaseUrl = process.env.INTEGRATION_DB_URL;
+const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
 const previousDatabaseUrl = process.env.DATABASE_URL;
 const previousDirectUrl = process.env.DATABASE_DIRECT_URL;
 const suite = databaseUrl ? describe : describe.skip;
-if (!databaseUrl) process.stderr.write("Rate retention proof skipped: INTEGRATION_DB_URL is required.\n");
+if (!databaseUrl) process.stderr.write("Rate retention proof skipped: INTEGRATION_DB_URL or DATABASE_URL is required.\n");
 
 suite("daily public rate-limit retention (#2329)", () => {
   const schemaName = `rate_retention_${randomUUID().replaceAll("-", "")}`;

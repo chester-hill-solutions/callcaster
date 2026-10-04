@@ -130,6 +130,10 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
+`INTEGRATION_DB_URL` as an optional override. Verify the suite with
+`DATABASE_URL` alone; skipped cases do not prove the remote database gate.
+
 For database failure controls, keep the isolated relation present. Renaming it
 can make an unqualified query resolve to a public table on the search path.
 Use a failure inside the isolated relation, such as a rejecting trigger, and
