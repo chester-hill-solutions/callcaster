@@ -2115,38 +2115,5 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
-  },
-  {
-    "issueNumber": 2320,
-    "verdict": "fix-now",
-    "recommendedTitle": "Download the current survey CSV on the first export click",
-    "summary": "The first export click downloads nothing; the next click downloads the previous CSV request.",
-    "currentBehavior": "Actual page/fetcher reproduction at 5707c2f5, with the export handler unchanged from dev@71f86986: first-click and fresh-second-click cases fail; one control confirms the second click downloads the first CSV revision. No skips. No deployed respondent data read or changed.",
-    "rootCause": "The async export handler reads the captured render value of exportFetcher.data after load(), which does not replace that value.",
-    "resolution": "Use the existing protected CSV attachment resource through the shared shad-cc Button link pattern. Remove the stale fetcher/blob copy; keep styling, action position, authorization, server filename, CSV protection and no-store policy.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx",
-      "app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts",
-      "app/lib/csv.ts:csvResponse",
-      "app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx"
-    ],
-    "existingTests": [
-      "Isolated actual-page reproduction: two regression failures and one positive control.",
-      "test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls."
-    ],
-    "missingTests": [
-      "Actual-page protected native action coverage; real-browser first and repeated download with changed CSV data.",
-      "Deployed protected-download acceptance after source merge."
-    ],
-    "acceptanceCriteria": [
-      "The first click downloads current survey data; a later click requests current data again.",
-      "Keep the shared Button geometry and action position.",
-      "Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.",
-      "Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Native Bug #2320 assigned to wra-sol. Implement as an independent atomic PR from clean dev; do not bundle with #2317 or historical assessment #2292."
   }
 ]
