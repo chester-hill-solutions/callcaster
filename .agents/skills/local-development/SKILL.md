@@ -130,6 +130,12 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+For real worker-loop tests, isolate the job table with a fresh schema on the
+fixture connection's search path. Workspace-owned fixture rows alone do not
+scope a global claim loop: it can claim jobs left by another suite. Keep a
+queued public-table control and verify that it remains untouched. Restore the
+process-local database URLs, close the pools, and drop only the owned schema.
+
 Projection guards need a valid positive `Pick` control, plus a secret-bearing
 `Pick` rejection. A full-row type inside an explicit safe field selection does
 not itself expose the full row. Check serialized nested payloads separately.

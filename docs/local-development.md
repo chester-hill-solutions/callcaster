@@ -246,7 +246,7 @@ Node 24+.
 - `npm run build` runs `react-router build` (client + server bundles under `build/`).
 - `npm run typecheck` runs `react-router typegen` then `tsc`.
 - `npm start` runs the Bun production server (`server/bun.ts`) against `build/server/index.js`.
-- `npm run worker` runs the background job worker (`worker/index.ts`).
+- `npm run worker` runs the background job worker (`worker/index.ts`). In long-running mode, general jobs and customer webhook delivery use separate claim loops. One delivery can run at a time; a slow destination does not take the general loop. Drain mode still processes one job.
 - Railway-style probes: `GET /healthz` (liveness), `GET /readyz` (readiness; 503 until the RR build is loaded, when the database is unreachable, or during graceful shutdown).
 - Optional: `PROCESS_FATAL_ON_REJECTION=1` exits the process on unhandled promise rejections (default logs only).
 - HTTPS for the optional dev websocket server (`scripts/dev/websocket-server.js`) uses self-signed certs in `scripts/dev/certs/` (gitignored). Regenerate with:

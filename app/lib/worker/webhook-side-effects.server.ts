@@ -12,7 +12,6 @@ import {
   pickRawTwilioSmsStatus,
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
-import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
 import { recheckCampaignCompletion } from "@/lib/campaign-settle-recheck.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
@@ -38,7 +37,10 @@ import {
 import type { TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
+import {
+  ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+  WEBHOOK_DELIVERY_JOB_TYPE,
+} from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
@@ -276,27 +278,30 @@ export async function runSmsStatusSideEffects(args: {
     }
   }
 
-  const webhookResult = await sendWorkspaceWebhookNotification({
+  await enqueueRegisteredJob({
+    type: WEBHOOK_DELIVERY_JOB_TYPE,
     workspaceId: messageData.workspace,
-    eventCategory: "outbound_sms",
-    eventType: "UPDATE",
-    payload: {
-      type: "outbound_sms",
-      record: {
-        message_sid: messageData.sid,
-        from: messageData.from,
-        to: messageData.to,
-        body: messageData.body,
-        num_media: messageData.num_media,
-        status: messageData.status,
-        date_updated: messageData.date_updated,
+    dedupe: { kind: "idempotency", key: `outbound_sms:${sid}:${messageStatus}` },
+    params: {
+      workspaceId: messageData.workspace,
+      eventCategory: "outbound_sms",
+      eventType: "UPDATE",
+      optional: true,
+      payload: {
+        type: "outbound_sms",
+        record: {
+          message_sid: messageData.sid,
+          from: messageData.from,
+          to: messageData.to,
+          body: messageData.body,
+          num_media: messageData.num_media,
+          status: messageStatus,
+          date_updated: messageData.date_updated,
+        },
+        old_record: { message_sid: messageData.sid },
       },
-      old_record: { message_sid: messageData.sid },
     },
   });
-  if (!webhookResult.success) {
-    logger.error("SMS status webhook delivery failed", webhookResult.error);
-  }
 
   // #2048: a message campaign is complete only when every message has settled.
   // The dispatch chain stops when the local queue empties, so this callback is
