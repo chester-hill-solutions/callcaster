@@ -4081,5 +4081,39 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "PR #2322 merged to dev at 96229009. Keep the native issue open until deployed browser acceptance and release promotion are verified. The separate response-column fix is #2317; historical response assessment remains #2292."
+  },
+  {
+    "issueNumber": 2117,
+    "verdict": "verify-close",
+    "recommendedTitle": "sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried",
+    "summary": "Durable SMS webhook retry and separate worker capacity merged into dev through PR #2324. Deployed acceptance and promotion remain pending.",
+    "currentBehavior": "Source fix at dev@d376fd88: SMS side effects enqueue customer delivery with normalized SID/status keys and preserve each callback status. General jobs and webhook delivery use separate filtered claim loops. Queue failures propagate; missing or disabled subscriptions remain no-ops. Full local CI passed on final head 2e2bfeaf; remote quality, bundle, browser checks and both deployment contexts passed. Real PostgreSQL retry, deduplication and saturated-delivery controls pass; removing the relevant runtime logic fails regression checks.",
+    "resolution": "Verify retry attempts, duplicate callbacks, distinct accepted status updates and general-job progress under saturated slow delivery on the deployed review worker. Keep the issue open until deployed acceptance and release promotion are complete.",
+    "lookIn": [
+      "app/lib/worker/webhook-side-effects.server.ts:281",
+      "app/lib/worker/run-worker.server.ts:8",
+      "app/lib/worker/poll-jobs.server.ts:153",
+      "app/lib/worker/handlers/campaign.server.ts:634",
+      "test/integration-db/webhook-delivery-lanes.test.ts"
+    ],
+    "existingTests": [
+      "test/webhook-side-effects.test.ts and test/worker.test.ts: 41 focused unit cases, including no-inline-send and distinct callback status controls.",
+      "test/integration-db/webhook-delivery-lanes.test.ts: six isolated real PostgreSQL controls for SQL claim filters, durable retry, event deduplication, saturated capacity and optional subscriptions.",
+      "Full real PostgreSQL tier: 187 passed, no skips or failures."
+    ],
+    "missingTests": [
+      "Deployed controlled retry, deduplication and saturated-delivery acceptance; release promotion."
+    ],
+    "acceptanceCriteria": [
+      "An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).",
+      "A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.",
+      "Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.",
+      "SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "PR #2324 merged to dev at d376fd88. Keep the native issue open until deployed review-worker acceptance and release promotion are verified.",
+    "rootCause": "The old SMS side-effect handler awaited the customer POST on the serial general worker loop and swallowed delivery failures."
   }
 ]
