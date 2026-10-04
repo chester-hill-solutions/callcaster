@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@eaaffaf4 + inbound source audit (2026-10-03)` · 303 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@ec6ff792 + survey source audit (2026-10-04 UTC)` · 304 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-03 after the verified inbound issue updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey issue updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -234,18 +234,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
 - Tracker: Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
 
-### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Displayed and resumed public answers collapse repeated labels across pages.
-- Current behavior: The editor generates question labels independently per page. Local answers and write-in state use questionId alone; the resume helper reduces persisted values under the same public label without page identity. Database writes and the #2108 queue preserve page scope, but the displayed and resumed answer map does not.
-- Root cause: The form and resume reader treat a page-scoped label as a survey-wide identity.
-- Resolution: Use an unambiguous page/question identity in the loader resume map and local answer/write-in state; preserve checkbox hydration, signed respondent identity and write ordering. No stored-row repair or required-answer policy.
-- Look in: `app/lib/survey-responses.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/surveys/useSurveyForm.ts`
-- Existing tests: test/ui/survey-respondent-identity.test.tsx; test/integration-db/survey-respondent-identity.test.ts
-- Missing tests: Actual-page different values across repeated labels and Previous/Next navigation.; Real-PG reload with repeated question labels on separate pages.
-- Done when: Each page retains its own displayed, resumed and write-in answer.; An unanswered question stays empty when another page has the same public label.; Single-page resume, checkbox hydration and signed identity remain valid.; A page-scope removal makes the new tests fail.
-- Tracker: Independent public read/state fix; no blocking dependency.
-
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - The current audience-history mount effect fetches server data. The syntax guard now exposes it as CANDIDATE-REMOVE; route data is the adopted policy.
@@ -347,6 +335,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block.
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317) Keep survey response columns tied to saved questions
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- Repeated page-local question labels select the first question in response table and CSV columns.
+- Current behavior: Source audit dev@bbc136e6: both response table and CSV find the first allQuestions entry with a public question_id. Header/cell keys repeat the same label. Correct stored answers already carry distinct internal question IDs.
+- Root cause: Response columns use a page-local public label instead of the saved question identity.
+- Resolution: Match and key columns by internal question identity. Preserve headers, order, checkbox formatting, permissions and tenant scope. No editor-label or stored-data changes.
+- Look in: `app/lib/survey-responses.server.ts:buildSurveyResponsesCsv`, `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/lib/survey-format.ts`, `test/survey-responses.route.test.ts`
+- Existing tests: test/survey-responses.route.test.ts; no repeated-label table/CSV control confirmed.
+- Missing tests: Actual-page distinct response columns with repeated labels and an unanswered question.; Real-Postgres CSV with distinct repeated-label answers and single-page/checkbox controls.; Restoring first-public-label lookup must fail the new controls.
+- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question stays empty; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
+- Tracker: Independent atomic response-column fix. Public respondent state is #2294; historical assessment is #2292. Native Bug type and assignee wra-sol verified.
 
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -747,9 +747,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 133
+## Verify and close — 134
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- Public survey answer and write-in state use page/question identity. Source verification passed; deployed public-form acceptance and promotion remain.
+- Current behavior: PR #2316 merged at dev@ec6ff792: the reader, local answers, write-in drafts and save queue share one page/question key. Resume excludes foreign-survey question rows without changing stored data.
+- Root cause: The form and resume reader treat a page-scoped label as a survey-wide identity.
+- Resolution: Verify the deployed public form with repeated labels through Next/Previous and reload, including checkbox/write-in state; then promote the tested source. Historical stored-data assessment stays in #2292.
+- Look in: `app/lib/survey-answer-state.ts`, `app/lib/survey-responses.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/surveys/useSurveySubmission.ts`, `test/ui/survey-answer-page-scope.test.tsx`, `test/integration-db/survey-respondent-identity.test.ts`
+- Existing tests: Focused actual-page UI controls: 25 passed. Focused real-Postgres controls: 16 passed.; Full local CI: 4323 node tests passed with 11 existing skips, 22 Bun tests passed, 1008 UI tests passed. Full native Postgres tier: 174 passed, no skips.; Fault proof: original reader six failures/ten controls; survey ownership removed one/fifteen; page identity removed ten/fifteen UI controls. Restored source passes.
+- Missing tests: Deployed public-form repeated-label navigation/reload and write-in acceptance before promotion.
+- Done when: Each page retains its own displayed, resumed and write-in answer.; An unanswered question stays empty when another page has the same public label.; Single-page resume, checkbox hydration and signed identity remain valid.; A page-scope removal makes the new tests fail.; Resumed foreign-survey question references cannot replace owned answers; stored rows are unchanged.
+- Tracker: Source fix in PR #2316; keep open for deployed acceptance and promotion. Project Status remains unverified by the local token.
 
 ### [#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129) The inbound-queue duplicate-offer guard is wired as "already in the baseline" but exists in no baseline, and both database lineages behave wrongly
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04

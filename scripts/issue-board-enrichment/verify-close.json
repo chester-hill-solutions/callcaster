@@ -3980,5 +3980,42 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Source repair verified on dev in PR #2314. Issue remains open until promotion and required deployed verification. No change to retry-agent preference."
+  },
+  {
+    "issueNumber": 2294,
+    "verdict": "verify-close",
+    "recommendedTitle": "Keep public survey answers scoped to their page",
+    "summary": "Public survey answer and write-in state use page/question identity. Source verification passed; deployed public-form acceptance and promotion remain.",
+    "currentBehavior": "PR #2316 merged at dev@ec6ff792: the reader, local answers, write-in drafts and save queue share one page/question key. Resume excludes foreign-survey question rows without changing stored data.",
+    "rootCause": "The form and resume reader treat a page-scoped label as a survey-wide identity.",
+    "resolution": "Verify the deployed public form with repeated labels through Next/Previous and reload, including checkbox/write-in state; then promote the tested source. Historical stored-data assessment stays in #2292.",
+    "lookIn": [
+      "app/lib/survey-answer-state.ts",
+      "app/lib/survey-responses.server.ts",
+      "app/routes/survey+/$surveyId.loader.server.ts",
+      "app/routes/survey+/$surveyId.tsx",
+      "app/hooks/surveys/useSurveySubmission.ts",
+      "test/ui/survey-answer-page-scope.test.tsx",
+      "test/integration-db/survey-respondent-identity.test.ts"
+    ],
+    "existingTests": [
+      "Focused actual-page UI controls: 25 passed. Focused real-Postgres controls: 16 passed.",
+      "Full local CI: 4323 node tests passed with 11 existing skips, 22 Bun tests passed, 1008 UI tests passed. Full native Postgres tier: 174 passed, no skips.",
+      "Fault proof: original reader six failures/ten controls; survey ownership removed one/fifteen; page identity removed ten/fifteen UI controls. Restored source passes."
+    ],
+    "missingTests": [
+      "Deployed public-form repeated-label navigation/reload and write-in acceptance before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Each page retains its own displayed, resumed and write-in answer.",
+      "An unanswered question stays empty when another page has the same public label.",
+      "Single-page resume, checkbox hydration and signed identity remain valid.",
+      "A page-scope removal makes the new tests fail.",
+      "Resumed foreign-survey question references cannot replace owned answers; stored rows are unchanged."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix in PR #2316; keep open for deployed acceptance and promotion. Project Status remains unverified by the local token."
   }
 ]

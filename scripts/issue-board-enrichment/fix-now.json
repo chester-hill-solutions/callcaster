@@ -2032,39 +2032,6 @@
     "trackerRecommendation": "Ready for its own atomic required-answer fix from clean dev."
   },
   {
-    "issueNumber": 2294,
-    "verdict": "fix-now",
-    "recommendedTitle": "Keep public survey answers scoped to their page",
-    "summary": "Displayed and resumed public answers collapse repeated labels across pages.",
-    "currentBehavior": "The editor generates question labels independently per page. Local answers and write-in state use questionId alone; the resume helper reduces persisted values under the same public label without page identity. Database writes and the #2108 queue preserve page scope, but the displayed and resumed answer map does not.",
-    "rootCause": "The form and resume reader treat a page-scoped label as a survey-wide identity.",
-    "resolution": "Use an unambiguous page/question identity in the loader resume map and local answer/write-in state; preserve checkbox hydration, signed respondent identity and write ordering. No stored-row repair or required-answer policy.",
-    "lookIn": [
-      "app/lib/survey-responses.server.ts",
-      "app/routes/survey+/$surveyId.loader.server.ts",
-      "app/routes/survey+/$surveyId.tsx",
-      "app/hooks/surveys/useSurveyForm.ts"
-    ],
-    "existingTests": [
-      "test/ui/survey-respondent-identity.test.tsx",
-      "test/integration-db/survey-respondent-identity.test.ts"
-    ],
-    "missingTests": [
-      "Actual-page different values across repeated labels and Previous/Next navigation.",
-      "Real-PG reload with repeated question labels on separate pages."
-    ],
-    "acceptanceCriteria": [
-      "Each page retains its own displayed, resumed and write-in answer.",
-      "An unanswered question stays empty when another page has the same public label.",
-      "Single-page resume, checkbox hydration and signed identity remain valid.",
-      "A page-scope removal makes the new tests fail."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Independent public read/state fix; no blocking dependency."
-  },
-  {
     "issueNumber": 2061,
     "verdict": "fix-now",
     "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
@@ -2147,5 +2114,37 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2317,
+    "verdict": "fix-now",
+    "recommendedTitle": "Keep survey response columns tied to saved questions",
+    "summary": "Repeated page-local question labels select the first question in response table and CSV columns.",
+    "currentBehavior": "Source audit dev@bbc136e6: both response table and CSV find the first allQuestions entry with a public question_id. Header/cell keys repeat the same label. Correct stored answers already carry distinct internal question IDs.",
+    "rootCause": "Response columns use a page-local public label instead of the saved question identity.",
+    "resolution": "Match and key columns by internal question identity. Preserve headers, order, checkbox formatting, permissions and tenant scope. No editor-label or stored-data changes.",
+    "lookIn": [
+      "app/lib/survey-responses.server.ts:buildSurveyResponsesCsv",
+      "app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx",
+      "app/lib/survey-format.ts",
+      "test/survey-responses.route.test.ts"
+    ],
+    "existingTests": [
+      "test/survey-responses.route.test.ts; no repeated-label table/CSV control confirmed."
+    ],
+    "missingTests": [
+      "Actual-page distinct response columns with repeated labels and an unanswered question.",
+      "Real-Postgres CSV with distinct repeated-label answers and single-page/checkbox controls.",
+      "Restoring first-public-label lookup must fail the new controls."
+    ],
+    "acceptanceCriteria": [
+      "Repeated-label columns show the answers for their distinct saved questions in both table and CSV.",
+      "An unanswered question stays empty; single-page/checkbox behavior and access controls remain.",
+      "Use unique internal question identities for header and cell keys."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Independent atomic response-column fix. Public respondent state is #2294; historical assessment is #2292. Native Bug type and assignee wra-sol verified."
   }
 ]
