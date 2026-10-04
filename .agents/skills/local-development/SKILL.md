@@ -64,6 +64,9 @@ only when the test needs multiple calls in that exact order.
 
 ## API and form response adapters
 
+`asRouteResponse` normalizes thrown Responses. To verify that an auth redirect
+stays thrown, call the raw loader or action and inspect its rejected Response.
+
 API services should call the domain service, then map its result or exception to
 JSON. A React Router form helper returns a data wrapper; checking a top-level
 `error` can miss `result.data.error` and falsely return success. Verify the real

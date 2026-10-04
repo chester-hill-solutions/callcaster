@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { consumeInvitationFlash } from "@/lib/invitation-flash.server";
 import { z } from "zod";
 
 import { resetRateLimitsForTests } from "@/lib/platform-rate-limit.server";
@@ -195,7 +196,7 @@ describe("app/routes/accept-invite.action.server.ts", () => {
       response: {
         user: { id: "u-new", email: "new@example.com", name: "First Last" },
       },
-      headers: new Headers([["Set-Cookie", "session=abc; Path=/"]]),
+      headers: new Headers([["Set-Cookie", "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT"], ["Set-Cookie", "session-data=cached; Path=/"]]),
     });
     mocks.redeemInvitation.mockResolvedValueOnce({
       ok: true,
@@ -228,9 +229,38 @@ describe("app/routes/accept-invite.action.server.ts", () => {
       verifiedEmail: "new@example.com",
     });
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("/workspaces?invite=accepted");
+    expect(response.headers.get("Location")).toBe("/workspaces");
     // The registration session must survive the redeem redirect.
-    expect(response.headers.get("Set-Cookie")).toBe("session=abc; Path=/");
+    expect(response.headers.getSetCookie()).toEqual(expect.arrayContaining([
+      "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT",
+      "session-data=cached; Path=/",
+    ]));
+    expect(response.headers.getSetCookie()).toHaveLength(3);
+    const flashCookie = response.headers.getSetCookie().find((cookie) => cookie.startsWith("cc.flash="));
+    const receipt = await consumeInvitationFlash(new Request("http://localhost/workspaces", { headers: { Cookie: flashCookie ?? "" } }));
+    expect(receipt.flash).toMatchObject({ code: "invite_accepted" });
+  });
+
+  test("existing-user redemption preserves refreshed auth cookies and a signed success receipt", async () => {
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: "existing-user", email: "invited@example.test" },
+      headers: new Headers([["Set-Cookie", "session=refreshed; Path=/"], ["Set-Cookie", "session-data=current; Path=/"]]),
+    });
+    mocks.redeemInvitation.mockResolvedValueOnce({ ok: true, workspaceId: "w1", alreadyAccepted: false });
+    const form = new FormData();
+    form.set("actionType", "redeemInvitation");
+    form.set("invitationId", "wi_invite_1");
+    form.set("token", "raw-token");
+    const mod = await import("../app/routes/accept-invite.action.server");
+    const response = await asRouteResponse(mod.action({ request: post(form) } as never));
+    expect(response.headers.get("Location")).toBe("/workspaces");
+    expect(response.headers.getSetCookie()).toEqual(expect.arrayContaining([
+      "session=refreshed; Path=/", "session-data=current; Path=/",
+    ]));
+    expect(response.headers.getSetCookie()).toHaveLength(3);
+    const cookie = response.headers.getSetCookie().find((value) => value.startsWith("cc.flash="));
+    const receipt = await consumeInvitationFlash(new Request("http://localhost/workspaces", { headers: { Cookie: cookie ?? "" } }));
+    expect(receipt.flash).toMatchObject({ code: "invite_accepted" });
   });
 
   // A token that does not resolve to a pending invite must not create an

@@ -7,11 +7,9 @@ export function mergeBetterAuthSetCookieHeaders(
     return target;
   }
 
-  source.forEach((value, key) => {
-    if (key.toLowerCase() === "set-cookie") {
-      target.append("Set-Cookie", value);
-    }
-  });
+  for (const value of source.getSetCookie()) {
+    target.append("Set-Cookie", value);
+  }
 
   return target;
 }
