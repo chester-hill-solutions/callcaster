@@ -1,5 +1,7 @@
 # Graph Report - dev  (2026-10-03)
 
+> Imported snapshot. Its source commit is not verified in this repository. Check findings against current source. See [snapshot notes](README.md).
+
 ## Corpus Check
 - Large corpus: 2672 files · ~1,605,602 words. Semantic extraction will be expensive (many Claude tokens). Consider running on a subfolder.
 

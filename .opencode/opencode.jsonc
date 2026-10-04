@@ -3,16 +3,14 @@
   "mcp": {
     "railway": {
       "type": "local",
-      "command": ["railway", "mcp"]
+      "command": [
+        "railway",
+        "mcp"
+      ]
     },
-    "servers": {
-      "twilio": {
-        "type": "remote",
-        "url": "https://mcp.twilio.com/docs"
-      }
+    "twilio": {
+      "type": "remote",
+      "url": "https://mcp.twilio.com/docs"
     }
-  },
-  "plugins": [
-    "./plugins/graphify.js"
-  ]
+  }
 }

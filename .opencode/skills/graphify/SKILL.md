@@ -1,9 +1,14 @@
 ---
 name: graphify
-description: "Use for any question about a codebase, its architecture, file relationships, or project content — especially when graphify-out/ exists, where the question should be treated as a graphify query first. Turns any input (code, docs, papers, images, videos) into a persistent knowledge graph with god nodes, community detection, and query/path/explain tools."
+description: "Use when the user requests Graphify or a knowledge graph query. Turns any input (code, docs, papers, images, videos) into a persistent knowledge graph with god nodes, community detection, and query/path/explain tools."
 ---
 
 # /graphify
+
+This tool is optional. If it is unavailable, continue with source searches.
+The checked-in graph is an imported snapshot with unverified source provenance;
+see `graphify-out/README.md`. Check every result against the current source.
+Do not treat the graph as proof that a reported issue is fixed.
 
 Turn any folder of files into a navigable knowledge graph with community detection, an honest audit trail, and three outputs: interactive HTML, GraphRAG-ready JSON, and a plain-language GRAPH_REPORT.md.
 
@@ -62,53 +67,29 @@ Follow these steps in order. Do not skip steps.
 
 Only when the path is one or more `https://github.com/...` URLs, or several local subfolders to merge. See `references/github-and-merge.md` for the clone, cross-repo merge, and monorepo flow, then continue with the resolved local path. A plain local path skips this step.
 
-### Step 1 - Ensure graphify is installed
+### Step 1 - Use an isolated, pinned Graphify install
+
+For an explicit Graphify task, use a repository-local virtual environment.
+Do not install into system Python or use `--break-system-packages`.
+The version in `.graphify_version` is the integration version.
 
 ```bash
-# Detect the correct Python interpreter (handles uv tool, pipx, venv, system installs)
-PYTHON=""
-GRAPHIFY_BIN=$(which graphify 2>/dev/null)
-# 1. uv tool installs — most reliable on modern Mac/Linux
-if [ -z "$PYTHON" ] && command -v uv >/dev/null 2>&1; then
-    _UV_PY=$(uv tool run --from graphifyy python -c "import sys; print(sys.executable)" 2>/dev/null)
-    if [ -n "$_UV_PY" ]; then PYTHON="$_UV_PY"; fi
-fi
-# 2. Read shebang from graphify binary (pipx and direct pip installs)
-if [ -z "$PYTHON" ] && [ -n "$GRAPHIFY_BIN" ]; then
-    _SHEBANG=$(head -1 "$GRAPHIFY_BIN" | tr -d '#!')
-    case "$_SHEBANG" in
-        *[!a-zA-Z0-9/_.@-]*) ;;
-        *) "$_SHEBANG" -c "import graphify" 2>/dev/null && PYTHON="$_SHEBANG" ;;
-    esac
-fi
-# 3. Fall back to python3
-if [ -z "$PYTHON" ]; then PYTHON="python3"; fi
-if ! "$PYTHON" -c "import graphify" 2>/dev/null; then
-    if command -v uv >/dev/null 2>&1; then
-        uv tool install --upgrade graphifyy -q 2>&1 | tail -3
-        _UV_PY=$(uv tool run --from graphifyy python -c "import sys; print(sys.executable)" 2>/dev/null)
-        if [ -n "$_UV_PY" ]; then PYTHON="$_UV_PY"; fi
-    else
-        "$PYTHON" -m pip install graphifyy -q 2>/dev/null \
-          || "$PYTHON" -m pip install graphifyy -q --break-system-packages 2>&1 | tail -3
-    fi
-fi
-# Write interpreter path for all subsequent steps (persists across invocations)
+set -e
+GRAPHIFY_VERSION=$(cat .opencode/skills/graphify/.graphify_version)
+python3 -m venv .opencode/.graphify-venv
+.opencode/.graphify-venv/bin/python -m pip install "graphifyy==$GRAPHIFY_VERSION"
+PYTHON=".opencode/.graphify-venv/bin/python"
+"$PYTHON" -c "import graphify"
 mkdir -p graphify-out
 "$PYTHON" -c "import sys; open('graphify-out/.graphify_python', 'w', encoding='utf-8').write(sys.executable)"
-# Save scan root so `graphify update` (no args) knows where to look next time.
-# The scan path is passed through a quoted heredoc, never substituted into the
-# command line itself: a bare `cd <path>` (or an unquoted heredoc, which
-# still expands $()/backticks in its body) would let a malicious path execute
-# as shell code the moment this line runs.
 "$PYTHON" -c "import os, sys; out_path = os.path.abspath('graphify-out/.graphify_root'); os.chdir(sys.stdin.readline().rstrip('\n')); open(out_path, 'w', encoding='utf-8').write(os.getcwd())" <<'GRAPHIFY_ROOT_EOF'
 INPUT_PATH
 GRAPHIFY_ROOT_EOF
 ```
 
-If the import succeeds, print nothing and move straight to Step 2.
-
-**In every subsequent bash block, replace `python3` with `$(cat graphify-out/.graphify_python)` to use the correct interpreter.**
+Replace INPUT_PATH with the scan root. Use the saved interpreter in subsequent
+steps. If installation fails, report that limit and use current source searches.
+Do not update or commit graph output as verified until the scan completes.
 
 ### Step 2 - Detect files
 

@@ -51,3 +51,6 @@ scripts/dev/certs/
 # Object storage (stow) — downloaded release binary, pidfile and bucket data
 /.stow-bin/
 /.stow/
+
+# Isolated optional Graphify tool
+/.opencode/.graphify-venv/
