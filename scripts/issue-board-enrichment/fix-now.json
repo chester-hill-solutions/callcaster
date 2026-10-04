@@ -204,40 +204,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2035,
-    "verdict": "fix-now",
-    "recommendedTitle": "The settings-sheet Leave Campaign button bypasses the new confirmation",
-    "summary": "Partial fix: the top Leave Campaign button and welcome leave actions ask for confirmation, but the settings-sheet Leave button still calls cleanup immediately.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. PR #2074 adds a visible top action and confirmation, but settings-only Leave bypasses it at Layout:325.",
-    "rootCause": "PR #2074 added confirmation to the top action and welcome leave callbacks. CallScreen.Layout.tsx:325 still passes handleLeaveCampaign directly to the settings-only CampaignHeader, so that button performs cleanup immediately.",
-    "resolution": "Finish confirmation wiring for the settings-sheet Leave button and cover all active-session exit controls.",
-    "lookIn": [
-      "app/components/call/CallScreen.Header.tsx:270",
-      "app/components/call/CallScreen.Layout.tsx:182",
-      "app/components/call/CallScreen.Layout.tsx:325",
-      "app/components/call/CallScreen.Header.tsx:239 (TopChrome header), :264-291 (the kebab menu holding Leave Campaign), :143-150 (the settings-only visible button)",
-      "app/components/call/CallScreen.Layout.tsx:164-172 (handleLeaveCampaign: hangUp, device.destroy, requeueContacts, navigate(-1)) and :238, :315, :504 (the three call sites)",
-      "app/components/call/CallScreen.Dialogs.tsx:142 and :177 (the existing leave actions), and the Dialog imports at :4-11 for the pattern to copy"
-    ],
-    "existingTests": [
-      "test/ui/call-screen-header.test.tsx (covers CampaignHeader only; TopChrome is not rendered by any test)"
-    ],
-    "missingTests": [
-      "Existing header test checks only callback invocation. No layout integration test proves settings Leave is safe, cancel does nothing, and confirm cleans up once."
-    ],
-    "acceptanceCriteria": [
-      "Leave Campaign is visible on the live call screen, not only inside the kebab menu",
-      "Leaving the campaign requires an explicit confirmation that states what it does",
-      "No hangup, device teardown or requeue happens before the confirmation is accepted",
-      "All leave entry points share one confirmation and one implementation",
-      "The confirmation is keyboard accessible and has a focus-visible cancel action"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Partial fix; retain Fix now for the settings-sheet bypass. Related PR evidence: #2074. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2004,
     "verdict": "fix-now",
     "recommendedTitle": "A 403 renders as \"Something went wrong\" with a Reload Page button and the raw status text",
@@ -1058,42 +1024,6 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2136,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/media lacks the file-size limit enforced by its sibling route",
-    "summary": "POST /api/media has no file-size guard before buffering, while /api/message_media has a 10 MiB file policy. The reported three independent buffer copies are not supported by the implementation.",
-    "currentBehavior": "Source still lacks the audio file cap and both routes materialize multipart before file validation. Five native multipart/actual-route cases at dev@0b72f37d reproduce audio accepting 10 MiB + 1 byte (201) and campaign text entering the storage-call key. Both exact-cap controls and the message-media oversize rejection pass. Buffer.from(ArrayBuffer) shares its allocation and existing Buffer conversion adds no copy; no production OOM/peak-memory claim is made.",
-    "resolution": "Share the size/type validation and run it before file.arrayBuffer. Add a bounded request/multipart reader where needed because request.formData has already read the part. Sanitize generated storage keys and measure memory before asserting copy count.",
-    "lookIn": [
-      "app/routes/api+/media.action.server.ts",
-      "app/routes/api+/message_media.action.server.ts",
-      "app/lib/object-storage.server.ts",
-      "test/media.route.test.ts",
-      "test/message-media.route.test.ts"
-    ],
-    "existingTests": [
-      "test/media.route.test.ts covers upload success, authentication refusal and upload/update failure.",
-      "test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media.",
-      "Five actual-route/native multipart cases: two expected regression failures (audio cap and campaign-derived key) plus three passing sibling/exact-cap controls. Only authentication/session, access, DB writes and storage I/O are stubbed; no provider/application DB calls."
-    ],
-    "missingTests": [
-      "A repaired oversized audio upload must reject before application File.arrayBuffer, storage or update. Both routes need literal exact-cap controls.",
-      "An actual streamed multipart request must enforce a byte budget with no or false Content-Length and cancel upstream on overflow; a post-formData check alone does not prove this.",
-      "Invalid type/name and foreign-tenant controls; removal/delay of the cap, stream limit or generated-key guard must fail relevant tests. Peak memory remains unmeasured."
-    ],
-    "acceptanceCriteria": [
-      "An oversized file is rejected before file.arrayBuffer or storage work runs.",
-      "A file at the shared cap succeeds on both routes.",
-      "The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.",
-      "campaignName cannot control the storage key's path structure.",
-      "Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Keep Fix now for absent upload limits. Correct the triple-copy/OOM claims; no production memory reproduction was performed."
   },
   {
     "issueNumber": 2137,
@@ -2007,5 +1937,68 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2355,
+    "verdict": "fix-now",
+    "recommendedTitle": "Reject invalid audio campaign targets before storage",
+    "summary": "The route allocates, uploads and signs audio before a scoped update proves the campaign exists. Campaign identifiers also lack numeric validation.",
+    "currentBehavior": "dev@cea31c69 has no scoped precheck. The actual-route audit attempts storage when the update returns null. This is orchestration evidence with external I/O stubbed; no physical orphan count was measured.",
+    "rootCause": "Campaign existence is checked only by the final update, after storage work. Number conversion accepts invalid target values without an explicit identifier policy.",
+    "resolution": "Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/lib/handler.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "The audit used actual action/native multipart/file validation with external I/O stubbed: 34 upload controls pass and the missing-target no-storage contract fails. Existing scoped campaign helper uses createTenantDb."
+    ],
+    "missingTests": [
+      "Actual-route invalid/missing/foreign target and valid-target controls; no media work before target validation; a final-update failure cannot report success; precheck removal must fail."
+    ],
+    "acceptanceCriteria": [
+      "Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.",
+      "A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.",
+      "A valid campaign in the requested workspace retains its 201 response and updated audio URL.",
+      "A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.",
+      "The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.",
+      "Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.",
+      "Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356."
+  },
+  {
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "issueNumber": 2298,
+    "verdict": "fix-now",
+    "recommendedTitle": "Remove obsolete STRIPE_API_KEY configuration",
+    "summary": "Four active Railway configuration lists still preserve or copy STRIPE_API_KEY. App and worker use STRIPE_SECRET_KEY.",
+    "currentBehavior": "Source audit dev@8ae867ed, 2026-10-04: dev, staging and production IaC plus the staging app copy list retain the obsolete key. No app runtime use was found. External runtime use is not yet verified.",
+    "rootCause": "The active environment preservation and staging copy lists still include the old variable.",
+    "resolution": "Verify that no external runtime consumer needs the old key, then remove it from the four active lists while preserving STRIPE_SECRET_KEY for app and worker.",
+    "lookIn": [
+      ".railway/environments/dev.ts:22",
+      ".railway/environments/staging.ts:35",
+      ".railway/environments/production.ts:28",
+      "scripts/railway/sync-staging-vars.sh:33"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Confirm external runtime consumers before removal. Verify required Stripe secret configuration and full repository checks."
+    ],
+    "acceptanceCriteria": [
+      "STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.",
+      "STRIPE_SECRET_KEY remains configured for the app and worker where required.",
+      "Repository checks pass.",
+      "Confirm no external runtime consumer depends on STRIPE_API_KEY."
+    ],
+    "trackerRecommendation": "Native issue updated with source proof. Fix now; keep the external-consumer acceptance check open until verified."
   }
 ]

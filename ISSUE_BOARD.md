@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@ee225fc3; merged #2348/#2350 source and current recovery/media evidence (2026-10-04 UTC)` · 315 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@ec3d87f1; media source fixes, review pagination and current Sai report evidence (2026-10-04 UTC)` · 319 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after merged original-file Task #2350 and current parent/media-scope updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the media fixes, review pagination repair and current Sai source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -133,16 +133,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136) POST /api/media lacks the file-size limit enforced by its sibling route
+### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
-- POST /api/media has no file-size guard before buffering, while /api/message_media has a 10 MiB file policy. The reported three independent buffer copies are not supported by the implementation.
-- Current behavior: Source still lacks the audio file cap and both routes materialize multipart before file validation. Five native multipart/actual-route cases at dev@0b72f37d reproduce audio accepting 10 MiB + 1 byte (201) and campaign text entering the storage-call key. Both exact-cap controls and the message-media oversize rejection pass. Buffer.from(ArrayBuffer) shares its allocation and existing Buffer conversion adds no copy; no production OOM/peak-memory claim is made.
-- Resolution: Share the size/type validation and run it before file.arrayBuffer. Add a bounded request/multipart reader where needed because request.formData has already read the part. Sanitize generated storage keys and measure memory before asserting copy count.
-- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `test/media.route.test.ts`, `test/message-media.route.test.ts`
-- Existing tests: test/media.route.test.ts covers upload success, authentication refusal and upload/update failure.; test/message-media.route.test.ts covers the sibling route; neither establishes the required shared boundary for /api/media.; Five actual-route/native multipart cases: two expected regression failures (audio cap and campaign-derived key) plus three passing sibling/exact-cap controls. Only authentication/session, access, DB writes and storage I/O are stubbed; no provider/application DB calls.
-- Missing tests: A repaired oversized audio upload must reject before application File.arrayBuffer, storage or update. Both routes need literal exact-cap controls.; An actual streamed multipart request must enforce a byte budget with no or false Content-Length and cancel upstream on overflow; a post-formData check alone does not prove this.; Invalid type/name and foreign-tenant controls; removal/delay of the cap, stream limit or generated-key guard must fail relevant tests. Peak memory remains unmeasured.
-- Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
-- Tracker: Keep Fix now for absent upload limits. Correct the triple-copy/OOM claims; no production memory reproduction was performed.
+- The route allocates, uploads and signs audio before a scoped update proves the campaign exists. Campaign identifiers also lack numeric validation.
+- Current behavior: dev@cea31c69 has no scoped precheck. The actual-route audit attempts storage when the update returns null. This is orchestration evidence with external I/O stubbed; no physical orphan count was measured.
+- Root cause: Campaign existence is checked only by the final update, after storage work. Number conversion accepts invalid target values without an explicit identifier policy.
+- Resolution: Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: The audit used actual action/native multipart/file validation with external I/O stubbed: 34 upload controls pass and the missing-target no-storage contract fails. Existing scoped campaign helper uses createTenantDb.
+- Missing tests: Actual-route invalid/missing/foreign target and valid-target controls; no media work before target validation; a final-update failure cannot report success; precheck removal must fail.
+- Done when: Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.; A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.; A valid campaign in the requested workspace retains its 201 response and updated audio URL.; A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.; The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.; Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.; Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open.
+- Tracker: Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -574,6 +575,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Literal absolute redirect pathnames match registered routes, including multiline calls.; Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.; Existing violations are corrected or tracked before enabling the gate.; Local and quality CI run the gate; the relative redirect check remains.
 - Tracker: Independent preventive Task split from #2075; no blocking edge.
 
+### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-04
+- Four active Railway configuration lists still preserve or copy STRIPE_API_KEY. App and worker use STRIPE_SECRET_KEY.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04: dev, staging and production IaC plus the staging app copy list retain the obsolete key. No app runtime use was found. External runtime use is not yet verified.
+- Root cause: The active environment preservation and staging copy lists still include the old variable.
+- Resolution: Verify that no external runtime consumer needs the old key, then remove it from the four active lists while preserving STRIPE_SECRET_KEY for app and worker.
+- Look in: `.railway/environments/dev.ts:22`, `.railway/environments/staging.ts:35`, `.railway/environments/production.ts:28`, `scripts/railway/sync-staging-vars.sh:33`
+- Missing tests: Confirm external runtime consumers before removal. Verify required Stripe secret configuration and full repository checks.
+- Done when: STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.; STRIPE_SECRET_KEY remains configured for the app and worker where required.; Repository checks pass.; Confirm no external runtime consumer depends on STRIPE_API_KEY.
+- Tracker: Native issue updated with source proof. Fix now; keep the external-consumer acceptance check open until verified.
+
 ### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
 - Option B is recorded: make the default Alert neutral and require explicit semantic tones. CallCaster has not adopted that contract.
@@ -596,18 +608,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2035](https://github.com/chester-hill-solutions/callcaster/issues/2035) The settings-sheet Leave Campaign button bypasses the new confirmation
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-03
-- Partial fix: the top Leave Campaign button and welcome leave actions ask for confirmation, but the settings-sheet Leave button still calls cleanup immediately.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. PR #2074 adds a visible top action and confirmation, but settings-only Leave bypasses it at Layout:325.
-- Root cause: PR #2074 added confirmation to the top action and welcome leave callbacks. CallScreen.Layout.tsx:325 still passes handleLeaveCampaign directly to the settings-only CampaignHeader, so that button performs cleanup immediately.
-- Resolution: Finish confirmation wiring for the settings-sheet Leave button and cover all active-session exit controls.
-- Look in: `app/components/call/CallScreen.Header.tsx:270`, `app/components/call/CallScreen.Layout.tsx:182`, `app/components/call/CallScreen.Layout.tsx:325`, `app/components/call/CallScreen.Header.tsx:239 (TopChrome header), :264-291 (the kebab menu holding Leave Campaign), :143-150 (the settings-only visible button)`, `app/components/call/CallScreen.Layout.tsx:164-172 (handleLeaveCampaign: hangUp, device.destroy, requeueContacts, navigate(-1)) and :238, :315, :504 (the three call sites)`, `app/components/call/CallScreen.Dialogs.tsx:142 and :177 (the existing leave actions), and the Dialog imports at :4-11 for the pattern to copy`
-- Existing tests: test/ui/call-screen-header.test.tsx (covers CampaignHeader only; TopChrome is not rendered by any test)
-- Missing tests: Existing header test checks only callback invocation. No layout integration test proves settings Leave is safe, cancel does nothing, and confirm cleans up once.
-- Done when: Leave Campaign is visible on the live call screen, not only inside the kebab menu; Leaving the campaign requires an explicit confirmation that states what it does; No hangup, device teardown or requeue happens before the confirmation is accepted; All leave entry points share one confirmation and one implementation; The confirmation is keyboard accessible and has a focus-visible cancel action
-- Tracker: Partial fix; retain Fix now for the settings-sheet bypass. Related PR evidence: #2074. A PR reference alone does not prove deployed behavior.
 
 ### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-02
@@ -702,9 +702,56 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 146
+## Verify and close — 150
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2358](https://github.com/chester-hill-solutions/callcaster/issues/2358) Sum all file pages in the structural review check
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify release of the fixed review-coverage pagination**
+- PR #2359 is merged in dev. The real 221-file Sai PR passed the corrected workflow with one total of 664695, then merged under #2301. Default-branch release remains.
+- Current behavior: dev@ec3d87f1, 2026-10-04: the reviewed workflow repair passed full local CI, applicable remote checks and both deployments. Sai PR #2301 passed corrected require-coverage at e79e0d48 with changed_lines=664695, plus quality, bundle, E2E and both deployments before merge. Job: https://github.com/chester-hill-solutions/callcaster/actions/runs/37213298927/job/111468640453
+- Root cause: gh --paginate --jq aggregated each page separately and wrote multiple totals to GITHUB_OUTPUT. A pipeline also needs pipefail to reject a partial API read.
+- Resolution: Retain the merged jq -s aggregate and explicit Bash shell. Keep default-branch release tracking open.
+- Look in: `.github/workflows/review-coverage.yml`, `.agents/skills/github-cli/SKILL.md`
+- Existing tests: Actual 221-file API response: page lengths 100/100/21, one sum 664695.; Bash controls: empty=0; single and multi=10; failed and partial producer exit 1 with no output.; Real Sai require-coverage job 111468640453 completed successfully at e79e0d48 with changed_lines=664695.
+- Done when: PRs with more than 100 files produce one additions total across every page.; Single-page and empty responses produce one integer, including 0 for empty.; API failures and partial reads stop the step; they cannot pass with 0 or an incomplete total.; GITHUB_OUTPUT receives valid step output.; The risk paths, 500-line threshold, marker rule and board exemption remain unchanged.; The real 221-file Sai response and corrected Sai job are verified before merge.; Full local and applicable remote checks are green.
+- Tracker: All source and real large-PR acceptance checks passed. Source fixes are on dev under #2359 and #2301. Keep the issue open until default-branch release.
+
+### [#2035](https://github.com/chester-hill-solutions/callcaster/issues/2035) The settings-sheet Leave Campaign button bypasses the new confirmation
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-04
+- The settings-sheet callback already uses the shared confirmation in current dev. Settings-path, keyboard, page geometry and deployed acceptance remain.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04. Top, settings and welcome Leave callbacks use requestLeaveCampaign. PR #2257 fixed the settings bypass. The modal keeps Cancel/confirm disabled while predictive cleanup waits for acknowledgement.
+- Root cause: Historical: the settings callback called cleanup directly. Current source fixes that callback; the remaining gap is acceptance proof.
+- Resolution: Exercise the real settings button and prove no cleanup before confirm, Cancel safety, single cleanup while pending, keyboard/focus behavior and stable page landmarks. Verify the deployed flow and release.
+- Look in: `app/components/call/CallScreen.Layout.tsx:271`, `app/components/call/CallScreen.Layout.tsx:348`, `app/components/call/CallScreen.Layout.tsx:378`, `app/components/call/CallScreen.Layout.tsx:552`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: test/ui/call-screen-leave.test.tsx covers actual layout behavior for predictive acknowledgement, failure/retry, Cancel, live cleanup and a welcome callback stub. It does not drive settings Leave or prove browser geometry.
+- Missing tests: Real settings-sheet Leave integration; keyboard focus/focus-visible Cancel/focus return; no page-landmark or scroll movement through open, Cancel, confirmation and pending states; deployed acceptance.
+- Done when: Leave Campaign is visible on the live call screen, not only inside the kebab menu; Leaving the campaign requires an explicit confirmation that states what it does; No hangup, device teardown or requeue happens before the confirmation is accepted; All leave entry points share one confirmation and one implementation; The confirmation is keyboard accessible and has a focus-visible cancel action
+- Tracker: Source bypass fixed under #2257. Native #2035 now records the current proof and retains all original acceptance criteria. Keep it open for remaining acceptance and release.
+
+### [#2354](https://github.com/chester-hill-solutions/callcaster/issues/2354) Preserve workspace denial status on audio media uploads
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Known workspace denials retain 404/403 under merged #2357. Deployed acceptance and release remain.
+- Current behavior: dev@8ae867ed includes #2357 at tested head 23950884. The route rethrows known AppError instances to its existing mapper, preserving safe 404/403 responses before file allocation or media work. Unknown failures remain 500.
+- Root cause: The route catch swallows the known AppError before defineAction can map it.
+- Resolution: Verify deployed denials, successful uploads, unknown failures and retry behavior, then promote through the release PR.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: Seven actual-route cases reproduce two denial failures and five passing controls. The fix passes 50 affected cases; removing passthrough fails both denials, restoring passes seven. Both source and final full local gates passed.; Exact final local gate passed at 23950884. Remote quality executed seven denial cases, 34 boundary cases and six stream cases; all applicable checks, e2e and both app/worker deployments passed before merge.
+- Missing tests: Deployed functional acceptance and release promotion remain. Green deployment contexts are not functional QA.
+- Done when: A non-member response is 404 with the safe workspace-not-found message and no file allocation, upload, URL signing or campaign update.; A known 403 role denial retains 403 and also does no media work.; A permitted session user still receives 201 for a valid upload. Unauthenticated and API-key-only callers remain refused.; Unknown storage/update failures remain failures. No exception details are added to user responses.; File and encoded body limits, source cancellation, safe keys and accepted formats remain covered.; Real action tests fail if the catch again maps known denials to 500. Full local gates and exact-head remote checks pass.; Verify the deployed response and failure/retry behavior before release promotion. Keep the issue open until then.
+- Tracker: Source complete under #2357. Preserve the open Bug until deployed acceptance and default-branch release.
+
+### [#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136) POST /api/media lacks the file-size limit enforced by its sibling route
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- The shared file cap, bounded body reader and safe audio keys are merged in #2353. Deployed functional acceptance and release promotion remain.
+- Current behavior: dev@cea31c69 includes merged #2353. Both routes enforce the 10 MiB file policy before application allocation/storage. The encoded reader limits actual bytes to 10 MiB + 64 KiB and cancels overflow even without a truthful Content-Length. Random safe audio keys exclude campaign text. WebM audio remains supported by the native Bun parser; MMS still rejects it. No peak-memory or one-copy claim is made.
+- Resolution: Verify the deployed exact-cap, oversize, malformed, stream-cancellation and WebM paths, then promote through the release PR. Measure peak memory/concurrency before making memory capacity claims.
+- Look in: `app/lib/bounded-form-data.server.ts`, `app/lib/media-upload.server.ts`, `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `test/media-upload-boundary.test.ts`, `test/bounded-form-data.test.ts`, `test/media-upload.runtime.test.ts`
+- Existing tests: 101 focused Node cases and 11 native Bun media cases passed. Six Node faults and a Bun WebM fault failed the relevant contracts; restored controls passed.; Full ci:local passed at exact reviewed head a574eefc. Remote quality ran 34 route, six stream and 11 native Bun media cases; applicable checks, e2e and both deployment contexts were green before merge.
+- Missing tests: Deployed functional acceptance for valid/invalid and streamed uploads, failure/retry behavior and WebM compatibility remains. Process peak-memory and concurrent-request capacity have not been measured.
+- Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
+- Tracker: Source complete under #2353. Keep the native Bug open for deployed functional acceptance and default-branch promotion; deployment green is not QA.
 
 ### [#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350) Retain the original audience CSV before import starts
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
@@ -2285,9 +2332,34 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 12
+## Needs reproduction — 14
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify toast spacing and move defaults into the shared component**
+- The app adapter adds gap-2 py-3 globally, but shad-cc does not own those defaults. Caller toastOptions can replace the adapter settings.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04: one root host uses the app adapter. Shared spacing ownership and actual audio-error spacing are not verified.
+- Root cause: App-level class duplication is not a shared component spacing contract. The reported computed spacing has not been reproduced on current code.
+- Resolution: Measure the audio-upload error toast in light/dark themes with long text and actions. Move confirmed global defaults into shad-cc with safe option merging. Prove alerts render outside page flow with no layout shift.
+- Look in: `app/components/ui/sonner.tsx:12`, `app/root.tsx:123`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/sonner.tsx:56`, `docs/design-system.md`
+- Missing tests: Computed toast spacing for audio-upload errors and option overrides.; Light/dark and long-content browser checks with stable page landmarks.
+- Done when: Error toasts have sensible global spacing defaults.; The shared component prevents the same spacing mistake across callers.; No alert causes page layout to shift when it renders.
+- Tracker: Native issue updated. Needs reproduction; app adapter classes are partial source evidence. Keep shared component ownership under #2300 visible.
+
+### [#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832) workspace setup sms goal continue with local number selected isn't visible on dark mode
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-04
+- Recommended title: **Reproduce dark-mode Continue visibility in SMS onboarding**
+- Current Continue uses the shared Button and renders only with hasFirstNumber and continueTarget. Source classes do not prove the reported dark-mode flow.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04: first-number footer uses shared default Button with primary/primary-foreground tokens. No browser visibility or computed-style proof has been collected.
+- Root cause: Not established for the current code. Separate absent, disabled and unreadable states before changing the component.
+- Resolution: Reproduce SMS goal with a selected local number and writable role. Inspect render conditions and dark-theme normal, hover, focus and pending states. Put any shared appearance repair in shad-cc and keep page layout stable.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx:155`, `app/components/ui/button.tsx`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/button.tsx:17`
+- Existing tests: test/ui/onboarding-first-number-flow.test.tsx
+- Missing tests: Real dark-mode visibility and computed contrast for the reported local-number flow.
+- Done when: Continue is visible and usable in the reported SMS/local-number dark-mode flow.; The fix uses the shared component contract and prevents the same defect on other controls.
+- Tracker: Native issue updated. Needs reproduction; do not close from shared token class names alone.
 
 ### [#2292](https://github.com/chester-hill-solutions/callcaster/issues/2292) Assess fragmented public survey responses
 - Verdict: **Needs reproduction** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -2815,9 +2887,21 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 42
+## Blocked / split first — 43
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#2356](https://github.com/chester-hill-solutions/callcaster/issues/2356) Reconcile audio objects left unattached after campaign update failure
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Audio upload ownership and attachment reconciliation need a durable protocol before a safe cleanup implementation can ship.
+- Current behavior: The audio action has no cleanup after an empty or failed campaign update. A thrown database error can leave commit status uncertain; immediate deletion can remove an attached object. Current source/test evidence does not establish physical orphan counts or crash recovery.
+- Root cause: Object upload and campaign attachment have separate acknowledgement/failure boundaries and no durable lifecycle record or reference/deletion coordination.
+- Resolution: Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: Actual-route audit proves storage-call ordering before an empty scoped update; provider/database I/O is stubbed.
+- Missing tests: Durable state-transition, uncertain commit, duplicate retry, restart, reference-read failure and reference/deletion race controls with suitable DB/storage integration.
+- Done when: Define durable upload ownership and attachment state using existing media/storage and job patterns where they fit. Do not add a route-local garbage collector.; An upload that is known to be unattached can be reclaimed. A confirmed attachment is retained. An uncertain write result is retained until authoritative reconciliation resolves it.; The durable retry/reconciliation record survives a crash after upload or an uncertain database acknowledgement. Unresolved cases remain visible to operators and are retried.; Reconciliation cannot delete an existing or shared object. It verifies owned object identity and current attachment references; coordinate reference checks with supported attachment writes so a new attachment cannot race deletion.; Cleanup failures cannot replace the original user error or falsely report success. They retain actionable operator evidence and durable retry state.; Cover successful attachment, known rejection, uncertain commit, failed reference read, duplicate retries, process restart and a reference/deletion race with real state transitions and appropriate database/storage integration controls.; Verify deployed behavior and release promotion before closing the task. Do not claim physical orphan cleanup from mocked storage calls.
+- Tracker: Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.
 
 ### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
 - Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -3334,7 +3418,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 8
+## Needs triage — 5
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -3348,18 +3432,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#2303](https://github.com/chester-hill-solutions/callcaster/issues/2303) Extract safe-outbound-url to a shared package — three repos now need it, and two have written their own half
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-03
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
-- Status: No status · Labels: devops/admin · Assignee: none · Updated: 2026-10-03
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832) workspace setup sms goal continue with local number selected isn't visible on dark mode
-- Status: No status · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
-- Status: No status · Labels: design · Assignee: none · Updated: 2026-10-02
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2239](https://github.com/chester-hill-solutions/callcaster/issues/2239) e2e toolchain step times out on a 62.8 MB ffmpeg apt download

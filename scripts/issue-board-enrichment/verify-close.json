@@ -4342,5 +4342,140 @@
     "blockedBy": [],
     "size": "S",
     "risk": "high"
+  },
+  {
+    "issueNumber": 2136,
+    "verdict": "verify-close",
+    "recommendedTitle": "POST /api/media lacks the file-size limit enforced by its sibling route",
+    "summary": "The shared file cap, bounded body reader and safe audio keys are merged in #2353. Deployed functional acceptance and release promotion remain.",
+    "currentBehavior": "dev@cea31c69 includes merged #2353. Both routes enforce the 10 MiB file policy before application allocation/storage. The encoded reader limits actual bytes to 10 MiB + 64 KiB and cancels overflow even without a truthful Content-Length. Random safe audio keys exclude campaign text. WebM audio remains supported by the native Bun parser; MMS still rejects it. No peak-memory or one-copy claim is made.",
+    "resolution": "Verify the deployed exact-cap, oversize, malformed, stream-cancellation and WebM paths, then promote through the release PR. Measure peak memory/concurrency before making memory capacity claims.",
+    "lookIn": [
+      "app/lib/bounded-form-data.server.ts",
+      "app/lib/media-upload.server.ts",
+      "app/routes/api+/media.action.server.ts",
+      "app/routes/api+/message_media.action.server.ts",
+      "test/media-upload-boundary.test.ts",
+      "test/bounded-form-data.test.ts",
+      "test/media-upload.runtime.test.ts"
+    ],
+    "existingTests": [
+      "101 focused Node cases and 11 native Bun media cases passed. Six Node faults and a Bun WebM fault failed the relevant contracts; restored controls passed.",
+      "Full ci:local passed at exact reviewed head a574eefc. Remote quality ran 34 route, six stream and 11 native Bun media cases; applicable checks, e2e and both deployment contexts were green before merge."
+    ],
+    "missingTests": [
+      "Deployed functional acceptance for valid/invalid and streamed uploads, failure/retry behavior and WebM compatibility remains. Process peak-memory and concurrent-request capacity have not been measured."
+    ],
+    "acceptanceCriteria": [
+      "An oversized file is rejected before file.arrayBuffer or storage work runs.",
+      "A file at the shared cap succeeds on both routes.",
+      "The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.",
+      "campaignName cannot control the storage key's path structure.",
+      "Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source complete under #2353. Keep the native Bug open for deployed functional acceptance and default-branch promotion; deployment green is not QA."
+  },
+  {
+    "issueNumber": 2035,
+    "verdict": "verify-close",
+    "recommendedTitle": "The settings-sheet Leave Campaign button bypasses the new confirmation",
+    "summary": "The settings-sheet callback already uses the shared confirmation in current dev. Settings-path, keyboard, page geometry and deployed acceptance remain.",
+    "currentBehavior": "Source audit dev@8ae867ed, 2026-10-04. Top, settings and welcome Leave callbacks use requestLeaveCampaign. PR #2257 fixed the settings bypass. The modal keeps Cancel/confirm disabled while predictive cleanup waits for acknowledgement.",
+    "rootCause": "Historical: the settings callback called cleanup directly. Current source fixes that callback; the remaining gap is acceptance proof.",
+    "resolution": "Exercise the real settings button and prove no cleanup before confirm, Cancel safety, single cleanup while pending, keyboard/focus behavior and stable page landmarks. Verify the deployed flow and release.",
+    "lookIn": [
+      "app/components/call/CallScreen.Layout.tsx:271",
+      "app/components/call/CallScreen.Layout.tsx:348",
+      "app/components/call/CallScreen.Layout.tsx:378",
+      "app/components/call/CallScreen.Layout.tsx:552",
+      "test/ui/call-screen-leave.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-leave.test.tsx covers actual layout behavior for predictive acknowledgement, failure/retry, Cancel, live cleanup and a welcome callback stub. It does not drive settings Leave or prove browser geometry."
+    ],
+    "missingTests": [
+      "Real settings-sheet Leave integration; keyboard focus/focus-visible Cancel/focus return; no page-landmark or scroll movement through open, Cancel, confirmation and pending states; deployed acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Leave Campaign is visible on the live call screen, not only inside the kebab menu",
+      "Leaving the campaign requires an explicit confirmation that states what it does",
+      "No hangup, device teardown or requeue happens before the confirmation is accepted",
+      "All leave entry points share one confirmation and one implementation",
+      "The confirmation is keyboard accessible and has a focus-visible cancel action"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Source bypass fixed under #2257. Native #2035 now records the current proof and retains all original acceptance criteria. Keep it open for remaining acceptance and release."
+  },
+  {
+    "issueNumber": 2354,
+    "verdict": "verify-close",
+    "recommendedTitle": "Preserve workspace denial status on audio media uploads",
+    "summary": "Known workspace denials retain 404/403 under merged #2357. Deployed acceptance and release remain.",
+    "currentBehavior": "dev@8ae867ed includes #2357 at tested head 23950884. The route rethrows known AppError instances to its existing mapper, preserving safe 404/403 responses before file allocation or media work. Unknown failures remain 500.",
+    "rootCause": "The route catch swallows the known AppError before defineAction can map it.",
+    "resolution": "Verify deployed denials, successful uploads, unknown failures and retry behavior, then promote through the release PR.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/lib/handler.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "Seven actual-route cases reproduce two denial failures and five passing controls. The fix passes 50 affected cases; removing passthrough fails both denials, restoring passes seven. Both source and final full local gates passed.",
+      "Exact final local gate passed at 23950884. Remote quality executed seven denial cases, 34 boundary cases and six stream cases; all applicable checks, e2e and both app/worker deployments passed before merge."
+    ],
+    "missingTests": [
+      "Deployed functional acceptance and release promotion remain. Green deployment contexts are not functional QA."
+    ],
+    "acceptanceCriteria": [
+      "A non-member response is 404 with the safe workspace-not-found message and no file allocation, upload, URL signing or campaign update.",
+      "A known 403 role denial retains 403 and also does no media work.",
+      "A permitted session user still receives 201 for a valid upload. Unauthenticated and API-key-only callers remain refused.",
+      "Unknown storage/update failures remain failures. No exception details are added to user responses.",
+      "File and encoded body limits, source cancellation, safe keys and accepted formats remain covered.",
+      "Real action tests fail if the catch again maps known denials to 500. Full local gates and exact-head remote checks pass.",
+      "Verify the deployed response and failure/retry behavior before release promotion. Keep the issue open until then."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source complete under #2357. Preserve the open Bug until deployed acceptance and default-branch release."
+  },
+  {
+    "issueNumber": 2358,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify release of the fixed review-coverage pagination",
+    "summary": "PR #2359 is merged in dev. The real 221-file Sai PR passed the corrected workflow with one total of 664695, then merged under #2301. Default-branch release remains.",
+    "currentBehavior": "dev@ec3d87f1, 2026-10-04: the reviewed workflow repair passed full local CI, applicable remote checks and both deployments. Sai PR #2301 passed corrected require-coverage at e79e0d48 with changed_lines=664695, plus quality, bundle, E2E and both deployments before merge. Job: https://github.com/chester-hill-solutions/callcaster/actions/runs/37213298927/job/111468640453",
+    "rootCause": "gh --paginate --jq aggregated each page separately and wrote multiple totals to GITHUB_OUTPUT. A pipeline also needs pipefail to reject a partial API read.",
+    "resolution": "Retain the merged jq -s aggregate and explicit Bash shell. Keep default-branch release tracking open.",
+    "lookIn": [
+      ".github/workflows/review-coverage.yml",
+      ".agents/skills/github-cli/SKILL.md"
+    ],
+    "existingTests": [
+      "Actual 221-file API response: page lengths 100/100/21, one sum 664695.",
+      "Bash controls: empty=0; single and multi=10; failed and partial producer exit 1 with no output.",
+      "Real Sai require-coverage job 111468640453 completed successfully at e79e0d48 with changed_lines=664695."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "PRs with more than 100 files produce one additions total across every page.",
+      "Single-page and empty responses produce one integer, including 0 for empty.",
+      "API failures and partial reads stop the step; they cannot pass with 0 or an incomplete total.",
+      "GITHUB_OUTPUT receives valid step output.",
+      "The risk paths, 500-line threshold, marker rule and board exemption remain unchanged.",
+      "The real 221-file Sai response and corrected Sai job are verified before merge.",
+      "Full local and applicable remote checks are green."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "All source and real large-PR acceptance checks passed. Source fixes are on dev under #2359 and #2301. Keep the issue open until default-branch release."
   }
 ]
