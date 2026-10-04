@@ -16,7 +16,12 @@ function payload(value: unknown, status = 200) {
 }
 async function settle() { await act(async () => {}); }
 async function poll() { await act(async () => { await vi.advanceTimersByTimeAsync(30_000); }); }
-function inbound(subscription = events.subscriptions.at(-1)!) {
+function latestSubscription() {
+  const subscription = events.subscriptions.at(-1);
+  if (!subscription) throw new Error("Expected a workspace subscription");
+  return subscription;
+}
+function inbound(subscription = latestSubscription()) {
   act(() => subscription.onChange({ eventType: "INSERT", new: { sid: "new-inbound", direction: "inbound", workspace: subscription.workspaceId } }));
 }
 beforeEach(() => {
@@ -32,7 +37,9 @@ beforeEach(() => {
     if (url.searchParams.get("summary") !== "unread") {
       return Promise.resolve(Response.json({ conversations: Array.from({ length: 100 }, () => ({ unread_count: 1 })) }));
     }
-    return replies.get(url.pathname.split("/")[3])!();
+    const reply = replies.get(url.pathname.split("/")[3]);
+    if (!reply) throw new Error("Unexpected workspace request");
+    return reply();
   });
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -67,7 +74,7 @@ test("switching workspaces clears the old visible count and does not wait for it
   const { result, rerender } = renderHook(({ id }) => useUnreadConversationsCount(id), { initialProps: { id: workspaceId } });
   await settle();
   expect(result.current).toBe(107);
-  const oldSubscription = events.subscriptions.at(-1)!;
+  const oldSubscription = latestSubscription();
   let finishOld!: (response: Response) => void;
   replies.set(workspaceId, () => new Promise(resolve => { finishOld = resolve; }));
   await poll();
@@ -84,7 +91,7 @@ test("outbound and non-insert events do not create unread messages", async () =>
   const { result } = renderHook(() => useUnreadConversationsCount(workspaceId));
   await settle();
   act(() => {
-    const subscription = events.subscriptions.at(-1)!;
+    const subscription = latestSubscription();
     subscription.onChange({ eventType: "INSERT", new: { direction: "outbound-api" } });
     subscription.onChange({ eventType: "UPDATE", new: { direction: "inbound" } });
   });

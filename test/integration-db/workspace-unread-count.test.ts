@@ -26,7 +26,8 @@ describeDb("complete workspace unread count (#2045)", () => {
   let helpers: typeof import("@/lib/database/workspace-conversations.server");
 
   beforeAll(async () => {
-    client = postgres(databaseUrl!, { prepare: false, max: 2, connect_timeout: 5 });
+    if (!databaseUrl) throw new Error("A real database URL is required");
+    client = postgres(databaseUrl, { prepare: false, max: 2, connect_timeout: 5 });
     clientRef.current = client;
     helpers = await import("@/lib/database/workspace-conversations.server");
     await client`INSERT INTO public.workspace (id, name, credits, twilio_data, feature_flags, disabled)
