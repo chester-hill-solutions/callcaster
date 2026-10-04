@@ -1135,39 +1135,6 @@
     "rootCause": "PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path."
   },
   {
-    "issueNumber": 2129,
-    "verdict": "fix-now",
-    "recommendedTitle": "The inbound-queue duplicate-offer guard is wired as \"already in the baseline\" but exists in no baseline, and both database lineages behave wrongly",
-    "summary": "The July 5 duplicate-offer guard exists but is skipped by fresh bootstrap. The baseline lacks it and the July 31 claim definition has no duplicate pre-check.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The July 5 duplicate-offer guard exists but is skipped by fresh bootstrap. The baseline lacks it and the July 31 claim definition has no duplicate pre-check.",
-    "resolution": "Prove duplicate active offers and legal re-offers on a fresh database, then add a later migration and correct bootstrap coverage. File existence is not deployed proof.",
-    "lookIn": [
-      "scripts/db/bootstrap-fresh-db.mjs:143",
-      "scripts/e2e/bootstrap-compose-db.mjs:101",
-      "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql:179",
-      "client/migrations/20260705000200_acd_duplicate_offer_guard.sql",
-      "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
-      "drizzle/0000_baseline.sql",
-      "scripts/db/bootstrap-fresh-db.mjs",
-      "scripts/e2e/bootstrap-compose-db.mjs",
-      "app/lib/acd/acd-router.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Concurrent claims for one CallSid create one active offer; after release a new offer is possible."
-    ],
-    "acceptanceCriteria": [
-      "Concurrent claims for the same queue and CallSid produce at most one active offer.",
-      "After timeout/release, a later claim can create a new offer; any different-agent preference is an explicit policy rather than assumed behavior.",
-      "The final claim definition and duplicate-offer constraint are applied on each supported database lineage.",
-      "A real-Postgres test fails when active-offer protection is removed."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2251. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2131,
     "verdict": "fix-now",
     "recommendedTitle": "Predictive \"Start Dialing\" is a silent no-op when the campaign has no caller ID, and the error is discarded",
@@ -1904,31 +1871,34 @@
     "issueNumber": 2269,
     "verdict": "fix-now",
     "recommendedTitle": "Validate inbound IVR scripts before number attachment",
-    "summary": "Platform and form attachment paths accept inbound_script_id without routing validation; later edits can invalidate an attached script.",
-    "currentBehavior": "Source audit dev@f6d02f91: patchWorkspaceNumber copies inbound_script_id, the phone-number form writes it directly, and shared script persistence stores changed steps. Campaign launch validation does not cover inbound number activation.",
+    "summary": "Attachment services accept scripts without full inbound target validation, and workspace/campaign saves can invalidate an attached script.",
+    "currentBehavior": "Source audit dev@c1d3a34e, confirmed unchanged at eaaffaf4: the phone-number form delegates to patchWorkspaceNumber. The automated-menu preset separately checks workspace presence only. Workspace and campaign script saves can overwrite an attached valid configuration. Generic editor validation misreads inbound terminal targets and displays errors in a conditional flow row.",
     "rootCause": "Inbound activation and attached-script editing have no shared ownership/routing validation boundary.",
-    "resolution": "Use one inbound validator at both attachment writes and saves of attached scripts. Reuse graph validation and extend it for documented queue, forward and voicemail email targets. Check script/queue workspace ownership, reject before writes and preserve the last valid configuration. Clearing an attachment remains valid.",
+    "resolution": "Use one inbound validator in the platform attachment service, automated-menu preset and both attached-script save paths. Align client/server checks for documented queue, forward and voicemail email targets, validate workspace ownership and reject before writes. Preserve the draft and last valid configuration; use canonical shared feedback without page movement. Clearing remains valid.",
     "lookIn": [
       "app/lib/platform-workspace-numbers.server.ts",
       "app/routes/workspaces+/$id/phone-numbers.action.server.ts",
+      "app/lib/routing-preset-write.server.ts",
       "app/lib/script-persistence.server.ts",
-      "app/lib/campaign-execution.server.ts",
+      "app/components/campaign/settings/script/ScriptEditorShell.tsx",
       "app/lib/inbound-ivr-db.server.ts",
       "docs/contact-center-platform-plan.md"
     ],
     "existingTests": [],
     "missingTests": [
-      "Both real attachment boundaries and attached-script saves: foreign/missing scripts, dangling references, malformed targets, valid targets and clearing controls."
+      "Real platform/form and preset attachment boundaries, plus workspace/campaign attached-script saves: foreign/missing/type-invalid scripts, dangling/malformed targets, valid targets and clearing.",
+      "Client/server target agreement, preserved draft/configuration, usable shared validation feedback and no layout movement."
     ],
     "acceptanceCriteria": [
       "Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.",
       "Valid targets and clearing remain usable.",
-      "API, editor and target docs agree; real write-boundary regressions and deployed checks pass."
+      "API, editor and target docs agree; real write-boundary regressions and deployed checks pass.",
+      "Draft/configuration are preserved and canonical shared validation feedback does not move the page."
     ],
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Independent Task split from #2088. No blocking edge to playback or email delivery: the target grammar is documented."
+    "trackerRecommendation": "Current native scope corrected after the write-boundary audit. Source defect remains Fix now; playback and recipient delivery are separate concerns."
   },
   {
     "issueNumber": 2278,

@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cb88df8b + feedback source audit (2026-10-03)` · 303 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@eaaffaf4 + inbound source audit (2026-10-03)` · 303 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-03 after the verified feedback issue updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-03 after the verified inbound issue updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 64
+## Fix now — 63
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -46,6 +46,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
 
+### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Attachment services accept scripts without full inbound target validation, and workspace/campaign saves can invalidate an attached script.
+- Current behavior: Source audit dev@c1d3a34e, confirmed unchanged at eaaffaf4: the phone-number form delegates to patchWorkspaceNumber. The automated-menu preset separately checks workspace presence only. Workspace and campaign script saves can overwrite an attached valid configuration. Generic editor validation misreads inbound terminal targets and displays errors in a conditional flow row.
+- Root cause: Inbound activation and attached-script editing have no shared ownership/routing validation boundary.
+- Resolution: Use one inbound validator in the platform attachment service, automated-menu preset and both attached-script save paths. Align client/server checks for documented queue, forward and voicemail email targets, validate workspace ownership and reject before writes. Preserve the draft and last valid configuration; use canonical shared feedback without page movement. Clearing remains valid.
+- Look in: `app/lib/platform-workspace-numbers.server.ts`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/lib/routing-preset-write.server.ts`, `app/lib/script-persistence.server.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/inbound-ivr-db.server.ts`, `docs/contact-center-platform-plan.md`
+- Missing tests: Real platform/form and preset attachment boundaries, plus workspace/campaign attached-script saves: foreign/missing/type-invalid scripts, dangling/malformed targets, valid targets and clearing.; Client/server target agreement, preserved draft/configuration, usable shared validation feedback and no layout movement.
+- Done when: Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.; Valid targets and clearing remain usable.; API, editor and target docs agree; real write-boundary regressions and deployed checks pass.; Draft/configuration are preserved and canonical shared validation feedback does not move the page.
+- Tracker: Current native scope corrected after the write-boundary audit. Source defect remains Fix now; playback and recipient delivery are separate concerns.
+
 ### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.
@@ -55,17 +66,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path.
 - Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
 - Tracker: Ready for its own atomic required-answer fix from clean dev.
-
-### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Platform and form attachment paths accept inbound_script_id without routing validation; later edits can invalidate an attached script.
-- Current behavior: Source audit dev@f6d02f91: patchWorkspaceNumber copies inbound_script_id, the phone-number form writes it directly, and shared script persistence stores changed steps. Campaign launch validation does not cover inbound number activation.
-- Root cause: Inbound activation and attached-script editing have no shared ownership/routing validation boundary.
-- Resolution: Use one inbound validator at both attachment writes and saves of attached scripts. Reuse graph validation and extend it for documented queue, forward and voicemail email targets. Check script/queue workspace ownership, reject before writes and preserve the last valid configuration. Clearing an attachment remains valid.
-- Look in: `app/lib/platform-workspace-numbers.server.ts`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/lib/script-persistence.server.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `docs/contact-center-platform-plan.md`
-- Missing tests: Both real attachment boundaries and attached-script saves: foreign/missing scripts, dangling references, malformed targets, valid targets and clearing controls.
-- Done when: Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.; Valid targets and clearing remain usable.; API, editor and target docs agree; real write-boundary regressions and deployed checks pass.
-- Tracker: Independent Task split from #2088. No blocking edge to playback or email delivery: the target grammar is documented.
 
 ### [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268) Deliver inbound IVR voicemail to the script recipient
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -78,16 +78,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129) The inbound-queue duplicate-offer guard is wired as "already in the baseline" but exists in no baseline, and both database lineages behave wrongly
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- The July 5 duplicate-offer guard exists but is skipped by fresh bootstrap. The baseline lacks it and the July 31 claim definition has no duplicate pre-check.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The July 5 duplicate-offer guard exists but is skipped by fresh bootstrap. The baseline lacks it and the July 31 claim definition has no duplicate pre-check.
-- Resolution: Prove duplicate active offers and legal re-offers on a fresh database, then add a later migration and correct bootstrap coverage. File existence is not deployed proof.
-- Look in: `scripts/db/bootstrap-fresh-db.mjs:143`, `scripts/e2e/bootstrap-compose-db.mjs:101`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql:179`, `client/migrations/20260705000200_acd_duplicate_offer_guard.sql`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`, `drizzle/0000_baseline.sql`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/acd/acd-router.server.ts`
-- Missing tests: Concurrent claims for one CallSid create one active offer; after release a new offer is possible.
-- Done when: Concurrent claims for the same queue and CallSid produce at most one active offer.; After timeout/release, a later claim can create a new offer; any different-agent preference is an explicit policy rather than assumed behavior.; The final claim definition and duplicate-offer constraint are applied on each supported database lineage.; A real-Postgres test fails when active-offer protection is removed.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2251. A PR reference alone does not prove deployed behavior.
 
 ### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -757,9 +747,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 132
+## Verify and close — 133
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129) The inbound-queue duplicate-offer guard is wired as "already in the baseline" but exists in no baseline, and both database lineages behave wrongly
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The active-offer guard is repaired on dev. Repeated requests return no new offer; timeout and decline permit a new offer. Deployed caller behavior and promotion remain to verify.
+- Current behavior: PR #2314 merged at dev@eaaffaf4. Both bootstrap paths apply the later guard after the unguarded claim definition. The partial index and RPC use queued/offered/accepted; duplicate claims reserve no extra agent or dial.
+- Resolution: Verify the deployed final RPC, partial index, concurrent wait callbacks and release/retry behavior, then promote the tested source. Review existing duplicate active rows before an upgrade; the migration rejects them without ending calls.
+- Look in: `client/migrations/20261003231500_guard_active_inbound_offers.sql`, `app/db/schema-inbound-queue.ts`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/acd/acd-router.server.ts`, `test/integration-db/inbound-offer-guard.test.ts`
+- Existing tests: test/integration-db/inbound-offer-guard.test.ts: thirteen real-Postgres cases on production fresh, compose fresh and legacy text-status/index upgrade fixtures.; Full real-database tier: 169 passed locally and in final PR E2E CI. Full local CI, remote quality/E2E/bundle/guards and both app/worker deployments passed at eb9019c4.; Fault proof: original runtime nine failures/four controls; caller serialization removed one/twelve; wrong terminal predicate three/ten; queue ownership removed one/twelve; restored thirteen pass. Dirty upgrade preserves rows, agent state, previous RPC and index state.
+- Missing tests: Deployed real-caller concurrent wait and timeout/decline retry verification before promotion.
+- Done when: Concurrent claims for the same queue and CallSid produce at most one active offer.; After timeout/release, a later claim can create a new offer; any different-agent preference is an explicit policy rather than assumed behavior.; The final claim definition and duplicate-offer constraint are applied on each supported database lineage.; A real-Postgres test fails when active-offer protection is removed.
+- Tracker: Source repair verified on dev in PR #2314. Issue remains open until promotion and required deployed verification. No change to retry-agent preference.
 
 ### [#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304) Show reset-password action failure once
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
