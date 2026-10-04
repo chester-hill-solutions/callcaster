@@ -278,14 +278,14 @@
   {
     "issueNumber": 1802,
     "verdict": "blocked-epic",
-    "summary": "Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.",
-    "resolution": "Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.",
+    "summary": "Runtime security work is a native Epic with Tasks #2333 (Axios), #2334 (csv-parse) and #2335 (Scalar AI SDK chain). Axios source is on dev after PR #2336; deployed acceptance and promotion remain open. #1809 is closed. The production npm audit now reports eight affected package nodes across CSV and Scalar.",
+    "resolution": "Implement the remaining children as separate package concerns and PRs. Verify npm and Bun independently because their locked versions differ. Complete each child’s deployed behavior checks and release promotion before completing the Epic.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "Do not duplicate Nano ID #1805 or the active qs #1809 work."
+    "trackerRecommendation": "Keep Nano ID #1805 and closed qs #1809 as existing history. Do not recreate their work. Default-branch Dependabot reports two runtime alerts (#220, #218), a different snapshot from the dev npm affected-node count."
   },
   {
     "issueNumber": 1803,

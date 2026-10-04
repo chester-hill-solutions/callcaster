@@ -4149,5 +4149,22 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Source fix merged in PR #2326. Retain the native issue open for deployed verification and promotion."
+  },
+  {
+    "issueNumber": 2333,
+    "verdict": "verify-close",
+    "summary": "Axios source is merged to dev in PR #2336 (9edfb271). Both npm and Bun resolve 1.20.0 while their existing Twilio versions remain unchanged. Six real HTTP/SDK cases pass in each installed tree; the old Axios redirect fault fails with five passing controls. No production exploit path is claimed.",
+    "resolution": "Verify deployed Twilio request authentication, form serialization, errors and retry behavior, then promote the source fix to the release branch. Keep this Task open until its full acceptance is met.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "test/runtime-axios.test.ts"
+    ],
+    "existingTests": [
+      "test/runtime-axios.test.ts",
+      "test/twilio-client.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #2336 passed full ci:local on final head 68832c47 and all applicable remote gates plus both deployments. Remote quality executed all six HTTP cases. Task #2333 remains a child of runtime Epic #1802; deployed acceptance and release promotion remain open."
   }
 ]
