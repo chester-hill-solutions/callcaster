@@ -4710,5 +4710,43 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix merged and reviewed on dev. Run deployed acceptance and promote before closing; do not implement the billing read gate again.",
     "rootCause": "The page loader and activity service proved membership without an Admin floor. The server now enforces the existing billing policy before reads. The new sibling role guard records 11 exact pre-existing permission gaps for separate work."
+  },
+  {
+    "issueNumber": 2141,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify workspace-scoped inbound queue member assignments",
+    "summary": "The shared service validates queue ownership, target membership and global-user existence before insertion. Both actual add routes return clear 400 validation errors.",
+    "currentBehavior": "PR #2373 merged to dev as 9fa9d582 on 2026-10-04. The service refuses foreign queues and foreign or missing users, including stale memberships. Both routes map validation to 400; valid assignments succeed and unexpected database failures retain 500. The tested source and squash merge match. Full local CI, both reviews, remote checks and both deployment checks passed. Deployed acceptance and default-branch release remain.",
+    "resolution": "Run deployed dev acceptance through both real add routes for foreign user, nonexistent user with and without stale membership, foreign queue, caller refusal and valid member assignment. Promote the verified fix to the default branch before closure. A read-only dev review database audit found 0 total queue-member rows and 0 invalid rows; no cleanup was required and no rows changed. This is not a production-data audit. A membership FK migration needs its own key-upgrade and member-removal policy.",
+    "lookIn": [
+      "app/lib/inbound-queue-db.server.ts:107",
+      "app/routes/api+/inbound-queue.action.server.ts:97",
+      "app/routes/workspaces+/$id/settings/queues.action.server.ts:96",
+      "test/integration-db/inbound-queue-members.test.ts",
+      "app/db/schema-inbound-queue.ts",
+      "app/lib/workspace-members-db.server.ts"
+    ],
+    "existingTests": [
+      "22 real PostgreSQL route/service cases passed: invalid target and queue controls, stale membership, valid same-workspace rows, caller refusal and unexpected database failure.",
+      "Six injected faults failed their regression tests; exact restored source passed all 22 cases.",
+      "14 actual session/HTTP cases passed against the final production build for both add routes.",
+      "Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, production build, bundle check and codegen verification."
+    ],
+    "missingTests": [
+      "Repeat the actual add-route acceptance checks on deployed dev.",
+      "Default-branch promotion and release verification before closure."
+    ],
+    "acceptanceCriteria": [
+      "Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.",
+      "Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.",
+      "The shared service rejects a queue belonging to another workspace.",
+      "A valid member and queue in the same workspace succeed.",
+      "An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is merged and reviewed on dev. Verify deployed acceptance and promote before closing; do not implement the membership validation again.",
+    "rootCause": "The shared service inserted caller-selected queue and user IDs without checking queue ownership or target membership. The global-user FK could reject nonexistent users only after insertion was attempted, producing 500. Canonical membership can be stale, so the service now also checks global-user existence."
   }
 ]

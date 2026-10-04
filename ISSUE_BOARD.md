@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@486de78e; billing read source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@9fa9d582; queue member source fix with deployed acceptance and release pending (2026-10-04 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the billing read fix. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the queue member fix. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 53
+## Fix now — 52
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -381,17 +381,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).; Warn → pay without suspension → lapse also produces a second warning.; The first lapse still warns exactly once.; A workspace that never lapses is never warned.; The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2141](https://github.com/chester-hill-solutions/callcaster/issues/2141) addInboundQueueMember accepts any user_id, including non-members of the workspace
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Add-member service still checks neither target membership nor queue ownership. Existing-user ids from another workspace can be written. Fresh bootstrap already has a user FK, so nonexistent users do not insert successfully.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Service inserts caller-selected existing user/queue ids without workspace membership/queue ownership checks. A fresh database FK already rejects nonexistent user ids, but error maps to 500 instead of clear 400.
-- Resolution: Validate target workspace membership and queue belongs to workspace inside the shared service. A DB membership constraint must reference composite (workspace_id,user_id), not bare workspace_member(user_id), which is not unique. Preserve existing global user FK. Audit existing rows with authorized database access.
-- Look in: `app/lib/inbound-queue-db.server.ts:103`, `app/routes/api+/inbound-queue.action.server.ts:89`, `app/routes/workspaces+/$id/settings/queues.action.server.ts:88`, `drizzle/0006_app_schema_tail.sql:147`, `app/lib/inbound-queue-db.server.ts:97`, `drizzle/0006_app_schema_tail.sql:144`, `app/db/schema-inbound-queue.ts:25`
-- Existing tests: test/inbound-queue.test.ts covers queue-name helpers; it does not cover add-member target membership or queue ownership.
-- Missing tests: Existing foreign user refused/no insert, nonexistent user gives clear 400, foreign queue refused, and valid same-workspace member accepted; live-row audit count unknown.
-- Done when: Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.; Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.; The shared service rejects a queue belonging to another workspace.; A valid member and queue in the same workspace succeed.; An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2124](https://github.com/chester-hill-solutions/callcaster/issues/2124) Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - Both guards still accept stale baseline entries. Redirect scanning also remains line-based, and replacing mocks are stored as a set rather than occurrence counts.
@@ -631,9 +620,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 156
+## Verify and close — 157
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2141](https://github.com/chester-hill-solutions/callcaster/issues/2141) addInboundQueueMember accepts any user_id, including non-members of the workspace
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify workspace-scoped inbound queue member assignments**
+- The shared service validates queue ownership, target membership and global-user existence before insertion. Both actual add routes return clear 400 validation errors.
+- Current behavior: PR #2373 merged to dev as 9fa9d582 on 2026-10-04. The service refuses foreign queues and foreign or missing users, including stale memberships. Both routes map validation to 400; valid assignments succeed and unexpected database failures retain 500. The tested source and squash merge match. Full local CI, both reviews, remote checks and both deployment checks passed. Deployed acceptance and default-branch release remain.
+- Root cause: The shared service inserted caller-selected queue and user IDs without checking queue ownership or target membership. The global-user FK could reject nonexistent users only after insertion was attempted, producing 500. Canonical membership can be stale, so the service now also checks global-user existence.
+- Resolution: Run deployed dev acceptance through both real add routes for foreign user, nonexistent user with and without stale membership, foreign queue, caller refusal and valid member assignment. Promote the verified fix to the default branch before closure. A read-only dev review database audit found 0 total queue-member rows and 0 invalid rows; no cleanup was required and no rows changed. This is not a production-data audit. A membership FK migration needs its own key-upgrade and member-removal policy.
+- Look in: `app/lib/inbound-queue-db.server.ts:107`, `app/routes/api+/inbound-queue.action.server.ts:97`, `app/routes/workspaces+/$id/settings/queues.action.server.ts:96`, `test/integration-db/inbound-queue-members.test.ts`, `app/db/schema-inbound-queue.ts`, `app/lib/workspace-members-db.server.ts`
+- Existing tests: 22 real PostgreSQL route/service cases passed: invalid target and queue controls, stale membership, valid same-workspace rows, caller refusal and unexpected database failure.; Six injected faults failed their regression tests; exact restored source passed all 22 cases.; 14 actual session/HTTP cases passed against the final production build for both add routes.; Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, production build, bundle check and codegen verification.
+- Missing tests: Repeat the actual add-route acceptance checks on deployed dev.; Default-branch promotion and release verification before closure.
+- Done when: Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.; Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.; The shared service rejects a queue belonging to another workspace.; A valid member and queue in the same workspace succeed.; An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected.
+- Tracker: Source fix is merged and reviewed on dev. Verify deployed acceptance and promote before closing; do not implement the membership validation again.
 
 ### [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137) The billing/ledger loader has no role gate — any member, including caller, reads the full credit history
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2893,6 +2895,18 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
+### [#2003](https://github.com/chester-hill-solutions/callcaster/issues/2003) Agent role can reach the billing page by URL even though the sidebar link is hidden
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- A concrete live instance of the gap the cluster is about. The Credits entry is correctly absent from the sidebar for the Agent role, but an Agent who types the billing path directly reaches the page. Hiding a link is not access control.
+- Current behavior: Sidebar hides the link; the route does not enforce the permission. The route renders.
+- Root cause: UI visibility was treated as the control. The route has no permission check for this resource.
+- Resolution: Blocked by #2030, because the right fix is a permission check and which permission depends on the model. When it lands: the route must enforce, not merely render, and a direct URL request must be refused. Note the existing convention from AGENTS.md — a non-member gets a uniform 404 rather than a 403, to avoid workspace-id inference, so match whatever the sibling billing routes already do rather than inventing a response shape.
+- Look in: `app/routes/workspaces+/$id/billing.*`, `app/components/layout/WorkspaceSidebar.tsx`, `app/lib/workspace-middleware.server.ts`
+- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
+- Missing tests: an Agent requesting the billing path directly is refused
+- Done when: An Agent requesting the billing path by URL is refused; The refusal matches the convention used by sibling routes (404 for non-members); The check is a permission check at the route, not a UI-visibility check
+- Tracker: The smallest concrete instance of the cluster and the easiest to verify, so it makes a good first implementation once #2030 reports. Keep it separate from the model work so the model is not judged by one route.
+
 ### [#2356](https://github.com/chester-hill-solutions/callcaster/issues/2356) Reconcile audio objects left unattached after campaign update failure
 - Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
 - Audio upload ownership and attachment reconciliation need a durable protocol before a safe cleanup implementation can ship.
@@ -3138,18 +3152,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Missing tests: each capability has a route-level enforcement test; sidebar visibility and route enforcement agree
 - Done when: The Agent capability set is written down as data, not scattered conditionals; Every denied surface returns 403 on a direct URL attempt, not only when hidden; The 403-versus-404 boundary is decided and documented rather than incidental; Sidebar visibility and route enforcement read from the same source
 - Tracker: This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes.
-
-### [#2003](https://github.com/chester-hill-solutions/callcaster/issues/2003) Agent role can reach the billing page by URL even though the sidebar link is hidden
-- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
-- A concrete live instance of the gap the cluster is about. The Credits entry is correctly absent from the sidebar for the Agent role, but an Agent who types the billing path directly reaches the page. Hiding a link is not access control.
-- Current behavior: Sidebar hides the link; the route does not enforce the permission. The route renders.
-- Root cause: UI visibility was treated as the control. The route has no permission check for this resource.
-- Resolution: Blocked by #2030, because the right fix is a permission check and which permission depends on the model. When it lands: the route must enforce, not merely render, and a direct URL request must be refused. Note the existing convention from AGENTS.md — a non-member gets a uniform 404 rather than a 403, to avoid workspace-id inference, so match whatever the sibling billing routes already do rather than inventing a response shape.
-- Look in: `app/routes/workspaces+/$id/billing.*`, `app/components/layout/WorkspaceSidebar.tsx`, `app/lib/workspace-middleware.server.ts`
-- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
-- Missing tests: an Agent requesting the billing path directly is refused
-- Done when: An Agent requesting the billing path by URL is refused; The refusal matches the convention used by sibling routes (404 for non-members); The check is a permission check at the route, not a UI-visibility check
-- Tracker: The smallest concrete instance of the cluster and the easiest to verify, so it makes a good first implementation once #2030 reports. Keep it separate from the model work so the model is not judged by one route.
 
 ### [#2002](https://github.com/chester-hill-solutions/callcaster/issues/2002) epic(authz): permission-based authorization instead of role checks
 - Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-25
