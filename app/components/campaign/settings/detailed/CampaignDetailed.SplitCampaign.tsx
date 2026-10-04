@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -285,7 +286,7 @@ export function SplitCampaignPrompt({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-4 py-4">
+          <SheetBody className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="split-segment-count">Number of segments</Label>
               <Input
@@ -302,14 +303,14 @@ export function SplitCampaignPrompt({
                 }}
                 className="max-w-[8rem]"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 ~{perSegment.toLocaleString()} contacts per segment.
               </p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Copy-variation checklist</p>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <ul className="text-muted-foreground space-y-1.5 text-sm">
                 {COPY_VARIATION_CHECKLIST.map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span
@@ -323,7 +324,9 @@ export function SplitCampaignPrompt({
               <label className="flex items-start gap-2 pt-1 text-sm">
                 <Checkbox
                   checked={acknowledged}
-                  onCheckedChange={(checked) => setAcknowledged(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setAcknowledged(checked === true)
+                  }
                   className="mt-0.5"
                 />
                 <span>
@@ -332,7 +335,7 @@ export function SplitCampaignPrompt({
                 </span>
               </label>
             </div>
-          </div>
+          </SheetBody>
 
           <SheetFooter className="gap-2 sm:flex-row">
             <Button

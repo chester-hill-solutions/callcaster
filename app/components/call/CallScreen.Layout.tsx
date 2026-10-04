@@ -20,6 +20,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -284,13 +285,13 @@ export function CallScreenLayout({
             </Button>
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,32rem)] overflow-y-auto sm:max-w-lg">
-            <SheetHeader className="mb-4">
+            <SheetHeader>
               <SheetTitle>Call queue</SheetTitle>
               <SheetDescription>
                 Review recipients, skip contacts, or load the next queue.
               </SheetDescription>
             </SheetHeader>
-            {queueList}
+            <SheetBody>{queueList}</SheetBody>
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -305,20 +306,22 @@ export function CallScreenLayout({
             </Button>
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,22rem)]">
-            <SheetHeader className="mb-4">
+            <SheetHeader>
               <SheetTitle>DTMF keypad</SheetTitle>
               <SheetDescription>
                 Send keypad tones during the active call. Keyboard digits remain
                 available.
               </SheetDescription>
             </SheetHeader>
-            <PhoneKeypad
-              onKeyPress={handleDTMF}
-              displayState={displayState}
-              displayColor={displayColor}
-              callDuration={callDuration}
-              showStatus={false}
-            />
+            <SheetBody>
+              <PhoneKeypad
+                onKeyPress={handleDTMF}
+                displayState={displayState}
+                displayColor={displayColor}
+                callDuration={callDuration}
+                showStatus={false}
+              />
+            </SheetBody>
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -339,39 +342,41 @@ export function CallScreenLayout({
                 Choose audio devices, calling device, and microphone state.
               </SheetDescription>
             </SheetHeader>
-            <CampaignHeader
-              settingsOnly
-              className="px-0"
-              campaign={campaign}
-              count={count}
-              completed={completed}
-              onLeaveCampaign={requestLeaveCampaign}
-              onReportError={() => setReportDialog(!isReportDialogOpen)}
-              mediaStream={stream}
-              availableMicrophones={availableMicrophones}
-              availableSpeakers={availableSpeakers}
-              selectedMicrophone={selectedMicrophone}
-              selectedSpeaker={selectedSpeaker}
-              handleMicrophoneChange={handleMicrophoneChange}
-              handleSpeakerChange={handleSpeakerChange}
-              handleMuteMicrophone={handleMuteMicrophone}
-              isMicrophoneMuted={isMicrophoneMuted}
-              availableCredits={availableCredits}
-              creditState={creditState}
-              hasAccess={hasAccess}
-              phoneStatus={phoneConnectionStatus}
-              selectedDevice={selectedDevice}
-              onDeviceSelect={setSelectedDevice}
-              verifiedNumbers={verifiedNumbers}
-              isAddingNumber={isAddingNumber}
-              onAddNumberClick={() => setIsAddingNumber(true)}
-              onAddNumberCancel={() => setIsAddingNumber(false)}
-              newPhoneNumber={newPhoneNumber}
-              onNewPhoneNumberChange={setNewPhoneNumber}
-              onVerifyNewNumber={handleVerifyNewNumber}
-              verificationPhoneNumber={verificationPhoneNumber}
-              {...audioTest}
-            />
+            <SheetBody>
+              <CampaignHeader
+                settingsOnly
+                className="px-0"
+                campaign={campaign}
+                count={count}
+                completed={completed}
+                onLeaveCampaign={requestLeaveCampaign}
+                onReportError={() => setReportDialog(!isReportDialogOpen)}
+                mediaStream={stream}
+                availableMicrophones={availableMicrophones}
+                availableSpeakers={availableSpeakers}
+                selectedMicrophone={selectedMicrophone}
+                selectedSpeaker={selectedSpeaker}
+                handleMicrophoneChange={handleMicrophoneChange}
+                handleSpeakerChange={handleSpeakerChange}
+                handleMuteMicrophone={handleMuteMicrophone}
+                isMicrophoneMuted={isMicrophoneMuted}
+                availableCredits={availableCredits}
+                creditState={creditState}
+                hasAccess={hasAccess}
+                phoneStatus={phoneConnectionStatus}
+                selectedDevice={selectedDevice}
+                onDeviceSelect={setSelectedDevice}
+                verifiedNumbers={verifiedNumbers}
+                isAddingNumber={isAddingNumber}
+                onAddNumberClick={() => setIsAddingNumber(true)}
+                onAddNumberCancel={() => setIsAddingNumber(false)}
+                newPhoneNumber={newPhoneNumber}
+                onNewPhoneNumberChange={setNewPhoneNumber}
+                onVerifyNewNumber={handleVerifyNewNumber}
+                verificationPhoneNumber={verificationPhoneNumber}
+                {...audioTest}
+              />
+            </SheetBody>
           </SheetContent>
         </Sheet>
       </TopChrome>

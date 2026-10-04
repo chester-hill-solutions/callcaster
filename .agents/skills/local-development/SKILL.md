@@ -20,6 +20,13 @@ directory before tests collect. Keep local-only browser/channel overrides out
 of tracked product configuration, and require the expected case count and a
 completed browser run before claiming geometry acceptance.
 
+Put standalone Vite JSX fixtures outside `node_modules`, and load the app's
+`public/buffer-polyfill.mjs` before app imports. The utils barrel loads CSV code
+that reads Buffer at startup. A fixture startup failure is not geometry proof.
+Wait for the overlay's entering state to clear and its CSS animations to finish
+before measuring controls. Scope background landmarks and include hidden roles
+when a modal makes the page inert; required field names can include an asterisk.
+
 Before another isolated install or full gate in a long audit, check available
 disk space. Remove only reproducible dependencies/build output in owned
 temporary worktrees whose readers have stopped; keep source, proof artifacts

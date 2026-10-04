@@ -36,6 +36,23 @@ function renderPrompt(overrideActive: boolean) {
 }
 
 describe("SplitCampaignPrompt bulk-on-local override", () => {
+  test("the padded split body retains its inputs, cancellation and acknowledged submit", async () => {
+    const user = userEvent.setup();
+    renderPrompt(false);
+    await user.click(screen.getByRole("button", { name: "Split into 2 campaigns" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(submitted).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Split into 2 campaigns" }));
+    fireEvent.change(screen.getByLabelText("Number of segments"), { target: { value: "3" } });
+    const submit = screen.getByRole("button", { name: "Split into 3 campaigns" });
+    expect(submit).toBeDisabled();
+    await user.click(screen.getByRole("checkbox"));
+    expect(submit).toBeEnabled();
+    reply = async () => ({ success: true, actionType: "split" });
+    await user.click(submit);
+    await vi.waitFor(() => expect(submitted).toEqual([{ intent: "split", segmentCount: "3" }]));
+  });
+
   test("the safeguard offers a split and an explicit override that needs acknowledgement", async () => {
     renderPrompt(false);
     expect(screen.getByText("Large bulk send on a local number")).toBeInTheDocument();

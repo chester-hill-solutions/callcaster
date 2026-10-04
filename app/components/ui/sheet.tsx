@@ -1,4 +1,5 @@
 import * as React from "react";
+import { cn } from "@/lib/utils";
 
 import {
   Sheet as ShadSheet,
@@ -54,10 +55,32 @@ function SheetContent(
   return <ShadSheetContent {...props} />;
 }
 
+type SheetBodyProps = React.ComponentProps<"div"> & {
+  inset?: "default" | "none" | "navigation";
+};
+
+function SheetBody({ inset = "default", className, ...props }: SheetBodyProps) {
+  return (
+    <div
+      {...props}
+      data-slot="sheet-body"
+      data-inset={inset}
+      className={cn(
+        "min-w-0",
+        inset === "default" && "px-6 py-4",
+        inset === "none" && "p-0",
+        inset === "navigation" && "px-3 py-5",
+        className,
+      )}
+    />
+  );
+}
+
 export {
   Sheet,
   SheetTrigger,
   SheetContent,
+  SheetBody,
   SheetHeader,
   SheetFooter,
   SheetTitle,
