@@ -84,6 +84,7 @@ const steps = [
   "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
   "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
   "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
+  "client/migrations/20261003231500_guard_active_inbound_offers.sql",
 ];
 
 /**
@@ -100,7 +101,6 @@ const coveredByBaseline = new Set([
   "20260704000003_extend_job_table.sql",
   "20260704000005_drop_legacy_triggers.sql",
   "20260705000100_add_call_user_id.sql",
-  "20260705000200_acd_duplicate_offer_guard.sql",
   "20260705000200_add_campaign_queue_workspace.sql",
   "20260705000200_survey_response_unique_result_id.sql",
   "20260706120000_auth_two_factor.sql",
@@ -116,6 +116,11 @@ const coveredByBaseline = new Set([
  * appending its migration turned every bare `select()` on `workspace` into
  * `column "coaching_config" does not exist`.
  */
+// The later guard replaces the legacy index and final claim function.
+const coveredByLaterMigration = new Set([
+  "20260705000200_acd_duplicate_offer_guard.sql",
+]);
+
 const listed = new Set(
   steps
     .filter((step) => step.startsWith("client/migrations/"))
@@ -123,13 +128,13 @@ const listed = new Set(
 );
 const unwired = readdirSync(path.join(rootDir, "client/migrations"))
   .filter((file) => file.endsWith(".sql"))
-  .filter((file) => !listed.has(file) && !coveredByBaseline.has(file))
+  .filter((file) => !listed.has(file) && !coveredByBaseline.has(file) && !coveredByLaterMigration.has(file))
   .sort();
 
 if (unwired.length > 0) {
   console.error(
-    "[e2e-bootstrap] migrations exist in client/migrations/ but are wired into neither\n" +
-      "`steps` nor `coveredByBaseline` in this file:\n" +
+    "[e2e-bootstrap] migrations exist in client/migrations/ but are wired into none of\n" +
+      "`steps`, `coveredByBaseline` or `coveredByLaterMigration` in this file:\n" +
       unwired.map((file) => `  ${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
       "the drizzle/ baseline already contains its effect.",

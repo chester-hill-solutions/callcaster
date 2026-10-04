@@ -99,6 +99,16 @@ and still accept a send-failure update. Keep a valid saved-row precision control
 
 ## SQL query regressions
 
+For an owned native Postgres fixture, initialize with `--no-locale
+--encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
+fixture in a temporary directory and bind only loopback on an unused port;
+do not change `.env` or the machine locale. Stop only the owned server after
+verification.
+
+If sandbox process checks say a fixture stopped, verify the same PID and port
+with the required permissions before restarting. A failed process probe does
+not prove that the server stopped.
+
 Use the real Postgres tier for query predicates; a mocked duplicate helper
 cannot check which rows the SQL counts. For a read-only query, a transaction-local
 temporary table can isolate the required columns without changing stored app

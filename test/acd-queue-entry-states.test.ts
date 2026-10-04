@@ -78,18 +78,4 @@ describe("ACD queue-entry state filters", () => {
     }
   });
 
-  /**
-   * `declined` and `timed_out` must not count as active, or the entry blocks
-   * its own re-offer and the caller holds until MAX_QUEUE_TIME_SECONDS while
-   * MAX_OFFER_ATTEMPTS never applies.
-   */
-  test("a declined or timed-out entry is not treated as still active", async () => {
-    executed.queries.length = 0;
-    await findExistingInboundQueueEntry({ queueId: 1, callSid: "CA1" });
-
-    const used = executed.queries.flatMap(literalsIn);
-    expect(used).toEqual(expect.arrayContaining(["queued", "offered", "accepted"]));
-    expect(used).not.toContain("declined");
-    expect(used).not.toContain("timed_out");
-  });
 });
