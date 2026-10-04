@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: WebSocket dependency updates limit buffered fragments and reject unsupported close-reason types. ([#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340), [PR #2343](https://github.com/chester-hill-solutions/callcaster/pull/2343))
+
 - Fixed: Daily maintenance removes public rate-limit buckets that expired more than 24 hours ago and logs the cleanup result. ([#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329), [PR #2331](https://github.com/chester-hill-solutions/callcaster/pull/2331))
 
 - **Fixed:** Admin users, workspaces and campaigns remain populated when rows per page changes; pagination stays within available records. ([#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109), [PR #2326](https://github.com/chester-hill-solutions/callcaster/pull/2326))

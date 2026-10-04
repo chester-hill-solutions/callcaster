@@ -177,7 +177,7 @@
     "twilio": "^5.0.4",
     "wavefile": "^11.0.0",
     "wavesurfer.js": "^7.12.10",
-    "ws": "^8.16.0",
+    "ws": "8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -243,6 +243,7 @@
     "js-yaml": "^4.2.0",
     "qs": "6.16.0",
     "axios": "1.20.0",
-    "@ai-sdk/provider-utils": "4.0.33"
+    "@ai-sdk/provider-utils": "4.0.33",
+    "ws": "8.21.0"
   }
 }

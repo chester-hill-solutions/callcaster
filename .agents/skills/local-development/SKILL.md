@@ -180,6 +180,12 @@ tests, restore native globals in `vi.hoisted` before the adapter captures fetch.
 Pair a rejection case with a successful local response and check the rejection's
 status or cause. A generic rejection can pass because the shared stub threw.
 
+For local WebSocket fixtures, register client and peer close listeners before
+terminating either socket. Await both close events before asserting that the
+server client set is empty; the server close callback alone can run earlier.
+Bound awaited transport events with a deadline so an old-package rejection
+control cannot leave an open connection after a test timeout.
+
 ## Inbound queue TwiML tests
 
 For queue-route changes, keep the real builder from `app/lib/twilio-twiml.server.ts`.
