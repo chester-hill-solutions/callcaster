@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Invitation acceptance shows one success toast without moving the workspace list or leaving a replayable success URL. Sign-in cookies survive both acceptance paths. ([#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032))
+
 - Fixed: Sign-in distinguishes incorrect credentials, email verification and rate limits from a temporary server failure, with safe messages in the existing toast. ([#2015](https://github.com/chester-hill-solutions/callcaster/issues/2015), [PR #2361](https://github.com/chester-hill-solutions/callcaster/pull/2361))
 
 - Fixed: Audio uploads retain the expected workspace access response and stop before media work when access is denied. ([#2354](https://github.com/chester-hill-solutions/callcaster/issues/2354), [PR #2357](https://github.com/chester-hill-solutions/callcaster/pull/2357))

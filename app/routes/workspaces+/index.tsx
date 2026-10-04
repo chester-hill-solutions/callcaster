@@ -10,10 +10,10 @@ import {
   useSearchParams,
 } from "react-router";
 import type { MetaFunction } from "react-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 export const meta: MetaFunction = () => [{ title: "Workspaces — CallCaster" }];
-import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
+import { toast } from "sonner";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { FaPlus } from "react-icons/fa";
@@ -211,7 +211,20 @@ const ZeroWorkspaceIntro = ({
 );
 
 export default function Workspaces() {
-  const { workspaces, error } = useLoaderData<WorkspacesIndexLoaderData>();
+  const { workspaces, error, flash } = useLoaderData<WorkspacesIndexLoaderData>();
+  const lastFlashId = useRef<string | null>(null);
+  /**
+   * @effect Display the server-owned invitation receipt once through the root toast.
+   * @effect-deps flash (the signed, allow-listed receipt returned by the loader)
+   * @effect-side-effects toast.success
+   * @effect-why-not-loader The loader consumes the cookie; only the browser can show a toast.
+   */
+  useEffect(() => {
+    if (flash?.code === "invite_accepted" && flash.id !== lastFlashId.current) {
+      lastFlashId.current = flash.id;
+      toast.success("Invitation accepted");
+    }
+  }, [flash]);
   const actionData = useActionData<WorkspaceActionData>();
   const { state } = useNavigation();
   const [searchParams] = useSearchParams();
@@ -268,18 +281,6 @@ export default function Workspaces() {
 
   return (
     <main className="mx-auto flex min-h-[70vh] w-full max-w-7xl flex-col items-center gap-6 px-4 py-8">
-      <div className="w-full max-w-3xl">
-        <QueryParamBanner
-          param="invite"
-          variants={{
-            accepted: {
-              title: "Invitation accepted",
-              description: "You can open your workspace from the list below.",
-              variant: "success",
-            },
-          }}
-        />
-      </div>
       <Heading level={1} className="text-center" branded={false}>
         Your Workspaces
       </Heading>

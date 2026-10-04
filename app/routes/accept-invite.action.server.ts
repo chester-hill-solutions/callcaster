@@ -1,3 +1,4 @@
+import { appendInvitationAcceptedFlash } from "@/lib/invitation-flash.server";
 import { getSession } from "@/lib/auth.server";
 import { AuthzError, emailsMatch, InviteError, normalizeEmail } from "@chester-hill-solutions/auth";
 import { isSignupOpen } from "@/lib/env.server";
@@ -26,6 +27,7 @@ type ActionContext<
   body: Extract<AcceptInviteAction, { actionType: T }>;
   session: Awaited<ReturnType<typeof getSession>>;
   requestHeaders: Headers;
+  request: Request;
 };
 
 function invalidSubmission(headers: Headers) {
@@ -61,7 +63,9 @@ async function redeemInvitationAction(ctx: ActionContext<"redeemInvitation">) {
       { headers: requestHeaders, status: result.status },
     );
   }
-  return redirect("/workspaces?invite=accepted", { headers: requestHeaders });
+  return redirect("/workspaces", {
+    headers: await appendInvitationAcceptedFlash(ctx.request, requestHeaders),
+  });
 }
 
 async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
@@ -174,8 +178,8 @@ async function signUpAndClaimAction(ctx: ActionContext<"updateUser">) {
         { headers: responseHeaders, status: result.status },
       );
     }
-    return redirect("/workspaces?invite=accepted", {
-      headers: responseHeaders,
+    return redirect("/workspaces", {
+      headers: await appendInvitationAcceptedFlash(ctx.request, responseHeaders),
     });
   } catch (error) {
     logger.error("Error in signUpEmail:", error);
@@ -216,7 +220,7 @@ export const action = defineAction({
       return invalidSubmission(headers);
     }
     const body = parsed.data;
-    const ctx = { body, session, requestHeaders: headers } as ActionContext;
+    const ctx = { body, session, request, requestHeaders: headers } as ActionContext;
 
     switch (body.actionType) {
       case "redeemInvitation":
