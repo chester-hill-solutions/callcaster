@@ -62,6 +62,11 @@ API error response and absence of a success audit when the domain write fails.
 
 ## Table-driven tests
 
+For native multipart tests, pass encoded bytes with an explicit Content-Type
+boundary through the route's reader. Bun can derive a parsed File's MIME type
+from its filename; `Response(FormData).formData()` can take a different path.
+Check the parsed file's policy in both runtimes, not only a hand-built File.
+
 Use object rows when a `test.each` case contains an array input, for example
 `[{ ids: [] }, { ids: ["id"] }]`. Vitest spreads a bare array row into positional
 arguments; an empty row supplies no argument. Check the fixed positive cases

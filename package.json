@@ -57,7 +57,7 @@
     "worker": "bun run ./worker/index.ts",
     "typecheck": "react-router typegen && tsc",
     "test": "npm run test:node && npm run test:ui",
-    "test:node": "vitest run -c vitest.node.config.ts && bun test test/server-runtime.test.ts test/twilio-webhook-prehandler.test.ts vendor/scriptkit/scriptkit-call-script-core/src/",
+    "test:node": "vitest run -c vitest.node.config.ts && bun test test/server-runtime.test.ts test/twilio-webhook-prehandler.test.ts test/media-upload.runtime.test.ts vendor/scriptkit/scriptkit-call-script-core/src/",
     "test:ui": "vitest run -c vitest.ui.config.ts",
     "test:integration-db": "vitest run -c vitest.integration-db.config.ts",
     "test:integration-twilio": "vitest run -c vitest.integration-twilio.config.ts",

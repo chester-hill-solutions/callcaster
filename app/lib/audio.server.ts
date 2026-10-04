@@ -37,6 +37,7 @@ const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "audio/x-wav",
   "audio/wave",
   "video/mp4",
+  "video/webm",
 ]);
 
 type NormalizeUploadedAudioDeps = Partial<{

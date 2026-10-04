@@ -148,6 +148,7 @@ test.each([
   ["clip.ogg", "audio/ogg"],
   ["clip.wav", "audio/wav"],
   ["clip.webm", "audio/webm"],
+  ["clip.webm", "video/webm"],
 ])("audio retains %s format support", async (name, type) => {
   const request = await requestFor("audio", 1, "Campaign", name, type);
   expect((await dispatch("audio", request)).status).toBe(201);
