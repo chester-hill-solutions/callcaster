@@ -168,6 +168,12 @@ related `bigint({ mode: "number" })` column maps to numbers. Normalize trusted
 identity values before signing or comparing them. Verify contact resume with a
 second later response so a type mismatch cannot silently switch the saved ID.
 
+## Package regression controls
+
+Check the installed Python version before using newer standard-library arguments
+in a fixture runner. Validate archive paths and entry types before extraction.
+Keep temporary installed-package replacement and restoration in `try/finally`.
+
 ## Network resource tests
 
 Use real Node readable streams when testing response limits and cleanup. The
