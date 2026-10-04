@@ -28,6 +28,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
+- Patched Axios in both runtime install paths while preserving Twilio request handling ([#2333](https://github.com/chester-hill-solutions/callcaster/issues/2333)).
+
 - Conversation read acknowledgments now require the same workspace capability as conversation reads. Keys without `campaigns.read` cannot change read state ([PR #2285](https://github.com/chester-hill-solutions/callcaster/pull/2285), [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134)).
 
 - Webhook tests now require a permitted workspace member and share a per-user rate limit across both test URLs; rejected requests do not send a webhook ([PR #2284](https://github.com/chester-hill-solutions/callcaster/pull/2284), [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080)).

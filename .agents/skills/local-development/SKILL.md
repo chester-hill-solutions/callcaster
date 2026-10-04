@@ -175,6 +175,11 @@ request adapter must include the real `ClientRequest` lifecycle, including
 `destroy()`. Assert that rejected responses close both resources and that late
 stream events cannot allocate or resolve a response after rejection.
 
+The node suite stubs global fetch before module imports. For real fetch-adapter
+tests, restore native globals in `vi.hoisted` before the adapter captures fetch.
+Pair a rejection case with a successful local response and check the rejection's
+status or cause. A generic rejection can pass because the shared stub threw.
+
 ## Inbound queue TwiML tests
 
 For queue-route changes, keep the real builder from `app/lib/twilio-twiml.server.ts`.
