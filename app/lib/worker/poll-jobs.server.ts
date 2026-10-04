@@ -19,10 +19,15 @@ export type ClaimedJobRow = {
 export type JobHandler = (job: ClaimedJobRow) => Promise<unknown>;
 export type JobHandlers = Record<string, JobHandler>;
 
+export type JobTypeFilter =
+  | { include: string; exclude?: never }
+  | { exclude: string; include?: never };
+
 export type WorkerOptions = {
   pollIntervalMs?: number;
   heartbeatIntervalMs?: number;
   claimTtlMinutes?: number;
+  jobTypeFilter?: JobTypeFilter;
 };
 
 function getJobRequestId(job: ClaimedJobRow): string {
@@ -145,12 +150,18 @@ async function deadLetterExhaustedJobs(): Promise<void> {
 export async function claimNextJob(
   workerId: string,
   claimTtlMinutes: number = DEFAULT_CLAIM_TTL_MINUTES,
+  jobTypeFilter?: JobTypeFilter,
 ): Promise<ClaimedJobRow | null> {
   return db.transaction(async (tx) => {
     const rows = (await tx.execute(sql`
       SELECT id, type, params, workspace_id, user_id, attempt_count, max_attempts
       FROM job
       WHERE status = 'queued'
+        ${jobTypeFilter
+          ? jobTypeFilter.include !== undefined
+            ? sql`AND type = ${jobTypeFilter.include}`
+            : sql`AND type <> ${jobTypeFilter.exclude}`
+          : sql``}
         AND (retry_at IS NULL OR retry_at <= now())
         -- Dead-lettering happens in failJob, which is only reached when a
         -- handler THROWS. A job that kills the process instead — OOM, an
@@ -317,7 +328,7 @@ export async function runWorkerPollLoop(
       // without waiting for the next process restart.
       await resetStaleClaims();
 
-      const job = await claimNextJob(workerId, claimTtlMinutes);
+      const job = await claimNextJob(workerId, claimTtlMinutes, options.jobTypeFilter);
       if (!job) {
         await sleep(pollIntervalMs, signal);
         continue;

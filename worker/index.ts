@@ -13,12 +13,12 @@
  */
 import { validateWorkerEnv } from "../app/lib/worker/validate-worker-env.ts";
 import {
-  runWorkerPollLoop,
   resetStaleClaims,
   claimJob,
   completeJob,
   failJob,
 } from "../app/lib/adapters/jobqueue.adapter.server.ts";
+import { runWorkerJobLanes } from "../app/lib/worker/run-worker.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
 import {
   ensureSelfSchedulingJobsSeeded,
@@ -167,5 +167,5 @@ if (mode === "drain") {
 
 console.info("worker.start", { mode, workerId });
 startScheduleWatchdog({ signal: abort.signal });
-await runWorkerPollLoop(abort.signal, jobHandlers);
+await runWorkerJobLanes(abort.signal, jobHandlers);
 console.info("worker.shutdown");

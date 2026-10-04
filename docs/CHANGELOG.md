@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: SMS status webhooks use durable retries and separate worker capacity, so slow integrations do not block other jobs ([#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117)).
+
 - Fixed survey CSV exports needing a second click and returning an older response snapshot ([PR #2322](https://github.com/chester-hill-solutions/callcaster/pull/2322), [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320)).
 
 - Fixed survey response tables and CSV exports repeating the first answer when question labels repeat across pages ([PR #2319](https://github.com/chester-hill-solutions/callcaster/pull/2319), [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317)).

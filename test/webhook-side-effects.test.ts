@@ -463,7 +463,45 @@ describe("webhook side-effect handlers", () => {
         campaignId: 7,
       }),
     );
-    expect(mocks.sendWorkspaceWebhookNotification).toHaveBeenCalled();
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(expect.objectContaining({
+      type: "webhook_delivery",
+      workspaceId: "w1",
+      dedupe: { kind: "idempotency", key: "outbound_sms:SM1:delivered" },
+      params: expect.objectContaining({
+        workspaceId: "w1",
+        eventCategory: "outbound_sms",
+        eventType: "UPDATE",
+        optional: true,
+        payload: expect.objectContaining({
+          type: "outbound_sms",
+          record: expect.objectContaining({ message_sid: "SM1", status: "delivered" }),
+          old_record: { message_sid: "SM1" },
+        }),
+      }),
+    }));
+  });
+
+  test("SMS callback status stays distinct from the later saved message status", async () => {
+    const { runSmsStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runSmsStatusSideEffects({ messageSid: "SM1", twilioParams: { SmsStatus: "SENT" } });
+    await runSmsStatusSideEffects({ messageSid: "SM1", twilioParams: { SmsStatus: "delivered" } });
+    expect(mocks.enqueueJob.mock.calls.map(([args]) => args.dedupe.key)).toEqual([
+      "outbound_sms:SM1:sent", "outbound_sms:SM1:delivered",
+    ]);
+    expect(mocks.enqueueJob.mock.calls.map(([args]) => args.params.payload.record.status)).toEqual([
+      "sent", "delivered",
+    ]);
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
+  });
+
+  test("SMS side effects fail when durable delivery cannot be queued", async () => {
+    mocks.enqueueJob.mockRejectedValueOnce(new Error("Queue unavailable"));
+    const { runSmsStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await expect(runSmsStatusSideEffects({
+      messageSid: "SM1", twilioParams: { SmsStatus: "sent" },
+    })).rejects.toThrow("Queue unavailable");
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
   });
 
   test("runSmsStatusSideEffects records a null campaign for non-campaign SMS", async () => {
