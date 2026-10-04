@@ -86,10 +86,10 @@ for (const width of [390, 1280]) {
         const buttonBounds = await page
           .getByRole("button", { name: "Upload audio", exact: true })
           .boundingBox();
-        expect(nameBounds).not.toBeNull();
-        expect(buttonBounds).not.toBeNull();
-        expect(nameBounds!.x).toBeCloseTo(buttonBounds!.x, 1);
-        expect(nameBounds!.width).toBeCloseTo(buttonBounds!.width, 1);
+        if (!nameBounds || !buttonBounds)
+          throw new Error("Audio controls have no visible bounds");
+        expect(nameBounds.x).toBeCloseTo(buttonBounds.x, 1);
+        expect(nameBounds.width).toBeCloseTo(buttonBounds.width, 1);
         expect(await pageHeading.boundingBox()).toEqual(before);
         await page.getByRole("button", { name: "Cancel", exact: true }).click();
         await expect(sheet).toHaveCount(0);
