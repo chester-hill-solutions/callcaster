@@ -2047,33 +2047,57 @@
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
   },
   {
-    "issueNumber": 2334,
+    "issueNumber": 2341,
     "verdict": "fix-now",
-    "summary": "csv-parse 5.6.0 remains affected by runtime alert #220. The patched line starts at 7.0.2. Current parser paths do not enable grouped duplicate columns; package exposure is confirmed without an application exploit claim.",
-    "rootCause": "The direct ^5.5.6 dependency excludes the patched major release, so a lock-only update cannot resolve this finding.",
-    "resolution": "Upgrade to a supported patched release in both install paths. Preserve the actual server and sync/async audience parsing contracts through regression cases and full local/remote gates.",
+    "summary": "Bun resolves jws 3.2.2 through Twilio 5.4.4 and jsonwebtoken 9.0.2. npm already resolves jsonwebtoken 9.0.3 and patched jws 4.0.1. The maintainer explicitly excludes jsonwebtoken users from the exploit conditions; no token bypass is claimed.",
+    "rootCause": "Bun’s older permitted JWT patch keeps an affected installed jws range. Twilio’s ^9.0.2 range permits the verified npm 9.0.3 dependency contract.",
+    "resolution": "Verify a compatible scoped jsonwebtoken 9.0.3 path in both installers, preserving Twilio versions and unrelated dependencies. Exercise the real app token generators and real signature verification with valid and rejected-token controls.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock",
-      "app/lib/csv.ts",
-      "app/lib/csv-contacts.ts",
-      "app/components/audience/audience-upload-csv.ts"
+      "app/lib/twilio-token.server.ts",
+      "app/lib/handset/handset-token.server.ts"
     ],
     "existingTests": [
-      "test/csv.test.ts",
-      "test/audience-upload-csv.test.ts",
-      "test/csv-opt-out-parsing.test.ts"
+      "test/handset-token.server.test.ts"
     ],
     "missingTests": [
-      "Patched duplicate __proto__ advisory control plus parser parity across quoted/BOM/headerless/duplicate/malformed input."
+      "Both real installed trees: issuer, subject, identity, expiry and grants through actual token generators; wrong key/algorithm, altered claims and expired-token rejection controls."
     ],
     "acceptanceCriteria": [
-      "Both install paths resolve csv-parse >=7.0.2 and support its import/type contract.",
-      "Actual parser behavior and upload mapping remain correct.",
-      "Advisory regression and valid controls pass; production audit no longer reports csv-parse.",
-      "Full ci:local, remote gates, deployed upload verification and release promotion are complete."
+      "Every jws resolution excludes <=3.2.2 and 4.0.0.",
+      "App token contracts stay correct without provider calls or real credentials.",
+      "Both installers, full local CI, remote checks and both deployments pass.",
+      "Deployed token acceptance and release promotion are complete."
     ],
-    "trackerRecommendation": "Native Task under #1802. Keep Scalar compatibility work in #2335."
+    "trackerRecommendation": "Native Task under #1802. Package exposure and app exploit reachability remain separate claims."
+  },
+  {
+    "issueNumber": 2342,
+    "verdict": "fix-now",
+    "summary": "Bun resolves PostCSS 8.5.16 through Scalar, Vue and compiler-sfc. The root and npm resolution are already 8.5.25. Both source-map advisories require a resolution at least 8.5.23. Compiler package presence does not prove a live API that processes untrusted CSS.",
+    "rootCause": "Bun retains an older nested PostCSS 8.x copy despite compatible consumer ranges and a patched direct development dependency.",
+    "resolution": "Verify a matching PostCSS root spec/override for every copy, keeping Scalar, Vue and app theme intact. Use only owned CSS/map marker fixtures for traversal and missing-from regressions with valid CSS/source-map controls.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/tailwind.css",
+      "app/routes/docs.tsx"
+    ],
+    "existingTests": [
+      "test/ui/docs.route.test.tsx"
+    ],
+    "missingTests": [
+      "Real installed parser rejection and positive controls for source-map loading, including with/without from; old-version fault proof; both installed Scalar widget/build compatibility checks."
+    ],
+    "acceptanceCriteria": [
+      "All PostCSS copies are >=8.5.23 and compatible with their consumers.",
+      "Outside marker maps are not read; valid CSS and supported source maps still work.",
+      "Both installers, full local CI, real docs render and remote gates pass.",
+      "Required deployed acceptance and release promotion are complete."
+    ],
+    "trackerRecommendation": "Native Task under #1802. Cover development copies in the same PostCSS task to avoid duplicate work under #1803."
   }
 ]

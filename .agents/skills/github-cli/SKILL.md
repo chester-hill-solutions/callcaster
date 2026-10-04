@@ -39,6 +39,20 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 4. When `gh pr create` / `gh pr merge` hit `graphql_rate_limit`, fall back to REST: `POST /repos/{owner}/{repo}/pulls` (create; ensure the head branch has commits ahead of base first — "No commits between base and head" is the failure when it does not), `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `-f merge_method=squash`, and `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}`.
 5. Verify REST fallbacks the same as any mutation: query the remote state and report it.
 
+## Dependabot Alert Pagination
+
+The alert list uses `before`/`after` cursors from the Link header; it rejects
+the `page` parameter. Use `gh api --paginate` or follow those cursors. A malformed
+request can also print a scope hint: correct the endpoint parameters and retry
+before asking for broader access. See the [official alert API](https://docs.github.com/en/rest/dependabot/alerts#list-dependabot-alerts-for-a-repository).
+
+## CI Test-Count Evidence
+
+Job logs can contain ANSI escapes as actual ESC bytes or literal `\u001b` text.
+Normalize both forms before matching a test file and collected count. A failed
+raw-string match does not prove that the suite was skipped. Require the expected
+executed cases and a completed successful job.
+
 ## Empty REST Responses
 
 A successful REST deletion can return HTTP 204 with no response body. Check the
