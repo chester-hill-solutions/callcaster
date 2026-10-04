@@ -823,41 +823,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2117,
-    "verdict": "fix-now",
-    "recommendedTitle": "sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried",
-    "summary": "SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it. Current dev@b6a00f60 source confirms that incoming SMS side effects use SID/status keys; a SID-only delivery key would suppress distinct status events.",
-    "resolution": "Queue customer webhooks for durable retry and message/status event deduplication. To meet the no-delay claim-loop requirement, give webhook delivery separate processing capacity or bound delivery concurrency while reserving capacity for other job types; enqueueing onto the same serial loop alone does not meet it. app/lib/worker/poll-jobs.server.ts:320-359 claims one job and awaits its handler before the next claim.",
-    "lookIn": [
-      "app/lib/worker/webhook-side-effects.server.ts:278",
-      "app/lib/worker/webhook-side-effects.server.ts:297",
-      "app/lib/workspace-webhooks.server.ts:77",
-      "app/lib/worker/handlers/campaign.server.ts:640",
-      "app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)",
-      "app/lib/worker/job-params.server.ts:175-181,221",
-      "app/lib/worker/handlers/campaign.server.ts:545-567",
-      "app/lib/workspace-webhooks.server.ts",
-      "app/routes/api+/sms/status.action.server.ts:26-31"
-    ],
-    "existingTests": [
-      "test/webhook-side-effects.test.ts"
-    ],
-    "missingTests": [
-      "Retry/dedup tests, distinct sent/delivered event controls, repeated-callback controls and worker next-claim timing with a slow destination. Existing delivery handler alone does not prove this path is fixed."
-    ],
-    "acceptanceCriteria": [
-      "An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).",
-      "A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.",
-      "Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.",
-      "SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2118,
     "verdict": "fix-now",
     "recommendedTitle": "A malformed known feature flag disables valid sibling flags",

@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@4dd7c3b8 + survey download state refresh (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@7da6dd52 + webhook delivery state refresh (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey export merge and native issue update. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified webhook delivery merge and native issue update. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 62
+## Fix now — 61
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,17 +45,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
-
-### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
-- SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it. Current dev@b6a00f60 source confirms that incoming SMS side effects use SID/status keys; a SID-only delivery key would suppress distinct status events.
-- Resolution: Queue customer webhooks for durable retry and message/status event deduplication. To meet the no-delay claim-loop requirement, give webhook delivery separate processing capacity or bound delivery concurrency while reserving capacity for other job types; enqueueing onto the same serial loop alone does not meet it. app/lib/worker/poll-jobs.server.ts:320-359 claims one job and awaits its handler before the next claim.
-- Look in: `app/lib/worker/webhook-side-effects.server.ts:278`, `app/lib/worker/webhook-side-effects.server.ts:297`, `app/lib/workspace-webhooks.server.ts:77`, `app/lib/worker/handlers/campaign.server.ts:640`, `app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)`, `app/lib/worker/job-params.server.ts:175-181,221`, `app/lib/worker/handlers/campaign.server.ts:545-567`, `app/lib/workspace-webhooks.server.ts`, `app/routes/api+/sms/status.action.server.ts:26-31`
-- Existing tests: test/webhook-side-effects.test.ts
-- Missing tests: Retry/dedup tests, distinct sent/delivered event controls, repeated-callback controls and worker next-claim timing with a slow destination. Existing delivery handler alone does not prove this path is fixed.
-- Done when: An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).; A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.; Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.; SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -735,9 +724,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 136
+## Verify and close — 137
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Durable SMS webhook retry and separate worker capacity merged into dev through PR #2324. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@d376fd88: SMS side effects enqueue customer delivery with normalized SID/status keys and preserve each callback status. General jobs and webhook delivery use separate filtered claim loops. Queue failures propagate; missing or disabled subscriptions remain no-ops. Full local CI passed on final head 2e2bfeaf; remote quality, bundle, browser checks and both deployment contexts passed. Real PostgreSQL retry, deduplication and saturated-delivery controls pass; removing the relevant runtime logic fails regression checks.
+- Root cause: The old SMS side-effect handler awaited the customer POST on the serial general worker loop and swallowed delivery failures.
+- Resolution: Verify retry attempts, duplicate callbacks, distinct accepted status updates and general-job progress under saturated slow delivery on the deployed review worker. Keep the issue open until deployed acceptance and release promotion are complete.
+- Look in: `app/lib/worker/webhook-side-effects.server.ts:281`, `app/lib/worker/run-worker.server.ts:8`, `app/lib/worker/poll-jobs.server.ts:153`, `app/lib/worker/handlers/campaign.server.ts:634`, `test/integration-db/webhook-delivery-lanes.test.ts`
+- Existing tests: test/webhook-side-effects.test.ts and test/worker.test.ts: 41 focused unit cases, including no-inline-send and distinct callback status controls.; test/integration-db/webhook-delivery-lanes.test.ts: six isolated real PostgreSQL controls for SQL claim filters, durable retry, event deduplication, saturated capacity and optional subscriptions.; Full real PostgreSQL tier: 187 passed, no skips or failures.
+- Missing tests: Deployed controlled retry, deduplication and saturated-delivery acceptance; release promotion.
+- Done when: An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).; A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.; Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.; SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary.
+- Tracker: PR #2324 merged to dev at d376fd88. Keep the native issue open until deployed review-worker acceptance and release promotion are verified.
 
 ### [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320) Download the current survey CSV on the first export click
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
