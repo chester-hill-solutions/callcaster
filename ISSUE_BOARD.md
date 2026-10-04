@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5af3f675 + survey export audit (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@b6a00f60 + webhook delivery plan audit (2026-10-04 UTC)` · 305 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified survey export issue updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the verified webhook delivery acceptance update. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -45,6 +45,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
+
+### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it. Current dev@b6a00f60 source confirms that incoming SMS side effects use SID/status keys; a SID-only delivery key would suppress distinct status events.
+- Resolution: Queue customer webhooks for durable retry and message/status event deduplication. To meet the no-delay claim-loop requirement, give webhook delivery separate processing capacity or bound delivery concurrency while reserving capacity for other job types; enqueueing onto the same serial loop alone does not meet it. app/lib/worker/poll-jobs.server.ts:320-359 claims one job and awaits its handler before the next claim.
+- Look in: `app/lib/worker/webhook-side-effects.server.ts:278`, `app/lib/worker/webhook-side-effects.server.ts:297`, `app/lib/workspace-webhooks.server.ts:77`, `app/lib/worker/handlers/campaign.server.ts:640`, `app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)`, `app/lib/worker/job-params.server.ts:175-181,221`, `app/lib/worker/handlers/campaign.server.ts:545-567`, `app/lib/workspace-webhooks.server.ts`, `app/routes/api+/sms/status.action.server.ts:26-31`
+- Existing tests: test/webhook-side-effects.test.ts
+- Missing tests: Retry/dedup tests, distinct sent/delivered event controls, repeated-callback controls and worker next-claim timing with a slow destination. Existing delivery handler alone does not prove this path is fixed.
+- Done when: An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).; A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.; Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.; SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -90,17 +101,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Upload CSV with unsubscribe/opted out/unknown strings through the actual server mapping path; assert boolean opt_out and no partial-write failure.
 - Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
 - Tracker: Fix now: mapped audience opt_out remains unnormalized. The broad row-report/retry requirements need a separate plan. Related PR evidence: #2250. A PR reference alone does not prove deployed behavior.
-
-### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.
-- Resolution: Queue customer webhooks for durable retry and SID/event deduplication. To meet the no-delay claim-loop requirement, give webhook delivery separate processing capacity or bound worker concurrency; enqueueing onto the same serial loop alone does not meet it. app/lib/worker/poll-jobs.server.ts:320-359 claims one job and awaits its handler before the next claim.
-- Look in: `app/lib/worker/webhook-side-effects.server.ts:278`, `app/lib/worker/webhook-side-effects.server.ts:297`, `app/lib/workspace-webhooks.server.ts:77`, `app/lib/worker/handlers/campaign.server.ts:640`, `app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)`, `app/lib/worker/job-params.server.ts:175-181,221`, `app/lib/worker/handlers/campaign.server.ts:545-567`, `app/lib/workspace-webhooks.server.ts`
-- Existing tests: test/webhook-side-effects.test.ts
-- Missing tests: Retry/dedup tests plus worker next-claim timing with a slow destination. Existing delivery handler alone does not prove this path is fixed.
-- Done when: An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).; A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery.; Deduplication by `outbound_sms:<sid>` prevents duplicate deliveries.; No inline customer webhook send remains on a worker loop (grep-verified and recorded in the issue).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -1645,16 +1645,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
-### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
-- useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.
-- Resolution: Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.
-- Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
-- Existing tests: test/ui/campaign-export-button.test.tsx
-- Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
 ### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
@@ -1663,6 +1653,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/survey-public-action.server.ts`
 - Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
 - Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.
+- Resolution: Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.
+- Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
+- Existing tests: test/ui/campaign-export-button.test.tsx
+- Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
 ### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) verify-close: admin pagination consolidated onto TablePagination (#1920)
@@ -2570,17 +2570,6 @@ Product, security, or operations decision required before implementation can be 
 - Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
 - Tracker: Co-ordinate with #1770.
 
-### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
-- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
-- Root cause: Feature gap.
-- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
-- Missing tests: preview plays selected voice text; membership enforced
-- Done when: Speak step previews audibly; voice matches the block; workspace-gated
-- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
-
 ### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) feature(audience): client-side preview + column-mapping step (gocanvass parity)
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
@@ -2592,6 +2581,17 @@ Product, security, or operations decision required before implementation can be 
 - Missing tests: preview renders parsed headers/rows; mapping submitted with upload
 - Done when: parsed preview before start; columns mappable; server validation still gates
 - Tracker: Scope with #1771 (can ship together or split).
+
+### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
+- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
+- Root cause: Feature gap.
+- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
+- Missing tests: preview plays selected voice text; membership enforced
+- Done when: Speak step previews audibly; voice matches the block; workspace-gated
+- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
 
 ### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) change(ivr): make simple/complex a script property, not a campaign type
 - Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
