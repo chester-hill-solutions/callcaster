@@ -4220,5 +4220,62 @@
       "test/runtime-ws.test.ts"
     ],
     "trackerRecommendation": "PR #2343 passed full local CI on final head 95ea1c17, all applicable remote gates and both deployments. Remote quality executed all ten cases. The verified worktree and local/remote refs are removed with a recovery bundle. Task #2340 remains a child of #1802; applicable deployed acceptance and release promotion remain open."
+  },
+  {
+    "issueNumber": 2341,
+    "verdict": "verify-close",
+    "summary": "PR #2345 merged the compatible Twilio JWT patch to dev at 9c834837. Both locked install trees resolve patched jws, with both Twilio versions and unrelated packages preserved. Source work is complete; deployed token acceptance and release promotion remain open.",
+    "rootCause": "Bun retained an older compatible jsonwebtoken patch and affected jws range. The merged flat jsonwebtoken 9.0.3 override repairs that path. The maintainer excludes jsonwebtoken users from the exploit conditions; no app token bypass is claimed.",
+    "resolution": "Verify applicable deployed browser and handset token behavior, then release promotion and the default-branch dependency state. Do not repeat the completed source patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/lib/twilio-token.server.ts",
+      "app/lib/handset/handset-token.server.ts"
+    ],
+    "existingTests": [
+      "test/runtime-twilio-token.test.ts: 22 real cases per installer, including Node and Bun app token generators, signature and rejection controls.",
+      "Official old JWT/JWS path fails one package-only stream guard while 21 controls pass; a real app TTL mutation fails two cases with 20 controls passing."
+    ],
+    "missingTests": [
+      "Applicable deployed token acceptance and release/default-branch verification remain unfinished."
+    ],
+    "acceptanceCriteria": [
+      "Every jws resolution excludes <=3.2.2 and 4.0.0.",
+      "App token contracts stay correct without provider calls or real credentials.",
+      "Both installers, full local CI, remote checks and both deployments pass.",
+      "Deployed token acceptance and release promotion are complete."
+    ],
+    "trackerRecommendation": "Native Task under #1802 remains open. Final head 42bef2ee passed full local CI, all applicable remote gates and both deployments; remote quality executed all 22 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Package exposure and app exploit reachability remain separate claims."
+  },
+  {
+    "issueNumber": 2342,
+    "verdict": "verify-close",
+    "summary": "PR #2346 merged PostCSS 8.5.25 across all locked consumers to dev at befe20fa. Both immutable install trees pass all 38 real cases and actual Scalar docs compatibility checks. Source work is complete; deployed docs/style acceptance and release promotion remain open.",
+    "rootCause": "Bun retained four old compatible nested PostCSS copies. The merged matching direct spec and flat override retain one patched copy; npm changes only root spec metadata. Both source-map advisory ranges are excluded.",
+    "resolution": "Verify applicable deployed docs and style behavior, then release promotion and the default-branch dependency state. Preserve the existing theme and do not repeat the completed source patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/tailwind.css",
+      "app/routes/docs.tsx"
+    ],
+    "existingTests": [
+      "test/runtime-postcss.test.ts: seven owned-file guard/control cases through five actual consumers plus three real Vue style compilation cases, 38 per clean installer.",
+      "Official 8.5.16 fails 16 guards with 22 controls passing; 8.5.22 fails 10 missing-filename guards with 28 controls passing; restored patched source passes all 38.",
+      "Actual DocsPage/Scalar widget built and rendered in both trees: public/complete specs, auth alternatives, examples, fonts and light/dark styles."
+    ],
+    "missingTests": [
+      "Applicable deployed docs/style acceptance and release/default-branch verification remain unfinished."
+    ],
+    "acceptanceCriteria": [
+      "All PostCSS copies are >=8.5.23 and compatible with their consumers.",
+      "Outside marker maps are not read; valid CSS and supported source maps still work.",
+      "Both installers, full local CI, real docs render and remote gates pass.",
+      "Required deployed acceptance and release promotion are complete."
+    ],
+    "trackerRecommendation": "Native Task under #1802 remains open; development copies share this package task under #1803. Final head d28fecdf passed full local CI, all applicable remote gates and both deployments; remote quality executed all 38 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Compiler package presence does not prove a live untrusted-CSS service or app file-disclosure exploit."
   }
 ]

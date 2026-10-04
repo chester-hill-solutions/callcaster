@@ -1032,25 +1032,27 @@
     "verdict": "fix-now",
     "recommendedTitle": "An opt-out column value like \"unsubscribe\" crashes the audience import mid-run and leaves a partial import committed",
     "summary": "PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.",
-    "resolution": "Reuse one fail-safe opt-out parser in the actual audience-upload mapping path, with an upload-level test. Split row reporting and whole-run failure/re-upload guarantees into separate reviewable work; do not assume the merged standalone parser fixes this route.",
+    "currentBehavior": "Fresh audit: dev@9c834837 on 2026-10-04; affected app source is identical at current dev@befe20fa. The actual upload processor imports generic lib/csv and writes mapped opt_out strings into contact.insertMany. The private boolean parser repaired in #2250 is not called here.",
+    "resolution": "Reuse the existing total opt-out parser at the actual server upload mapping boundary, preserving its current documented value semantics, with real upload-level regression controls. Split normalization into an atomic child Task. Keep #1771 for existing per-row reporting and plan the parent’s insert/link/progress failure and re-upload guarantees separately.",
     "lookIn": [
-      "app/lib/audience-upload-process.server.ts:1",
-      "app/lib/audience-upload-process.server.ts:406",
-      "app/lib/audience-upload-process.server.ts:496",
       "app/lib/audience-upload-process.server.ts",
       "app/lib/audience-upload-db.server.ts",
       "app/routes/api+/audience-upload.action.server.ts",
-      "app/components/audience/AudienceUploader.tsx`, `AudienceUploadMapStep.tsx",
-      "shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts",
-      "app/lib/chat-opt-out.ts:1"
+      "app/components/audience/AudienceUploader.tsx",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "shared/contact-import-headers.ts",
+      "app/lib/csv-contacts.ts",
+      "app/lib/chat-opt-out.ts"
     ],
     "existingTests": [
-      "test/csv-opt-out-parsing.test.ts covers the separate contact parser.",
-      "test/audience-upload.route.test.ts does not prove safe opt_out normalization at the insert boundary."
+      "test/csv-opt-out-parsing.test.ts covers the separate standalone contact parser.",
+      "test/audience-upload.route.test.ts does not prove normalization at the real contact insert boundary.",
+      "test/audience-upload-dedupe.test.ts covers within-file and already-linked audience phones; it does not prove recovery after contact insertion succeeds and membership insertion fails."
     ],
     "missingTests": [
-      "Upload CSV with unsubscribe/opted out/unknown strings through the actual server mapping path; assert boolean opt_out and no partial-write failure."
+      "Actual server upload mapping with opt-out, opt-in, blank and unknown CSV values; verify boolean values at the contact insert boundary.",
+      "Insert/link/progress failure and re-upload controls, including rows without a mapped phone; normalization alone does not prove recovery.",
+      "Unknown-value review reporting and dispatch exclusion remain part of the broad parent acceptance."
     ],
     "acceptanceCriteria": [
       "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
@@ -1062,7 +1064,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Fix now: mapped audience opt_out remains unnormalized. The broad row-report/retry requirements need a separate plan. Related PR evidence: #2250. A PR reference alone does not prove deployed behavior.",
+    "trackerRecommendation": "The normalization defect remains Fix now. Create one native child Task before implementation. #1771 already tracks per-row import reporting; do not duplicate it. Existing phone dedupe reads through audience membership and cannot prove rollback or retry safety after a linking failure. Keep all broad acceptance visible; a normalization-only PR cannot close #2128.",
     "rootCause": "PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path."
   },
   {
@@ -2045,59 +2047,5 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
-  },
-  {
-    "issueNumber": 2341,
-    "verdict": "fix-now",
-    "summary": "Bun resolves jws 3.2.2 through Twilio 5.4.4 and jsonwebtoken 9.0.2. npm already resolves jsonwebtoken 9.0.3 and patched jws 4.0.1. The maintainer explicitly excludes jsonwebtoken users from the exploit conditions; no token bypass is claimed.",
-    "rootCause": "Bun’s older permitted JWT patch keeps an affected installed jws range. Twilio’s ^9.0.2 range permits the verified npm 9.0.3 dependency contract.",
-    "resolution": "Verify a compatible scoped jsonwebtoken 9.0.3 path in both installers, preserving Twilio versions and unrelated dependencies. Exercise the real app token generators and real signature verification with valid and rejected-token controls.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock",
-      "app/lib/twilio-token.server.ts",
-      "app/lib/handset/handset-token.server.ts"
-    ],
-    "existingTests": [
-      "test/handset-token.server.test.ts"
-    ],
-    "missingTests": [
-      "Both real installed trees: issuer, subject, identity, expiry and grants through actual token generators; wrong key/algorithm, altered claims and expired-token rejection controls."
-    ],
-    "acceptanceCriteria": [
-      "Every jws resolution excludes <=3.2.2 and 4.0.0.",
-      "App token contracts stay correct without provider calls or real credentials.",
-      "Both installers, full local CI, remote checks and both deployments pass.",
-      "Deployed token acceptance and release promotion are complete."
-    ],
-    "trackerRecommendation": "Native Task under #1802. Package exposure and app exploit reachability remain separate claims."
-  },
-  {
-    "issueNumber": 2342,
-    "verdict": "fix-now",
-    "summary": "Bun resolves PostCSS 8.5.16 through Scalar, Vue and compiler-sfc. The root and npm resolution are already 8.5.25. Both source-map advisories require a resolution at least 8.5.23. Compiler package presence does not prove a live API that processes untrusted CSS.",
-    "rootCause": "Bun retains an older nested PostCSS 8.x copy despite compatible consumer ranges and a patched direct development dependency.",
-    "resolution": "Verify a matching PostCSS root spec/override for every copy, keeping Scalar, Vue and app theme intact. Use only owned CSS/map marker fixtures for traversal and missing-from regressions with valid CSS/source-map controls.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock",
-      "app/tailwind.css",
-      "app/routes/docs.tsx"
-    ],
-    "existingTests": [
-      "test/ui/docs.route.test.tsx"
-    ],
-    "missingTests": [
-      "Real installed parser rejection and positive controls for source-map loading, including with/without from; old-version fault proof; both installed Scalar widget/build compatibility checks."
-    ],
-    "acceptanceCriteria": [
-      "All PostCSS copies are >=8.5.23 and compatible with their consumers.",
-      "Outside marker maps are not read; valid CSS and supported source maps still work.",
-      "Both installers, full local CI, real docs render and remote gates pass.",
-      "Required deployed acceptance and release promotion are complete."
-    ],
-    "trackerRecommendation": "Native Task under #1802. Cover development copies in the same PostCSS task to avoid duplicate work under #1803."
   }
 ]
