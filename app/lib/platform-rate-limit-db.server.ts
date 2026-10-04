@@ -44,3 +44,36 @@ export async function checkRateLimitPostgres(
     resetAt,
   };
 }
+
+// Commit small batches so the pool's statement timeout cannot undo the whole
+// backlog. Keep checking until empty; a batch can shrink when a writer resets
+// a selected bucket while DELETE waits for its row lock.
+export async function pruneExpiredRateLimitBuckets(): Promise<number> {
+  let total = 0;
+  for (;;) {
+    const [row] = await db.execute<{ pruned: number; candidates: number }>(sql`
+      WITH candidates AS (
+        SELECT key FROM rate_limit_bucket
+        WHERE reset_at < now() - interval '24 hours'
+        ORDER BY reset_at
+        LIMIT 1000
+      ), deleted AS (
+        DELETE FROM rate_limit_bucket
+        WHERE key IN (SELECT key FROM candidates)
+          AND reset_at < now() - interval '24 hours'
+        RETURNING 1
+      )
+      SELECT count(*)::integer AS pruned,
+        (SELECT count(*)::integer FROM candidates) AS candidates
+      FROM deleted
+    `);
+    if (
+      !row || !Number.isInteger(row.pruned) || row.pruned < 0 ||
+      !Number.isInteger(row.candidates) || row.candidates < row.pruned
+    ) {
+      throw new Error("Rate-limit cleanup returned an invalid count");
+    }
+    total += row.pruned;
+    if (row.candidates === 0) return total;
+  }
+}
