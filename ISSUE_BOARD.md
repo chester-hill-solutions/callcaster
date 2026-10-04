@@ -3386,7 +3386,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
 ### [#2000](https://github.com/chester-hill-solutions/callcaster/issues/2000) Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast
-- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-27
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-04
 - Duplicate of: [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032)
 - Duplicate of #2032. PR #2362 removes the invitation banner and uses the existing root success toast. Tone, deployed geometry and telemetry acceptance remain to verify with the canonical report.
 - Current behavior: Source verified on dev@46ba4b7e, 2026-10-04: the invitation-only QueryParamBanner row is removed. The root toast consumes a signed finite receipt; deployed acceptance remains pending.
