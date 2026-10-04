@@ -117,6 +117,8 @@ export type ApiSurfaceEntry = {
   specTarget: SpecTarget;
   /** Human docs guide path under docs/ */
   docsGuide: string;
+  /** Maximum encoded request bytes before form parsing; absent for unbounded surfaces. */
+  requestBodyLimit?: number;
   notes?: string;
   securityWarning?: string;
   /** Marks duplicate path registrations (legacy overlap). */
@@ -185,6 +187,8 @@ export type ApiSurfaceAnnotation = {
    * failure, not an override.
    */
   authClass?: AuthClass;
+  /** Maximum encoded request bytes before form parsing; absent for unbounded surfaces. */
+  requestBodyLimit?: number;
   notes?: string;
   securityWarning?: string;
   duplicate?: boolean;

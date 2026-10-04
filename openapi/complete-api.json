@@ -6290,7 +6290,7 @@
       "post": {
         "operationId": "postMedia",
         "summary": "POST /api/media",
-        "description": "",
+        "description": "Audio file limit: 10 MiB (10485760 bytes). Total encoded request limit: 10551296 bytes (10 MiB + 64 KiB for multipart fields and overhead). Oversized file or body returns 413; malformed form or invalid audio returns 400. Campaign name does not control the object key.",
         "tags": [
           "User API",
           "media"
@@ -6299,6 +6299,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
@@ -6331,6 +6332,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -6343,6 +6354,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
             "content": {
               "application/json": {
                 "schema": {
@@ -6358,7 +6379,7 @@
       "post": {
         "operationId": "postMessage_media",
         "summary": "POST /api/message_media",
-        "description": "",
+        "description": "File limit: 10 MiB (10485760 bytes); file validation failures retain HTTP 200 with success:false and error. POST and DELETE encoded request limit: 10551296 bytes (10 MiB + 64 KiB for fields and overhead). Body overflow returns 413, malformed form returns 400, both with success:false and error.",
         "tags": [
           "User API",
           "messaging"
@@ -6367,6 +6388,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
@@ -6399,6 +6421,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -6418,13 +6450,23 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "delete": {
         "operationId": "deleteMessage_media",
         "summary": "DELETE /api/message_media",
-        "description": "",
+        "description": "File limit: 10 MiB (10485760 bytes); file validation failures retain HTTP 200 with success:false and error. POST and DELETE encoded request limit: 10551296 bytes (10 MiB + 64 KiB for fields and overhead). Body overflow returns 413, malformed form returns 400, both with success:false and error.",
         "tags": [
           "User API",
           "messaging"
@@ -6433,6 +6475,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
@@ -6453,6 +6496,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -6465,6 +6518,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
             "content": {
               "application/json": {
                 "schema": {

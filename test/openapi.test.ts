@@ -298,3 +298,27 @@ describe("openapi spec", () => {
     expect(transfer?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
   });
 });
+
+describe("media upload byte-limit contract", () => {
+  test.each([
+    { path: "/api/media", method: "post" },
+    { path: "/api/message_media", method: "post" },
+    { path: "/api/message_media", method: "delete" },
+  ])("$method $path documents its encoded limit and rejection", ({path, method}) => {
+    const operation = openApiSpec.paths[path]?.[method];
+    expect(operation).toMatchObject({
+      "x-callcaster-request-body-limit": 10551296,
+      responses: {
+        "400": { description: expect.stringContaining("Malformed form body") },
+        "413": { description: expect.stringContaining("10551296 bytes") },
+      },
+    });
+    expect(operation?.description).toContain("10 MiB");
+  });
+  test("unrelated multipart routes do not claim the media bound", () => {
+    const operation = openApiSpec.paths["/api/audience-upload"]?.post;
+    expect(operation).toBeDefined();
+    expect(operation).not.toHaveProperty("x-callcaster-request-body-limit");
+    expect(operation?.responses).not.toHaveProperty("413");
+  });
+});
