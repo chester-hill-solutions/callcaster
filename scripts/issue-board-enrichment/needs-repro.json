@@ -251,5 +251,62 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Independent read-only historical assessment; it does not block the source fix."
+  },
+  {
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "issueNumber": 1832,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Reproduce dark-mode Continue visibility in SMS onboarding",
+    "summary": "Current Continue uses the shared Button and renders only with hasFirstNumber and continueTarget. Source classes do not prove the reported dark-mode flow.",
+    "currentBehavior": "Source audit dev@8ae867ed, 2026-10-04: first-number footer uses shared default Button with primary/primary-foreground tokens. No browser visibility or computed-style proof has been collected.",
+    "rootCause": "Not established for the current code. Separate absent, disabled and unreadable states before changing the component.",
+    "resolution": "Reproduce SMS goal with a selected local number and writable role. Inspect render conditions and dark-theme normal, hover, focus and pending states. Put any shared appearance repair in shad-cc and keep page layout stable.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx:155",
+      "app/components/ui/button.tsx",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/button.tsx:17"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [
+      "Real dark-mode visibility and computed contrast for the reported local-number flow."
+    ],
+    "acceptanceCriteria": [
+      "Continue is visible and usable in the reported SMS/local-number dark-mode flow.",
+      "The fix uses the shared component contract and prevents the same defect on other controls."
+    ],
+    "trackerRecommendation": "Native issue updated. Needs reproduction; do not close from shared token class names alone."
+  },
+  {
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "issueNumber": 1668,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Verify toast spacing and move defaults into the shared component",
+    "summary": "The app adapter adds gap-2 py-3 globally, but shad-cc does not own those defaults. Caller toastOptions can replace the adapter settings.",
+    "currentBehavior": "Source audit dev@8ae867ed, 2026-10-04: one root host uses the app adapter. Shared spacing ownership and actual audio-error spacing are not verified.",
+    "rootCause": "App-level class duplication is not a shared component spacing contract. The reported computed spacing has not been reproduced on current code.",
+    "resolution": "Measure the audio-upload error toast in light/dark themes with long text and actions. Move confirmed global defaults into shad-cc with safe option merging. Prove alerts render outside page flow with no layout shift.",
+    "lookIn": [
+      "app/components/ui/sonner.tsx:12",
+      "app/root.tsx:123",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/sonner.tsx:56",
+      "docs/design-system.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Computed toast spacing for audio-upload errors and option overrides.",
+      "Light/dark and long-content browser checks with stable page landmarks."
+    ],
+    "acceptanceCriteria": [
+      "Error toasts have sensible global spacing defaults.",
+      "The shared component prevents the same spacing mistake across callers.",
+      "No alert causes page layout to shift when it renders."
+    ],
+    "trackerRecommendation": "Native issue updated. Needs reproduction; app adapter classes are partial source evidence. Keep shared component ownership under #2300 visible."
   }
 ]

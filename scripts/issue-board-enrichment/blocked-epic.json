@@ -1268,5 +1268,39 @@
     "risk": "medium",
     "trackerRecommendation": "Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 2356,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Reconcile audio objects left unattached after campaign update failure",
+    "summary": "Audio upload ownership and attachment reconciliation need a durable protocol before a safe cleanup implementation can ship.",
+    "currentBehavior": "The audio action has no cleanup after an empty or failed campaign update. A thrown database error can leave commit status uncertain; immediate deletion can remove an attached object. Current source/test evidence does not establish physical orphan counts or crash recovery.",
+    "rootCause": "Object upload and campaign attachment have separate acknowledgement/failure boundaries and no durable lifecycle record or reference/deletion coordination.",
+    "resolution": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/lib/handler.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "Actual-route audit proves storage-call ordering before an empty scoped update; provider/database I/O is stubbed."
+    ],
+    "missingTests": [
+      "Durable state-transition, uncertain commit, duplicate retry, restart, reference-read failure and reference/deletion race controls with suitable DB/storage integration."
+    ],
+    "acceptanceCriteria": [
+      "Define durable upload ownership and attachment state using existing media/storage and job patterns where they fit. Do not add a route-local garbage collector.",
+      "An upload that is known to be unattached can be reclaimed. A confirmed attachment is retained. An uncertain write result is retained until authoritative reconciliation resolves it.",
+      "The durable retry/reconciliation record survives a crash after upload or an uncertain database acknowledgement. Unresolved cases remain visible to operators and are retried.",
+      "Reconciliation cannot delete an existing or shared object. It verifies owned object identity and current attachment references; coordinate reference checks with supported attachment writes so a new attachment cannot race deletion.",
+      "Cleanup failures cannot replace the original user error or falsely report success. They retain actionable operator evidence and durable retry state.",
+      "Cover successful attachment, known rejection, uncertain commit, failed reference read, duplicate retries, process restart and a reference/deletion race with real state transitions and appropriate database/storage integration controls.",
+      "Verify deployed behavior and release promotion before closing the task. Do not claim physical orphan cleanup from mocked storage calls."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently."
   }
 ]
