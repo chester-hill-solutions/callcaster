@@ -8,7 +8,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const io = vi.hoisted(() => ({
   uploadObject: vi.fn(), enqueue: vi.fn(), updateUpload: vi.fn(), tenantDb: vi.fn(),
   markAudienceUpdating: vi.fn(), createAudience: vi.fn(), createUpload: vi.fn(),
-  findAudience: vi.fn(), events: [] as string[],
+  findAudience: vi.fn(), findCampaign: vi.fn(), linkCampaign: vi.fn(), events: [] as string[],
 }));
 vi.mock("@/lib/object-storage.server", async importOriginal => ({
   ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
@@ -20,6 +20,8 @@ vi.mock("@/lib/audience-upload-db.server", async importOriginal => ({
   markAudienceUpdating: io.markAudienceUpdating,
   createAudienceForUpload: io.createAudience,
   createAudienceUploadRecord: io.createUpload,
+  findCampaignForAudienceUpload: io.findCampaign,
+  linkAudienceToCampaign: io.linkCampaign,
 }));
 vi.mock("@/server/tenant-db", async importOriginal => ({
   ...(await importOriginal<typeof import("@/server/tenant-db")>()),
@@ -31,8 +33,9 @@ const source = new TextEncoder().encode('﻿First Name,Phone,Note\r\nZoé,416555
 const mapping = { "First Name": "firstname", Phone: "phone", Note: "other_data" };
 const session = async () => ({ headers: new Headers(), user: { id: workspaceId } });
 
-async function send(options: { access?: () => Promise<void>; mapping?: Record<string, string>; file?: Uint8Array; existing?: boolean } = {}) {
+async function send(options: { access?: () => Promise<void>; mapping?: Record<string, string>; file?: Uint8Array; existing?: boolean; campaign?: boolean } = {}) {
   const form = new FormData();form.set("workspace_id", workspaceId);
+  if (options.campaign) form.set("campaign_id", "33");
   if (options.existing !== false) form.set("audience_id", "22");else form.set("audience_name", "New audience");
   form.set("contacts", new File([options.file ?? source], "customer-source.csv", { type: "text/csv" }));
   form.set("header_mapping", JSON.stringify(options.mapping ?? mapping));
@@ -52,6 +55,8 @@ beforeEach(() => {
   io.findAudience.mockReset().mockResolvedValue({ id: 22 });
   io.createAudience.mockReset().mockResolvedValue({ id: 22 });
   io.createUpload.mockReset().mockResolvedValue({ id: 99 });
+  io.findCampaign.mockReset().mockResolvedValue({ id: 33 });
+  io.linkCampaign.mockReset().mockImplementation(async () => { io.events.push("linked");return true; });
 });
 
 test("retains literal original bytes privately before enqueue, including BOM and multiline UTF-8", async () => {
@@ -70,19 +75,22 @@ test("retains literal original bytes privately before enqueue, including BOM and
   }));
 });
 
-test("holds enqueue and existing-audience status until original storage acknowledges", async () => {
+test("holds enqueue, campaign link and existing-audience status until original storage acknowledges", async () => {
   let resolveStorage: () => void = () => {};
   let notifyStorage: () => void = () => {};
   const reachedStorage = new Promise<void>(resolve => { notifyStorage = resolve; });
   io.uploadObject.mockImplementation(() => new Promise<void>(resolve => { resolveStorage = resolve;notifyStorage(); }));
-  const pending = send();
+  const pending = send({ campaign: true });
   try {
     await Promise.race([reachedStorage, pending.then(() => { throw new Error("Request ended before storage acknowledgement"); })]);
     expect(io.enqueue).not.toHaveBeenCalled();expect(io.markAudienceUpdating).not.toHaveBeenCalled();
+    expect(io.linkCampaign).not.toHaveBeenCalled();
   } finally {
     resolveStorage();await pending;
   }
   expect((await pending).status).toBe(200);expect(io.enqueue).toHaveBeenCalledTimes(1);
+  expect(io.linkCampaign).toHaveBeenCalledWith({ workspaceId, campaignId: 33, audienceId: 22 });
+  expect(io.events).toEqual(["linked", "enqueued"]);
 });
 
 test("storage failure fails the upload record and leaves existing audience and queue unchanged", async () => {
@@ -99,6 +107,20 @@ test("new audience also requires retained source before its worker starts", asyn
   const response = await send({ existing: false });expect(response.status).toBe(200);
   expect(io.createAudience).toHaveBeenCalledWith(workspaceId, "New audience");
   expect(io.events).toEqual(["stored", "enqueued"]);
+});
+
+test("storage failure leaves the existing audience's campaign links unchanged", async () => {
+  io.uploadObject.mockRejectedValueOnce(new Error("fixture storage unavailable"));
+  const response = await send({ campaign: true });expect(response.status).toBe(500);
+  expect(io.findCampaign).toHaveBeenCalledWith(workspaceId, 33);
+  expect(io.linkCampaign).not.toHaveBeenCalled();expect(io.enqueue).not.toHaveBeenCalled();
+  expect(io.markAudienceUpdating).not.toHaveBeenCalled();
+});
+
+test("foreign campaign performs no original storage or upload writes", async () => {
+  io.findCampaign.mockResolvedValueOnce(null);const response = await send({ campaign: true });expect(response.status).toBe(404);
+  expect(io.uploadObject).not.toHaveBeenCalled();expect(io.createUpload).not.toHaveBeenCalled();
+  expect(io.linkCampaign).not.toHaveBeenCalled();expect(io.enqueue).not.toHaveBeenCalled();
 });
 
 test("denied workspace performs no original storage or upload enqueue", async () => {

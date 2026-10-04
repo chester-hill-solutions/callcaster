@@ -193,17 +193,6 @@ export const action = defineAction({
       finalAudienceId = audienceData.id;
     }
 
-    if (campaignId != null) {
-      const linked = await linkAudienceToCampaign({
-        workspaceId,
-        campaignId,
-        audienceId: finalAudienceId,
-      });
-      if (!linked) {
-        return routeData({ error: "Campaign not found" }, { status: 404, headers });
-      }
-    }
-
     // Convert file to base64 for processing
     // Use a safer encoding method that can handle non-ASCII characters
     // First encode the string as UTF-8, then encode to base64
@@ -241,6 +230,17 @@ export const action = defineAction({
       const message = "Original audience CSV could not be saved";
       await markAudienceUploadFailed(workspaceId, uploadId, message);
       throw new AppError(message, 500);
+    }
+
+    if (campaignId != null) {
+      const linked = await linkAudienceToCampaign({
+        workspaceId,
+        campaignId,
+        audienceId: finalAudienceId,
+      });
+      if (!linked) {
+        return routeData({ error: "Campaign not found" }, { status: 404, headers });
+      }
     }
 
     if (audienceIdStr) await markAudienceUpdating(workspaceId, finalAudienceId);
