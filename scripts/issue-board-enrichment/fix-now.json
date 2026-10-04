@@ -1747,5 +1747,47 @@
       "Confirm no external runtime consumer depends on STRIPE_API_KEY."
     ],
     "trackerRecommendation": "Native issue updated with source proof. Fix now; keep the external-consumer acceptance check open until verified."
+  },
+  {
+    "issueNumber": 2371,
+    "verdict": "fix-now",
+    "recommendedTitle": "Require Admin access for JSON billing checkout",
+    "summary": "JSON checkout creation and session polling require membership without the adopted Admin floor. Lower roles can reach replay, provider work or paid-session credit confirmation.",
+    "currentBehavior": "Source audit at dev@9fa9d582, 2026-10-04. The creation route uses requireDataPlaneWorkspaceUser before withIdempotency. Polling only obtains a user ID from the data-plane context. Both shared services call requireWorkspaceAccess without minRole. Billing form, balance and receipt routes already require Admin. Eight actual route invocations with real PostgreSQL membership returned 200 and reached Stripe create/retrieve for Owner, Admin, Member and Caller. Stripe responses used a local fixture and data-plane context was supplied directly. No browser/session HTTP or paid-session acceptance is claimed.",
+    "rootCause": "Checkout endpoints and services prove workspace membership but do not enforce the existing billing role policy. Admin annotations in the API inventory do not enforce runtime access.",
+    "resolution": "Use the existing session-only Admin strategy on both routes before replay lookup, provider work or credit changes. Require Admin in both checkout services as defence in depth. Keep non-member 404, API-key-without-session 401, workspace/session matching, idempotency and valid Admin/Owner behavior. State the policy for checkout and polling in API docs and verify generated contracts.",
+    "lookIn": [
+      "app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.loader.server.ts",
+      "app/lib/platform-billing.server.ts",
+      "app/lib/capability-guard.server.ts",
+      "app/lib/api-surface-annotations.ts",
+      "app/lib/openapi-platform.ts",
+      "docs/api-agent-quickstart.md"
+    ],
+    "existingTests": [
+      "test/platform-billing-checkout.test.ts verifies receipt line-item credit counts with mocked requireWorkspaceAccess; it does not prove authorization.",
+      "test/billing-read-access.test.ts proves sibling billing read Admin policy, not checkout creation or polling.",
+      "Current-source reproduction passed eight actual route invocation cases against real PostgreSQL membership. Both endpoints allowed Member/Caller and reached Stripe, proving the role gap; Owner/Admin are permitted controls. The fixture used an open, unpaid session and made no credit write."
+    ],
+    "missingTests": [
+      "Actual route and membership checks for Caller/Member 403 before replay or provider work, with Admin/Owner success, non-member 404 and sessionless API-key 401.",
+      "Direct-service authorization controls before Stripe or credit writes, plus same-workspace paid-session and duplicate-credit controls.",
+      "Fault checks that weaken each route/service gate must fail denial cases.",
+      "Real browser/session HTTP requests for all four roles with isolated provider fixtures; API docs and generated-contract verification."
+    ],
+    "acceptanceCriteria": [
+      "Caller and member sessions receive 403 for checkout creation and session polling, before replay lookup, Stripe work or credit-ledger writes.",
+      "Administrator and owner sessions retain valid checkout creation, polling and confirmation behavior.",
+      "Non-members receive the existing uniform 404; API keys without a session receive 401.",
+      "Direct checkout service calls enforce Admin before provider or ledger work.",
+      "Existing workspace/session matching and duplicate credit protections remain in place.",
+      "Tests use actual auth and membership checks, plus permitted controls. Removing or weakening each gate makes a denial test fail.",
+      "Direct browser/session HTTP tests cover all four roles. API documentation states the existing Admin policy and generated contract verification passes."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "high",
+    "trackerRecommendation": "The billing policy is adopted. Fix the route and service enforcement gap as one concern; #2115 customer creation concurrency and #2137 billing reads stay separate."
   }
 ]
