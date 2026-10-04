@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@3228e89f + dependency audit source refresh (2026-10-04 UTC)` · 313 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@befe20fa + verified runtime closure source refresh (2026-10-04 UTC)` · 313 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the native runtime security Epic and child-task updates. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the six native runtime package-task source merges and parent audit updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 62
+## Fix now — 60
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,6 +45,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
+
+### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.
+- Current behavior: Fresh audit: dev@9c834837 on 2026-10-04; affected app source is identical at current dev@befe20fa. The actual upload processor imports generic lib/csv and writes mapped opt_out strings into contact.insertMany. The private boolean parser repaired in #2250 is not called here.
+- Root cause: PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path.
+- Resolution: Reuse the existing total opt-out parser at the actual server upload mapping boundary, preserving its current documented value semantics, with real upload-level regression controls. Split normalization into an atomic child Task. Keep #1771 for existing per-row reporting and plan the parent’s insert/link/progress failure and re-upload guarantees separately.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts`
+- Existing tests: test/csv-opt-out-parsing.test.ts covers the separate standalone contact parser.; test/audience-upload.route.test.ts does not prove normalization at the real contact insert boundary.; test/audience-upload-dedupe.test.ts covers within-file and already-linked audience phones; it does not prove recovery after contact insertion succeeds and membership insertion fails.
+- Missing tests: Actual server upload mapping with opt-out, opt-in, blank and unknown CSV values; verify boolean values at the contact insert boundary.; Insert/link/progress failure and re-upload controls, including rows without a mapped phone; normalization alone does not prove recovery.; Unknown-value review reporting and dispatch exclusion remain part of the broad parent acceptance.
+- Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
+- Tracker: The normalization defect remains Fix now. Create one native child Task before implementation. #1771 already tracks per-row import reporting; do not duplicate it. Existing phone dedupe reads through audience membership and cannot prove rollback or retry safety after a linking failure. Keep all broad acceptance visible; a normalization-only PR cannot close #2128.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -78,18 +90,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. PR #2250 fixes a separate csv-contacts parser, but the audience upload imports lib/csv and maps opt_out strings verbatim into contact inserts. The affected upload path still lacks safe boolean normalization.
-- Root cause: PR #2250 changed csv-contacts.ts, but the affected audience upload path uses lib/csv and maps non-phone values verbatim. The boolean coercion is not wired into that path.
-- Resolution: Reuse one fail-safe opt-out parser in the actual audience-upload mapping path, with an upload-level test. Split row reporting and whole-run failure/re-upload guarantees into separate reviewable work; do not assume the merged standalone parser fixes this route.
-- Look in: `app/lib/audience-upload-process.server.ts:1`, `app/lib/audience-upload-process.server.ts:406`, `app/lib/audience-upload-process.server.ts:496`, `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts:1`
-- Existing tests: test/csv-opt-out-parsing.test.ts covers the separate contact parser.; test/audience-upload.route.test.ts does not prove safe opt_out normalization at the insert boundary.
-- Missing tests: Upload CSV with unsubscribe/opted out/unknown strings through the actual server mapping path; assert boolean opt_out and no partial-write failure.
-- Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
-- Tracker: Fix now: mapped audience opt_out remains unnormalized. The broad row-report/retry requirements need a separate plan. Related PR evidence: #2250. A PR reference alone does not prove deployed behavior.
 
 ### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -562,28 +562,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341) security(deps): patch the Twilio jws dependency path
-- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Bun resolves jws 3.2.2 through Twilio 5.4.4 and jsonwebtoken 9.0.2. npm already resolves jsonwebtoken 9.0.3 and patched jws 4.0.1. The maintainer explicitly excludes jsonwebtoken users from the exploit conditions; no token bypass is claimed.
-- Root cause: Bun’s older permitted JWT patch keeps an affected installed jws range. Twilio’s ^9.0.2 range permits the verified npm 9.0.3 dependency contract.
-- Resolution: Verify a compatible scoped jsonwebtoken 9.0.3 path in both installers, preserving Twilio versions and unrelated dependencies. Exercise the real app token generators and real signature verification with valid and rejected-token controls.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/twilio-token.server.ts`, `app/lib/handset/handset-token.server.ts`
-- Existing tests: test/handset-token.server.test.ts
-- Missing tests: Both real installed trees: issuer, subject, identity, expiry and grants through actual token generators; wrong key/algorithm, altered claims and expired-token rejection controls.
-- Done when: Every jws resolution excludes <=3.2.2 and 4.0.0.; App token contracts stay correct without provider calls or real credentials.; Both installers, full local CI, remote checks and both deployments pass.; Deployed token acceptance and release promotion are complete.
-- Tracker: Native Task under #1802. Package exposure and app exploit reachability remain separate claims.
-
-### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
-- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Bun resolves PostCSS 8.5.16 through Scalar, Vue and compiler-sfc. The root and npm resolution are already 8.5.25. Both source-map advisories require a resolution at least 8.5.23. Compiler package presence does not prove a live API that processes untrusted CSS.
-- Root cause: Bun retains an older nested PostCSS 8.x copy despite compatible consumer ranges and a patched direct development dependency.
-- Resolution: Verify a matching PostCSS root spec/override for every copy, keeping Scalar, Vue and app theme intact. Use only owned CSS/map marker fixtures for traversal and missing-from regressions with valid CSS/source-map controls.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/tailwind.css`, `app/routes/docs.tsx`
-- Existing tests: test/ui/docs.route.test.tsx
-- Missing tests: Real installed parser rejection and positive controls for source-map loading, including with/without from; old-version fault proof; both installed Scalar widget/build compatibility checks.
-- Done when: All PostCSS copies are >=8.5.23 and compatible with their consumers.; Outside marker maps are not read; valid CSS and supported source maps still work.; Both installers, full local CI, real docs render and remote gates pass.; Required deployed acceptance and release promotion are complete.
-- Tracker: Native Task under #1802. Cover development copies in the same PostCSS task to avoid duplicate work under #1803.
-
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
@@ -736,9 +714,31 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 142
+## Verify and close — 144
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- PR #2346 merged PostCSS 8.5.25 across all locked consumers to dev at befe20fa. Both immutable install trees pass all 38 real cases and actual Scalar docs compatibility checks. Source work is complete; deployed docs/style acceptance and release promotion remain open.
+- Root cause: Bun retained four old compatible nested PostCSS copies. The merged matching direct spec and flat override retain one patched copy; npm changes only root spec metadata. Both source-map advisory ranges are excluded.
+- Resolution: Verify applicable deployed docs and style behavior, then release promotion and the default-branch dependency state. Preserve the existing theme and do not repeat the completed source patch.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/tailwind.css`, `app/routes/docs.tsx`
+- Existing tests: test/runtime-postcss.test.ts: seven owned-file guard/control cases through five actual consumers plus three real Vue style compilation cases, 38 per clean installer.; Official 8.5.16 fails 16 guards with 22 controls passing; 8.5.22 fails 10 missing-filename guards with 28 controls passing; restored patched source passes all 38.; Actual DocsPage/Scalar widget built and rendered in both trees: public/complete specs, auth alternatives, examples, fonts and light/dark styles.
+- Missing tests: Applicable deployed docs/style acceptance and release/default-branch verification remain unfinished.
+- Done when: All PostCSS copies are >=8.5.23 and compatible with their consumers.; Outside marker maps are not read; valid CSS and supported source maps still work.; Both installers, full local CI, real docs render and remote gates pass.; Required deployed acceptance and release promotion are complete.
+- Tracker: Native Task under #1802 remains open; development copies share this package task under #1803. Final head d28fecdf passed full local CI, all applicable remote gates and both deployments; remote quality executed all 38 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Compiler package presence does not prove a live untrusted-CSS service or app file-disclosure exploit.
+
+### [#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341) security(deps): patch the Twilio jws dependency path
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- PR #2345 merged the compatible Twilio JWT patch to dev at 9c834837. Both locked install trees resolve patched jws, with both Twilio versions and unrelated packages preserved. Source work is complete; deployed token acceptance and release promotion remain open.
+- Root cause: Bun retained an older compatible jsonwebtoken patch and affected jws range. The merged flat jsonwebtoken 9.0.3 override repairs that path. The maintainer excludes jsonwebtoken users from the exploit conditions; no app token bypass is claimed.
+- Resolution: Verify applicable deployed browser and handset token behavior, then release promotion and the default-branch dependency state. Do not repeat the completed source patch.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/twilio-token.server.ts`, `app/lib/handset/handset-token.server.ts`
+- Existing tests: test/runtime-twilio-token.test.ts: 22 real cases per installer, including Node and Bun app token generators, signature and rejection controls.; Official old JWT/JWS path fails one package-only stream guard while 21 controls pass; a real app TTL mutation fails two cases with 20 controls passing.
+- Missing tests: Applicable deployed token acceptance and release/default-branch verification remain unfinished.
+- Done when: Every jws resolution excludes <=3.2.2 and 4.0.0.; App token contracts stay correct without provider calls or real credentials.; Both installers, full local CI, remote checks and both deployments pass.; Deployed token acceptance and release promotion are complete.
+- Tracker: Native Task under #1802 remains open. Final head 42bef2ee passed full local CI, all applicable remote gates and both deployments; remote quality executed all 22 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Package exposure and app exploit reachability remain separate claims.
 
 ### [#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340) security(deps): patch ws in both locked install paths
 - Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2819,19 +2819,19 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
-### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Runtime security is a native Epic with separate package Tasks. Axios, csv-parse, Scalar and ws source are merged through PRs #2336, #2338, #2339 and #2343; deployed acceptance and release promotion remain open. Dev npm production audit is clear. The independently resolved Bun runtime graph has two affected nodes: jws and PostCSS, tracked by #2341 and #2342.
-- Resolution: Complete the remaining package tasks as atomic PRs. Verify both locked install paths, each child’s real behavior controls, deployed acceptance and release promotion. No package exposure is a proved app exploit by itself.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Bun runtime trace resolves 594 nodes with no missing required edges and excludes vendor devDependencies/optional peer integrations. Fresh master Dependabot still has two runtime alerts (#220, #218) plus 37 development alerts; source fixes on dev do not prove alert resolution. Keep #1805 and closed #1809 as existing history.
-
 ### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
 - Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Development security is now a native Epic. A fresh complete npm audit reports 23 affected package families (17 high, five moderate and one low), while npm production is clear. Bun has separate affected development copies. The live master snapshot has 37 development alerts; this is a different source/release view.
+- Development security is a native Epic. The fresh complete npm audit on final PostCSS head d28fecdf (merged in #2346 to dev@befe20fa) reports 23 affected package families: 17 high, five moderate and one low, with no critical. npm production is clear. Bun retains separate affected development copies. The most recent master snapshot has 37 development alerts, a different source/release view.
 - Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Keep runtime fixes under #1802. PostCSS copies are already tracked in #2342; do not duplicate that package work. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, deployed acceptance and release promotion remain required.
+- Tracker: Keep runtime fixes under #1802. PostCSS source already merged in #2346 under #2342; do not duplicate that package work. Split remaining confirmed concerns into native child Tasks. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, both deployments, applicable deployed acceptance and release promotion remain required.
+
+### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Runtime security is a native Epic with separate package Tasks. Six source fixes are merged: Axios #2336, csv-parse #2338, Scalar SDK #2339, ws #2343, Twilio JWS #2345 and PostCSS #2346. Deployed acceptance and release promotion remain open. At dev@befe20fa, npm production audit is clear and the independently resolved Bun runtime graph has zero affected nodes.
+- Resolution: Complete each child’s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open.
 
 ### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
 - Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

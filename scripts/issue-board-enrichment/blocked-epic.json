@@ -278,26 +278,26 @@
   {
     "issueNumber": 1802,
     "verdict": "blocked-epic",
-    "summary": "Runtime security is a native Epic with separate package Tasks. Axios, csv-parse, Scalar and ws source are merged through PRs #2336, #2338, #2339 and #2343; deployed acceptance and release promotion remain open. Dev npm production audit is clear. The independently resolved Bun runtime graph has two affected nodes: jws and PostCSS, tracked by #2341 and #2342.",
-    "resolution": "Complete the remaining package tasks as atomic PRs. Verify both locked install paths, each child’s real behavior controls, deployed acceptance and release promotion. No package exposure is a proved app exploit by itself.",
+    "summary": "Runtime security is a native Epic with separate package Tasks. Six source fixes are merged: Axios #2336, csv-parse #2338, Scalar SDK #2339, ws #2343, Twilio JWS #2345 and PostCSS #2346. Deployed acceptance and release promotion remain open. At dev@befe20fa, npm production audit is clear and the independently resolved Bun runtime graph has zero affected nodes.",
+    "resolution": "Complete each child’s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "Bun runtime trace resolves 594 nodes with no missing required edges and excludes vendor devDependencies/optional peer integrations. Fresh master Dependabot still has two runtime alerts (#220, #218) plus 37 development alerts; source fixes on dev do not prove alert resolution. Keep #1805 and closed #1809 as existing history."
+    "trackerRecommendation": "The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open."
   },
   {
     "issueNumber": 1803,
     "verdict": "blocked-epic",
-    "summary": "Development security is now a native Epic. A fresh complete npm audit reports 23 affected package families (17 high, five moderate and one low), while npm production is clear. Bun has separate affected development copies. The live master snapshot has 37 development alerts; this is a different source/release view.",
+    "summary": "Development security is a native Epic. The fresh complete npm audit on final PostCSS head d28fecdf (merged in #2346 to dev@befe20fa) reports 23 affected package families: 17 high, five moderate and one low, with no critical. npm production is clear. Bun retains separate affected development copies. The most recent master snapshot has 37 development alerts, a different source/release view.",
     "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "Keep runtime fixes under #1802. PostCSS copies are already tracked in #2342; do not duplicate that package work. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, deployed acceptance and release promotion remain required."
+    "trackerRecommendation": "Keep runtime fixes under #1802. PostCSS source already merged in #2346 under #2342; do not duplicate that package work. Split remaining confirmed concerns into native child Tasks. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, both deployments, applicable deployed acceptance and release promotion remain required."
   },
   {
     "issueNumber": 1892,
