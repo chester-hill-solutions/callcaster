@@ -112,6 +112,18 @@ export async function listAudiencePhones(
   return phones;
 }
 
+export async function markAudienceUploadFailed(
+  workspaceId: string,
+  uploadId: number,
+  errorMessage: string,
+): Promise<void> {
+  const tdb = createTenantDb(workspaceId);
+  await tdb.audience_upload.update({
+    set: { status: "error", error_message: errorMessage },
+    where: eq(audienceUploadTable.id, uploadId),
+  });
+}
+
 export async function findCampaignForAudienceUpload(
   workspaceId: string,
   campaignId: number,

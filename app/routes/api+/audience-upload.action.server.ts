@@ -13,12 +13,14 @@ import {
   findCampaignForAudienceUpload,
   linkAudienceToCampaign,
   markAudienceUpdating,
+  markAudienceUploadFailed,
 } from "@/lib/audience-upload-db.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { toUserMessage } from "@/lib/user-message";
+import { uploadObject } from "@/lib/object-storage.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
 import {
@@ -181,7 +183,7 @@ export const action = defineAction({
       }
 
       finalAudienceId = audienceId;
-      await markAudienceUpdating(workspaceId, finalAudienceId);
+
     } else {
       const audienceData = await createAudienceForUpload(workspaceId, audienceName);
       if (!audienceData) {
@@ -189,17 +191,6 @@ export const action = defineAction({
       }
 
       finalAudienceId = audienceData.id;
-    }
-
-    if (campaignId != null) {
-      const linked = await linkAudienceToCampaign({
-        workspaceId,
-        campaignId,
-        audienceId: finalAudienceId,
-      });
-      if (!linked) {
-        return routeData({ error: "Campaign not found" }, { status: 404, headers });
-      }
     }
 
     // Convert file to base64 for processing
@@ -226,6 +217,33 @@ export const action = defineAction({
     }
 
     const uploadId = uploadData.id;
+
+    try {
+      await uploadObject(
+        "audience-uploads",
+        `${workspaceId}/${uploadId}/original.csv`,
+        new Uint8Array(fileContent),
+        { contentType: "text/csv; charset=utf-8", cacheControl: "no-store", upsert: false },
+      );
+    } catch (error) {
+      logger.error("audience_upload.original.failed", { workspaceId, uploadId, error });
+      const message = "Original audience CSV could not be saved";
+      await markAudienceUploadFailed(workspaceId, uploadId, message);
+      throw new AppError(message, 500);
+    }
+
+    if (campaignId != null) {
+      const linked = await linkAudienceToCampaign({
+        workspaceId,
+        campaignId,
+        audienceId: finalAudienceId,
+      });
+      if (!linked) {
+        return routeData({ error: "Campaign not found" }, { status: 404, headers });
+      }
+    }
+
+    if (audienceIdStr) await markAudienceUpdating(workspaceId, finalAudienceId);
 
     await d.enqueueJob({
       type: "audience_upload",
