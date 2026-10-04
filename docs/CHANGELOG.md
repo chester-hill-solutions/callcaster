@@ -61,7 +61,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Normalize mapped audience upload opt-out values with the existing CSV value rules before contact insertion ([#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348)).
+- Normalize mapped audience upload opt-out values with the existing CSV value rules before contact insertion ([#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348), [PR #2349](https://github.com/chester-hill-solutions/callcaster/pull/2349)).
 
 - Loaded chat history stays available after replies and filter refreshes; saved and live rows reconcile without duplicate messages, and each workspace/contact retains its own pagination lifetime ([#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106)).
 
