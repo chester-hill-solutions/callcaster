@@ -112,7 +112,8 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
       await vi.waitFor(async () => expect(await stored(id)).toMatchObject({ status: "queued", attempt_count: 1 }), { timeout: 3000 });
       const failed = await stored(id);
       expect(failed.error_message).toContain("503");
-      expect(new Date(failed.retry_at!).getTime()).toBeGreaterThan(Date.now());
+      if (!failed.retry_at) throw new Error("Retry was not scheduled");
+      expect(new Date(failed.retry_at).getTime()).toBeGreaterThan(Date.now());
       await client`update job set retry_at = now() - interval '1 second' where id = ${id}`;
       await vi.waitFor(async () => expect(await stored(id)).toMatchObject({ status: "completed", attempt_count: 2 }), { timeout: 3000 });
       expect(transport.fetch).toHaveBeenCalledTimes(2);
@@ -129,6 +130,7 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
     const first = await queueStatus("SM-slow-first", "sent");
     const second = await queueStatus("SM-slow-second", "sent");
     if (!first.jobId || !second.jobId) throw new Error("Delivery was not queued");
+    const secondId = second.jobId;
     const controller = new AbortController();
     const loop = start(controller);
     try {
@@ -139,7 +141,7 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
       expect(await stored(second.jobId)).toMatchObject({ status: "queued", attempt_count: 0 });
       expect(transport.fetch).toHaveBeenCalledTimes(1);
       release();
-      await vi.waitFor(async () => expect(await stored(second.jobId!)).toMatchObject({ status: "completed", attempt_count: 1 }), { timeout: 3000 });
+      await vi.waitFor(async () => expect(await stored(secondId)).toMatchObject({ status: "completed", attempt_count: 1 }), { timeout: 3000 });
     } finally {
       release();
       controller.abort();
@@ -152,10 +154,11 @@ suite("durable webhook delivery has reserved worker capacity (#2117)", () => {
     else await client`update webhook set events = '[]'::jsonb where workspace = ${workspaceId}::uuid`;
     const queued = await queueStatus("SM-optional", "sent");
     if (!queued.jobId) throw new Error("Delivery was not queued");
+    const id = queued.jobId;
     const controller = new AbortController();
     const loop = start(controller);
     try {
-      await vi.waitFor(async () => expect(await stored(queued.jobId!)).toMatchObject({ status: "completed", attempt_count: 1 }), { timeout: 3000 });
+      await vi.waitFor(async () => expect(await stored(id)).toMatchObject({ status: "completed", attempt_count: 1 }), { timeout: 3000 });
       expect(transport.fetch).not.toHaveBeenCalled();
     } finally {
       controller.abort();
