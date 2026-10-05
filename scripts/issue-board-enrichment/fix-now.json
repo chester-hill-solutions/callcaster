@@ -135,37 +135,6 @@
     "trackerRecommendation": "Fix now as defensive hook-contract work. Do not report a reproduced current production infinite loop."
   },
   {
-    "issueNumber": 2064,
-    "verdict": "fix-now",
-    "recommendedTitle": "Nightly ledger drift check compares the wrong branch against the dev database",
-    "summary": "All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.",
-    "rootCause": "Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.",
-    "resolution": "Pin the intended branch per environment and add a workflow contract check.",
-    "lookIn": [
-      ".github/workflows/ledger-drift-check.yml:97",
-      ".github/workflows/ledger-drift-check.yml:127",
-      ".github/workflows/ledger-drift-check.yml:153",
-      ".github/workflows/ledger-drift-check.yml (all three jobs)",
-      "scripts/db/check-db-orphans.mjs",
-      "scripts/db/bootstrap-fresh-db.mjs"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Need fixture showing a refless environment job fails and dev-ahead-of-master comparison passes."
-    ],
-    "acceptanceCriteria": [
-      "Every job in the workflow checks out an explicit ref",
-      "The nightly dev job passes on a correct database that is ahead of master",
-      "The job name states which comparison it makes",
-      "A refless job fails the check"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2067,
     "verdict": "fix-now",
     "recommendedTitle": "check:effects never verifies @effect-deps against the real dependency array",
@@ -504,40 +473,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2122,
-    "verdict": "fix-now",
-    "recommendedTitle": "DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month",
-    "summary": "Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.",
-    "resolution": "Sync month/period on external value changes and use value={period} for TimePeriodSelect; period-state sync alone does not fix its uncontrolled Select.",
-    "lookIn": [
-      "app/components/ui/datetime.tsx:617",
-      "app/components/ui/datetime.tsx:488",
-      "app/components/ui/datetime.tsx:328",
-      "test/ui/components-ui-primitives.test.tsx:369",
-      "app/components/ui/datetime.tsx (`DateTimePicker` `month` state; `TimePicker` `period` state)",
-      "app/components/audience/AudienceTable.tsx:84-90",
-      "app/components/queue/QueueTable.tsx:198-202,215-227"
-    ],
-    "existingTests": [
-      "test/ui/components-ui-primitives.test.tsx"
-    ],
-    "missingTests": [
-      "Need mounted popover rerenders and rendered AM/PM selection tests, not just state or a button smoke assertion."
-    ],
-    "acceptanceCriteria": [
-      "A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).",
-      "Clearing `value` resets the month to the current month.",
-      "After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.",
-      "`TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.",
-      "The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2123,
     "verdict": "fix-now",
     "recommendedTitle": "The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors",
@@ -813,77 +748,6 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2149,
-    "verdict": "fix-now",
-    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
-    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
-    "resolution": "Leave create-time disposition nonterminal and let delivery callbacks own the terminal result. Define recovery for messages with no callback.",
-    "lookIn": [
-      "app/lib/campaign-sms-send.server.ts:238",
-      "app/lib/outreach-disposition.ts:25",
-      "app/lib/worker/webhook-side-effects.server.ts:227",
-      "app/lib/campaign-sms-send.server.ts (the `disposition: \"completed\"` on the create response)",
-      "app/lib/outreach-disposition.ts (`canTransitionOutreachDisposition`, `shouldUpdateOutreachDisposition`)",
-      "app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)",
-      "app/lib/campaign-queue-search.server.ts:171-200",
-      "app/routes/api+/sms/status.action.server.ts"
-    ],
-    "existingTests": [
-      "test/campaign-sms-send.server.test.ts",
-      "test/sms-status-settled.test.ts"
-    ],
-    "missingTests": [
-      "Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks."
-    ],
-    "acceptanceCriteria": [
-      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
-      "`undelivered` and `delivered` likewise.",
-      "A message that never receives a callback still reaches a terminal disposition (positive control).",
-      "The call path is unchanged."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2150,
-    "verdict": "fix-now",
-    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
-    "summary": "Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
-    "resolution": "Persist validated provider segment count before any terminal debit; handle absence through explicit provider fetch/reconciliation rather than blind one-segment default.",
-    "lookIn": [
-      "app/routes/api+/sms/status.action.server.ts:105",
-      "app/routes/api+/sms/status.action.server.ts:137",
-      "app/lib/worker/webhook-side-effects.server.ts:203",
-      "app/lib/twilio-open-sync.server.ts:404",
-      "app/routes/api+/sms/status.action.server.ts:97-110,150-164",
-      "app/lib/sms-send.server.ts:247-258",
-      "app/lib/campaign-sms-send.server.ts:97-110",
-      "app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)",
-      "app/lib/sms-segments.ts (`estimateMessageCredits`, `estimateSegments`)"
-    ],
-    "existingTests": [
-      "test/sms-status-webhook.test.ts",
-      "test/webhook-side-effects.test.ts"
-    ],
-    "missingTests": [
-      "Recovered three-segment debit test and terminal missing-count alert; provider status callback field availability must be verified before assuming all callbacks contain NumSegments."
-    ],
-    "acceptanceCriteria": [
-      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
-      "A send-time-resolved intent is unaffected (positive control).",
-      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
-      "The reconciliation variance for a multi-segment blast is zero."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
@@ -1500,5 +1364,102 @@
     "size": "M-L",
     "risk": "high",
     "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed."
+  },
+  {
+    "issueNumber": 2049,
+    "verdict": "fix-now",
+    "recommendedTitle": "Preserve provider send time across Date encoding and null updates",
+    "summary": "The capture/backfill path exists, but its raw Date SQL parameter fails encoding and explicit null can erase the first send time. PR #2406 awaits final remote checks.",
+    "currentBehavior": "Real Postgres at dev@c704cdf9: five cases executed; four original-source assertions failed and one status control passed. Separately reviewed fix passes five cases, two fault controls, three database modes and 42 caller cases. Complete final-head local CI passed; PR #2406 is unmerged during the hosted runner delay.",
+    "rootCause": "The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.",
+    "resolution": "Merge the reviewed Date/null guard fix on green, then verify provider capture and measured backfill cost on the release candidate. Preserve prior capture/backfill implementation and original criteria.",
+    "lookIn": [
+      "app/lib/message-db.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "test/message-db.server.test.ts",
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts",
+      "test/message-db.server.test.ts",
+      "test/sms-status-webhook.test.ts"
+    ],
+    "missingTests": [
+      "Final exact-head remote checks for PR #2406 and release provider capture/cost acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Message row carries the provider-reported date_sent after the sweep runs",
+      "Messages that settle before any sweep observed them still receive a date_sent",
+      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
+      "date_sent is never overwritten once written and never inferred from date_created",
+      "Backfill selection is bounded, self-limiting, and its cost is measured",
+      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now until PR #2406 lands. This real driver regression invalidates the old source-only Verify and close verdict. #2149 depends on the Date guard for current-base recovery tests."
+  },
+  {
+    "issueNumber": 2149,
+    "verdict": "fix-now",
+    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
+    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
+    "currentBehavior": "At dev@c704cdf9, provider acceptance still stamps completed and leaves delivery ownership wrong. The separate committed fix has 13 real database cases and four independent fault controls with the reviewed, unmerged #2049 helper applied. Current-base provider recovery still fails Date encoding. Full final-base gates remain pending.",
+    "resolution": "Land #2049, rebase the separately reviewed delivery fix from clean dev, verify the actual current-base cases, then run complete local/remote gates. Retain atomic preparation, saved attempt ownership, window compensation and sent-message recovery.",
+    "lookIn": [
+      "app/lib/campaign-sms-send.server.ts",
+      "app/lib/sms-send.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-queue-search.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-sms-send.server.test.ts",
+      "test/sms-status-settled.test.ts"
+    ],
+    "missingTests": [
+      "Final clean-dev database and full local/remote gates after #2049 lands; live carrier delivery and separately verified historical attempt repair."
+    ],
+    "acceptanceCriteria": [
+      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
+      "`undelivered` and `delivered` likewise.",
+      "A message that never receives a callback still reaches a terminal disposition (positive control).",
+      "The call path is unchanged."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "OPEN Fix now. The 13-case development proof includes an unmerged prerequisite; it is not deployed or current-base green acceptance."
+  },
+  {
+    "issueNumber": 2150,
+    "verdict": "fix-now",
+    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
+    "summary": "Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
+    "currentBehavior": "At dev@c704cdf9, 18 real signed-callback/worker/sweep/ledger/reconciliation cases executed: fourteen failed and four controls passed. PR #2407 passes all 18 cases, eight separate protection-removal controls, three database modes and 51 existing callers. Both reviews and complete final-head local CI passed; the PR remains unmerged.",
+    "resolution": "Merge the atomic validated provider-quantity fix after exact-head remote checks and both deployments pass. Keep actual blast/provider comparison for release QA; historical incorrect debits need separate verified repair.",
+    "lookIn": [
+      "app/routes/api+/sms/status.action.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/sms-status-webhook.test.ts",
+      "test/webhook-side-effects.test.ts"
+    ],
+    "missingTests": [
+      "Exact final-head remote Actions checks for PR #2407; both deployments have passed. Live multi-segment acceptance on the release candidate remains."
+    ],
+    "acceptanceCriteria": [
+      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
+      "A send-time-resolved intent is unaffected (positive control).",
+      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
+      "The reconciliation variance for a multi-segment blast is zero."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "OPEN Fix now until PR #2407 lands. Callbacks do not always supply quantities; missing/provisional provider data defers billing without blocking delivery settlement."
   }
 ]

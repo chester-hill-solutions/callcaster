@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f8f40ffc; Merged feedback/member fixes and callback prerequisite reconciled with current source evidence (2026-10-05 UTC)` · 322 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@c704cdf9; merged workflow/date/filter fixes and pending SMS driver/delivery/billing fixes (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the feedback, member-name and predictive callback source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC. Source descriptions distinguish merged dev fixes from reviewed but unmerged changes. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 44
+## Fix now — 43
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -57,6 +57,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Persistent operation state with actual database rows, concurrent/sequential replay, delayed/rejected and uncertain provider acknowledgement, process retry and no duplicate continuation. Retain human/device and no-audio controls.
 - Done when: Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.; Continuation does not run while playback acknowledgement is pending.; Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.; Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.; Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required.
 - Tracker: Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed.
+
+### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
+- Resolution: First make number units/purchase-cycle treatment correct, then include number variance in snapshot and alert.
+- Look in: `shared/billing-reconciliation.ts:232`, `shared/billing-reconciliation.ts:261`, `app/lib/billing-reconciliation-snapshot.server.ts:47`, `app/lib/billing-reconciliation-alert.server.ts:174-184`, `app/lib/billing-reconciliation-snapshot.server.ts`, `app/lib/billing-reconciliation.server.ts`, `app/lib/billing-reconciliation-workspace.server.ts`, `shared/billing-reconciliation.ts:12`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`)`
+- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
+- Missing tests: Need month-unit positive control, purchase exclusion/period semantics, threshold alert and snapshot round-trip.
+- Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -112,17 +123,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.; A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.; Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.; The balance can never go negative through this path (an assertion or check, not a comment).; `check:credit-writes` stays green.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
-- Resolution: First make number units/purchase-cycle treatment correct, then include number variance in snapshot and alert.
-- Look in: `shared/billing-reconciliation.ts:232`, `shared/billing-reconciliation.ts:261`, `app/lib/billing-reconciliation-snapshot.server.ts:47`, `app/lib/billing-reconciliation-alert.server.ts:174-184`, `app/lib/billing-reconciliation-snapshot.server.ts`, `app/lib/billing-reconciliation.server.ts`, `app/lib/billing-reconciliation-workspace.server.ts`, `shared/billing-reconciliation.ts:12`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`)`
-- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
-- Missing tests: Need month-unit positive control, purchase exclusion/period semantics, threshold alert and snapshot round-trip.
-- Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085) Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - Release still deletes the provider number and local row before updating sender metadata. A metadata write failure returns a plain error after irreversible provider success.
@@ -133,6 +133,28 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success.
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
+- Current behavior: At dev@c704cdf9, 18 real signed-callback/worker/sweep/ledger/reconciliation cases executed: fourteen failed and four controls passed. PR #2407 passes all 18 cases, eight separate protection-removal controls, three database modes and 51 existing callers. Both reviews and complete final-head local CI passed; the PR remains unmerged.
+- Resolution: Merge the atomic validated provider-quantity fix after exact-head remote checks and both deployments pass. Keep actual blast/provider comparison for release QA; historical incorrect debits need separate verified repair.
+- Look in: `app/routes/api+/sms/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/twilio-open-sync.server.ts`
+- Existing tests: test/sms-status-webhook.test.ts; test/webhook-side-effects.test.ts
+- Missing tests: Exact final-head remote Actions checks for PR #2407; both deployments have passed. Live multi-segment acceptance on the release candidate remains.
+- Done when: A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.; A send-time-resolved intent is unaffected (positive control).; A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.; The reconciliation variance for a multi-segment blast is zero.
+- Tracker: OPEN Fix now until PR #2407 lands. Callbacks do not always supply quantities; missing/provisional provider data defers billing without blocking delivery settlement.
+
+### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.
+- Current behavior: At dev@c704cdf9, provider acceptance still stamps completed and leaves delivery ownership wrong. The separate committed fix has 13 real database cases and four independent fault controls with the reviewed, unmerged #2049 helper applied. Current-base provider recovery still fails Date encoding. Full final-base gates remain pending.
+- Resolution: Land #2049, rebase the separately reviewed delivery fix from clean dev, verify the actual current-base cases, then run complete local/remote gates. Retain atomic preparation, saved attempt ownership, window compensation and sent-message recovery.
+- Look in: `app/lib/campaign-sms-send.server.ts`, `app/lib/sms-send.server.ts`, `app/lib/twilio-open-sync.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-queue-search.server.ts`
+- Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
+- Missing tests: Final clean-dev database and full local/remote gates after #2049 lands; live carrier delivery and separately verified historical attempt repair.
+- Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
+- Tracker: OPEN Fix now. The 13-case development proof includes an unmerged prerequisite; it is not deployed or current-base green acceptance.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -146,17 +168,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
-- Resolution: Persist validated provider segment count before any terminal debit; handle absence through explicit provider fetch/reconciliation rather than blind one-segment default.
-- Look in: `app/routes/api+/sms/status.action.server.ts:105`, `app/routes/api+/sms/status.action.server.ts:137`, `app/lib/worker/webhook-side-effects.server.ts:203`, `app/lib/twilio-open-sync.server.ts:404`, `app/routes/api+/sms/status.action.server.ts:97-110,150-164`, `app/lib/sms-send.server.ts:247-258`, `app/lib/campaign-sms-send.server.ts:97-110`, `app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)`, `app/lib/sms-segments.ts (`estimateMessageCredits`, `estimateSegments`)`
-- Existing tests: test/sms-status-webhook.test.ts; test/webhook-side-effects.test.ts
-- Missing tests: Recovered three-segment debit test and terminal missing-count alert; provider status callback field availability must be verified before assuming all callbacks contain NumSegments.
-- Done when: A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.; A send-time-resolved intent is unaffected (positive control).; A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.; The reconciliation variance for a multi-segment blast is zero.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2145](https://github.com/chester-hill-solutions/callcaster/issues/2145) The regulatory optInType submitted to Twilio is derived by substring-matching free-text prose
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
 - optInType still falls back to free-text workflow and substring matches VERBAL/PAPER/TEXT/QR. Explicit input is also substring-normalized rather than checked as an exact enum.
@@ -165,17 +176,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/lib/twilio-toll-free-provision.server.ts:90`, `app/lib/twilio-toll-free-provision.server.ts:96`, `app/lib/twilio-toll-free-provision.server.ts:218`, `app/lib/twilio-toll-free-provision.server.ts:66-68,232`, `app/lib/twilio-toll-free.server.ts`, `app/components/other-services/`, the toll-free onboarding step`, `app/lib/twilio-a2p-provision.server.ts (the sibling fields)`
 - Missing tests: Negated verbal workflow, every exact valid enum passthrough, invalid explicit type, absent legacy field. No live provider registration audit was performed.
 - Done when: Free-text workflow descriptions never determine optInType.; Each supported explicit enum value passes through exactly; invalid explicit values are refused.; Missing selections follow an explicit recorded product policy and cannot silently produce an unsupported consent statement.; Any allowed legacy fallback logs the workspace and reason.; Tests cover negated verbal prose, explicit enum values, invalid values and missing selections.; The provisioning sweep result is recorded; any live registration audit is tracked separately.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.
-- Resolution: Leave create-time disposition nonterminal and let delivery callbacks own the terminal result. Define recovery for messages with no callback.
-- Look in: `app/lib/campaign-sms-send.server.ts:238`, `app/lib/outreach-disposition.ts:25`, `app/lib/worker/webhook-side-effects.server.ts:227`, `app/lib/campaign-sms-send.server.ts (the `disposition: "completed"` on the create response)`, `app/lib/outreach-disposition.ts (`canTransitionOutreachDisposition`, `shouldUpdateOutreachDisposition`)`, `app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)`, `app/lib/campaign-queue-search.server.ts:171-200`, `app/routes/api+/sms/status.action.server.ts`
-- Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
-- Missing tests: Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks.
-- Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
@@ -189,6 +189,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link.
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
+
+### [#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049) Verify provider send-time capture and bounded backfill on the review environment
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Preserve provider send time across Date encoding and null updates**
+- The capture/backfill path exists, but its raw Date SQL parameter fails encoding and explicit null can erase the first send time. PR #2406 awaits final remote checks.
+- Current behavior: Real Postgres at dev@c704cdf9: five cases executed; four original-source assertions failed and one status control passed. Separately reviewed fix passes five cases, two fault controls, three database modes and 42 caller cases. Complete final-head local CI passed; PR #2406 is unmerged during the hosted runner delay.
+- Root cause: The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.
+- Resolution: Merge the reviewed Date/null guard fix on green, then verify provider capture and measured backfill cost on the release candidate. Preserve prior capture/backfill implementation and original criteria.
+- Look in: `app/lib/message-db.server.ts`, `app/lib/twilio-open-sync.server.ts`, `test/message-db.server.test.ts`, `test/twilio-open-sync.server.test.ts`
+- Existing tests: test/twilio-open-sync.server.test.ts; test/message-db.server.test.ts; test/sms-status-webhook.test.ts
+- Missing tests: Final exact-head remote checks for PR #2406 and release provider capture/cost acceptance.
+- Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752.
+- Tracker: Fix now until PR #2406 lands. This real driver regression invalidates the old source-only Verify and close verdict. #2149 depends on the Date guard for current-base recovery tests.
 
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -278,28 +291,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/effects-compliance.test.ts covers annotation compliance rules; dependency-array/scanner fixtures remain missing.
 - Missing tests: Fixture tests must fail mismatched annotations and accept matching arrays plus a justified escape.
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122) DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
-- Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
-- Resolution: Sync month/period on external value changes and use value={period} for TimePeriodSelect; period-state sync alone does not fix its uncontrolled Select.
-- Look in: `app/components/ui/datetime.tsx:617`, `app/components/ui/datetime.tsx:488`, `app/components/ui/datetime.tsx:328`, `test/ui/components-ui-primitives.test.tsx:369`, `app/components/ui/datetime.tsx (`DateTimePicker` `month` state; `TimePicker` `period` state)`, `app/components/audience/AudienceTable.tsx:84-90`, `app/components/queue/QueueTable.tsx:198-202,215-227`
-- Existing tests: test/ui/components-ui-primitives.test.tsx
-- Missing tests: Need mounted popover rerenders and rendered AM/PM selection tests, not just state or a button smoke assertion.
-- Done when: A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).; Clearing `value` resets the month to the current month.; After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.; `TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.; The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
-- All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
-- Root cause: Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.
-- Resolution: Pin the intended branch per environment and add a workflow contract check.
-- Look in: `.github/workflows/ledger-drift-check.yml:97`, `.github/workflows/ledger-drift-check.yml:127`, `.github/workflows/ledger-drift-check.yml:153`, `.github/workflows/ledger-drift-check.yml (all three jobs)`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`
-- Missing tests: Need fixture showing a refless environment job fails and dev-ahead-of-master comparison passes.
-- Done when: Every job in the workflow checks out an explicit ref; The nightly dev job passes on a correct database that is ahead of master; The job name states which comparison it makes; A refless job fails the check
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
@@ -462,6 +453,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Literal absolute redirect pathnames match registered routes, including multiline calls.; Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.; Existing violations are corrected or tracked before enabling the gate.; Local and quality CI run the gate; the relative redirect check remains.
 - Tracker: Independent preventive Task split from #2075; no blocking edge.
 
+### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All observed alerts become severity-free alert-banner events; workspace-scoped successes can become warning logs. The /workspaces invite banner only logs locally, without a stack or network beacon.
+- Root cause: The telemetry keys on the ARIA role rather than on the severity the component is actually communicating. `role="alert"` is an accessibility announcement mechanism, not a severity signal, and a neutral `Alert` uses it too.
+- Resolution: Make severity explicit through primitive, client payload and sink schema. Do not infer severity from role alone.
+- Look in: `app/lib/flash-telemetry.client.ts:125`, `app/lib/flash-telemetry.client.ts:58`, `app/routes/api+/workspaces+/$workspaceId/client-flash.action.server.ts:29`, `app/lib/flash-telemetry.client.ts`, `app/components/shared/QueryParamBanner.tsx (the Alert inside it)`, `app/routes/api+/workspaces+/$workspaceId/client-flash`
+- Existing tests: test/ui/flash-telemetry.test.tsx (error-toast and alert-banner capture; no semantic severity mapping)
+- Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
+- Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-04
 - Four active Railway configuration lists still preserve or copy STRIPE_API_KEY. App and worker use STRIPE_SECRET_KEY.
@@ -483,18 +486,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Actual light/dark rendered tone and contrast, including default/explicit warning sites; browser geometry for any migrated dynamic notices.
 - Done when: Record the token change, explicit tone, or combined decision.; Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.; List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.; If shared tokens change, check their other consumers in light and dark themes.; Test the selected Alert tone contract and verify the rendered result.
 - Tracker: Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished.
-
-### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
-- Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All observed alerts become severity-free alert-banner events; workspace-scoped successes can become warning logs. The /workspaces invite banner only logs locally, without a stack or network beacon.
-- Root cause: The telemetry keys on the ARIA role rather than on the severity the component is actually communicating. `role="alert"` is an accessibility announcement mechanism, not a severity signal, and a neutral `Alert` uses it too.
-- Resolution: Make severity explicit through primitive, client payload and sink schema. Do not infer severity from role alone.
-- Look in: `app/lib/flash-telemetry.client.ts:125`, `app/lib/flash-telemetry.client.ts:58`, `app/routes/api+/workspaces+/$workspaceId/client-flash.action.server.ts:29`, `app/lib/flash-telemetry.client.ts`, `app/components/shared/QueryParamBanner.tsx (the Alert inside it)`, `app/routes/api+/workspaces+/$workspaceId/client-flash`
-- Existing tests: test/ui/flash-telemetry.test.tsx (error-toast and alert-banner capture; no semantic severity mapping)
-- Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
-- Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Finish the raw-button cursor migration and prevention guard
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
@@ -532,9 +523,45 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 168
+## Verify and close — 170
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402) Scope campaign queue disposition filters to the selected campaign
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Scope campaign queue disposition filters to the selected campaign and workspace**
+- Named and unknown disposition predicates now match the queue row campaign and workspace; PR #2405 is merged on dev.
+- Current behavior: Verified dev@c704cdf9 / PR #2405: all 14 real Postgres query cases passed. Four separate predicate-removal controls failed with passing cases. Final full local CI, exact-head remote checks and both deployments passed.
+- Root cause: Disposition EXISTS subqueries previously matched only contact_id, allowing results from another campaign or workspace.
+- Resolution: Verify both disposition branches on the release candidate, then retain OPEN until default promotion and deployed acceptance.
+- Look in: `app/lib/campaign-queue-search.server.ts`, `test/integration-db/campaign-queue-disposition.test.ts`
+- Existing tests: test/integration-db/campaign-queue-disposition.test.ts
+- Missing tests: Deployed release filter acceptance with one contact in multiple campaigns and isolated workspace data.
+- Done when: A named disposition from another campaign cannot match a queue row in the selected campaign.; A null disposition from another campaign cannot satisfy the selected campaign unknown filter.; An attempt from another workspace cannot satisfy either disposition branch.; Same-campaign, same-workspace named and unknown results remain visible; unfiltered results and other filters keep their behavior.; Actual Postgres cases pass and fail when each scope predicate is removed. Full local CI, exact-head remote checks and both deployments pass before merge.; Keep this issue open for default promotion and deployed filter acceptance.
+- Tracker: OPEN Verify and close. Source scope is fixed; delivery state ownership remains separate in #2149.
+
+### [#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122) DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- External date, cleared value and AM/PM mirrors are fixed on dev in PR #2404; release browser acceptance remains.
+- Current behavior: PR #2404 merged at 4e132d1ca1530026a3bcc0850a34815e475204f3. Twelve real UI cases, three independent fault controls and 32 caller cases passed. Final full local and exact-head remote checks and deployments passed.
+- Resolution: Verify saved-value changes, clearing and retained calendar navigation on the release candidate; keep OPEN through default promotion and acceptance.
+- Look in: `app/components/ui/datetime.tsx`, `test/ui/datetime-external-value.test.tsx`
+- Existing tests: test/ui/datetime-external-value.test.tsx; test/ui/components-ui-primitives.test.tsx
+- Missing tests: Release-candidate browser acceptance for external values, clearing, period display and intentional navigation.
+- Done when: A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).; Clearing `value` resets the month to the current month.; After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.; `TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.; The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue.
+- Tracker: OPEN Verify and close. Source is merged and tested; default promotion and live browser acceptance remain.
+
+### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Environment-specific ledger checkout and contract protection merged into dev in PR #2401. Default-branch promotion and deployed scheduled runs remain to verify.
+- Current behavior: Verified dev merge bf689a853aa1e99f80c198394e6f04cd87b036c0 includes PR #2401. All environment refs, independent missing/wrong-ref controls and real migration inventory controls passed; final full local and exact-head applicable remote gates passed.
+- Root cause: Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.
+- Resolution: Promote the corrected workflow to the default branch, then verify scheduled environment jobs against their matching deployed databases.
+- Look in: `.github/workflows/ledger-drift-check.yml`, `scripts/db/check-migration-ledger.mjs`, `scripts/db/check-schema-drift.mjs`, `test/ledger-drift-workflow.test.ts`
+- Existing tests: test/ledger-drift-workflow.test.ts
+- Missing tests: Default-branch workflow promotion and actual scheduled deployment/database checks.
+- Done when: Every job in the workflow checks out an explicit ref; The nightly dev job passes on a correct database that is ahead of master; The job name states which comparison it makes; A refless job fails the check
+- Tracker: OPEN for release verification. Do not repeat the merged workflow fix. All original acceptance criteria remain required.
 
 ### [#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140) Settings member projection drops names from the manage-sheet heading
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
@@ -1396,18 +1423,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: A focused adapter-level welcome CREDIT test would pin the already-correct displayed/reconciliation behavior.
 - Done when: A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.; The intentional prefix-only grant bucket remains other unless product semantics change.; Any change to distinguish paid purchases and grants has its own decision and task.
 - Tracker: Move to Verify and close. Public adapters already satisfy the claimed purchase classification; do not change intentional grant prefix buckets solely to satisfy the original incorrect premise.
-
-### [#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049) Verify provider send-time capture and bounded backfill on the review environment
-- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- PR #2055 implements provider date_sent capture and bounded backfill on dev. Move to runtime verification.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Provider send-time capture is implemented: open rows and bounded untimed non-open rows are processed; first-write-wins is enforced at the SQL update. Export visibility remains a separate follow-up.
-- Root cause: The original omission is fixed in PR #2055: the sweep persists provider dateSent, selects bounded untimed non-open rows, and the database update preserves the first stored time.
-- Resolution: Verify real provider capture and record API/DB cost. Keep separate request/send-time export work with #1752.
-- Look in: `app/lib/twilio-open-sync.server.ts:295`, `app/lib/twilio-open-sync.server.ts:411`, `app/lib/message-db.server.ts:275`, `test/twilio-open-sync.server.test.ts:228`, `scripts/e2e/bootstrap-compose-db.mjs:89`, `app/lib/twilio-open-sync.server.ts:44,49,233-319`, `app/lib/message-db.server.ts:202-249`, `app/lib/worker/job-params.server.ts:52-56`, `app/lib/worker/handlers/cron.server.ts:73-107`, `app/db/schema.ts:390-420`, `app/lib/campaign-export.server.ts`
-- Existing tests: test/twilio-open-sync.server.test.ts; test/message-db.server.test.ts; test/sms-status-webhook.test.ts
-- Missing tests: No real capture-rate/cost measurement performed here; unit tests do not prove deployed historical data is filled.
-- Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752.
-- Tracker: Verify and close after provider/runtime cost checks. Do not repeat the write/backfill implementation. Related PR evidence: #2055. A PR reference alone does not prove deployed behavior.
 
 ### [#2040](https://github.com/chester-hill-solutions/callcaster/issues/2040) Verify the SMS contact creation fix in the review environment
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-10-02

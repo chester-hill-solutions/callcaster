@@ -2469,48 +2469,6 @@
     "trackerRecommendation": "Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2049,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify provider send-time capture and bounded backfill on the review environment",
-    "summary": "PR #2055 implements provider date_sent capture and bounded backfill on dev. Move to runtime verification.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Provider send-time capture is implemented: open rows and bounded untimed non-open rows are processed; first-write-wins is enforced at the SQL update. Export visibility remains a separate follow-up.",
-    "rootCause": "The original omission is fixed in PR #2055: the sweep persists provider dateSent, selects bounded untimed non-open rows, and the database update preserves the first stored time.",
-    "resolution": "Verify real provider capture and record API/DB cost. Keep separate request/send-time export work with #1752.",
-    "lookIn": [
-      "app/lib/twilio-open-sync.server.ts:295",
-      "app/lib/twilio-open-sync.server.ts:411",
-      "app/lib/message-db.server.ts:275",
-      "test/twilio-open-sync.server.test.ts:228",
-      "scripts/e2e/bootstrap-compose-db.mjs:89",
-      "app/lib/twilio-open-sync.server.ts:44,49,233-319",
-      "app/lib/message-db.server.ts:202-249",
-      "app/lib/worker/job-params.server.ts:52-56",
-      "app/lib/worker/handlers/cron.server.ts:73-107",
-      "app/db/schema.ts:390-420",
-      "app/lib/campaign-export.server.ts"
-    ],
-    "existingTests": [
-      "test/twilio-open-sync.server.test.ts",
-      "test/message-db.server.test.ts",
-      "test/sms-status-webhook.test.ts"
-    ],
-    "missingTests": [
-      "No real capture-rate/cost measurement performed here; unit tests do not prove deployed historical data is filled."
-    ],
-    "acceptanceCriteria": [
-      "Message row carries the provider-reported date_sent after the sweep runs",
-      "Messages that settle before any sweep observed them still receive a date_sent",
-      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
-      "date_sent is never overwritten once written and never inferred from date_created",
-      "Backfill selection is bounded, self-limiting, and its cost is measured",
-      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Verify and close after provider/runtime cost checks. Do not repeat the write/backfill implementation. Related PR evidence: #2055. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2040,
     "verdict": "verify-close",
     "recommendedTitle": "Verify the SMS contact creation fix in the review environment",
@@ -5146,5 +5104,97 @@
     "risk": "low",
     "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2399. Preserve original criteria and separate source proof from release acceptance.",
     "rootCause": "The settings projection discarded name fields while a partial consumer type hid the omission."
+  },
+  {
+    "issueNumber": 2064,
+    "verdict": "verify-close",
+    "recommendedTitle": "Nightly ledger drift check compares the wrong branch against the dev database",
+    "summary": "Environment-specific ledger checkout and contract protection merged into dev in PR #2401. Default-branch promotion and deployed scheduled runs remain to verify.",
+    "currentBehavior": "Verified dev merge bf689a853aa1e99f80c198394e6f04cd87b036c0 includes PR #2401. All environment refs, independent missing/wrong-ref controls and real migration inventory controls passed; final full local and exact-head applicable remote gates passed.",
+    "rootCause": "Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.",
+    "resolution": "Promote the corrected workflow to the default branch, then verify scheduled environment jobs against their matching deployed databases.",
+    "lookIn": [
+      ".github/workflows/ledger-drift-check.yml",
+      "scripts/db/check-migration-ledger.mjs",
+      "scripts/db/check-schema-drift.mjs",
+      "test/ledger-drift-workflow.test.ts"
+    ],
+    "existingTests": [
+      "test/ledger-drift-workflow.test.ts"
+    ],
+    "missingTests": [
+      "Default-branch workflow promotion and actual scheduled deployment/database checks."
+    ],
+    "acceptanceCriteria": [
+      "Every job in the workflow checks out an explicit ref",
+      "The nightly dev job passes on a correct database that is ahead of master",
+      "The job name states which comparison it makes",
+      "A refless job fails the check"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN for release verification. Do not repeat the merged workflow fix. All original acceptance criteria remain required."
+  },
+  {
+    "issueNumber": 2122,
+    "verdict": "verify-close",
+    "recommendedTitle": "DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month",
+    "summary": "External date, cleared value and AM/PM mirrors are fixed on dev in PR #2404; release browser acceptance remains.",
+    "currentBehavior": "PR #2404 merged at 4e132d1ca1530026a3bcc0850a34815e475204f3. Twelve real UI cases, three independent fault controls and 32 caller cases passed. Final full local and exact-head remote checks and deployments passed.",
+    "resolution": "Verify saved-value changes, clearing and retained calendar navigation on the release candidate; keep OPEN through default promotion and acceptance.",
+    "lookIn": [
+      "app/components/ui/datetime.tsx",
+      "test/ui/datetime-external-value.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/datetime-external-value.test.tsx",
+      "test/ui/components-ui-primitives.test.tsx"
+    ],
+    "missingTests": [
+      "Release-candidate browser acceptance for external values, clearing, period display and intentional navigation."
+    ],
+    "acceptanceCriteria": [
+      "A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).",
+      "Clearing `value` resets the month to the current month.",
+      "After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.",
+      "`TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.",
+      "The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN Verify and close. Source is merged and tested; default promotion and live browser acceptance remain."
+  },
+  {
+    "issueNumber": 2402,
+    "verdict": "verify-close",
+    "recommendedTitle": "Scope campaign queue disposition filters to the selected campaign and workspace",
+    "summary": "Named and unknown disposition predicates now match the queue row campaign and workspace; PR #2405 is merged on dev.",
+    "currentBehavior": "Verified dev@c704cdf9 / PR #2405: all 14 real Postgres query cases passed. Four separate predicate-removal controls failed with passing cases. Final full local CI, exact-head remote checks and both deployments passed.",
+    "rootCause": "Disposition EXISTS subqueries previously matched only contact_id, allowing results from another campaign or workspace.",
+    "resolution": "Verify both disposition branches on the release candidate, then retain OPEN until default promotion and deployed acceptance.",
+    "lookIn": [
+      "app/lib/campaign-queue-search.server.ts",
+      "test/integration-db/campaign-queue-disposition.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-queue-disposition.test.ts"
+    ],
+    "missingTests": [
+      "Deployed release filter acceptance with one contact in multiple campaigns and isolated workspace data."
+    ],
+    "acceptanceCriteria": [
+      "A named disposition from another campaign cannot match a queue row in the selected campaign.",
+      "A null disposition from another campaign cannot satisfy the selected campaign unknown filter.",
+      "An attempt from another workspace cannot satisfy either disposition branch.",
+      "Same-campaign, same-workspace named and unknown results remain visible; unfiltered results and other filters keep their behavior.",
+      "Actual Postgres cases pass and fail when each scope predicate is removed. Full local CI, exact-head remote checks and both deployments pass before merge.",
+      "Keep this issue open for default promotion and deployed filter acceptance."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN Verify and close. Source scope is fixed; delivery state ownership remains separate in #2149."
   }
 ]
