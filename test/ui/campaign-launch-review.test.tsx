@@ -86,12 +86,18 @@ describe("campaign launch review", () => {
     expect(confirm).toHaveBeenCalledExactlyOnceWith("play");
   });
 
-  test("cancel and Escape do not confirm a launch", async () => {
+  test("Cancel does not confirm a launch", async () => {
     const confirm = renderLaunchReview();
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await userEvent.keyboard("{Escape}");
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("none");
     expect(confirm).not.toHaveBeenCalledWith("play");
-    expect(confirm).toHaveBeenCalledWith("none");
+  });
+
+  test("Escape cancels an open review without confirming a launch", async () => {
+    const confirm = renderLaunchReview();
+    await userEvent.keyboard("{Escape}");
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("none");
+    expect(confirm).not.toHaveBeenCalledWith("play");
   });
 
   test("a pending confirmation cannot submit again", async () => {
