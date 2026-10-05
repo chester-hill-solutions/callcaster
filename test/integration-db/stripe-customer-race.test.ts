@@ -59,7 +59,12 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
   let deletions: string[];
   let historyKinds: Set<string>;
   let rejectDelete: boolean;
-  let customerOverrides: Record<string, unknown>;
+  let customerOverrides: {
+    balance?: number;
+    default_source?: string;
+    invoice_settings?: { default_payment_method: string };
+    metadata?: { callcaster_workspace_id: string };
+  };
   const provisionedIds: string[] = [];
   const requestParams = new Map<string, string>();
 
@@ -85,7 +90,8 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
       let id = customers.get(identity);
       if (!id) { id = `${customerPrefix}_${customers.size + 1}`; customers.set(identity, id); }
       const customer = { id, object: "customer", balance: 0, default_source: null, invoice_settings: { default_payment_method: null },
-          name: fields.get("name"), email: fields.get("email"), metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"), callcaster_request_id: fields.get("metadata[callcaster_request_id]") }, ...customerOverrides };
+          name: fields.get("name"), email: fields.get("email"), ...customerOverrides, metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"),
+        callcaster_request_id: fields.get("metadata[callcaster_request_id]"), ...customerOverrides.metadata } };
         if (!providerCustomers.has(id)) providerCustomers.set(id, customer);
         reply(providerCustomers.get(id));
     };
@@ -386,7 +392,7 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
   );
 
   test.each([
-    { label: "foreign metadata", overrides: { metadata: { callcaster_workspace_id: foreignWorkspaceId, callcaster_request_id: "other_request" } } },
+    { label: "foreign metadata", overrides: { metadata: { callcaster_workspace_id: foreignWorkspaceId } } },
     { label: "credit balance", overrides: { balance: 100 } },
     { label: "legacy default source", overrides: { default_source: "src_saved_fixture" } },
     { label: "default payment method", overrides: { invoice_settings: { default_payment_method: "pm_saved_fixture" } } },
