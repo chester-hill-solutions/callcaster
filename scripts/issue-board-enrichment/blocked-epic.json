@@ -759,35 +759,6 @@
     "trackerRecommendation": "Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL."
   },
   {
-    "issueNumber": 2003,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Agent role can reach the billing page by URL even though the sidebar link is hidden",
-    "summary": "A concrete live instance of the gap the cluster is about. The Credits entry is correctly absent from the sidebar for the Agent role, but an Agent who types the billing path directly reaches the page. Hiding a link is not access control.",
-    "currentBehavior": "Sidebar hides the link; the route does not enforce the permission. The route renders.",
-    "rootCause": "UI visibility was treated as the control. The route has no permission check for this resource.",
-    "resolution": "Blocked by #2030, because the right fix is a permission check and which permission depends on the model. When it lands: the route must enforce, not merely render, and a direct URL request must be refused. Note the existing convention from AGENTS.md — a non-member gets a uniform 404 rather than a 403, to avoid workspace-id inference, so match whatever the sibling billing routes already do rather than inventing a response shape.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/billing.*",
-      "app/components/layout/WorkspaceSidebar.tsx",
-      "app/lib/workspace-middleware.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "an Agent requesting the billing path directly is refused"
-    ],
-    "acceptanceCriteria": [
-      "An Agent requesting the billing path by URL is refused",
-      "The refusal matches the convention used by sibling routes (404 for non-members)",
-      "The check is a permission check at the route, not a UI-visibility check"
-    ],
-    "blockedBy": [
-      2030
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "The smallest concrete instance of the cluster and the easiest to verify, so it makes a good first implementation once #2030 reports. Keep it separate from the model work so the model is not judged by one route."
-  },
-  {
     "issueNumber": 2008,
     "verdict": "blocked-epic",
     "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",

@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@3b27ff2e; checkout role gap confirmed by source and actual route reproduction (2026-10-04 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@2cfacadd; Agent billing report reconciled with merged canonical fix and role browser proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-04 UTC after the checkout authorization audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the Agent billing source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -632,7 +632,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 157
+## Verify and close — 158
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -648,6 +648,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Repeat the actual add-route acceptance checks on deployed dev.; Default-branch promotion and release verification before closure.
 - Done when: Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.; Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.; The shared service rejects a queue belonging to another workspace.; A valid member and queue in the same workspace succeed.; An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected.
 - Tracker: Source fix is merged and reviewed on dev. Verify deployed acceptance and promote before closing; do not implement the membership validation again.
+
+### [#2003](https://github.com/chester-hill-solutions/callcaster/issues/2003) Agent role can reach the billing page by URL even though the sidebar link is hidden
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- The Agent display name maps to Caller. The direct billing-page read gap is fixed on dev by PR #2370 under canonical #2137; do not add another gate for this report.
+- Current behavior: The billing loader checks Admin before reading billing data. Caller and Member document requests receive 403; Admin and Owner retain 200. Document non-members follow the existing workspace-picker redirect; billing JSON and service non-members receive 404.
+- Root cause: The original route relied on sidebar visibility. PR #2370 added the route and service read floor; the earlier #2030 policy blocker no longer applies to this specific billing report.
+- Resolution: Follow #2137 for deployed dev acceptance and default-branch promotion. Verify direct billing requests for all four roles. Preserve the document/API distinction when applying the existing non-member acceptance criterion. Keep checkout creation and polling scope in #2371 separate.
+- Look in: `app/lib/workspace-role-display.ts`, `app/routes/workspaces+/$id/billing.loader.server.ts`, `app/lib/workspace-middleware.server.ts`, `e2e/specs/rbac.spec.ts`, `test/billing-read-access.test.ts`
+- Existing tests: e2e/specs/rbac.spec.ts:83 — direct caller/member 403 and admin/owner 200 for document and JSON billing; isolated production run passed all five setup/role cases without retry; test/billing-read-access.test.ts — actual loader/service access checks with mocked membership rows; denied reads stop before balance or ledger access; PR #2370 merged at 486de78e585cf648754f5437ff34bf009c39b5a3; source paths checked at that commit
+- Missing tests: Deployed dev acceptance and default-branch release remain under canonical #2137
+- Done when: An Agent requesting the billing path by URL is refused; The refusal matches the convention used by sibling routes (404 for non-members); The check is a permission check at the route, not a UI-visibility check
+- Tracker: Verify with canonical #2137, then close only after default-branch promotion. This source fix needs no additional #2030 policy decision; keep broader role-model work separate.
 
 ### [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137) The billing/ledger loader has no role gate — any member, including caller, reads the full credit history
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -2903,21 +2915,9 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 43
+## Blocked / split first — 42
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
-
-### [#2003](https://github.com/chester-hill-solutions/callcaster/issues/2003) Agent role can reach the billing page by URL even though the sidebar link is hidden
-- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
-- A concrete live instance of the gap the cluster is about. The Credits entry is correctly absent from the sidebar for the Agent role, but an Agent who types the billing path directly reaches the page. Hiding a link is not access control.
-- Current behavior: Sidebar hides the link; the route does not enforce the permission. The route renders.
-- Root cause: UI visibility was treated as the control. The route has no permission check for this resource.
-- Resolution: Blocked by #2030, because the right fix is a permission check and which permission depends on the model. When it lands: the route must enforce, not merely render, and a direct URL request must be refused. Note the existing convention from AGENTS.md — a non-member gets a uniform 404 rather than a 403, to avoid workspace-id inference, so match whatever the sibling billing routes already do rather than inventing a response shape.
-- Look in: `app/routes/workspaces+/$id/billing.*`, `app/components/layout/WorkspaceSidebar.tsx`, `app/lib/workspace-middleware.server.ts`
-- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
-- Missing tests: an Agent requesting the billing path directly is refused
-- Done when: An Agent requesting the billing path by URL is refused; The refusal matches the convention used by sibling routes (404 for non-members); The check is a permission check at the route, not a UI-visibility check
-- Tracker: The smallest concrete instance of the cluster and the easiest to verify, so it makes a good first implementation once #2030 reports. Keep it separate from the model work so the model is not judged by one route.
 
 ### [#2356](https://github.com/chester-hill-solutions/callcaster/issues/2356) Reconcile audio objects left unattached after campaign update failure
 - Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
