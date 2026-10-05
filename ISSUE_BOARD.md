@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@22aad99b; Independent feature flag fix reconciled with merged source and real PostgreSQL proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@02af083e; Canonical Stripe customer fix reconciled with merged source and real PostgreSQL proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the feature flag source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the Stripe customer source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 50
+## Fix now — 49
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,17 +45,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
-
-### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
-- First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
-- Resolution: Use an idempotent workspace customer creation and/or a compare-and-set protocol; reconcile losers.
-- Look in: `app/lib/platform-billing.server.ts:54`, `app/lib/platform-billing.server.ts:65`, `app/lib/database/stripe.server.ts:62`, `app/lib/platform-billing.server.ts (`ensureStripeCustomer`, `createBillingCheckoutSession`)`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions`, `app/db/schema.ts (the `workspace.stripe_id` column)`
-- Existing tests: test/platform-billing-checkout.test.ts; test/db-stripe.server.test.ts
-- Missing tests: Concurrent first checkout, loser logging, retained payment method, and existing-ID control tests.
-- Done when: Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.; If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.; A saved payment method is retrievable after the race.; The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -597,9 +586,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 161
+## Verify and close — 162
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Verify canonical Stripe customer creation after release**
+- PR #2385 merged the canonical customer protocol into dev. Checkout and setup reuse one frozen provider request and an atomic persisted claim. Release and deployed Stripe acceptance remain.
+- Current behavior: Source audit: dev@02af083e, 2026-10-05. PR #2385 uses frozen customer parameters and a workspace provider key, atomic canonical claims, protected setup writes, old unknown-request recovery, and persisted conflict reconciliation. Unsafe or unfinished conflicts stop checkout and retry. Previously claimed customers are retained; unclaimed candidates require ownership, balance, saved-method and seven history checks before deletion. Provider I/O stays outside database locks.
+- Resolution: Promote PR #2385 to the default branch. Verify concurrent first checkout and setup in an owned deployed Stripe test-mode workspace, canonical storage, saved payment access and unchanged completed-ID checkout. Verify retry, old unknown-result recovery and protected-conflict behavior before closure. Preserve unsafe customers for operator reconciliation.
+- Look in: `app/lib/platform-billing.server.ts:38`, `app/lib/database/stripe.server.ts:136`, `app/lib/database/stripe-customer-reconciliation.server.ts:23`, `app/lib/database/workspace-provisioning.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts`, `client/migrations/20261005000000_persist_stripe_customer_creation.sql`, `scripts/db/bootstrap-fresh-db.mjs:129`, `scripts/e2e/bootstrap-compose-db.mjs:88`, `test/integration-db/stripe-customer-race.test.ts`
+- Existing tests: test/platform-billing-checkout.test.ts; test/db-stripe.server.test.ts; test/integration-db/stripe-customer-race.test.ts: 26 actual PostgreSQL and installed-Stripe-SDK cases; all 330 database cases passed on a fresh local bootstrap. The final 26-case suite and both final-head remote database jobs passed. Eleven independent source faults failed selected behavior cases; source was restored. Initial and final full ci:local, required remote checks and both deployment contexts passed at tested head d59fcf999498104c6dbb2e7958235bed6695d898; merge source equivalence verified.
+- Missing tests: Owned deployed Stripe test-mode acceptance: concurrent checkout/setup, saved methods, completed-ID control, retry/recovery and protected conflict handling. Local provider fixtures and green deployments do not prove this acceptance.
+- Done when: Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.; If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.; A saved payment method is retrievable after the race.; The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`.
+- Tracker: Keep OPEN in Verify and close until default-branch promotion and deployed Stripe acceptance. Native body preserves four criteria and original history; Development links to PR #2385.
 
 ### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
 - Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05

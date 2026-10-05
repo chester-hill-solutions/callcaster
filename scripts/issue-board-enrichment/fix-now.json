@@ -538,39 +538,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2115,
-    "verdict": "fix-now",
-    "recommendedTitle": "ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method",
-    "summary": "First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.",
-    "resolution": "Use an idempotent workspace customer creation and/or a compare-and-set protocol; reconcile losers.",
-    "lookIn": [
-      "app/lib/platform-billing.server.ts:54",
-      "app/lib/platform-billing.server.ts:65",
-      "app/lib/database/stripe.server.ts:62",
-      "app/lib/platform-billing.server.ts (`ensureStripeCustomer`, `createBillingCheckoutSession`)",
-      "app/routes/api+/workspaces+/$workspaceId/billing/sessions",
-      "app/db/schema.ts (the `workspace.stripe_id` column)"
-    ],
-    "existingTests": [
-      "test/platform-billing-checkout.test.ts",
-      "test/db-stripe.server.test.ts"
-    ],
-    "missingTests": [
-      "Concurrent first checkout, loser logging, retained payment method, and existing-ID control tests."
-    ],
-    "acceptanceCriteria": [
-      "Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.",
-      "If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.",
-      "A saved payment method is retrievable after the race.",
-      "The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2119,
     "verdict": "fix-now",
     "recommendedTitle": "runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting",
