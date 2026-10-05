@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: SMS campaigns show a persistent warning for unrestricted sending, including voice-only schedules. Launch review asks for consent, and incomplete SMS intervals cannot be saved ([#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047)).
+- Fixed: SMS campaigns show a persistent warning for unrestricted sending, including voice-only schedules. Launch review asks for consent, and incomplete SMS intervals cannot be saved ([#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047)). PR [#2387](https://github.com/chester-hill-solutions/callcaster/pull/2387).
 
 - **Fixed:** Concurrent checkout and workspace setup share one saved Stripe customer. Retries retain their original request, and old unknown results require customer recovery before checkout ([#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115)). PR [#2385](https://github.com/chester-hill-solutions/callcaster/pull/2385).
 
