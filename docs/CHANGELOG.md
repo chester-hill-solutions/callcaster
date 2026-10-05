@@ -99,7 +99,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Compare each environment’s ledger and schema with its deployed code branch ([#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064)).
+- Compare each environment’s ledger and schema with its deployed code branch ([#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064), [PR #2401](https://github.com/chester-hill-solutions/callcaster/pull/2401)).
 
 - Retain the original audience CSV before its import starts, so a storage failure does not queue an import without its source file ([#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350), [PR #2351](https://github.com/chester-hill-solutions/callcaster/pull/2351)).
 
