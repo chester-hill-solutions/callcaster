@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: A malformed workspace feature flag no longer disables valid flags beside it. Server warnings identify invalid known keys without exposing stored values ([#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118)).
+- Fixed: A malformed workspace feature flag no longer disables valid flags beside it. Server warnings identify invalid known keys without exposing stored values ([#2382](https://github.com/chester-hill-solutions/callcaster/pull/2382), [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118)).
 
 - Fixed: Audio uploads reject invalid or foreign campaign targets before storage and report failed attachments as failures. ([#2379](https://github.com/chester-hill-solutions/callcaster/pull/2379), [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355))
 
