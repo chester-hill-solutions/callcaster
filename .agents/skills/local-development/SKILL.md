@@ -188,6 +188,14 @@ inside a SQL expression, use the timestamp column encoder with `sql.param`.
 Verify capture, replacement and null input against real Postgres; mocked
 updates cannot prove driver serialization or first-write preservation.
 
+For real RPC fixtures, inspect and seed each required foreign-key actor.
+Membership or an auth identity may not supply the legacy user-profile row.
+A fixture or constraint error before the target assertion is not defect proof.
+
+The scoped client's delete method returns no rows. When compensation depends
+on whether a row was removed, use a transaction-bound deletion with explicit
+tenant scope and RETURNING. Prove the counter change through real Postgres.
+
 For a target-user check, membership does not prove that the global user still
 exists. Canonical `workspace_member` keys are text and have no global-user FK.
 Test missing users both with and without a stale membership row through each

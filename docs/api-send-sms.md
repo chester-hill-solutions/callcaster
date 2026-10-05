@@ -101,6 +101,24 @@ curl -X POST "$BASE_URL/api/sms" \
 
 `402` with `{ "creditsError": true, "error": "Insufficient credits" }` when the workspace has no credits to start the batch at all. `400` when the campaign needs a `caller_id` and none was given.
 
+### Delivery results and recovery
+
+Provider acceptance removes the recipient from dispatch. The outreach result
+stays unresolved until the linked message has a provider result. Delivered,
+failed and undelivered messages appear under those campaign queue filters.
+Repeated callbacks and late nonterminal updates preserve the terminal result.
+
+Open-sync also checks sent messages whose send time is already saved. When the
+provider reports a terminal result, it queues the same status side effects used
+by callbacks. A provider response of sent leaves delivery unresolved; elapsed
+time alone does not prove delivery. Recovery follows the existing sweep budget.
+
+This behavior applies to messages with a saved outreach-attempt link. Older
+messages without that link, or attempts already marked completed at send time,
+need a separate repair with verified message-to-attempt identity. The send path
+does not rewrite those historical rows. The shared call terminal guard remains
+in force.
+
 ---
 
 ## Authentication

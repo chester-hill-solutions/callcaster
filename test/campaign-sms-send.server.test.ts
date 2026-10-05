@@ -1,12 +1,14 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { DispatchPolicy } from "@/lib/campaign-dispatch-policy";
 
 const mocks = vi.hoisted(() => ({
   messagesCreate: vi.fn(),
   dequeueQueueEntry: vi.fn(async () => undefined),
   persistMessageRecord: vi.fn(async () => ({ data: [{ id: 1 }], error: null as { message: string } | null })),
-  isDispatchAllowedAt: vi.fn(() => true),
+  isDispatchAllowedAt: vi.fn<(policy: DispatchPolicy) => boolean>(() => true),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ campaign_id: 1 })),
   rpcCreateOutreachAttempt: vi.fn(async () => 7),
+  linkMessage: vi.fn(async () => [{ sid: "pending:fixture" }]),
   resolveMessageByClientRef: vi.fn(async () => ({ id: 1 })),
   deleteMessageByClientRef: vi.fn(async () => undefined),
   notifyOps: vi.fn(async () => ({ ok: true })),
@@ -59,7 +61,8 @@ vi.mock("@/lib/logger.server", async (importOriginal) => ({
 }));
 vi.mock("@/server/tenant-db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/tenant-db")>()),
-  createTenantDb: vi.fn(() => ({})),
+  createTenantDb: vi.fn(() => ({ message: { update: mocks.linkMessage } })),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
 }));
 
 import { sendSingleCampaignSms } from "../app/lib/campaign-sms-send.server";
@@ -84,6 +87,8 @@ function params() {
   };
 }
 
+afterEach(() => vi.useRealTimers());
+
 describe("sendSingleCampaignSms intent row (#1582)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +96,7 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
     mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
+    mocks.linkMessage.mockReset().mockResolvedValue([{ sid: "pending:fixture" }]);
   });
 
   test("writes a pending intent row before calling Twilio, then resolves it with the real SID", async () => {
@@ -166,13 +172,12 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
     vi.spyOn(Math, "random").mockReturnValue(0);
-    mocks.isDispatchAllowedAt
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(false);
-    mocks.messagesCreate.mockRejectedValueOnce(
-      Object.assign(new Error("temporary provider error"), { status: 503 }),
-    );
+    const policy = await vi.importActual<typeof import("@/lib/campaign-dispatch-policy")>("@/lib/campaign-dispatch-policy");
+    mocks.isDispatchAllowedAt.mockImplementation(policy.isDispatchAllowedAt);
+    mocks.messagesCreate.mockImplementationOnce(async () => {
+      vi.setSystemTime(new Date("2026-09-09T21:00:00.100Z"));
+      throw Object.assign(new Error("temporary provider error"), { status: 503 });
+    });
     const send = sendSingleCampaignSms({
       ...params(),
       sendPolicy: smsSendPolicy({
@@ -221,6 +226,8 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
 describe("sendSingleCampaignSms persist failure", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isDispatchAllowedAt.mockReset().mockReturnValue(true);
+    mocks.linkMessage.mockReset().mockResolvedValue([{ sid: "pending:fixture" }]);
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
     mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
