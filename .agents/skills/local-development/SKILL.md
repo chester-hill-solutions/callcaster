@@ -50,6 +50,10 @@ copy of a vendored package can prevent CSS import analysis from finding its
 theme tokens and produce false design-system lint warnings. Keep both lockfiles;
 do not raise the lint baseline to work around a package-resolution failure.
 
+Run `npm ci` with registry and npm-cache access in a new worktree. If a silent
+install cannot access those resources, verify and stop only its owned process
+before retrying with the needed permissions. Keep the existing lockfiles.
+
 Install locked dependencies before committing in a new worktree. The effects
 pre-commit guard imports TypeScript even for a Markdown-only change.
 
