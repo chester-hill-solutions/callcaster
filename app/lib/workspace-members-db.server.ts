@@ -15,6 +15,7 @@ import { authUser } from "@/db/auth-schema";
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { isTwoFactorEnabled } from "@/lib/two-factor.server";
+import { warnInvalidWorkspaceFeatureFlags } from "@/lib/workspace-feature-flags.server";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -606,6 +607,7 @@ export async function getWorkspaceById(workspaceId: string) {
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
+  if (row) warnInvalidWorkspaceFeatureFlags(workspaceId, row.feature_flags);
   return row ?? null;
 }
 
