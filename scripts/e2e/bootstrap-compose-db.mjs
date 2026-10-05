@@ -85,6 +85,7 @@ const steps = [
   "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
   "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
   "client/migrations/20261003231500_guard_active_inbound_offers.sql",
+  "client/migrations/20261005000000_persist_stripe_customer_creation.sql",
 ];
 
 /**

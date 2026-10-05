@@ -39,7 +39,9 @@ async function ensureStripeCustomer(
   workspaceId: string,
 ): Promise<{ ok: true; stripeCustomerId: string } | { ok: false; error: string; status: number }> {
   const [workspace] = await adminDb
-    .select({ stripe_id: workspaceTable.stripe_id })
+    .select({ stripe_id: workspaceTable.stripe_id, stripe_customer_conflict: workspaceTable.stripe_customer_conflict,
+      stripe_customer_creation: workspaceTable.stripe_customer_creation,
+      stripe_customer_creation_completed_id: workspaceTable.stripe_customer_creation_completed_id })
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
@@ -54,17 +56,13 @@ async function ensureStripeCustomer(
 
   let stripeCustomerId = workspace.stripe_id ?? null;
 
-  if (!stripeCustomerId) {
+  if (!stripeCustomerId || workspace.stripe_customer_conflict ||
+      (workspace.stripe_customer_creation && workspace.stripe_customer_creation_completed_id !== stripeCustomerId)) {
     try {
       const customer = await createStripeContact({
         workspace_id: workspaceId,
       });
       stripeCustomerId = customer.id;
-
-      await adminDb
-        .update(workspaceTable)
-        .set({ stripe_id: stripeCustomerId })
-        .where(eq(workspaceTable.id, workspaceId));
     } catch {
       return {
         ok: false,
