@@ -1321,45 +1321,5 @@
     "risk": "high",
     "trackerRecommendation": "OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.",
     "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
-  },
-  {
-    "issueNumber": 2152,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
-    "summary": "Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.",
-    "currentBehavior": "The public override defect is confirmed on dev@ee28af66. PR #2410 is open at final head cf2179dabbd95b5fab08ec556f51bf30aa62c98c and always reserves before queue entry writes. Ten real API/Postgres cases passed, two independent faults each fail six cases with four controls, and all three database URL modes pass. The guard passes 127 focused cases; the actual CLI rejects nine injected bypasses, including entry-RPC wrapper/SQL calls, and restored source passes. Both reviews and initial/final full local CI passed. Exact final-head remote checks and both deployments remain pending.",
-    "resolution": "Merge PR #2410 only after applicable final-head checks and both deployments pass. Verify release-candidate ordering against original criteria before promotion; preserve independent uniqueness. #2153 audit history remains separate.",
-    "lookIn": [
-      "app/routes/api+/campaign_queue.action.server.ts:40",
-      "app/routes/api+/campaign_queue.action.server.ts:69",
-      "app/lib/queue.server.ts:51",
-      "drizzle/0006_app_schema_tail.sql:95",
-      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
-      "app/routes/api+/campaign_queue.action.server.ts",
-      "app/lib/campaign-queue-db.server.ts",
-      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
-      "scripts/check-queue-rpc-contract.mjs",
-      "client/migrations/ (the reservation RPC)"
-    ],
-    "existingTests": [
-      "test/campaign-queue.route.test.ts",
-      "test/queue.server.test.ts",
-      "test/queue-rpc-contract.test.ts"
-    ],
-    "missingTests": [
-      "Exact final-head full local CI, remote checks, both deployments and release-candidate ordering acceptance remain."
-    ],
-    "acceptanceCriteria": [
-      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
-      "Two concurrent public enqueues reserve disjoint order ranges.",
-      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
-      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
-      "Record the API sweep for other client-writable queue lifecycle fields."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now until PR #2410 lands. Full local source proof is complete; no merge or live acceptance is claimed. Keep the native issue OPEN for promotion and acceptance.",
-    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
   }
 ]

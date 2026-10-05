@@ -5293,5 +5293,45 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "OPEN Verify and close. Source scope is fixed; delivery state ownership remains separate in #2149."
+  },
+  {
+    "issueNumber": 2152,
+    "verdict": "verify-close",
+    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
+    "summary": "Public queue appends now always use server-reserved ranges; the fix is merged to dev. Release-candidate ordering acceptance and promotion remain.",
+    "currentBehavior": "PR #2410 merged at dev@34fac6502fbc8dfee40cc127b837a511d1d2636c. Ten actual API/PostgreSQL cases pass; both independent faults fail six cases with four controls, and all three URL modes pass. Both reviews, 127 focused tests, nine actual CLI rejection cases, initial/final full local CI, applicable exact-head remote checks, E2E, bundle checks and both deployments passed. Clean topic refs/worktree were removed after source-equivalence and recovery-bundle verification.",
+    "resolution": "Verify ordering on the release candidate against the original criteria, then promote. Do not implement the landed repair again. Existing uniqueness is independent; #2153 queue-reset history remains a separate concern.",
+    "lookIn": [
+      "app/routes/api+/campaign_queue.action.server.ts:40",
+      "app/routes/api+/campaign_queue.action.server.ts:69",
+      "app/lib/queue.server.ts:51",
+      "drizzle/0006_app_schema_tail.sql:95",
+      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
+      "app/routes/api+/campaign_queue.action.server.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
+      "scripts/check-queue-rpc-contract.mjs",
+      "client/migrations/ (the reservation RPC)"
+    ],
+    "existingTests": [
+      "test/campaign-queue.route.test.ts",
+      "test/queue.server.test.ts",
+      "test/queue-rpc-contract.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate ordering and default-branch promotion remain. Historical order/counter data has not been audited or repaired by this change."
+    ],
+    "acceptanceCriteria": [
+      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
+      "Two concurrent public enqueues reserve disjoint order ranges.",
+      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
+      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
+      "Record the API sweep for other client-writable queue lifecycle fields."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. PR #2410 is merged to dev. Keep the issue OPEN until required acceptance and promotion; source/deployment proof does not establish live or historical data acceptance.",
+    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
   }
 ]

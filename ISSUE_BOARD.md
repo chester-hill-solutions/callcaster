@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@ee28af66; merged workflow/date/filter/SMS fixes, pending queue ordering and current security range evidence (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@34fac650; merged workflow/date/filter/SMS/queue fixes and current security range evidence (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC. Source descriptions distinguish merged dev fixes from reviewed but unmerged changes. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 40
+## Fix now — 39
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -259,18 +259,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
-- Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.
-- Current behavior: The public override defect is confirmed on dev@ee28af66. PR #2410 is open at final head cf2179dabbd95b5fab08ec556f51bf30aa62c98c and always reserves before queue entry writes. Ten real API/Postgres cases passed, two independent faults each fail six cases with four controls, and all three database URL modes pass. The guard passes 127 focused cases; the actual CLI rejects nine injected bypasses, including entry-RPC wrapper/SQL calls, and restored source passes. Both reviews and initial/final full local CI passed. Exact final-head remote checks and both deployments remain pending.
-- Root cause: A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe.
-- Resolution: Merge PR #2410 only after applicable final-head checks and both deployments pass. Verify release-candidate ordering against original criteria before promotion; preserve independent uniqueness. #2153 audit history remains separate.
-- Look in: `app/routes/api+/campaign_queue.action.server.ts:40`, `app/routes/api+/campaign_queue.action.server.ts:69`, `app/lib/queue.server.ts:51`, `drizzle/0006_app_schema_tail.sql:95`, `client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49`, `app/routes/api+/campaign_queue.action.server.ts`, `app/lib/campaign-queue-db.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts:156-161`, `scripts/check-queue-rpc-contract.mjs`, `client/migrations/ (the reservation RPC)`
-- Existing tests: test/campaign-queue.route.test.ts; test/queue.server.test.ts; test/queue-rpc-contract.test.ts
-- Missing tests: Exact final-head full local CI, remote checks, both deployments and release-candidate ordering acceptance remain.
-- Done when: Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.; Two concurrent public enqueues reserve disjoint order ranges.; The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.; check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.; Record the API sweep for other client-writable queue lifecycle fields.
-- Tracker: Fix now until PR #2410 lands. Full local source proof is complete; no merge or live acceptance is claimed. Keep the native issue OPEN for promotion and acceptance.
-
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
 - Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
@@ -489,9 +477,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 173
+## Verify and close — 174
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Public queue appends now always use server-reserved ranges; the fix is merged to dev. Release-candidate ordering acceptance and promotion remain.
+- Current behavior: PR #2410 merged at dev@34fac6502fbc8dfee40cc127b837a511d1d2636c. Ten actual API/PostgreSQL cases pass; both independent faults fail six cases with four controls, and all three URL modes pass. Both reviews, 127 focused tests, nine actual CLI rejection cases, initial/final full local CI, applicable exact-head remote checks, E2E, bundle checks and both deployments passed. Clean topic refs/worktree were removed after source-equivalence and recovery-bundle verification.
+- Root cause: A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe.
+- Resolution: Verify ordering on the release candidate against the original criteria, then promote. Do not implement the landed repair again. Existing uniqueness is independent; #2153 queue-reset history remains a separate concern.
+- Look in: `app/routes/api+/campaign_queue.action.server.ts:40`, `app/routes/api+/campaign_queue.action.server.ts:69`, `app/lib/queue.server.ts:51`, `drizzle/0006_app_schema_tail.sql:95`, `client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49`, `app/routes/api+/campaign_queue.action.server.ts`, `app/lib/campaign-queue-db.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts:156-161`, `scripts/check-queue-rpc-contract.mjs`, `client/migrations/ (the reservation RPC)`
+- Existing tests: test/campaign-queue.route.test.ts; test/queue.server.test.ts; test/queue-rpc-contract.test.ts
+- Missing tests: Live release-candidate ordering and default-branch promotion remain. Historical order/counter data has not been audited or repaired by this change.
+- Done when: Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.; Two concurrent public enqueues reserve disjoint order ranges.; The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.; check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.; Record the API sweep for other client-writable queue lifecycle fields.
+- Tracker: Verify and close. PR #2410 is merged to dev. Keep the issue OPEN until required acceptance and promotion; source/deployment proof does not establish live or historical data acceptance.
 
 ### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
