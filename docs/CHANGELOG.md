@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Predictive dialing shows missing caller ID or device in the existing start control, prevents repeated pending starts, and reports failures with a retryable toast and credit recovery ([#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131)).
+- Fixed: Predictive dialing shows missing caller ID or device in the existing start control, prevents repeated pending starts, and reports failures with a retryable toast and credit recovery ([#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131), [PR #2394](https://github.com/chester-hill-solutions/callcaster/pull/2394)).
 
 - Security: Twilio callback checks validate the complete encoded query under the configured public URL. Query changes and query-free signature reuse are rejected; GET callbacks do not count query fields twice ([#2390](https://github.com/chester-hill-solutions/callcaster/issues/2390), [PR #2391](https://github.com/chester-hill-solutions/callcaster/pull/2391)).
 
