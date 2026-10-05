@@ -58,6 +58,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.; Continuation does not run while playback acknowledgement is pending.; Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.; Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.; Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required.
 - Tracker: Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed.
 
+### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- Mixed SMS/MMS credits are compared as SMS segments, and SMS aggregate/subtype usage is double counted. Six actual builder cases confirm three defects with three controls.
+- Current behavior: At dev@c704cdf9, six actual report-builder cases executed. Pure MMS gives false SMS variance -2; a balanced SMS/MMS mix gives -4; overlapping SMS aggregate/subtype records give +3. The latter two trigger false material drift. Three SMS and inbound controls pass. Provider records are synthetic; no live or persistence acceptance is claimed.
+- Root cause: The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes.
+- Resolution: Carry verified message kind through the tenant loader, compare SMS and MMS in their proper units, and use non-overlapping supported outbound provider categories. Verify units, missing facts, persistence, alert controls and full gates before release acceptance.
+- Look in: `shared/billing-reconciliation.ts`, `app/lib/billing-reconciliation.server.ts`, `app/lib/billing-reconcile-workspace.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `shared/pricing.ts`
+- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconcile-workspace.server.test.ts
+- Missing tests: Pure SMS/MMS/mixed, aggregate/subtype overlap, provider-unit and unknown-kind controls; actual tenant loader/persistence and live provider comparison remain required.
+- Done when: A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.; A workspace that sent only MMS reconciles with zero variance.; A workspace that sent a mix of SMS and MMS reconciles with zero variance.; Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping.
+- Tracker: OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.
+
 ### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
 - Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
@@ -101,17 +113,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.
-- Resolution: Compare SMS and MMS in consistent separate units or join ledger/message facts before converting units.
-- Look in: `shared/billing-reconciliation.ts:180`, `shared/billing-reconciliation.ts:185`, `app/lib/worker/webhook-side-effects.server.ts:207`, `app/lib/billing-reconciliation.server.ts`, `app/lib/billing-reconciliation-workspace.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `shared/billing-reconciliation.ts:12`, `app/lib/worker/webhook-side-effects.server.ts:207-209`, `shared/pricing.ts (`SMS_SEGMENT_CREDITS`, `MMS_CREDITS`)`
-- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconcile-workspace.server.test.ts
-- Missing tests: Pure SMS, pure MMS and mixed tests with rate-card-driven coverage; no real provider reconciliation measured here.
-- Done when: A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.; A workspace that sent only MMS reconciles with zero variance.; A workspace that sent a mix of SMS and MMS reconciles with zero variance.; Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084) Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02

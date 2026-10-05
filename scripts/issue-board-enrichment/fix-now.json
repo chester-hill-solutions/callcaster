@@ -333,43 +333,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2112,
-    "verdict": "fix-now",
-    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
-    "summary": "Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
-    "resolution": "Compare SMS and MMS in consistent separate units or join ledger/message facts before converting units.",
-    "lookIn": [
-      "shared/billing-reconciliation.ts:180",
-      "shared/billing-reconciliation.ts:185",
-      "app/lib/worker/webhook-side-effects.server.ts:207",
-      "app/lib/billing-reconciliation.server.ts",
-      "app/lib/billing-reconciliation-workspace.server.ts",
-      "app/lib/billing-reconciliation-alert.server.ts",
-      "app/lib/billing-reconciliation-snapshot.server.ts",
-      "shared/billing-reconciliation.ts:12",
-      "app/lib/worker/webhook-side-effects.server.ts:207-209",
-      "shared/pricing.ts (`SMS_SEGMENT_CREDITS`, `MMS_CREDITS`)"
-    ],
-    "existingTests": [
-      "test/billing-reconciliation.test.ts",
-      "test/billing-reconcile-workspace.server.test.ts"
-    ],
-    "missingTests": [
-      "Pure SMS, pure MMS and mixed tests with rate-card-driven coverage; no real provider reconciliation measured here."
-    ],
-    "acceptanceCriteria": [
-      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
-      "A workspace that sent only MMS reconciles with zero variance.",
-      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
-      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2113,
     "verdict": "fix-now",
     "recommendedTitle": "hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot",
@@ -1461,5 +1424,39 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "OPEN Fix now until PR #2407 lands. Callbacks do not always supply quantities; missing/provisional provider data defers billing without blocking delivery settlement."
+  },
+  {
+    "issueNumber": 2112,
+    "verdict": "fix-now",
+    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
+    "summary": "Mixed SMS/MMS credits are compared as SMS segments, and SMS aggregate/subtype usage is double counted. Six actual builder cases confirm three defects with three controls.",
+    "currentBehavior": "At dev@c704cdf9, six actual report-builder cases executed. Pure MMS gives false SMS variance -2; a balanced SMS/MMS mix gives -4; overlapping SMS aggregate/subtype records give +3. The latter two trigger false material drift. Three SMS and inbound controls pass. Provider records are synthetic; no live or persistence acceptance is claimed.",
+    "resolution": "Carry verified message kind through the tenant loader, compare SMS and MMS in their proper units, and use non-overlapping supported outbound provider categories. Verify units, missing facts, persistence, alert controls and full gates before release acceptance.",
+    "lookIn": [
+      "shared/billing-reconciliation.ts",
+      "app/lib/billing-reconciliation.server.ts",
+      "app/lib/billing-reconcile-workspace.server.ts",
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "app/lib/billing-reconciliation-snapshot.server.ts",
+      "shared/pricing.ts"
+    ],
+    "existingTests": [
+      "test/billing-reconciliation.test.ts",
+      "test/billing-reconcile-workspace.server.test.ts"
+    ],
+    "missingTests": [
+      "Pure SMS/MMS/mixed, aggregate/subtype overlap, provider-unit and unknown-kind controls; actual tenant loader/persistence and live provider comparison remain required."
+    ],
+    "acceptanceCriteria": [
+      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
+      "A workspace that sent only MMS reconciles with zero variance.",
+      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
+      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.",
+    "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
   }
 ]
