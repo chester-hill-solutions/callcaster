@@ -217,6 +217,12 @@ store a JSON string instead of the intended object. Use the fixture identity
 in unique columns such as workspace keys; a shared marker can fail setup before
 any behavior case runs.
 
+A postgres.js `begin` transaction client is not a supported `drizzle()`
+constructor input. Use a Drizzle transaction, or compile the query through a
+supported client and execute it through the transaction that owns the temporary
+tables. A fixture adapter failure is not a failing behavior test. Require the
+expected executed cases and passing controls before accepting regression proof.
+
 The shared Vitest config restores spies before each case. Install observation
 spies in `beforeEach`; a spy created in `beforeAll` can be removed before the
 first case. Require executed cases and a passing result before using the proof.
