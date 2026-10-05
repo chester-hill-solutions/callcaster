@@ -6290,7 +6290,7 @@
       "post": {
         "operationId": "postMedia",
         "summary": "POST /api/media",
-        "description": "Audio file limit: 10 MiB (10485760 bytes). Total encoded request limit: 10551296 bytes (10 MiB + 64 KiB for multipart fields and overhead). Oversized file or body returns 413; malformed form or invalid audio returns 400. Campaign name does not control the object key.",
+        "description": "Audio file limit: 10 MiB (10485760 bytes). Total encoded request limit: 10551296 bytes (10 MiB + 64 KiB for multipart fields and overhead). Oversized file or body returns 413; malformed form, invalid audio or invalid campaign ID returns 400. A missing or foreign-workspace campaign returns 404 before media work. A successful attachment returns 201; a failed final update returns 500. Campaign name does not control the object key.",
         "tags": [
           "User API",
           "media"

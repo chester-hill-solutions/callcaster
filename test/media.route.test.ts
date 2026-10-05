@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   updateCampaignVoicedropAudio: vi.fn(async () => ({ id: 1 })),
+  findCampaignInWorkspace: vi.fn(async () => ({ id: 1 })),
 }));
 
 vi.mock("../app/lib/adminDb.server", () => ({
@@ -28,6 +29,7 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
   return {
     ...actual,
+    findCampaignInWorkspace: mocks.findCampaignInWorkspace,
     updateCampaignVoicedropAudio: (...args: unknown[]) =>
       mocks.updateCampaignVoicedropAudio(...args),
   };
@@ -45,6 +47,8 @@ describe("app/routes/api+/media/route.tsx", () => {
     mocks.logger.error.mockReset();
     mocks.updateCampaignVoicedropAudio.mockReset();
     mocks.updateCampaignVoicedropAudio.mockResolvedValue({ id: 1 });
+    mocks.findCampaignInWorkspace.mockReset();
+    mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
   });
 
   test("uploads media and updates campaign, returning public url", async () => {
@@ -83,6 +87,8 @@ describe("app/routes/api+/media/route.tsx", () => {
     const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
+    fd.set("live_campaign_id", "1");
+    fd.set("workspace_id", "w1");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();

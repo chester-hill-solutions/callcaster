@@ -24,6 +24,7 @@ vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-ivr.server")>()),
   updateCampaignVoicedropAudio: io.update,
+  findCampaignInWorkspace: vi.fn(async () => ({ id: 44 })),
 }));
 
 beforeEach(() => {
