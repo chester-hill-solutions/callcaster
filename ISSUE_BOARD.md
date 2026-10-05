@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@2cfacadd; Agent billing report reconciled with merged canonical fix and role browser proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f72e7095; JSON checkout fix reconciled with merged source, real PostgreSQL and session HTTP proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the Agent billing source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the checkout source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 53
+## Fix now — 52
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -132,18 +132,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success.
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371) Require Admin access for JSON billing checkout
-- Verdict: **Fix now** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
-- JSON checkout creation and session polling require membership without the adopted Admin floor. Lower roles can reach replay, provider work or paid-session credit confirmation.
-- Current behavior: Source audit at dev@9fa9d582, 2026-10-04. The creation route uses requireDataPlaneWorkspaceUser before withIdempotency. Polling only obtains a user ID from the data-plane context. Both shared services call requireWorkspaceAccess without minRole. Billing form, balance and receipt routes already require Admin. Eight actual route invocations with real PostgreSQL membership returned 200 and reached Stripe create/retrieve for Owner, Admin, Member and Caller. Stripe responses used a local fixture and data-plane context was supplied directly. No browser/session HTTP or paid-session acceptance is claimed.
-- Root cause: Checkout endpoints and services prove workspace membership but do not enforce the existing billing role policy. Admin annotations in the API inventory do not enforce runtime access.
-- Resolution: Use the existing session-only Admin strategy on both routes before replay lookup, provider work or credit changes. Require Admin in both checkout services as defence in depth. Keep non-member 404, API-key-without-session 401, workspace/session matching, idempotency and valid Admin/Owner behavior. State the policy for checkout and polling in API docs and verify generated contracts.
-- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.loader.server.ts`, `app/lib/platform-billing.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/openapi-platform.ts`, `docs/api-agent-quickstart.md`
-- Existing tests: test/platform-billing-checkout.test.ts verifies receipt line-item credit counts with mocked requireWorkspaceAccess; it does not prove authorization.; test/billing-read-access.test.ts proves sibling billing read Admin policy, not checkout creation or polling.; Current-source reproduction passed eight actual route invocation cases against real PostgreSQL membership. Both endpoints allowed Member/Caller and reached Stripe, proving the role gap; Owner/Admin are permitted controls. The fixture used an open, unpaid session and made no credit write.
-- Missing tests: Actual route and membership checks for Caller/Member 403 before replay or provider work, with Admin/Owner success, non-member 404 and sessionless API-key 401.; Direct-service authorization controls before Stripe or credit writes, plus same-workspace paid-session and duplicate-credit controls.; Fault checks that weaken each route/service gate must fail denial cases.; Real browser/session HTTP requests for all four roles with isolated provider fixtures; API docs and generated-contract verification.
-- Done when: Caller and member sessions receive 403 for checkout creation and session polling, before replay lookup, Stripe work or credit-ledger writes.; Administrator and owner sessions retain valid checkout creation, polling and confirmation behavior.; Non-members receive the existing uniform 404; API keys without a session receive 401.; Direct checkout service calls enforce Admin before provider or ledger work.; Existing workspace/session matching and duplicate credit protections remain in place.; Tests use actual auth and membership checks, plus permitted controls. Removing or weakening each gate makes a denial test fail.; Direct browser/session HTTP tests cover all four roles. API documentation states the existing Admin policy and generated contract verification passes.
-- Tracker: The billing policy is adopted. Fix the route and service enforcement gap as one concern; #2115 customer creation concurrency and #2137 billing reads stay separate.
 
 ### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -632,9 +620,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 158
+## Verify and close — 159
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371) Require Admin access for JSON billing checkout
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The JSON checkout role gap is fixed on dev by PR #2376. Both routes and both shared services enforce the existing Admin policy. Verify deployed acceptance and release rather than implementing the same fix again.
+- Current behavior: PR #2376 merged at cd0ac0d322fe9c01a14954af6c662a2b252902cb, with source paths equal to tested 6fc58491635dd188e7f357fe5dbf3759336af3fc. Caller and Member sessions receive 403 before replay, Stripe calls or ledger writes. Admin and Owner retain valid creation, polling and paid confirmation. Non-members remain 404 and valid API-key-only requests remain 401. Workspace/session matching and duplicate-credit protections remain. Local production HTTP used genuine Better Auth sessions and real PostgreSQL with a Stripe-provider fixture; it made no live charge.
+- Root cause: The original endpoints and services proved membership without the adopted billing role floor. PR #2376 applies the canonical session-only Admin strategy at the routes and Admin checks in both services.
+- Resolution: Verify the merged fix in deployed dev and promote through the default branch before closure. Keep checkout source work complete; #2115 Stripe customer concurrency and #2137 billing reads remain separate.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.loader.server.ts`, `app/lib/platform-billing.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/openapi-platform.ts`, `docs/api-agent-quickstart.md`, `test/integration-db/billing-checkout-access.test.ts`
+- Existing tests: test/integration-db/billing-checkout-access.test.ts — 34 real-Postgres route/service cases passed locally and in the remote E2E database tier at the tested head.; Four independent route/service role-floor faults failed denial cases; exact restored source passed all 34 cases.; 25 production HTTP cases passed with genuine Better Auth sessions, real PostgreSQL membership, persistent replay, paid confirmation, duplicate-credit and foreign-session controls. Only Stripe Checkout provider calls were fixtures; no live payment is claimed.; Full local ci:local, both review axes and strict structural review passed at the tested head. Final remote checks and both Railway deployments were green before merge. The successful on-dev workflow log identified only #2371 and recorded one project move.
+- Missing tests: Deployed dev functional acceptance and default-branch promotion remain open. Local fixtures and green deployments do not prove deployed functional acceptance.
+- Done when: Caller and member sessions receive 403 for checkout creation and session polling, before replay lookup, Stripe work or credit-ledger writes.; Administrator and owner sessions retain valid checkout creation, polling and confirmation behavior.; Non-members receive the existing uniform 404; API keys without a session receive 401.; Direct checkout service calls enforce Admin before provider or ledger work.; Existing workspace/session matching and duplicate credit protections remain in place.; Tests use actual auth and membership checks, plus permitted controls. Removing or weakening each gate makes a denial test fail.; Direct browser/session HTTP tests cover all four roles. API documentation states the existing Admin policy and generated contract verification passes.
+- Tracker: Source fix is merged and reviewed on dev. Verify deployed acceptance and release before closing; keep all seven original acceptance criteria. Do not add another checkout role gate.
 
 ### [#2141](https://github.com/chester-hill-solutions/callcaster/issues/2141) addInboundQueueMember accepts any user_id, including non-members of the workspace
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
