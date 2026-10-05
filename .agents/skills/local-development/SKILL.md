@@ -367,6 +367,9 @@ failure/control counts. Keep restoration in `finally`.
 For SQL write guards, cover raw SQL, conflict updates and tuple assignments.
 Keep reads, non-order writes, quoted values and unrelated-statement controls.
 Verify rejection through the actual CLI as well as the parser.
+Include canonical lower-level writers in the bypass inventory. A public API
+can call an entry RPC directly without the reservation helper. Cover renamed,
+namespace and local aliases, with shadowed-helper controls.
 
 Guard regressions must include multiline imports, import aliases, unused
 strategies/provider helpers and single-line exported handlers. Removing only

@@ -182,6 +182,9 @@ export function analyzePublicQueueOrder(sources) {
         if (imported(node.expression, bindings, "@/lib/queue.server", "enqueueContactsForCampaign") && !enqueueOptions(node.arguments[2])) {
           report(node, "forwarded-order", "Public enqueue options must be an explicit requeue/exec object; do not forward startOrder or arbitrary request options.");
         }
+        if (imported(node.expression, bindings, "@/lib/db-rpc.server", "rpcHandleCampaignQueueEntry")) {
+          report(node, "direct-order-write", "Public API modules cannot call the queue-entry RPC directly; use enqueueContactsForCampaign for server range reservation.");
+        }
         const write = writtenFields(node, bindings);
         if (write && (write.unknown || !explicitFields(write.fields, new Set(["queue_order"])))) {
           report(node, "direct-order-write", "Public queue writes cannot set queue_order or forward unknown fields; use server range reservation.");

@@ -125,3 +125,29 @@ describe("direct public queue writes", () => {
     expect(check(`${sqlImport} ${source}`)).toEqual([]);
   });
 });
+
+
+describe("direct public queue-entry RPC calls", () => {
+  test.each([
+    'import { rpcHandleCampaignQueueEntry } from "@/lib/db-rpc.server"; rpcHandleCampaignQueueEntry(db, body);',
+    'import { rpcHandleCampaignQueueEntry as writeEntry } from "@/lib/db-rpc.server"; writeEntry(db, body);',
+    'import * as rpc from "@/lib/db-rpc.server"; rpc.rpcHandleCampaignQueueEntry(db, body);',
+    'import * as rpc from "@/lib/db-rpc.server"; rpc["rpcHandleCampaignQueueEntry"](db, body);',
+    'import { rpcHandleCampaignQueueEntry } from "../../lib/db-rpc.server.ts"; const writeEntry = rpcHandleCampaignQueueEntry; writeEntry(db, body);',
+    'import * as rpc from "@/lib/db-rpc.server"; const local = rpc; const writeEntry = local.rpcHandleCampaignQueueEntry; writeEntry(db, body);',
+  ])("rejects direct low-level order writers: %s", (source) => {
+    expect(check(source)).toMatchObject([{ kind: "direct-order-write" }]);
+  });
+
+  test.each([
+    'function local(rpcHandleCampaignQueueEntry) { rpcHandleCampaignQueueEntry(db, body); }',
+    'function local() { const rpcHandleCampaignQueueEntry = unrelated; rpcHandleCampaignQueueEntry(db, body); }',
+    'const action = () => unrelated(body);',
+  ])("permits shadowed helpers and unused imports: %s", (source) => {
+    expect(check(`import { rpcHandleCampaignQueueEntry } from "@/lib/db-rpc.server"; ${source}`)).toEqual([]);
+  });
+
+  test("permits the range reservation RPC", () => {
+    expect(check('import { rpcReserveCampaignQueueOrderRange } from "@/lib/db-rpc.server"; rpcReserveCampaignQueueOrderRange(db, { campaignId: 1, count: 2 });')).toEqual([]);
+  });
+});
