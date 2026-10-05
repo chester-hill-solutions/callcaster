@@ -245,9 +245,6 @@ suite("campaign SMS delivery results against Postgres (#2149)", () => {
   test("sent with a saved send time reaches delivery through provider recovery", async () => {
     await send();
     const { pool, triggerTwilioOpenSync, runSmsStatusSideEffects } = await services();
-    // Seed the missing legacy link to isolate recovery from the send-link defect.
-    await pool`update message set outreach_attempt_id =
-      (select id from outreach_attempt where campaign_id = ${campaignId}) where sid = ${sid}`;
     const result = await triggerTwilioOpenSync({ workspaceId });
     if (!result.ok) throw new Error(result.error);
     expect(result).toMatchObject({ ok: true });
