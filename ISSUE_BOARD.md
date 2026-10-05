@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f72e7095; JSON checkout fix reconciled with merged source, real PostgreSQL and session HTTP proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@63fecfa0; Audio campaign target fix reconciled with merged source, real PostgreSQL and session HTTP proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the checkout source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the audio campaign target source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 52
+## Fix now — 51
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -132,18 +132,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success.
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
-- The route allocates, uploads and signs audio before a scoped update proves the campaign exists. Campaign identifiers also lack numeric validation.
-- Current behavior: dev@cea31c69 has no scoped precheck. The actual-route audit attempts storage when the update returns null. This is orchestration evidence with external I/O stubbed; no physical orphan count was measured.
-- Root cause: Campaign existence is checked only by the final update, after storage work. Number conversion accepts invalid target values without an explicit identifier policy.
-- Resolution: Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.
-- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
-- Existing tests: The audit used actual action/native multipart/file validation with external I/O stubbed: 34 upload controls pass and the missing-target no-storage contract fails. Existing scoped campaign helper uses createTenantDb.
-- Missing tests: Actual-route invalid/missing/foreign target and valid-target controls; no media work before target validation; a final-update failure cannot report success; precheck removal must fail.
-- Done when: Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.; A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.; A valid campaign in the requested workspace retains its 201 response and updated audio URL.; A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.; The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.; Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.; Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open.
-- Tracker: Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -620,9 +608,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 159
+## Verify and close — 160
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The audio campaign target precheck is merged through #2379. Invalid identifiers return 400 and missing or foreign campaigns return 404 before application file allocation or storage work.
+- Current behavior: dev@63fecfa0 validates the campaign ID and reads the target through findCampaignInWorkspace before file allocation, upload, signing or update. Valid attachment retains 201. A missing or failed final update cannot report success. Real campaign deletion during upload returns failure. Object lifecycle work remains under #2356.
+- Root cause: Resolved by #2379: the old action checked campaign existence only at the final update and used an unchecked Number conversion.
+- Resolution: Verify the deployed /api/media endpoint and promote #2379 to the default branch before closure. Keep #2356 separate: uncertain outcomes, durable object ownership and physical reclamation are not resolved by this precheck.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`, `test/integration-db/media-campaign-target.test.ts`, `docs/api-data-management.md`
+- Existing tests: All 25 actual-action PostgreSQL cases pass locally and in final-head remote job 111576750987 (run 37250419783). They use native multipart, real membership and scoped campaign reads/updates; session resolution and external storage are fixtures in this tier.; All 44 existing upload controls pass. Three independent faults remove the target precheck, identifier parser or empty-update guard; each fails relevant cases and exact restoration passes all 25.; All 25 production-build HTTP requests pass with genuine Better Auth sessions, real membership/campaign rows, native multipart and real URL signing. Valid MP3, WebM and OGA attach only to the owned campaign. Invalid, missing, foreign and sessionless targets have no application file allocation or S3 send. Real campaign deletion during upload returns failure. S3 SDK send is a provider fixture; no physical bucket acceptance or cleanup is claimed.; Full npm run ci:local and exact-head remote checks pass at a5e6d9123f7b1b8286b84ed09b51417db8ba1fc8; both deployments pass. Squash source equivalence is verified at 63fecfa07b7777cee052bffc1317c8e6de9d43cc.
+- Missing tests: Deployed functional acceptance with the real bucket remains open. Confirm invalid/missing/foreign target rejection, valid 201 attachment and truthful final-update failure.; Default-branch release remains open; retain the native issue until release and required verification complete.
+- Done when: Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.; A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.; A valid campaign in the requested workspace retains its 201 response and updated audio URL.; A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.; The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.; Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.; Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open.
+- Tracker: Keep #2355 open in Verify and close for deployed functional acceptance and default-branch release. Its source fix is verified in #2379. Keep physical object reconciliation and uncertain attachment outcomes under #2356.
 
 ### [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371) Require Admin access for JSON billing checkout
 - Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
