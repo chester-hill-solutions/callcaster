@@ -557,7 +557,11 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     // Bounded: an unbounded list() makes the Twilio helper auto-page the whole
     // usage history, which is what pushed this admin loader past the SSR
     // stream timeout.
-    expect(usageList).toHaveBeenCalledWith({ limit: 200 });
+    expect(usageList).toHaveBeenCalledWith({
+      limit: 200,
+      startDate: new Date("2026-02-04T00:00:00.000Z"),
+      endDate: new Date("2026-03-06T00:00:00.000Z"),
+    });
     expect(data.twilioUsage).toEqual([
       expect.objectContaining({
         category: "sms-outbound",

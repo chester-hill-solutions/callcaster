@@ -4,6 +4,7 @@ import {
   updateWorkspaceTwilioPortalConfig,
 } from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
@@ -184,7 +185,12 @@ export async function dispatchAdminTwilioAction({
 
         const twilio = await createWorkspaceTwilioInstance({           workspace_id: workspaceId,
         });
-        const usageRecords = await twilio.usage.records.list();
+        const referenceDate = new Date();
+        const { startDate, endDate } = getTwilioUsageDateRange(referenceDate);
+        const usageRecords = await twilio.usage.records.list({
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        });
         const twilioUsage = usageRecords.map((record) => ({
           category: record.category,
           description: record.description,
@@ -198,6 +204,7 @@ export async function dispatchAdminTwilioAction({
         const report = await loadBillingReconciliationReport({
           workspaceId,
           twilioUsage,
+          referenceDate,
         });
         const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
           workspaceId,
