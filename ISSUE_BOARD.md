@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@c704cdf9; merged workflow/date/filter fixes and pending SMS driver/delivery/billing fixes (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@ee28af66; merged workflow/date/filter/SMS fixes, pending queue ordering and current security range evidence (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC. Source descriptions distinguish merged dev fixes from reviewed but unmerged changes. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC. Source descriptions distinguish merged dev fixes from reviewed but unmerged changes. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 43
+## Fix now — 40
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -135,28 +135,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
-- Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
-- Current behavior: At dev@c704cdf9, 18 real signed-callback/worker/sweep/ledger/reconciliation cases executed: fourteen failed and four controls passed. PR #2407 passes all 18 cases, eight separate protection-removal controls, three database modes and 51 existing callers. Both reviews and complete final-head local CI passed; the PR remains unmerged.
-- Resolution: Merge the atomic validated provider-quantity fix after exact-head remote checks and both deployments pass. Keep actual blast/provider comparison for release QA; historical incorrect debits need separate verified repair.
-- Look in: `app/routes/api+/sms/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/twilio-open-sync.server.ts`
-- Existing tests: test/sms-status-webhook.test.ts; test/webhook-side-effects.test.ts
-- Missing tests: Exact final-head remote Actions checks for PR #2407; both deployments have passed. Live multi-segment acceptance on the release candidate remains.
-- Done when: A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.; A send-time-resolved intent is unaffected (positive control).; A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.; The reconciliation variance for a multi-segment blast is zero.
-- Tracker: OPEN Fix now until PR #2407 lands. Callbacks do not always supply quantities; missing/provisional provider data defers billing without blocking delivery settlement.
-
-### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
-- SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.
-- Current behavior: At dev@c704cdf9, provider acceptance still stamps completed and leaves delivery ownership wrong. The separate committed fix has 13 real database cases and four independent fault controls with the reviewed, unmerged #2049 helper applied. Current-base provider recovery still fails Date encoding. Full final-base gates remain pending.
-- Resolution: Land #2049, rebase the separately reviewed delivery fix from clean dev, verify the actual current-base cases, then run complete local/remote gates. Retain atomic preparation, saved attempt ownership, window compensation and sent-message recovery.
-- Look in: `app/lib/campaign-sms-send.server.ts`, `app/lib/sms-send.server.ts`, `app/lib/twilio-open-sync.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-queue-search.server.ts`
-- Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
-- Missing tests: Final clean-dev database and full local/remote gates after #2049 lands; live carrier delivery and separately verified historical attempt repair.
-- Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
-- Tracker: OPEN Fix now. The 13-case development proof includes an unmerged prerequisite; it is not deployed or current-base green acceptance.
-
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
 - Recommended title: **Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address**
@@ -190,19 +168,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link.
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
-
-### [#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049) Verify provider send-time capture and bounded backfill on the review environment
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
-- Recommended title: **Preserve provider send time across Date encoding and null updates**
-- The capture/backfill path exists, but its raw Date SQL parameter fails encoding and explicit null can erase the first send time. PR #2406 awaits final remote checks.
-- Current behavior: Real Postgres at dev@c704cdf9: five cases executed; four original-source assertions failed and one status control passed. Separately reviewed fix passes five cases, two fault controls, three database modes and 42 caller cases. Complete final-head local CI passed; PR #2406 is unmerged during the hosted runner delay.
-- Root cause: The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.
-- Resolution: Merge the reviewed Date/null guard fix on green, then verify provider capture and measured backfill cost on the release candidate. Preserve prior capture/backfill implementation and original criteria.
-- Look in: `app/lib/message-db.server.ts`, `app/lib/twilio-open-sync.server.ts`, `test/message-db.server.test.ts`, `test/twilio-open-sync.server.test.ts`
-- Existing tests: test/twilio-open-sync.server.test.ts; test/message-db.server.test.ts; test/sms-status-webhook.test.ts
-- Missing tests: Final exact-head remote checks for PR #2406 and release provider capture/cost acceptance.
-- Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752.
-- Tracker: Fix now until PR #2406 lands. This real driver regression invalidates the old source-only Verify and close verdict. #2149 depends on the Date guard for current-base recovery tests.
 
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -294,6 +259,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.
+- Current behavior: The public override defect is confirmed on dev@ee28af66. PR #2410 is open at final head cf2179dabbd95b5fab08ec556f51bf30aa62c98c and always reserves before queue entry writes. Ten real API/Postgres cases passed, two independent faults each fail six cases with four controls, and all three database URL modes pass. The guard passes 127 focused cases; the actual CLI rejects nine injected bypasses, including entry-RPC wrapper/SQL calls, and restored source passes. Both reviews and initial/final full local CI passed. Exact final-head remote checks and both deployments remain pending.
+- Root cause: A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe.
+- Resolution: Merge PR #2410 only after applicable final-head checks and both deployments pass. Verify release-candidate ordering against original criteria before promotion; preserve independent uniqueness. #2153 audit history remains separate.
+- Look in: `app/routes/api+/campaign_queue.action.server.ts:40`, `app/routes/api+/campaign_queue.action.server.ts:69`, `app/lib/queue.server.ts:51`, `drizzle/0006_app_schema_tail.sql:95`, `client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49`, `app/routes/api+/campaign_queue.action.server.ts`, `app/lib/campaign-queue-db.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts:156-161`, `scripts/check-queue-rpc-contract.mjs`, `client/migrations/ (the reservation RPC)`
+- Existing tests: test/campaign-queue.route.test.ts; test/queue.server.test.ts; test/queue-rpc-contract.test.ts
+- Missing tests: Exact final-head full local CI, remote checks, both deployments and release-candidate ordering acceptance remain.
+- Done when: Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.; Two concurrent public enqueues reserve disjoint order ranges.; The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.; check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.; Record the API sweep for other client-writable queue lifecycle fields.
+- Tracker: Fix now until PR #2410 lands. Full local source proof is complete; no merge or live acceptance is claimed. Keep the native issue OPEN for promotion and acceptance.
+
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
 - Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
@@ -338,18 +315,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Completed/dequeued history preservation, untouched-row control, opted-out never-rearmed and deliberate requeue audit tests.
 - Done when: A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).; Un-attempted rows return to `queued` (positive control).; An opted-out contact is never re-armed by a reset.; If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Public POST defaults startOrder to zero, so reservation is skipped even when clients omit the field.
-- Root cause: A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe.
-- Resolution: Remove public startOrder/default and always reserve server-side; test ordering concurrency separately from dedupe.
-- Look in: `app/routes/api+/campaign_queue.action.server.ts:40`, `app/routes/api+/campaign_queue.action.server.ts:69`, `app/lib/queue.server.ts:51`, `drizzle/0006_app_schema_tail.sql:95`, `client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49`, `app/routes/api+/campaign_queue.action.server.ts`, `app/lib/campaign-queue-db.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts:156-161`, `scripts/check-queue-rpc-contract.mjs`, `client/migrations/ (the reservation RPC)`
-- Existing tests: test/campaign-queue.route.test.ts; test/queue.server.test.ts; test/queue-rpc-contract.test.ts
-- Missing tests: Route missing/supplied order tests and concurrent reservation test. Same-contact duplicate rows are prevented by SQL; normalized-number distinct-contact behavior needs its own claim evidence.
-- Done when: Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.; Two concurrent public enqueues reserve disjoint order ranges.; The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.; check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.; Record the API sweep for other client-writable queue lifecycle fields.
-- Tracker: Fix now for server-owned ordering. Correct the unsupported claim that startOrder alone defeats dedupe.
 
 ### [#2142](https://github.com/chester-hill-solutions/callcaster/issues/2142) rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -524,9 +489,44 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 170
+## Verify and close — 173
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2409 at dev@ee28af666b6b0fd30f3c8bca0aa55ec996c8a429. Preparation commits the pending outreach link before provider invocation, leaves acceptance unresolved and queues recovered terminal side effects before settling local state. Thirteen real database cases and 153 caller cases passed. Full local CI, final-head remote checks and both deployments passed.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/lib/campaign-sms-send.server.ts`, `app/lib/sms-send.server.ts`, `app/lib/twilio-open-sync.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-queue-search.server.ts`
+- Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
+- Missing tests: Live provider/browser acceptance against the release candidate and default-branch promotion remain. Historical-row repair must be separately verified before claiming it is complete.
+- Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
+- Tracker: Verify and close. PR #2409 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
+
+### [#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049) Verify provider send-time capture and bounded backfill on the review environment
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Preserve provider send time across Date encoding and null updates**
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2406 at dev@d805e71fd9307f9e313e298cbe205575114ff808. Provider Date and null preservation passed five real database cases and fault controls. Full local CI, final-head remote checks and both deployments passed.
+- Root cause: The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/lib/message-db.server.ts`, `app/lib/twilio-open-sync.server.ts`, `test/message-db.server.test.ts`, `test/twilio-open-sync.server.test.ts`
+- Existing tests: test/twilio-open-sync.server.test.ts; test/message-db.server.test.ts; test/sms-status-webhook.test.ts
+- Missing tests: Live release-candidate acceptance and default-branch promotion remain.
+- Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752.
+- Tracker: Verify and close. PR #2406 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
+
+### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2407 at dev@b2831f728f273dddb269277ca6034af02a14413b. Signed callback and provider recovery paths persist provider quantity before billing. Eighteen real database cases passed with independent fault checks and all three database URL modes. Full local CI, final-head remote checks and both deployments passed.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/routes/api+/sms/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/twilio-open-sync.server.ts`
+- Existing tests: test/sms-status-webhook.test.ts; test/webhook-side-effects.test.ts
+- Missing tests: Live release-candidate acceptance and default-branch promotion remain.
+- Done when: A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.; A send-time-resolved intent is unaffected (positive control).; A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.; The reconciliation variance for a multi-segment blast is zero.
+- Tracker: Verify and close. PR #2407 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
 
 ### [#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402) Scope campaign queue disposition filters to the selected campaign
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
@@ -2956,6 +2956,13 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
+### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-05
+- Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.
+- Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments.
+
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
 - The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.
@@ -3005,13 +3012,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Missing tests: Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.; Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.; Applicable deployed original-file/reporting acceptance and release verification.
 - Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
 - Tracker: Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.
-
-### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
-- Development security is a native Epic. The fresh complete npm audit on final PostCSS head d28fecdf (merged in #2346 to dev@befe20fa) reports 23 affected package families: 17 high, five moderate and one low, with no critical. npm production is clear. Bun retains separate affected development copies. The most recent master snapshot has 37 development alerts, a different source/release view.
-- Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Keep runtime fixes under #1802. PostCSS source already merged in #2346 under #2342; do not duplicate that package work. Split remaining confirmed concerns into native child Tasks. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, both deployments, applicable deployed acceptance and release promotion remain required.
 
 ### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
 - Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04

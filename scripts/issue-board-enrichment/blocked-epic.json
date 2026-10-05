@@ -288,18 +288,6 @@
     "trackerRecommendation": "The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open."
   },
   {
-    "issueNumber": 1803,
-    "verdict": "blocked-epic",
-    "summary": "Development security is a native Epic. The fresh complete npm audit on final PostCSS head d28fecdf (merged in #2346 to dev@befe20fa) reports 23 affected package families: 17 high, five moderate and one low, with no critical. npm production is clear. Bun retains separate affected development copies. The most recent master snapshot has 37 development alerts, a different source/release view.",
-    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "trackerRecommendation": "Keep runtime fixes under #1802. PostCSS source already merged in #2346 under #2342; do not duplicate that package work. Split remaining confirmed concerns into native child Tasks. Preserve API codegen, test/coverage execution, build behavior and the shad-cc source/theme contract. Full local CI, exact-head remote gates, both deployments, applicable deployed acceptance and release promotion remain required."
-  },
-  {
     "issueNumber": 1892,
     "verdict": "blocked-epic",
     "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
@@ -1320,5 +1308,17 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged."
+  },
+  {
+    "issueNumber": 1803,
+    "verdict": "blocked-epic",
+    "summary": "Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.",
+    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "trackerRecommendation": "Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments."
   }
 ]

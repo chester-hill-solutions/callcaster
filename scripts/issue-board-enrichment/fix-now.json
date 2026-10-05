@@ -752,46 +752,6 @@
     "trackerRecommendation": "Partial fix. Keep Fix now for the remaining chat/cache and measurement scope. Related PR evidence: #2228. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2152,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
-    "summary": "Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Public POST defaults startOrder to zero, so reservation is skipped even when clients omit the field.",
-    "resolution": "Remove public startOrder/default and always reserve server-side; test ordering concurrency separately from dedupe.",
-    "lookIn": [
-      "app/routes/api+/campaign_queue.action.server.ts:40",
-      "app/routes/api+/campaign_queue.action.server.ts:69",
-      "app/lib/queue.server.ts:51",
-      "drizzle/0006_app_schema_tail.sql:95",
-      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
-      "app/routes/api+/campaign_queue.action.server.ts",
-      "app/lib/campaign-queue-db.server.ts",
-      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
-      "scripts/check-queue-rpc-contract.mjs",
-      "client/migrations/ (the reservation RPC)"
-    ],
-    "existingTests": [
-      "test/campaign-queue.route.test.ts",
-      "test/queue.server.test.ts",
-      "test/queue-rpc-contract.test.ts"
-    ],
-    "missingTests": [
-      "Route missing/supplied order tests and concurrent reservation test. Same-contact duplicate rows are prevented by SQL; normalized-number distinct-contact behavior needs its own claim evidence."
-    ],
-    "acceptanceCriteria": [
-      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
-      "Two concurrent public enqueues reserve disjoint order ranges.",
-      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
-      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
-      "Record the API sweep for other client-writable queue lifecycle fields."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now for server-owned ordering. Correct the unsupported claim that startOrder alone defeats dedupe.",
-    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
-  },
-  {
     "issueNumber": 2153,
     "verdict": "fix-now",
     "recommendedTitle": "DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail",
@@ -1329,103 +1289,6 @@
     "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed."
   },
   {
-    "issueNumber": 2049,
-    "verdict": "fix-now",
-    "recommendedTitle": "Preserve provider send time across Date encoding and null updates",
-    "summary": "The capture/backfill path exists, but its raw Date SQL parameter fails encoding and explicit null can erase the first send time. PR #2406 awaits final remote checks.",
-    "currentBehavior": "Real Postgres at dev@c704cdf9: five cases executed; four original-source assertions failed and one status control passed. Separately reviewed fix passes five cases, two fault controls, three database modes and 42 caller cases. Complete final-head local CI passed; PR #2406 is unmerged during the hosted runner delay.",
-    "rootCause": "The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.",
-    "resolution": "Merge the reviewed Date/null guard fix on green, then verify provider capture and measured backfill cost on the release candidate. Preserve prior capture/backfill implementation and original criteria.",
-    "lookIn": [
-      "app/lib/message-db.server.ts",
-      "app/lib/twilio-open-sync.server.ts",
-      "test/message-db.server.test.ts",
-      "test/twilio-open-sync.server.test.ts"
-    ],
-    "existingTests": [
-      "test/twilio-open-sync.server.test.ts",
-      "test/message-db.server.test.ts",
-      "test/sms-status-webhook.test.ts"
-    ],
-    "missingTests": [
-      "Final exact-head remote checks for PR #2406 and release provider capture/cost acceptance."
-    ],
-    "acceptanceCriteria": [
-      "Message row carries the provider-reported date_sent after the sweep runs",
-      "Messages that settle before any sweep observed them still receive a date_sent",
-      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
-      "date_sent is never overwritten once written and never inferred from date_created",
-      "Backfill selection is bounded, self-limiting, and its cost is measured",
-      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now until PR #2406 lands. This real driver regression invalidates the old source-only Verify and close verdict. #2149 depends on the Date guard for current-base recovery tests."
-  },
-  {
-    "issueNumber": 2149,
-    "verdict": "fix-now",
-    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
-    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
-    "currentBehavior": "At dev@c704cdf9, provider acceptance still stamps completed and leaves delivery ownership wrong. The separate committed fix has 13 real database cases and four independent fault controls with the reviewed, unmerged #2049 helper applied. Current-base provider recovery still fails Date encoding. Full final-base gates remain pending.",
-    "resolution": "Land #2049, rebase the separately reviewed delivery fix from clean dev, verify the actual current-base cases, then run complete local/remote gates. Retain atomic preparation, saved attempt ownership, window compensation and sent-message recovery.",
-    "lookIn": [
-      "app/lib/campaign-sms-send.server.ts",
-      "app/lib/sms-send.server.ts",
-      "app/lib/twilio-open-sync.server.ts",
-      "app/lib/worker/webhook-side-effects.server.ts",
-      "app/lib/campaign-queue-search.server.ts"
-    ],
-    "existingTests": [
-      "test/campaign-sms-send.server.test.ts",
-      "test/sms-status-settled.test.ts"
-    ],
-    "missingTests": [
-      "Final clean-dev database and full local/remote gates after #2049 lands; live carrier delivery and separately verified historical attempt repair."
-    ],
-    "acceptanceCriteria": [
-      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
-      "`undelivered` and `delivered` likewise.",
-      "A message that never receives a callback still reaches a terminal disposition (positive control).",
-      "The call path is unchanged."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "OPEN Fix now. The 13-case development proof includes an unmerged prerequisite; it is not deployed or current-base green acceptance."
-  },
-  {
-    "issueNumber": 2150,
-    "verdict": "fix-now",
-    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
-    "summary": "Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
-    "currentBehavior": "At dev@c704cdf9, 18 real signed-callback/worker/sweep/ledger/reconciliation cases executed: fourteen failed and four controls passed. PR #2407 passes all 18 cases, eight separate protection-removal controls, three database modes and 51 existing callers. Both reviews and complete final-head local CI passed; the PR remains unmerged.",
-    "resolution": "Merge the atomic validated provider-quantity fix after exact-head remote checks and both deployments pass. Keep actual blast/provider comparison for release QA; historical incorrect debits need separate verified repair.",
-    "lookIn": [
-      "app/routes/api+/sms/status.action.server.ts",
-      "app/lib/worker/webhook-side-effects.server.ts",
-      "app/lib/twilio-open-sync.server.ts"
-    ],
-    "existingTests": [
-      "test/sms-status-webhook.test.ts",
-      "test/webhook-side-effects.test.ts"
-    ],
-    "missingTests": [
-      "Exact final-head remote Actions checks for PR #2407; both deployments have passed. Live multi-segment acceptance on the release candidate remains."
-    ],
-    "acceptanceCriteria": [
-      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
-      "A send-time-resolved intent is unaffected (positive control).",
-      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
-      "The reconciliation variance for a multi-segment blast is zero."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "OPEN Fix now until PR #2407 lands. Callbacks do not always supply quantities; missing/provisional provider data defers billing without blocking delivery settlement."
-  },
-  {
     "issueNumber": 2112,
     "verdict": "fix-now",
     "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
@@ -1458,5 +1321,45 @@
     "risk": "high",
     "trackerRecommendation": "OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.",
     "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
+  },
+  {
+    "issueNumber": 2152,
+    "verdict": "fix-now",
+    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
+    "summary": "Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.",
+    "currentBehavior": "The public override defect is confirmed on dev@ee28af66. PR #2410 is open at final head cf2179dabbd95b5fab08ec556f51bf30aa62c98c and always reserves before queue entry writes. Ten real API/Postgres cases passed, two independent faults each fail six cases with four controls, and all three database URL modes pass. The guard passes 127 focused cases; the actual CLI rejects nine injected bypasses, including entry-RPC wrapper/SQL calls, and restored source passes. Both reviews and initial/final full local CI passed. Exact final-head remote checks and both deployments remain pending.",
+    "resolution": "Merge PR #2410 only after applicable final-head checks and both deployments pass. Verify release-candidate ordering against original criteria before promotion; preserve independent uniqueness. #2153 audit history remains separate.",
+    "lookIn": [
+      "app/routes/api+/campaign_queue.action.server.ts:40",
+      "app/routes/api+/campaign_queue.action.server.ts:69",
+      "app/lib/queue.server.ts:51",
+      "drizzle/0006_app_schema_tail.sql:95",
+      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
+      "app/routes/api+/campaign_queue.action.server.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
+      "scripts/check-queue-rpc-contract.mjs",
+      "client/migrations/ (the reservation RPC)"
+    ],
+    "existingTests": [
+      "test/campaign-queue.route.test.ts",
+      "test/queue.server.test.ts",
+      "test/queue-rpc-contract.test.ts"
+    ],
+    "missingTests": [
+      "Exact final-head full local CI, remote checks, both deployments and release-candidate ordering acceptance remain."
+    ],
+    "acceptanceCriteria": [
+      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
+      "Two concurrent public enqueues reserve disjoint order ranges.",
+      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
+      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
+      "Record the API sweep for other client-writable queue lifecycle fields."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now until PR #2410 lands. Full local source proof is complete; no merge or live acceptance is claimed. Keep the native issue OPEN for promotion and acceptance.",
+    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
   }
 ]

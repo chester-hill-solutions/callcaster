@@ -5106,6 +5106,41 @@
     "rootCause": "The settings projection discarded name fields while a partial consumer type hid the omission."
   },
   {
+    "issueNumber": 2049,
+    "verdict": "verify-close",
+    "recommendedTitle": "Preserve provider send time across Date encoding and null updates",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2406 at dev@d805e71fd9307f9e313e298cbe205575114ff808. Provider Date and null preservation passed five real database cases and fault controls. Full local CI, final-head remote checks and both deployments passed.",
+    "rootCause": "The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/lib/message-db.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "test/message-db.server.test.ts",
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts",
+      "test/message-db.server.test.ts",
+      "test/sms-status-webhook.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate acceptance and default-branch promotion remain."
+    ],
+    "acceptanceCriteria": [
+      "Message row carries the provider-reported date_sent after the sweep runs",
+      "Messages that settle before any sweep observed them still receive a date_sent",
+      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
+      "date_sent is never overwritten once written and never inferred from date_created",
+      "Backfill selection is bounded, self-limiting, and its cost is measured",
+      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. PR #2406 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
+  },
+  {
     "issueNumber": 2064,
     "verdict": "verify-close",
     "recommendedTitle": "Nightly ledger drift check compares the wrong branch against the dev database",
@@ -5165,6 +5200,68 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "OPEN Verify and close. Source is merged and tested; default promotion and live browser acceptance remain."
+  },
+  {
+    "issueNumber": 2149,
+    "verdict": "verify-close",
+    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2409 at dev@ee28af666b6b0fd30f3c8bca0aa55ec996c8a429. Preparation commits the pending outreach link before provider invocation, leaves acceptance unresolved and queues recovered terminal side effects before settling local state. Thirteen real database cases and 153 caller cases passed. Full local CI, final-head remote checks and both deployments passed.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/lib/campaign-sms-send.server.ts",
+      "app/lib/sms-send.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-queue-search.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-sms-send.server.test.ts",
+      "test/sms-status-settled.test.ts"
+    ],
+    "missingTests": [
+      "Live provider/browser acceptance against the release candidate and default-branch promotion remain. Historical-row repair must be separately verified before claiming it is complete."
+    ],
+    "acceptanceCriteria": [
+      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
+      "`undelivered` and `delivered` likewise.",
+      "A message that never receives a callback still reaches a terminal disposition (positive control).",
+      "The call path is unchanged."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. PR #2409 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
+  },
+  {
+    "issueNumber": 2150,
+    "verdict": "verify-close",
+    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2407 at dev@b2831f728f273dddb269277ca6034af02a14413b. Signed callback and provider recovery paths persist provider quantity before billing. Eighteen real database cases passed with independent fault checks and all three database URL modes. Full local CI, final-head remote checks and both deployments passed.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/routes/api+/sms/status.action.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/sms-status-webhook.test.ts",
+      "test/webhook-side-effects.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate acceptance and default-branch promotion remain."
+    ],
+    "acceptanceCriteria": [
+      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
+      "A send-time-resolved intent is unaffected (positive control).",
+      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
+      "The reconciliation variance for a multi-segment blast is zero."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. PR #2407 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
   },
   {
     "issueNumber": 2402,
