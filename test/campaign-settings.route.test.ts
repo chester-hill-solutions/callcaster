@@ -324,6 +324,29 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
   });
 
+  test.each([
+    { interval: { start: "18:00" } },
+    { interval: { start: "18:00", end: "26:00" } },
+  ])("save rejects incomplete SMS intervals beside a valid sibling: $interval", async ({ interval }) => {
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "save",
+      campaignData: JSON.stringify({
+        type: "message", schedule: null,
+        sms_send_window: { monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }, interval] } },
+      }),
+      campaignDetails: "{}",
+    });
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ actionType: "save", error: expect.stringMatching(/SMS.*start and end/) });
+    expect(mocks.updateCampaign).not.toHaveBeenCalled();
+    expect(mocks.rescheduleDispatchAfterWindowEdit).not.toHaveBeenCalled();
+  });
+
   test("save on a live message campaign pulls a parked dispatch successor forward (#1816)", async () => {
     mocks.updateCampaign.mockResolvedValue({
       campaign: {

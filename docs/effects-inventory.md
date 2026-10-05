@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**119** documented / **121** total effects (2 grandfathered, ratcheting to 0).
+**121** documented / **123** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -13,6 +13,8 @@
 | `app/components/audience/use-audience-upload-progress.ts` | Hand a completed upload off to the caller's callback exactly once. | progress (fires when the upload state machine reaches "completed") | none (invokes caller-provided completion callbacks via refs) | Completion arrives asynchronously via realtime/poll |
 | `app/components/call/CallScreen.CallArea.tsx` | Clean up the hang-up and dial-arm confirmation timers on unmount | [] — fire-once cleanup, no external state to track | timer (clearTimeout on unmount) | Component lifecycle cleanup, not data fetching. |
 | `app/components/call/CallScreen.CallArea.tsx` | Arm a "click again to dial" guard on the Dial button whenever it | [showInCall, predictive] — flip is only meaningful when | timer (arms + 3s auto-disarm) | Pure UI state, no data fetch. |
+| `app/components/campaign/CampaignSendWindowNotice.tsx` | Remove the campaign notice when its page identity changes or unmounts. | identity identifies the campaign whose notice this page owns. | dom: dismiss the notice through the root feedback host. | The shared feedback host is a browser subscription. |
+| `app/components/campaign/CampaignSendWindowNotice.tsx` | Keep the persistent SMS warning aligned with the saved campaign window. | identity and message choose the notice; workspaceId, campaignId, canEdit and navigate choose its remedy. | dom: update or dismiss a notice after the root host subscribes. | Sonner renders through the existing browser feedback host. |
 | `app/components/campaign/home/CampaignStatusRail.tsx` | Keep the active place tab scrolled into view in the horizontal rail. | location.pathname, location.hash, items (active slot changes with route/hash) | dom (tablist scrollLeft/scrollTo) | Scroll position is viewport chrome, not request data. |
 | `app/components/campaign/settings/AddAudioSheet.tsx` | Clear form state when the sheet closes so the next open starts blank. | open | local form reset | Sheet open state is client-only UI chrome. |
 | `app/components/campaign/settings/useCampaignSettingsController.ts` | Mirror local draft dirty state into CampaignShellDirty for rail navigation guards. | isChanged (draft vs saved), setIsDirty from shell context | context setter; clears dirty on unmount | Dirty state is client edit chrome shared across sibling routes. |
