@@ -66,16 +66,25 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
 }
 
 const CONFERENCE_START_FAILURE = "Could not start dialing. Try again.";
+const CONFERENCE_START_MESSAGES = new Map([
+  ["Campaign is paused.", "Campaign is paused."],
+  ["Campaign is not live yet. Start it from the Launch page.", "Campaign is not live yet. Start it from the Launch page."],
+  ["Campaign is not currently active", "Campaign is not active. Check the Launch page."],
+  ["Selected device is not a verified phone number", "Select a verified device and try again."],
+  ["Insufficient role", "You do not have permission to start this campaign."],
+  ["Unauthorized", "Sign in, then try again."],
+  ["Workspace not found", "This campaign is unavailable. Reload the page."],
+  ["Campaign not found", "This campaign is unavailable. Reload the page."],
+]);
 
 function conferenceStartError(data: unknown): string {
   if (typeof data !== "object" || data === null || !("error" in data)) {
     return CONFERENCE_START_FAILURE;
   }
   const message = data.error;
-  if (typeof message !== "string" || !message.trim() || message.length > 300 || /[<>\r\n]/.test(message)) {
-    return CONFERENCE_START_FAILURE;
-  }
-  return message.trim();
+  return typeof message === "string"
+    ? CONFERENCE_START_MESSAGES.get(message) ?? CONFERENCE_START_FAILURE
+    : CONFERENCE_START_FAILURE;
 }
 
 function conferenceStartResult(data: unknown): StartConferenceResponse {

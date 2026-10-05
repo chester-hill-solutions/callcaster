@@ -100,7 +100,9 @@ describe("startConferenceAndDial", () => {
     { status: 400, body: JSON.stringify({ error: { secret: "trace" } }) },
     { status: 400, body: JSON.stringify({ error: "" }) },
     { status: 400, body: JSON.stringify({ error: "x".repeat(301) }) },
+    { status: 400, body: JSON.stringify({ error: "provider account secret" }) },
     { status: 500, body: JSON.stringify({ error: "provider account secret" }) },
+    { status: 500, body: JSON.stringify({ error: "Campaign is paused." }) },
     { status: 200, body: "not JSON" },
     { status: 200, body: "null" },
     { status: 200, body: JSON.stringify({ success: true, conferenceName: 42 }) },
@@ -108,6 +110,18 @@ describe("startConferenceAndDial", () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(body, { status }));
     const { startConferenceAndDial } = await import("../app/lib/services/hooks-api");
     await expect(startConferenceAndDial(params)).rejects.toThrow("Could not start dialing. Try again.");
+  });
+
+  test("an unsuccessful 200 with an unknown error returns only the safe retry message", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ success: false, error: "provider account secret" }));
+    const { startConferenceAndDial } = await import("../app/lib/services/hooks-api");
+    await expect(startConferenceAndDial(params)).resolves.toEqual({ success: false, error: "Could not start dialing. Try again." });
+  });
+
+  test("an unsuccessful 200 preserves a recognized recovery message", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ success: false, error: "Campaign is paused." }));
+    const { startConferenceAndDial } = await import("../app/lib/services/hooks-api");
+    await expect(startConferenceAndDial(params)).resolves.toEqual({ success: false, error: "Campaign is paused." });
   });
 
 });
