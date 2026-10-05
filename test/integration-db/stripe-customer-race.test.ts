@@ -55,37 +55,75 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
   let rejectCreate: boolean;
   let onFirstCreate: (() => void) | undefined;
   let beforeCustomerReply: (() => Promise<void>) | undefined;
+  let providerCustomers: Map<string, Record<string, unknown>>;
+  let deletions: string[];
+  let historyKinds: Set<string>;
+  let rejectDelete: boolean;
+  let customerOverrides: Record<string, unknown>;
   const provisionedIds: string[] = [];
   const requestParams = new Map<string, string>();
 
   async function respondToCustomer(request: import("node:http").IncomingMessage,
     response: import("node:http").ServerResponse, fields: URLSearchParams, reply: (value: unknown) => void) {
-  const key = request.headers["idempotency-key"] as string | undefined;
-  requests.push({ key, fields });
-  await beforeCustomerReply?.();
-  onFirstCreate?.(); onFirstCreate = undefined;
-  if (rejectCreate) {
-    response.writeHead(400, { "Content-Type": "application/json", "Stripe-Should-Retry": "false" });
-    response.end(JSON.stringify({ error: { type: "invalid_request_error", message: "Fixture rejects before execution" } }));
-    return;
+    const key = request.headers["idempotency-key"] as string | undefined;
+    requests.push({ key, fields });
+    await beforeCustomerReply?.();
+    onFirstCreate?.(); onFirstCreate = undefined;
+    if (rejectCreate) {
+      response.writeHead(400, { "Content-Type": "application/json", "Stripe-Should-Retry": "false" });
+      response.end(JSON.stringify({ error: { type: "invalid_request_error", message: "Fixture rejects before execution" } }));
+      return;
+    }
+    if (key && requestParams.has(key) && requestParams.get(key) !== fields.toString()) {
+      response.writeHead(400, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { type: "idempotency_error", message: "Parameters changed" } }));
+      return;
+    }
+    if (key) requestParams.set(key, fields.toString());
+    const send = () => {
+      const identity = key ?? randomUUID();
+      let id = customers.get(identity);
+      if (!id) { id = `${customerPrefix}_${customers.size + 1}`; customers.set(identity, id); }
+      const customer = { id, object: "customer", balance: 0, default_source: null, invoice_settings: { default_payment_method: null },
+          name: fields.get("name"), email: fields.get("email"), metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"), callcaster_request_id: fields.get("metadata[callcaster_request_id]") }, ...customerOverrides };
+        if (!providerCustomers.has(id)) providerCustomers.set(id, customer);
+        reply(providerCustomers.get(id));
+    };
+    if (synchronizeCreates && requests.length === 1) { firstResponse = send; return; }
+    if (synchronizeCreates) {
+      secondResponse = send; firstResponse?.(); firstResponse = undefined; return;
+    }
+    send(); return;
   }
-  if (key && requestParams.has(key) && requestParams.get(key) !== fields.toString()) {
-    response.writeHead(400, { "Content-Type": "application/json" });
-    response.end(JSON.stringify({ error: { type: "idempotency_error", message: "Parameters changed" } }));
-    return;
-  }
-  if (key) requestParams.set(key, fields.toString());
-  const send = () => {
-    const identity = key ?? randomUUID();
-    let id = customers.get(identity);
-    if (!id) { id = `${customerPrefix}_${customers.size + 1}`; customers.set(identity, id); }
-    reply({ id, object: "customer", name: fields.get("name"), email: fields.get("email"), metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"), callcaster_request_id: fields.get("metadata[callcaster_request_id]") } });
-  };
-  if (synchronizeCreates && requests.length === 1) { firstResponse = send; return; }
-  if (synchronizeCreates) {
-    secondResponse = send; firstResponse?.(); firstResponse = undefined; return;
-  }
-  send(); return;
+
+  async function respondToConflictInspection(method: string | undefined, url: URL,
+    response: import("node:http").ServerResponse, reply: (value: unknown) => void) {
+    const customerPath = /^\/v1\/customers\/(cus_[^/]+)$/.exec(url.pathname);
+    if (customerPath && method === "GET") {
+      reply(providerCustomers.get(customerPath[1] ?? ""));
+      return true;
+    }
+    if (customerPath && method === "DELETE") {
+      if (rejectDelete) {
+        response.writeHead(500, { "Content-Type": "application/json", "Stripe-Should-Retry": "false" });
+        response.end(JSON.stringify({ error: { type: "api_error", message: "Fixture deletion failed" } }));
+        return true;
+      }
+      const id = customerPath[1] ?? "";
+      deletions.push(id);
+      providerCustomers.set(id, { id, object: "customer", deleted: true });
+      reply({ id, object: "customer", deleted: true });
+      return true;
+    }
+    const listKind = url.pathname.startsWith("/v1/customers/") && url.pathname.endsWith("/sources")
+      ? "sources" : url.pathname.replace("/v1/", "");
+    if (method === "GET" && ["checkout/sessions", "invoices", "subscriptions", "charges", "payment_intents", "sources"].includes(listKind)) {
+      const queriedCustomer = listKind === "sources" ? url.pathname.split("/")[3] : url.searchParams.get("customer");
+      reply({ object: "list", data: historyKinds.has(listKind) && queriedCustomer === `${customerPrefix}_1`
+        ? [{ id: "history_fixture" }] : [], has_more: false });
+      return true;
+    }
+    return false;
   }
 
   beforeAll(async () => {
@@ -120,6 +158,7 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
         return;
       }
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
+      if (await respondToConflictInspection(request.method, url, response, reply)) return;
       if (request.method === "GET" && url.pathname === "/v1/customers/search") {
         searchCalls += 1;
         searchQueries.push(url.searchParams.get("query"));
@@ -127,7 +166,7 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
         return;
       }
       if (request.method === "GET" && url.pathname === "/v1/payment_methods") {
-        const saved = url.searchParams.get("customer") === sessions[0];
+        const saved = (historyKinds.has("payment_methods") && url.searchParams.get("customer") === `${customerPrefix}_1`) || url.searchParams.get("customer") === sessions[0];
         reply({ object: "list", data: saved ? [{ id: "pm_saved_fixture", object: "payment_method", customer: sessions[0], type: "card" }] : [], has_more: false });
         return;
       }
@@ -143,10 +182,10 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
   beforeEach(async () => {
     observedErrors = vi.spyOn((await import("@/lib/logger.server")).logger, "error");
     customerPrefix = `cus_fixture_${randomUUID().replaceAll("-", "")}`;
-    requests = []; customers = new Map(); sessions = []; firstResponse = undefined; secondResponse = undefined; synchronizeCreates = false; searchResults = []; searchCalls = 0; searchQueries = []; rejectCreate = false; requestParams.clear(); provisioning.intercept = undefined; onFirstCreate = undefined; beforeCustomerReply = undefined;
+    requests = []; customers = new Map(); providerCustomers = new Map(); deletions = []; historyKinds = new Set(); rejectDelete = false; customerOverrides = {}; sessions = []; firstResponse = undefined; secondResponse = undefined; synchronizeCreates = false; searchResults = []; searchCalls = 0; searchQueries = []; rejectCreate = false; requestParams.clear(); provisioning.intercept = undefined; onFirstCreate = undefined; beforeCustomerReply = undefined;
     await client`update public.workspace set stripe_id = 'cus_foreign_control' where id = ${foreignWorkspaceId}::uuid`;
     await client`update public."user" set username = ${`stripe-race-${ownerId}@example.test`} where id = ${ownerId}::uuid`;
-    await client`update public.workspace set name = 'Stripe customer race', stripe_id = null, stripe_customer_creation = null, stripe_customer_creation_started_at = null where id = ${workspaceId}::uuid`;
+    await client`update public.workspace set name = 'Stripe customer race', stripe_id = null, stripe_customer_creation = null, stripe_customer_creation_started_at = null, stripe_customer_conflict = null, stripe_customer_creation_completed_id = null where id = ${workspaceId}::uuid`;
   });
 
   afterAll(async () => {
@@ -306,19 +345,116 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
     expect(sessions).toEqual([`${customerPrefix}_1`]);
   });
 
-  test("a competing canonical claim is preserved and the unclaimed customer cannot start checkout", async () => {
+  function competingClaim() {
     beforeCustomerReply = async () => {
       await client`update public.workspace set stripe_id = 'cus_competing_claim' where id = ${workspaceId}::uuid`;
     };
-    expect(await checkout()).toMatchObject({ ok: false });
-    expect(customers.size).toBe(1);
-    expect(sessions).toEqual([]);
+  }
+
+  test("an unused losing customer is logged, removed and reconciled before checkout and retry", async () => {
+    competingClaim();
+    expect(await checkout()).toMatchObject({ ok: true });
     expect(observedErrors).toHaveBeenCalledWith("Stripe customer claim needs reconciliation", {
       workspaceId, unclaimedCustomerId: `${customerPrefix}_1`, canonicalCustomerId: "cus_competing_claim",
     });
-    expect(await storedCustomers()).toEqual(expect.arrayContaining([
-      { id: workspaceId, stripe_id: "cus_competing_claim" }, { id: foreignWorkspaceId, stripe_id: "cus_foreign_control" },
-    ]));
+    expect(deletions).toEqual([`${customerPrefix}_1`]);
+    expect(sessions).toEqual(["cus_competing_claim"]);
+    const [row] = await client`select stripe_id, stripe_customer_conflict, stripe_customer_creation_completed_id
+      from public.workspace where id = ${workspaceId}::uuid`;
+    expect(row).toEqual({ stripe_id: "cus_competing_claim", stripe_customer_conflict: null,
+      stripe_customer_creation_completed_id: "cus_competing_claim" });
+    expect(await checkout()).toMatchObject({ ok: true });
+    expect(requests).toHaveLength(1);
+    expect(deletions).toHaveLength(1);
+    expect(sessions).toEqual(["cus_competing_claim", "cus_competing_claim"]);
+  });
+
+  test.each(["checkout/sessions", "payment_methods", "invoices", "subscriptions", "charges", "payment_intents", "sources"])(
+    "a losing customer with %s history stays saved and blocks this checkout and retry", async kind => {
+      competingClaim(); historyKinds.add(kind);
+      expect(await checkout()).toMatchObject({ ok: false });
+      expect(await checkout()).toMatchObject({ ok: false });
+      expect(deletions).toEqual([]);
+      expect(sessions).toEqual([]);
+      expect(requests).toHaveLength(1);
+      const [row] = await client`select stripe_id, stripe_customer_conflict, stripe_customer_creation_completed_id
+        from public.workspace where id = ${workspaceId}::uuid`;
+      expect(row).toEqual({ stripe_id: "cus_competing_claim",
+        stripe_customer_conflict: { unclaimed_id: `${customerPrefix}_1`, canonical_id: "cus_competing_claim" },
+        stripe_customer_creation_completed_id: null });
+    },
+  );
+
+  test.each([
+    { label: "foreign metadata", overrides: { metadata: { callcaster_workspace_id: foreignWorkspaceId, callcaster_request_id: "other_request" } } },
+    { label: "credit balance", overrides: { balance: 100 } },
+    { label: "legacy default source", overrides: { default_source: "src_saved_fixture" } },
+    { label: "default payment method", overrides: { invoice_settings: { default_payment_method: "pm_saved_fixture" } } },
+  ])("a losing customer with $label is preserved and blocks retry", async ({ overrides }) => {
+    competingClaim(); customerOverrides = overrides;
+    expect(await checkout()).toMatchObject({ ok: false });
+    expect(await checkout()).toMatchObject({ ok: false });
+    expect(deletions).toEqual([]);
+    expect(sessions).toEqual([]);
+    expect(requests).toHaveLength(1);
+    const [row] = await client`select stripe_customer_conflict from public.workspace where id = ${workspaceId}::uuid`;
+    expect(row.stripe_customer_conflict).toEqual({ unclaimed_id: `${customerPrefix}_1`, canonical_id: "cus_competing_claim" });
+  });
+
+  test("a failed losing-customer removal keeps the conflict until a successful retry", async () => {
+    competingClaim(); rejectDelete = true;
+    expect(await checkout()).toMatchObject({ ok: false });
+    expect(sessions).toEqual([]);
+    expect(deletions).toEqual([]);
+    rejectDelete = false;
+    expect(await checkout()).toMatchObject({ ok: true });
+    expect(requests).toHaveLength(1);
+    expect(deletions).toEqual([`${customerPrefix}_1`]);
+    expect(sessions).toEqual(["cus_competing_claim"]);
+  });
+
+  test("a lost reconciliation acknowledgement retries without deleting the customer twice", async () => {
+    competingClaim();
+    const trigger = `reject_conflict_clear_${workspaceId.replaceAll("-", "")}`;
+    await client.unsafe(`create function public.${trigger}() returns trigger language plpgsql as $$
+      begin if new.id = '${workspaceId}'::uuid and new.stripe_customer_conflict is null then
+        raise exception 'fixture conflict clear failure'; end if; return new; end $$`);
+    await client.unsafe(`create trigger ${trigger} before update of stripe_customer_conflict on public.workspace
+      for each row execute function public.${trigger}()`);
+    try {
+      expect(await checkout()).toMatchObject({ ok: false });
+      expect(sessions).toEqual([]);
+      expect(deletions).toEqual([`${customerPrefix}_1`]);
+    } finally {
+      await client.unsafe(`drop trigger ${trigger} on public.workspace`);
+      await client.unsafe(`drop function public.${trigger}()`);
+    }
+    expect(await checkout()).toMatchObject({ ok: true });
+    expect(requests).toHaveLength(1);
+    expect(deletions).toEqual([`${customerPrefix}_1`]);
+    expect(sessions).toEqual(["cus_competing_claim"]);
+  });
+
+  test("a failed conflict write cannot bypass the pending request on the next checkout", async () => {
+    competingClaim();
+    const trigger = `reject_customer_conflict_${workspaceId.replaceAll("-", "")}`;
+    await client.unsafe(`create function public.${trigger}() returns trigger language plpgsql as $$
+      begin if new.id = '${workspaceId}'::uuid then raise exception 'fixture conflict write failure'; end if; return new; end $$`);
+    await client.unsafe(`create trigger ${trigger} before update of stripe_customer_conflict on public.workspace
+      for each row execute function public.${trigger}()`);
+    try {
+      expect(await checkout()).toMatchObject({ ok: false });
+      expect(sessions).toEqual([]);
+      expect(deletions).toEqual([]);
+    } finally {
+      await client.unsafe(`drop trigger ${trigger} on public.workspace`);
+      await client.unsafe(`drop function public.${trigger}()`);
+    }
+    expect(await checkout()).toMatchObject({ ok: true });
+    expect(requests).toHaveLength(2);
+    expect(customers.size).toBe(1);
+    expect(deletions).toEqual([`${customerPrefix}_1`]);
+    expect(sessions).toEqual(["cus_competing_claim"]);
   });
 
   async function oldRequest() {

@@ -135,6 +135,8 @@ export const workspace = pgTable("workspace", {
     metadata: { callcaster_workspace_id: string; callcaster_request_id: string };
   }>(),
   stripe_customer_creation_started_at: timestamp({ withTimezone: true, mode: "string" }),
+  stripe_customer_conflict: jsonb().$type<{ unclaimed_id: string; canonical_id: string }>(),
+  stripe_customer_creation_completed_id: text(),
   token: text(),
   twilio_data: text().notNull(),
   users: text().array(),

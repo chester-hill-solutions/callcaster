@@ -4,13 +4,14 @@
 import { randomUUID } from "node:crypto";
 import Stripe from "stripe";
 import { z } from "zod";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import { user, workspace, workspace_member } from "@/db/schema";
 import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
+import { reconcileStripeCustomerConflict } from "./stripe-customer-reconciliation.server";
 
 const customerCreationSchema = z.object({
   name: z.string(),
@@ -28,6 +29,8 @@ function readCustomerWorkspace(workspaceId: string) {
       name: true,
       stripe_id: true,
       stripe_customer_creation: true,
+      stripe_customer_conflict: true,
+      stripe_customer_creation_completed_id: true,
     },
     extras: {
       creation_expired: sql<boolean>`
@@ -84,6 +87,34 @@ async function recoverCustomer(stripe: Stripe, params: z.infer<typeof customerCr
   return recovered;
 }
 
+async function claimCustomer(stripe: Stripe, workspaceId: string, customer: Stripe.Customer) {
+  const [claimed] = await adminDb.update(workspace)
+    .set({ stripe_id: customer.id, stripe_customer_creation_completed_id: customer.id })
+    .where(and(eq(workspace.id, workspaceId), isNull(workspace.stripe_id)))
+    .returning({ stripe_id: workspace.stripe_id });
+  if (claimed) return customer;
+  const canonical = await readCustomerWorkspace(workspaceId);
+  if (canonical?.stripe_id === customer.id && !canonical.stripe_customer_conflict) {
+    const [completed] = await adminDb.update(workspace).set({ stripe_customer_creation_completed_id: customer.id })
+      .where(and(eq(workspace.id, workspaceId), eq(workspace.stripe_id, customer.id),
+        isNull(workspace.stripe_customer_conflict)))
+      .returning({ stripe_id: workspace.stripe_id });
+    if (!completed) throw new Error("Stripe customer claim changed before completion");
+    return customer;
+  }
+  logger.error("Stripe customer claim needs reconciliation", {
+    workspaceId: workspaceId,
+    unclaimedCustomerId: customer.id,
+    canonicalCustomerId: canonical?.stripe_id ?? null,
+  });
+  if (!canonical?.stripe_id) throw new Error("Stripe customer claim has no canonical identity");
+  await adminDb.update(workspace).set({
+    stripe_customer_conflict: { unclaimed_id: customer.id, canonical_id: canonical.stripe_id },
+  }).where(and(eq(workspace.id, workspaceId), ne(workspace.stripe_id, customer.id),
+    isNull(workspace.stripe_customer_conflict)));
+  return reconcileStripeCustomerConflict(stripe, workspaceId);
+}
+
 export async function createStripeContact({
   workspace_id,
   tdb: tdbIn,
@@ -99,13 +130,17 @@ export async function createStripeContact({
     throw error;
   }
   if (!workspaceRow) throw new Error("No owner found for the workspace");
-  if (workspaceRow.stripe_id) return { id: workspaceRow.stripe_id };
-
-  if (!workspaceRow.stripe_customer_creation) {
+  if (!workspaceRow.stripe_id && !workspaceRow.stripe_customer_creation) {
     await freezeCustomerCreation(workspace_id, workspaceRow.name, tdbIn);
     workspaceRow = await readCustomerWorkspace(workspace_id);
     if (!workspaceRow) throw new Error("Workspace no longer exists");
-    if (workspaceRow.stripe_id) return { id: workspaceRow.stripe_id };
+  }
+  if (workspaceRow.stripe_customer_conflict) {
+    return reconcileStripeCustomerConflict(new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS), workspace_id);
+  }
+  if (workspaceRow.stripe_id && (!workspaceRow.stripe_customer_creation ||
+      workspaceRow.stripe_customer_creation_completed_id === workspaceRow.stripe_id)) {
+    return { id: workspaceRow.stripe_id };
   }
 
   const params = customerCreationSchema.parse(workspaceRow.stripe_customer_creation);
@@ -120,19 +155,7 @@ export async function createStripeContact({
     : await stripe.customers.create(params, { idempotencyKey });
   if (!customer.id) throw new Error("Stripe returned no customer identity");
 
-  const [claimed] = await adminDb.update(workspace)
-    .set({ stripe_id: customer.id })
-    .where(and(eq(workspace.id, workspace_id), isNull(workspace.stripe_id)))
-    .returning({ stripe_id: workspace.stripe_id });
-  if (claimed) return customer;
-  const canonical = await readCustomerWorkspace(workspace_id);
-  if (canonical?.stripe_id === customer.id) return customer;
-  logger.error("Stripe customer claim needs reconciliation", {
-    workspaceId: workspace_id,
-    unclaimedCustomerId: customer.id,
-    canonicalCustomerId: canonical?.stripe_id ?? null,
-  });
-  throw new Error("Stripe customer claim needs reconciliation before checkout");
+  return claimCustomer(stripe, workspace_id, customer);
 }
 
 export async function meterEvent({
