@@ -33,6 +33,28 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 | POST/DELETE | `/api/campaign_queue` | Queue row operations |
 | POST | `/api/reset_campaign` | Reset campaign via RPC |
 
+POST `/api/campaign_queue` reserves queue order on the server. Omitted or supplied
+`startOrder` values cannot change the reserved range. Concurrent requests reserve
+separate ranges. Existing campaign/contact uniqueness and explicit `requeue`
+behavior still apply; order reservation is not duplicate-send protection.
+
+Queue lifecycle API review for #2152:
+
+| Entry point | Field ownership observed in the writer |
+| --- | --- |
+| `/api/campaign_queue` POST | Clients choose contacts and explicit `requeue`; the server reserves order and the RPC writes queue state. |
+| `/api/queues` POST / DELETE | Dequeue uses the authenticated actor and fixed reason. Reset applies the queued transition; its history-loss defect remains tracked in #2153. |
+| `/api/dial` | The server calls the atomic claim RPC with queue, campaign, workspace and authenticated actor. |
+| `/api/auto-dial/status` | A signed provider callback uses a known queue status update builder. |
+| `/api/outreach-attempts` | Explicit relation IDs and authenticated actor reach the outreach RPC; queue counters are server writes. |
+| `/api/outreach_attempts/:id` | The separate outreach resource forwards a caller update to its scoped writer. Its field and relation authorization need a separate behavior audit. |
+
+These observations are a source review, not acceptance of every lifecycle API.
+The queue contract gate checks direct named/namespace calls, simple local aliases,
+and direct Drizzle, tenant and SQL writes in API modules. It requires explicit
+enqueue options and queue write fields. It does not replace service authorization
+or a whole-program data-flow audit.
+
 ## Scripts & surveys
 
 | Method | Path | Purpose |
