@@ -75,6 +75,9 @@ Keep shared server module mock factories additive with `importOriginal`.
 When a real service adds a transaction callback, update each calling fixture's
 transaction and scoped-client boundary. Keep its existing behavior assertions;
 prove rollback and persisted state in the real Postgres tier.
+Include route re-exports in a caller inventory. Older combined route tests can
+import the route barrel without naming the service or its action server file.
+Run those cases before relying on a focused caller result.
 For route-to-service call checks, wrap the original service with `vi.fn` in an
 additive module factory. A namespace spy installed after import can miss a
 route's bound service call. Keep the real service logic and database access.
