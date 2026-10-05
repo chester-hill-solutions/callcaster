@@ -1273,5 +1273,52 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently."
+  },
+  {
+    "issueNumber": 1878,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
+    "summary": "The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. Native #2396 now blocks #1878.",
+    "rootCause": "The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.",
+    "resolution": "Resolve #2396 as a separate callback operation first, with durable duplicate/acknowledgement recovery. Then extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
+    "lookIn": [
+      "app/components/call/CallScreen.Dialogs.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCallScreen.ts",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/routes/api+/audiodrop.action.server.ts",
+      "app/lib/auto-dial-start.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/lib/openapi-platform-components.ts",
+      "app/lib/services/hooks-api.ts"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx",
+      "test/ui/call-screen-callarea.test.tsx",
+      "test/audiodrop.test.ts",
+      "test/auto-dial-start.server.test.ts",
+      "test/auto-dial.server.test.ts",
+      "test/auto-dial-room.route.test.ts",
+      "test/auto-dial-status.test.ts"
+    ],
+    "missingTests": [
+      "Session file identity/None through every continuation; loader revalidation and separate agents; no shared configuration writes; tenant/object/actor/session refusal before provider updates; provider delay/rejection and retry without ending the call; API schema parity; real shared Dialog/Select/Toaster and stable geometry. Existing AMD replay/acknowledgement findings must be tested explicitly before claiming robust playback."
+    ],
+    "acceptanceCriteria": [
+      "The welcome dialog surfaces the caller audio (name and a way to change it)",
+      "What is surfaced matches what the dialer actually plays",
+      "The choice is session-only and does not write the campaign config"
+    ],
+    "blockedBy": [
+      2396
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged."
   }
 ]
