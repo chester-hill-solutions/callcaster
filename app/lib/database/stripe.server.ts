@@ -37,6 +37,53 @@ function readCustomerWorkspace(workspaceId: string) {
   });
 }
 
+async function freezeCustomerCreation(workspace_id: string, workspaceName: string, tdbIn?: TenantDb) {
+  const tdb = tdbIn ?? createTenantDb(workspace_id);
+  const ownerRecord = await tdb.workspace_member.findFirst({
+    where: eq(workspace_member.role_id, "owner"),
+    columns: { user_id: true },
+  });
+  if (!ownerRecord) throw new Error("No owner found for the workspace");
+  const ownerUser = await adminDb.query.user.findFirst({
+    where: eq(user.id, ownerRecord.user_id),
+    columns: { id: true, username: true },
+  });
+  if (!ownerUser) throw new Error("No owner user found");
+  if (!ownerUser.username) throw new Error("Owner user has no email or username");
+
+  await adminDb.update(workspace).set({
+    stripe_customer_creation: {
+      name: workspaceName,
+      email: ownerUser.username,
+      metadata: {
+        callcaster_workspace_id: workspace_id,
+        callcaster_request_id: randomUUID(),
+      },
+    },
+    stripe_customer_creation_started_at: sql`clock_timestamp()`,
+  }).where(and(
+    eq(workspace.id, workspace_id),
+    isNull(workspace.stripe_id),
+    isNull(workspace.stripe_customer_creation),
+  ));
+}
+
+async function recoverCustomer(stripe: Stripe, params: z.infer<typeof customerCreationSchema>) {
+  // A pruned provider key can create a second customer. Never repeat an old unknown create.
+  const existing = await stripe.customers.search({
+    query: `metadata['callcaster_request_id']:'${params.metadata.callcaster_request_id}'`,
+    limit: 2,
+  });
+  const recovered = existing.data[0];
+  if (existing.has_more || existing.data.length !== 1 || !recovered ||
+      recovered.metadata.callcaster_workspace_id !== params.metadata.callcaster_workspace_id ||
+      recovered.metadata.callcaster_request_id !== params.metadata.callcaster_request_id) {
+    logger.error("Stripe customer creation needs reconciliation", { workspaceId: params.metadata.callcaster_workspace_id });
+    throw new Error("Stripe customer creation needs reconciliation before retry");
+  }
+  return recovered;
+}
+
 export async function createStripeContact({
   workspace_id,
   tdb: tdbIn,
@@ -55,34 +102,7 @@ export async function createStripeContact({
   if (workspaceRow.stripe_id) return { id: workspaceRow.stripe_id };
 
   if (!workspaceRow.stripe_customer_creation) {
-    const tdb = tdbIn ?? createTenantDb(workspace_id);
-    const ownerRecord = await tdb.workspace_member.findFirst({
-      where: eq(workspace_member.role_id, "owner"),
-      columns: { user_id: true },
-    });
-    if (!ownerRecord) throw new Error("No owner found for the workspace");
-    const ownerUser = await adminDb.query.user.findFirst({
-      where: eq(user.id, ownerRecord.user_id),
-      columns: { id: true, username: true },
-    });
-    if (!ownerUser) throw new Error("No owner user found");
-    if (!ownerUser.username) throw new Error("Owner user has no email or username");
-
-    await adminDb.update(workspace).set({
-      stripe_customer_creation: {
-        name: workspaceRow.name,
-        email: ownerUser.username,
-        metadata: {
-          callcaster_workspace_id: workspace_id,
-          callcaster_request_id: randomUUID(),
-        },
-      },
-      stripe_customer_creation_started_at: sql`clock_timestamp()`,
-    }).where(and(
-      eq(workspace.id, workspace_id),
-      isNull(workspace.stripe_id),
-      isNull(workspace.stripe_customer_creation),
-    ));
+    await freezeCustomerCreation(workspace_id, workspaceRow.name, tdbIn);
     workspaceRow = await readCustomerWorkspace(workspace_id);
     if (!workspaceRow) throw new Error("Workspace no longer exists");
     if (workspaceRow.stripe_id) return { id: workspaceRow.stripe_id };
@@ -95,24 +115,9 @@ export async function createStripeContact({
   const idempotencyKey = `workspace:${workspace_id}:stripe-customer`;
   if (idempotencyKey.length > 255) throw new Error("Workspace id is too long for Stripe billing");
   const stripe = new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS);
-  let customer: Stripe.Customer;
-  if (workspaceRow.creation_expired) {
-    // A pruned provider key can create a second customer. Never repeat an old unknown create.
-    const existing = await stripe.customers.search({
-      query: `metadata['callcaster_request_id']:'${params.metadata.callcaster_request_id}'`,
-      limit: 2,
-    });
-    const recovered = existing.data[0];
-    if (existing.has_more || existing.data.length !== 1 || !recovered ||
-        recovered.metadata.callcaster_workspace_id !== workspace_id ||
-        recovered.metadata.callcaster_request_id !== params.metadata.callcaster_request_id) {
-      logger.error("Stripe customer creation needs reconciliation", { workspaceId: workspace_id });
-      throw new Error("Stripe customer creation needs reconciliation before retry");
-    }
-    customer = recovered;
-  } else {
-    customer = await stripe.customers.create(params, { idempotencyKey });
-  }
+  const customer = workspaceRow.creation_expired
+    ? await recoverCustomer(stripe, params)
+    : await stripe.customers.create(params, { idempotencyKey });
   if (!customer.id) throw new Error("Stripe returned no customer identity");
 
   const [claimed] = await adminDb.update(workspace)

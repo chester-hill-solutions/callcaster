@@ -58,6 +58,36 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
   const provisionedIds: string[] = [];
   const requestParams = new Map<string, string>();
 
+  async function respondToCustomer(request: import("node:http").IncomingMessage,
+    response: import("node:http").ServerResponse, fields: URLSearchParams, reply: (value: unknown) => void) {
+  const key = request.headers["idempotency-key"] as string | undefined;
+  requests.push({ key, fields });
+  await beforeCustomerReply?.();
+  onFirstCreate?.(); onFirstCreate = undefined;
+  if (rejectCreate) {
+    response.writeHead(400, { "Content-Type": "application/json", "Stripe-Should-Retry": "false" });
+    response.end(JSON.stringify({ error: { type: "invalid_request_error", message: "Fixture rejects before execution" } }));
+    return;
+  }
+  if (key && requestParams.has(key) && requestParams.get(key) !== fields.toString()) {
+    response.writeHead(400, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { type: "idempotency_error", message: "Parameters changed" } }));
+    return;
+  }
+  if (key) requestParams.set(key, fields.toString());
+  const send = () => {
+    const identity = key ?? randomUUID();
+    let id = customers.get(identity);
+    if (!id) { id = `${customerPrefix}_${customers.size + 1}`; customers.set(identity, id); }
+    reply({ id, object: "customer", name: fields.get("name"), email: fields.get("email"), metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"), callcaster_request_id: fields.get("metadata[callcaster_request_id]") } });
+  };
+  if (synchronizeCreates && requests.length === 1) { firstResponse = send; return; }
+  if (synchronizeCreates) {
+    secondResponse = send; firstResponse?.(); firstResponse = undefined; return;
+  }
+  send(); return;
+  }
+
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Stripe race tests require a database URL");
     vi.stubEnv("DATABASE_URL", databaseUrl);
@@ -80,32 +110,8 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
         response.end(JSON.stringify(value));
       };
       if (request.method === "POST" && request.url === "/v1/customers") {
-        const key = request.headers["idempotency-key"] as string | undefined;
-        requests.push({ key, fields });
-        await beforeCustomerReply?.();
-        onFirstCreate?.(); onFirstCreate = undefined;
-        if (rejectCreate) {
-          response.writeHead(400, { "Content-Type": "application/json", "Stripe-Should-Retry": "false" });
-          response.end(JSON.stringify({ error: { type: "invalid_request_error", message: "Fixture rejects before execution" } }));
-          return;
-        }
-        if (key && requestParams.has(key) && requestParams.get(key) !== fields.toString()) {
-          response.writeHead(400, { "Content-Type": "application/json" });
-          response.end(JSON.stringify({ error: { type: "idempotency_error", message: "Parameters changed" } }));
-          return;
-        }
-        if (key) requestParams.set(key, fields.toString());
-        const send = () => {
-          const identity = key ?? randomUUID();
-          let id = customers.get(identity);
-          if (!id) { id = `${customerPrefix}_${customers.size + 1}`; customers.set(identity, id); }
-          reply({ id, object: "customer", name: fields.get("name"), email: fields.get("email"), metadata: { callcaster_workspace_id: fields.get("metadata[callcaster_workspace_id]"), callcaster_request_id: fields.get("metadata[callcaster_request_id]") } });
-        };
-        if (synchronizeCreates && requests.length === 1) { firstResponse = send; return; }
-        if (synchronizeCreates) {
-          secondResponse = send; firstResponse?.(); firstResponse = undefined; return;
-        }
-        send(); return;
+        await respondToCustomer(request, response, fields, reply);
+        return;
       }
       if (request.method === "POST" && request.url === "/v1/checkout/sessions") {
         sessions.push(fields.get("customer") ?? "");
@@ -212,31 +218,45 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
       setupReached(id);
       await setupGate;
     };
-    const setup = await import("@/lib/database/workspace-provisioning.server");
-    const setupResult = setup.createNewWorkspace({ workspaceName: "Setup checkout race", user_id: ownerId });
-    const id = await setupWaiting;
-    synchronizeCreates = true;
-    const firstCreate = new Promise<void>(resolve => { onFirstCreate = resolve; });
-    const checkoutResult = checkout(id);
-    await firstCreate;
-    releaseSetup();
-    const [created, checkedOut] = await Promise.all([setupResult, checkoutResult]);
-    expect(created).toMatchObject({ data: id, error: null });
-    expect(created.provisioningWarning).not.toContain("Stripe");
-    expect(checkedOut).toMatchObject({ ok: true });
-    expect(customers.size).toBe(1);
-    expect(requests.map(r => r.key)).toEqual([
-      `workspace:${id}:stripe-customer`, `workspace:${id}:stripe-customer`,
-    ]);
-    expect(sessions).toEqual([`${customerPrefix}_1`]);
-    const [stored] = await client`select stripe_id, twilio_data::text as twilio_data, credits from public.workspace where id = ${id}::uuid`;
-    expect(stored.stripe_id).toBe(`${customerPrefix}_1`);
-    expect(JSON.parse(stored.twilio_data).onboarding).toBeTruthy();
-    expect(stored.credits).toBe(100);
-    const Stripe = (await import("stripe")).default;
-    const methods = await new Stripe("sk_test_fixture").paymentMethods.list({ customer: stored.stripe_id, type: "card" });
-    expect(methods.data.map(method => method.id)).toEqual(["pm_saved_fixture"]);
-    expect(await storedCustomers()).toEqual(expect.arrayContaining([{ id: foreignWorkspaceId, stripe_id: "cus_foreign_control" }]));
+    const setupName = `Setup checkout race ${ownerId}`;
+    const trigger = `protect_setup_customer_${ownerId.replaceAll("-", "")}`;
+    await client.unsafe(`create function public.${trigger}() returns trigger language plpgsql as $$
+      begin if new.name = '${setupName}' and old.stripe_id is not null then
+        raise exception 'setup cannot write a claimed customer'; end if; return new; end $$`);
+    await client.unsafe(`create trigger ${trigger} before update of stripe_id on public.workspace
+      for each row execute function public.${trigger}()`);
+    try {
+      const setup = await import("@/lib/database/workspace-provisioning.server");
+      const setupResult = setup.createNewWorkspace({ workspaceName: setupName, user_id: ownerId });
+      const id = await setupWaiting;
+      synchronizeCreates = true;
+      const firstCreate = new Promise<void>(resolve => { onFirstCreate = resolve; });
+      const checkoutResult = checkout(id);
+      await firstCreate;
+      releaseSetup();
+      const [created, checkedOut] = await Promise.all([setupResult, checkoutResult]);
+      expect(created).toMatchObject({ data: id, error: null });
+      expect(created.provisioningWarning).not.toContain("Stripe");
+      expect(created.provisioningWarning).not.toContain("metadata update failed");
+      expect(checkedOut).toMatchObject({ ok: true });
+      expect(customers.size).toBe(1);
+      expect(requests.map(r => r.key)).toEqual([
+        `workspace:${id}:stripe-customer`, `workspace:${id}:stripe-customer`,
+      ]);
+      expect(sessions).toEqual([`${customerPrefix}_1`]);
+      const [stored] = await client`select stripe_id, twilio_data::text as twilio_data, credits from public.workspace where id = ${id}::uuid`;
+      expect(stored.stripe_id).toBe(`${customerPrefix}_1`);
+      expect(JSON.parse(stored.twilio_data).onboarding).toBeTruthy();
+      expect(stored.credits).toBe(100);
+      const Stripe = (await import("stripe")).default;
+      const methods = await new Stripe("sk_test_fixture").paymentMethods.list({ customer: stored.stripe_id, type: "card" });
+      expect(methods.data.map(method => method.id)).toEqual(["pm_saved_fixture"]);
+      expect(await storedCustomers()).toEqual(expect.arrayContaining([{ id: foreignWorkspaceId, stripe_id: "cus_foreign_control" }]));
+    } finally {
+      releaseSetup();
+      await client.unsafe(`drop trigger ${trigger} on public.workspace`);
+      await client.unsafe(`drop function public.${trigger}()`);
+    }
   });
 
   test("a rejected create retries with the frozen name, owner and key", async () => {
