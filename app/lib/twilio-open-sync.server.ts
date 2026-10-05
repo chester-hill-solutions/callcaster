@@ -3,6 +3,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
+import { smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import {
   isPendingMessageSid,
@@ -74,6 +75,8 @@ const DATE_SENT_BACKFILL_LIMIT = 100;
 
 type ProviderMessage = {
   sid: string;
+  numSegments?: string | null;
+  numMedia?: string | null;
   to?: string | null;
   from?: string | null;
   status?: string | null;
@@ -129,7 +132,10 @@ async function reconcilePendingIntent<T extends ProviderMessage>(args: {
     });
     return { kind: "failed" };
   }
-  await resolveMessageByClientRef(workspaceId, local.client_ref, { sid: match.sid });
+  await resolveMessageByClientRef(workspaceId, local.client_ref, {
+    sid: match.sid,
+    ...smsProviderQuantityFields(match),
+  });
   logger.warn("Twilio open sync: pending intent resolved by number pair", {
     workspaceId,
     clientRef: local.client_ref,
@@ -402,6 +408,7 @@ export async function triggerTwilioOpenSync({
         }
 
         await updateMessageBySid(workspaceId, local.sid, {
+          ...smsProviderQuantityFields(remote),
           // Omit `status` when it is unchanged so this is a pure send-time
           // write: updateMessageBySid only reports a status regression, and a
           // same-value write would otherwise be indistinguishable from a real

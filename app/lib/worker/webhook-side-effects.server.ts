@@ -15,11 +15,12 @@ import {
 import { recheckCampaignCompletion } from "@/lib/campaign-settle-recheck.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
-import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
+import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
 import { campaign as campaignTable, campaign_queue as campaignQueueTable } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
-import { findMessageBySid } from "@/lib/message-db.server";
+import { findMessageBySid, updateMessageBySid, type MessageRow } from "@/lib/message-db.server";
+import { parseSmsProviderCount, smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import {
   findCallBySid,
   findOutreachAttemptById,
@@ -159,6 +160,50 @@ export async function runCallStatusSideEffects(args: {
   return { ok: true };
 }
 
+async function billTerminalSms(message: MessageRow, status: TwilioSmsStatus): Promise<void> {
+  const workspaceId = message.workspace;
+  if (!workspaceId || !isTerminalSmsStatus(status)) return;
+
+  let segments = parseSmsProviderCount(message.num_segments);
+  let media = parseSmsProviderCount(message.num_media);
+  if (media == null || (media === 0 && (segments == null || segments === 0))) {
+    const remote = await createWorkspaceTwilioInstance({ workspace_id: workspaceId })
+      .then((twilio) => twilio.messages(message.sid).fetch())
+      .catch((error: unknown) => {
+        logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+        throw new Error(`SMS billing metadata unavailable for ${message.sid}`, { cause: error });
+      });
+    if (remote.sid !== message.sid || (message.account_sid && remote.accountSid !== message.account_sid)) {
+      logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+      throw new Error(`Unexpected provider message identity for ${message.sid}`);
+    }
+    segments = parseSmsProviderCount(remote.numSegments);
+    media = parseSmsProviderCount(remote.numMedia);
+    const saved = await updateMessageBySid(workspaceId, message.sid, smsProviderQuantityFields(remote));
+    if (!saved) throw new Error(`Message ${message.sid} not found while saving billing metadata`);
+  }
+
+  if (media == null || (media === 0 && (segments == null || segments === 0))) {
+    logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+    throw new Error(`SMS billing metadata unavailable for ${message.sid}`);
+  }
+
+  const isMms = media > 0;
+  const amount = isMms ? MMS_CREDITS : SMS_SEGMENT_CREDITS * (segments ?? 0);
+  const note = isMms
+    ? `MMS ${message.sid} ${status}`
+    : `SMS ${message.sid} ${status} (${segments} segment${segments === 1 ? "" : "s"})`;
+  await insertTransactionHistoryIdempotent(db, {
+    workspaceId,
+    type: "DEBIT",
+    amount: debitAmountFromCredits(amount),
+    note,
+    idempotencyKey: smsKey(message.sid),
+    messageSid: message.sid,
+    campaignId: message.campaign_id ?? null,
+  });
+}
+
 export async function runSmsStatusSideEffects(args: {
   messageSid: string;
   twilioParams: Partial<TwilioSmsStatusWebhook>;
@@ -200,26 +245,13 @@ export async function runSmsStatusSideEffects(args: {
     });
   }
 
-  if (messageData.workspace && isTerminalSmsStatus(messageStatus)) {
-    const numSegments = Math.max(
-      1,
-      Number.parseInt(String(messageData.num_segments ?? "1"), 10) || 1,
-    );
-    const numMedia = Number.parseInt(String(messageData.num_media ?? "0"), 10) || 0;
-    const isMms = numMedia > 0;
-    const amount = isMms ? MMS_CREDITS : SMS_SEGMENT_CREDITS * numSegments;
-    const note = isMms
-      ? `MMS ${sid} ${messageStatus}`
-      : `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`;
-    await insertTransactionHistoryIdempotent(db, {
-      workspaceId: messageData.workspace,
-      type: "DEBIT",
-      amount: debitAmountFromCredits(amount),
-      note,
-      idempotencyKey: smsKey(sid),
-      messageSid: sid,
-      campaignId: messageData.campaign_id ?? null,
-    });
+  // Missing provider metadata defers billing, while delivery results still
+  // settle. Throw after the independent effects so the durable job retries.
+  let billingFailure: { error: unknown } | null = null;
+  try {
+    await billTerminalSms(messageData, messageStatus);
+  } catch (error) {
+    billingFailure = { error };
   }
 
   let outreachData:
@@ -314,6 +346,8 @@ export async function runSmsStatusSideEffects(args: {
     campaignId: messageData.campaign_id,
     reason: `sms_status:${messageStatus}`,
   });
+
+  if (billingFailure) throw billingFailure.error;
 
   return { ok: true };
 }
