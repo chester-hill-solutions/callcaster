@@ -241,6 +241,9 @@ first case. Require executed cases and a passing result before using the proof.
 Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
 `INTEGRATION_DB_URL` as an optional override. Verify the suite with
 `DATABASE_URL` alone; skipped cases do not prove the remote database gate.
+Bind the selected URL to both app pool variables before importing the runtime
+database module, then restore the worker environment. Verify override-only
+and differing-URL controls so the fixture cannot use the wrong database.
 
 For database failure controls, keep the isolated relation present. Renaming it
 can make an unqualified query resolve to a public table on the search path.

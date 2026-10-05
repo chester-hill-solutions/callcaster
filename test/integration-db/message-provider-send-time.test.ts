@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, describe, expect, test, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import type { TenantDb } from "@/server/tenant-db";
 
@@ -8,13 +8,18 @@ vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
   emitChatMessageEvent: vi.fn(async () => undefined),
 }));
 
-const suite = process.env.INTEGRATION_DB_URL || process.env.DATABASE_URL ? describe : describe.skip;
+const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
+const suite = databaseUrl ? describe : describe.skip;
 const workspaceId = randomUUID();
 const sid = "SMprovider_send_time_fixture";
 const first = new Date("2026-10-05T10:11:12.345Z");
 const later = new Date("2026-10-05T12:13:14.567Z");
 
 suite("provider send-time writes against real Postgres (#2049)", () => {
+  beforeAll(() => {
+    vi.stubEnv("DATABASE_URL", databaseUrl);
+    vi.stubEnv("DATABASE_DIRECT_URL", databaseUrl);
+  });
   async function fixture(run: (tdb: TenantDb) => Promise<void>, stored: Date | null = null) {
     const { withAppCurrentUser, createTenantDb } = await import("@/server/tenant-db");
     await withAppCurrentUser(randomUUID(), async (tx) => {
@@ -26,8 +31,12 @@ suite("provider send-time writes against real Postgres (#2049)", () => {
   }
 
   afterAll(async () => {
-    const { pool, directPool } = await import("@/server/db");
-    await Promise.all([pool.end(), directPool.end()]);
+    try {
+      const { pool, directPool } = await import("@/server/db");
+      await Promise.all([pool.end(), directPool.end()]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   test("captures the actual provider Date rather than request time", async () => {
