@@ -6,12 +6,13 @@ import { asRouteResponse } from "../helpers/route-result";
 
 const provider = vi.hoisted(() => {
   vi.stubEnv("TZ", "UTC");
-  return { fetch: vi.fn(), list: vi.fn(), workspaces: [] as string[] };
+  return { fetch: vi.fn(), list: vi.fn(), setup: vi.fn(), workspaces: [] as string[] };
 });
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
   createWorkspaceTwilioInstance: async (args: { workspace_id: string }) => {
     provider.workspaces.push(args.workspace_id);
+    await provider.setup();
     return {
       messages: Object.assign((sid: string) => ({ fetch: () => provider.fetch(sid) }), { list: provider.list }),
       calls: { list: async () => [] },
@@ -73,6 +74,7 @@ suite("authoritative SMS quantities against real Postgres (#2150)", () => {
       values (${workspace}, 'SMS quantity fixture', 1000, ${JSON.stringify({ sid: accountSid, authToken })}::jsonb)`;
     const [saved] = await pool`select twilio_data from workspace where id = ${workspace}`;
     expect(saved.twilio_data).toEqual({ sid: accountSid, authToken });
+    provider.setup.mockReset().mockResolvedValue(undefined);
     provider.fetch.mockReset();
     provider.list.mockReset().mockResolvedValue([]);
     provider.workspaces.length = 0;
@@ -229,6 +231,22 @@ suite("authoritative SMS quantities against real Postgres (#2150)", () => {
     const { runSmsStatusSideEffects } = await services();
     await expect(runSmsStatusSideEffects({ messageSid: sid, twilioParams: params })).rejects.toThrow(/SMS billing metadata unavailable/);
     expect(await ledger()).toEqual([]);
+    await runSmsStatusSideEffects({ messageSid: sid, twilioParams: params });
+    expect(await ledger()).toEqual([{ amount: -6, idempotency_key: `sms:${sid}` }]);
+  });
+
+  test("workspace client setup failure logs the missing quantity and can recover on retry", async () => {
+    const sid = await message();
+    provider.setup.mockRejectedValueOnce(new Error("Workspace provider credentials unavailable"));
+    const params = await callback(sid);
+    const { logger } = await import("@/lib/logger.server");
+    const warning = vi.spyOn(logger, "warn");
+    const { runSmsStatusSideEffects } = await services();
+    await expect(runSmsStatusSideEffects({ messageSid: sid, twilioParams: params })).rejects.toThrow(/SMS billing metadata unavailable/);
+    expect(warning).toHaveBeenCalledWith("billing.sms_metadata_unavailable", expect.objectContaining({ workspaceId: workspace, sid }));
+    expect(provider.fetch).not.toHaveBeenCalled();
+    expect(await ledger()).toEqual([]);
+    expect((await report(3)).entityAudit.messageGap).toBe(1);
     await runSmsStatusSideEffects({ messageSid: sid, twilioParams: params });
     expect(await ledger()).toEqual([{ amount: -6, idempotency_key: `sms:${sid}` }]);
   });

@@ -167,12 +167,14 @@ async function billTerminalSms(message: MessageRow, status: TwilioSmsStatus): Pr
   let segments = parseSmsProviderCount(message.num_segments);
   let media = parseSmsProviderCount(message.num_media);
   if (media == null || (media === 0 && (segments == null || segments === 0))) {
-    const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId });
-    const remote = await twilio.messages(message.sid).fetch().catch((error: unknown) => {
-      logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
-      throw new Error(`SMS billing metadata unavailable for ${message.sid}`, { cause: error });
-    });
+    const remote = await createWorkspaceTwilioInstance({ workspace_id: workspaceId })
+      .then((twilio) => twilio.messages(message.sid).fetch())
+      .catch((error: unknown) => {
+        logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+        throw new Error(`SMS billing metadata unavailable for ${message.sid}`, { cause: error });
+      });
     if (remote.sid !== message.sid || (message.account_sid && remote.accountSid !== message.account_sid)) {
+      logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
       throw new Error(`Unexpected provider message identity for ${message.sid}`);
     }
     segments = parseSmsProviderCount(remote.numSegments);
