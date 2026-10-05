@@ -1,4 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
+import { useState } from "react";
+import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
@@ -40,6 +41,7 @@ vi.mock("@/lib/services/hooks-api", () => ({
 
 const fetcher = createMockFetcher({ submit: vi.fn() });
 const queueFetcher = createMockFetcher({ submit: vi.fn() });
+const saveFetcher = createMockFetcher({ submit: vi.fn() });
 const verifyFetcher = createMockFetcher({
   load: vi.fn(),
   data: {
@@ -59,8 +61,12 @@ const queueItem = {
   contact: { id: 1, phone: "+15551234567", address: "123 Main" },
 } as any;
 
+let dialType = "call";
+let callerId = "+15550000001";
+let workspaceAccess = true;
+const navigate = vi.fn();
 let fetcherCall = 0;
-const routeFetchers = [fetcher, queueFetcher, verifyFetcher];
+const routeFetchers = [verifyFetcher, fetcher, queueFetcher, saveFetcher];
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
@@ -70,17 +76,16 @@ vi.mock("react-router", async () => {
     useOutletContext: () => ({ client }),
     useNavigation: () => ({ state: "idle" }),
     useRevalidator: () => ({ revalidate }),
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigate,
     useFetcher: () => {
-      const f = routeFetchers[fetcherCall % routeFetchers.length];
-      fetcherCall += 1;
+      const [f] = useState(() => routeFetchers[fetcherCall++ % routeFetchers.length]);
       return f;
     },
     useLoaderData: () => ({
       campaign: {
         id: 1,
-        dial_type: "call",
-        caller_id: "+15550000001",
+        dial_type: dialType,
+        caller_id: callerId,
         group_household_queue: false,
       },
       attempts: [],
@@ -98,7 +103,7 @@ vi.mock("react-router", async () => {
       count: 0,
       completed: 0,
       isActive: true,
-      hasAccess: true,
+      hasAccess: workspaceAccess,
       verifiedNumbers: [],
     }),
   };
@@ -107,6 +112,9 @@ vi.mock("react-router", async () => {
 describe("useCallScreen", () => {
   beforeEach(() => {
     fetcherCall = 0;
+    dialType = "call";
+    callerId = "+15550000001";
+    workspaceAccess = true;
     vi.clearAllMocks();
     vi.stubGlobal("alert", vi.fn());
     vi.stubGlobal(
@@ -124,6 +132,7 @@ describe("useCallScreen", () => {
 
     Object.assign(fetcher, { submit: vi.fn(), state: "idle", data: undefined });
     Object.assign(queueFetcher, { submit: vi.fn(), state: "idle", data: undefined });
+    Object.assign(saveFetcher, { submit: vi.fn(), state: "idle", data: undefined });
     Object.assign(verifyFetcher, {
       load: vi.fn(),
       data: {
@@ -218,6 +227,89 @@ describe("useCallScreen", () => {
     act(() => result.current.phoneVerification.setSelectedDevice("+15559998888"));
 
     window.dispatchEvent(new KeyboardEvent("keypress", { key: "3" }));
+  });
+
+  test("predictive start errors reach the shared toast once and pending state reaches the layout contract", async () => {
+    dialType = "predictive";
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    await act(async () => { result.current.dialogControls.onJoin(); });
+    const { mockTwilioDevice } = await import("../mocks/twilio-voice-sdk");
+    await waitFor(() => expect(result.current.device).not.toBeNull());
+    act(() => mockTwilioDevice.emit("registered"));
+    let respond!: (value: { success: boolean; error: string }) => void;
+    vi.mocked(api.startConferenceAndDial).mockReturnValueOnce(new Promise((resolve) => { respond = resolve; }));
+    act(() => { result.current.callControls.handleDialButton(); });
+    expect(result.current.callControls.isStartingConference).toBe(true);
+    await act(async () => { respond({ success: false, error: "Campaign is paused." }); });
+    expect(result.current.callControls.isStartingConference).toBe(false);
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith("Campaign is paused.");
+    rerender();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(result.current.callControls.callState).toBe("idle");
+  });
+
+  test.each([true, false])("predictive credit recovery does not add a credit-error banner, workspace access: %s", async (hasAccess) => {
+    dialType = "predictive";
+    workspaceAccess = hasAccess;
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    const { result } = renderHook(() => useCallScreen());
+    await act(async () => { result.current.dialogControls.onJoin(); });
+    const { mockTwilioDevice } = await import("../mocks/twilio-voice-sdk");
+    await waitFor(() => expect(result.current.device).not.toBeNull());
+    act(() => mockTwilioDevice.emit("registered"));
+    vi.mocked(api.startConferenceAndDial).mockResolvedValueOnce({ success: false, creditsError: true });
+    await act(async () => { result.current.callControls.handleDialButton(); });
+    expect(result.current.creditsError).toBe(false);
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    const [message, options] = vi.mocked(toast.error).mock.calls[0];
+    if (hasAccess) {
+      expect(message).toBe("Add credits to start dialing, then try again.");
+      expect(options?.action).toMatchObject({ label: "Add credits" });
+      act(() => (options?.action as { onClick: () => void }).onClick());
+      expect(navigate).toHaveBeenCalledWith("/workspaces/ws/billing");
+    } else {
+      expect(message).toBe("Contact a workspace administrator to add credits, then try again.");
+      expect(options?.action).toBeUndefined();
+    }
+  });
+
+  test("the call-screen contract carries the missing caller-ID reason and recovers after loader refresh", async () => {
+    dialType = "predictive";
+    callerId = "";
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    expect(result.current.callControls.startDisabledReason).toBe("Set caller ID in Setup");
+    callerId = "+15550000001";
+    rerender();
+    expect(result.current.callControls.startDisabledReason).toBeNull();
+  });
+
+  test("the actual layout passes missing-prerequisite and pending feedback into the shared dial control", async () => {
+    dialType = "predictive";
+    callerId = "";
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { CallScreenLayout } = await import("@/components/call/CallScreen.Layout");
+    const { MemoryRouter } = await import("react-router");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    const layout = () => <MemoryRouter><CallScreenLayout {...result.current}
+      dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
+    /></MemoryRouter>;
+    const view = render(layout());
+    expect(screen.getByRole("button", { name: "Set caller ID in Setup" })).toBeDisabled();
+    callerId = "+15550000001";
+    rerender();
+    view.rerender(layout());
+    expect(screen.getByRole("button", { name: "Start Dialing" })).toBeEnabled();
+    view.rerender(<MemoryRouter><CallScreenLayout {...result.current}
+      dialogControls={{ ...result.current.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }}
+      callControls={{ ...result.current.callControls, isStartingConference: true }}
+    /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: "Starting…" })).toBeDisabled();
   });
 
   test("keyboard DTMF ignores keypresses from editable fields", async () => {

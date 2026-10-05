@@ -97,6 +97,8 @@ export function CallScreenLayout({
     callState,
     callDuration,
     deviceIsBusy,
+    isStartingConference,
+    startDisabledReason,
     handleDialButton,
     handleDequeueNext,
     handleVoiceDrop,
@@ -421,6 +423,8 @@ export function CallScreenLayout({
             conference={conference ? { parameters: { Sid: conference } } : null}
             isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
+            isStartingConference={isStartingConference}
+            startDisabledReason={startDisabledReason}
             nextRecipient={nextRecipient}
             questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}

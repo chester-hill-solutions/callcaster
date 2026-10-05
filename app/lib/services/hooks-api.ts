@@ -65,6 +65,41 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
   }
 }
 
+const CONFERENCE_START_FAILURE = "Could not start dialing. Try again.";
+
+function conferenceStartError(data: unknown): string {
+  if (typeof data !== "object" || data === null || !("error" in data)) {
+    return CONFERENCE_START_FAILURE;
+  }
+  const message = data.error;
+  if (typeof message !== "string" || !message.trim() || message.length > 300 || /[<>\r\n]/.test(message)) {
+    return CONFERENCE_START_FAILURE;
+  }
+  return message.trim();
+}
+
+function conferenceStartResult(data: unknown): StartConferenceResponse {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error(CONFERENCE_START_FAILURE);
+  }
+
+  if ("creditsError" in data && data.creditsError === true) {
+    return {
+      success: false,
+      creditsError: true,
+      error: 'Insufficient credits to start conference',
+    };
+  }
+
+  if ("success" in data && data.success === true) {
+    if (!("conferenceName" in data) || typeof data.conferenceName !== "string" || !data.conferenceName.trim()) {
+      throw new Error(CONFERENCE_START_FAILURE);
+    }
+    return { success: true, conferenceName: data.conferenceName };
+  }
+  return { success: false, error: conferenceStartError(data) };
+}
+
 /**
  * Start a conference and initiate auto-dial
  * @param params - Conference and dial parameters
@@ -95,7 +130,9 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
         selected_device,
       }),
     },
-    );
+    ).catch(() => {
+      throw new Error(CONFERENCE_START_FAILURE);
+    });
 
     if (response.status === 402) {
       // Insufficient credits — the route returns this as a graceful JSON
@@ -109,25 +146,12 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      const errorData: unknown = await response.json().catch(() => null);
+      throw new Error(response.status < 500 ? conferenceStartError(errorData) : CONFERENCE_START_FAILURE);
     }
 
-    const data = await response.json();
-
-    if (data.creditsError) {
-      return {
-        success: false,
-        creditsError: true,
-        error: 'Insufficient credits to start conference',
-      };
-    }
-
-    if (data.success && !data.conferenceName) {
-      throw new Error('Conference started but no conference name returned');
-    }
-
-    return data;
+    const data: unknown = await response.json().catch(() => null);
+    return conferenceStartResult(data);
   } catch (error) {
     if (error instanceof Error) {
       throw error;
