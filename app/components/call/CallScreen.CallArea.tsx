@@ -31,6 +31,8 @@ interface Conference {
 
 export interface CallAreaProps {
   isBusy: boolean;
+  isStartingConference?: boolean;
+  startDisabledReason?: string | null;
   nextRecipient: QueueItem | null;
   /**
    * The contact the script/disposition panel is currently recording an
@@ -143,6 +145,8 @@ export function ContactStrip({
 type CallControlsProps = Pick<
   CallAreaProps,
   | "isBusy"
+  | "isStartingConference"
+  | "startDisabledReason"
   | "nextRecipient"
   | "hangUp"
   | "handleVoiceDrop"
@@ -165,6 +169,8 @@ type CallControlsProps = Pick<
  */
 export function CallControls({
   isBusy,
+  isStartingConference = false,
+  startDisabledReason = null,
   nextRecipient,
   hangUp,
   handleVoiceDrop,
@@ -335,7 +341,8 @@ export function CallControls({
     <div className="flex flex-col gap-3 px-4 py-3">
       <Button
         onClick={handleDialClick}
-        disabled={isBusy}
+        disabled={isBusy || (predictive && (isStartingConference || Boolean(startDisabledReason)))}
+        isPending={predictive && isStartingConference}
         data-testid="call-screen-dial"
         className="w-full rounded-full bg-success text-success-foreground hover:bg-success/80"
         title={
@@ -344,7 +351,7 @@ export function CallControls({
             : undefined
         }
       >
-        {dialLabel}
+        {predictive ? (isStartingConference ? "Starting…" : startDisabledReason || dialLabel) : dialLabel}
       </Button>
     </div>
   );
@@ -418,6 +425,8 @@ export function DispositionBar({
 
 export const CallArea: React.FC<CallAreaProps> = ({
   isBusy,
+  isStartingConference,
+  startDisabledReason,
   nextRecipient,
   questionContact,
   displayState,
@@ -444,6 +453,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
       <ContactStrip nextRecipient={nextRecipient} questionContact={questionContact} />
       <CallControls
         isBusy={isBusy}
+        isStartingConference={isStartingConference}
+        startDisabledReason={startDisabledReason}
         nextRecipient={nextRecipient}
         hangUp={hangUp}
         handleVoiceDrop={handleVoiceDrop}
