@@ -71,7 +71,7 @@ function signedRequest(options: {
 
 async function validate(request: Request, boundary: "route" | "ingress") {
   if (boundary === "route") {
-    return await requireTwilioSignature(request, { callSid: "CA_query_fixture" });
+    return requireTwilioSignature(request, { callSid: "CA_query_fixture" });
   }
   const result = await handleTwilioWebhookRequest(request);
   if (result.kind === "response") return result.response;

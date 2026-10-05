@@ -26,7 +26,23 @@ const params = { CallSid: "CA_bun_query", AccountSid: "AC_bun_query", CallStatus
 const query = "?audio=hello%20%26%20thanks.mp3&tag=a&tag=b&empty=";
 let executed = 0;
 
-for (const boundary of ["route", "ingress"]) {
+async function validate(request: Request, boundary: "route" | "ingress"): Promise<number | null> {
+  if (boundary === "route") {
+    return (await requireTwilioSignature(request, { callSid: "CA_bun_query" }))?.status ?? null;
+  }
+  const result = await handleTwilioWebhookRequest(request);
+  assert.notEqual(result.kind, "continue");
+  if (result.kind === "response") return result.response.status;
+  if (result.kind === "validated") {
+    assert.equal(result.request.url, request.url);
+    if (request.method === "POST") {
+      assert.deepEqual(Object.fromEntries(await result.request.formData()), params);
+    }
+  }
+  return null;
+}
+
+for (const boundary of ["route", "ingress"] as const) {
   for (const entry of [
     { method: "POST", query, signedQuery: query, expected: null },
     { method: "POST", query: "", signedQuery: "", expected: null },
@@ -45,20 +61,7 @@ for (const boundary of ["route", "ingress"]) {
       headers: { "X-Twilio-Signature": signature, "Content-Type": "application/x-www-form-urlencoded" },
       ...(entry.method === "POST" ? { body: new URLSearchParams(params).toString() } : {}),
     });
-    let status: number | null;
-    if (boundary === "route") {
-      status = (await requireTwilioSignature(request, { callSid: "CA_bun_query" }))?.status ?? null;
-    } else {
-      const result = await handleTwilioWebhookRequest(request);
-      assert.notEqual(result.kind, "continue");
-      status = result.kind === "response" ? result.response.status : null;
-      if (result.kind === "validated") {
-        assert.equal(result.request.url, request.url);
-        if (entry.method === "POST") {
-          assert.deepEqual(Object.fromEntries(await result.request.formData()), params);
-        }
-      }
-    }
+    const status = await validate(request, boundary);
     assert.equal(status, entry.expected, `${boundary} ${entry.method} ${entry.query}`);
     executed++;
   }
