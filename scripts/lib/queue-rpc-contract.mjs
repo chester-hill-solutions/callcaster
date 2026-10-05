@@ -322,6 +322,44 @@ const INSERT_RE = new RegExp(
 );
 const INSERT_ANY_RE = new RegExp(`insert\\s+into\\s+(?:public\\.)?${QUEUE_TABLE}\\b`, "gi");
 
+function parseUpdateClause(clause) {
+  const columns = [];
+  let targetState = null;
+  let targetIsLiteral = false;
+  for (const part of splitTopLevel(clause)) {
+    const tuple = part.match(/^\s*\(([^)]*)\)\s*=/);
+    if (tuple) {
+      for (const field of tuple[1].split(",")) {
+        const column = field.trim().replace(/"/g, "").toLowerCase();
+        columns.push(/^[a-z_][a-z0-9_]*$/.test(column) ? column : "__expression");
+      }
+      continue;
+    }
+    const assign = part.match(/^\s*([a-z_][a-z0-9_]*)\s*=\s*([\s\S]*)$/i);
+    if (!assign) {
+      columns.push("__expression");
+      continue;
+    }
+    const column = assign[1].toLowerCase();
+    columns.push(column);
+    if (column !== "queue_state") continue;
+    const literal = assign[2].trim().match(/^'([^']*)'(?:::\s*[a-z_]+)?\s*$/i);
+    if (literal) {
+      targetState = literal[1];
+      targetIsLiteral = true;
+    }
+  }
+  return { columns: [...new Set(columns)], targetState, targetIsLiteral };
+}
+
+function sliceInsertStatement(sql) {
+  // A semicolon inside a quoted value does not end the INSERT.
+  for (const token of sql.matchAll(/'(?:[^']|'')*'|;/g)) {
+    if (token[0] === ";") return sql.slice(0, token.index);
+  }
+  return sql;
+}
+
 /**
  * Every campaign_queue write in a function body.
  *
@@ -332,24 +370,13 @@ export function parseQueueWrites(sql) {
   const updates = [];
   for (const m of sql.matchAll(UPDATE_RE)) {
     const clause = sliceSetClause(sql.slice(m.index + m[0].length));
-    const columns = [];
-    let targetState = null;
-    let targetIsLiteral = false;
-    for (const part of splitTopLevel(clause)) {
-      const assign = part.match(/^\s*([a-z_][a-z0-9_]*)\s*=\s*([\s\S]*)$/i);
-      if (!assign) continue;
-      const column = assign[1].toLowerCase();
-      columns.push(column);
-      if (column !== "queue_state") continue;
-      // A bare string literal is the only target (c) can trust. `queue_state =
-      // v_state` or a CASE expression has no single destination state.
-      const literal = assign[2].trim().match(/^'([^']*)'(?:::\s*[a-z_]+)?\s*$/i);
-      if (literal) {
-        targetState = literal[1];
-        targetIsLiteral = true;
-      }
-    }
-    updates.push({ columns: [...new Set(columns)], targetState, targetIsLiteral });
+    updates.push(parseUpdateClause(clause));
+  }
+  for (const insert of sql.matchAll(INSERT_ANY_RE)) {
+    const statement = sliceInsertStatement(sql.slice(insert.index));
+    const visible = statement.replace(/'(?:[^']|'')*'/g, (value) => " ".repeat(value.length));
+    const conflict = /\bon\s+conflict\b[\s\S]*?\bdo\s+update\s+set\b/i.exec(visible);
+    if (conflict) updates.push(parseUpdateClause(sliceSetClause(statement.slice(conflict.index + conflict[0].length))));
   }
 
   const inserts = [];

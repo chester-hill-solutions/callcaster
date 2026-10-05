@@ -67,6 +67,9 @@ describe("direct public queue writes", () => {
     'tdb.campaign_queue.update({ set });',
     'tdb.campaign_queue.update({ set: { provider_status: "sent" }, ...body });',
     'tdb.campaign_queue.insert({ queue_order: 4 });',
+    'const table = tdb.campaign_queue; table.update({ set: { queue_order: 4 } });',
+    'const table = tdb["campaign_queue"]; table.insert({ queue_order: 4 });',
+    'const write = db.update(campaign_queue); write.set({ queue_order: 4 });',
   ])('rejects order writes or unknown write fields: %s', (source) => {
     expect(check(`${tableImport} ${source}`)).toMatchObject([{ kind: "direct-order-write" }]);
   });
@@ -83,6 +86,7 @@ describe("direct public queue writes", () => {
     'db.update(campaign_queue).set({ provider_status: "sent" }).where(eq(campaign_queue.queue_order, 4));',
     'tdb.campaign_queue.update({ set: { provider_status: "sent" } });',
     'db.insert(contact).values({ queue_order: 4 });',
+    'const table = tdb.campaign_queue; table.update({ set: { provider_status: "sent" } });',
   ])('permits reads and explicit non-order writes: %s', (source) => {
     expect(check(`${tableImport} ${source}`)).toEqual([]);
   });
@@ -93,6 +97,14 @@ describe("direct public queue writes", () => {
     'sql`insert into campaign_queue (campaign_id, queue_order) values (1, 4)`;',
     'sql`update ${campaign_queue} set queue_order = 4`;',
     'sql`update campaign_queue set ${body.fields} where id = 2`;',
+    'sql.raw("update campaign_queue set queue_order = 4 where id = 2");',
+    'sql["raw"](`update campaign_queue set queue_order = ${body.order}`);',
+    'const raw = sql.raw; raw("update campaign_queue set queue_order = 4");',
+    'sql.raw(body.sql);',
+    'sql`insert into campaign_queue (contact_id) values (2) on conflict (contact_id) do update set queue_order = 4`;',
+    'sql`update campaign_queue set provider_status = \'sent\', (queue_order, attempt_count) = (4, 0)`;',
+    'sql`insert into campaign_queue (contact_id) values (2) on conflict (contact_id) do update set (queue_order, attempt_count) = (4, 0)`;',
+    'sql`update campaign_queue set provider_status = \'sent\', ${body.fields}`;',
   ])('rejects SQL order writes: %s', (source) => {
     expect(check(`${sqlImport} ${tableImport} ${source}`)).toMatchObject([{ kind: "direct-order-write" }]);
   });
@@ -100,5 +112,16 @@ describe("direct public queue writes", () => {
   test("SQL reads, string values and comments are not writes", () => {
     expect(check(`${sqlImport} sql\`select queue_order, 'update campaign_queue set queue_order = 4' from campaign_queue\`;`)).toEqual([]);
     expect(check(`${sqlImport} sql\`update campaign_queue set provider_status = 'sent' where queue_order = 4 /* queue_order = 7 */\`;`)).toEqual([]);
+  });
+
+  test.each([
+    'sql.raw("select queue_order from campaign_queue");',
+    'sql.raw("update campaign_queue set provider_status = \'sent\' where queue_order = 4");',
+    'sql`update campaign_queue set (provider_status, attempt_count) = (\'sent\', 1) where queue_order = 4`;',
+    'sql`insert into campaign_queue (contact_id) values (2) on conflict (contact_id) do update set provider_status = \'sent\'`;',
+    'sql`insert into campaign_queue (contact_id) values (2); insert into contact (id) values (2) on conflict (id) do update set queue_order = 4`;',
+    'function unrelated(sql) { sql.raw(body.sql); }',
+  ])('permits raw reads and proved non-order SQL writes: %s', (source) => {
+    expect(check(`${sqlImport} ${source}`)).toEqual([]);
   });
 });

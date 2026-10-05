@@ -95,6 +95,34 @@ describe("SQL text handling", () => {
     expect(parseQueueWrites(`update campaign_queue set queue_state = v_next where id = 1`)
       .updates[0]).toMatchObject({ targetState: null, targetIsLiteral: false });
   });
+
+  test("includes tuple assignments after a scalar assignment", () => {
+    expect(parseQueueWrites(`update campaign_queue set provider_status = 'sent',
+      (queue_order, attempt_count) = (4, 0) where id = 2`).updates[0].columns)
+      .toEqual(["provider_status", "queue_order", "attempt_count"]);
+  });
+
+  test("includes conflict assignments only for the queue INSERT statement", () => {
+    const sql = `insert into campaign_queue (contact_id) values (2)
+      on conflict (contact_id) do update set (queue_order, attempt_count) = (4, 0);
+      insert into contact (id) values (2) on conflict (id) do update set queue_order = 9;`;
+    expect(parseQueueWrites(sql).updates.map((write) => write.columns))
+      .toEqual([["queue_order", "attempt_count"]]);
+  });
+
+  test("a quoted semicolon or conflict phrase does not change INSERT boundaries", () => {
+    expect(parseQueueWrites(`insert into campaign_queue (contact_id, dequeued_reason)
+      values (2, 'a; on conflict do update set queue_order = 9')
+      on conflict (contact_id) do update set attempts = 1`).updates[0].columns)
+      .toEqual(["attempts"]);
+    expect(parseQueueWrites(`insert into campaign_queue (dequeued_reason)
+      values ('on conflict do update set queue_order = 9')`).updates).toEqual([]);
+  });
+
+  test("does not silently drop an unknown assignment after a known one", () => {
+    expect(parseQueueWrites(`update campaign_queue set provider_status = 'sent', __expression`).updates[0].columns)
+      .toEqual(["provider_status", "__expression"]);
+  });
 });
 
 describe("seeded drift is caught", () => {

@@ -364,6 +364,10 @@ failure/control counts. Keep restoration in `finally`.
 
 ## Structural guard fixtures
 
+For SQL write guards, cover raw SQL, conflict updates and tuple assignments.
+Keep reads, non-order writes, quoted values and unrelated-statement controls.
+Verify rejection through the actual CLI as well as the parser.
+
 Guard regressions must include multiline imports, import aliases, unused
 strategies/provider helpers and single-line exported handlers. Removing only
 lines that start with `import` leaves names from multiline imports as false

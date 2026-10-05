@@ -90,6 +90,15 @@ function imported(node, bindings, module, exported) {
   return binding?.module === module && binding.exported === "*";
 }
 
+function localExpression(node, seen = new Set()) {
+  node = unwrap(node);
+  if (!node || seen.has(node)) return null;
+  seen.add(node);
+  if (!ts.isIdentifier(node)) return node;
+  const local = localBinding(node);
+  return local.initializer ? localExpression(local.initializer, seen) : node;
+}
+
 function explicitFields(node, forbidden) {
   node = unwrap(node);
   if (!node) return true;
@@ -109,7 +118,7 @@ function enqueueOptions(node) {
 }
 
 function queueWrite(node, bindings) {
-  node = unwrap(node);
+  node = localExpression(node);
   if (!node || !ts.isCallExpression(node)) return false;
   const method = property(node.expression);
   if (!method) return false;
@@ -132,7 +141,7 @@ function writtenFields(call, bindings) {
   if (method.key === "onConflictDoUpdate" && queueWrite(method.object, bindings)) {
     return updateFields(arg);
   }
-  const table = property(method.object);
+  const table = property(localExpression(method.object));
   if (table?.key !== "campaign_queue") return null;
   if (["insert", "insertMany"].includes(method.key)) return { fields: arg };
   if (method.key !== "update") return null;
@@ -147,6 +156,18 @@ function templateText(template, bindings) {
       : access && imported(access.object, bindings, "@/db/schema", "campaign_queue") ? access.key : "__expression";
     return value + span.literal.text;
   }).join("");
+}
+
+function sqlText(node, bindings) {
+  if (ts.isTaggedTemplateExpression(node) && imported(node.tag, bindings, "drizzle-orm", "sql")) {
+    return templateText(node.template, bindings);
+  }
+  if (!ts.isCallExpression(node)) return undefined;
+  const method = property(localExpression(node.expression));
+  if (method?.key !== "raw" || !imported(method.object, bindings, "drizzle-orm", "sql")) return undefined;
+  const text = unwrap(node.arguments[0]);
+  if (text && (ts.isStringLiteral(text) || ts.isNoSubstitutionTemplateLiteral(text))) return text.text;
+  return text && ts.isTemplateExpression(text) ? templateText(text, bindings) : null;
 }
 
 /** Direct API calls and writes; dynamic options must use an explicit field list. */
@@ -166,8 +187,11 @@ export function analyzePublicQueueOrder(sources) {
           report(node, "direct-order-write", "Public queue writes cannot set queue_order or forward unknown fields; use server range reservation.");
         }
       }
-      if (ts.isTaggedTemplateExpression(node) && imported(node.tag, bindings, "drizzle-orm", "sql")) {
-        const text = stripSqlComments(templateText(node.template, bindings)).replace(/'(?:[^']|'')*'/g, "''").replace(/"([a-z_][a-z0-9_]*)"/gi, "$1");
+      const raw = sqlText(node, bindings);
+      if (raw === null) {
+        report(node, "direct-order-write", "Public raw SQL must have visible text; unknown SQL can bypass queue range reservation.");
+      } else if (raw !== undefined) {
+        const text = stripSqlComments(raw).replace(/'(?:[^']|'')*'/g, "''").replace(/"([a-z_][a-z0-9_]*)"/gi, "$1");
         const { updates, inserts, positionalInserts } = parseQueueWrites(text);
         if (positionalInserts || [...updates, ...inserts].some((write) => !write.columns.length || write.columns.some((key) => ["queue_order", "__expression"].includes(key)))) {
           report(node, "direct-order-write", "Public SQL cannot set queue_order or hide queue write columns; use server range reservation.");
