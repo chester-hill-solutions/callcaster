@@ -123,6 +123,14 @@ describe("SQL text handling", () => {
     expect(parseQueueWrites(`update campaign_queue set provider_status = 'sent', __expression`).updates[0].columns)
       .toEqual(["provider_status", "__expression"]);
   });
+
+  test("commas in quoted values do not hide or invent write columns", () => {
+    expect(parseQueueWrites(`update campaign_queue set dequeued_reason = 'a,b', attempts = 1`).updates[0].columns)
+      .toEqual(["dequeued_reason", "attempts"]);
+    expect(parseQueueWrites(`insert into campaign_queue (contact_id) values (2)
+      on conflict (contact_id) do update set dequeued_reason = 'a,''b,c', attempts = 1`).updates[0].columns)
+      .toEqual(["dequeued_reason", "attempts"]);
+  });
 });
 
 describe("seeded drift is caught", () => {

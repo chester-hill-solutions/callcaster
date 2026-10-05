@@ -269,12 +269,24 @@ export function selectQueueRpcs(definitions, table = QUEUE_TABLE) {
 
 // ─── Statement parsing ────────────────────────────────────────────────────
 
-/** Split on commas that are not inside parentheses. */
+/** Split on commas outside parentheses and quoted values. */
 function splitTopLevel(text) {
   const parts = [];
   let depth = 0;
+  let quoted = false;
   let cur = "";
-  for (const ch of text) {
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "'") {
+      cur += ch;
+      if (quoted && text[i + 1] === "'") cur += text[++i];
+      else quoted = !quoted;
+      continue;
+    }
+    if (quoted) {
+      cur += ch;
+      continue;
+    }
     if (ch === "(") depth++;
     else if (ch === ")") depth--;
     if (ch === "," && depth === 0) {
