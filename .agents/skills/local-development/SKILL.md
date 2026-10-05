@@ -104,6 +104,13 @@ JSON. A React Router form helper returns a data wrapper; checking a top-level
 `error` can miss `result.data.error` and falsely return success. Verify the real
 API error response and absence of a success audit when the domain write fails.
 
+Before changing a shared client response adapter, search its exported function
+name across app, test and e2e callers. Run every affected caller suite, including
+older combined service tests. Use real `Response` objects for HTTP failure and
+malformed JSON controls; partial response-shaped mocks can miss the parser
+contract. Update old error expectations only after the new safe-message behavior
+and the configured success path are proved.
+
 ## Table-driven tests
 
 For native multipart tests, pass encoded bytes with an explicit Content-Type
