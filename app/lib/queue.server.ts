@@ -8,14 +8,6 @@ import { db } from "@/server/db";
 const BATCH_SIZE = 100;
 const RPC_CONCURRENCY = 10;
 
-function parseFiniteNumber(
-  value: number | string | undefined,
-): number | undefined {
-  const parsedValue =
-    typeof value === "string" ? Number.parseInt(value, 10) : value;
-  return Number.isFinite(parsedValue) ? parsedValue : undefined;
-}
-
 function chunkArray<T>(items: T[], chunkSize: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += chunkSize) {
@@ -32,7 +24,6 @@ export async function enqueueContactsForCampaign(
   campaignId: number,
   contactIds: number[],
   options?: {
-    startOrder?: number | string;
     requeue?: boolean;
     /**
      * Run the order reservation and the entry writes inside the caller's
@@ -46,15 +37,10 @@ export async function enqueueContactsForCampaign(
 
   const requeue = options?.requeue ?? false;
   const exec = options?.exec ?? db;
-  let startOrder = parseFiniteNumber(options?.startOrder);
-
-  if (startOrder === undefined) {
-    startOrder = await rpcReserveCampaignQueueOrderRange(exec, {
-      campaignId,
-      count: contactIds.length,
-    });
-  }
-  const resolvedStartOrder = startOrder as number;
+  const startOrder = await rpcReserveCampaignQueueOrderRange(exec, {
+    campaignId,
+    count: contactIds.length,
+  });
   const enqueueErrors: Error[] = [];
 
   for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
@@ -67,7 +53,7 @@ export async function enqueueContactsForCampaign(
     for (const group of chunkArray(indexedBatch, RPC_CONCURRENCY)) {
       const groupResults = await Promise.allSettled(
         group.map(async ({ contactId, indexInBatch }) => {
-          const queueOrder = resolvedStartOrder + i + indexInBatch;
+          const queueOrder = startOrder + i + indexInBatch;
           try {
             await rpcHandleCampaignQueueEntry(exec, {
               contactId,

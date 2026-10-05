@@ -33,6 +33,11 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs)
 | POST/DELETE | `/api/campaign_queue` | Queue row operations |
 | POST | `/api/reset_campaign` | Reset campaign via RPC |
 
+POST `/api/campaign_queue` reserves queue order on the server. Omitted or supplied
+`startOrder` values cannot change the reserved range. Concurrent requests reserve
+separate ranges. Existing campaign/contact uniqueness and explicit `requeue`
+behavior still apply; order reservation is not duplicate-send protection.
+
 ## Scripts & surveys
 
 | Method | Path | Purpose |

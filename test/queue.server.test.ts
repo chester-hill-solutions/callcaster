@@ -7,7 +7,8 @@ const rpcMocks = vi.hoisted(() => ({
   rpcHandleCampaignQueueEntry: vi.fn(),
 }));
 
-vi.mock("@/lib/db-rpc.server", () => ({
+vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/db-rpc.server")>()),
   rpcReserveCampaignQueueOrderRange: (...args: any[]) =>
     rpcMocks.rpcReserveCampaignQueueOrderRange(...args),
   rpcHandleCampaignQueueEntry: (...args: any[]) =>
@@ -28,7 +29,7 @@ describe("queue.server", () => {
     expect(rpcMocks.rpcHandleCampaignQueueEntry).not.toHaveBeenCalled();
   });
 
-  test("reserves startOrder in DB when not provided", async () => {
+  test("reserves a server range before writing queue entries", async () => {
     rpcMocks.rpcReserveCampaignQueueOrderRange.mockResolvedValueOnce(10);
 
     await enqueueContactsForCampaign(7, [1, 2], { requeue: true });
@@ -59,11 +60,15 @@ describe("queue.server", () => {
     );
   });
 
-  test("uses provided startOrder and batches >100 contacts", async () => {
+  test("reserves once for all batches of more than 100 contacts", async () => {
     const ids = Array.from({ length: 101 }, (_, i) => i + 1);
-    await enqueueContactsForCampaign(9, ids, { startOrder: 5 });
+    rpcMocks.rpcReserveCampaignQueueOrderRange.mockResolvedValueOnce(5);
+    await enqueueContactsForCampaign(9, ids);
 
-    expect(rpcMocks.rpcReserveCampaignQueueOrderRange).not.toHaveBeenCalled();
+    expect(rpcMocks.rpcReserveCampaignQueueOrderRange).toHaveBeenCalledTimes(1);
+    expect(rpcMocks.rpcReserveCampaignQueueOrderRange).toHaveBeenCalledWith(
+      expect.anything(), { campaignId: 9, count: 101 },
+    );
     expect(rpcMocks.rpcHandleCampaignQueueEntry).toHaveBeenCalledTimes(101);
     expect(rpcMocks.rpcHandleCampaignQueueEntry).toHaveBeenNthCalledWith(
       1,
@@ -77,21 +82,6 @@ describe("queue.server", () => {
     );
   });
 
-  test("accepts string startOrder values from parsed forms", async () => {
-    await enqueueContactsForCampaign(9, [1, 2], { startOrder: "5" });
-    expect(rpcMocks.rpcReserveCampaignQueueOrderRange).not.toHaveBeenCalled();
-    expect(rpcMocks.rpcHandleCampaignQueueEntry).toHaveBeenNthCalledWith(
-      1,
-      expect.anything(),
-      { contactId: 1, campaignId: 9, queueOrder: 5, requeue: false },
-    );
-    expect(rpcMocks.rpcHandleCampaignQueueEntry).toHaveBeenNthCalledWith(
-      2,
-      expect.anything(),
-      { contactId: 2, campaignId: 9, queueOrder: 6, requeue: false },
-    );
-  });
-
   test("throws when queue-entry RPC returns error", async () => {
     rpcMocks.rpcReserveCampaignQueueOrderRange.mockResolvedValueOnce(1);
     rpcMocks.rpcHandleCampaignQueueEntry.mockRejectedValueOnce(
@@ -102,16 +92,4 @@ describe("queue.server", () => {
     );
   });
 
-  test("falls back to reservation when startOrder is non-numeric string", async () => {
-    rpcMocks.rpcReserveCampaignQueueOrderRange.mockResolvedValueOnce(4);
-    await enqueueContactsForCampaign(8, [11], { startOrder: "abc" });
-    expect(rpcMocks.rpcReserveCampaignQueueOrderRange).toHaveBeenCalledWith(
-      expect.anything(),
-      { campaignId: 8, count: 1 },
-    );
-    expect(rpcMocks.rpcHandleCampaignQueueEntry).toHaveBeenCalledWith(
-      expect.anything(),
-      { contactId: 11, campaignId: 8, queueOrder: 4, requeue: false },
-    );
-  });
 });

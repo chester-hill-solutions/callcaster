@@ -34,7 +34,7 @@ export const action = defineAction({
 
     try {
       if (request.method === "POST") {
-        const { ids, campaign_id, startOrder = 0, requeue = false } = data;
+        const { ids, campaign_id, requeue = false } = data;
         const contactIds = ids.map((id: string | number) =>
           typeof id === "string" ? parseInt(id, 10) : id,
         );
@@ -61,7 +61,7 @@ export const action = defineAction({
         await enqueueContactsForCampaign(
           campaignIdNum,
           resolved.contactIds,
-          { startOrder, requeue },
+          { requeue },
         );
         return routeData({ success: true });
       }

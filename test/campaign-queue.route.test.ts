@@ -98,7 +98,6 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(10, [1, 2], {
-      startOrder: 0,
       requeue: false,
     });
   });

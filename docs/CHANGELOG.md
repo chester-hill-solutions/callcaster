@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Public campaign enqueues use server-reserved order ranges, so concurrent requests cannot select overlapping positions ([#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152)).
+
 - Fixed: SMS debits use validated provider segment and media counts. Missing counts wait for recovery while delivery results complete ([#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150), [PR #2407](https://github.com/chester-hill-solutions/callcaster/pull/2407)).
 
 - Fixed: Provider send times can be saved without a database error, and later or missing times preserve the first saved value ([#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049), [PR #2406](https://github.com/chester-hill-solutions/callcaster/pull/2406)).

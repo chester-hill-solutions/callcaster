@@ -249,7 +249,6 @@ describe("every campaign-queue contact guard still enqueues owned ids", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(57, [1, 2], {
-      startOrder: 0,
       requeue: false,
     });
   });
@@ -275,7 +274,6 @@ describe("every campaign-queue contact guard still enqueues owned ids", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(57, [1], {
-      startOrder: 0,
       requeue: false,
     });
   });
