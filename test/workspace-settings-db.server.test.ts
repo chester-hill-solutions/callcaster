@@ -67,8 +67,20 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
       workspace: { id: "w1", name: "Acme" },
       userRole: "owner",
       users: [
-        { id: "u1", username: "owner@example.com", role: "owner" },
-        { id: "u2", username: "caller@example.com", role: "caller" },
+        {
+          id: "u1",
+          username: "owner@example.com",
+          first_name: "O",
+          last_name: "W",
+          role: "owner",
+        },
+        {
+          id: "u2",
+          username: "caller@example.com",
+          first_name: "C",
+          last_name: "A",
+          role: "caller",
+        },
       ],
       pendingInvites: [
         expect.objectContaining({
@@ -103,14 +115,23 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
 
     expect(result.userRole).toBe("caller");
     expect(result.hasAccess).toBe(false);
+    expect(JSON.parse(JSON.stringify(result.users))).toEqual([
+      {
+        id: "u2",
+        username: "caller@example.com",
+        first_name: null,
+        last_name: null,
+        role: "caller",
+      },
+    ]);
   });
 
   test("getWorkspaceSettingsPageData throws when workspace missing", async () => {
     workspaceDbMocks.getWorkspaceById.mockResolvedValueOnce(null);
 
     const mod = await import("../app/lib/workspace-settings-db.server");
-    await expect(mod.getWorkspaceSettingsPageData("missing", "u1")).rejects.toThrow(
-      "Workspace not found",
-    );
+    await expect(
+      mod.getWorkspaceSettingsPageData("missing", "u1"),
+    ).rejects.toThrow("Workspace not found");
   });
 });

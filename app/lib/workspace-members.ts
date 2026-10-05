@@ -1,4 +1,10 @@
 import { MemberRole } from "@/lib/member-role";
+import type { User } from "@/lib/types";
+
+export type WorkspaceMemberDisplay = Pick<
+  NonNullable<User>,
+  "id" | "username" | "first_name" | "last_name"
+> & { role: string };
 
 type MemberWithRole = { role: string };
 
