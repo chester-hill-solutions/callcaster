@@ -4748,5 +4748,38 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix is merged and reviewed on dev. Verify deployed acceptance and promote before closing; do not implement the membership validation again.",
     "rootCause": "The shared service inserted caller-selected queue and user IDs without checking queue ownership or target membership. The global-user FK could reject nonexistent users only after insertion was attempted, producing 500. Canonical membership can be stale, so the service now also checks global-user existence."
+  },
+  {
+    "issueNumber": 2003,
+    "verdict": "verify-close",
+    "recommendedTitle": "Agent role can reach the billing page by URL even though the sidebar link is hidden",
+    "summary": "The Agent display name maps to Caller. The direct billing-page read gap is fixed on dev by PR #2370 under canonical #2137; do not add another gate for this report.",
+    "currentBehavior": "The billing loader checks Admin before reading billing data. Caller and Member document requests receive 403; Admin and Owner retain 200. Document non-members follow the existing workspace-picker redirect; billing JSON and service non-members receive 404.",
+    "rootCause": "The original route relied on sidebar visibility. PR #2370 added the route and service read floor; the earlier #2030 policy blocker no longer applies to this specific billing report.",
+    "resolution": "Follow #2137 for deployed dev acceptance and default-branch promotion. Verify direct billing requests for all four roles. Preserve the document/API distinction when applying the existing non-member acceptance criterion. Keep checkout creation and polling scope in #2371 separate.",
+    "lookIn": [
+      "app/lib/workspace-role-display.ts",
+      "app/routes/workspaces+/$id/billing.loader.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "e2e/specs/rbac.spec.ts",
+      "test/billing-read-access.test.ts"
+    ],
+    "existingTests": [
+      "e2e/specs/rbac.spec.ts:83 — direct caller/member 403 and admin/owner 200 for document and JSON billing; isolated production run passed all five setup/role cases without retry",
+      "test/billing-read-access.test.ts — actual loader/service access checks with mocked membership rows; denied reads stop before balance or ledger access",
+      "PR #2370 merged at 486de78e585cf648754f5437ff34bf009c39b5a3; source paths checked at that commit"
+    ],
+    "missingTests": [
+      "Deployed dev acceptance and default-branch release remain under canonical #2137"
+    ],
+    "acceptanceCriteria": [
+      "An Agent requesting the billing path by URL is refused",
+      "The refusal matches the convention used by sibling routes (404 for non-members)",
+      "The check is a permission check at the route, not a UI-visibility check"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify with canonical #2137, then close only after default-branch promotion. This source fix needs no additional #2030 policy decision; keep broader role-model work separate."
   }
 ]
