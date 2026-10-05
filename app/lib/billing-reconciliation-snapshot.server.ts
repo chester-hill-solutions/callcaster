@@ -17,6 +17,7 @@ const DEFAULT_SNAPSHOT: BillingReconciliationSnapshot = {
   materialVariance: false,
   period: { startDate: "", endDate: "" },
   smsVariance: 0,
+  mmsVariance: 0,
   voiceVariance: 0,
   messageGap: 0,
   callGap: 0,
@@ -39,12 +40,13 @@ export function normalizeBillingReconciliationSnapshot(
   return {
     lastRunAt,
     lastRunSource: value.lastRunSource === "cron" ? "cron" : "admin",
-    materialVariance: value.materialVariance === true,
+    materialVariance: value.materialVariance === true || value.smsVariance === null || value.mmsVariance === null,
     period: {
       startDate: parseOptionalString(period?.startDate) ?? "",
       endDate: parseOptionalString(period?.endDate) ?? "",
     },
-    smsVariance: typeof value.smsVariance === "number" ? value.smsVariance : 0,
+    smsVariance: value.smsVariance === null ? null : typeof value.smsVariance === "number" ? value.smsVariance : 0,
+    mmsVariance: value.mmsVariance === null ? null : typeof value.mmsVariance === "number" ? value.mmsVariance : 0,
     voiceVariance:
       typeof value.voiceVariance === "number" ? value.voiceVariance : 0,
     messageGap: typeof value.messageGap === "number" ? value.messageGap : 0,

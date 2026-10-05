@@ -128,6 +128,8 @@ export async function loadBillingReconciliationReport(args: {
         amount: true,
         idempotency_key: true,
         created_at: true,
+        note: true,
+        message_sid: true,
       },
     }),
     loadBillingEntityAudit({

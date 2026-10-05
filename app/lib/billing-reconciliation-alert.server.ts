@@ -46,7 +46,8 @@ function buildDriftEmail(args: {
         <p>Our daily billing reconciliation for period <strong>${periodLabel}</strong>
         found material variance between Twilio usage and the <strong>${workspaceNameHtml}</strong> workspace ledger.</p>
         <ul>
-          <li>SMS variance: ${args.details.smsVariance}</li>
+          <li>SMS variance: ${args.details.smsVariance ?? "Unavailable (unsupported usage)"}</li>
+          <li>MMS variance: ${args.details.mmsVariance ?? "Unavailable (unsupported usage)"}</li>
           <li>Voice variance: ${args.details.voiceVariance}</li>
           <li>Message entity gap: ${args.details.messageGap}</li>
           <li>Call entity gap: ${args.details.callGap}</li>
@@ -61,7 +62,8 @@ Billing reconciliation drift
 
 Workspace: ${args.workspaceName}
 Period: ${periodLabel}
-SMS variance: ${args.details.smsVariance}
+SMS variance: ${args.details.smsVariance ?? "Unavailable (unsupported usage)"}
+MMS variance: ${args.details.mmsVariance ?? "Unavailable (unsupported usage)"}
 Voice variance: ${args.details.voiceVariance}
 Message entity gap: ${args.details.messageGap}
 Call entity gap: ${args.details.callGap}
@@ -177,6 +179,7 @@ export async function handleBillingReconciliationDrift(args: {
       periodStart: args.snapshot.period.startDate,
       periodEnd: args.snapshot.period.endDate,
       smsVariance: args.snapshot.smsVariance,
+      mmsVariance: args.snapshot.mmsVariance,
       voiceVariance: args.snapshot.voiceVariance,
       messageGap: args.snapshot.messageGap,
       callGap: args.snapshot.callGap,

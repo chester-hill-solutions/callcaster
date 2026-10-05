@@ -4,7 +4,8 @@ export type BillingReconciliationDriftMarker = {
   alertedAt: string;
   periodStart: string;
   periodEnd: string;
-  smsVariance: number;
+  smsVariance: number | null;
+  mmsVariance: number | null;
   voiceVariance: number;
   messageGap: number;
   callGap: number;
@@ -33,7 +34,8 @@ export function getBillingReconciliationDriftMarker(
     alertedAt,
     periodStart,
     periodEnd,
-    smsVariance: typeof record.smsVariance === "number" ? record.smsVariance : 0,
+    smsVariance: record.smsVariance === null ? null : typeof record.smsVariance === "number" ? record.smsVariance : 0,
+    mmsVariance: record.mmsVariance === null ? null : typeof record.mmsVariance === "number" ? record.mmsVariance : 0,
     voiceVariance:
       typeof record.voiceVariance === "number" ? record.voiceVariance : 0,
     messageGap: typeof record.messageGap === "number" ? record.messageGap : 0,
