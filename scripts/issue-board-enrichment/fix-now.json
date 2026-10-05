@@ -135,37 +135,6 @@
     "trackerRecommendation": "Fix now as defensive hook-contract work. Do not report a reproduced current production infinite loop."
   },
   {
-    "issueNumber": 2064,
-    "verdict": "fix-now",
-    "recommendedTitle": "Nightly ledger drift check compares the wrong branch against the dev database",
-    "summary": "All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.",
-    "rootCause": "Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.",
-    "resolution": "Pin the intended branch per environment and add a workflow contract check.",
-    "lookIn": [
-      ".github/workflows/ledger-drift-check.yml:97",
-      ".github/workflows/ledger-drift-check.yml:127",
-      ".github/workflows/ledger-drift-check.yml:153",
-      ".github/workflows/ledger-drift-check.yml (all three jobs)",
-      "scripts/db/check-db-orphans.mjs",
-      "scripts/db/bootstrap-fresh-db.mjs"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Need fixture showing a refless environment job fails and dev-ahead-of-master comparison passes."
-    ],
-    "acceptanceCriteria": [
-      "Every job in the workflow checks out an explicit ref",
-      "The nightly dev job passes on a correct database that is ahead of master",
-      "The job name states which comparison it makes",
-      "A refless job fails the check"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2067,
     "verdict": "fix-now",
     "recommendedTitle": "check:effects never verifies @effect-deps against the real dependency array",
@@ -364,43 +333,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2112,
-    "verdict": "fix-now",
-    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
-    "summary": "Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
-    "resolution": "Compare SMS and MMS in consistent separate units or join ledger/message facts before converting units.",
-    "lookIn": [
-      "shared/billing-reconciliation.ts:180",
-      "shared/billing-reconciliation.ts:185",
-      "app/lib/worker/webhook-side-effects.server.ts:207",
-      "app/lib/billing-reconciliation.server.ts",
-      "app/lib/billing-reconciliation-workspace.server.ts",
-      "app/lib/billing-reconciliation-alert.server.ts",
-      "app/lib/billing-reconciliation-snapshot.server.ts",
-      "shared/billing-reconciliation.ts:12",
-      "app/lib/worker/webhook-side-effects.server.ts:207-209",
-      "shared/pricing.ts (`SMS_SEGMENT_CREDITS`, `MMS_CREDITS`)"
-    ],
-    "existingTests": [
-      "test/billing-reconciliation.test.ts",
-      "test/billing-reconcile-workspace.server.test.ts"
-    ],
-    "missingTests": [
-      "Pure SMS, pure MMS and mixed tests with rate-card-driven coverage; no real provider reconciliation measured here."
-    ],
-    "acceptanceCriteria": [
-      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
-      "A workspace that sent only MMS reconciles with zero variance.",
-      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
-      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2113,
     "verdict": "fix-now",
     "recommendedTitle": "hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot",
@@ -497,40 +429,6 @@
       "A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).",
       "The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.",
       "The production count is recorded in the issue."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2122,
-    "verdict": "fix-now",
-    "recommendedTitle": "DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month",
-    "summary": "Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.",
-    "resolution": "Sync month/period on external value changes and use value={period} for TimePeriodSelect; period-state sync alone does not fix its uncontrolled Select.",
-    "lookIn": [
-      "app/components/ui/datetime.tsx:617",
-      "app/components/ui/datetime.tsx:488",
-      "app/components/ui/datetime.tsx:328",
-      "test/ui/components-ui-primitives.test.tsx:369",
-      "app/components/ui/datetime.tsx (`DateTimePicker` `month` state; `TimePicker` `period` state)",
-      "app/components/audience/AudienceTable.tsx:84-90",
-      "app/components/queue/QueueTable.tsx:198-202,215-227"
-    ],
-    "existingTests": [
-      "test/ui/components-ui-primitives.test.tsx"
-    ],
-    "missingTests": [
-      "Need mounted popover rerenders and rendered AM/PM selection tests, not just state or a button smoke assertion."
-    ],
-    "acceptanceCriteria": [
-      "A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).",
-      "Clearing `value` resets the month to the current month.",
-      "After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.",
-      "`TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.",
-      "The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue."
     ],
     "blockedBy": [],
     "size": "S",
@@ -816,77 +714,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2149,
-    "verdict": "fix-now",
-    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
-    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
-    "resolution": "Leave create-time disposition nonterminal and let delivery callbacks own the terminal result. Define recovery for messages with no callback.",
-    "lookIn": [
-      "app/lib/campaign-sms-send.server.ts:238",
-      "app/lib/outreach-disposition.ts:25",
-      "app/lib/worker/webhook-side-effects.server.ts:227",
-      "app/lib/campaign-sms-send.server.ts (the `disposition: \"completed\"` on the create response)",
-      "app/lib/outreach-disposition.ts (`canTransitionOutreachDisposition`, `shouldUpdateOutreachDisposition`)",
-      "app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)",
-      "app/lib/campaign-queue-search.server.ts:171-200",
-      "app/routes/api+/sms/status.action.server.ts"
-    ],
-    "existingTests": [
-      "test/campaign-sms-send.server.test.ts",
-      "test/sms-status-settled.test.ts"
-    ],
-    "missingTests": [
-      "Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks."
-    ],
-    "acceptanceCriteria": [
-      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
-      "`undelivered` and `delivered` likewise.",
-      "A message that never receives a callback still reaches a terminal disposition (positive control).",
-      "The call path is unchanged."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2150,
-    "verdict": "fix-now",
-    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
-    "summary": "Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.",
-    "resolution": "Persist validated provider segment count before any terminal debit; handle absence through explicit provider fetch/reconciliation rather than blind one-segment default.",
-    "lookIn": [
-      "app/routes/api+/sms/status.action.server.ts:105",
-      "app/routes/api+/sms/status.action.server.ts:137",
-      "app/lib/worker/webhook-side-effects.server.ts:203",
-      "app/lib/twilio-open-sync.server.ts:404",
-      "app/routes/api+/sms/status.action.server.ts:97-110,150-164",
-      "app/lib/sms-send.server.ts:247-258",
-      "app/lib/campaign-sms-send.server.ts:97-110",
-      "app/lib/worker/handlers/cron.server.ts (`runSmsStatusSideEffects`)",
-      "app/lib/sms-segments.ts (`estimateMessageCredits`, `estimateSegments`)"
-    ],
-    "existingTests": [
-      "test/sms-status-webhook.test.ts",
-      "test/webhook-side-effects.test.ts"
-    ],
-    "missingTests": [
-      "Recovered three-segment debit test and terminal missing-count alert; provider status callback field availability must be verified before assuming all callbacks contain NumSegments."
-    ],
-    "acceptanceCriteria": [
-      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
-      "A send-time-resolved intent is unaffected (positive control).",
-      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
-      "The reconciliation variance for a multi-segment blast is zero."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2151,
     "verdict": "fix-now",
     "recommendedTitle": "Cache interactive SMS readiness checks and measure Twilio read cost",
@@ -923,46 +750,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Partial fix. Keep Fix now for the remaining chat/cache and measurement scope. Related PR evidence: #2228. A PR reference alone does not prove deployed behavior."
-  },
-  {
-    "issueNumber": 2152,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
-    "summary": "Public enqueue skips server order reservation. It defaults startOrder to zero even if omitted. The duplicate-send assertion is overstated: bootstrap enforces unique campaign/contact and dispatch has independent dedupe.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Public POST defaults startOrder to zero, so reservation is skipped even when clients omit the field.",
-    "resolution": "Remove public startOrder/default and always reserve server-side; test ordering concurrency separately from dedupe.",
-    "lookIn": [
-      "app/routes/api+/campaign_queue.action.server.ts:40",
-      "app/routes/api+/campaign_queue.action.server.ts:69",
-      "app/lib/queue.server.ts:51",
-      "drizzle/0006_app_schema_tail.sql:95",
-      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
-      "app/routes/api+/campaign_queue.action.server.ts",
-      "app/lib/campaign-queue-db.server.ts",
-      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
-      "scripts/check-queue-rpc-contract.mjs",
-      "client/migrations/ (the reservation RPC)"
-    ],
-    "existingTests": [
-      "test/campaign-queue.route.test.ts",
-      "test/queue.server.test.ts",
-      "test/queue-rpc-contract.test.ts"
-    ],
-    "missingTests": [
-      "Route missing/supplied order tests and concurrent reservation test. Same-contact duplicate rows are prevented by SQL; normalized-number distinct-contact behavior needs its own claim evidence."
-    ],
-    "acceptanceCriteria": [
-      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
-      "Two concurrent public enqueues reserve disjoint order ranges.",
-      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
-      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
-      "Record the API sweep for other client-writable queue lifecycle fields."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now for server-owned ordering. Correct the unsupported claim that startOrder alone defeats dedupe.",
-    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
   },
   {
     "issueNumber": 2153,
@@ -1500,5 +1287,39 @@
     "size": "M-L",
     "risk": "high",
     "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed."
+  },
+  {
+    "issueNumber": 2112,
+    "verdict": "fix-now",
+    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
+    "summary": "Mixed SMS/MMS credits are compared as SMS segments, and SMS aggregate/subtype usage is double counted. Six actual builder cases confirm three defects with three controls.",
+    "currentBehavior": "At dev@c704cdf9, six actual report-builder cases executed. Pure MMS gives false SMS variance -2; a balanced SMS/MMS mix gives -4; overlapping SMS aggregate/subtype records give +3. The latter two trigger false material drift. Three SMS and inbound controls pass. Provider records are synthetic; no live or persistence acceptance is claimed.",
+    "resolution": "Carry verified message kind through the tenant loader, compare SMS and MMS in their proper units, and use non-overlapping supported outbound provider categories. Verify units, missing facts, persistence, alert controls and full gates before release acceptance.",
+    "lookIn": [
+      "shared/billing-reconciliation.ts",
+      "app/lib/billing-reconciliation.server.ts",
+      "app/lib/billing-reconcile-workspace.server.ts",
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "app/lib/billing-reconciliation-snapshot.server.ts",
+      "shared/pricing.ts"
+    ],
+    "existingTests": [
+      "test/billing-reconciliation.test.ts",
+      "test/billing-reconcile-workspace.server.test.ts"
+    ],
+    "missingTests": [
+      "Pure SMS/MMS/mixed, aggregate/subtype overlap, provider-unit and unknown-kind controls; actual tenant loader/persistence and live provider comparison remain required."
+    ],
+    "acceptanceCriteria": [
+      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
+      "A workspace that sent only MMS reconciles with zero variance.",
+      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
+      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.",
+    "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
   }
 ]

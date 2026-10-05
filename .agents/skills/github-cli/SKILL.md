@@ -46,6 +46,14 @@ the `page` parameter. Use `gh api --paginate` or follow those cursors. A malform
 request can also print a scope hint: correct the endpoint parameters and retry
 before asking for broader access. See the [official alert API](https://docs.github.com/en/rest/dependabot/alerts#list-dependabot-alerts-for-a-repository).
 
+## Advisory Version Ranges
+
+Before comparing an advisory with installed versions, normalize provider
+comma-separated bounds to the package comparator's syntax. Require a valid
+parsed range and version; parse failure is unknown, not unaffected. Keep the
+original advisory range, install path and development/runtime metadata in the
+proof. Version applicability does not prove exploit reachability.
+
 ## CI Test-Count Evidence
 
 Job logs can contain ANSI escapes as actual ESC bytes or literal `\u001b` text.

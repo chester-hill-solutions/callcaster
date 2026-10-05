@@ -2469,48 +2469,6 @@
     "trackerRecommendation": "Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2049,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify provider send-time capture and bounded backfill on the review environment",
-    "summary": "PR #2055 implements provider date_sent capture and bounded backfill on dev. Move to runtime verification.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Provider send-time capture is implemented: open rows and bounded untimed non-open rows are processed; first-write-wins is enforced at the SQL update. Export visibility remains a separate follow-up.",
-    "rootCause": "The original omission is fixed in PR #2055: the sweep persists provider dateSent, selects bounded untimed non-open rows, and the database update preserves the first stored time.",
-    "resolution": "Verify real provider capture and record API/DB cost. Keep separate request/send-time export work with #1752.",
-    "lookIn": [
-      "app/lib/twilio-open-sync.server.ts:295",
-      "app/lib/twilio-open-sync.server.ts:411",
-      "app/lib/message-db.server.ts:275",
-      "test/twilio-open-sync.server.test.ts:228",
-      "scripts/e2e/bootstrap-compose-db.mjs:89",
-      "app/lib/twilio-open-sync.server.ts:44,49,233-319",
-      "app/lib/message-db.server.ts:202-249",
-      "app/lib/worker/job-params.server.ts:52-56",
-      "app/lib/worker/handlers/cron.server.ts:73-107",
-      "app/db/schema.ts:390-420",
-      "app/lib/campaign-export.server.ts"
-    ],
-    "existingTests": [
-      "test/twilio-open-sync.server.test.ts",
-      "test/message-db.server.test.ts",
-      "test/sms-status-webhook.test.ts"
-    ],
-    "missingTests": [
-      "No real capture-rate/cost measurement performed here; unit tests do not prove deployed historical data is filled."
-    ],
-    "acceptanceCriteria": [
-      "Message row carries the provider-reported date_sent after the sweep runs",
-      "Messages that settle before any sweep observed them still receive a date_sent",
-      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
-      "date_sent is never overwritten once written and never inferred from date_created",
-      "Backfill selection is bounded, self-limiting, and its cost is measured",
-      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Verify and close after provider/runtime cost checks. Do not repeat the write/backfill implementation. Related PR evidence: #2055. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2040,
     "verdict": "verify-close",
     "recommendedTitle": "Verify the SMS contact creation fix in the review environment",
@@ -5146,5 +5104,234 @@
     "risk": "low",
     "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2399. Preserve original criteria and separate source proof from release acceptance.",
     "rootCause": "The settings projection discarded name fields while a partial consumer type hid the omission."
+  },
+  {
+    "issueNumber": 2049,
+    "verdict": "verify-close",
+    "recommendedTitle": "Preserve provider send time across Date encoding and null updates",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2406 at dev@d805e71fd9307f9e313e298cbe205575114ff808. Provider Date and null preservation passed five real database cases and fault controls. Full local CI, final-head remote checks and both deployments passed.",
+    "rootCause": "The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/lib/message-db.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "test/message-db.server.test.ts",
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts",
+      "test/message-db.server.test.ts",
+      "test/sms-status-webhook.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate acceptance and default-branch promotion remain."
+    ],
+    "acceptanceCriteria": [
+      "Message row carries the provider-reported date_sent after the sweep runs",
+      "Messages that settle before any sweep observed them still receive a date_sent",
+      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
+      "date_sent is never overwritten once written and never inferred from date_created",
+      "Backfill selection is bounded, self-limiting, and its cost is measured",
+      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. PR #2406 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
+  },
+  {
+    "issueNumber": 2064,
+    "verdict": "verify-close",
+    "recommendedTitle": "Nightly ledger drift check compares the wrong branch against the dev database",
+    "summary": "Environment-specific ledger checkout and contract protection merged into dev in PR #2401. Default-branch promotion and deployed scheduled runs remain to verify.",
+    "currentBehavior": "Verified dev merge bf689a853aa1e99f80c198394e6f04cd87b036c0 includes PR #2401. All environment refs, independent missing/wrong-ref controls and real migration inventory controls passed; final full local and exact-head applicable remote gates passed.",
+    "rootCause": "Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.",
+    "resolution": "Promote the corrected workflow to the default branch, then verify scheduled environment jobs against their matching deployed databases.",
+    "lookIn": [
+      ".github/workflows/ledger-drift-check.yml",
+      "scripts/db/check-migration-ledger.mjs",
+      "scripts/db/check-schema-drift.mjs",
+      "test/ledger-drift-workflow.test.ts"
+    ],
+    "existingTests": [
+      "test/ledger-drift-workflow.test.ts"
+    ],
+    "missingTests": [
+      "Default-branch workflow promotion and actual scheduled deployment/database checks."
+    ],
+    "acceptanceCriteria": [
+      "Every job in the workflow checks out an explicit ref",
+      "The nightly dev job passes on a correct database that is ahead of master",
+      "The job name states which comparison it makes",
+      "A refless job fails the check"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN for release verification. Do not repeat the merged workflow fix. All original acceptance criteria remain required."
+  },
+  {
+    "issueNumber": 2122,
+    "verdict": "verify-close",
+    "recommendedTitle": "DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month",
+    "summary": "External date, cleared value and AM/PM mirrors are fixed on dev in PR #2404; release browser acceptance remains.",
+    "currentBehavior": "PR #2404 merged at 4e132d1ca1530026a3bcc0850a34815e475204f3. Twelve real UI cases, three independent fault controls and 32 caller cases passed. Final full local and exact-head remote checks and deployments passed.",
+    "resolution": "Verify saved-value changes, clearing and retained calendar navigation on the release candidate; keep OPEN through default promotion and acceptance.",
+    "lookIn": [
+      "app/components/ui/datetime.tsx",
+      "test/ui/datetime-external-value.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/datetime-external-value.test.tsx",
+      "test/ui/components-ui-primitives.test.tsx"
+    ],
+    "missingTests": [
+      "Release-candidate browser acceptance for external values, clearing, period display and intentional navigation."
+    ],
+    "acceptanceCriteria": [
+      "A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).",
+      "Clearing `value` resets the month to the current month.",
+      "After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.",
+      "`TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.",
+      "The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN Verify and close. Source is merged and tested; default promotion and live browser acceptance remain."
+  },
+  {
+    "issueNumber": 2149,
+    "verdict": "verify-close",
+    "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2409 at dev@ee28af666b6b0fd30f3c8bca0aa55ec996c8a429. Preparation commits the pending outreach link before provider invocation, leaves acceptance unresolved and queues recovered terminal side effects before settling local state. Thirteen real database cases and 153 caller cases passed. Full local CI, final-head remote checks and both deployments passed.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/lib/campaign-sms-send.server.ts",
+      "app/lib/sms-send.server.ts",
+      "app/lib/twilio-open-sync.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-queue-search.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-sms-send.server.test.ts",
+      "test/sms-status-settled.test.ts"
+    ],
+    "missingTests": [
+      "Live provider/browser acceptance against the release candidate and default-branch promotion remain. Historical-row repair must be separately verified before claiming it is complete."
+    ],
+    "acceptanceCriteria": [
+      "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
+      "`undelivered` and `delivered` likewise.",
+      "A message that never receives a callback still reaches a terminal disposition (positive control).",
+      "The call path is unchanged."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. PR #2409 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
+  },
+  {
+    "issueNumber": 2150,
+    "verdict": "verify-close",
+    "recommendedTitle": "An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was",
+    "summary": "The source fix is merged to dev; release acceptance and promotion remain.",
+    "currentBehavior": "Merged in PR #2407 at dev@b2831f728f273dddb269277ca6034af02a14413b. Signed callback and provider recovery paths persist provider quantity before billing. Eighteen real database cases passed with independent fault checks and all three database URL modes. Full local CI, final-head remote checks and both deployments passed.",
+    "resolution": "Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.",
+    "lookIn": [
+      "app/routes/api+/sms/status.action.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/sms-status-webhook.test.ts",
+      "test/webhook-side-effects.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate acceptance and default-branch promotion remain."
+    ],
+    "acceptanceCriteria": [
+      "A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.",
+      "A send-time-resolved intent is unaffected (positive control).",
+      "A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.",
+      "The reconciliation variance for a multi-segment blast is zero."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. PR #2407 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof."
+  },
+  {
+    "issueNumber": 2402,
+    "verdict": "verify-close",
+    "recommendedTitle": "Scope campaign queue disposition filters to the selected campaign and workspace",
+    "summary": "Named and unknown disposition predicates now match the queue row campaign and workspace; PR #2405 is merged on dev.",
+    "currentBehavior": "Verified dev@c704cdf9 / PR #2405: all 14 real Postgres query cases passed. Four separate predicate-removal controls failed with passing cases. Final full local CI, exact-head remote checks and both deployments passed.",
+    "rootCause": "Disposition EXISTS subqueries previously matched only contact_id, allowing results from another campaign or workspace.",
+    "resolution": "Verify both disposition branches on the release candidate, then retain OPEN until default promotion and deployed acceptance.",
+    "lookIn": [
+      "app/lib/campaign-queue-search.server.ts",
+      "test/integration-db/campaign-queue-disposition.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-queue-disposition.test.ts"
+    ],
+    "missingTests": [
+      "Deployed release filter acceptance with one contact in multiple campaigns and isolated workspace data."
+    ],
+    "acceptanceCriteria": [
+      "A named disposition from another campaign cannot match a queue row in the selected campaign.",
+      "A null disposition from another campaign cannot satisfy the selected campaign unknown filter.",
+      "An attempt from another workspace cannot satisfy either disposition branch.",
+      "Same-campaign, same-workspace named and unknown results remain visible; unfiltered results and other filters keep their behavior.",
+      "Actual Postgres cases pass and fail when each scope predicate is removed. Full local CI, exact-head remote checks and both deployments pass before merge.",
+      "Keep this issue open for default promotion and deployed filter acceptance."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "OPEN Verify and close. Source scope is fixed; delivery state ownership remains separate in #2149."
+  },
+  {
+    "issueNumber": 2152,
+    "verdict": "verify-close",
+    "recommendedTitle": "POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation",
+    "summary": "Public queue appends now always use server-reserved ranges; the fix is merged to dev. Release-candidate ordering acceptance and promotion remain.",
+    "currentBehavior": "PR #2410 merged at dev@34fac6502fbc8dfee40cc127b837a511d1d2636c. Ten actual API/PostgreSQL cases pass; both independent faults fail six cases with four controls, and all three URL modes pass. Both reviews, 127 focused tests, nine actual CLI rejection cases, initial/final full local CI, applicable exact-head remote checks, E2E, bundle checks and both deployments passed. Clean topic refs/worktree were removed after source-equivalence and recovery-bundle verification.",
+    "resolution": "Verify ordering on the release candidate against the original criteria, then promote. Do not implement the landed repair again. Existing uniqueness is independent; #2153 queue-reset history remains a separate concern.",
+    "lookIn": [
+      "app/routes/api+/campaign_queue.action.server.ts:40",
+      "app/routes/api+/campaign_queue.action.server.ts:69",
+      "app/lib/queue.server.ts:51",
+      "drizzle/0006_app_schema_tail.sql:95",
+      "client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49",
+      "app/routes/api+/campaign_queue.action.server.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts:156-161",
+      "scripts/check-queue-rpc-contract.mjs",
+      "client/migrations/ (the reservation RPC)"
+    ],
+    "existingTests": [
+      "test/campaign-queue.route.test.ts",
+      "test/queue.server.test.ts",
+      "test/queue-rpc-contract.test.ts"
+    ],
+    "missingTests": [
+      "Live release-candidate ordering and default-branch promotion remain. Historical order/counter data has not been audited or repaired by this change."
+    ],
+    "acceptanceCriteria": [
+      "Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.",
+      "Two concurrent public enqueues reserve disjoint order ranges.",
+      "The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.",
+      "check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.",
+      "Record the API sweep for other client-writable queue lifecycle fields."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. PR #2410 is merged to dev. Keep the issue OPEN until required acceptance and promotion; source/deployment proof does not establish live or historical data acceptance.",
+    "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
   }
 ]
