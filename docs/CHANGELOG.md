@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Twilio callback checks validate the complete encoded query under the configured public URL. Query changes and query-free signature reuse are rejected; GET callbacks do not count query fields twice ([#2390](https://github.com/chester-hill-solutions/callcaster/issues/2390)).
+- Security: Twilio callback checks validate the complete encoded query under the configured public URL. Query changes and query-free signature reuse are rejected; GET callbacks do not count query fields twice ([#2390](https://github.com/chester-hill-solutions/callcaster/issues/2390), [PR #2391](https://github.com/chester-hill-solutions/callcaster/pull/2391)).
 
 - Fixed: SMS campaigns show a persistent warning for unrestricted sending, including voice-only schedules. Launch review asks for consent, and incomplete SMS intervals cannot be saved ([#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047)). PR [#2387](https://github.com/chester-hill-solutions/callcaster/pull/2387).
 
