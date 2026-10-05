@@ -103,7 +103,7 @@ describe("app/lib/campaign-readiness.ts", () => {
         caller_id: "+15555550100",
         start_date: "2026-03-11T10:00:00.000Z",
         end_date: "2026-03-10T10:00:00.000Z",
-        schedule: {
+        sms_send_window: {
           monday: {
             active: true,
             intervals: [{ start: "13:00", end: "13:00" }],
@@ -121,7 +121,7 @@ describe("app/lib/campaign-readiness.ts", () => {
       "Start date must be before the end date",
     );
     expect(readiness.startIssues).toContain(
-      "Each active calling day needs at least one valid time window",
+      "Each active send day needs at least one valid time window",
     );
   });
 
@@ -369,7 +369,7 @@ describe("app/lib/campaign-readiness.ts", () => {
         caller_id: "+15555550100",
         start_date: "2026-03-10T10:00:00.000Z",
         end_date: "2026-03-11T10:00:00.000Z",
-        schedule: {
+        sms_send_window: {
           monday: { intervals: [{ start: "09:00", end: "17:00" }] },
           tuesday: null,
         },
@@ -381,7 +381,7 @@ describe("app/lib/campaign-readiness.ts", () => {
       { queueCount: 1 },
     );
 
-    expect(readiness.startIssues).toContain("Calling hours are required");
+    expect(readiness.startIssues).toContain("Set an SMS send window or clear the current schedule for unrestricted sending");
   });
 
   test("marks active day with empty intervals as invalid window", () => {
@@ -391,7 +391,7 @@ describe("app/lib/campaign-readiness.ts", () => {
         caller_id: "+15555550100",
         start_date: "2026-03-10T10:00:00.000Z",
         end_date: "2026-03-11T10:00:00.000Z",
-        schedule: {
+        sms_send_window: {
           monday: { active: true, intervals: [] },
           tuesday: {
             active: false,
@@ -407,9 +407,9 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
 
     expect(readiness.startIssues).toContain(
-      "Each active calling day needs at least one valid time window",
+      "Each active send day needs at least one valid time window",
     );
-    expect(readiness.startIssues).toContain("Calling hours are required");
+    expect(readiness.startIssues).toContain("Set an SMS send window or clear the current schedule for unrestricted sending");
   });
 
   test("accepts scripted live campaign and default options path", () => {
@@ -528,7 +528,7 @@ describe("app/lib/campaign-readiness.ts", () => {
         caller_id: "+15555550100",
         start_date: "2026-03-10T10:00:00.000Z",
         end_date: "2026-03-11T10:00:00.000Z",
-        schedule: {
+        sms_send_window: {
           monday: { active: true, intervals: { start: "09:00", end: "17:00" } },
         },
       } as any,
@@ -539,9 +539,9 @@ describe("app/lib/campaign-readiness.ts", () => {
       { queueCount: 1 },
     );
 
-    expect(readiness.startIssues).toContain("Calling hours are required");
+    expect(readiness.startIssues).toContain("Set an SMS send window or clear the current schedule for unrestricted sending");
     expect(readiness.startIssues).toContain(
-      "Each active calling day needs at least one valid time window",
+      "Each active send day needs at least one valid time window",
     );
   });
 

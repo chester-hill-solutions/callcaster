@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { CampaignLaunch } from "@/components/campaign/settings/CampaignLaunch";
@@ -17,7 +18,9 @@ vi.mock("@/components/campaign/settings/CampaignCostPanel", () => ({
 function renderLaunchReview(
   readinessIssues: string[] = [],
   campaignBilling: unknown = null,
+  options: { isBusy?: boolean; campaign?: Record<string, unknown> } = {},
 ) {
+  const handleConfirmStatus = vi.fn();
   const props = {
     campaignData: {
       id: 9,
@@ -27,6 +30,7 @@ function renderLaunchReview(
       start_date: "2026-07-20T00:00:00.000Z",
       end_date: "2026-07-31T00:00:00.000Z",
       status: "draft",
+      ...options.campaign,
     },
     campaignDetails: {
       campaign_id: 9,
@@ -49,9 +53,9 @@ function renderLaunchReview(
     queueCount: 25,
     dequeuedCount: 0,
     scheduleDisabled: false,
-    handleConfirmStatus: vi.fn(),
+    handleConfirmStatus,
     confirmStatus: "play",
-    isBusy: false,
+    isBusy: options.isBusy ?? false,
     isSaving: false,
     activeIntent: null,
     credits: 100,
@@ -68,9 +72,47 @@ function renderLaunchReview(
     { initialEntries: ["/"] },
   );
   render(<RouterProvider router={router} />);
+  return handleConfirmStatus;
 }
 
 describe("campaign launch review", () => {
+  test("requires deliberate unrestricted SMS consent while allowing launch", async () => {
+    const confirm = renderLaunchReview([], null, { campaign: { schedule: { monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] } } } });
+    const warning = screen.getByRole("alert");
+    expect(warning).toHaveTextContent(/any hour, including overnight/);
+    expect(warning).toHaveTextContent(/voice schedule does not restrict SMS/);
+    expect(confirm).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Start text campaign" }));
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("play");
+  });
+
+  test("Cancel does not confirm a launch", async () => {
+    const confirm = renderLaunchReview();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("none");
+    expect(confirm).not.toHaveBeenCalledWith("play");
+  });
+
+  test("Escape cancels an open review without confirming a launch", async () => {
+    const confirm = renderLaunchReview();
+    await userEvent.keyboard("{Escape}");
+    expect(confirm).toHaveBeenCalledExactlyOnceWith("none");
+    expect(confirm).not.toHaveBeenCalledWith("play");
+  });
+
+  test("a pending confirmation cannot submit again", async () => {
+    const confirm = renderLaunchReview([], null, { isBusy: true });
+    const button = screen.getByRole("button", { name: "Start text campaign" });
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  test("a valid SMS window has no unrestricted warning", () => {
+    renderLaunchReview([], null, { campaign: { sms_send_window: { monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] } } } });
+    expect(screen.queryByText(/Are you sure you want unrestricted SMS/)).not.toBeInTheDocument();
+  });
+
   test("summarizes launch inputs and goal-aware action", () => {
     renderLaunchReview();
 
