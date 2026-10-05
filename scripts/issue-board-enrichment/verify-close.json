@@ -4898,5 +4898,42 @@
     "size": "XS",
     "risk": "medium",
     "trackerRecommendation": "Keep #2118 open in Verify and close after PR #2382 merged into dev. on-dev workflow 37255076883 moved one issue; a deployment success is not deployed functional acceptance."
+  },
+  {
+    "issueNumber": 2115,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify canonical Stripe customer creation after release",
+    "summary": "PR #2385 merged the canonical customer protocol into dev. Checkout and setup reuse one frozen provider request and an atomic persisted claim. Release and deployed Stripe acceptance remain.",
+    "currentBehavior": "Source audit: dev@02af083e, 2026-10-05. PR #2385 uses frozen customer parameters and a workspace provider key, atomic canonical claims, protected setup writes, old unknown-request recovery, and persisted conflict reconciliation. Unsafe or unfinished conflicts stop checkout and retry. Previously claimed customers are retained; unclaimed candidates require ownership, balance, saved-method and seven history checks before deletion. Provider I/O stays outside database locks.",
+    "resolution": "Promote PR #2385 to the default branch. Verify concurrent first checkout and setup in an owned deployed Stripe test-mode workspace, canonical storage, saved payment access and unchanged completed-ID checkout. Verify retry, old unknown-result recovery and protected-conflict behavior before closure. Preserve unsafe customers for operator reconciliation.",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts:38",
+      "app/lib/database/stripe.server.ts:136",
+      "app/lib/database/stripe-customer-reconciliation.server.ts:23",
+      "app/lib/database/workspace-provisioning.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts",
+      "client/migrations/20261005000000_persist_stripe_customer_creation.sql",
+      "scripts/db/bootstrap-fresh-db.mjs:129",
+      "scripts/e2e/bootstrap-compose-db.mjs:88",
+      "test/integration-db/stripe-customer-race.test.ts"
+    ],
+    "existingTests": [
+      "test/platform-billing-checkout.test.ts",
+      "test/db-stripe.server.test.ts",
+      "test/integration-db/stripe-customer-race.test.ts: 26 actual PostgreSQL and installed-Stripe-SDK cases; all 330 database cases passed on a fresh local bootstrap. The final 26-case suite and both final-head remote database jobs passed. Eleven independent source faults failed selected behavior cases; source was restored. Initial and final full ci:local, required remote checks and both deployment contexts passed at tested head d59fcf999498104c6dbb2e7958235bed6695d898; merge source equivalence verified."
+    ],
+    "missingTests": [
+      "Owned deployed Stripe test-mode acceptance: concurrent checkout/setup, saved methods, completed-ID control, retry/recovery and protected conflict handling. Local provider fixtures and green deployments do not prove this acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.",
+      "If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.",
+      "A saved payment method is retrievable after the race.",
+      "The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Keep OPEN in Verify and close until default-branch promotion and deployed Stripe acceptance. Native body preserves four criteria and original history; Development links to PR #2385."
   }
 ]
