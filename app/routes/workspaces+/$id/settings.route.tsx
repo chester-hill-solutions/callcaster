@@ -24,19 +24,20 @@ import {
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import type { ProductCapabilityId } from "@/lib/capabilities";
-import { compareMembersByRole } from "@/lib/workspace-members";
+import {
+  compareMembersByRole,
+  type WorkspaceMemberDisplay,
+} from "@/lib/workspace-members";
 import { getWorkspaceRoleDisplayName } from "@/lib/workspace-role-display";
-import { User, WorkspaceData, WorkspaceWebhook  } from "@/lib/types";
+import type { WorkspaceData, WorkspaceWebhook } from "@/lib/types";
 import type { PendingInvitationRow } from "@/lib/workspace-settings-db.server";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
-type UserWithRole = Partial<User> & { role: string };
-
 type LoaderData = {
   workspace: WorkspaceData;
   userRole: MemberRole;
-  users: UserWithRole[];
+  users: WorkspaceMemberDisplay[];
   activeUserId: string;
   pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook;
@@ -83,7 +84,7 @@ export default function WorkspaceSettings() {
   const webhookUserId = String(activeUserId);
   const workspaceOwner = users?.find(
     (user) => user?.role === "owner"
-  ) as UserWithRole | undefined;
+  );
   users?.sort((a, b) => compareMembersByRole(a, b));
   // Mirrors what the list below actually renders: non-owner members plus any
   // pending invites. The owner has its own row above this list.
@@ -229,8 +230,10 @@ export default function WorkspaceSettings() {
                         id: invite.id,
                         ...(invite.user ?? {}),
                         username: invite.user?.username ?? invite.email,
+                        first_name: invite.user?.first_name ?? null,
+                        last_name: invite.user?.last_name ?? null,
                         role: "invited",
-                      } as UserWithRole}
+                      }}
                       userRole={userRole}
                       memberIsUser={false}
                       workspaceOwner={workspaceOwner!}

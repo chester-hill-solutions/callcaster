@@ -15,7 +15,7 @@ import {
 
 import { Form } from "react-router";
 import { MdCancel } from "react-icons/md";
-import { User } from "@/lib/types";
+import type { WorkspaceMemberDisplay } from "@/lib/workspace-members";
 
 import { MemberRole } from "@/lib/member-role";
 import {
@@ -41,24 +41,23 @@ export const handleRoleTextStyles = (memberRole: MemberRole): string =>
     memberRole === MemberRole.Admin && "text-purple-500",
   );
 
-  type UserWithRole = Partial<User> & { role: string };
-
-
 export default function TeamMember({
   member,
   userRole,
   memberIsUser,
   workspaceOwner,
 }: {
-  member: UserWithRole;
+  member: WorkspaceMemberDisplay;
   userRole: MemberRole;
   memberIsUser: boolean;
-  workspaceOwner: UserWithRole;
+  workspaceOwner: WorkspaceMemberDisplay;
 }) {  
   const memberRole = member.role;
-  const firstName = member.first_name ? capitalize(member.first_name) : "Unnamed";  
-  const lastName = member.last_name ? capitalize(member.last_name) : "";
-  const memberName = `${firstName} ${lastName}`;
+  const memberName =
+    [member.first_name, member.last_name]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => capitalize(name))
+      .join(" ") || member.username;
 
   const iconStyles = handleIconStyles(memberRole as MemberRole);
   const roleTextStyles = handleRoleTextStyles(memberRole as MemberRole);

@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Member management shows the selected member's name and uses their username when both names are absent ([#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140)).
+
 - Fixed: Query parameter banners clear dismissed notices without adding browser history, so Back and Forward keep them dismissed and preserve unrelated query parameters ([#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121), [PR #2398](https://github.com/chester-hill-solutions/callcaster/pull/2398)).
 
 - Fixed: Agent startup failures show one persistent message, with stable space for long errors and the Back to workspace action ([#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308), [PR #2395](https://github.com/chester-hill-solutions/callcaster/pull/2395)).
