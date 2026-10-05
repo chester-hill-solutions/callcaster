@@ -37,9 +37,59 @@ describe("feature-flags", () => {
     expect(hasFeatureFlag({ liveTranscription: true }, "liveTranscription")).toBe(true);
     expect(hasFeatureFlag({}, "liveCoaching")).toBe(false);
   });
+
+  test.each([
+    { flag: "liveTranscription", flags: { liveTranscription: true, liveCoaching: "yes" } },
+    { flag: "liveTranscription", flags: { liveTranscription: true, batchTranscription: null } },
+    { flag: "liveCoaching", flags: { liveCoaching: true, liveTranscription: 1 } },
+    { flag: "liveCoaching", flags: { liveCoaching: true, batchTranscription: "true" } },
+    { flag: "batchTranscription", flags: { batchTranscription: true, liveTranscription: [] } },
+    { flag: "batchTranscription", flags: { batchTranscription: true, liveCoaching: {} } },
+  ])("a true $flag survives a malformed known sibling", ({ flag, flags }) => {
+    expect(hasFeatureFlag(flags, flag)).toBe(true);
+  });
+
+  test.each([
+    { value: false },
+    { value: "true" },
+    { value: "false" },
+    { value: 1 },
+    { value: 0 },
+    { value: null },
+    { value: undefined },
+    { value: [] },
+    { value: {} },
+  ])("a requested flag with value $value stays off", ({ value }) => {
+    expect(hasFeatureFlag({ liveTranscription: value, liveCoaching: true }, "liveTranscription")).toBe(false);
+  });
+
+  test("a missing requested flag stays off beside another true flag", () => {
+    expect(hasFeatureFlag({ liveCoaching: true }, "liveTranscription")).toBe(false);
+  });
+
+  test("an unknown key does not disable a true known flag", () => {
+    expect(hasFeatureFlag({ liveTranscription: true, operatorNote: "private" }, "liveTranscription")).toBe(true);
+  });
 });
 
 describe("liveMediaCapabilities", () => {
+  test("transcription survives invalid coaching without enabling coaching", () => {
+    expect(liveMediaCapabilities({ liveTranscription: true, liveCoaching: "yes" })).toEqual({
+      attachStream: true,
+      runCoaching: false,
+      showTranscript: true,
+      showCoaching: false,
+    });
+  });
+
+  test("coaching survives invalid transcription without showing the transcript", () => {
+    expect(liveMediaCapabilities({ liveCoaching: true, liveTranscription: "yes" })).toEqual({
+      attachStream: true,
+      runCoaching: true,
+      showTranscript: false,
+      showCoaching: true,
+    });
+  });
   test("neither flag: nothing runs", () => {
     expect(liveMediaCapabilities({})).toEqual({
       attachStream: false,

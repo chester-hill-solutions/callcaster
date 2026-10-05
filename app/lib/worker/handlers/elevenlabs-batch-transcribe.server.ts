@@ -3,6 +3,7 @@ import { call as callTable, workspace as workspaceTable } from "@/db/schema";
 import { call_transcript } from "@/db/schema-transcription";
 import { batchTranscriptionKey } from "@/lib/billing-keys";
 import { hasFeatureFlag } from "@/lib/feature-flags";
+import { warnInvalidWorkspaceFeatureFlags } from "@/lib/workspace-feature-flags.server";
 import { downloadObject } from "@/lib/object-storage.server";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
@@ -29,6 +30,7 @@ export async function isBatchTranscriptionEnabled(
     where: eq(workspaceTable.id, workspaceId),
     columns: { feature_flags: true },
   });
+  if (row) warnInvalidWorkspaceFeatureFlags(workspaceId, row.feature_flags);
   return hasFeatureFlag(
     row?.feature_flags as Record<string, unknown> | undefined,
     "batchTranscription",

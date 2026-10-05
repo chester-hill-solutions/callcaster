@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { timestampToIsoString } from "@/lib/parse-utils.server";
+import { warnInvalidWorkspaceFeatureFlags } from "@/lib/workspace-feature-flags.server";
 
 /**
  * Client-safe column projection of the `workspace` row.
@@ -55,5 +56,6 @@ export async function getWorkspaceForClient(workspaceId: string) {
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
+  if (row) warnInvalidWorkspaceFeatureFlags(workspaceId, row.feature_flags);
   return row ?? null;
 }
