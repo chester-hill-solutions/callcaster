@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   createTenantDb: vi.fn(() => ({
     tenant: true,
     workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+    message: { update: async () => [{ outreach_attempt_id: 1 }] },
   })),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
 
@@ -149,7 +150,9 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
     mocks.rpcFailExhaustedCampaignQueueContacts(...args),
 }));
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
   createTenantDb: (...args: unknown[]) => mocks.createTenantDb(...args),
 }));
 vi.mock("@/lib/object-storage.server", () => ({
