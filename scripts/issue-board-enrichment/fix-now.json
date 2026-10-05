@@ -1686,40 +1686,6 @@
     "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
   },
   {
-    "issueNumber": 2355,
-    "verdict": "fix-now",
-    "recommendedTitle": "Reject invalid audio campaign targets before storage",
-    "summary": "The route allocates, uploads and signs audio before a scoped update proves the campaign exists. Campaign identifiers also lack numeric validation.",
-    "currentBehavior": "dev@cea31c69 has no scoped precheck. The actual-route audit attempts storage when the update returns null. This is orchestration evidence with external I/O stubbed; no physical orphan count was measured.",
-    "rootCause": "Campaign existence is checked only by the final update, after storage work. Number conversion accepts invalid target values without an explicit identifier policy.",
-    "resolution": "Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356.",
-    "lookIn": [
-      "app/routes/api+/media.action.server.ts",
-      "app/lib/campaign-ivr.server.ts",
-      "app/lib/handler.server.ts",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [
-      "The audit used actual action/native multipart/file validation with external I/O stubbed: 34 upload controls pass and the missing-target no-storage contract fails. Existing scoped campaign helper uses createTenantDb."
-    ],
-    "missingTests": [
-      "Actual-route invalid/missing/foreign target and valid-target controls; no media work before target validation; a final-update failure cannot report success; precheck removal must fail."
-    ],
-    "acceptanceCriteria": [
-      "Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.",
-      "A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.",
-      "A valid campaign in the requested workspace retains its 201 response and updated audio URL.",
-      "A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.",
-      "The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.",
-      "Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.",
-      "Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Validate the campaign ID and reuse findCampaignInWorkspace before file allocation/upload/signing/update. Return 400 for invalid identifiers and uniform 404 for missing/foreign targets; retain valid 201 and truthful final-update failures. Keep durable cleanup in #2356."
-  },
-  {
     "blockedBy": [],
     "size": "S",
     "risk": "low",

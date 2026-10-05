@@ -4822,5 +4822,45 @@
     "size": "S-M",
     "risk": "high",
     "trackerRecommendation": "Source fix is merged and reviewed on dev. Verify deployed acceptance and release before closing; keep all seven original acceptance criteria. Do not add another checkout role gate."
+  },
+  {
+    "issueNumber": 2355,
+    "verdict": "verify-close",
+    "recommendedTitle": "Reject invalid audio campaign targets before storage",
+    "summary": "The audio campaign target precheck is merged through #2379. Invalid identifiers return 400 and missing or foreign campaigns return 404 before application file allocation or storage work.",
+    "currentBehavior": "dev@63fecfa0 validates the campaign ID and reads the target through findCampaignInWorkspace before file allocation, upload, signing or update. Valid attachment retains 201. A missing or failed final update cannot report success. Real campaign deletion during upload returns failure. Object lifecycle work remains under #2356.",
+    "rootCause": "Resolved by #2379: the old action checked campaign existence only at the final update and used an unchecked Number conversion.",
+    "resolution": "Verify the deployed /api/media endpoint and promote #2379 to the default branch before closure. Keep #2356 separate: uncertain outcomes, durable object ownership and physical reclamation are not resolved by this precheck.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/lib/handler.server.ts",
+      "app/lib/object-storage.server.ts",
+      "test/integration-db/media-campaign-target.test.ts",
+      "docs/api-data-management.md"
+    ],
+    "existingTests": [
+      "All 25 actual-action PostgreSQL cases pass locally and in final-head remote job 111576750987 (run 37250419783). They use native multipart, real membership and scoped campaign reads/updates; session resolution and external storage are fixtures in this tier.",
+      "All 44 existing upload controls pass. Three independent faults remove the target precheck, identifier parser or empty-update guard; each fails relevant cases and exact restoration passes all 25.",
+      "All 25 production-build HTTP requests pass with genuine Better Auth sessions, real membership/campaign rows, native multipart and real URL signing. Valid MP3, WebM and OGA attach only to the owned campaign. Invalid, missing, foreign and sessionless targets have no application file allocation or S3 send. Real campaign deletion during upload returns failure. S3 SDK send is a provider fixture; no physical bucket acceptance or cleanup is claimed.",
+      "Full npm run ci:local and exact-head remote checks pass at a5e6d9123f7b1b8286b84ed09b51417db8ba1fc8; both deployments pass. Squash source equivalence is verified at 63fecfa07b7777cee052bffc1317c8e6de9d43cc."
+    ],
+    "missingTests": [
+      "Deployed functional acceptance with the real bucket remains open. Confirm invalid/missing/foreign target rejection, valid 201 attachment and truthful final-update failure.",
+      "Default-branch release remains open; retain the native issue until release and required verification complete."
+    ],
+    "acceptanceCriteria": [
+      "Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.",
+      "A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.",
+      "A valid campaign in the requested workspace retains its 201 response and updated audio URL.",
+      "A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.",
+      "The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.",
+      "Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.",
+      "Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Keep #2355 open in Verify and close for deployed functional acceptance and default-branch release. Its source fix is verified in #2379. Keep physical object reconciliation and uncertain attachment outcomes under #2356."
   }
 ]
