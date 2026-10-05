@@ -1,14 +1,16 @@
 import type Stripe from "stripe";
-import { and, eq } from "drizzle-orm";
-import { workspace } from "@/db/schema";
-import { adminDb } from "@/server/admin-db";
+import type { workspace } from "@/db/schema";
 
-async function readConflict(workspaceId: string) {
-  const row = await adminDb.query.workspace.findFirst({
-    where: eq(workspace.id, workspaceId),
-    columns: { stripe_id: true, stripe_customer_creation: true, stripe_customer_conflict: true,
-      stripe_customer_creation_completed_id: true },
-  });
+type ConflictState = Pick<typeof workspace.$inferSelect, "stripe_id" | "stripe_customer_creation" |
+  "stripe_customer_conflict" | "stripe_customer_creation_completed_id">;
+
+type ConflictAccess = {
+  read: () => Promise<ConflictState | undefined>;
+  complete: (conflict: NonNullable<ConflictState["stripe_customer_conflict"]>) => Promise<string | undefined>;
+};
+
+async function readConflict(access: ConflictAccess) {
+  const row = await access.read();
   const conflict = row?.stripe_customer_conflict;
   if (!conflict || conflict.canonical_id !== row.stripe_id ||
       conflict.unclaimed_id === row.stripe_id ||
@@ -18,8 +20,8 @@ async function readConflict(workspaceId: string) {
   return { row, conflict };
 }
 
-export async function reconcileStripeCustomerConflict(stripe: Stripe, workspaceId: string) {
-  const { row, conflict } = await readConflict(workspaceId);
+export async function reconcileStripeCustomerConflict(stripe: Stripe, workspaceId: string, access: ConflictAccess) {
+  const { row, conflict } = await readConflict(access);
   const customer = await stripe.customers.retrieve(conflict.unclaimed_id);
   if (customer.id !== conflict.unclaimed_id) throw new Error("Stripe returned a different customer identity");
   if (!customer.deleted) {
@@ -42,7 +44,7 @@ export async function reconcileStripeCustomerConflict(stripe: Stripe, workspaceI
       throw new Error("Unclaimed Stripe customer has payment or billing history");
     }
     // New checkout paths stop at the durable conflict. Recheck ownership after provider reads.
-    const current = await readConflict(workspaceId);
+    const current = await readConflict(access);
     if (current.conflict.unclaimed_id !== conflict.unclaimed_id ||
         current.conflict.canonical_id !== conflict.canonical_id) {
       throw new Error("Stripe customer conflict changed during reconciliation");
@@ -50,11 +52,7 @@ export async function reconcileStripeCustomerConflict(stripe: Stripe, workspaceI
     const deleted = await stripe.customers.del(customer.id);
     if (!deleted.deleted) throw new Error("Stripe did not confirm customer removal");
   }
-  const [cleared] = await adminDb.update(workspace).set({ stripe_customer_conflict: null,
-    stripe_customer_creation_completed_id: conflict.canonical_id })
-    .where(and(eq(workspace.id, workspaceId), eq(workspace.stripe_id, conflict.canonical_id),
-      eq(workspace.stripe_customer_conflict, conflict)))
-    .returning({ stripe_id: workspace.stripe_id });
-  if (!cleared?.stripe_id) throw new Error("Stripe customer conflict changed before completion");
-  return { id: cleared.stripe_id };
+  const clearedId = await access.complete(conflict);
+  if (!clearedId) throw new Error("Stripe customer conflict changed before completion");
+  return { id: clearedId };
 }

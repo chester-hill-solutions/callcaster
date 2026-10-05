@@ -87,6 +87,24 @@ async function recoverCustomer(stripe: Stripe, params: z.infer<typeof customerCr
   return recovered;
 }
 
+function reconcileCustomer(stripe: Stripe, workspaceId: string) {
+  return reconcileStripeCustomerConflict(stripe, workspaceId, {
+    read: () => adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+      columns: { stripe_id: true, stripe_customer_creation: true, stripe_customer_conflict: true,
+        stripe_customer_creation_completed_id: true },
+    }),
+    complete: async conflict => {
+      const [cleared] = await adminDb.update(workspace).set({ stripe_customer_conflict: null,
+        stripe_customer_creation_completed_id: conflict.canonical_id })
+        .where(and(eq(workspace.id, workspaceId), eq(workspace.stripe_id, conflict.canonical_id),
+          eq(workspace.stripe_customer_conflict, conflict)))
+        .returning({ stripe_id: workspace.stripe_id });
+      return cleared?.stripe_id ?? undefined;
+    },
+  });
+}
+
 async function claimCustomer(stripe: Stripe, workspaceId: string, customer: Stripe.Customer) {
   const [claimed] = await adminDb.update(workspace)
     .set({ stripe_id: customer.id, stripe_customer_creation_completed_id: customer.id })
@@ -112,7 +130,7 @@ async function claimCustomer(stripe: Stripe, workspaceId: string, customer: Stri
     stripe_customer_conflict: { unclaimed_id: customer.id, canonical_id: canonical.stripe_id },
   }).where(and(eq(workspace.id, workspaceId), ne(workspace.stripe_id, customer.id),
     isNull(workspace.stripe_customer_conflict)));
-  return reconcileStripeCustomerConflict(stripe, workspaceId);
+  return reconcileCustomer(stripe, workspaceId);
 }
 
 export async function createStripeContact({
@@ -136,7 +154,7 @@ export async function createStripeContact({
     if (!workspaceRow) throw new Error("Workspace no longer exists");
   }
   if (workspaceRow.stripe_customer_conflict) {
-    return reconcileStripeCustomerConflict(new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS), workspace_id);
+    return reconcileCustomer(new Stripe(env.STRIPE_SECRET_KEY(), STRIPE_CLIENT_OPTIONS), workspace_id);
   }
   if (workspaceRow.stripe_id && (!workspaceRow.stripe_customer_creation ||
       workspaceRow.stripe_customer_creation_completed_id === workspaceRow.stripe_id)) {
