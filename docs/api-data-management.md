@@ -63,6 +63,8 @@ For automated campaign setup with script + audiences, use the supported API:
 
 ### Media upload limits
 
+`POST /api/media` requires a positive decimal safe integer in `live_campaign_id`. Missing or invalid identifiers return **400**. A missing campaign or one outside the requested workspace returns **404** before file allocation, upload, signing or attachment. A successful attachment retains **201** and its audio URL; an empty or failed final update returns **500**. Workspace access and file validation still apply.
+
 `POST /api/media` accepts audio in the existing supported formats, including WebM and OGA. `POST /api/message_media` retains its image/audio extension and MIME policy. Both accept a file up to **10 MiB (10,485,760 bytes)**. Validation precedes application file buffering and object storage. Audio storage keys use a generated identifier and a safe filename; `campaign_name` cannot set their path structure.
 
 The encoded body for both uploads and `DELETE /api/message_media` is limited to **10,551,296 bytes**: 10 MiB plus 64 KiB for form fields, multipart headers, and boundaries. Keep all fields and overhead within that total. The reader checks actual stream bytes, including requests with no Content-Length or a false low value. It stops and cancels the source on overflow; an oversized declared length is rejected before reading.
