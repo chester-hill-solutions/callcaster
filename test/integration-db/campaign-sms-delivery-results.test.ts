@@ -176,11 +176,20 @@ suite("campaign SMS delivery results against Postgres (#2149)", () => {
   test.each(["reject", "skip"] as const)("a %s of the link write rolls back preparation before send", async (mode) => {
     const { pool } = await services();
     const body = mode === "reject" ? "RAISE EXCEPTION 'fixture rejected link';" : "RETURN NULL;";
-    await pool.unsafe(`CREATE FUNCTION public.cc_2149_reject_link() RETURNS trigger LANGUAGE plpgsql AS $$
-      BEGIN ${body} END $$`);
-    await pool.unsafe(`CREATE TRIGGER cc_2149_reject_link BEFORE UPDATE OF outreach_attempt_id ON message
-      FOR EACH ROW EXECUTE FUNCTION public.cc_2149_reject_link()`);
+    const objectName = `cc_2149_${randomUUID().replaceAll("-", "")}`;
+    const controlWorkspace = randomUUID();
+    const controlSid = `SM${randomUUID().replaceAll("-", "")}`;
     try {
+      await pool`insert into workspace (id, name, twilio_data)
+        values (${controlWorkspace}, 'Unrelated message control', '{}')`;
+      await pool`insert into message (sid, workspace, status)
+        values (${controlSid}, ${controlWorkspace}, 'queued')`;
+      await pool.unsafe(`CREATE FUNCTION public.${objectName}() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN ${body} END $$`);
+      await pool.unsafe(`CREATE TRIGGER ${objectName} BEFORE UPDATE OF outreach_attempt_id ON public.message
+        FOR EACH ROW WHEN (NEW.workspace = '${workspaceId}') EXECUTE FUNCTION public.${objectName}()`);
+      expect(await pool`update message set outreach_attempt_id = null
+        where workspace = ${controlWorkspace} and sid = ${controlSid} returning sid`).toEqual([{ sid: controlSid }]);
       await expect(send()).rejects.toThrow();
       expect(provider.create).not.toHaveBeenCalled();
       expect(await pool`select id from outreach_attempt where workspace = ${workspaceId}`).toEqual([]);
@@ -189,7 +198,13 @@ suite("campaign SMS delivery results against Postgres (#2149)", () => {
       expect(Number(queue.attempts)).toBe(0);
       expect(queue.attempt_count).toBe(0);
     } finally {
-      await pool.unsafe("DROP TRIGGER cc_2149_reject_link ON message; DROP FUNCTION public.cc_2149_reject_link()");
+      try {
+        await pool.unsafe(`DROP TRIGGER IF EXISTS ${objectName} ON public.message;
+          DROP FUNCTION IF EXISTS public.${objectName}()`);
+      } finally {
+        await pool`delete from message where workspace = ${controlWorkspace}`;
+        await pool`delete from workspace where id = ${controlWorkspace}`;
+      }
     }
   });
 
