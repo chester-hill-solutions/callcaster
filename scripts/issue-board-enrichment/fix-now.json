@@ -3,25 +3,36 @@
     "issueNumber": 1878,
     "verdict": "fix-now",
     "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
-    "summary": "The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.",
-    "rootCause": "The call-loader/Dialogs contract carries booleans and prose only; /api/audiodrop has no override parameter.",
-    "resolution": "Pass the audio library and both campaign defaults through the loader; add session state and validated overrides to every relevant playback path. Confirm machine drop and agent drop follow the chosen values without a campaign write.",
+    "summary": "The welcome dialog and agent control still lack session-selected audio. The complete-URL signature prerequisite is implemented by PR #2391; the native blocking edge is removed. The feature remains Fix now.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics.",
+    "rootCause": "The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.",
+    "resolution": "Extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
     "lookIn": [
-      "app/components/call/CallScreen.Dialogs.tsx:25",
-      "app/components/call/CallScreen.Layout.tsx:523",
-      "app/routes/api+/audiodrop.action.server.ts:46",
       "app/components/call/CallScreen.Dialogs.tsx",
       "app/components/call/CallScreen.Layout.tsx",
-      "app/routes/api+/audiodrop.action.server.ts"
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCallScreen.ts",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/routes/api+/audiodrop.action.server.ts",
+      "app/lib/auto-dial-start.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/lib/openapi-platform-components.ts",
+      "app/lib/services/hooks-api.ts"
     ],
     "existingTests": [
       "test/ui/call-screen-dialogs.test.tsx",
       "test/ui/call-screen-callarea.test.tsx",
-      "test/audiodrop.test.ts"
+      "test/audiodrop.test.ts",
+      "test/auto-dial-start.server.test.ts",
+      "test/auto-dial.server.test.ts",
+      "test/auto-dial-room.route.test.ts",
+      "test/auto-dial-status.test.ts"
     ],
     "missingTests": [
-      "Existing dialog and audiodrop tests do not cover file identity, session picker changes, override playback or no campaign writes."
+      "Session file identity/None through every continuation; loader revalidation and separate agents; no shared configuration writes; tenant/object/actor/session refusal before provider updates; provider delay/rejection and retry without ending the call; API schema parity; real shared Dialog/Select/Toaster and stable geometry. Existing AMD replay/acknowledgement findings must be tested explicitly before claiming robust playback."
     ],
     "acceptanceCriteria": [
       "The welcome dialog surfaces the caller audio (name and a way to change it)",
@@ -29,9 +40,9 @@
       "The choice is session-only and does not write the campaign config"
     ],
     "blockedBy": [],
-    "size": "M",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Keep OPEN in Fix now. #2390 is implemented on dev by PR #2391; its release verification remains separate. Native criteria and audit history are retained. Implement the adjusted session/ownership plan in atomic slices; do not treat the picker alone as complete playback behavior."
   },
   {
     "issueNumber": 1833,

@@ -4977,5 +4977,42 @@
     "size": "S-M",
     "risk": "medium",
     "trackerRecommendation": "Keep OPEN in Verify and close until release promotion and deployed acceptance. Native body preserves all five criteria and both original and pre-fix audit history; Development links to PR #2387."
+  },
+  {
+    "issueNumber": 2390,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify complete Twilio callback URL signatures after release",
+    "summary": "PR #2391 merged complete encoded callback queries and GET/HEAD signature handling. Actual SDK, Bun, full local CI, remote E2E and both deployments are green; default promotion and genuine deployed provider callback acceptance remain.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The trusted configured public URL includes pathname and unchanged encoded query. GET/HEAD query fields resolve workspace credentials without being appended as POST fields. Query changes and query-free signature reuse are refused; POST body validation, workspace-only tokens and SDK encoding compatibility remain. Failure diagnostics omit query values.",
+    "rootCause": "The canonical verifier discarded the query and passed GET/HEAD query fields again as form parameters. Its old mocked unit test encoded query removal as expected behavior.",
+    "resolution": "Promote PR #2391 to the default branch. Verify genuine signed provider callbacks under the deployed public URL, including valid encoded queries, query tampering, no-query compatibility and relevant GET callbacks. Keep OPEN until release acceptance; fixture callbacks and green deployment contexts do not prove live call delivery.",
+    "lookIn": [
+      "app/lib/twilio-webhook.server.ts",
+      "server/twilio-webhook.ts",
+      "e2e/fixtures/webhooks.ts",
+      "e2e/specs/twilio-webhook-auth.spec.ts"
+    ],
+    "existingTests": [
+      "test/twilio-webhook-query.test.ts",
+      "test/twilio-webhook.server.test.ts",
+      "test/twilio-webhook-production-guard.test.ts",
+      "test/twilio-webhook-prehandler.test.ts",
+      "test/fixtures/twilio-webhook-query.bun.ts",
+      "53 focused Node and 7 Bun pre-handler cases passed; Bun child executed 12 real-SDK checks. Five independent source faults and the Bun query-removal fault failed their selected cases; sources restored. Complete local CI passed at 652c25e0; exact-head remote checks, 330 real-Postgres cases, 139 E2E cases and both deployments passed. New HTTP fixtures observed 200/403/403. Merge source equivalence and recoverable cleanup verified."
+    ],
+    "missingTests": [
+      "Default-branch promotion and genuine deployed provider callback acceptance. No live call or message was sent by the fixture checks."
+    ],
+    "acceptanceCriteria": [
+      "Valid SDK POST signatures with encoded/repeated/blank queries pass; no-query callbacks stay compatible",
+      "Changed/added/removed queries and query-free signature replay fail with 403",
+      "Valid GET/HEAD signatures avoid duplicate query fields while retaining workspace credential lookup",
+      "Route and Bun ingress validation agree and retain a readable POST body",
+      "Workspace credentials, missing-credential refusal and production validation remain; new failure logs omit query values"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "high",
+    "trackerRecommendation": "Keep OPEN in Verify and close until default promotion and deployed acceptance. Development is linked to PR #2391; the implementation prerequisite for #1878 is fulfilled."
   }
 ]
