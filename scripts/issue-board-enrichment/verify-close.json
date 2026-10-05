@@ -5014,5 +5014,72 @@
     "size": "S-M",
     "risk": "high",
     "trackerRecommendation": "Keep OPEN in Verify and close until default promotion and deployed acceptance. Development is linked to PR #2391; the implementation prerequisite for #1878 is fulfilled."
+  },
+  {
+    "issueNumber": 2131,
+    "verdict": "verify-close",
+    "recommendedTitle": "Predictive \"Start Dialing\" is a silent no-op when the campaign has no caller ID, and the error is discarded",
+    "summary": "PR #2394 merged predictive start prerequisites, pending protection and safe once-only root feedback into dev. Default promotion and deployed acceptance remain.",
+    "currentBehavior": "Source verified at dev@9f33f3e7, 2026-10-05. Missing caller ID/device disables the existing shared predictive start control with a reason. A synchronous pending lock prevents repeated requests before acknowledgement. Known route failures use safe recovery text; unknown/malformed/server replies use a stable retry message. Credit recovery is role-appropriate and adds no inline banner.",
+    "resolution": "Promote PR #2394 to the default branch and verify missing prerequisites, server and credit failures, pending/double-click protection, retry and manual/connected controls on the deployed product. Keep OPEN until release acceptance.",
+    "lookIn": [
+      "app/hooks/call/useStartConferenceAndDial.ts",
+      "app/hooks/call/useCallScreen.ts",
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/lib/services/hooks-api.ts"
+    ],
+    "existingTests": [
+      "test/startConferenceAndDial.test.ts",
+      "test/services-api.test.ts",
+      "test/ui/predictive-start-feedback.test.tsx",
+      "test/ui/hooks-call-screen.test.tsx",
+      "45 focused Node cases and 50 UI cases passed. Ten independent source faults failed one executed case each. Browser geometry stayed fixed at desktop/narrow widths in both themes through 11 states each. Full local CI, exact-head remote checks, E2E and both deployments passed before merge."
+    ],
+    "missingTests": [
+      "Default promotion and acceptance on the deployed product. Local start responses were loopback fixtures; no live provider call was sent."
+    ],
+    "acceptanceCriteria": [
+      "With `campaign.caller_id === null`, the Dial button is disabled and the reason is visible (kill-check: remove the `disabled` condition and confirm the test goes red).",
+      "With no device selected, same.",
+      "When the server rejects a start for any reason, the error reaches the user through a toast, not only the log (kill-check: drop the toast and confirm the test goes red).",
+      "The positive control: a configured caller ID and a device → the button is enabled and the start path runs."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2394; preserve original criteria and separate release acceptance from source proof.",
+    "rootCause": "The call-screen contract discarded start error/loading state, and the client adapter exposed raw response text."
+  },
+  {
+    "issueNumber": 2308,
+    "verdict": "verify-close",
+    "recommendedTitle": "Show agent startup failure once",
+    "summary": "PR #2395 merged one persistent startup Alert in stable reserved space. Default promotion and deployed acceptance remain.",
+    "currentBehavior": "Source verified at dev@e011e04b, 2026-10-05. Loading and failure startup views share one fixed-height region and Back to workspace action. A startup error appears once through the real shared Alert. Long messages scroll inside a keyboard-focusable region without moving page landmarks or page scroll. Connected status-error handling, device checks, pending guards and session ownership retain their existing behavior.",
+    "rootCause": "Startup failure was passed to StatusBar and rendered again in an outer Alert.",
+    "resolution": "Promote PR #2395 to the default branch, then verify one token/runtime startup message, recovery navigation, pending controls and stable page geometry in the deployed product. Separate connected-status placement and runtime retry concerns are not resolved by this atomic startup presentation fix.",
+    "lookIn": [
+      "app/components/agent/AgentDesktop.tsx",
+      "app/components/calls/SoftphonePanel.tsx",
+      "docs/design-system.md"
+    ],
+    "existingTests": [
+      "test/ui/agent-startup-feedback.test.tsx",
+      "test/ui/agent-desktop.test.tsx",
+      "Ten focused component cases passed. Four independent source faults each failed one executed case; removing the region height failed real-browser geometry. Desktop/narrow and light/dark cases each kept six transitions stable, including keyboard scrolling of long messages. Full local CI, exact-head remote checks, E2E and both deployments passed before merge."
+    ],
+    "missingTests": [
+      "Default promotion and acceptance on the deployed product. Browser tests used isolated router/device boundaries and did not send provider calls."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2395; preserve original criteria and separate release acceptance from source proof."
   }
 ]
