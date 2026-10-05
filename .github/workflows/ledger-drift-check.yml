@@ -84,6 +84,7 @@ concurrency:
 
 jobs:
   dev:
+    name: Dev drift against dev
     # Runs on: nightly schedule, dispatch-with-input=dev, and push-to-dev.
     if: >-
       github.event_name == 'schedule' ||
@@ -95,6 +96,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: dev
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -113,6 +116,7 @@ jobs:
         run: node scripts/db/check-schema-drift.mjs --require-db
 
   staging:
+    name: Staging drift against master
     # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-master
     # (staging deploys master under the 2026-08-31 topology, #1300).
     if: >-
@@ -125,6 +129,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -139,6 +145,7 @@ jobs:
         run: node scripts/db/check-schema-drift.mjs --require-db
 
   production:
+    name: Production drift against master
     # Runs on: nightly schedule, dispatch-with-input=production, and push-to-master
     # (production deploys master under the 2026-08-31 topology, #1300).
     if: >-
@@ -151,6 +158,8 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: master
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
