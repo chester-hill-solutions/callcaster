@@ -4862,5 +4862,41 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "Keep #2355 open in Verify and close for deployed functional acceptance and default-branch release. Its source fix is verified in #2379. Keep physical object reconciliation and uncertain attachment outcomes under #2356."
+  },
+  {
+    "issueNumber": 2118,
+    "verdict": "verify-close",
+    "recommendedTitle": "A malformed known feature flag disables valid sibling flags",
+    "summary": "Independent feature-flag reads and safe workspace diagnostics merged through PR #2382. Deployed functional acceptance and release remain open.",
+    "currentBehavior": "Source fix dev@9f4bb125: requested flags use strict === true independently. Known-key diagnostics at the client projection, server workspace read and batch-worker flag read include only workspace ID and invalid key names. Stored values, defaults and batch policy stay unchanged. All 24 actual-reader PostgreSQL cases passed locally and in the final-head remote E2E job; all 68 focused Node cases passed. Six independent faults fail the relevant cases and exact restoration passes.",
+    "resolution": "Verify deployed client, server and batch-worker behavior with malformed known siblings and valid requested flags, confirm safe workspace diagnostics, then promote to the default branch before closure.",
+    "lookIn": [
+      "app/lib/feature-flags.ts",
+      "app/lib/workspace-feature-flags.server.ts",
+      "app/lib/workspace-client-projection.server.ts",
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts",
+      "test/feature-flags.test.ts",
+      "test/workspace-feature-flags.server.test.ts",
+      "test/integration-db/workspace-feature-flags.test.ts"
+    ],
+    "existingTests": [
+      "68 focused Node cases cover flags, diagnostics, TwiML and live-media route controls.",
+      "24 real PostgreSQL cases exercise the three actual readers, real TwiML/token signing, safe client projection, unchanged stored JSON and foreign-workspace isolation. Final-head remote E2E job 111588289870 ran all 24 successfully.",
+      "Six faults cover whole-object parsing, loose truthiness, removed diagnostics and each removed server call site; exact restoration passes 24 database and 36 focused Node cases."
+    ],
+    "missingTests": [
+      "Deployed client, server and batch-worker acceptance with malformed known siblings and safe diagnostics; default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "A true requested flag remains true when another known flag contains a wrong type.",
+      "A requested flag with a wrong type returns false.",
+      "A missing requested flag returns false.",
+      "Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "medium",
+    "trackerRecommendation": "Keep #2118 open in Verify and close after PR #2382 merged into dev. on-dev workflow 37255076883 moved one issue; a deployment success is not deployed functional acceptance."
   }
 ]
