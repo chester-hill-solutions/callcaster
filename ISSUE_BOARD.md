@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@4fa72d69; Unrestricted SMS warning reconciled with merged source, consent and browser proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@eb7bc066; Complete callback signatures and session-audio prerequisite reconciled with merged source and real SDK/HTTP proof (2026-10-05 UTC)` · 321 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the SMS send-window source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the callback-signature source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -34,6 +34,18 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 ## Fix now — 48
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
+- Verdict: **Fix now** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The welcome dialog and agent control still lack session-selected audio. The complete-URL signature prerequisite is implemented by PR #2391; the native blocking edge is removed. The feature remains Fix now.
+- Current behavior: Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics.
+- Root cause: The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.
+- Resolution: Extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.
+- Look in: `app/components/call/CallScreen.Dialogs.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallScreen.ts`, `app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts`, `app/lib/platform-media.server.ts`, `app/routes/api+/audiodrop.action.server.ts`, `app/lib/auto-dial-start.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/openapi-platform-components.ts`, `app/lib/services/hooks-api.ts`
+- Existing tests: test/ui/call-screen-dialogs.test.tsx; test/ui/call-screen-callarea.test.tsx; test/audiodrop.test.ts; test/auto-dial-start.server.test.ts; test/auto-dial.server.test.ts; test/auto-dial-room.route.test.ts; test/auto-dial-status.test.ts
+- Missing tests: Session file identity/None through every continuation; loader revalidation and separate agents; no shared configuration writes; tenant/object/actor/session refusal before provider updates; provider delay/rejection and retry without ending the call; API schema parity; real shared Dialog/Select/Toaster and stable geometry. Existing AMD replay/acknowledgement findings must be tested explicitly before claiming robust playback.
+- Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
+- Tracker: Keep OPEN in Fix now. #2390 is implemented on dev by PR #2391; its release verification remains separate. Native criteria and audit history are retained. Implement the adjusted session/ownership plan in atomic slices; do not treat the picker alone as complete playback behavior.
 
 ### [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282) Prepare a valid A2P Messaging Profile before brand registration
 - Verdict: **Fix now** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -268,6 +280,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131) Predictive "Start Dialing" is a silent no-op when the campaign has no caller ID, and the error is discarded
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Predictive begin sets an error for missing caller ID/device, but useCallScreen does not read that error or loading state. The button does not explain these preconditions.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Predictive begin sets an error for missing caller ID/device, but useCallScreen does not read that error or loading state. The button does not explain these preconditions.
+- Resolution: Expose the start error in the UI and disable Dial with the exact missing prerequisite.
+- Look in: `app/hooks/call/useStartConferenceAndDial.ts:66`, `app/hooks/call/useCallScreen.ts:294`, `app/hooks/call/useStartConferenceAndDial.ts`, `app/components/call/CallScreen.Layout.tsx (`handleDialButton`, the Dial control)`, `app/components/call/CallScreen.CallArea.tsx`, `app/components/campaign/settings/detailed/CampaignLaunch*.tsx (the existing readiness-gate pattern)`
+- Existing tests: test/ui/use-campaign-dial-actions.test.ts
+- Missing tests: Render missing caller ID/device and a server failure; assert an actionable message and safe disabled/loading state.
+- Done when: With `campaign.caller_id === null`, the Dial button is disabled and the reason is visible (kill-check: remove the `disabled` condition and confirm the test goes red).; With no device selected, same.; When the server rejects a start for any reason, the error reaches the user through a toast, not only the log (kill-check: drop the toast and confirm the test goes red).; The positive control: a configured caller ID and a device → the button is enabled and the start path runs.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.
@@ -437,17 +460,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131) Predictive "Start Dialing" is a silent no-op when the campaign has no caller ID, and the error is discarded
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Predictive begin sets an error for missing caller ID/device, but useCallScreen does not read that error or loading state. The button does not explain these preconditions.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Predictive begin sets an error for missing caller ID/device, but useCallScreen does not read that error or loading state. The button does not explain these preconditions.
-- Resolution: Expose the start error in the UI and disable Dial with the exact missing prerequisite.
-- Look in: `app/hooks/call/useStartConferenceAndDial.ts:66`, `app/hooks/call/useCallScreen.ts:294`, `app/hooks/call/useStartConferenceAndDial.ts`, `app/components/call/CallScreen.Layout.tsx (`handleDialButton`, the Dial control)`, `app/components/call/CallScreen.CallArea.tsx`, `app/components/campaign/settings/detailed/CampaignLaunch*.tsx (the existing readiness-gate pattern)`
-- Existing tests: test/ui/use-campaign-dial-actions.test.ts
-- Missing tests: Render missing caller ID/device and a server failure; assert an actionable message and safe disabled/loading state.
-- Done when: With `campaign.caller_id === null`, the Dial button is disabled and the reason is visible (kill-check: remove the `disabled` condition and confirm the test goes red).; With no device selected, same.; When the server rejects a start for any reason, the error reaches the user through a toast, not only the log (kill-check: drop the toast and confirm the test goes red).; The positive control: a configured caller ID and a device → the button is enabled and the start path runs.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119) runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Schedule sync still skips any voice campaign without both dates. Those campaigns never transition to waiting outside their calling hours.
@@ -457,18 +469,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/campaign-schedule-sync.server.test.ts; test/integration-db/campaign-schedule-sync-status-race.test.ts
 - Missing tests: No-date outside-window, in-window, expired bounds and sweep/dispatch parity tests; production count still needs measurement.
 - Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
-- Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
-- The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
-- Root cause: The call-loader/Dialogs contract carries booleans and prose only; /api/audiodrop has no override parameter.
-- Resolution: Pass the audio library and both campaign defaults through the loader; add session state and validated overrides to every relevant playback path. Confirm machine drop and agent drop follow the chosen values without a campaign write.
-- Look in: `app/components/call/CallScreen.Dialogs.tsx:25`, `app/components/call/CallScreen.Layout.tsx:523`, `app/routes/api+/audiodrop.action.server.ts:46`, `app/components/call/CallScreen.Dialogs.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/routes/api+/audiodrop.action.server.ts`
-- Existing tests: test/ui/call-screen-dialogs.test.tsx; test/ui/call-screen-callarea.test.tsx; test/audiodrop.test.ts
-- Missing tests: Existing dialog and audiodrop tests do not cover file identity, session picker changes, override playback or no campaign writes.
-- Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278) Validate literal redirect targets against the route tree
@@ -574,9 +574,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 163
+## Verify and close — 164
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2390](https://github.com/chester-hill-solutions/callcaster/issues/2390) Validate Twilio signatures against complete callback URLs
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-05
+- Recommended title: **Verify complete Twilio callback URL signatures after release**
+- PR #2391 merged complete encoded callback queries and GET/HEAD signature handling. Actual SDK, Bun, full local CI, remote E2E and both deployments are green; default promotion and genuine deployed provider callback acceptance remain.
+- Current behavior: Source audit: dev@eb7bc066, 2026-10-05. The trusted configured public URL includes pathname and unchanged encoded query. GET/HEAD query fields resolve workspace credentials without being appended as POST fields. Query changes and query-free signature reuse are refused; POST body validation, workspace-only tokens and SDK encoding compatibility remain. Failure diagnostics omit query values.
+- Root cause: The canonical verifier discarded the query and passed GET/HEAD query fields again as form parameters. Its old mocked unit test encoded query removal as expected behavior.
+- Resolution: Promote PR #2391 to the default branch. Verify genuine signed provider callbacks under the deployed public URL, including valid encoded queries, query tampering, no-query compatibility and relevant GET callbacks. Keep OPEN until release acceptance; fixture callbacks and green deployment contexts do not prove live call delivery.
+- Look in: `app/lib/twilio-webhook.server.ts`, `server/twilio-webhook.ts`, `e2e/fixtures/webhooks.ts`, `e2e/specs/twilio-webhook-auth.spec.ts`
+- Existing tests: test/twilio-webhook-query.test.ts; test/twilio-webhook.server.test.ts; test/twilio-webhook-production-guard.test.ts; test/twilio-webhook-prehandler.test.ts; test/fixtures/twilio-webhook-query.bun.ts; 53 focused Node and 7 Bun pre-handler cases passed; Bun child executed 12 real-SDK checks. Five independent source faults and the Bun query-removal fault failed their selected cases; sources restored. Complete local CI passed at 652c25e0; exact-head remote checks, 330 real-Postgres cases, 139 E2E cases and both deployments passed. New HTTP fixtures observed 200/403/403. Merge source equivalence and recoverable cleanup verified.
+- Missing tests: Default-branch promotion and genuine deployed provider callback acceptance. No live call or message was sent by the fixture checks.
+- Done when: Valid SDK POST signatures with encoded/repeated/blank queries pass; no-query callbacks stay compatible; Changed/added/removed queries and query-free signature replay fail with 403; Valid GET/HEAD signatures avoid duplicate query fields while retaining workspace credential lookup; Route and Bun ingress validation agree and retain a readable POST body; Workspace credentials, missing-credential refusal and production validation remain; new failure logs omit query values
+- Tracker: Keep OPEN in Verify and close until default promotion and deployed acceptance. Development is linked to PR #2391; the implementation prerequisite for #1878 is fulfilled.
 
 ### [#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047) Warn when a message campaign has no end time on its send window
 - Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
