@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@02af083e; Canonical Stripe customer fix reconciled with merged source and real PostgreSQL proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@4fa72d69; Unrestricted SMS warning reconciled with merged source, consent and browser proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the Stripe customer source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the SMS send-window source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 49
+## Fix now — 48
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -266,18 +266,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/effects-compliance.test.ts covers annotation compliance rules; dependency-array/scanner fixtures remain missing.
 - Missing tests: Fixture tests must fail mismatched annotations and accept matching arrays plus a justified escape.
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047) Warn when a message campaign has no end time on its send window
-- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- No warning is emitted for a null SMS send window. Malformed interval ends are removed by parsing. The readiness check still explicitly accepts unrestricted sending.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. No warning is emitted for a null SMS send window. Malformed interval ends are removed by parsing. The readiness check still explicitly accepts unrestricted sending.
-- Root cause: The readiness gate deliberately treats null send windows as a non-issue, and SMS dispatch never consults `campaign.schedule` (voice field). Interval end-times that are missing/malformed are silently dropped by parseSendWindow.
-- Resolution: Add a warning for unrestricted SMS and preserve raw malformed interval validation before normalization.
-- Look in: `app/lib/campaign-readiness.ts:479`, `app/lib/campaign-send-window.ts:141`, `app/lib/campaign-readiness.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/campaign-send-window.ts`, `app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`
-- Existing tests: test/campaign-readiness.test.ts; test/campaign-send-window.test.ts
-- Missing tests: Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block.
-- Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
@@ -586,9 +574,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 162
+## Verify and close — 163
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047) Warn when a message campaign has no end time on its send window
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Verify unrestricted SMS send-window warning after release**
+- PR #2387 merged unrestricted SMS warnings and raw interval save validation into dev. Launch remains allowed after deliberate consent. Release and deployed acceptance remain.
+- Current behavior: Source audit: dev@4fa72d69, 2026-10-05. Null and voice-only SMS windows show a persistent shared-root notice before launch and while running. Launch review adds deliberate consent; Cancel and Escape independently cancel without a send. Raw active intervals are validated before normalization, and the settings action rejects invalid SMS intervals before writes. Sender, content, expiry and queue blockers remain. Real browser fixtures keep page landmarks and scroll stable across desktop/narrow and both themes.
+- Root cause: Previously warning data did not exist separately from blockers. The readiness parser removed incomplete raw intervals, so valid siblings could hide them. Settings save checked the voice schedule instead of the raw SMS window. SMS dispatch never uses voice hours.
+- Resolution: Promote PR #2387 to the default branch. In deployed acceptance, verify null and voice-only SMS warnings before launch and while running, allowed deliberate unrestricted launch, independent Cancel/Escape and pending protection, invalid raw SMS save rejection, authorized editor navigation and notice cleanup. Keep the issue open until those checks pass.
+- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/campaign-send-window.ts`, `app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`, `app/components/campaign/CampaignSendWindowNotice.tsx`, `app/components/campaign/settings/CampaignLaunch.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`
+- Existing tests: test/campaign-readiness.test.ts; test/campaign-send-window.test.ts; test/campaign-send-window-warning.test.ts; test/campaign-settings.route.test.ts; test/ui/campaign-send-window-notice.test.tsx; test/ui/campaign-launch-review.test.tsx; 72 focused cases passed (57 Node, 15 UI). Seven independent source faults each failed one executed case, followed by source restoration. Initial and final full ci:local, required final-head remote checks and both deployments passed at 375ffaf32e68e14d88f5b44fa27ed61bf8b05c15; merge source equivalence verified. Browser fixtures cover stable background geometry and consent controls at 1280x720 and 390x844 in both themes.
+- Missing tests: Default-branch promotion and deployed acceptance for unrestricted warning lifetime, permitted confirmed launch, invalid SMS interval save rejection, editor permission and notice cleanup. Local fixtures and green deployment contexts do not prove deployed acceptance.
+- Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
+- Tracker: Keep OPEN in Verify and close until release promotion and deployed acceptance. Native body preserves all five criteria and both original and pre-fix audit history; Development links to PR #2387.
 
 ### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05

@@ -1,40 +1,5 @@
 [
   {
-    "issueNumber": 2047,
-    "verdict": "fix-now",
-    "recommendedTitle": "Warn when a message campaign has no end time on its send window",
-    "summary": "No warning is emitted for a null SMS send window. Malformed interval ends are removed by parsing. The readiness check still explicitly accepts unrestricted sending.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. No warning is emitted for a null SMS send window. Malformed interval ends are removed by parsing. The readiness check still explicitly accepts unrestricted sending.",
-    "rootCause": "The readiness gate deliberately treats null send windows as a non-issue, and SMS dispatch never consults `campaign.schedule` (voice field). Interval end-times that are missing/malformed are silently dropped by parseSendWindow.",
-    "resolution": "Add a warning for unrestricted SMS and preserve raw malformed interval validation before normalization.",
-    "lookIn": [
-      "app/lib/campaign-readiness.ts:479",
-      "app/lib/campaign-send-window.ts:141",
-      "app/lib/campaign-readiness.ts",
-      "app/lib/campaign-dispatch-policy.ts",
-      "app/lib/campaign-send-window.ts",
-      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
-      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx"
-    ],
-    "existingTests": [
-      "test/campaign-readiness.test.ts",
-      "test/campaign-send-window.test.ts"
-    ],
-    "missingTests": [
-      "Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block."
-    ],
-    "acceptanceCriteria": [
-      "No sms_send_window → visible unrestricted-send warning at launch",
-      "Voice schedule with null sms_send_window → same warning",
-      "Missing/malformed interval end flagged, not dropped",
-      "Warning only, no new blocker for legitimately 24/7 campaigns"
-    ],
-    "blockedBy": [],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 1878,
     "verdict": "fix-now",
     "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",

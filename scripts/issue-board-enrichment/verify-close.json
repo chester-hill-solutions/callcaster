@@ -4935,5 +4935,47 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Keep OPEN in Verify and close until default-branch promotion and deployed Stripe acceptance. Native body preserves four criteria and original history; Development links to PR #2385."
+  },
+  {
+    "issueNumber": 2047,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify unrestricted SMS send-window warning after release",
+    "summary": "PR #2387 merged unrestricted SMS warnings and raw interval save validation into dev. Launch remains allowed after deliberate consent. Release and deployed acceptance remain.",
+    "currentBehavior": "Source audit: dev@4fa72d69, 2026-10-05. Null and voice-only SMS windows show a persistent shared-root notice before launch and while running. Launch review adds deliberate consent; Cancel and Escape independently cancel without a send. Raw active intervals are validated before normalization, and the settings action rejects invalid SMS intervals before writes. Sender, content, expiry and queue blockers remain. Real browser fixtures keep page landmarks and scroll stable across desktop/narrow and both themes.",
+    "rootCause": "Previously warning data did not exist separately from blockers. The readiness parser removed incomplete raw intervals, so valid siblings could hide them. Settings save checked the voice schedule instead of the raw SMS window. SMS dispatch never uses voice hours.",
+    "resolution": "Promote PR #2387 to the default branch. In deployed acceptance, verify null and voice-only SMS warnings before launch and while running, allowed deliberate unrestricted launch, independent Cancel/Escape and pending protection, invalid raw SMS save rejection, authorized editor navigation and notice cleanup. Keep the issue open until those checks pass.",
+    "lookIn": [
+      "app/lib/campaign-readiness.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/lib/campaign-send-window.ts",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/components/campaign/CampaignSendWindowNotice.tsx",
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/routes/workspaces+/$id/campaigns/$selected_id.route.tsx",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-readiness.test.ts",
+      "test/campaign-send-window.test.ts",
+      "test/campaign-send-window-warning.test.ts",
+      "test/campaign-settings.route.test.ts",
+      "test/ui/campaign-send-window-notice.test.tsx",
+      "test/ui/campaign-launch-review.test.tsx",
+      "72 focused cases passed (57 Node, 15 UI). Seven independent source faults each failed one executed case, followed by source restoration. Initial and final full ci:local, required final-head remote checks and both deployments passed at 375ffaf32e68e14d88f5b44fa27ed61bf8b05c15; merge source equivalence verified. Browser fixtures cover stable background geometry and consent controls at 1280x720 and 390x844 in both themes."
+    ],
+    "missingTests": [
+      "Default-branch promotion and deployed acceptance for unrestricted warning lifetime, permitted confirmed launch, invalid SMS interval save rejection, editor permission and notice cleanup. Local fixtures and green deployment contexts do not prove deployed acceptance."
+    ],
+    "acceptanceCriteria": [
+      "No sms_send_window → visible unrestricted-send warning at launch",
+      "Voice schedule with null sms_send_window → same warning",
+      "Missing/malformed interval end flagged, not dropped",
+      "Warning only, no new blocker for legitimately 24/7 campaigns"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep OPEN in Verify and close until release promotion and deployed acceptance. Native body preserves all five criteria and both original and pre-fix audit history; Development links to PR #2387."
   }
 ]
