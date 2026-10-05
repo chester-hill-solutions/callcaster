@@ -8,7 +8,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Provider send times can be saved without a database error, and later or missing times preserve the first saved value ([#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049), [PR #2406](https://github.com/chester-hill-solutions/callcaster/pull/2406)).
 
-- Fixed: Campaign SMS results follow confirmed delivery, failure or undelivered status. Sent messages stay eligible for provider recovery, and failed attempt preparation stops before a message is sent ([#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149)).
+- Fixed: Campaign SMS results follow confirmed delivery, failure or undelivered status. Sent messages stay eligible for provider recovery, and failed attempt preparation stops before a message is sent ([#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149), [PR #2409](https://github.com/chester-hill-solutions/callcaster/pull/2409)).
 
 - Fixed: Campaign queue disposition filters now use results from the selected campaign and workspace. ([#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402), [PR #2405](https://github.com/chester-hill-solutions/callcaster/pull/2405)).
 
