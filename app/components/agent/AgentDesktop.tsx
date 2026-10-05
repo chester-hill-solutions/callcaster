@@ -112,34 +112,35 @@ export default function AgentDesktop() {
     );
   }
 
-  if (tokenError || runtimeError) {
+  const startupError = tokenError ?? runtimeError;
+
+  if (startupError || !token) {
     return (
       <PageShell title="Agent Desktop" maxWidth="narrow">
         <StatusBar
           currentStatus={effectiveStatus}
           onSetStatus={handleSetStatus}
           disabled={statusLoading}
-          error={tokenError ?? runtimeError ?? undefined}
         />
-        <Alert variant="destructive">
-          <AlertDescription>{tokenError ?? runtimeError}</AlertDescription>
-        </Alert>
+        {/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- Long errors need keyboard scrolling inside this region. */}
+        <div
+          role="region"
+          aria-label="Connection status"
+          tabIndex={0}
+          className="h-40 overflow-auto"
+        >
+          {startupError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{startupError}</AlertDescription>
+            </Alert>
+          ) : (
+            <Text variant="muted">Connecting...</Text>
+          )}
+        </div>
+        {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
         <Button asChild variant="outline" className="w-fit">
           <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
         </Button>
-      </PageShell>
-    );
-  }
-
-  if (!token) {
-    return (
-      <PageShell title="Agent Desktop" maxWidth="narrow">
-        <StatusBar
-          currentStatus={effectiveStatus}
-          onSetStatus={handleSetStatus}
-          disabled={statusLoading}
-        />
-        <Text variant="muted">Connecting...</Text>
       </PageShell>
     );
   }
