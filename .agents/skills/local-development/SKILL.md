@@ -74,6 +74,9 @@ does not prove that the route stopped before the service.
 When a canonical guard lets the API surface generator derive the auth class,
 remove the route's manual `authClass` annotation. Regenerate the API files and
 run `tools:api:surface:check`; matching duplicate declarations also fail the guard.
+For several real logins in a production-build fixture, honor Better Auth's
+`Retry-After` response. Shared loopback login requests can reach its rate limit;
+wait before retrying instead of weakening auth or treating 429 as a login.
 Use `setJsonAuthSession` for a shared default that a case must replace. A default
 queued with `queueJsonAuthSession` runs before a later queued denial; use queues
 only when the test needs multiple calls in that exact order.
