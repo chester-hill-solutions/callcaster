@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Billing reconciliation compares SMS segments and MMS messages separately, excludes overlapping usage totals, and marks unsupported usage as unavailable ([#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112), [PR #2411](https://github.com/chester-hill-solutions/callcaster/pull/2411)).
+
 - Fixed: Public campaign enqueues use server-reserved order ranges, so concurrent requests cannot select overlapping positions ([#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152), [PR #2410](https://github.com/chester-hill-solutions/callcaster/pull/2410)).
 
 - Fixed: SMS debits use validated provider segment and media counts. Missing counts wait for recovery while delivery results complete ([#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150), [PR #2407](https://github.com/chester-hill-solutions/callcaster/pull/2407)).

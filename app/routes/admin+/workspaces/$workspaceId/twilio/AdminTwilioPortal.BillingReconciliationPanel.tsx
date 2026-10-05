@@ -13,7 +13,10 @@ type BillingReconciliationPanelProps = {
   snapshot: BillingReconciliationSnapshot | null;
 };
 
-function varianceBadge(variance: number) {
+function varianceBadge(variance: number | null) {
+  if (variance === null) {
+    return <Badge variant="destructive">Unavailable</Badge>;
+  }
   if (variance === 0) {
     return <Badge variant="secondary">Balanced</Badge>;
   }
@@ -52,6 +55,7 @@ export function BillingReconciliationPanel({
 
   const rows = [
     { label: "SMS", data: report.categories.sms },
+    { label: "MMS", data: report.categories.mms },
     { label: "Voice", data: report.categories.voice },
     { label: "Phone numbers", data: report.categories.numbers },
   ];
@@ -122,7 +126,7 @@ export function BillingReconciliationPanel({
               <TableRow key={label}>
                 <TableCell className="font-medium">{label}</TableCell>
                 <TableCell className="text-right">
-                  {data.twilioUnits.toLocaleString()} {data.twilioUnitLabel}
+                  {data.twilioUnits === null ? "Unsupported usage" : `${data.twilioUnits.toLocaleString()} ${data.twilioUnitLabel}`}
                 </TableCell>
                 <TableCell className="text-right">{data.ledgerEvents.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{data.ledgerCredits.toLocaleString()}</TableCell>
