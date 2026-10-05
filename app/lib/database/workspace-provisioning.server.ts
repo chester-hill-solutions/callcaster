@@ -133,12 +133,10 @@ export async function createNewWorkspace({
       }
     }
 
-    let stripeCustomerId: string | null = null;
     try {
-      const newStripeCustomer = await createStripeContact({
+      await createStripeContact({
         workspace_id: createdWorkspaceId,
       });
-      stripeCustomerId = newStripeCustomer.id;
     } catch (stripeError) {
       logger.error("Stripe customer creation failed after workspace insert:", stripeError);
       provisioningWarnings.push("Stripe customer creation failed");
@@ -170,16 +168,12 @@ export async function createNewWorkspace({
       twilio_data: string;
       key?: string;
       token?: string;
-      stripe_id?: string;
     } = {
       twilio_data: JSON.stringify(twilioPayload),
     };
     if (newKey) {
       workspaceUpdate.key = newKey.sid;
       workspaceUpdate.token = newKey.secret;
-    }
-    if (stripeCustomerId) {
-      workspaceUpdate.stripe_id = stripeCustomerId;
     }
 
     try {

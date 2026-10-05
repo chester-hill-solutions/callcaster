@@ -11,6 +11,7 @@ const logger = vi.hoisted(() => ({
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
   userFindFirst: vi.fn(),
+  update: vi.fn(),
 }));
 
 const workspaceMemberFindFirst = vi.hoisted(() => vi.fn());
@@ -24,8 +25,10 @@ vi.mock("../app/lib/env.server", () => ({
     },
   ),
 }));
-vi.mock("@/server/admin-db", () => ({
+vi.mock("@/server/admin-db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/admin-db")>(),
   adminDb: {
+    update: adminDbMocks.update,
     query: {
       workspace: { findFirst: adminDbMocks.workspaceFindFirst },
       user: { findFirst: adminDbMocks.userFindFirst },
@@ -54,6 +57,10 @@ describe("app/lib/database/stripe.server.ts", () => {
     adminDbMocks.workspaceFindFirst.mockReset();
     adminDbMocks.userFindFirst.mockReset();
     workspaceMemberFindFirst.mockReset();
+    adminDbMocks.update.mockReset();
+    adminDbMocks.update.mockReturnValue({ set: vi.fn(() => ({ where: vi.fn(() =>
+      Object.assign(Promise.resolve(), { returning: vi.fn(async () => [{ stripe_id: "cus_1" }]) }),
+    ) })) });
   });
 
   test("createStripeContact: throws and logs on workspace query error", async () => {
@@ -125,7 +132,12 @@ describe("app/lib/database/stripe.server.ts", () => {
 
     const mod = await import("../app/lib/database/stripe.server");
 
-    adminDbMocks.workspaceFindFirst.mockResolvedValue({ name: "Workspace" });
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({ name: "Workspace" }).mockResolvedValue({
+      name: "Workspace", stripe_customer_creation: {
+        name: "Workspace", email: "owner@example.com",
+        metadata: { callcaster_workspace_id: "w1", callcaster_request_id: "10000000-0000-4000-8000-000000000001" },
+      }, creation_expired: false,
+    });
     workspaceMemberFindFirst.mockResolvedValue({ user_id: "u1" });
     adminDbMocks.userFindFirst.mockResolvedValue({
       id: "u1",
@@ -142,9 +154,9 @@ describe("app/lib/database/stripe.server.ts", () => {
       email: "owner@example.com",
     });
     expect(customersCreate).toHaveBeenCalledWith({
-      name: "Workspace",
-      email: "owner@example.com",
-    });
+      name: "Workspace", email: "owner@example.com",
+      metadata: { callcaster_workspace_id: "w1", callcaster_request_id: "10000000-0000-4000-8000-000000000001" },
+    }, { idempotencyKey: "workspace:w1:stripe-customer" });
   });
 
   test("meterEvent returns early when stripe_id is missing or query errors", async () => {

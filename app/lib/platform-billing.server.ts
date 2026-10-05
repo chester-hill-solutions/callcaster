@@ -60,11 +60,6 @@ async function ensureStripeCustomer(
         workspace_id: workspaceId,
       });
       stripeCustomerId = customer.id;
-
-      await adminDb
-        .update(workspaceTable)
-        .set({ stripe_id: stripeCustomerId })
-        .where(eq(workspaceTable.id, workspaceId));
     } catch {
       return {
         ok: false,
