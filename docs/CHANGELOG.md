@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Audio uploads reject invalid or foreign campaign targets before storage and report failed attachments as failures. ([#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355))
+- Fixed: Audio uploads reject invalid or foreign campaign targets before storage and report failed attachments as failures. ([#2379](https://github.com/chester-hill-solutions/callcaster/pull/2379), [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355))
 
 - Security: Restrict JSON billing checkout and session confirmation to workspace administrators and owners. ([#2376](https://github.com/chester-hill-solutions/callcaster/pull/2376), [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371))
 
