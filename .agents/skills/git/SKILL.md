@@ -45,3 +45,15 @@ Then fast-forward the clean shared `dev`, remove the topic worktree and local
 branch, and delete only the verified remote topic ref. Preserve dirty worktrees,
 unproven branches and user files. Use the app archive tool for app-managed
 worktrees so their saved attachments remain recoverable.
+
+### Interrupted worktree removal
+
+A short command deadline can leave an owned worktree partly deleted. Before
+retrying, verify the merged PR, tested head, source-equivalent merge and recovery
+bundle again. Read Git status without trimming its leading status columns.
+Continue only when the worktree was clean before removal, the remaining tracked
+files are unchanged and all new tracked changes are unstaged deletions from that
+interrupted command. Stop for modified, staged or untracked source; preserve
+ignored environment files. Restore only the proven partial deletions from the
+exact verified commit, require a clean worktree, then repeat normal removal with
+a sufficient command deadline. Never force-delete user changes to finish cleanup.
