@@ -102,10 +102,13 @@ vi.mock("@/lib/sms-send.server", () => ({
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
 }));
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
   createTenantDb: vi.fn(() => ({
     // Fixture: this workspace owns the sending number.
     workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+    message: { update: async () => [{ outreach_attempt_id: 1 }] },
   })),
 }));
 vi.mock("@/lib/object-storage.server", () => ({

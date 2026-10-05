@@ -12,7 +12,7 @@ import {
 } from "@/lib/message-db.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
-import { isTerminalSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
+import { isSettledSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
 
 /**
  * An intent row (#1582) normally gets its real SID within seconds, from the
@@ -33,6 +33,7 @@ const OPEN_MESSAGE_STATUSES = [
   "scheduled",
   "queued",
   "sending",
+  "sent",
 ] as const;
 
 /**
@@ -303,10 +304,8 @@ export async function triggerTwilioOpenSync({
     // a large send-time backlog starve lost-callback recovery, which is the
     // one job this sweep must never drop. Two queries, two limits, one loop.
     //
-    // "Not open" rather than "settled" on purpose. The provider sets dateSent
-    // at carrier handoff, which is before any terminal status, so a `sent` row
-    // has a real send time worth recording; excluding it would leave the rows
-    // most worth auditing (the ones still awaiting delivery) blank.
+    // Sent messages remain in the open population until the provider reports
+    // delivery. This separate budget backfills send times for settled rows.
     const localUntimedMessages = await tdb.message.findMany({
       where: and(
         isNull(message.date_sent),
@@ -391,7 +390,7 @@ export async function triggerTwilioOpenSync({
         // that every message had already been debited.
         if (
           !statusUnchanged &&
-          isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))
+          isSettledSmsStatus(normalizeSmsStatus(twilioStatus))
         ) {
           await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,

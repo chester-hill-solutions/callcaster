@@ -72,6 +72,12 @@ The node suite installs a shared `api-auth.server` mock in
 `vi.unmock("@/lib/api-auth.server")` and mock only the session/provider boundary.
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
+When a real service adds a transaction callback, update each calling fixture's
+transaction and scoped-client boundary. Keep its existing behavior assertions;
+prove rollback and persisted state in the real Postgres tier.
+Include route re-exports in a caller inventory. Older combined route tests can
+import the route barrel without naming the service or its action server file.
+Run those cases before relying on a focused caller result.
 For route-to-service call checks, wrap the original service with `vi.fn` in an
 additive module factory. A namespace spy installed after import can miss a
 route's bound service call. Keep the real service logic and database access.
@@ -187,6 +193,14 @@ Raw SQL parameters bypass a column's value encoder. For a JavaScript Date
 inside a SQL expression, use the timestamp column encoder with `sql.param`.
 Verify capture, replacement and null input against real Postgres; mocked
 updates cannot prove driver serialization or first-write preservation.
+
+For real RPC fixtures, inspect and seed each required foreign-key actor.
+Membership or an auth identity may not supply the legacy user-profile row.
+A fixture or constraint error before the target assertion is not defect proof.
+
+The scoped client's delete method returns no rows. When compensation depends
+on whether a row was removed, use a transaction-bound deletion with explicit
+tenant scope and RETURNING. Prove the counter change through real Postgres.
 
 For a target-user check, membership does not prove that the global user still
 exists. Canonical `workspace_member` keys are text and have no global-user FK.

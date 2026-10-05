@@ -44,7 +44,6 @@ const mocks = vi.hoisted(() => {
     dequeueQueueEntry: vi.fn(async () => undefined),
     loadCampaignSmsDispatchData: vi.fn(),
     countCampaignMessagesToPhone: vi.fn(),
-    updateOutreachAttemptForWorkspace: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
     getWorkspaceCreditsBalance: vi.fn(async () => 100),
     env: {
@@ -128,9 +127,11 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-import { configureTenantDbStub, createTenantDbMock, tenantDbStubState } from "./helpers/tenant-db-stub";
+import { configureTenantDbStub, createTenantDbMock, tenantDbStubState, tenantDbMocks } from "./helpers/tenant-db-stub";
 
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
   createTenantDb: () => createTenantDbMock(),
 }));
 
@@ -166,15 +167,6 @@ vi.mock("@/lib/message-db.server", async (importOriginal) => {
     ...actual,
     countCampaignMessagesToPhone: (...args: unknown[]) =>
       mocks.countCampaignMessagesToPhone(...args),
-  };
-});
-
-vi.mock("@/lib/telephony-db.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/telephony-db.server")>();
-  return {
-    ...actual,
-    updateOutreachAttemptForWorkspace: (...args: unknown[]) =>
-      mocks.updateOutreachAttemptForWorkspace(...args),
   };
 });
 
@@ -229,7 +221,6 @@ function makeDbClient(opts: {
   campaign?: any;
   campaignError?: any;
   rpcResult?: { data: any; error: any };
-  outreachUpdate?: { data: any; error: any };
   messageInsert?: any;
   messageCount?: number;
   signedUrls?: Array<string | undefined>;
@@ -250,17 +241,6 @@ function makeDbClient(opts: {
     mocks.loadCampaignSmsDispatchData.mockResolvedValue(dispatchDataFromOpts(opts));
   }
   mocks.countCampaignMessagesToPhone.mockResolvedValue(opts.messageCount ?? 0);
-  if (opts.outreachUpdate?.error) {
-    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue(
-      new Response(
-        `Error updating outreach attempt: ${opts.outreachUpdate.error.message}`,
-        { status: 500 },
-      ),
-    );
-  } else {
-    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue({ id: "oa1" });
-  }
-
   const signedUrls = opts.signedUrls ?? [];
   let signedUrlIdx = 0;
 
@@ -291,7 +271,6 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.dequeueQueueEntry.mockReset();
     mocks.loadCampaignSmsDispatchData.mockReset();
     mocks.countCampaignMessagesToPhone.mockReset();
-    mocks.updateOutreachAttemptForWorkspace.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
     mocks.getWorkspaceCreditsBalance.mockReset();
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
@@ -305,7 +284,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       scopes: ["campaigns.dispatch"],
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
-    mocks.rpcCreateOutreachAttempt.mockResolvedValue("oa1");
+    mocks.rpcCreateOutreachAttempt.mockResolvedValue(1);
 
     (globalThis as any).fetch = vi.fn(async () => ({ ok: true, text: async () => "http://tiny" }));
   });
@@ -567,11 +546,11 @@ describe("app/routes/api+/sms/route.tsx", () => {
     expect(body.responses[0]["4"].error).toBe("rpc-bad");
   });
 
-  test("updateOutreach error returns per-member success=false", async () => {
+  test("attempt-link failure stops the provider call and returns per-member success=false", async () => {
     currentClient = makeDbClient({
-      outreachUpdate: { data: null, error: { message: "update-bad" } },
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
+    tenantDbMocks.messageUpdate.mockRejectedValueOnce(new Error("link-bad"));
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c5",
       workspace_id: TEST_WORKSPACE_ID,
@@ -581,18 +560,16 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.getCampaignQueueById.mockResolvedValueOnce([
       { id: 14, contact_id: 5, contact: { phone: "+15551234567" } },
     ]);
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      messages: { create: vi.fn(async () => ({ sid: "SM5", body: "Hi" })) },
-    });
+    const create = vi.fn(async () => ({ sid: "SM5", body: "Hi" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["5"].success).toBe(false);
-    expect(body.responses[0]["5"].error).toBe(
-      "Error updating outreach attempt: update-bad",
-    );
+    expect(body.responses[0]["5"].error).toBe("link-bad");
+    expect(create).not.toHaveBeenCalled();
   });
 
   test("preserves URLs in body for from-number sends (Twilio shortening uses Messaging Service)", async () => {
@@ -683,8 +660,9 @@ describe("app/routes/api+/sms/route.tsx", () => {
     // on the resolve (#1582).
     const intent = tenantDbStubState.messageInsertCalls[0] as { sid?: string } | undefined;
     expect(intent?.sid).toMatch(/^pending:/);
-    const resolve = tenantDbStubState.messageUpdateCalls[0] as { set?: { sid?: string } } | undefined;
-    expect(resolve?.set?.sid).toBe("failed-+15551234567-123");
+    expect(tenantDbStubState.messageUpdateCalls).toContainEqual(expect.objectContaining({
+      set: expect.objectContaining({ sid: "failed-+15551234567-123" }),
+    }));
     dateNowSpy.mockRestore();
   });
 

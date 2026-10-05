@@ -44,6 +44,7 @@ export type MessagePersistFields = {
   workspace: string;
   contact_id?: string | number | null;
   campaign_id?: string | number | null;
+  outreach_attempt_id?: string | number | null;
   /** Sender-side reference for an intent row (#1582). */
   client_ref?: string | null;
   outbound_media?: unknown[];
@@ -189,6 +190,10 @@ export function buildMessageInsert(fields: MessagePersistFields): MessageInsert 
   const campaignId = toNumberOrNull(fields.campaign_id);
   if (campaignId !== null) {
     row.campaign_id = campaignId;
+  }
+  const outreachAttemptId = toNumberOrNull(fields.outreach_attempt_id);
+  if (outreachAttemptId !== null) {
+    row.outreach_attempt_id = outreachAttemptId;
   }
   if (fields.outbound_media && fields.outbound_media.length > 0) {
     row.outbound_media = [...fields.outbound_media] as string[];
