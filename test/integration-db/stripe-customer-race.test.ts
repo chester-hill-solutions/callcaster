@@ -375,6 +375,23 @@ suite("canonical Stripe customer uses real database claims and SDK requests (#21
     expect(sessions).toEqual(["cus_competing_claim", "cus_competing_claim"]);
   });
 
+  test("a previously claimed customer stays saved while a checkout could still be in flight", async () => {
+    beforeCustomerReply = async () => {
+      await client`update public.workspace set stripe_id = 'cus_competing_claim',
+        stripe_customer_creation_completed_id = ${`${customerPrefix}_1`} where id = ${workspaceId}::uuid`;
+    };
+    expect(await checkout()).toMatchObject({ ok: false });
+    expect(await checkout()).toMatchObject({ ok: false });
+    expect(deletions).toEqual([]);
+    expect(sessions).toEqual([]);
+    expect(requests).toHaveLength(1);
+    const [row] = await client`select stripe_id, stripe_customer_conflict, stripe_customer_creation_completed_id
+      from public.workspace where id = ${workspaceId}::uuid`;
+    expect(row).toEqual({ stripe_id: "cus_competing_claim",
+      stripe_customer_conflict: { unclaimed_id: `${customerPrefix}_1`, canonical_id: "cus_competing_claim" },
+      stripe_customer_creation_completed_id: `${customerPrefix}_1` });
+  });
+
   test.each(["checkout/sessions", "payment_methods", "invoices", "subscriptions", "charges", "payment_intents", "sources"])(
     "a losing customer with %s history stays saved and blocks this checkout and retry", async kind => {
       competingClaim(); historyKinds.add(kind);

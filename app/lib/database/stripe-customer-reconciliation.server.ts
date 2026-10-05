@@ -6,11 +6,13 @@ import { adminDb } from "@/server/admin-db";
 async function readConflict(workspaceId: string) {
   const row = await adminDb.query.workspace.findFirst({
     where: eq(workspace.id, workspaceId),
-    columns: { stripe_id: true, stripe_customer_creation: true, stripe_customer_conflict: true },
+    columns: { stripe_id: true, stripe_customer_creation: true, stripe_customer_conflict: true,
+      stripe_customer_creation_completed_id: true },
   });
   const conflict = row?.stripe_customer_conflict;
   if (!conflict || conflict.canonical_id !== row.stripe_id ||
-      conflict.unclaimed_id === row.stripe_id) {
+      conflict.unclaimed_id === row.stripe_id ||
+      row.stripe_customer_creation_completed_id === conflict.unclaimed_id) {
     throw new Error("Stripe customer conflict needs operator reconciliation");
   }
   return { row, conflict };
