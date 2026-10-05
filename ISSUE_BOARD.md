@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@e011e04b; Startup feedback and predictive callback prerequisite reconciled with merged source and reproduction proof (2026-10-05 UTC)` · 322 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f8f40ffc; Merged feedback/member fixes and callback prerequisite reconciled with current source evidence (2026-10-05 UTC)` · 322 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the startup and predictive callback source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the feedback, member-name and predictive callback source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 46
+## Fix now — 44
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -49,14 +49,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ### [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396) Make predictive machine playback and continuation retry-safe
 - Verdict: **Fix now** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
 - The terminal outreach claim guards the next dialer turn but not playback. Enabled-drop duplicate callbacks request playback twice; continuation runs before provider acknowledgement.
-- Current behavior: Source audit dev@9f33f3e7, 2026-10-05. The real route/TwiML builder failed two regression assertions: two callbacks with one winning claim sent two playback updates, and one next turn ran while the provider update was held pending. The existing drop-off concurrency control passed. Provider calls were isolated; no live call was sent.
+- Current behavior: Source audit dev@9f33f3e7, 2026-10-05. The real route/TwiML builder failed two regression assertions: two callbacks with one winning claim sent two playback updates, and one next turn ran while the provider update was held pending. The existing drop-off concurrency control passed. Provider calls were isolated; no live call was sent. Source contract follow-up at dev@256f8720: createTwilioCall uses /api/auto-dial/$roomId as the initial voice URL with machineDetection Enable and no async AMD option. Twilio defaults to synchronous AMD. The route receives the classified result as a voice TwiML request; it is not only an asynchronous notification.
 - Root cause: A terminal outcome claim is used as operation completion state. Playback is outside its winning branch, while continuation occurs before the provider mutation acknowledgement.
-- Resolution: Define durable playback/continuation operation state by workspace, outreach attempt, call and conference. Prevent duplicate playback requests and keep continuation pending until the playback update acknowledgement. Record recovery for rejected or uncertain acknowledgements before implementing the retry path. Preserve signed callbacks, tenant scope, billing status ownership and drop-off/no-audio behavior. Keep this separate from session picker changes.
-- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/outreach-disposition.ts`, `app/lib/twilio-twiml.server.ts`
+- Resolution: Review the synchronous voice-URL contract before selecting the callback protocol. Returning playback TwiML from that existing URL may avoid a separate REST call update, but XML generation does not prove delivery or completion. Define durable playback/continuation state for workspace, outreach attempt, call and conference, with authoritative recovery after a lost response or uncertain provider result. Prevent duplicate playback and continuation. Queue idempotency alone is insufficient: dead-letter jobs can revive and expired leases can rerun handlers. Preserve the original acknowledgement criteria, signatures, tenant scope, billing ownership and drop-off/human/device controls. Keep the session picker separate.
+- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/outreach-disposition.ts`, `app/lib/twilio-twiml.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/enqueue-job.server.ts`, `app/lib/worker/poll-jobs.server.ts`
 - Existing tests: test/auto-dial-room.route.test.ts; Actual-route audit executed three selected cases: two desired regression assertions failed and one existing drop-off control passed. Temporary tests and product source were restored.
 - Missing tests: Persistent operation state with actual database rows, concurrent/sequential replay, delayed/rejected and uncertain provider acknowledgement, process retry and no duplicate continuation. Retain human/device and no-audio controls.
 - Done when: Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.; Continuation does not run while playback acknowledgement is pending.; Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.; Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.; Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required.
-- Tracker: Fix now as one independent callback-operation concern. Native Bug is unassigned and blocks #1878. Define the retry/reconciliation protocol before runtime edits; no deployed playback claim is made.
+- Tracker: Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -280,13 +280,36 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122) DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
+- Resolution: Sync month/period on external value changes and use value={period} for TimePeriodSelect; period-state sync alone does not fix its uncontrolled Select.
+- Look in: `app/components/ui/datetime.tsx:617`, `app/components/ui/datetime.tsx:488`, `app/components/ui/datetime.tsx:328`, `test/ui/components-ui-primitives.test.tsx:369`, `app/components/ui/datetime.tsx (`DateTimePicker` `month` state; `TimePicker` `period` state)`, `app/components/audience/AudienceTable.tsx:84-90`, `app/components/queue/QueueTable.tsx:198-202,215-227`
+- Existing tests: test/ui/components-ui-primitives.test.tsx
+- Missing tests: Need mounted popover rerenders and rendered AM/PM selection tests, not just state or a button smoke assertion.
+- Done when: A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).; Clearing `value` resets the month to the current month.; After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.; `TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.; The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
+- Root cause: Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.
+- Resolution: Pin the intended branch per environment and add a workflow contract check.
+- Look in: `.github/workflows/ledger-drift-check.yml:97`, `.github/workflows/ledger-drift-check.yml:127`, `.github/workflows/ledger-drift-check.yml:153`, `.github/workflows/ledger-drift-check.yml (all three jobs)`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`
+- Missing tests: Need fixture showing a refless environment job fails and dev-ahead-of-master comparison passes.
+- Done when: Every job in the workflow checks out an explicit ref; The nightly dev job passes on a correct database that is ahead of master; The job name states which comparison it makes; A refless job fails the check
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
 - Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
-- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
+- Current behavior: Source audit dev@efb3bb54, 2026-10-05. The same actionData.error goes to the shared root feedback hook and the invite Email FormField. Permission, role, member, webhook and API key errors can become email field errors. Responses lack an explicit field discriminator. An addUser form name alone does not prove email validation. The current FormField error paragraph is in document flow. Actual-page UI reproduction ran four cases: the unrelated-field and duplicate-result desired assertions failed; the email-description and no-replay controls passed. Server action responses were isolated; no authorization or browser geometry proof is claimed.
 - Root cause: The route assigns failures from unrelated settings actions to the Email field.
-- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
-- Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `docs/feedback-inventory.md`
+- Resolution: Identify actual email validation from explicit server field feedback, not action names or message text. Preserve the shared FormField accessible association and use its adopted anchored/reserved-area contract. Render other operation failures once through the root toast, preserve retry values and permission checks, and retain once-only action feedback during revalidation. Keep the member-name concern separate.
+- Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `app/routes/workspaces+/$id/settings.action.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/hooks/utils/useActionFeedback.ts`, `app/components/ui/form-field.tsx`, `docs/design-system.md`
+- Existing tests: Actual WorkspaceSettings page, shared FormField, useActionFeedback and root Toaster with a real memory router: four isolated-response cases ran, two desired defect assertions failed and two controls passed. Four presentation source blobs matched the audited dev commit. The temporary fixture was removed; product source stayed clean.
 - Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
 - Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
@@ -371,17 +394,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A 403 thrown as "You do not have access to this workspace" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).; A 404 still renders its not-found treatment (the existing correct behaviour must stay green).; A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.; Safe string response data and recognized structured error payloads both produce the intended message.; Response data containing a driver/internal message produces a safe fallback.; Missing or unrecognized response data uses the status fallback.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122) DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Date/month and AM/PM mirrors are still initialized once. The proposed period state sync alone would be insufficient because the period Select is also uncontrolled.
-- Resolution: Sync month/period on external value changes and use value={period} for TimePeriodSelect; period-state sync alone does not fix its uncontrolled Select.
-- Look in: `app/components/ui/datetime.tsx:617`, `app/components/ui/datetime.tsx:488`, `app/components/ui/datetime.tsx:328`, `test/ui/components-ui-primitives.test.tsx:369`, `app/components/ui/datetime.tsx (`DateTimePicker` `month` state; `TimePicker` `period` state)`, `app/components/audience/AudienceTable.tsx:84-90`, `app/components/queue/QueueTable.tsx:198-202,215-227`
-- Existing tests: test/ui/components-ui-primitives.test.tsx
-- Missing tests: Need mounted popover rerenders and rendered AM/PM selection tests, not just state or a button smoke assertion.
-- Done when: A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).; Clearing `value` resets the month to the current month.; After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.; `TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.; The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2114](https://github.com/chester-hill-solutions/callcaster/issues/2114) Message campaign credit estimates assume one segment per contact while billing charges per segment
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - The estimate still assumes one segment per message and has no template/media input. Its copy says per segment while total is contact count times 2.
@@ -402,17 +414,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/ui/hooks-chats-optimistic-failure.test.tsx
 - Missing tests: Existing DOM-only failure test cannot detect that bodyValue remains empty. Mount the actual composer and assert restored text, segments/credits, cursor behavior, and successful clearing.
 - Done when: After a failed send of a 340-character message, the counter shows the real length, the real segment count and the real credit estimate (kill-check: keep the DOM write and confirm the test goes red).; The restored text is the user's, unchanged, and the cursor is at a sensible position.; A successful send still clears the composer.; The 160-character boundary warning still fires on the restored text.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
-- Root cause: Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.
-- Resolution: Pin the intended branch per environment and add a workflow contract check.
-- Look in: `.github/workflows/ledger-drift-check.yml:97`, `.github/workflows/ledger-drift-check.yml:127`, `.github/workflows/ledger-drift-check.yml:153`, `.github/workflows/ledger-drift-check.yml (all three jobs)`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`
-- Missing tests: Need fixture showing a refless environment job fails and dev-ahead-of-master comparison passes.
-- Done when: Every job in the workflow checks out an explicit ref; The nightly dev job passes on a correct database that is ahead of master; The job name states which comparison it makes; A refless job fails the check
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2063](https://github.com/chester-hill-solutions/callcaster/issues/2063) Harden useChatRealtime against a fresh array with unchanged contents
@@ -519,27 +520,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No dial path records without a persisted callback; Conference recordings persist (or record is removed)
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121) Dismissing a query-param banner pushes a history entry, so Back resurrects it
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
-- Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
-- Resolution: Pass replace:true for banner dismissal and inventory presentation-only clears. Keep real filter/page navigation separate. Test dismiss then Back with unrelated parameters preserved.
-- Look in: `app/components/shared/QueryParamBanner.tsx:34`, `app/hooks/utils/useSearchParamFlash.ts:51`, `test/ui/components-shared-smoke.test.tsx:113`, `app/components/shared/QueryParamBanner.tsx:16-57`, `app/hooks/ (the flash hook that already uses `replace: true`)`, `every `setSearchParams(` call site (grep)`
-- Existing tests: test/ui/components-shared-smoke.test.tsx
-- Missing tests: Need router/browser history outcome, exact URL clearing, and unrelated-param preservation. Existing test would remain green with push semantics.
-- Done when: Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).; Dismissing still clears the parameter from the URL.; Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140) Settings member projection drops names from the manage-sheet heading
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
-- Settings member projection still drops names. Manage sheet renders the target memberName as Unnamed; it does not show the actor name as the issue also claims.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The target-name heading inside the sheet shows Unnamed because the settings projection drops names. SheetTitle itself is Manage Team Member. The current component reads the target member, not the actor.
-- Resolution: Preserve first_name/last_name in the settings projection; define required nullable name fields plus username in the consumer type and use username fallback. Admin Access-tab projection already retains names. Remove the unsupported actor-name fix from scope.
-- Look in: `app/lib/workspace-settings-db.server.ts:65`, `app/components/workspace/TeamMember.tsx:58`, `app/components/workspace/TeamMember.tsx:130`, `app/lib/platform-admin.server.ts:366`, `app/routes/workspaces+/$id/settings.loader.server.ts:15-22`, `app/lib/workspace-settings-db.server.ts:15 (`UserWithRole`), `getWorkspaceSettingsPageData`, `app/components/workspace/TeamMember.tsx (the heading)`
-- Missing tests: Render target names, username fallback and type narrowing regression. No actor-name defect is established.
-- Done when: Member sheet heading shows target first/last name.; When both names are absent, heading falls back to username.; Producer/consumer types require the name fields, even when null.; Other member list producers are reviewed; admin invite projection already includes names.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111) Admin Add User and Add Workspace buttons have no action
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - Add User and Add Workspace remain dead buttons. The proposed /admin/users/new and /admin/workspaces/new routes do not exist in the current route tree.
@@ -552,9 +532,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 166
+## Verify and close — 168
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140) Settings member projection drops names from the manage-sheet heading
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2399 merged target member names and username fallback in workspace settings. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@f8f40ffc, 2026-10-05. The settings projection retains both names. The actual member sheet shows available target names with existing capitalization and falls back to the target username when both are absent. The shared display contract requires nullable names. Invitations provide null fields; the admin producer and its fallback rows already preserve the same fields. Sheet structure, roles and form identities retain their existing behavior; no actor-name defect was established.
+- Root cause: The settings projection discarded name fields while a partial consumer type hid the omission.
+- Resolution: Promote PR #2399 to the default branch and verify named and unnamed target members in workspace settings. Confirm the selected target and mutation form IDs on the deployed product. Keep OPEN for release acceptance.
+- Look in: `app/lib/workspace-members.ts`, `app/lib/workspace-settings-db.server.ts`, `app/components/workspace/TeamMember.tsx`, `app/routes/workspaces+/$id/settings.route.tsx`, `app/lib/platform-admin.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.route.tsx`
+- Existing tests: test/workspace-settings-db.server.test.ts; test/ui/team-member-a11y.test.tsx; Three service cases and seven actual shared-sheet UI cases passed. Each projected-name deletion failed one executed case; removing the username fallback failed two executed cases. The compiler rejected the missing required first_name projection. Sources were restored. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product.
+- Done when: Member sheet heading shows target first/last name.; When both names are absent, heading falls back to username.; Producer/consumer types require the name fields, even when null.; Other member list producers are reviewed; admin invite projection already includes names.
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2399. Preserve original criteria and separate source proof from release acceptance.
+
+### [#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121) Dismissing a query-param banner pushes a history entry, so Back resurrects it
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2398 merged query-notice dismissal with history replacement. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@efb3bb54, 2026-10-05. QueryParamBanner dismissal replaces the history entry and preserves unrelated repeated parameters. Active URL-flash cleanup already replaces history. QueryParamBanner has no current product-route consumer; this fix preserves its rendering and does not adopt a new banner. Genuine filter and pagination navigation retain their existing history behavior.
+- Root cause: QueryParamBanner cleared its URL parameter with a push instead of a replacement.
+- Resolution: Promote PR #2398 to the default branch, then verify that an active flash does not replay after Back/Forward and that filter navigation retains its own entry. Keep OPEN for release acceptance.
+- Look in: `app/components/shared/QueryParamBanner.tsx`, `app/hooks/utils/useSearchParamFlash.ts`
+- Existing tests: test/ui/notice-query-history.test.tsx; test/ui/components-shared-smoke.test.tsx; Thirty focused UI cases passed, including six new actual shared-banner/flash-hook cases with a real memory router. Two independent replacement faults each failed one executed case. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product. No current product-route banner adoption is claimed.
+- Done when: Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).; Dismissing still clears the parameter from the URL.; Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue).
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2398. Preserve original criteria and separate source proof from release acceptance.
 
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05

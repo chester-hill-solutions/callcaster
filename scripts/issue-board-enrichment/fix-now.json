@@ -504,37 +504,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2121,
-    "verdict": "fix-now",
-    "recommendedTitle": "Dismissing a query-param banner pushes a history entry, so Back resurrects it",
-    "summary": "Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.",
-    "resolution": "Pass replace:true for banner dismissal and inventory presentation-only clears. Keep real filter/page navigation separate. Test dismiss then Back with unrelated parameters preserved.",
-    "lookIn": [
-      "app/components/shared/QueryParamBanner.tsx:34",
-      "app/hooks/utils/useSearchParamFlash.ts:51",
-      "test/ui/components-shared-smoke.test.tsx:113",
-      "app/components/shared/QueryParamBanner.tsx:16-57",
-      "app/hooks/ (the flash hook that already uses `replace: true`)",
-      "every `setSearchParams(` call site (grep)"
-    ],
-    "existingTests": [
-      "test/ui/components-shared-smoke.test.tsx"
-    ],
-    "missingTests": [
-      "Need router/browser history outcome, exact URL clearing, and unrelated-param preservation. Existing test would remain green with push semantics."
-    ],
-    "acceptanceCriteria": [
-      "Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).",
-      "Dismissing still clears the parameter from the URL.",
-      "Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue)."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2122,
     "verdict": "fix-now",
     "recommendedTitle": "DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month",
@@ -711,37 +680,6 @@
     "risk": "medium",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
     "rootCause": "Platform role and workspace role are mixed in the Access tab; parallel sudo writer APIs bypass the product membership safety policy."
-  },
-  {
-    "issueNumber": 2140,
-    "verdict": "fix-now",
-    "recommendedTitle": "Settings member projection drops names from the manage-sheet heading",
-    "summary": "Settings member projection still drops names. Manage sheet renders the target memberName as Unnamed; it does not show the actor name as the issue also claims.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The target-name heading inside the sheet shows Unnamed because the settings projection drops names. SheetTitle itself is Manage Team Member. The current component reads the target member, not the actor.",
-    "resolution": "Preserve first_name/last_name in the settings projection; define required nullable name fields plus username in the consumer type and use username fallback. Admin Access-tab projection already retains names. Remove the unsupported actor-name fix from scope.",
-    "lookIn": [
-      "app/lib/workspace-settings-db.server.ts:65",
-      "app/components/workspace/TeamMember.tsx:58",
-      "app/components/workspace/TeamMember.tsx:130",
-      "app/lib/platform-admin.server.ts:366",
-      "app/routes/workspaces+/$id/settings.loader.server.ts:15-22",
-      "app/lib/workspace-settings-db.server.ts:15 (`UserWithRole`), `getWorkspaceSettingsPageData",
-      "app/components/workspace/TeamMember.tsx (the heading)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Render target names, username fallback and type narrowing regression. No actor-name defect is established."
-    ],
-    "acceptanceCriteria": [
-      "Member sheet heading shows target first/last name.",
-      "When both names are absent, heading falls back to username.",
-      "Producer/consumer types require the name fields, even when null.",
-      "Other member list producers are reviewed; admin invite projection already includes names."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
     "issueNumber": 2142,
@@ -1471,14 +1409,20 @@
     "verdict": "fix-now",
     "recommendedTitle": "Associate workspace settings errors with the correct action",
     "summary": "Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.",
-    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.",
+    "currentBehavior": "Source audit dev@efb3bb54, 2026-10-05. The same actionData.error goes to the shared root feedback hook and the invite Email FormField. Permission, role, member, webhook and API key errors can become email field errors. Responses lack an explicit field discriminator. An addUser form name alone does not prove email validation. The current FormField error paragraph is in document flow. Actual-page UI reproduction ran four cases: the unrelated-field and duplicate-result desired assertions failed; the email-description and no-replay controls passed. Server action responses were isolated; no authorization or browser geometry proof is claimed.",
     "rootCause": "The route assigns failures from unrelated settings actions to the Email field.",
-    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "resolution": "Identify actual email validation from explicit server field feedback, not action names or message text. Preserve the shared FormField accessible association and use its adopted anchored/reserved-area contract. Render other operation failures once through the root toast, preserve retry values and permission checks, and retain once-only action feedback during revalidation. Keep the member-name concern separate.",
     "lookIn": [
       "app/routes/workspaces+/$id/settings.route.tsx",
-      "docs/feedback-inventory.md"
+      "app/routes/workspaces+/$id/settings.action.server.ts",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/hooks/utils/useActionFeedback.ts",
+      "app/components/ui/form-field.tsx",
+      "docs/design-system.md"
     ],
-    "existingTests": [],
+    "existingTests": [
+      "Actual WorkspaceSettings page, shared FormField, useActionFeedback and root Toaster with a real memory router: four isolated-response cases ran, two desired defect assertions failed and two controls passed. Four presentation source blobs matched the audited dev commit. The temporary fixture was removed; product source stayed clean."
+    ],
     "missingTests": [
       "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
     ],
@@ -1526,14 +1470,17 @@
     "verdict": "fix-now",
     "recommendedTitle": "Make predictive machine playback and continuation retry-safe",
     "summary": "The terminal outreach claim guards the next dialer turn but not playback. Enabled-drop duplicate callbacks request playback twice; continuation runs before provider acknowledgement.",
-    "currentBehavior": "Source audit dev@9f33f3e7, 2026-10-05. The real route/TwiML builder failed two regression assertions: two callbacks with one winning claim sent two playback updates, and one next turn ran while the provider update was held pending. The existing drop-off concurrency control passed. Provider calls were isolated; no live call was sent.",
+    "currentBehavior": "Source audit dev@9f33f3e7, 2026-10-05. The real route/TwiML builder failed two regression assertions: two callbacks with one winning claim sent two playback updates, and one next turn ran while the provider update was held pending. The existing drop-off concurrency control passed. Provider calls were isolated; no live call was sent. Source contract follow-up at dev@256f8720: createTwilioCall uses /api/auto-dial/$roomId as the initial voice URL with machineDetection Enable and no async AMD option. Twilio defaults to synchronous AMD. The route receives the classified result as a voice TwiML request; it is not only an asynchronous notification.",
     "rootCause": "A terminal outcome claim is used as operation completion state. Playback is outside its winning branch, while continuation occurs before the provider mutation acknowledgement.",
-    "resolution": "Define durable playback/continuation operation state by workspace, outreach attempt, call and conference. Prevent duplicate playback requests and keep continuation pending until the playback update acknowledgement. Record recovery for rejected or uncertain acknowledgements before implementing the retry path. Preserve signed callbacks, tenant scope, billing status ownership and drop-off/no-audio behavior. Keep this separate from session picker changes.",
+    "resolution": "Review the synchronous voice-URL contract before selecting the callback protocol. Returning playback TwiML from that existing URL may avoid a separate REST call update, but XML generation does not prove delivery or completion. Define durable playback/continuation state for workspace, outreach attempt, call and conference, with authoritative recovery after a lost response or uncertain provider result. Prevent duplicate playback and continuation. Queue idempotency alone is insufficient: dead-letter jobs can revive and expired leases can rerun handlers. Preserve the original acknowledgement criteria, signatures, tenant scope, billing ownership and drop-off/human/device controls. Keep the session picker separate.",
     "lookIn": [
       "app/routes/api+/auto-dial/$roomId.action.server.ts",
       "app/lib/telephony-db.server.ts",
       "app/lib/outreach-disposition.ts",
-      "app/lib/twilio-twiml.server.ts"
+      "app/lib/twilio-twiml.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/lib/worker/enqueue-job.server.ts",
+      "app/lib/worker/poll-jobs.server.ts"
     ],
     "existingTests": [
       "test/auto-dial-room.route.test.ts",
@@ -1552,6 +1499,6 @@
     "blockedBy": [],
     "size": "M-L",
     "risk": "high",
-    "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug is unassigned and blocks #1878. Define the retry/reconciliation protocol before runtime edits; no deployed playback claim is made."
+    "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed."
   }
 ]

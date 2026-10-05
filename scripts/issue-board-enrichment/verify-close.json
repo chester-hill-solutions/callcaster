@@ -5081,5 +5081,70 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2395; preserve original criteria and separate release acceptance from source proof."
+  },
+  {
+    "issueNumber": 2121,
+    "verdict": "verify-close",
+    "recommendedTitle": "Dismissing a query-param banner pushes a history entry, so Back resurrects it",
+    "summary": "PR #2398 merged query-notice dismissal with history replacement. Default promotion and deployed acceptance remain.",
+    "currentBehavior": "Source verified at dev@efb3bb54, 2026-10-05. QueryParamBanner dismissal replaces the history entry and preserves unrelated repeated parameters. Active URL-flash cleanup already replaces history. QueryParamBanner has no current product-route consumer; this fix preserves its rendering and does not adopt a new banner. Genuine filter and pagination navigation retain their existing history behavior.",
+    "resolution": "Promote PR #2398 to the default branch, then verify that an active flash does not replay after Back/Forward and that filter navigation retains its own entry. Keep OPEN for release acceptance.",
+    "lookIn": [
+      "app/components/shared/QueryParamBanner.tsx",
+      "app/hooks/utils/useSearchParamFlash.ts"
+    ],
+    "existingTests": [
+      "test/ui/notice-query-history.test.tsx",
+      "test/ui/components-shared-smoke.test.tsx",
+      "Thirty focused UI cases passed, including six new actual shared-banner/flash-hook cases with a real memory router. Two independent replacement faults each failed one executed case. Full local CI, exact-head remote checks, E2E and both deployments passed before merge."
+    ],
+    "missingTests": [
+      "Default promotion and acceptance on the deployed product. No current product-route banner adoption is claimed."
+    ],
+    "acceptanceCriteria": [
+      "Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).",
+      "Dismissing still clears the parameter from the URL.",
+      "Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue)."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2398. Preserve original criteria and separate source proof from release acceptance.",
+    "rootCause": "QueryParamBanner cleared its URL parameter with a push instead of a replacement."
+  },
+  {
+    "issueNumber": 2140,
+    "verdict": "verify-close",
+    "recommendedTitle": "Settings member projection drops names from the manage-sheet heading",
+    "summary": "PR #2399 merged target member names and username fallback in workspace settings. Default promotion and deployed acceptance remain.",
+    "currentBehavior": "Source verified at dev@f8f40ffc, 2026-10-05. The settings projection retains both names. The actual member sheet shows available target names with existing capitalization and falls back to the target username when both are absent. The shared display contract requires nullable names. Invitations provide null fields; the admin producer and its fallback rows already preserve the same fields. Sheet structure, roles and form identities retain their existing behavior; no actor-name defect was established.",
+    "resolution": "Promote PR #2399 to the default branch and verify named and unnamed target members in workspace settings. Confirm the selected target and mutation form IDs on the deployed product. Keep OPEN for release acceptance.",
+    "lookIn": [
+      "app/lib/workspace-members.ts",
+      "app/lib/workspace-settings-db.server.ts",
+      "app/components/workspace/TeamMember.tsx",
+      "app/routes/workspaces+/$id/settings.route.tsx",
+      "app/lib/platform-admin.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/invite.route.tsx"
+    ],
+    "existingTests": [
+      "test/workspace-settings-db.server.test.ts",
+      "test/ui/team-member-a11y.test.tsx",
+      "Three service cases and seven actual shared-sheet UI cases passed. Each projected-name deletion failed one executed case; removing the username fallback failed two executed cases. The compiler rejected the missing required first_name projection. Sources were restored. Full local CI, exact-head remote checks, E2E and both deployments passed before merge."
+    ],
+    "missingTests": [
+      "Default promotion and acceptance on the deployed product."
+    ],
+    "acceptanceCriteria": [
+      "Member sheet heading shows target first/last name.",
+      "When both names are absent, heading falls back to username.",
+      "Producer/consumer types require the name fields, even when null.",
+      "Other member list producers are reviewed; admin invite projection already includes names."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Keep OPEN in Verify and close. Development is linked to PR #2399. Preserve original criteria and separate source proof from release acceptance.",
+    "rootCause": "The settings projection discarded name fields while a partial consumer type hid the omission."
   }
 ]
