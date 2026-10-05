@@ -195,6 +195,9 @@ export function analyzePublicQueueOrder(sources) {
         report(node, "direct-order-write", "Public raw SQL must have visible text; unknown SQL can bypass queue range reservation.");
       } else if (raw !== undefined) {
         const text = stripSqlComments(raw).replace(/'(?:[^']|'')*'/g, "''").replace(/"([a-z_][a-z0-9_]*)"/gi, "$1");
+        if (/\bhandle_campaign_queue_entry\s*\(/i.test(text)) {
+          report(node, "direct-order-write", "Public SQL cannot call the queue-entry RPC directly; use enqueueContactsForCampaign for server range reservation.");
+        }
         const { updates, inserts, positionalInserts } = parseQueueWrites(text);
         if (positionalInserts || [...updates, ...inserts].some((write) => !write.columns.length || write.columns.some((key) => ["queue_order", "__expression"].includes(key)))) {
           report(node, "direct-order-write", "Public SQL cannot set queue_order or hide queue write columns; use server range reservation.");

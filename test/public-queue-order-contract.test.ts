@@ -151,3 +151,24 @@ describe("direct public queue-entry RPC calls", () => {
     expect(check('import { rpcReserveCampaignQueueOrderRange } from "@/lib/db-rpc.server"; rpcReserveCampaignQueueOrderRange(db, { campaignId: 1, count: 2 });')).toEqual([]);
   });
 });
+
+
+describe("public SQL queue-entry RPC calls", () => {
+  test.each([
+    'sql`select handle_campaign_queue_entry(1, 2, ${body.startOrder}, false)`;',
+    'sql.raw("select public.handle_campaign_queue_entry(1, 2, 9, false)");',
+    'sql`select "public"."handle_campaign_queue_entry"(1, 2, 9, false)`;',
+    'sql`SELECT HANDLE_CAMPAIGN_QUEUE_ENTRY (1, 2, 9, false)`;',
+    'const raw = sql.raw; raw("select handle_campaign_queue_entry(1, 2, 9, false)");',
+  ])("rejects SQL entry writers: %s", (source) => {
+    expect(check(`${sqlImport} ${source}`)).toMatchObject([{ kind: "direct-order-write" }]);
+  });
+
+  test.each([
+    "sql`select reserve_campaign_queue_order_range(1, 2)`;",
+    "sql`select 'handle_campaign_queue_entry(1, 2, 9, false)'`;",
+    "sql`select queue_order from campaign_queue /* handle_campaign_queue_entry(1, 2, 9, false) */`;",
+  ])("permits reservation, reads, and quoted or commented names: %s", (source) => {
+    expect(check(`${sqlImport} ${source}`)).toEqual([]);
+  });
+});

@@ -370,6 +370,8 @@ Verify rejection through the actual CLI as well as the parser.
 Include canonical lower-level writers in the bypass inventory. A public API
 can call an entry RPC directly without the reservation helper. Cover renamed,
 namespace and local aliases, with shadowed-helper controls.
+Check SQL calls to the same writer, not only UPDATE/INSERT statements. Keep
+reservation calls, ordinary reads and quoted/commented names as controls.
 
 Guard regressions must include multiline imports, import aliases, unused
 strategies/provider helpers and single-line exported handlers. Removing only
