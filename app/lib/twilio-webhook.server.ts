@@ -144,11 +144,11 @@ export function twilioWebhookForbiddenHangup(): Response {
   });
 }
 
-/** Build the canonical validation URL from BASE_URL + request pathname. */
+/** Keep the query bytes Twilio signed; rebuilding them changes the signature. */
 export function resolveCanonicalTwilioWebhookUrl(request: Request): string {
   const url = new URL(request.url);
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
-  return `${baseUrl}${url.pathname}`;
+  return `${baseUrl}${url.pathname}${url.search}`;
 }
 
 async function parseTwilioWebhookParams(request: Request): Promise<Record<string, string>> {
@@ -205,9 +205,10 @@ export async function requireTwilioSignature(
   }
 
   const canonicalUrl = resolveCanonicalTwilioWebhookUrl(request);
+  const diagnosticUrl = canonicalUrl.split("?")[0];
 
   if (!request.headers.get("x-twilio-signature")) {
-    logWebhookAuthFailure("missing_signature", { url: canonicalUrl });
+    logWebhookAuthFailure("missing_signature", { url: diagnosticUrl });
     return twilioWebhookForbiddenHangup();
   }
 
@@ -253,7 +254,7 @@ export async function requireTwilioSignature(
 
   if (!authToken) {
     logWebhookAuthFailure("missing_credentials", {
-      url: canonicalUrl,
+      url: diagnosticUrl,
       callSid: options?.callSid ?? null,
       messageSid: options?.messageSid ?? null,
       phoneNumber: options?.phoneNumber ?? null,
@@ -265,9 +266,11 @@ export async function requireTwilioSignature(
   }
 
   const signature = request.headers.get("x-twilio-signature");
-  if (!validateTwilioWebhookParams(params, signature, canonicalUrl, authToken)) {
+  // GET query fields already occur in the signed URL; only POST fields append.
+  const signatureParams = request.method === "GET" || request.method === "HEAD" ? {} : params;
+  if (!validateTwilioWebhookParams(signatureParams, signature, canonicalUrl, authToken)) {
     logWebhookAuthFailure("invalid_signature", {
-      url: canonicalUrl,
+      url: diagnosticUrl,
       callSid: options?.callSid ?? null,
       messageSid: options?.messageSid ?? null,
       phoneNumber: options?.phoneNumber ?? null,
