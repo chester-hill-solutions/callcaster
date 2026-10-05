@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: Restrict JSON billing checkout and session confirmation to workspace administrators and owners. ([#2376](https://github.com/chester-hill-solutions/callcaster/pull/2376), [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371))
+
 - Fixed: Queue agents must belong to the queue's workspace; invalid assignments return a clear error ([#2373](https://github.com/chester-hill-solutions/callcaster/pull/2373), [#2141](https://github.com/chester-hill-solutions/callcaster/issues/2141)).
 
 - Security: Workspace billing pages require an administrator or owner. Callers and members cannot read the credit ledger or lifetime spend. ([#2370](https://github.com/chester-hill-solutions/callcaster/pull/2370), [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137))

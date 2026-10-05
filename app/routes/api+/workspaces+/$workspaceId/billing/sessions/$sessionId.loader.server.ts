@@ -1,35 +1,22 @@
 import { pollBillingCheckoutSession } from "@/lib/platform-billing.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionMinRoleAuth } from "@/lib/capability-guard.server";
+import { MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
-  auth: ({ params, context }: LoaderFunctionArgs) => {
-    const workspaceId = params.workspaceId;
+  auth: dataPlaneSessionMinRoleAuth(MemberRole.Admin),
+  sideEffects: ["external", "credit"],
+  handler: async ({ auth, params }) => {
     const sessionId = params.sessionId;
-
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-
     if (!sessionId) {
       return jsonError("sessionId is required", 400);
     }
 
-    const { userId } = getDataPlaneRouteContext(context, workspaceId);
-    if (!userId) {
-      return jsonError("Unauthorized", 401);
-    }
-
-    return { userId, workspaceId, sessionId };
-  },
-  sideEffects: ["external", "credit"],
-  handler: async ({ auth }) => {
     const result = await pollBillingCheckoutSession({
       userId: auth.userId,
       workspaceId: auth.workspaceId,
-      sessionId: auth.sessionId,
+      sessionId,
     });
 
     if (!result.ok) {

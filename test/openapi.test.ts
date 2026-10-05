@@ -2,6 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import { getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { openApiSpec } from "../app/lib/openapi";
+import { completeOpenApiSpec } from "../app/lib/openapi-complete";
+import { API_SURFACE_CORE } from "../app/lib/api-surface-generated";
 import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
@@ -15,6 +17,23 @@ import { zConversationSummaryMode, zWorkspaceUnreadCountResponse } from "../app/
 const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
+  test.each([
+    { route: "/api/workspaces/:workspaceId/billing/checkout-session", path: "/api/workspaces/{workspaceId}/billing/checkout-session", method: "post" },
+    { route: "/api/workspaces/:workspaceId/billing/sessions/:sessionId", path: "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}", method: "get" },
+  ])("derives and documents Admin session access for $route", ({ route, path, method }) => {
+    expect(API_SURFACE_CORE.find((entry) => entry.path === route)?.authClass).toBe("workspaceAdmin");
+    for (const spec of [openApiSpec, completeOpenApiSpec]) {
+      const operation = spec.paths[path]?.[method];
+      expect(operation?.["x-callcaster-auth-class"]).toBe("workspaceAdmin");
+      expect(operation?.["x-callcaster-exposure"]).toBe("sessionOnly");
+      expect(operation?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
+      expect(operation?.description).toContain("Admin or Owner user session");
+      expect(operation?.description).toContain("Member and Caller receive 403");
+      expect(operation?.description).toContain("non-members receive 404");
+      expect(operation?.responses?.["401"]).toBeDefined();
+      expect(operation?.responses?.["403"]).toBeDefined();
+    }
+  });
   test("documents the optional workspace unread mode and validates its count contract", () => {
     const operation = openApiSpec.paths["/api/workspaces/{workspaceId}/conversations"].get;
     expect(operation?.operationId).toBe("getWorkspaces_workspaceId_conversations");
