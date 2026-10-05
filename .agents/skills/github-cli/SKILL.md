@@ -62,6 +62,20 @@ help and require one numeric output before writing a count to GITHUB_OUTPUT.
 Use `pipefail` so a failed or incomplete API read cannot become a successful
 zero or partial count. In GitHub Actions, declare `shell: bash` for this pipeline.
 
+## Concurrent PR Check Events
+
+Do not use a check-run or job ID to infer workflow event order. Concurrent
+opened and labeled events can allocate their jobs in the opposite order.
+Resolve each check's Actions run, group by workflow and check name, and compare
+the workflow run number and attempt at the exact tested head. Keep checks from
+different workflows visible even when their job names match.
+
+Inspect an earlier failure before treating it as superseded. The issue-reference
+workflow reads labels from its event payload: rerunning an opened event does not
+add a later `no-issue` label to that payload. Verify the current PR label, the
+successful later event, all applicable required checks and deployment contexts,
+and the PR's current merge state before merging.
+
 ## Empty REST Responses
 
 A successful REST deletion can return HTTP 204 with no response body. Check the
