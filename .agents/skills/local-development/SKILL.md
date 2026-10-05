@@ -178,6 +178,11 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+For a render timeout during concurrent full gates, wait for the other gate
+to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
+A passing focused rerun does not replace `ci:local`; do not weaken assertions
+or raise a baseline to treat a timeout as green.
+
 For postgres.js JSON fixtures, use `client.json(value)` and check the stored
 JSON value or type. Passing `JSON.stringify(value)` to a `::jsonb` parameter can
 store a JSON string instead of the intended object. Use the fixture identity
