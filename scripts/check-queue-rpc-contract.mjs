@@ -36,7 +36,7 @@
  * Static parsing cannot prove that, so such cases land in the baseline with the
  * guard named as the reason — see BASELINE_FILE.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -47,12 +47,28 @@ import {
   LEVEL,
 } from "./lib/queue-rpc-contract.mjs";
 import { loadQueueEntryTransitions } from "./lib/queue-transitions-source.mjs";
+import { analyzePublicQueueOrder } from "./lib/public-queue-order-contract.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const BASELINE_FILE = join(ROOT, "scripts", "queue-rpc-contract-baseline.json");
 
 const verbose = process.argv.includes("--verbose");
 const update = process.argv.includes("--update");
+
+function apiSources(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = join(directory, entry.name);
+    if (entry.isDirectory()) return apiSources(file);
+    return /\.tsx?$/.test(entry.name) ? [{ file: file.slice(ROOT.length + 1), source: readFileSync(file, "utf8") }] : [];
+  });
+}
+const publicSources = apiSources(join(ROOT, "app/routes/api+"));
+const orderViolations = analyzePublicQueueOrder(publicSources);
+if (orderViolations.length) {
+  for (const violation of orderViolations) console.error(`${violation.file}:${violation.line}: ${violation.message}`);
+  process.exit(1);
+}
+console.log(`check-queue-rpc-contract: public server-owned ordering checked in ${publicSources.length} API modules.`);
 
 const transitions = loadQueueEntryTransitions(ROOT);
 const rpcSources = selectQueueRpcs(collectCurrentFunctionDefinitions(ROOT));

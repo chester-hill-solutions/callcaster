@@ -344,6 +344,10 @@ editor migration can repair it. Keep legacy and explicit-page controls.
 
 ## Scripted source edits
 
+Run source faults only when no other test reads that worktree. Restore each
+fault before starting the next reader, then rerun the fixed source. A passing
+report from overlapping runs does not identify which source it tested.
+
 Use checked subprocesses or `set -e` when a shell step contains a required check
 followed by another command. A later successful command can hide the failed
 check in the shell exit status. Inspect each required result before reporting it.
