@@ -325,7 +325,7 @@ const TimePeriodSelect = React.forwardRef<HTMLButtonElement, PeriodSelectorProps
     return (
       <div className="flex h-10 items-center">
         <Select
-          defaultValue={period}
+          value={period}
           onValueChange={(value) => handleValueChange(value as Period)}
         >
           <SelectTrigger
@@ -488,6 +488,13 @@ const TimePicker = React.forwardRef<TimePickerRef, TimePickerProps>(
     const secondRef = React.useRef<HTMLInputElement>(null);
     const periodRef = React.useRef<HTMLButtonElement>(null);
     const [period, setPeriod] = React.useState<Period>(date && date.getHours() >= 12 ? 'PM' : 'AM');
+    const dateTimestamp = date?.getTime();
+    const [previousDateTimestamp, setPreviousDateTimestamp] = React.useState(dateTimestamp);
+
+    if (!Object.is(previousDateTimestamp, dateTimestamp)) {
+      setPreviousDateTimestamp(dateTimestamp);
+      setPeriod(date && date.getHours() >= 12 ? 'PM' : 'AM');
+    }
 
     useImperativeHandle(
       ref,
@@ -617,6 +624,13 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
     ref,
   ) => {
     const [month, setMonth] = React.useState<Date>(value ?? new Date());
+    const valueTimestamp = value?.getTime();
+    const [previousValueTimestamp, setPreviousValueTimestamp] = React.useState(valueTimestamp);
+
+    if (!Object.is(previousValueTimestamp, valueTimestamp)) {
+      setPreviousValueTimestamp(valueTimestamp);
+      setMonth(value ?? new Date());
+    }
     const buttonRef = useRef<HTMLButtonElement>(null);
     /**
      * carry over the current time when a user clicks a new day
