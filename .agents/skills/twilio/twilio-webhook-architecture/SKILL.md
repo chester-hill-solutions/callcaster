@@ -145,6 +145,24 @@ const isValid = twilio.validateRequestWithBody(
 
 **Critical:** Use the SDK validator. Do not implement your own -- Twilio may add parameters without notice, and the exact algorithm (including port handling) has edge cases the SDK handles.
 
+### CallCaster signature regression controls
+
+Use the configured public `BASE_URL` plus the request pathname and unchanged
+encoded query. Internal request hosts and forwarded headers are not trusted
+public origins. For form callbacks, pass POST body fields separately; GET/HEAD
+query fields already occur in the signed URL. Keep query fields available for
+workspace credential lookup. Auth-failure diagnostics must omit query values.
+
+Keep the actual SDK validator in regressions. Its port and equivalent query
+encoding compatibility is part of the contract; do not reject those forms with
+a custom raw-URL comparison. Pair valid encoded/repeated/blank queries with
+changed-value, added-query and query-free signature replay refusals. Exercise
+both route and Bun ingress boundaries, with preserved readable POST bodies.
+If a Bun suite mocks the validator, use an isolated child process for real-SDK
+checks. Require executed failures when removing URL, method or ingress guards.
+An HTTP ingress success control must assert the route's expected status and
+body; `not 403` alone also accepts a route failure.
+
 ### 3. Status Callback Handling
 
 Status callbacks are asynchronous POST requests Twilio sends when a resource changes state. They do not expect TwiML -- return `200` or `204`.
