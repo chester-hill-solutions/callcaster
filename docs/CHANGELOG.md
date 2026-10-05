@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Agent startup failures show one persistent message, with stable space for long errors and the Back to workspace action ([#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308)).
+- Fixed: Agent startup failures show one persistent message, with stable space for long errors and the Back to workspace action ([#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308), [PR #2395](https://github.com/chester-hill-solutions/callcaster/pull/2395)).
 
 - Fixed: Predictive dialing shows missing caller ID or device in the existing start control, prevents repeated pending starts, and reports failures with a retryable toast and credit recovery ([#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131), [PR #2394](https://github.com/chester-hill-solutions/callcaster/pull/2394)).
 
