@@ -178,6 +178,21 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+For a render timeout during concurrent full gates, wait for the other gate
+to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
+A passing focused rerun does not replace `ci:local`; do not weaken assertions
+or raise a baseline to treat a timeout as green.
+
+For postgres.js JSON fixtures, use `client.json(value)` and check the stored
+JSON value or type. Passing `JSON.stringify(value)` to a `::jsonb` parameter can
+store a JSON string instead of the intended object. Use the fixture identity
+in unique columns such as workspace keys; a shared marker can fail setup before
+any behavior case runs.
+
+The shared Vitest config restores spies before each case. Install observation
+spies in `beforeEach`; a spy created in `beforeAll` can be removed before the
+first case. Require executed cases and a passing result before using the proof.
+
 Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
 `INTEGRATION_DB_URL` as an optional override. Verify the suite with
 `DATABASE_URL` alone; skipped cases do not prove the remote database gate.
