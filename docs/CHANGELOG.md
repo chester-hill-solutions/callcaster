@@ -99,6 +99,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Compare each environment’s ledger and schema with its deployed code branch ([#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064)).
+
 - Retain the original audience CSV before its import starts, so a storage failure does not queue an import without its source file ([#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350), [PR #2351](https://github.com/chester-hill-solutions/callcaster/pull/2351)).
 
 - Normalize mapped audience upload opt-out values with the existing CSV value rules before contact insertion ([#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348), [PR #2349](https://github.com/chester-hill-solutions/callcaster/pull/2349)).
