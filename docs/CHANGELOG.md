@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign queue disposition filters now use results from the selected campaign and workspace. ([#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402), [PR #2405](https://github.com/chester-hill-solutions/callcaster/pull/2405)).
+
 - Fixed: Date and time pickers show updated dates and periods after a saved value changes or is cleared, while retaining navigation for an unchanged value ([#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122), [PR #2404](https://github.com/chester-hill-solutions/callcaster/pull/2404)).
 
 - Fixed: Member management shows the selected member's name and uses their username when both names are absent ([#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140), [PR #2399](https://github.com/chester-hill-solutions/callcaster/pull/2399)).
