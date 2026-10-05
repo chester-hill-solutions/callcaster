@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: SMS debits use validated provider segment and media counts. Missing counts wait for recovery while delivery results complete ([#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150)).
+- Fixed: SMS debits use validated provider segment and media counts. Missing counts wait for recovery while delivery results complete ([#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150), [PR #2407](https://github.com/chester-hill-solutions/callcaster/pull/2407)).
 
 - Fixed: Campaign queue disposition filters now use results from the selected campaign and workspace. ([#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402), [PR #2405](https://github.com/chester-hill-solutions/callcaster/pull/2405)).
 
