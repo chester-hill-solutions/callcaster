@@ -183,6 +183,11 @@ and still accept a send-failure update. Keep a valid saved-row precision control
 
 ## SQL query regressions
 
+Raw SQL parameters bypass a column's value encoder. For a JavaScript Date
+inside a SQL expression, use the timestamp column encoder with `sql.param`.
+Verify capture, replacement and null input against real Postgres; mocked
+updates cannot prove driver serialization or first-write preservation.
+
 For a target-user check, membership does not prove that the global user still
 exists. Canonical `workspace_member` keys are text and have no global-user FK.
 Test missing users both with and without a stale membership row through each
@@ -236,6 +241,9 @@ first case. Require executed cases and a passing result before using the proof.
 Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
 `INTEGRATION_DB_URL` as an optional override. Verify the suite with
 `DATABASE_URL` alone; skipped cases do not prove the remote database gate.
+Bind the selected URL to both app pool variables before importing the runtime
+database module, then restore the worker environment. Verify override-only
+and differing-URL controls so the fixture cannot use the wrong database.
 
 For database failure controls, keep the isolated relation present. Renaming it
 can make an unqualified query resolve to a public table on the search path.

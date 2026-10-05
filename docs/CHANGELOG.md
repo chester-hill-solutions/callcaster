@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: SMS debits use validated provider segment and media counts. Missing counts wait for recovery while delivery results complete ([#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150), [PR #2407](https://github.com/chester-hill-solutions/callcaster/pull/2407)).
 
+- Fixed: Provider send times can be saved without a database error, and later or missing times preserve the first saved value ([#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049), [PR #2406](https://github.com/chester-hill-solutions/callcaster/pull/2406)).
+
 - Fixed: Campaign queue disposition filters now use results from the selected campaign and workspace. ([#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402), [PR #2405](https://github.com/chester-hill-solutions/callcaster/pull/2405)).
 
 - Fixed: Date and time pickers show updated dates and periods after a saved value changes or is cleared, while retaining navigation for an unchanged value ([#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122), [PR #2404](https://github.com/chester-hill-solutions/callcaster/pull/2404)).
