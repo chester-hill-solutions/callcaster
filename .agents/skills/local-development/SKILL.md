@@ -211,6 +211,12 @@ to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
 
+The raw pool from app/server/db.ts is also used by Drizzle, which replaces
+postgres.js JSON serializers. Bind JSON.stringify(value) with an explicit
+::jsonb cast on that pool, then check the decoded object. Use client.json(value)
+on a separate native fixture client with its default serializers. Check the
+native column type; a legacy Drizzle text declaration can map to JSONB.
+
 For postgres.js JSON fixtures, use `client.json(value)` and check the stored
 JSON value or type. Passing `JSON.stringify(value)` to a `::jsonb` parameter can
 store a JSON string instead of the intended object. Use the fixture identity

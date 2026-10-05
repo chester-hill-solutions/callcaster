@@ -111,3 +111,23 @@ See [API overview — Authentication](./api-overview.md#authentication).
 
 - [Create campaign with script](./api-create-campaign-with-script.md)
 - [Script JSON format](./script-json-format.md)
+
+## SMS billing quantities
+
+SMS debits use the provider's validated segment count. MMS keeps its flat rate.
+A signed status callback saves segment and media counts when supplied. When
+those counts are missing or incomplete, the worker fetches the Message resource
+with the saved workspace credentials and checks its identity before saving
+metadata and applying the existing per-SID debit.
+
+If the provider count is still unavailable, the worker logs
+`billing.sms_metadata_unavailable`, leaves the debit pending and retries through
+the durable status job. Delivery results and campaign completion checks still
+run. A terminal message without its debit remains visible in the existing
+reconciliation message gap. An exhausted job uses the existing dead-letter
+recovery process. This change does not repair historical incorrect debits.
+
+Twilio status callbacks can contain different subsets of properties, and a
+Messaging Service create response can initially report zero segments. See the
+[Message resource](https://www.twilio.com/docs/messaging/api/message-resource)
+and [segment-count guidance](https://help.twilio.com/articles/360034857114).

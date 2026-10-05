@@ -1,6 +1,7 @@
 import { data as routeData } from "react-router";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
 import { logger } from "@/lib/logger.server";
+import { smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
   normalizeSmsStatus,
@@ -134,6 +135,7 @@ export const action = defineAction({
 
       const messageData = await updateMessageBySid(preUpdateMessage.workspace, sid, {
         status: messageStatus,
+        ...smsProviderQuantityFields({ numSegments: payload.NumSegments, numMedia: payload.NumMedia }),
         ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
         ...(errorCode != null && Number.isFinite(errorCode) ? { error_code: errorCode } : {}),
       });
