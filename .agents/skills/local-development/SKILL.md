@@ -50,6 +50,9 @@ copy of a vendored package can prevent CSS import analysis from finding its
 theme tokens and produce false design-system lint warnings. Keep both lockfiles;
 do not raise the lint baseline to work around a package-resolution failure.
 
+Install locked dependencies before committing in a new worktree. The effects
+pre-commit guard imports TypeScript even for a Markdown-only change.
+
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
 checkout has no dependencies. Use the prepared worktree instead of fetching a
@@ -132,6 +135,20 @@ Run the actual component test before using it as regression evidence.
 For route UI tests, mock the one-off server loader/action re-export boundary
 when router data is supplied by the fixture. Importing the real server graph can
 fail database startup before UI cases collect; retain the actual browser hooks.
+
+For persistent Sonner notices, render the real shared root Toaster in the UI
+fixture after the condition component. The host subscribes in an effect; a
+synchronous child effect can emit before that subscription and lose the first
+notice. Defer initial presentation until the mount subscriptions can run. Keep
+an owned toast ID in a ref, update that ID while the notice is present, and
+allocate a fresh ID after resolution or a new page lifetime. Dismissal uses
+asynchronous removal; reusing the old ID can remove a newly opened notice.
+Check direct mount, StrictMode, time beyond the default expiry, message updates,
+resolution, page exit with the host retained and rapid resolve/reopen. Remove
+each lifetime or subscription safeguard separately and require an executed,
+failing case before accepting the proof. For browser checks, wait for entering
+and exit animations to settle; test Cancel and Escape from separate fresh
+modal states so one cannot satisfy the other's assertion.
 
 ## Custom-control busy proofs
 
