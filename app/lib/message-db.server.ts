@@ -269,10 +269,13 @@ function withTerminalStatusGuard(update: MessageUpdate): MessageUpdate {
  * an inferred value would have made that look like zero.
  */
 function withDateSentGuard(update: MessageUpdate): MessageUpdate {
-  if (update.date_sent == null) return update;
+  if (update.date_sent === undefined) return update;
+  const incoming = update.date_sent instanceof Date
+    ? sql.param(update.date_sent, messageTable.date_sent)
+    : update.date_sent;
   return {
     ...update,
-    date_sent: sql`coalesce(${messageTable.date_sent}, ${update.date_sent})`,
+    date_sent: sql`coalesce(${messageTable.date_sent}, ${incoming})`,
   };
 }
 

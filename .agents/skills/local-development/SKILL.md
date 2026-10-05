@@ -183,6 +183,11 @@ and still accept a send-failure update. Keep a valid saved-row precision control
 
 ## SQL query regressions
 
+Raw SQL parameters bypass a column's value encoder. For a JavaScript Date
+inside a SQL expression, use the timestamp column encoder with `sql.param`.
+Verify capture, replacement and null input against real Postgres; mocked
+updates cannot prove driver serialization or first-write preservation.
+
 For a target-user check, membership does not prove that the global user still
 exists. Canonical `workspace_member` keys are text and have no global-user FK.
 Test missing users both with and without a stale membership row through each
