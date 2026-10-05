@@ -49,7 +49,8 @@ test.describe("Twilio webhook signatures", () => {
       headers: { "X-Twilio-Signature": twilioWebhookSignature(path, params) },
       form: params,
     });
-    expect(response.status()).not.toBe(403);
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
   });
 
   test("WHA-07 a changed query is rejected with the original signature", async ({ request }) => {
