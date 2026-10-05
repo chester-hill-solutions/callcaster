@@ -571,39 +571,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2118,
-    "verdict": "fix-now",
-    "recommendedTitle": "A malformed known feature flag disables valid sibling flags",
-    "summary": "A wrong type in any known flag still causes whole-object schema parsing to fail and disables an independently valid flag. Unknown passthrough keys are not the same failure case.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Any mistyped known schema flag masks valid sibling flags. Unknown passthrough keys do not necessarily cause validation failure.",
-    "resolution": "Evaluate the requested key with value === true. Log malformed known stored flags at a call site that knows the workspace; the current helper has no workspace argument.",
-    "lookIn": [
-      "app/lib/feature-flags.ts:12",
-      "app/lib/coaching-schemas.ts:6",
-      "test/feature-flags.test.ts:36",
-      "app/lib/feature-flags.ts:1-40",
-      "the `feature_flags` column in `app/db/schema*.ts",
-      "the schema (`WorkspaceFeatureFlagsSchema`)",
-      "every `hasFeatureFlag` call site (grep)"
-    ],
-    "existingTests": [
-      "test/feature-flags.test.ts covers true, missing and null values, plus capability combinations; it does not cover a valid flag beside a malformed known flag."
-    ],
-    "missingTests": [
-      "Add known-sibling-invalid plus own-value-invalid/missing tests; ensure a valid true survives another known flag with string value."
-    ],
-    "acceptanceCriteria": [
-      "A true requested flag remains true when another known flag contains a wrong type.",
-      "A requested flag with a wrong type returns false.",
-      "A missing requested flag returns false.",
-      "Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2119,
     "verdict": "fix-now",
     "recommendedTitle": "runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting",

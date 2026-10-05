@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@63fecfa0; Audio campaign target fix reconciled with merged source, real PostgreSQL and session HTTP proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@22aad99b; Independent feature flag fix reconciled with merged source and real PostgreSQL proof (2026-10-05 UTC)` · 320 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the audio campaign target source audit. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC after the feature flag source audit. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 51
+## Fix now — 50
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,6 +45,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
+
+### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
+- Resolution: Use an idempotent workspace customer creation and/or a compare-and-set protocol; reconcile losers.
+- Look in: `app/lib/platform-billing.server.ts:54`, `app/lib/platform-billing.server.ts:65`, `app/lib/database/stripe.server.ts:62`, `app/lib/platform-billing.server.ts (`ensureStripeCustomer`, `createBillingCheckoutSession`)`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions`, `app/db/schema.ts (the `workspace.stripe_id` column)`
+- Existing tests: test/platform-billing-checkout.test.ts; test/db-stripe.server.test.ts
+- Missing tests: Concurrent first checkout, loser logging, retained payment method, and existing-ID control tests.
+- Done when: Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.; If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.; A saved payment method is retrievable after the race.; The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -78,17 +89,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. First-time checkout remains a read-create-unconditional-write race. Stripe customer creation does not use a workspace idempotency key.
-- Resolution: Use an idempotent workspace customer creation and/or a compare-and-set protocol; reconcile losers.
-- Look in: `app/lib/platform-billing.server.ts:54`, `app/lib/platform-billing.server.ts:65`, `app/lib/database/stripe.server.ts:62`, `app/lib/platform-billing.server.ts (`ensureStripeCustomer`, `createBillingCheckoutSession`)`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions`, `app/db/schema.ts (the `workspace.stripe_id` column)`
-- Existing tests: test/platform-billing-checkout.test.ts; test/db-stripe.server.test.ts
-- Missing tests: Concurrent first checkout, loser logging, retained payment method, and existing-ID control tests.
-- Done when: Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.; If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.; A saved payment method is retrievable after the race.; The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -482,17 +482,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
-- Verdict: **Fix now** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- A wrong type in any known flag still causes whole-object schema parsing to fail and disables an independently valid flag. Unknown passthrough keys are not the same failure case.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Any mistyped known schema flag masks valid sibling flags. Unknown passthrough keys do not necessarily cause validation failure.
-- Resolution: Evaluate the requested key with value === true. Log malformed known stored flags at a call site that knows the workspace; the current helper has no workspace argument.
-- Look in: `app/lib/feature-flags.ts:12`, `app/lib/coaching-schemas.ts:6`, `test/feature-flags.test.ts:36`, `app/lib/feature-flags.ts:1-40`, `the `feature_flags` column in `app/db/schema*.ts`, `the schema (`WorkspaceFeatureFlagsSchema`)`, `every `hasFeatureFlag` call site (grep)`
-- Existing tests: test/feature-flags.test.ts covers true, missing and null values, plus capability combinations; it does not cover a valid flag beside a malformed known flag.
-- Missing tests: Add known-sibling-invalid plus own-value-invalid/missing tests; ensure a valid true survives another known flag with string value.
-- Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
@@ -608,9 +597,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 160
+## Verify and close — 161
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Independent feature-flag reads and safe workspace diagnostics merged through PR #2382. Deployed functional acceptance and release remain open.
+- Current behavior: Source fix dev@9f4bb125: requested flags use strict === true independently. Known-key diagnostics at the client projection, server workspace read and batch-worker flag read include only workspace ID and invalid key names. Stored values, defaults and batch policy stay unchanged. All 24 actual-reader PostgreSQL cases passed locally and in the final-head remote E2E job; all 68 focused Node cases passed. Six independent faults fail the relevant cases and exact restoration passes.
+- Resolution: Verify deployed client, server and batch-worker behavior with malformed known siblings and valid requested flags, confirm safe workspace diagnostics, then promote to the default branch before closure.
+- Look in: `app/lib/feature-flags.ts`, `app/lib/workspace-feature-flags.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts`, `test/feature-flags.test.ts`, `test/workspace-feature-flags.server.test.ts`, `test/integration-db/workspace-feature-flags.test.ts`
+- Existing tests: 68 focused Node cases cover flags, diagnostics, TwiML and live-media route controls.; 24 real PostgreSQL cases exercise the three actual readers, real TwiML/token signing, safe client projection, unchanged stored JSON and foreign-workspace isolation. Final-head remote E2E job 111588289870 ran all 24 successfully.; Six faults cover whole-object parsing, loose truthiness, removed diagnostics and each removed server call site; exact restoration passes 24 database and 36 focused Node cases.
+- Missing tests: Deployed client, server and batch-worker acceptance with malformed known siblings and safe diagnostics; default-branch promotion.
+- Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
+- Tracker: Keep #2118 open in Verify and close after PR #2382 merged into dev. on-dev workflow 37255076883 moved one issue; a deployment success is not deployed functional acceptance.
 
 ### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
