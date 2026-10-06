@@ -120,12 +120,51 @@ Both baselines are two-way ratchets. A new drift fails, and a baselined line tha
 is no longer needed fails too — a stale entry would let the next regression on
 that column match it and pass.
 
-## Running the guards
+## Independent database CI
+
+The [independent workflow](../.github/workflows/schema-default-drift.yml) runs
+the full `test:integration-db` tier, including these two guards, on every pull
+request and every push to `dev`. It has no file-path filters. A server-only,
+route-only or integration-test-only change gets the same database result.
+The existing check name remains `guards`.
+
+The job starts an isolated `postgres:18-alpine` database, applies the compose
+bootstrap, then runs `npm run test:integration-db`. A bootstrap or test failure
+fails this job. There is no `continue-on-error` or conditional step that hides
+the failure. E2E still runs the tier separately and prints
+`[e2e-compose] running integration-db suites…` before test output.
+
+GitHub keeps a required check pending when its workflow is filtered out. The
+unfiltered events avoid that gap ([GitHub workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore)).
+Running a check does not set repository protection rules. On 2026-10-06 UTC,
+the `dev` rules endpoint returned no active rules, and its protection endpoint
+returned `Branch not protected`. No settings were changed. The release work
+still requires successful checks at the exact PR commit before merge.
+
+### E2E reliability snapshot
+
+On 2026-10-06 UTC, the 40 latest pull-request runs of the
+[E2E workflow](https://github.com/chester-hill-solutions/callcaster/actions/workflows/e2e.yml)
+contained 25 successful, one failed, seven cancelled and seven skipped `e2e`
+jobs. The runs were created from 2026-10-05 11:53:51 UTC through
+2026-10-06 02:56:12 UTC. One of 26 completed, executed jobs failed: **3.8%**.
+Cancelled and skipped jobs are excluded from that denominator. This sample
+uses the latest attempt; it does not measure first-attempt flakiness or identify
+the failure's cause. The earlier 32-success/7-failure/1-cancelled snapshot is
+retained in [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211).
+Database failures have their own check so an E2E failure does not hide their
+result.
+
+## Running the full database tier locally
 
 Both suites need a database and **skip loudly without one**, writing a banner to
 stderr rather than passing quietly. `test:integration-db` is not in `ci:local`;
-run it separately:
+run it separately. Use a disposable database: the fixtures create and remove
+rows. Use Node 22 and Postgres 18 to match CI. Apply the same bootstrap first,
+then point all supported database URL inputs at that fixture:
 
 ```bash
-DATABASE_URL=postgres://… npm run test:integration-db
+callcaster_integration_db_url='postgres://…'
+DATABASE_URL="$callcaster_integration_db_url" node scripts/e2e/bootstrap-compose-db.mjs
+DATABASE_URL="$callcaster_integration_db_url" DATABASE_DIRECT_URL="$callcaster_integration_db_url" INTEGRATION_DB_URL="$callcaster_integration_db_url" npm run test:integration-db
 ```

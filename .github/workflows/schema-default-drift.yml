@@ -1,15 +1,13 @@
 name: Schema default drift
 
-# The model-vs-database default guard (#2243) needs a real database, and
-# `test:integration-db` is NOT in `ci:local` or the `quality` job — the
-# integration tier has no Postgres service in CI at all. So the guard that exists
-# to stop the model drifting from the database has never run on a push, which is
-# the same gap #2211 filed for the tier as a whole.
+# The independent real-Postgres tier includes both schema drift guards (#2243)
+# and application integration tests (#2211). `ci:local` and `quality` have no
+# database; this job gives database failures their own result, separate from E2E.
 #
 # This workflow is the actual gate. It boots Postgres, applies
 # `client/migrations` with the repo's own psql-free bootstrap
-# (`scripts/e2e/bootstrap-compose-db.mjs`, #2227), and runs the two drift guards
-# against it. Both fail loudly rather than skipping: `SCHEMA_DEFAULT_DRIFT_UPDATE`
+# (`scripts/e2e/bootstrap-compose-db.mjs`, #2227), and runs the entire tier.
+# Both drift guards fail loudly rather than skipping: `SCHEMA_DEFAULT_DRIFT_UPDATE`
 # is never set here, so the baseline is asserted, never rewritten.
 #
 # What each guard catches:
@@ -23,30 +21,14 @@ name: Schema default drift
 # regression on that column match it and pass.
 #
 # Needs no secrets. The database is ephemeral and local to the runner.
+# Keep events free of file filters. Server-only and test-only changes need this
+# signal, and a filtered-out workflow cannot report a required check result.
 
 on:
   pull_request:
-    paths:
-      - app/db/**
-      - test/helpers/schema-drift.ts
-      - test/integration-db/schema-type-drift.test.ts
-      - test/integration-db/schema-default-drift.test.ts
-      - scripts/baselines/schema-type-drift.txt
-      - scripts/baselines/schema-default-drift.txt
-      - client/migrations/**
-      - .github/workflows/schema-default-drift.yml
   push:
     branches:
       - dev
-    paths:
-      - app/db/**
-      - test/helpers/schema-drift.ts
-      - test/integration-db/schema-type-drift.test.ts
-      - test/integration-db/schema-default-drift.test.ts
-      - scripts/baselines/schema-type-drift.txt
-      - scripts/baselines/schema-default-drift.txt
-      - client/migrations/**
-      - .github/workflows/schema-default-drift.yml
   workflow_dispatch:
 
 permissions:
@@ -109,9 +91,8 @@ jobs:
           DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
         run: node scripts/e2e/bootstrap-compose-db.mjs
 
-      # `quality` already runs the mocked suites; this is the tier it cannot
-      # reach. #2211 tracks the broader gap.
-      - name: Schema drift guards
+      # Leave failures visible on this job; do not suppress its exit status.
+      - name: Real-Postgres integration tier
         env:
           DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
         run: npm run test:integration-db
