@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import postgres from "postgres";
 import { asRouteResponse } from "../helpers/route-result";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -34,6 +35,8 @@ const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
 const workspaceId = randomUUID(), actor = randomUUID(), caller = randomUUID();
 const tag = randomUUID().replaceAll("-", "");
 const fn = `purchase_fault_${tag}`, trigger = `purchase_fault_${tag}`;
+const schemaName = `purchase_${tag}`, publicControlId = randomUUID(), publicControlLease = randomUUID();
+let fixture: postgres.Sql;
 let sql: postgres.Sql;
 let service: typeof import("@/lib/platform-workspace-numbers.server");
 let faultTable: string | undefined;
@@ -43,18 +46,34 @@ const address = { street: "1 Fixture Street", city: "Toronto", region: "ON", pos
 describe("number purchase preserves credits and inventory (#2084)", () => {
   beforeAll(async () => {
     if (!url) throw new Error("Owned database URL required");
-    process.env.DATABASE_URL = url; process.env.DATABASE_DIRECT_URL = url;
-    sql = postgres(url, { max: 3 });
+    fixture = postgres(url, { max: 1 });
+    await fixture.unsafe(`create schema "${schemaName}"`);
+    const migration = await readFile(new URL("../../client/migrations/20261006000000_number_purchase_recovery.sql", import.meta.url), "utf8");
+    await fixture.unsafe(migration.replaceAll("public.workspace_number_purchase", `"${schemaName}".workspace_number_purchase`));
+    const scopedUrl = new URL(url);
+    scopedUrl.searchParams.set("search_path", `${schemaName},public`);
+    process.env.DATABASE_URL = scopedUrl.toString(); process.env.DATABASE_DIRECT_URL = scopedUrl.toString();
+    sql = postgres(scopedUrl.toString(), { max: 3 });
     for (const id of [actor, caller]) await sql`insert into public."user" (id, username, created_at) values (${id}::uuid, ${`purchase-${id}@example.test`}, now())`;
     await sql`insert into public.workspace (id, name, credits, twilio_data, disabled, feature_flags) values (${workspaceId}::uuid, 'Purchase fixture', 100, '{}'::jsonb, false, '{}'::jsonb)`;
     for (const [id, role] of [[actor, "owner"], [caller, "caller"]]) await sql`insert into public.workspace_member (id, workspace_id, user_id, role_id) values (${`purchase:${workspaceId}:${id}`}, ${workspaceId}, ${id}, ${role})`;
+    await fixture`insert into public.workspace_number_purchase
+      (id, workspace, actor_user_id, phone_number, account_sid, credits, state, lease_token, lease_expires_at)
+      values (${publicControlId}::uuid, ${workspaceId}::uuid, ${actor}, '+14165550999',
+        'AC00000000000000000000000000009999', 100, 'reserved', ${publicControlLease}::uuid, now() - interval '1 day')`;
     service = await import("@/lib/platform-workspace-numbers.server");
   });
   async function clearFault() {
-    if (faultTable) { await sql.unsafe(`drop trigger if exists ${trigger} on public.${faultTable}`); faultTable = undefined; }
+    if (faultTable) { await sql.unsafe(`drop trigger if exists ${trigger} on ${faultTable === "workspace_number_purchase" ? `"${schemaName}".workspace_number_purchase` : `public.${faultTable}`}`); faultTable = undefined; }
     await sql.unsafe(`drop function if exists public.${fn}()`);
   }
-  afterEach(async () => { if (sql) await clearFault(); });
+  afterEach(async () => {
+    if (sql) await clearFault();
+    if (fixture) {
+      const [control] = await fixture`select state, lease_token from public.workspace_number_purchase where id = ${publicControlId}::uuid`;
+      expect(control).toEqual({ state: "reserved", lease_token: publicControlLease });
+    }
+  });
   afterAll(async () => {
     try {
       if (sql) {
@@ -68,6 +87,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     } finally {
       await sql?.end();
       if (service) { const { pool, directPool } = await import("@/server/db"); await Promise.all([pool.end(), directPool.end()]); }
+      if (fixture) { await fixture.unsafe(`drop schema if exists "${schemaName}" cascade`); await fixture.end(); }
       for (const [key, value] of Object.entries(originalEnv)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
     }
   });
@@ -86,18 +106,18 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     provider.remove.mockImplementation(async (sid: string) => { provider.active.delete(sid); return true; });
     await sql`delete from public.workspace_number where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
-    await sql`delete from public.workspace_number_purchase where workspace = ${workspaceId}::uuid`;
+    await sql`delete from workspace_number_purchase where workspace = ${workspaceId}::uuid`;
     const data = { onboarding: { emergencyVoice: { address }, messagingService: { serviceSid: null } } };
     await sql`update public.workspace set credits = 100, twilio_data = ${sql.json(data)} where id = ${workspaceId}::uuid`;
     const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server"); invalidateWorkspaceTwilioData(workspaceId);
   });
   async function activeReservations() {
-    const [row] = await sql`select count(*)::int as count from public.workspace_number_purchase
+    const [row] = await sql`select count(*)::int as count from workspace_number_purchase
       where workspace = ${workspaceId}::uuid and state not in ('completed', 'cancelled')`;
     return row.count;
   }
   async function expireReservations() {
-    await sql`update public.workspace_number_purchase set lease_expires_at = now() - interval '1 minute'
+    await sql`update workspace_number_purchase set lease_expires_at = now() - interval '1 minute'
       where workspace = ${workspaceId}::uuid and state not in ('completed', 'cancelled')`;
   }
   async function state() {
@@ -240,7 +260,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
   });
   test("failure after the ledger write rolls back inventory and never emits a false debit event", async () => {
     await sql.unsafe(`create function public.${fn}() returns trigger language plpgsql as $$ begin raise exception 'Owned purchase completion fault'; end $$`);
-    await sql.unsafe(`create trigger ${trigger} before update on public.workspace_number_purchase for each row when (new.workspace = '${workspaceId}'::uuid and new.state = 'completed') execute function public.${fn}()`);
+    await sql.unsafe(`create trigger ${trigger} before update on workspace_number_purchase for each row when (new.workspace = '${workspaceId}'::uuid and new.state = 'completed') execute function public.${fn}()`);
     faultTable = "workspace_number_purchase";
     expect(await service.purchaseWorkspaceNumber(actor, workspaceId, "+14165550001")).toMatchObject({ ok: false });
     expect(await state()).toEqual({ credits: 100, numbers: 0, ledger: 0, active: 0 });
@@ -268,7 +288,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     expect(await activeReservations()).toBe(0);
   });
   test("a stale reservation that never began provider creation releases its budget", async () => {
-    const { reserveNumberPurchase } = await import("@/lib/number-purchase-reservation.server");
+    const { reserveNumberPurchase } = await import("@/server/number-purchase-reservation.server");
     expect(await reserveNumberPurchase({ workspaceId, actorUserId: actor, phoneNumber: "+14165550001", accountSid: "AC00000000000000000000000000002084" })).toMatchObject({ ok: true });
     await expireReservations();
     const { runNumberPurchaseRecovery } = await import("@/lib/number-purchase-recovery.server");
@@ -318,7 +338,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     expect(row.twilio_data.onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.sort()).toEqual(["+14165550001", "+14165550002"]);
   });
   test("a recovery lease prevents the stale request from finalizing or cancelling", async () => {
-    const { reserveNumberPurchase, startNumberPurchase, recordNumberPurchaseProvider, claimNumberPurchaseRecovery, finalizeNumberPurchase, cancelNumberPurchase } = await import("@/lib/number-purchase-reservation.server");
+    const { reserveNumberPurchase, startNumberPurchase, recordNumberPurchaseProvider, claimNumberPurchaseRecovery, finalizeNumberPurchase, cancelNumberPurchase } = await import("@/server/number-purchase-reservation.server");
     const reserved = await reserveNumberPurchase({ workspaceId, actorUserId: actor, phoneNumber: "+14165550001", accountSid: provider.accountSid });
     if (!reserved.ok) throw new Error("Fixture reservation required");
     await startNumberPurchase(reserved.purchase);
@@ -337,7 +357,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     expect(await activeReservations()).toBe(0);
   });
   test("two sweep claims cannot own the same expired reservation", async () => {
-    const { reserveNumberPurchase, claimNumberPurchaseRecovery } = await import("@/lib/number-purchase-reservation.server");
+    const { reserveNumberPurchase, claimNumberPurchaseRecovery } = await import("@/server/number-purchase-reservation.server");
     expect(await reserveNumberPurchase({ workspaceId, actorUserId: actor, phoneNumber: "+14165550001", accountSid: provider.accountSid })).toMatchObject({ ok: true });
     await expireReservations();
     const claims = await Promise.all([claimNumberPurchaseRecovery(), claimNumberPurchaseRecovery()]);
@@ -352,7 +372,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     const { createWorkspaceTwilioInstance } = await import("@/lib/database/workspace.server");
     const { compensateNumberPurchase, runNumberPurchaseRecovery } = await import("@/lib/number-purchase-recovery.server");
     expect(await compensateNumberPurchase(purchase, await createWorkspaceTwilioInstance({ workspace_id: workspaceId }))).toBe(false);
-    await sql`update public.workspace_number_purchase set lease_expires_at = now() - interval '1 minute' where workspace = ${workspaceId}::uuid`;
+    await sql`update workspace_number_purchase set lease_expires_at = now() - interval '1 minute' where workspace = ${workspaceId}::uuid`;
     expect(await runNumberPurchaseRecovery()).toEqual({ examined: 0, cancelled: 0, pending: 0 });
     expect(provider.remove).not.toHaveBeenCalled();
     expect(await state()).toEqual({ credits: 0, numbers: 1, ledger: 1, active: 1 });
@@ -360,7 +380,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
   test.each(["wrong account", "different phone", "ambiguous match"])("unknown creation with %s retains its hold", async (kind) => {
     provider.create.mockRejectedValue(Object.assign(new Error("Synthetic create timeout"), { code: "ETIMEDOUT" }));
     expect(await service.purchaseWorkspaceNumber(actor, workspaceId, "+14165550001")).toMatchObject({ ok: false, status: 409 });
-    const [purchase] = await sql`select id from public.workspace_number_purchase where workspace = ${workspaceId}::uuid`;
+    const [purchase] = await sql`select id from workspace_number_purchase where workspace = ${workspaceId}::uuid`;
     const row = { sid: "PN00000000000000000000000000002084", accountSid: provider.accountSid, phoneNumber: "+14165550001", friendlyName: `[purchase:${purchase.id}]` };
     if (kind === "wrong account") row.accountSid = "AC00000000000000000000000000009999";
     if (kind === "different phone") row.phoneNumber = "+14165550002";
@@ -377,7 +397,7 @@ describe("number purchase preserves credits and inventory (#2084)", () => {
     expect((await state()).credits).toBe(100);
   });
   test("a changed provider account cannot release the recorded number", async () => {
-    const { reserveNumberPurchase, startNumberPurchase, recordNumberPurchaseProvider } = await import("@/lib/number-purchase-reservation.server");
+    const { reserveNumberPurchase, startNumberPurchase, recordNumberPurchaseProvider } = await import("@/server/number-purchase-reservation.server");
     const reserved = await reserveNumberPurchase({ workspaceId, actorUserId: actor, phoneNumber: "+14165550001", accountSid: provider.accountSid });
     if (!reserved.ok) throw new Error("Fixture reservation required");
     await startNumberPurchase(reserved.purchase);

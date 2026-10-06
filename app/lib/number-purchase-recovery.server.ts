@@ -6,7 +6,7 @@ import { isObject } from "@/lib/type-safety-utils";
 import {
   getCancellableNumberPurchase, cancelNumberPurchase, claimNumberPurchaseRecovery,
   deferNumberPurchaseRecovery, numberPurchaseProviderMarker, type NumberPurchase,
-} from "@/lib/number-purchase-reservation.server";
+} from "@/server/number-purchase-reservation.server";
 
 export function isDefiniteNumberPurchaseRejection(error: unknown) {
   return isObject(error) && typeof error.status === "number" &&

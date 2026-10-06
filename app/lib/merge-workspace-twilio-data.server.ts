@@ -2,9 +2,8 @@ import { eq, or, sql } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { isObject } from "@/lib/type-safety-utils";
-import type { Database } from "@/server/db";
 
-export type TwilioDataExecutor = Pick<Database, "select" | "update">;
+export type TwilioDataExecutor = Pick<typeof adminDb, "select" | "update">;
 
 export type WorkspaceTwilioData = Record<string, unknown>;
 

@@ -80,6 +80,10 @@ Keep shared server module mock factories additive with `importOriginal`.
 When a real service adds a transaction callback, update each calling fixture's
 transaction and scoped-client boundary. Keep its existing behavior assertions;
 prove rollback and persisted state in the real Postgres tier.
+When extracting a transaction, keep storage and global claims in `app/server`.
+Do not add an unscoped client allowance to a product adapter. Derive a shared
+executor type from its existing database capability, and remove a stale guard
+entry only after its import is gone.
 Include route re-exports in a caller inventory. Older combined route tests can
 import the route barrel without naming the service or its action server file.
 Run those cases before relying on a focused caller result.

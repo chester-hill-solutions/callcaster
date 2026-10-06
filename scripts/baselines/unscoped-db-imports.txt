@@ -53,7 +53,6 @@ app/lib/platform-billing.server.ts::@/server/db
 app/lib/platform-data.server.ts::@/server/db
 app/lib/platform-idempotency.server.ts::@/server/db
 app/lib/platform-rate-limit-db.server.ts::@/server/db
-app/lib/platform-workspace-numbers.server.ts::@/server/db
 app/lib/platform-workspace.server.ts::@/server/admin-db
 app/lib/queue.server.ts::@/server/db
 app/lib/script-persistence.server.ts::@/server/db
