@@ -550,7 +550,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(403);
 
     setupEmailVmMocks();
     credentialsMocks.readTwilioWorkspaceCredentials.mockReturnValueOnce(null);

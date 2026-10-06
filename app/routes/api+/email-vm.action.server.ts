@@ -85,16 +85,19 @@ export const action = defineAction({
       if (!callRow.to) {
         throw new Error("Call destination number not found");
       }
+      if (!callRow.workspace) {
+        return routeData({ error: "Voicemail call binding does not match" }, { status: 403 });
+      }
 
-      const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
+      const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to, callRow.workspace);
 
       if (!number) {
-        throw new Error("Error fetching workspace number: not found");
+        return routeData({ error: "Voicemail call binding does not match" }, { status: 403 });
       }
       if (!number.workspace) {
         throw new Error("Workspace not found");
       }
-      if (!callRow.workspace || callRow.workspace !== number.workspace.id) {
+      if (callRow.workspace !== number.workspace.id) {
         return routeData({ error: "Voicemail call binding does not match" }, { status: 403 });
       }
       const boundRecipient = await getInboundVoicemailRecipient({ workspaceId: number.workspace.id, callSid, phoneNumber: callRow.to });

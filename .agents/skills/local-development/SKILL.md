@@ -326,7 +326,10 @@ not itself expose the full row. Check serialized nested payloads separately.
 
 For global-table mutations, verify the actual UPDATE predicate with foreign and
 owned rows, then exercise the real API/form error responses. Access checks before
-a bare-ID write do not impose tenant scope. Keep a permitted-role and an explicit
+a bare-ID write do not impose tenant scope. For callback context reads, select the
+number by the stored call workspace as well as its phone. Test two workspace
+rows with the same phone: a workspace check after a phone-only `LIMIT 1` can
+block valid work after it selects the wrong row. Keep a permitted-role and an explicit
 global-admin control when their policies differ.
 
 ## RPC migration changes

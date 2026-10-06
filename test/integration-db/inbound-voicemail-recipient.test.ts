@@ -110,6 +110,15 @@ suite("inbound voicemail recipient delivery (#2268)", () => {
     }, options.authToken), params: {}, context: new RouterContextProvider() }));
   }
 
+  test("the bound recipient survives an old workspace row for the same phone", async () => {
+    await client`delete from workspace_number where workspace = ${workspace} and phone_number = ${phone}`;
+    await client`insert into workspace_number (workspace, type, phone_number, inbound_action) values (${foreignWorkspace}, 'local', ${phone}, 'old-owner@example.test')`;
+    const [active] = await client`insert into workspace_number (workspace, type, phone_number, inbound_action, inbound_script_id) values (${workspace}, 'local', ${phone}, 'default@example.test', ${scriptId}) returning id`;
+    numberId = Number(active.id);
+    expect((await route()).status).toBe(200);
+    expect((await callback()).status).toBe(200);
+    expect(provider.send.mock.calls[0][0].to).toEqual(["script@example.test"]);
+  });
   test("the IVR script inbox receives the recording instead of a different number default", async () => {
     expect(await (await route()).text()).toContain("<Record");
     const delivered = await callback(); expect(delivered.status).toBe(200);

@@ -161,7 +161,7 @@ export async function updateWorkspaceNumberCapabilitiesByPhone(
   return rows;
 }
 
-export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: string) {
+export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: string, workspaceId: string) {
   const [row] = await adminDb
     .select({
       inbound_action: workspaceNumberTable.inbound_action,
@@ -177,7 +177,10 @@ export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: st
       workspaceTable,
       eq(workspaceNumberTable.workspace, workspaceTable.id),
     )
-    .where(eq(workspaceNumberTable.phone_number, phoneNumber))
+    .where(and(
+      eq(workspaceNumberTable.phone_number, phoneNumber),
+      eq(workspaceNumberTable.workspace, workspaceId),
+    ))
     .limit(1);
 
   if (!row?.workspaceId) {
