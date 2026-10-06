@@ -227,6 +227,9 @@ updates cannot prove driver serialization or first-write preservation.
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.
+Read current enum values before seeding companion rows. Script and campaign
+types can use different vocabularies; a script type does not prove a valid
+campaign enum.
 
 The scoped client's delete method returns no rows. When compensation depends
 on whether a row was removed, use a transaction-bound deletion with explicit
@@ -416,6 +419,10 @@ When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
 push; run the full tier if the caller inventory is not complete.
 
+For React Aria controls, a DOM click can miss the native press action. If the
+control stays unchanged, inspect the current browser state and try native input.
+Confirm the dialog or selected value before claiming an interactive check.
+
 Finish full CI and codegen writers before live Vite browser acceptance.
 Generated file rewrites can reload an active request fixture. Require a completed
 stable browser run after those writers stop.
@@ -424,6 +431,10 @@ For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from
 a fresh result; verify a second send and later user edits.
+
+Route tests use `asRouteResponse` from `test/helpers/route-result.ts`. It returns
+a response-shaped adapter, not a native `Response`; narrow its documented fields
+when inspecting mixed concurrent-write results.
 
 ## Scripted source edits
 

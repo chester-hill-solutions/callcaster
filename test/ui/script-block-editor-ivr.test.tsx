@@ -253,21 +253,21 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "On no input" }));
     fireEvent.click(screen.getByText("Replay these instructions"));
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ noInput: { action: "replay", maxReplays: 2 } }),
+      expect.objectContaining({ wireExtras: { noInput: { action: "replay", maxReplays: 2 } } }),
     );
 
     // Change the wait time -> writes gatherTimeoutSeconds.
     fireEvent.change(screen.getByLabelText("Wait (seconds)"), { target: { value: "12" } });
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ gatherTimeoutSeconds: 12 }),
+      expect.objectContaining({ wireExtras: { gatherTimeoutSeconds: 12 } }),
     );
   });
 
   test("a block with an existing noInput:route renders the route target (#1883)", () => {
     renderStep({
       block: spokenBlock({
-        noInput: { action: { pageId: "page_2", blockId: "b2" }, maxReplays: 3 },
-        gatherTimeoutSeconds: 9,
+        wireExtras: { noInput: { action: { pageId: "page_2", blockId: "b2" }, maxReplays: 3 },
+          gatherTimeoutSeconds: 9 },
       }),
     });
 

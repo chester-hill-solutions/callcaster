@@ -31,6 +31,7 @@ export type ScriptBlockEditorProps = {
    * type from an older editor or a live-call script.
    */
   audioFlow?: boolean;
+  inboundFlow?: boolean;
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
@@ -60,6 +61,7 @@ export function ScriptBlockEditor({
   block,
   readOnly = false,
   audioFlow = false,
+  inboundFlow = false,
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
@@ -130,6 +132,7 @@ export function ScriptBlockEditor({
           options={options}
           readOnly={readOnly}
           routingTargets={routingTargets}
+          inboundPageByBlockId={inboundFlow ? pageByBlockId : undefined}
           onOptionAdd={onOptionAdd}
           onOptionChange={onOptionChange}
           onOptionRemove={onOptionRemove}

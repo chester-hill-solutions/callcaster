@@ -39,11 +39,16 @@ export function parseJsonField<T>(value: unknown): T {
  * `check:pg-errors` enforces this.
  */
 export const PG_ERROR_CODES = {
+  SERIALIZATION_FAILURE: "40001",
   UNIQUE_VIOLATION: "23505",
   FOREIGN_KEY_VIOLATION: "23503",
   INVALID_TEXT_REPRESENTATION: "22P02",
   POSTGREST_NOT_FOUND: "PGRST116",
 } as const;
+
+export function isSerializationFailure(error: unknown): boolean {
+  return getPostgresErrorCode(error) === PG_ERROR_CODES.SERIALIZATION_FAILURE;
+}
 
 /**
  * Returns the first string `code` found on the error or anywhere down its

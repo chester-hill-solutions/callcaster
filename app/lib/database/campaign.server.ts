@@ -19,6 +19,7 @@ import { createTenantDb, withAppCurrentUser, type TenantDb } from "@/server/tena
 // type, taken from the module that produces it rather than re-declared here.
 type TransactionClient = Parameters<Parameters<typeof withAppCurrentUser>[1]>[0];
 import { db, type Database } from "@/server/db";
+import { withInboundScriptWrite } from "@/server/inbound-script-write.server";
 import {
   dequeueQueueEntry,
   type DeferredEmit,
@@ -642,13 +643,9 @@ export async function updateCampaignWithScript(args: {
   const database = args.dbInstance ?? db;
 
   try {
-    return await database.transaction(
-      async (txRaw) => {
-        // type-cast justified: drizzle transaction callback type is not precisely exported as Database
-        const tdb = createTenantDb(
-          args.workspaceId,
-          txRaw as unknown as Database,
-        );
+    return await withInboundScriptWrite(
+      args.workspaceId,
+      async (tdb) => {
         const script = await persistCampaignScriptWithTenantDb({
           workspaceId: args.workspaceId,
           campaignId,
@@ -675,7 +672,7 @@ export async function updateCampaignWithScript(args: {
         });
         return { ...updated, scriptId: script.id, script };
       },
-      { isolationLevel: "serializable" },
+      database,
     );
   } catch (error: unknown) {
     if (isUniqueViolation(error)) {

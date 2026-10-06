@@ -1,8 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+
+const feedback = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }));
+vi.mock("sonner", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("sonner")>()),
+  toast: { error: feedback.error, success: feedback.success },
+}));
 
 // The route re-exports its loader/action from server-only modules; the
 // component under test never runs them, so stub them out to keep the DB out of
@@ -89,4 +95,29 @@ describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
     expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /save/i })).toHaveLength(1);
   });
+  test.each([
+    [400, "The menu has invalid routing. Review Script validation."],
+    [409, "The menu changed during this save. Review it and try again."],
+  ])("keeps the failed draft and server feedback for a %s save, then permits retry", async (status, message) => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: message }), { status: Number(status) }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ script: { ...script, name: "Voter ID script (edited)" } }), { status: 200 }));
+    vi.stubGlobal("fetch", request);
+    feedback.error.mockClear(); feedback.success.mockClear();
+    try {
+      await renderScriptEditor();
+      await screen.findByRole("heading", { name: script.name });
+      await userEvent.click(screen.getByRole("button", { name: "dirty the form" }));
+      await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      await waitFor(() => expect(feedback.error).toHaveBeenCalledWith(message));
+      expect(screen.getByRole("heading", { name: "Voter ID script (edited)" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+      expect(request).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+      await waitFor(() => expect(feedback.success).toHaveBeenCalledWith("Script saved"));
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
 });

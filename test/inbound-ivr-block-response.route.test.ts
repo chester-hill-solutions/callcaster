@@ -73,6 +73,18 @@ beforeEach(() => {
 });
 
 describe("inbound IVR block response", () => {
+  test("a declared page target does not need a generated page_ prefix", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: { pages: { page_1: { blocks: ["b1"] }, goodbye: { blocks: ["b2"] } },
+        blocks: { b1: { id: "b1", options: [{ value: "1", next: "goodbye" }] }, b2: { id: "b2", options: [] } } },
+    });
+    const { action } = await import("../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server");
+    const response = await asRouteResponse(action({ request: makeReq({ CallSid: "CA1", Digits: "1" }),
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" }, context: new RouterContextProvider() }));
+    expect(await response.text()).toContain("<Redirect>https://base.example/api/inbound-ivr/1/goodbye/</Redirect>");
+  });
+
   test("internal error text is not spoken to the caller", async () => {
     // Simulate an internal error from findCallBySid
     mocks.findCallBySid.mockRejectedValue(new Error("ECONNREFUSED postgres:5432"));

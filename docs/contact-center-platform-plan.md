@@ -138,10 +138,14 @@ is not changed by the duplicate-offer guard.
 ### 2.1 Data model
 
 - Reuse the `script` table with `type = 'inbound_ivr'`; same `steps` pages/blocks document ([docs/script-json-format.md](script-json-format.md)).
-- New **option target grammar** (extends the existing `next` values `hangup` / `pageId:blockId` / `page_…`):
+- New **option target grammar** (extends the existing `next` values `hangup` / `end` / `pageId:blockId` / a declared page ID):
   - `queue:{queueId}` — enqueue into an inbound queue (milestone 1 flow takes over).
   - `forward:{e164}` — `<Dial>` a number.
   - `voicemail:{email}` — reuse [inbound-voicemail-twiml](../app/lib/inbound-voicemail-twiml.server.ts).
+- Attachment accepts only `inbound_ivr` scripts owned by the number's workspace. Queue targets use positive safe integer IDs and must belong to that workspace. Forward targets use E.164 syntax: `+`, a nonzero first digit and at most 15 digits ([Twilio E.164 reference](https://www.twilio.com/docs/glossary/what-e164)). This checks syntax, not whether the number exists or can receive a call. Voicemail targets use a conservative email address with a dotted domain. Email delivery for that target remains separate work in #2268.
+- A `pageId:blockId` target must refer to a block in that page. Bare block IDs are not inbound targets. A response with no `next` continues to the next ordered step; at the end, the call hangs up. No-input routes must refer to a block in the declared page, and replay limits must be nonnegative safe integers.
+- The platform number API, phone-number form and automated-menu preset validate before attachment. Workspace and campaign saves validate an attached menu before overwriting it. A rejected save keeps the last valid stored menu and the editor draft. Unattached invalid drafts and explicit copies can be saved. Null clears a number's attachment. Concurrent attachment/save conflicts return 409 with a retry message.
+- The editor uses the same inbound document and target validator. The permanent **Script validation** toolbar action opens shared shad-cc sheet details. Validation changes do not add a row to the page. Queue ownership is checked on the server, so a syntactically valid draft can still fail attachment.
 - `workspace_number`: add `inbound_script_id bigint null FK script(id)`. Precedence: **IVR script → queue → handset → forward → voicemail**.
 
 ### 2.2 Runtime
@@ -222,7 +226,7 @@ is not changed by the duplicate-offer guard.
 
 ### IVR builder edges (M2)
 
-- **Activation validation**: extend the existing script validation ([docs/script-validator.js](script-validator.js) lineage) for inbound scripts — unreachable blocks, options with no `next`, dangling `queue:{id}` references (queue deleted), missing audio files. A script with errors can be saved but not assigned to a number.
+- **Activation validation**: extend the existing script validation ([docs/script-validator.js](script-validator.js) lineage) for inbound scripts — unreachable blocks, dangling `queue:{id}` references (queue deleted), missing audio files. A response with no `next` follows the documented linear continuation. A script with errors can be saved but not assigned to a number.
 - **Always-an-exit rule**: every block must terminate (hangup/forward/voicemail/queue) or navigate; gather-timeout fallbacks get a default destination so silent callers (rotary phones, pocket dials, IVR-confused humans) aren't looped forever — default after 2 unmatched attempts: replay menu once, then route to the script's configured fallback destination.
 - DTMF-first for inbound menus: speech matching stays supported (existing engine), but the builder defaults new inbound options to digits — speech recognition surprises (`vx-any`) are opt-in.
 

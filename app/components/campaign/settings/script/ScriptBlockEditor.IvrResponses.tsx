@@ -22,6 +22,7 @@ export type IvrResponsesEditorProps = {
   options: ScriptOption[];
   readOnly: boolean;
   routingTargets: RoutingTarget[];
+  inboundPageByBlockId?: Record<string, string>;
   onOptionAdd: () => void;
   onOptionChange: (optionId: string, patch: Partial<ScriptOption>) => void;
   onOptionRemove: (optionId: string) => void;
@@ -36,11 +37,12 @@ export function IvrResponsesEditor({
   options,
   readOnly,
   routingTargets,
+  inboundPageByBlockId,
   onOptionAdd,
   onOptionChange,
   onOptionRemove,
 }: IvrResponsesEditorProps) {
-  const routingOptions = routingOptionsFor(routingTargets, "Continue to the next step");
+  const routingOptions = routingOptionsFor(routingTargets, "Continue to the next step", inboundPageByBlockId);
 
   return (
     <div className="grid gap-3">
@@ -89,6 +91,9 @@ function IvrResponseRow({
   const labelId = useId();
   const nextId = useId();
   const value = option.value ?? "";
+  const targetChoices = option.next && !routingOptions.some((target) => target.value === option.next)
+    ? [{ value: option.next, label: option.next }, ...routingOptions]
+    : routingOptions;
   // Older scripts stored free-text values ("yes", "good"). Show them as-is so
   // nothing silently changes, but only offer the keys the runtime can match.
   const keyChoices =
@@ -138,7 +143,7 @@ function IvrResponseRow({
             <SelectValue placeholder="Select…" />
           </SelectTrigger>
           <SelectContent>
-            {routingOptions.map((routingOption) => (
+            {targetChoices.map((routingOption) => (
               <SelectItem key={routingOption.value} value={routingOption.value}>
                 {routingOption.label}
               </SelectItem>

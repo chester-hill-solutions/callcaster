@@ -147,7 +147,7 @@ export const action = defineAction({
           inbound_script_id: inboundScriptId ? Number(inboundScriptId) : null,
         },
       );
-      if (!result.ok) return { error: result.error };
+      if (!result.ok) return routeData({ error: result.error }, { status: result.status });
       return null;
     }
 

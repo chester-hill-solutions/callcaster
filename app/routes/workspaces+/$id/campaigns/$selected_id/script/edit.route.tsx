@@ -3,6 +3,7 @@ export { action } from "./edit.action.server";
 
 import { useLoaderData } from "react-router";
 import { useState } from "react";
+import { toUserMessage } from "@/lib/user-message";
 import { toast } from "sonner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -147,9 +148,9 @@ export default function ScriptEditor() {
     } catch (error) {
       loggerClient.error("Error saving update:", error);
       toast.error(
-        pageData.type === "message"
+        toUserMessage(error, pageData.type === "message"
           ? "Couldn't save the message. Please try again."
-          : "Couldn't save the script. Please try again.",
+          : "Couldn't save the script. Please try again."),
       );
     } finally {
       setIsSaving(false);

@@ -740,10 +740,11 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
             },
           },
         },
-        "400": errorResponse("Validation error"),
+        "400": errorResponse("Invalid number settings or inbound menu. The previous configuration is preserved."),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
         "404": errorResponse("Number not found"),
+        "409": errorResponse("The menu changed during this save. Review it and retry."),
       },
     },
     delete: {

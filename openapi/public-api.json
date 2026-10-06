@@ -10151,7 +10151,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Invalid number settings or inbound menu. The previous configuration is preserved.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10182,6 +10182,16 @@
           },
           "404": {
             "description": "Number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The menu changed during this save. Review it and retry.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12304,7 +12314,9 @@
           },
           "inbound_script_id": {
             "type": "integer",
-            "nullable": true
+            "minimum": 1,
+            "nullable": true,
+            "description": "An inbound_ivr script in this workspace with valid document and routing targets. Referenced queues must belong to this workspace. Null clears the attachment. Invalid selection preserves the previous configuration."
           },
           "handset_enabled": {
             "type": "boolean"

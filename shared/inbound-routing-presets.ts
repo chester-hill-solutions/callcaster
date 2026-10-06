@@ -346,6 +346,7 @@ export function isConservativeEmail(value: string): boolean {
   if (!localPart || !domain || localPart.length > 64 || domain.length > 255) {
     return false;
   }
+  if (localPart.startsWith(".") || localPart.endsWith(".") || localPart.includes("..")) return false;
   const topLevelDomain = domain.split(".").at(-1);
   return domain.includes(".") && Boolean(topLevelDomain && topLevelDomain.length >= 2);
 }

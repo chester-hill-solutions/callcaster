@@ -9,6 +9,7 @@
  */
 
 import type { ScriptDocument } from "@chester-hill-solutions/scriptkit-call-script-core";
+import { isConservativeEmail } from "../../shared/inbound-routing-presets";
 
 export type IvrRoutingIssue =
   | {
@@ -24,10 +25,9 @@ export type IvrRoutingValidation = {
   issues: IvrRoutingIssue[];
 };
 
-export type IvrRoutingInput = Pick<
-  ScriptDocument,
-  "pages" | "blocks" | "startPageId"
->;
+export type IvrRoutingInput = Pick<ScriptDocument, "pages" | "startPageId"> & {
+  blocks: Record<string, ScriptDocument["blocks"][string] | { id: string; options?: Array<{ next?: string }> }>;
+};
 
 const TERMINAL_TARGETS = new Set(["hangup", "end"]);
 
@@ -36,18 +36,49 @@ type ResolvedTarget =
   | { kind: "block"; pageId: string; blockId: string }
   | { kind: "invalid"; reason: string };
 
+export type InboundTerminalTarget =
+  | { kind: "queue"; queueId: number }
+  | { kind: "forward"; phoneNumber: string }
+  | { kind: "voicemail"; email: string }
+  | { kind: "invalid"; reason: string };
+
+/** Syntax only; the server checks queue ownership before activation. */
+export function parseInboundTerminalTarget(next: string): InboundTerminalTarget | null {
+  if (!/^(queue|forward|voicemail):/.test(next)) return null;
+  const separator = next.indexOf(":");
+  const kind = next.slice(0, separator);
+  const value = next.slice(separator + 1);
+  if (kind === "queue" && /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) && Number(value) > 0) {
+    return { kind: "queue", queueId: Number(value) };
+  }
+  // Twilio's E.164 format: decimal digits, nonzero country prefix, at most 15 digits.
+  if (kind === "forward" && /^\+[1-9]\d{1,14}$/.test(value)) {
+    return { kind: "forward", phoneNumber: value };
+  }
+  if (kind === "voicemail" && isConservativeEmail(value)) {
+    return { kind: "voicemail", email: value };
+  }
+  return { kind: "invalid", reason: `Has an invalid ${kind} target "${next}"` };
+}
+
 function resolveNext(
   next: string,
   currentPageId: string,
   document: IvrRoutingInput,
+  inbound: boolean,
 ): ResolvedTarget {
   if (TERMINAL_TARGETS.has(next)) {
     return { kind: "terminal" };
   }
 
+  if (inbound) {
+    const terminal = parseInboundTerminalTarget(next);
+    if (terminal) return terminal.kind === "invalid" ? terminal : { kind: "terminal" };
+  }
+
   if (next.includes(":")) {
-    const [pageId, blockId] = next.split(":");
-    if (!pageId || !blockId) {
+    const [pageId, blockId, extra] = next.split(":");
+    if (!pageId || !blockId || (inbound && extra !== undefined)) {
       return { kind: "invalid", reason: `Malformed page:block target "${next}"` };
     }
     if (!document.pages[pageId]) {
@@ -55,6 +86,9 @@ function resolveNext(
     }
     if (!document.blocks[blockId]) {
       return { kind: "invalid", reason: `Routes to missing block "${blockId}"` };
+    }
+    if (inbound && !document.pages[pageId].blockIds.includes(blockId)) {
+      return { kind: "invalid", reason: `Routes to block "${blockId}" outside page "${pageId}"` };
     }
     return { kind: "block", pageId, blockId };
   }
@@ -70,7 +104,7 @@ function resolveNext(
     return { kind: "block", pageId: next, blockId: firstBlockId };
   }
 
-  if (document.blocks[next]) {
+  if (!inbound && document.blocks[next]) {
     return { kind: "block", pageId: currentPageId, blockId: next };
   }
 
@@ -79,6 +113,7 @@ function resolveNext(
 
 export function validateIvrRouting(
   document: IvrRoutingInput,
+  options: { inbound?: boolean } = {},
 ): IvrRoutingValidation {
   const issues: IvrRoutingIssue[] = [];
   const edges = new Map<string, Array<{ pageId: string; blockId: string }>>();
@@ -93,7 +128,7 @@ export function validateIvrRouting(
         if (!option.next) {
           continue;
         }
-        const resolved = resolveNext(option.next, page.id, document);
+        const resolved = resolveNext(option.next, page.id, document, options.inbound === true);
         if (resolved.kind === "terminal") {
           continue;
         }
