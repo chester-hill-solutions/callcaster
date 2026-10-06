@@ -100,7 +100,6 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                     Sync Twilio
                                 </Button>
                             </Form>
-                            <Button size="sm">Add Workspace</Button>
                         </div>
                     </div>
                 </CardHeader>

@@ -79,7 +79,6 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button size="sm">Add User</Button>
                             <span className="text-sm text-muted-foreground">{filteredUsers.length} users</span>
                         </div>
                     </div>

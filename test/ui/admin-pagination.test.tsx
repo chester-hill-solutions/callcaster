@@ -214,3 +214,31 @@ describe.each(panels)("$name admin pagination", (entry) => {
     ).toHaveAttribute("aria-current", "page");
   });
 });
+
+
+describe("admin creation controls (#2111)", () => {
+  test.each([
+    ["users", "Add User"],
+    ["workspaces", "Add Workspace"],
+  ])("%s has no creation control without a creation flow", async (name, label) => {
+    const entry = panels.find((panel) => panel.name === name);
+    if (!entry) throw new Error("Missing admin panel fixture");
+    mountPanel(entry);
+    expect(screen.getByRole("tabpanel")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: label, exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: label, exact: true })).not.toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText(entry.search), "Record 12");
+    expect(rows()).toHaveLength(1);
+    expect(screen.getByText("Record 12", { exact: true })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear Filters" }));
+    expect(rows()).toHaveLength(10);
+    expect(screen.getByText("Record 01", { exact: true })).toBeInTheDocument();
+    if (name === "workspaces") {
+      const sync = screen.getByRole("button", { name: "Sync Twilio" });
+      expect(sync).toHaveAttribute("type", "submit");
+      expect(sync.closest("form")?.querySelector('input[name="_action"]')).toHaveValue("sync_all_workspaces_twilio");
+    }
+  });
+});
