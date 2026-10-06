@@ -5,13 +5,11 @@ import { CREDIT_PRICE_CAD } from "@/lib/pricing";
 
 type CampaignCostPanelProps = {
   billing: CampaignBillingSummary;
-  queuedCount: number;
   completedCount: number;
 };
 
 export function CampaignCostPanel({
   billing,
-  queuedCount,
   completedCount,
 }: CampaignCostPanelProps) {
   const actualCad = billing.actualDebitCredits * CREDIT_PRICE_CAD;
@@ -22,7 +20,7 @@ export function CampaignCostPanel({
       <SectionHeader
         compact
         title="Campaign cost"
-        description="Option B rates — estimates use queued contacts; actuals come from the credit ledger."
+        description="Estimated remaining send cost; actual charges come from the credit ledger."
       />
 
       <div className="space-y-4">
@@ -30,13 +28,14 @@ export function CampaignCostPanel({
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-lg border p-4">
-            <div className="text-sm text-muted-foreground">Estimated (queued)</div>
+            <div className="text-sm text-muted-foreground">Estimated remaining</div>
             <div className="mt-1 text-lg font-semibold">
               {formatCredits(billing.estimate.totalCredits)} credits
             </div>
             <div className="text-xs text-muted-foreground">
-              {queuedCount.toLocaleString()} contacts × {billing.estimate.perContactCredits}{" "}
-              ({formatCurrency(estimateCad)})
+              {billing.estimate.contactCount.toLocaleString()} contacts ·{" "}
+              {billing.estimate.perContactCredits.toLocaleString(undefined, { maximumFractionDigits: 2 })}{" "}
+              credits/contact on average ({formatCurrency(estimateCad)})
             </div>
           </div>
           <div className="rounded-lg border p-4">

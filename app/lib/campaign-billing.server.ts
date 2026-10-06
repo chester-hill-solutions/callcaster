@@ -15,6 +15,7 @@ import {
   legacyCallKeys,
   bucketFromIdempotencyKey,
 } from "@/lib/billing-keys";
+import { loadMessageCampaignCreditEstimate } from "@/lib/campaign-message-estimate.server";
 import { createTenantDb } from "@/server/tenant-db";
 
 export type { CampaignBillingSummary };
@@ -27,10 +28,12 @@ export async function loadCampaignBillingSummary(args: {
   campaignType: string | null | undefined;
   queuedCount: number;
 }): Promise<CampaignBillingSummary> {
-  const estimate = estimateCampaignCredits(args.campaignType, args.queuedCount);
   const tdb = createTenantDb(args.workspaceId);
 
-  const [messageRows, callRows] = await Promise.all([
+  const [estimate, messageRows, callRows] = await Promise.all([
+    args.campaignType === "message"
+      ? loadMessageCampaignCreditEstimate(tdb, args.workspaceId, args.campaignId)
+      : Promise.resolve(estimateCampaignCredits(args.campaignType, args.queuedCount)),
     tdb.message.findMany({
       where: and(
         eq(messageTable.campaign_id, args.campaignId),

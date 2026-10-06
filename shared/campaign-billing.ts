@@ -1,11 +1,14 @@
 import {
   IVR_FIRST_MINUTE_CREDITS,
+  MMS_CREDITS,
   SMS_SEGMENT_CREDITS,
+  estimateMessageCredits,
   STAFFED_FIRST_MINUTE_CREDITS,
   voiceBillingKindFromCampaignType,
 } from "./pricing";
 
 export type CampaignCreditEstimate = {
+  contactCount: number;
   perContactCredits: number;
   totalCredits: number;
   rateDescription: string;
@@ -23,14 +26,20 @@ export type CampaignBillingSummary = {
 export function estimateCampaignCredits(
   campaignType: string | null | undefined,
   contactCount: number,
+  message?: { body: string; hasMedia: boolean },
 ): CampaignCreditEstimate {
   const count = Math.max(0, contactCount);
 
   if (campaignType === "message") {
+    if (!message) throw new Error("Message content is required for a campaign estimate");
+    const { credits, segments, isMms } = estimateMessageCredits(message);
     return {
-      perContactCredits: SMS_SEGMENT_CREDITS,
-      totalCredits: count * SMS_SEGMENT_CREDITS,
-      rateDescription: `${SMS_SEGMENT_CREDITS} credits per SMS segment`,
+      contactCount: count,
+      perContactCredits: credits,
+      totalCredits: count * credits,
+      rateDescription: isMms
+        ? `${MMS_CREDITS} credits per MMS message`
+        : `${SMS_SEGMENT_CREDITS} credits per SMS segment (${segments} segment${segments === 1 ? "" : "s"} per message; MMS excluded)`,
     };
   }
 
@@ -39,6 +48,7 @@ export function estimateCampaignCredits(
     kind === "ivr" ? IVR_FIRST_MINUTE_CREDITS : STAFFED_FIRST_MINUTE_CREDITS;
 
   return {
+    contactCount: count,
     perContactCredits,
     totalCredits: count * perContactCredits,
     rateDescription:

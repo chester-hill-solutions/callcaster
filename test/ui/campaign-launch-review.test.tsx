@@ -159,7 +159,7 @@ describe("campaign launch review", () => {
   });
 
   test("shows the campaign cost inline, not behind a disclosure (#1859)", () => {
-    renderLaunchReview([], { estimate: { totalCredits: 12, rateDescription: "1 credit" } });
+    renderLaunchReview([], { estimate: { contactCount: 6, perContactCredits: 2, totalCredits: 12, rateDescription: "2 credits per SMS segment" } });
 
     const panel = screen.getByTestId("campaign-cost-panel");
     expect(panel).toHaveAttribute("data-has-billing", "yes");

@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Fixed: CI rejects literal redirects to pages outside the registered route tree ([PR #2443](https://github.com/chester-hill-solutions/callcaster/pull/2443), [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278)).
 
 - Fixed: Admin panels no longer offer Add User or Add Workspace actions without an available creation flow ([#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111), [#2440](https://github.com/chester-hill-solutions/callcaster/pull/2440)).
+- Fixed: Campaign message cost estimates use eligible queued recipients’ rendered text and media rate, including multi-segment SMS and MMS ([#2114](https://github.com/chester-hill-solutions/callcaster/issues/2114)).
 
 - Fixed: Manual-call recordings enter the storage pipeline after completion; campaign conferences stop creating recordings that cannot be stored ([#1989](https://github.com/chester-hill-solutions/callcaster/issues/1989), [#2439](https://github.com/chester-hill-solutions/callcaster/pull/2439)).
 

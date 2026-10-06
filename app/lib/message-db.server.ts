@@ -1,3 +1,4 @@
+import { andConditions } from "@/lib/sql-conditions";
 import { and, desc, eq, inArray, isNotNull, like, lt, or, sql, type SQL } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
@@ -332,6 +333,15 @@ export function isPendingMessageSid(sid: string | null | undefined): boolean {
   return typeof sid === "string" && sid.startsWith(PENDING_MESSAGE_SID_PREFIX);
 }
 
+/** Include pending intents, except failures that never reached the provider. */
+export function campaignSmsDuplicateWhere(campaignId: number, destination: SQL): SQL {
+  return andConditions([
+    eq(messageTable.campaign_id, campaignId),
+    destination,
+    sql`NOT (${messageTable.sid} LIKE ${`${PENDING_MESSAGE_SID_PREFIX}%`} AND LOWER(${messageTable.status}::text) = 'failed')`,
+  ], "campaign SMS duplicate check");
+}
+
 export async function countCampaignMessagesToPhone(
   workspaceId: string,
   campaignId: string | number,
@@ -340,14 +350,7 @@ export async function countCampaignMessagesToPhone(
 ): Promise<number> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
   return tdb.message.count({
-    where: and(
-      eq(messageTable.campaign_id, Number(campaignId)),
-      eq(messageTable.to, to),
-      // An intent row counts (it is the double-send guard), except one that
-      // was marked failed without ever reaching Twilio: nothing was sent, so
-      // the contact must stay eligible.
-      sql`NOT (${messageTable.sid} LIKE ${`${PENDING_MESSAGE_SID_PREFIX}%`} AND LOWER(${messageTable.status}::text) = 'failed')`,
-    ),
+    where: campaignSmsDuplicateWhere(Number(campaignId), eq(messageTable.to, to)),
   });
 }
 
