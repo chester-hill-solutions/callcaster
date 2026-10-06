@@ -5,7 +5,7 @@ import { RouterContextProvider } from "react-router";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "../helpers/route-result";
 
-const provider = vi.hoisted(() => ({ send: vi.fn(), upload: vi.fn(), sign: vi.fn(), fetch: vi.fn() }));
+const provider = vi.hoisted(() => ({ send: vi.fn(), upload: vi.fn(), sign: vi.fn(), fetch: vi.fn(), webhookFetch: vi.fn() }));
 vi.mock("resend", () => ({
   Resend: class { emails = { send: provider.send }; },
 }));
@@ -13,6 +13,10 @@ vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
   uploadObject: provider.upload,
   createSignedObjectUrl: provider.sign,
+}));
+vi.mock("@/lib/safe-outbound-url.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/safe-outbound-url.server")>()),
+  safeOutboundFetch: provider.webhookFetch,
 }));
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
@@ -48,6 +52,7 @@ suite("inbound voicemail recipient delivery (#2268)", () => {
   let emailAction: typeof import("../../app/routes/api+/email-vm.action.server").action;
 
   async function cleanup() {
+    await client`delete from webhook where workspace in (${workspace}, ${foreignWorkspace})`;
     await client`delete from call where workspace in (${workspace}, ${foreignWorkspace})`;
     await client`delete from workspace_number where workspace in (${workspace}, ${foreignWorkspace})`;
     await client`delete from script where workspace in (${workspace}, ${foreignWorkspace})`;
@@ -78,6 +83,7 @@ suite("inbound voicemail recipient delivery (#2268)", () => {
     await client`insert into call (sid, workspace, account_sid, "from", "to", direction)
       values (${callSid}, ${workspace}, ${accountSid}, '+15555550101', ${phone}, 'inbound')`;
     provider.send.mockReset(); provider.upload.mockReset(); provider.sign.mockReset(); provider.fetch.mockReset();
+    provider.webhookFetch.mockReset().mockImplementation(async () => new Response(null, { status: 204 }));
     provider.send.mockResolvedValue({ data: { id: "owned-email-id" }, error: null });
     provider.upload.mockResolvedValue(undefined); provider.sign.mockResolvedValue("https://owned-storage.example.test/voicemail.mp3");
     provider.fetch.mockImplementation(async () => new Response("owned fake recording", { status: 200, headers: { "Content-Type": "audio/mpeg" } }));
@@ -203,16 +209,30 @@ suite("inbound voicemail recipient delivery (#2268)", () => {
     const [row] = await client`select state, recipient, resend_email_id from inbound_voicemail_delivery where workspace = ${workspace} and call_sid = ${callSid}`;
     expect(row).toMatchObject({ state: "uncertain", recipient: "script@example.test", resend_email_id: null });
   });
-  test("a failed call URL write after a sent receipt retries without another send", async () => {
+  test("a failed call URL write recovers the enabled webhook without another email", async () => {
+    await client`insert into webhook (workspace, destination_url, events) values (${workspace}, 'https://owned-webhook.example.test/voicemail', ${client.json([{ category: "voicemail", type: "INSERT" }])})`;
     await route(); const fn = `vm_url_${randomUUID().replaceAll("-", "")}`; const trigger = fn + "_trigger";
     try {
       await client.unsafe(`create function public.${fn}() returns trigger language plpgsql as $$ begin if NEW.sid = '${callSid}' and NEW.recording_url is not null then raise exception 'owned URL failure' using errcode = '40001'; end if; return NEW; end $$`);
       await client.unsafe(`create trigger ${trigger} before update on public.call for each row execute function public.${fn}()`);
       expect((await callback()).status).toBe(500); expect(provider.send).toHaveBeenCalledTimes(1);
+      expect(provider.webhookFetch).not.toHaveBeenCalled();
     } finally { await client.unsafe(`drop trigger if exists ${trigger} on public.call`); await client.unsafe(`drop function if exists public.${fn}()`); }
     expect((await callback()).status).toBe(200); expect(provider.send).toHaveBeenCalledTimes(1);
+    expect(provider.webhookFetch).toHaveBeenCalledTimes(1);
+    expect(provider.webhookFetch.mock.calls[0][0]).toBe("https://owned-webhook.example.test/voicemail");
+    const notification = JSON.parse(provider.webhookFetch.mock.calls[0][1].body);
+    expect(notification).toMatchObject({ event_category: "voicemail", event_type: "INSERT", workspace_id: workspace,
+      payload: { call_sid: callSid, recording_url: "https://owned-storage.example.test/voicemail.mp3" } });
+    expect((await callback()).status).toBe(200);
+    expect(provider.webhookFetch).toHaveBeenCalledTimes(1); expect(provider.send).toHaveBeenCalledTimes(1);
     const [row] = await client`select recording_url from call where workspace = ${workspace} and sid = ${callSid}`;
     expect(row.recording_url).toContain(recordingSid);
+  });
+  test("a webhook without the voicemail event does not receive the recording", async () => {
+    await client`insert into webhook (workspace, destination_url, events) values (${workspace}, 'https://owned-webhook.example.test/other', ${client.json([{ category: "outreach_attempt", type: "INSERT" }])})`;
+    await route(); expect((await callback()).status).toBe(200);
+    expect(provider.send).toHaveBeenCalledTimes(1); expect(provider.webhookFetch).not.toHaveBeenCalled();
   });
   test("a failed delivery receipt reuses the provider key and frozen payload", async () => {
     await route(); const fn = `vm_receipt_${randomUUID().replaceAll("-", "")}`; const trigger = fn + "_trigger";

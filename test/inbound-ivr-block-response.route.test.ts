@@ -67,7 +67,6 @@ beforeEach(() => {
     sid: "CA1",
     to: "+15551234567",
     workspace: "w1",
-    workspace: "w1",
   });
   mocks.loadInboundIvrBlockContext.mockResolvedValue({
     number: { phoneNumber: "+15551234567", workspaceId: "w1" },

@@ -325,7 +325,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect((logged?.[1] as Error).message).toMatch(/auth-token credentials/);
   });
 
-  test("success path with no matching webhook does not call sendWebhookNotification", async () => {
+  test("success delegates optional webhook policy to the canonical notification service", async () => {
     setupEmailVmMocks({
       workspace: {
         id: "w1",
@@ -352,7 +352,9 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       params: {},
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+    expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ optional: true, eventCategory: "voicemail", eventType: "INSERT", workspaceId: "w1" }),
+    );
   });
 
   test("acks (does NOT send) when inbound_action is null — Twilio retries are drained via the recording_url guard (#1224)", async () => {

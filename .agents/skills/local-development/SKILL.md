@@ -455,7 +455,9 @@ check in the shell exit status. Inspect each required result before reporting it
 Before inserting a constant beside an export, find its first runtime use. An
 exported table can aggregate an earlier private table, so shared constants must
 precede that first construction. Anchor replacements to whole lines or complete
-declarations, and require a unique match before writing. Run the affected module
+declarations, and require a unique match before writing. Check existing object
+keys before adding a test fixture property; a repeated key can be only a build
+warning when the test files are outside the TypeScript gate. Run the affected module
 tests after the edit.
 Baseline experiments after staging must include staged and unstaged runtime
 changes against the pinned commit (`git diff HEAD`), not only the worktree diff.

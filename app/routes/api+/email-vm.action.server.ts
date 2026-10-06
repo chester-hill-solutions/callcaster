@@ -29,7 +29,6 @@ export const action = defineAction({
       const callSid = params.CallSid;
 
       if (!recordingUrl || typeof recordingUrl !== "string") {
-        // The handler re-runs this validation and produces the original 500.
         return { preflight: "ok" };
       }
       if (!callSid || typeof callSid !== "string") {
@@ -147,20 +146,21 @@ export const action = defineAction({
         delivery = await prepareVoicemailDelivery(binding, { recipient, ...prepared });
       }
       const claim = await claimVoicemailDelivery(binding, delivery.id);
-      if (claim.kind === "sent") {
-        if (callRow.recording_url !== recordingUrl && !await updateCallRecordingUrlBySid(callSid, recordingUrl)) throw new Error("Error updating call: not found");
+      if (claim.kind === "sent" && callRow.recording_url === recordingUrl) {
         return routeData({ success: true, message: "Already processed" });
       }
-      if (claim.kind !== "claimed") return routeData({ error: claim.kind === "busy" ? "Voicemail delivery is already in progress" : "Voicemail delivery needs reconciliation" }, { status: 503 });
+      if (claim.kind === "busy" || claim.kind === "uncertain") return routeData({ error: claim.kind === "busy" ? "Voicemail delivery is already in progress" : "Voicemail delivery needs reconciliation" }, { status: 503 });
       let result;
-      try {
-        result = await resend.emails.send(claim.delivery.email_payload, { idempotencyKey: `voicemail/${claim.delivery.id}` });
-        if (result.error) throw new Error(`Email send failed: ${result.error.message}`);
-        if (typeof result.data?.id !== "string" || !result.data.id.trim()) throw new Error("Email provider returned no delivery receipt");
-        await completeVoicemailDelivery(binding, delivery.id, claim.leaseToken, result.data.id);
-      } catch (error) {
-        await releaseVoicemailDelivery(binding, delivery.id, claim.leaseToken, error);
-        throw error;
+      if (claim.kind === "claimed") {
+        try {
+          result = await resend.emails.send(claim.delivery.email_payload, { idempotencyKey: `voicemail/${claim.delivery.id}` });
+          if (result.error) throw new Error(`Email send failed: ${result.error.message}`);
+          if (typeof result.data?.id !== "string" || !result.data.id.trim()) throw new Error("Email provider returned no delivery receipt");
+          await completeVoicemailDelivery(binding, delivery.id, claim.leaseToken, result.data.id);
+        } catch (error) {
+          await releaseVoicemailDelivery(binding, delivery.id, claim.leaseToken, error);
+          throw error;
+        }
       }
       const signedUrl = claim.delivery.signed_url;
       const call = callRow;
@@ -174,24 +174,20 @@ export const action = defineAction({
         throw new Error("Error updating call: not found");
       }
 
-      const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
-        Array.isArray(webhook.events) && (webhook.events as string[]).includes("voicemail"),
-      );
-      if (voicemailWebhook.length > 0) {
-        await sendWebhookNotification({
-          eventCategory: "voicemail",
-          eventType: "INSERT",
-          workspaceId: number.workspace.id,
-          payload: {
-            call_sid: call.sid,
-            from: call.from,
-            to: call.to,
-            recording_url: signedUrl,
-            duration: recordingDuration ? String(recordingDuration) : undefined,
-            timestamp: now.toISOString(),
-          },
-        });
-      }
+      await sendWebhookNotification({
+        optional: true,
+        eventCategory: "voicemail",
+        eventType: "INSERT",
+        workspaceId: number.workspace.id,
+        payload: {
+          call_sid: call.sid,
+          from: call.from,
+          to: call.to,
+          recording_url: signedUrl,
+          duration: recordingDuration ? String(recordingDuration) : undefined,
+          timestamp: now.toISOString(),
+        },
+      });
 
       return routeData({
         success: true,
