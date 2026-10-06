@@ -5333,5 +5333,323 @@
     "risk": "medium",
     "trackerRecommendation": "Verify and close. PR #2410 is merged to dev. Keep the issue OPEN until required acceptance and promotion; source/deployment proof does not establish live or historical data acceptance.",
     "rootCause": "A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe."
+  },
+  {
+    "issueNumber": 2112,
+    "verdict": "verify-close",
+    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2411 merged into dev as f811e7dd6f6671db7e4997d7b639551971e09184. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "app/lib/billing-reconciliation-snapshot.server.ts",
+      "app/lib/billing-reconciliation.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx",
+      "shared/billing-reconciliation-alert.ts",
+      "shared/billing-reconciliation.ts",
+      "app/lib/billing-reconcile-workspace.server.ts",
+      "shared/pricing.ts"
+    ],
+    "existingTests": [
+      "test/billing-message-reconciliation.test.ts",
+      "test/billing-reconciliation-alert.test.ts",
+      "test/billing-reconciliation.test.ts",
+      "test/integration-db/billing-message-reconciliation.test.ts",
+      "test/ui/billing-message-reconciliation.test.tsx",
+      "test/billing-reconcile-workspace.server.test.ts"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
+      "A workspace that sent only MMS reconciles with zero variance.",
+      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
+      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2411 is merged to dev; deployment success alone is not product QA.",
+    "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
+  },
+  {
+    "issueNumber": 2153,
+    "verdict": "verify-close",
+    "recommendedTitle": "DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2414 merged into dev as 7defe663d6d3847500ad74070e72758f92ad7301. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      "app/lib/campaign-queue-updates.server.ts",
+      "app/routes/api+/queues.action.server.ts",
+      "app/lib/queue-status.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/components/call/CallScreen.Layout.tsx",
+      "scripts/check-queue-rpc-contract.mjs"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-queue-reset.test.ts",
+      "test/queues.route.test.ts",
+      "test/queue-status.test.ts"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).",
+      "Un-attempted rows return to `queued` (positive control).",
+      "An opted-out contact is never re-armed by a reset.",
+      "If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2414 is merged to dev; deployment success alone is not product QA."
+  },
+  {
+    "issueNumber": 2084,
+    "verdict": "verify-close",
+    "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2415 merged into dev as 4c5220df788701ef51bd6b6024d3e4a1a1e6416f. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/db/workspace-scoped-tables.ts",
+      "app/lib/merge-workspace-twilio-data.server.ts",
+      "app/lib/messaging-onboarding/persistence.server.ts",
+      "app/lib/number-purchase-recovery.server.ts",
+      "app/lib/number-purchase.server.ts",
+      "app/lib/openapi-platform.ts",
+      "app/lib/platform-workspace-numbers.server.ts",
+      "app/lib/transaction-history.server.ts",
+      "app/lib/worker/handlers.server.ts",
+      "app/lib/worker/job-params.server.ts",
+      "app/routes/api+/numbers.action.server.ts",
+      "app/server/number-purchase-reservation.server.ts",
+      "app/server/tenant-db.ts",
+      "client/migrations/20261006000000_number_purchase_recovery.sql",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "app/lib/number-rental-billing.server.ts",
+      "client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql",
+      "app/lib/workspace-credits.server.ts",
+      "scripts/check-credit-write-paths.mjs"
+    ],
+    "existingTests": [
+      "test/integration-db/number-purchase-credits.test.ts",
+      "test/job-registry.test.ts",
+      "test/number-purchase-worker.test.ts",
+      "test/tenant-db.test.ts"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.",
+      "A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.",
+      "Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.",
+      "The balance can never go negative through this path (an assertion or check, not a comment).",
+      "`check:credit-writes` stays green."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2415 is merged to dev; deployment success alone is not product QA."
+  },
+  {
+    "issueNumber": 2085,
+    "verdict": "verify-close",
+    "recommendedTitle": "Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2416 merged into dev as 860372a7faff9af67fdd6b3bbbf7c01033cb6e2b. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      "app/db/schema-number-release.ts",
+      "app/db/schema.ts",
+      "app/db/workspace-scoped-tables.ts",
+      "app/lib/database/workspace.server.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/lib/number-release-recovery.server.ts",
+      "app/lib/number-release.server.ts",
+      "app/lib/number-rental-billing.server.ts",
+      "app/lib/openapi-platform.ts",
+      "app/lib/platform-workspace-numbers.server.ts",
+      "app/lib/worker/handlers.server.ts",
+      "app/lib/worker/job-params.server.ts",
+      "app/routes/workspaces+/$id/phone-numbers.action.server.ts",
+      "app/server/number-release-intent.server.ts",
+      "client/migrations/20261006000001_number_release_recovery.sql",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "app/lib/twilio-sender-pool.server.ts",
+      "app/lib/twilio-readiness.server.ts"
+    ],
+    "existingTests": [
+      "test/db-workspace.server.test.ts",
+      "test/helpers/number-release-final-write.ts",
+      "test/integration-db/number-release-recovery.test.ts",
+      "test/job-registry.test.ts",
+      "test/messaging-sender-pool-readiness.test.ts",
+      "test/number-release-worker.test.ts",
+      "test/number-rental-billing.server.test.ts",
+      "test/tenant-db.test.ts",
+      "test/twilio-sender-pool.server.test.ts"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.",
+      "A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.",
+      "After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.",
+      "The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2416 is merged to dev; deployment success alone is not product QA."
+  },
+  {
+    "issueNumber": 2211,
+    "verdict": "verify-close",
+    "recommendedTitle": "Run the independent real-Postgres CI tier for application changes covered by its tests",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2417 merged into dev as c194cdb5767b8a5c050035130c1ebdd84e88cab0. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "rootCause": "The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      ".github/workflows/schema-default-drift.yml",
+      "scripts/e2e/run-compose-e2e.mjs",
+      "docs/schema-default-drift.md",
+      "package.json",
+      "vitest.integration-db.config.ts"
+    ],
+    "existingTests": [
+      "test/integration-db-workflow.test.ts"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.",
+      "The tier is runnable locally by a documented command, matching what CI runs.",
+      "The e2e log names the tier it is running before any test output.",
+      "The measured e2e failure rate is recorded somewhere durable."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2417 is merged to dev; deployment success alone is not product QA."
+  },
+  {
+    "issueNumber": 2107,
+    "verdict": "verify-close",
+    "recommendedTitle": "Require answers before public survey completion",
+    "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
+    "currentBehavior": "PR #2419 merged into dev as a691d7a7910153f4529902ebfb7e04e5159cbd81. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
+    "lookIn": [
+      "app/components/ui/form-field.tsx",
+      "app/hooks/surveys/useSurveySubmission.ts",
+      "app/lib/survey-answer-state.ts",
+      "app/lib/survey-db.server.ts",
+      "app/lib/survey-required-answer.ts",
+      "app/routes/survey+/$surveyId.tsx",
+      "app/server/survey-completion.ts",
+      "app/routes/api+/survey-complete.action.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/survey-required-answers.test.ts",
+      "test/ui/form-field.test.tsx",
+      "test/ui/survey-required-answers.test.tsx",
+      "test/ui/survey-save-order.test.tsx"
+    ],
+    "missingTests": [
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+    ],
+    "acceptanceCriteria": [
+      "A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.",
+      "A required question left blank on the last page blocks submission.",
+      "A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).",
+      "Non-required questions remain skippable.",
+      "An existing completed response with a blank required answer is not retroactively invalidated without a decision on that."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close after required acceptance and promotion. PR #2419 is merged to dev; deployment success alone is not product QA."
+  },
+  {
+    "issueNumber": 2418,
+    "verdict": "verify-close",
+    "recommendedTitle": "Allow blank optional-only public surveys to complete",
+    "summary": "Blank optional public surveys can complete; the repair is merged into dev.",
+    "currentBehavior": "PR #2420 merged as bc8c10bbe00f6c5fff5c4068b11ca200840f979f after full local CI before both pushes, clear final reviews, all applicable exact-head remote checks, all555 Postgres18 cases without skips and both deployments. Actual browser and HTTP retries passed. Candidate QA remains pending.",
+    "rootCause": "The signed public loader created an identity but no response row; blank optional forms sent completion without first saving an answer. The repair creates or resolves the response through the canonical signed completion path.",
+    "resolution": "Run required release-candidate acceptance and promote through the release PR. Keep the issue open until required QA and default-branch promotion.",
+    "lookIn": [
+      "app/hooks/surveys/useSurveySubmission.ts",
+      "app/lib/survey-db.server.ts",
+      "app/routes/api+/survey-complete.action.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/survey-optional-completion.test.ts",
+      "test/integration-db/survey-respondent-identity.test.ts",
+      "test/survey-complete.route.test.ts",
+      "test/ui/survey-save-order.test.tsx"
+    ],
+    "missingTests": [
+      "Release-candidate QA for anonymous/contact-specific blank optional completion, retries, rejected identities and feedback layout."
+    ],
+    "acceptanceCriteria": [
+      "An anonymous valid optional-only blank response completes through the actual browser and HTTP action; exactly one response row exists with a completion time and zero answers.",
+      "Repeating completion preserves the same row and original completion time.",
+      "A contact-specific valid response retains the correct scoped contact identity.",
+      "Missing, invalid, expired, or foreign tokens cannot create or complete a response; inactive surveys remain rejected.",
+      "A required survey with no answers remains incomplete.",
+      "Optional questions beside valid required answers remain skippable.",
+      "Rejection and retry use the shared feedback surfaces without page layout or scroll movement.",
+      "Verify real persisted rows, full local CI, exact-head remote checks, both deployments and release QA before default-branch closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fixed on dev; verify candidate acceptance before default-branch closure."
+  },
+  {
+    "issueNumber": 2142,
+    "verdict": "verify-close",
+    "recommendedTitle": "rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned",
+    "summary": "Fully paid rentals can warn again after a later lapse; the repair is merged into dev.",
+    "currentBehavior": "PR #2421 merged as 4b0322c490ba0c3da676ca5a2051a52b71f34ccb after both full local CI gates, clear final reviews, all applicable exact-head remote checks, all567 Postgres18 cases without skips and both deployments. The warning marker resets only at zero unpaid cycles; partial payment and technical failures retain it. Candidate QA remains pending.",
+    "resolution": "Run required release-candidate acceptance and promote through the release PR. Keep the issue OPEN until required QA and default-branch promotion.",
+    "lookIn": [
+      "app/lib/number-rental-billing.server.ts",
+      "app/lib/number-rental-lifecycle.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/number-rental-warning-reset.test.ts",
+      "test/number-rental-billing.server.test.ts",
+      "test/number-rental-lifecycle.test.ts",
+      "test/jobs-number-rental-billing.route.test.ts"
+    ],
+    "missingTests": [
+      "Release-candidate QA for later-lapse warnings, partial payment, retained-marker recovery and safe retry."
+    ],
+    "acceptanceCriteria": [
+      "The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).",
+      "Warn → pay without suspension → lapse also produces a second warning.",
+      "The first lapse still warns exactly once.",
+      "A workspace that never lapses is never warned.",
+      "The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fixed on dev; verify candidate acceptance before default-branch closure."
   }
 ]

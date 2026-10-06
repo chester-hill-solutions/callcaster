@@ -167,74 +167,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2084,
-    "verdict": "fix-now",
-    "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",
-    "summary": "Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.",
-    "resolution": "Add an atomic credit reservation and explicit provider/database compensation protocol.",
-    "lookIn": [
-      "app/lib/platform-workspace-numbers.server.ts:129",
-      "app/lib/platform-workspace-numbers.server.ts:175",
-      "app/lib/platform-workspace-numbers.server.ts:316",
-      "app/lib/platform-workspace-numbers.server.ts:129-138,175-192,216-325",
-      "app/lib/number-rental-billing.server.ts:394-397 (the documented precedent)",
-      "client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql:75-79",
-      "app/lib/workspace-credits.server.ts`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`, `debitAmountFromCredits`)",
-      "scripts/check-credit-write-paths.mjs"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Real concurrency test for one affordable rental; provider/write fault injection must prove balance, number inventory and ledger agree."
-    ],
-    "acceptanceCriteria": [
-      "Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.",
-      "A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.",
-      "Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.",
-      "The balance can never go negative through this path (an assertion or check, not a comment).",
-      "`check:credit-writes` stays green."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2085,
-    "verdict": "fix-now",
-    "recommendedTitle": "Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS",
-    "summary": "Release still deletes the provider number and local row before updating sender metadata. A metadata write failure returns a plain error after irreversible provider success.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Release still deletes the provider number and local row before updating sender metadata. A metadata write failure returns a plain error after irreversible provider success.",
-    "resolution": "Make release state durable and retryable; reconcile stale sender references after provider success.",
-    "lookIn": [
-      "app/lib/database/workspace.server.ts:549",
-      "app/lib/database/workspace.server.ts:561",
-      "app/lib/database/workspace.server.ts:581",
-      "app/lib/database/workspace.server.ts:586-619",
-      "app/lib/number-rental-billing.server.ts:170-200 (suspend/release lifecycle and its workspace notification)",
-      "app/lib/twilio-sender-pool.server.ts",
-      "app/lib/messaging-onboarding/predicates.ts:458-471",
-      "app/lib/twilio-readiness.server.ts:66-88"
-    ],
-    "existingTests": [
-      "test/db-workspace.server.test.ts",
-      "test/twilio-sender-pool.server.test.ts"
-    ],
-    "missingTests": [
-      "Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success."
-    ],
-    "acceptanceCriteria": [
-      "A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.",
-      "A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.",
-      "After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.",
-      "The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",
@@ -580,40 +512,6 @@
     "rootCause": "Platform role and workspace role are mixed in the Access tab; parallel sudo writer APIs bypass the product membership safety policy."
   },
   {
-    "issueNumber": 2142,
-    "verdict": "fix-now",
-    "recommendedTitle": "rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned",
-    "summary": "Successful rental charges clear suspension but never clear rental_warned_cycle. A later one-cycle lapse can skip its warning.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Successful rental charges clear suspension but never clear rental_warned_cycle. A later one-cycle lapse can skip its warning.",
-    "resolution": "Reset rental_warned_cycle after the unpaid streak is cleared. Do not put the reset only inside if(number.suspended_at): a warned-but-not-suspended number must reset too. Preserve paid-cycle idempotency and technical-failure handling.",
-    "lookIn": [
-      "app/lib/number-rental-billing.server.ts:230",
-      "app/lib/number-rental-billing.server.ts:502",
-      "app/lib/number-rental-billing.server.ts:230,449-461",
-      "app/lib/number-rental-lifecycle.ts:1-10",
-      "app/lib/database/workspace.server.ts (the `workspace_number` write)",
-      "shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`)"
-    ],
-    "existingTests": [
-      "test/number-rental-billing.server.test.ts",
-      "test/number-rental-lifecycle.test.ts"
-    ],
-    "missingTests": [
-      "Warn → pay → lapse warns again; also cover suspend → full recovery → lapse and idempotent reruns."
-    ],
-    "acceptanceCriteria": [
-      "The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).",
-      "Warn → pay without suspension → lapse also produces a second warning.",
-      "The first lapse still warns exactly once.",
-      "A workspace that never lapses is never warned.",
-      "The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2144,
     "verdict": "fix-now",
     "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500",
@@ -752,40 +650,6 @@
     "trackerRecommendation": "Partial fix. Keep Fix now for the remaining chat/cache and measurement scope. Related PR evidence: #2228. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2153,
-    "verdict": "fix-now",
-    "recommendedTitle": "DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail",
-    "summary": "Queue reset still applies the queued transition to every campaign row. That transition clears dequeue timestamp/reason and current claim/assignment, with no history or opt-out filter.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Queue reset still applies the queued transition to every campaign row. That transition clears dequeue timestamp/reason and current claim/assignment, with no history or opt-out filter.",
-    "resolution": "Scope ordinary reset to eligible in-flight rows; design explicit audited full requeue separately.",
-    "lookIn": [
-      "app/routes/api+/queues.action.server.ts:111",
-      "app/lib/campaign-queue-updates.server.ts:81",
-      "app/lib/queue-status.ts:306",
-      "app/routes/api+/queues.action.server.ts (the reset branch)",
-      "app/lib/campaign-queue-db.server.ts (`requeueAllCampaignQueueForCampaign`)",
-      "app/components/call/CallScreen.Layout.tsx:167-172",
-      "scripts/check-queue-rpc-contract.mjs"
-    ],
-    "existingTests": [
-      "test/queues.route.test.ts",
-      "test/queue-status.test.ts"
-    ],
-    "missingTests": [
-      "Completed/dequeued history preservation, untouched-row control, opted-out never-rearmed and deliberate requeue audit tests."
-    ],
-    "acceptanceCriteria": [
-      "A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).",
-      "Un-attempted rows return to `queued` (positive control).",
-      "An opted-out contact is never re-armed by a reset.",
-      "If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2155,
     "verdict": "fix-now",
     "recommendedTitle": "Double-clicking Record leaks a microphone stream and corrupts the take",
@@ -884,42 +748,6 @@
     "size": "M-L",
     "risk": "medium",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior."
-  },
-  {
-    "issueNumber": 2211,
-    "verdict": "fix-now",
-    "recommendedTitle": "Run the independent real-Postgres CI tier for application changes covered by its tests",
-    "summary": "Independent real-Postgres CI now exists and runs the entire tier. Its trigger filters exclude app/server and app/lib changes covered by that tier; ci:local still omits it.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Independent Postgres job and local run documentation are present. Application-only changes can bypass that job because of path filters. E2E names the tier explicitly.",
-    "rootCause": "The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.",
-    "resolution": "Extend existing triggers and verify required-check behavior. Remaining runtime acceptance includes measured E2E failure rate.",
-    "lookIn": [
-      ".github/workflows/schema-default-drift.yml:31",
-      ".github/workflows/schema-default-drift.yml:117",
-      "scripts/e2e/run-compose-e2e.mjs:105",
-      "docs/schema-default-drift.md:124",
-      ".github/workflows/schema-default-drift.yml",
-      "scripts/e2e/run-compose-e2e.mjs",
-      "package.json",
-      "vitest.integration-db.config.ts"
-    ],
-    "existingTests": [
-      "test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only",
-      "test/integration-db/split-campaign-atomic.test.ts — six real-Postgres tests added by #2209"
-    ],
-    "missingTests": [
-      "Need application-only PR trigger proof and repository required-check settings; neither established in this source audit."
-    ],
-    "acceptanceCriteria": [
-      "An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.",
-      "The tier is runnable locally by a documented command, matching what CI runs.",
-      "The e2e log names the tier it is running before any test output.",
-      "The measured e2e failure rate is recorded somewhere durable."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Partial fix remains. Do not repeat the independent CI job, local command or E2E tier label."
   },
   {
     "issueNumber": 2215,
@@ -1129,37 +957,6 @@
     "trackerRecommendation": "Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104."
   },
   {
-    "issueNumber": 2107,
-    "verdict": "fix-now",
-    "recommendedTitle": "Require answers before public survey completion",
-    "summary": "The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.",
-    "currentBehavior": "Stable respondent identity source prerequisite #2125 merged to dev in PR #2293 at be7f2312; native dependency removed. Public completion still lacks required-answer enforcement. Implement per-page user feedback and persisted server checks in its own atomic fix, preserving optional questions.",
-    "resolution": "Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.",
-    "lookIn": [
-      "app/routes/survey+/$surveyId.tsx:107",
-      "app/routes/survey+/$surveyId.tsx:198",
-      "app/lib/survey-db.server.ts:699",
-      "app/routes/survey+/$surveyId.tsx",
-      "app/routes/api+/survey-complete.action.server.ts",
-      "app/lib/survey-db.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path."
-    ],
-    "acceptanceCriteria": [
-      "A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.",
-      "A required question left blank on the last page blocks submission.",
-      "A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).",
-      "Non-required questions remain skippable.",
-      "An existing completed response with a blank required answer is not retroactively invalidated without a decision on that."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Ready for its own atomic required-answer fix from clean dev."
-  },
-  {
     "issueNumber": 2061,
     "verdict": "fix-now",
     "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
@@ -1287,39 +1084,5 @@
     "size": "M-L",
     "risk": "high",
     "trackerRecommendation": "Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed."
-  },
-  {
-    "issueNumber": 2112,
-    "verdict": "fix-now",
-    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
-    "summary": "Mixed SMS/MMS credits are compared as SMS segments, and SMS aggregate/subtype usage is double counted. Six actual builder cases confirm three defects with three controls.",
-    "currentBehavior": "At dev@c704cdf9, six actual report-builder cases executed. Pure MMS gives false SMS variance -2; a balanced SMS/MMS mix gives -4; overlapping SMS aggregate/subtype records give +3. The latter two trigger false material drift. Three SMS and inbound controls pass. Provider records are synthetic; no live or persistence acceptance is claimed.",
-    "resolution": "Carry verified message kind through the tenant loader, compare SMS and MMS in their proper units, and use non-overlapping supported outbound provider categories. Verify units, missing facts, persistence, alert controls and full gates before release acceptance.",
-    "lookIn": [
-      "shared/billing-reconciliation.ts",
-      "app/lib/billing-reconciliation.server.ts",
-      "app/lib/billing-reconcile-workspace.server.ts",
-      "app/lib/billing-reconciliation-alert.server.ts",
-      "app/lib/billing-reconciliation-snapshot.server.ts",
-      "shared/pricing.ts"
-    ],
-    "existingTests": [
-      "test/billing-reconciliation.test.ts",
-      "test/billing-reconcile-workspace.server.test.ts"
-    ],
-    "missingTests": [
-      "Pure SMS/MMS/mixed, aggregate/subtype overlap, provider-unit and unknown-kind controls; actual tenant loader/persistence and live provider comparison remain required."
-    ],
-    "acceptanceCriteria": [
-      "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
-      "A workspace that sent only MMS reconciles with zero variance.",
-      "A workspace that sent a mix of SMS and MMS reconciles with zero variance.",
-      "Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.",
-    "rootCause": "The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes."
   }
 ]

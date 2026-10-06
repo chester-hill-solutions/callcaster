@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@34fac650; merged workflow/date/filter/SMS/queue fixes and current security range evidence (2026-10-05 UTC)` · 323 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@4b0322c490ba0c3da676ca5a2051a52b71f34ccb; merged repairs and native issue evidence (2026-10-06 UTC)` · 325 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-05 UTC. Source descriptions distinguish merged dev fixes from reviewed but unmerged changes. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7, retained through board at dev@34fac650; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-06T06:13:35.441975+00:00. Source descriptions distinguish merged dev fixes from QA acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 39
+## Fix now — 32
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -58,18 +58,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.; Continuation does not run while playback acknowledgement is pending.; Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.; Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.; Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required.
 - Tracker: Fix now as one independent callback-operation concern. Native Bug remains unassigned and blocks #1878. Review the synchronous provider contract and durable recovery protocol before runtime edits; no approved implementation plan or deployed playback proof is claimed.
 
-### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
-- Mixed SMS/MMS credits are compared as SMS segments, and SMS aggregate/subtype usage is double counted. Six actual builder cases confirm three defects with three controls.
-- Current behavior: At dev@c704cdf9, six actual report-builder cases executed. Pure MMS gives false SMS variance -2; a balanced SMS/MMS mix gives -4; overlapping SMS aggregate/subtype records give +3. The latter two trigger false material drift. Three SMS and inbound controls pass. Provider records are synthetic; no live or persistence acceptance is claimed.
-- Root cause: The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes.
-- Resolution: Carry verified message kind through the tenant loader, compare SMS and MMS in their proper units, and use non-overlapping supported outbound provider categories. Verify units, missing facts, persistence, alert controls and full gates before release acceptance.
-- Look in: `shared/billing-reconciliation.ts`, `app/lib/billing-reconciliation.server.ts`, `app/lib/billing-reconcile-workspace.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `shared/pricing.ts`
-- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconcile-workspace.server.test.ts
-- Missing tests: Pure SMS/MMS/mixed, aggregate/subtype overlap, provider-unit and unknown-kind controls; actual tenant loader/persistence and live provider comparison remain required.
-- Done when: A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.; A workspace that sent only MMS reconciles with zero variance.; A workspace that sent a mix of SMS and MMS reconciles with zero variance.; Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping.
-- Tracker: OPEN Fix now. Six executed source fixtures prove the defect, not a repair. Keep the original acceptance criteria and do not replace provider acceptance with a synthetic balanced example.
-
 ### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
 - Number variance is calculated but excluded from material alerts and snapshots. The number comparison also equates ledger events with provider number-month units, including purchase events.
@@ -92,16 +80,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.; Valid targets and clearing remain usable.; API, editor and target docs agree; real write-boundary regressions and deployed checks pass.; Draft/configuration are preserved and canonical shared validation feedback does not move the page.
 - Tracker: Current native scope corrected after the write-boundary audit. Source defect remains Fix now; playback and recipient delivery are separate concerns.
 
-### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.
-- Current behavior: Stable respondent identity source prerequisite #2125 merged to dev in PR #2293 at be7f2312; native dependency removed. Public completion still lacks required-answer enforcement. Implement per-page user feedback and persisted server checks in its own atomic fix, preserving optional questions.
-- Resolution: Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.
-- Look in: `app/routes/survey+/$surveyId.tsx:107`, `app/routes/survey+/$surveyId.tsx:198`, `app/lib/survey-db.server.ts:699`, `app/routes/survey+/$surveyId.tsx`, `app/routes/api+/survey-complete.action.server.ts`, `app/lib/survey-db.server.ts`
-- Missing tests: No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path.
-- Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
-- Tracker: Ready for its own atomic required-answer fix from clean dev.
-
 ### [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268) Deliver inbound IVR voicemail to the script recipient
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - The documented voicemail email target is dropped; delivery reads the number default instead.
@@ -113,27 +91,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084) Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.
-- Resolution: Add an atomic credit reservation and explicit provider/database compensation protocol.
-- Look in: `app/lib/platform-workspace-numbers.server.ts:129`, `app/lib/platform-workspace-numbers.server.ts:175`, `app/lib/platform-workspace-numbers.server.ts:316`, `app/lib/platform-workspace-numbers.server.ts:129-138,175-192,216-325`, `app/lib/number-rental-billing.server.ts:394-397 (the documented precedent)`, `client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql:75-79`, `app/lib/workspace-credits.server.ts`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`, `debitAmountFromCredits`)`, `scripts/check-credit-write-paths.mjs`
-- Missing tests: Real concurrency test for one affordable rental; provider/write fault injection must prove balance, number inventory and ledger agree.
-- Done when: Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.; A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.; Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.; The balance can never go negative through this path (an assertion or check, not a comment).; `check:credit-writes` stays green.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085) Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Release still deletes the provider number and local row before updating sender metadata. A metadata write failure returns a plain error after irreversible provider success.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Release still deletes the provider number and local row before updating sender metadata. A metadata write failure returns a plain error after irreversible provider success.
-- Resolution: Make release state durable and retryable; reconcile stale sender references after provider success.
-- Look in: `app/lib/database/workspace.server.ts:549`, `app/lib/database/workspace.server.ts:561`, `app/lib/database/workspace.server.ts:581`, `app/lib/database/workspace.server.ts:586-619`, `app/lib/number-rental-billing.server.ts:170-200 (suspend/release lifecycle and its workspace notification)`, `app/lib/twilio-sender-pool.server.ts`, `app/lib/messaging-onboarding/predicates.ts:458-471`, `app/lib/twilio-readiness.server.ts:66-88`
-- Existing tests: test/db-workspace.server.test.ts; test/twilio-sender-pool.server.test.ts
-- Missing tests: Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success.
-- Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
@@ -259,6 +216,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119) runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Schedule sync still skips any voice campaign without both dates. Those campaigns never transition to waiting outside their calling hours.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Schedule sync still skips any voice campaign without both dates. Those campaigns never transition to waiting outside their calling hours.
+- Resolution: Separate optional date-bound evaluation from the calling-window rule and share the rule with dispatch.
+- Look in: `app/lib/campaign-schedule-sync.server.ts:49`, `app/lib/campaign-schedule-sync.server.ts:55`, `app/lib/worker/handlers/cron.server.ts (`runCampaignScheduleSync` and its header)`, `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-dispatch-policy.ts (the dispatch gate)`, `app/lib/campaign-status.ts`, `app/lib/campaign-status-rail.ts`, `app/lib/recipient-calling-window.ts`
+- Existing tests: test/campaign-schedule-sync.server.test.ts; test/integration-db/campaign-schedule-sync-status-race.test.ts
+- Missing tests: No-date outside-window, in-window, expired bounds and sweep/dispatch parity tests; production count still needs measurement.
+- Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
 - Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
@@ -271,18 +239,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
 - Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
 
-### [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211) Run the independent real-Postgres CI tier for application changes covered by its tests
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Independent real-Postgres CI now exists and runs the entire tier. Its trigger filters exclude app/server and app/lib changes covered by that tier; ci:local still omits it.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Independent Postgres job and local run documentation are present. Application-only changes can bypass that job because of path filters. E2E names the tier explicitly.
-- Root cause: The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.
-- Resolution: Extend existing triggers and verify required-check behavior. Remaining runtime acceptance includes measured E2E failure rate.
-- Look in: `.github/workflows/schema-default-drift.yml:31`, `.github/workflows/schema-default-drift.yml:117`, `scripts/e2e/run-compose-e2e.mjs:105`, `docs/schema-default-drift.md:124`, `.github/workflows/schema-default-drift.yml`, `scripts/e2e/run-compose-e2e.mjs`, `package.json`, `vitest.integration-db.config.ts`
-- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only; test/integration-db/split-campaign-atomic.test.ts — six real-Postgres tests added by #2209
-- Missing tests: Need application-only PR trigger proof and repository required-check settings; neither established in this source audit.
-- Done when: An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.; The tier is runnable locally by a documented command, matching what CI runs.; The e2e log names the tier it is running before any test output.; The measured e2e failure rate is recorded somewhere durable.
-- Tracker: Partial fix remains. Do not repeat the independent CI job, local command or E2E tier label.
-
 ### [#2155](https://github.com/chester-hill-solutions/callcaster/issues/2155) Double-clicking Record leaks a microphone stream and corrupts the take
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - Recorder start remains reentrant during microphone permission acquisition. Concurrent starts overwrite stream/recorder refs and share a chunk buffer; there is no starting phase or phase status region.
@@ -291,28 +247,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/components/file-assets/AudioRecorder.tsx:31`, `app/components/file-assets/AudioRecorder.tsx:259`, `app/components/file-assets/AudioRecorder.tsx:335`, `app/components/file-assets/AudioRecorder.tsx:459`, `app/components/file-assets/AudioRecorder.tsx`
 - Missing tests: No AudioRecorder-specific test was found. Add deferred getUserMedia double activation, all track release, isolated take, permission failure, cancel/unmount while pending, and phase announcement assertions.
 - Done when: A double-click on Record starts exactly one recording (kill-check: remove the latch and confirm the test goes red).; Only one `getUserMedia` stream is open at any time, and it is released on stop.; The recorded take contains one recording, not two.; The Record button is disabled while starting.; The phase is announced to assistive technology on start, pause, resume and stop.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2153](https://github.com/chester-hill-solutions/callcaster/issues/2153) DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Queue reset still applies the queued transition to every campaign row. That transition clears dequeue timestamp/reason and current claim/assignment, with no history or opt-out filter.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Queue reset still applies the queued transition to every campaign row. That transition clears dequeue timestamp/reason and current claim/assignment, with no history or opt-out filter.
-- Resolution: Scope ordinary reset to eligible in-flight rows; design explicit audited full requeue separately.
-- Look in: `app/routes/api+/queues.action.server.ts:111`, `app/lib/campaign-queue-updates.server.ts:81`, `app/lib/queue-status.ts:306`, `app/routes/api+/queues.action.server.ts (the reset branch)`, `app/lib/campaign-queue-db.server.ts (`requeueAllCampaignQueueForCampaign`)`, `app/components/call/CallScreen.Layout.tsx:167-172`, `scripts/check-queue-rpc-contract.mjs`
-- Existing tests: test/queues.route.test.ts; test/queue-status.test.ts
-- Missing tests: Completed/dequeued history preservation, untouched-row control, opted-out never-rearmed and deliberate requeue audit tests.
-- Done when: A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).; Un-attempted rows return to `queued` (positive control).; An opted-out contact is never re-armed by a reset.; If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2142](https://github.com/chester-hill-solutions/callcaster/issues/2142) rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Successful rental charges clear suspension but never clear rental_warned_cycle. A later one-cycle lapse can skip its warning.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Successful rental charges clear suspension but never clear rental_warned_cycle. A later one-cycle lapse can skip its warning.
-- Resolution: Reset rental_warned_cycle after the unpaid streak is cleared. Do not put the reset only inside if(number.suspended_at): a warned-but-not-suspended number must reset too. Preserve paid-cycle idempotency and technical-failure handling.
-- Look in: `app/lib/number-rental-billing.server.ts:230`, `app/lib/number-rental-billing.server.ts:502`, `app/lib/number-rental-billing.server.ts:230,449-461`, `app/lib/number-rental-lifecycle.ts:1-10`, `app/lib/database/workspace.server.ts (the `workspace_number` write)`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`)`
-- Existing tests: test/number-rental-billing.server.test.ts; test/number-rental-lifecycle.test.ts
-- Missing tests: Warn → pay → lapse warns again; also cover suspend → full recovery → lapse and idempotent reruns.
-- Done when: The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).; Warn → pay without suspension → lapse also produces a second warning.; The first lapse still warns exactly once.; A workspace that never lapses is never warned.; The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2124](https://github.com/chester-hill-solutions/callcaster/issues/2124) Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow
@@ -382,17 +316,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/inbound-ivr-block.route.test.ts; test/ivr-wav.server.test.ts
 - Missing tests: Inbound content-only speech must be audible; recorded blocks use the supported sidecar path.
 - Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119) runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Schedule sync still skips any voice campaign without both dates. Those campaigns never transition to waiting outside their calling hours.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Schedule sync still skips any voice campaign without both dates. Those campaigns never transition to waiting outside their calling hours.
-- Resolution: Separate optional date-bound evaluation from the calling-window rule and share the rule with dispatch.
-- Look in: `app/lib/campaign-schedule-sync.server.ts:49`, `app/lib/campaign-schedule-sync.server.ts:55`, `app/lib/worker/handlers/cron.server.ts (`runCampaignScheduleSync` and its header)`, `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-dispatch-policy.ts (the dispatch gate)`, `app/lib/campaign-status.ts`, `app/lib/campaign-status-rail.ts`, `app/lib/recipient-calling-window.ts`
-- Existing tests: test/campaign-schedule-sync.server.test.ts; test/integration-db/campaign-schedule-sync-status-race.test.ts
-- Missing tests: No-date outside-window, in-window, expired bounds and sweep/dispatch parity tests; production count still needs measurement.
-- Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278) Validate literal redirect targets against the route tree
@@ -477,9 +400,100 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 174
+## Verify and close — 182
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2142](https://github.com/chester-hill-solutions/callcaster/issues/2142) rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Fully paid rentals can warn again after a later lapse; the repair is merged into dev.
+- Current behavior: PR #2421 merged as 4b0322c490ba0c3da676ca5a2051a52b71f34ccb after both full local CI gates, clear final reviews, all applicable exact-head remote checks, all567 Postgres18 cases without skips and both deployments. The warning marker resets only at zero unpaid cycles; partial payment and technical failures retain it. Candidate QA remains pending.
+- Resolution: Run required release-candidate acceptance and promote through the release PR. Keep the issue OPEN until required QA and default-branch promotion.
+- Look in: `app/lib/number-rental-billing.server.ts`, `app/lib/number-rental-lifecycle.ts`
+- Existing tests: test/integration-db/number-rental-warning-reset.test.ts; test/number-rental-billing.server.test.ts; test/number-rental-lifecycle.test.ts; test/jobs-number-rental-billing.route.test.ts
+- Missing tests: Release-candidate QA for later-lapse warnings, partial payment, retained-marker recovery and safe retry.
+- Done when: The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).; Warn → pay without suspension → lapse also produces a second warning.; The first lapse still warns exactly once.; A workspace that never lapses is never warned.; The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour.
+- Tracker: Source fixed on dev; verify candidate acceptance before default-branch closure.
+
+### [#2418](https://github.com/chester-hill-solutions/callcaster/issues/2418) Allow blank optional-only public surveys to complete
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Blank optional public surveys can complete; the repair is merged into dev.
+- Current behavior: PR #2420 merged as bc8c10bbe00f6c5fff5c4068b11ca200840f979f after full local CI before both pushes, clear final reviews, all applicable exact-head remote checks, all555 Postgres18 cases without skips and both deployments. Actual browser and HTTP retries passed. Candidate QA remains pending.
+- Root cause: The signed public loader created an identity but no response row; blank optional forms sent completion without first saving an answer. The repair creates or resolves the response through the canonical signed completion path.
+- Resolution: Run required release-candidate acceptance and promote through the release PR. Keep the issue open until required QA and default-branch promotion.
+- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/lib/survey-db.server.ts`, `app/routes/api+/survey-complete.action.server.ts`
+- Existing tests: test/integration-db/survey-optional-completion.test.ts; test/integration-db/survey-respondent-identity.test.ts; test/survey-complete.route.test.ts; test/ui/survey-save-order.test.tsx
+- Missing tests: Release-candidate QA for anonymous/contact-specific blank optional completion, retries, rejected identities and feedback layout.
+- Done when: An anonymous valid optional-only blank response completes through the actual browser and HTTP action; exactly one response row exists with a completion time and zero answers.; Repeating completion preserves the same row and original completion time.; A contact-specific valid response retains the correct scoped contact identity.; Missing, invalid, expired, or foreign tokens cannot create or complete a response; inactive surveys remain rejected.; A required survey with no answers remains incomplete.; Optional questions beside valid required answers remain skippable.; Rejection and retry use the shared feedback surfaces without page layout or scroll movement.; Verify real persisted rows, full local CI, exact-head remote checks, both deployments and release QA before default-branch closure.
+- Tracker: Source fixed on dev; verify candidate acceptance before default-branch closure.
+
+### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2419 merged into dev as a691d7a7910153f4529902ebfb7e04e5159cbd81. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/components/ui/form-field.tsx`, `app/hooks/surveys/useSurveySubmission.ts`, `app/lib/survey-answer-state.ts`, `app/lib/survey-db.server.ts`, `app/lib/survey-required-answer.ts`, `app/routes/survey+/$surveyId.tsx`, `app/server/survey-completion.ts`, `app/routes/api+/survey-complete.action.server.ts`
+- Existing tests: test/integration-db/survey-required-answers.test.ts; test/ui/form-field.test.tsx; test/ui/survey-required-answers.test.tsx; test/ui/survey-save-order.test.tsx
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
+- Tracker: Verify and close after required acceptance and promotion. PR #2419 is merged to dev; deployment success alone is not product QA.
+
+### [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211) Run the independent real-Postgres CI tier for application changes covered by its tests
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2417 merged into dev as c194cdb5767b8a5c050035130c1ebdd84e88cab0. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Root cause: The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `.github/workflows/schema-default-drift.yml`, `scripts/e2e/run-compose-e2e.mjs`, `docs/schema-default-drift.md`, `package.json`, `vitest.integration-db.config.ts`
+- Existing tests: test/integration-db-workflow.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.; The tier is runnable locally by a documented command, matching what CI runs.; The e2e log names the tier it is running before any test output.; The measured e2e failure rate is recorded somewhere durable.
+- Tracker: Verify and close after required acceptance and promotion. PR #2417 is merged to dev; deployment success alone is not product QA.
+
+### [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085) Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2416 merged into dev as 860372a7faff9af67fdd6b3bbbf7c01033cb6e2b. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/db/schema-number-release.ts`, `app/db/schema.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/database/workspace.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/number-release-recovery.server.ts`, `app/lib/number-release.server.ts`, `app/lib/number-rental-billing.server.ts`, `app/lib/openapi-platform.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/worker/handlers.server.ts`, `app/lib/worker/job-params.server.ts`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/server/number-release-intent.server.ts`, `client/migrations/20261006000001_number_release_recovery.sql`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/twilio-sender-pool.server.ts`, `app/lib/twilio-readiness.server.ts`
+- Existing tests: test/db-workspace.server.test.ts; test/helpers/number-release-final-write.ts; test/integration-db/number-release-recovery.test.ts; test/job-registry.test.ts; test/messaging-sender-pool-readiness.test.ts; test/number-release-worker.test.ts; test/number-rental-billing.server.test.ts; test/tenant-db.test.ts; test/twilio-sender-pool.server.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
+- Tracker: Verify and close after required acceptance and promotion. PR #2416 is merged to dev; deployment success alone is not product QA.
+
+### [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084) Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2415 merged into dev as 4c5220df788701ef51bd6b6024d3e4a1a1e6416f. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/db/schema.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/merge-workspace-twilio-data.server.ts`, `app/lib/messaging-onboarding/persistence.server.ts`, `app/lib/number-purchase-recovery.server.ts`, `app/lib/number-purchase.server.ts`, `app/lib/openapi-platform.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/transaction-history.server.ts`, `app/lib/worker/handlers.server.ts`, `app/lib/worker/job-params.server.ts`, `app/routes/api+/numbers.action.server.ts`, `app/server/number-purchase-reservation.server.ts`, `app/server/tenant-db.ts`, `client/migrations/20261006000000_number_purchase_recovery.sql`, `scripts/baselines/unscoped-db-imports.txt`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/number-rental-billing.server.ts`, `client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql`, `app/lib/workspace-credits.server.ts`, `scripts/check-credit-write-paths.mjs`
+- Existing tests: test/integration-db/number-purchase-credits.test.ts; test/job-registry.test.ts; test/number-purchase-worker.test.ts; test/tenant-db.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.; A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.; Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.; The balance can never go negative through this path (an assertion or check, not a comment).; `check:credit-writes` stays green.
+- Tracker: Verify and close after required acceptance and promotion. PR #2415 is merged to dev; deployment success alone is not product QA.
+
+### [#2153](https://github.com/chester-hill-solutions/callcaster/issues/2153) DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2414 merged into dev as 7defe663d6d3847500ad74070e72758f92ad7301. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/lib/campaign-queue-updates.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/lib/queue-status.ts`, `app/lib/campaign-queue-db.server.ts`, `app/components/call/CallScreen.Layout.tsx`, `scripts/check-queue-rpc-contract.mjs`
+- Existing tests: test/integration-db/campaign-queue-reset.test.ts; test/queues.route.test.ts; test/queue-status.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).; Un-attempted rows return to `queued` (positive control).; An opted-out contact is never re-armed by a reset.; If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature.
+- Tracker: Verify and close after required acceptance and promotion. PR #2414 is merged to dev; deployment success alone is not product QA.
+
+### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2411 merged into dev as f811e7dd6f6671db7e4997d7b639551971e09184. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.
+- Root cause: The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `app/lib/billing-reconciliation.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx`, `shared/billing-reconciliation-alert.ts`, `shared/billing-reconciliation.ts`, `app/lib/billing-reconcile-workspace.server.ts`, `shared/pricing.ts`
+- Existing tests: test/billing-message-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts; test/billing-reconciliation.test.ts; test/integration-db/billing-message-reconciliation.test.ts; test/ui/billing-message-reconciliation.test.tsx; test/billing-reconcile-workspace.server.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof.
+- Done when: A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.; A workspace that sent only MMS reconciles with zero variance.; A workspace that sent a mix of SMS and MMS reconciles with zero variance.; Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping.
+- Tracker: Verify and close after required acceptance and promotion. PR #2411 is merged to dev; deployment success alone is not product QA.
 
 ### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
@@ -2957,7 +2971,7 @@ Product, security, or operations decision required before implementation can be 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
 ### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-05
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-06
 - Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.
 - Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
@@ -3484,9 +3498,13 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 5
+## Needs triage — 6
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#2412](https://github.com/chester-hill-solutions/callcaster/issues/2412) Use the same billing period in admin reconciliation
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-06
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
 - Status: No status · Labels: none · Assignee: none · Updated: 2026-10-04
