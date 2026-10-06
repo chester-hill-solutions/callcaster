@@ -37,7 +37,12 @@ export function hasTemplateSyntax(text: string): boolean {
   return TAG_TEST.test(text) || BTOA_SYNTAX.test(text);
 }
 
-const FIELD_READERS: Record<string, (contact: Contact) => string | number | null | undefined> = {
+export type TemplateContact = Pick<Contact,
+  "id" | "firstname" | "surname" | "phone" | "email" | "address" | "city" |
+  "province" | "postal" | "country" | "external_id"
+>;
+
+const FIELD_READERS: Record<string, (contact: TemplateContact) => string | number | null | undefined> = {
   firstname: (c) => c.firstname,
   surname: (c) => c.surname,
   fullname: (c) => `${c.firstname || ""} ${c.surname || ""}`.trim(),
@@ -52,7 +57,7 @@ const FIELD_READERS: Record<string, (contact: Contact) => string | number | null
   contact_id: (c) => c.id,
 };
 
-function contactField(contact: Contact, field: string): string {
+function contactField(contact: TemplateContact, field: string): string {
   const read = Object.hasOwn(FIELD_READERS, field) ? FIELD_READERS[field] : undefined;
   const value = read?.(contact);
   return value == null ? "" : String(value);
@@ -70,7 +75,7 @@ function unquote(fallback: string): string {
  * The editor inserts `{{field}}` and `{{field|"fallback"}}`; single-brace
  * forms are still accepted for bodies saved before the editor existed.
  */
-export function processTemplateTags(text: string, contact: Contact): string {
+export function processTemplateTags(text: string, contact: TemplateContact): string {
   if (!text || !contact) return text;
 
   const processBraces = (input: string): string =>

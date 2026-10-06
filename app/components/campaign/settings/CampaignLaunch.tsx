@@ -459,7 +459,6 @@ export const CampaignLaunch = ({
               {campaignBilling ? (
                 <CampaignCostPanel
                   billing={campaignBilling}
-                  queuedCount={queueCount}
                   completedCount={dequeuedCount}
                 />
               ) : null}

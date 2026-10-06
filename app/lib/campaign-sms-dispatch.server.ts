@@ -182,7 +182,7 @@ export async function dispatchCampaignSmsBatch(args: {
       )
     : MAX_CONCURRENCY;
 
-  const allQueued = audience ?? [];
+  const allQueued = [...(audience ?? [])].sort((left, right) => left.id - right.id);
   const queueSelection = selectEligibleCampaignQueueMembers(allQueued, maxContacts);
   const queueMembers = queueSelection.selected;
 
@@ -517,6 +517,10 @@ async function handleMemberInner(
     });
   }
 
+  if (isSmsIncapableLineType(member.contact?.line_type)) {
+    return withPrepPermit(ctx, () => dequeueSmsIncapableMember(member, ctx));
+  }
+
   let phoneClaim: SmsPhoneClaim | null = null;
   if (normalizedPhone) {
     const existingClaim = claimedNumbers.get(normalizedPhone);
@@ -565,6 +569,14 @@ async function handleMemberInner(
   );
 }
 
+async function dequeueSmsIncapableMember(member: QueueMember, ctx: HandleMemberCtx): Promise<HandleMemberResult> {
+  await dequeueQueueEntry({ by: { id: member.id }, userId: ctx.userId, reason: LANDLINE_SMS_DEQUEUED_REASON });
+  ctx.counts.dequeued += 1;
+  return memberResponse({
+    [member.contact_id]: { success: true, skipped: true, reason: LANDLINE_SMS_DEQUEUED_REASON },
+  });
+}
+
 /** Runs `work` holding one preparation permit. */
 async function withPrepPermit<T>(ctx: HandleMemberCtx, work: () => Promise<T>): Promise<T> {
   const release = await ctx.prepSemaphore.acquire();
@@ -605,22 +617,7 @@ async function prepareClaimedMember(
     : null;
 
   if (isSmsIncapableLineType(lineType)) {
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId,
-      reason: LANDLINE_SMS_DEQUEUED_REASON,
-    });
-    counts.dequeued += 1;
-    return {
-      kind: "finished",
-      result: memberResponse({
-        [member.contact_id]: {
-          success: true,
-          skipped: true,
-          reason: LANDLINE_SMS_DEQUEUED_REASON,
-        },
-      }),
-    };
+    return { kind: "finished", result: await dequeueSmsIncapableMember(member, ctx) };
   }
 
   const duplicateExists = await hasDuplicateCampaignSms({
