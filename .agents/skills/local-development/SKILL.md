@@ -217,6 +217,12 @@ Test missing users both with and without a stale membership row through each
 real route. Both must return a validation error before insert; keep a separate
 database-failure control so infrastructure failures do not become validation.
 
+For the full real-Postgres suite, set `DATABASE_URL`, `DATABASE_DIRECT_URL` and
+`INTEGRATION_DB_URL` to the owned fixture in the command environment. Some suites
+gate on the app URL or import its direct client. The integration override alone
+can produce skipped tests and startup failures. Require the full count and zero
+skips before treating the run as proof.
+
 For an owned native Postgres fixture, initialize with `--no-locale
 --encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
 fixture in a temporary directory and bind only loopback on an unused port;

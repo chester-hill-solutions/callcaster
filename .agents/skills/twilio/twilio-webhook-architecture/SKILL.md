@@ -227,6 +227,13 @@ call = client.calls.create(
 )
 ```
 
+For a provider create response that can be lost, save reservation-tagged status
+callback URLs before the request. Persist valid unknown-call terminal callbacks
+with a recovery outbox in the same transaction. Busy, failed and unanswered
+calls do not request the voice URL and can lack an end time; do not fabricate
+voice request history for their recovery tests. Test a callback received while
+create is pending, followed by a late successful save and repeated delivery.
+
 ### 4. Connection Overrides (Retry and Timeout Tuning)
 
 Append URL fragments to any webhook URL to override default connection behavior. Fragments are not included in signature computation.
@@ -255,7 +262,13 @@ https://yourapp.com/voice#ct=1000&rc=2
 https://yourapp.com/status#e=ashburn,dublin&rc=1
 ```
 
-Twilio adds an `I-Twilio-Idempotency-Token` header on retries for deduplication.
+Twilio's `I-Twilio-Idempotency-Token` distinguishes retry attempts. It is not
+proof of a stable application operation key or of idempotent outbound Calls
+updates. Bind a durable operation to its workspace, CallSid, outreach attempt
+and conference. Store the issued, acknowledged and uncertain states separately;
+a terminal outcome alone cannot prove provider acknowledgement. A generated
+TwiML response cannot prove playback. The [connection-override reference](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides)
+is the source for the retry-header contract.
 
 **Limitations:** Connection overrides are not available on Twilio Conversations or Frontline webhooks. Voice webhooks have a hard 15-second ceiling regardless of override values.
 

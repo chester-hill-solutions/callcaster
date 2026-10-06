@@ -16,6 +16,8 @@ import {
 } from "@/lib/worker/job-registry.server";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+  PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
   ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
@@ -26,6 +28,18 @@ import {
   WEBHOOK_DELIVERY_JOB_TYPE,
   WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
+
+export const predictiveMachineParams = z.object({
+  operationId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+});
+
+export const predictiveMachineReconcileParams = predictiveMachineParams.extend({
+  successorCallSid: z
+    .string()
+    .regex(/^CA[0-9a-f]{32}$/i)
+    .optional(),
+});
 
 /**
  * Every registered job type's params schema, plus the typed enqueue/requeue
@@ -208,6 +222,14 @@ export const recordingRepairSweepParams = noParams;
  * guard that keeps this list and `jobRegistry` in sync.
  */
 export const jobParamsRegistry = [
+  {
+    type: PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+    params: predictiveMachineParams,
+  },
+  {
+    type: PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
+    params: predictiveMachineReconcileParams,
+  },
   { type: "twilio_open_sync", params: twilioOpenSyncParams },
   { type: "billing_reconcile", params: billingReconcileParams },
   { type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE, params: elevenlabsBatchTranscribeParams },

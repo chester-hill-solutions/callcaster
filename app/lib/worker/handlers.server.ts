@@ -1,6 +1,9 @@
+import { runPredictiveMachineContinuation, reconcilePredictiveMachineOperation } from "@/lib/predictive-machine.server";
 import { runNumberReleaseRecovery } from "@/lib/number-release-recovery.server";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+  PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
   RECORDING_REPAIR_SWEEP_JOB_TYPE,
@@ -15,6 +18,8 @@ import type { JobHandlers } from "@/lib/worker/poll-jobs.server";
 import { defineJob, type RegisteredJob } from "@/lib/worker/job-registry.server";
 import {
   audienceUploadParams,
+  predictiveMachineParams,
+  predictiveMachineReconcileParams,
   billingReconcileParams,
   callStatusSideEffectsParams,
   campaignDispatchParams,
@@ -160,6 +165,26 @@ const registrations = [
         },
         runNumberReleaseRecovery,
       ),
+  }),
+  defineJob({
+    type: PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+    params: predictiveMachineParams,
+    pages: true,
+    handler: (job, params) => {
+      if (job.workspace_id !== params.workspaceId)
+        throw new Error("Predictive job workspace does not match");
+      return runPredictiveMachineContinuation(params, job.id);
+    },
+  }),
+  defineJob({
+    type: PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
+    params: predictiveMachineReconcileParams,
+    pages: true,
+    handler: (job, params) => {
+      if (job.workspace_id !== params.workspaceId)
+        throw new Error("Predictive job workspace does not match");
+      return reconcilePredictiveMachineOperation(params, job.id);
+    },
   }),
   defineJob({
     type: "audience_upload",

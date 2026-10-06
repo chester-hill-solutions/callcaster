@@ -88,6 +88,7 @@ const steps = [
   "client/migrations/20261005000000_persist_stripe_customer_creation.sql",
   "client/migrations/20261006000000_number_purchase_recovery.sql",
   "client/migrations/20261006000001_number_release_recovery.sql",
+  "client/migrations/20261006000002_predictive_machine_operation.sql",
 ];
 
 /**

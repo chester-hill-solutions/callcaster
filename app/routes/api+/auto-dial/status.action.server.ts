@@ -1,3 +1,6 @@
+import { recordPredictiveSuccessorCallback } from "@/server/predictive-successor-callback.server";
+import { getPredictiveMachineOperation } from "@/server/predictive-machine-operation.server";
+import { needsPredictiveTerminalContinuation } from "@/lib/predictive-terminal-status";
 import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
@@ -161,7 +164,9 @@ const handleCallStatus = async (
     });
 
     if (!callUpdate.outreach_attempt_id) {
-      throw new Error("Missing outreach_attempt_id for auto-dial status update");
+      throw new Error(
+        "Missing outreach_attempt_id for auto-dial status update",
+      );
     }
     const outreachStatus = await findOutreachAttemptById(
       workspace,
@@ -172,7 +177,10 @@ const handleCallStatus = async (
     }
 
     await dequeueQueueEntry({
-      by: { contactId: outreachStatus.contact_id, campaignId: outreachStatus.campaign_id },
+      by: {
+        contactId: outreachStatus.contact_id,
+        campaignId: outreachStatus.campaign_id,
+      },
       workspaceId: workspace,
       household: true,
       // A conference name is `${userId}~${uuid}`, and this argument is bound
@@ -185,7 +193,14 @@ const handleCallStatus = async (
       friendlyName: callUpdate.conference_id ?? "",
       status: "in-progress",
     });
-    if (conferences.length && status !== "completed") {
+    const machineOperation = callUpdate.conference_id
+      ? await getPredictiveMachineOperation({
+          workspaceId: workspace,
+          callSid: callUpdate.sid,
+          conferenceId: callUpdate.conference_id,
+        })
+      : null;
+    if (conferences.length && needsPredictiveTerminalContinuation(status) && !machineOperation) {
       await triggerAutoDialer(dbCall);
     }
   } catch (error) {
@@ -316,10 +331,14 @@ export const action = defineAction({
     return { event, callSidValue };
   },
   sideEffects: ["db-write", "credit", "twilio"],
-  handler: async ({ auth }) => {
+  handler: async ({ auth, request }) => {
     const { event, callSidValue } = auth;
     try {
-    const dbCall = await findCallBySid(callSidValue);
+    let dbCall = await findCallBySid(callSidValue);
+    if (!dbCall?.workspace) {
+      await recordPredictiveSuccessorCallback(request, event.raw);
+      dbCall = await findCallBySid(callSidValue);
+    }
     if (!dbCall?.workspace) {
       // Unattributable callback (unknown CallSid, or a call row that never
       // got a workspace). Throwing here yields a 500, and Twilio retries 5xx

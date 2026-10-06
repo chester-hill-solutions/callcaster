@@ -44,6 +44,8 @@ function requireRegistration(type: string): (typeof jobRegistry)[number] {
 // The exact `jobHandlers` key set that existed in handlers.server.ts before
 // the registry landed (job-types.server.ts constants + bare string literals).
 const EXPECTED_JOB_TYPES = [
+  "predictive_machine_continue",
+  "predictive_machine_reconcile",
   "number_purchase_recovery",
   "number_release_recovery",
   "twilio_open_sync",
@@ -66,6 +68,8 @@ const EXPECTED_JOB_TYPES = [
 
 // The exact set poll-jobs.server.ts hand-maintained as `PAGING_JOB_TYPES`.
 const EXPECTED_PAGING_JOB_TYPES = [
+  "predictive_machine_continue",
+  "predictive_machine_reconcile",
   "call_status_side_effects",
   "sms_status_side_effects",
   "billing_reconcile",
