@@ -29,6 +29,7 @@ import {
   voicePatch,
 } from "@/lib/ivr-script-editor";
 import { DEFAULT_VOICE_ID, TTS_VOICES } from "@/lib/tts-voices";
+import { ivrNoInputSchema, type IvrNoInput } from "@/lib/ivr-no-input";
 
 export type IvrStepFieldsProps = {
   block: ScriptBlock;
@@ -191,7 +192,7 @@ export function IvrStepFields({
 /**
  * Per-step no-input behavior (#1883): how long to wait for a keypress and what
  * to do when the recipient stays silent. Writes `gatherTimeoutSeconds` +
- * `noInput` straight onto the block; the wire model is
+ * `noInput` through wireExtras so editor serialization retains them; the wire model is
  * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
  */
 function NoInputFields({
@@ -207,10 +208,9 @@ function NoInputFields({
   pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
 }) {
-  const timeoutSeconds = (block as { gatherTimeoutSeconds?: number }).gatherTimeoutSeconds ?? 5;
-  const noInput = (block as {
-    noInput?: { action: string | { pageId: string; blockId: string }; maxReplays?: number };
-  }).noInput;
+  const timeoutSeconds = typeof block.wireExtras?.gatherTimeoutSeconds === "number" ? block.wireExtras.gatherTimeoutSeconds : 5;
+  const parsedNoInput = ivrNoInputSchema.safeParse(block.wireExtras?.noInput);
+  const noInput = parsedNoInput.success ? parsedNoInput.data : undefined;
   const action: string = noInput
     ? typeof noInput.action === "object"
       ? "route"
@@ -224,8 +224,8 @@ function NoInputFields({
   const maxId = useId();
   const routeId = useId();
 
-  const setNoInput = (patch: { action: string | { pageId: string; blockId: string }; maxReplays?: number }) => {
-    onChange({ noInput: patch } as Partial<ScriptBlock>);
+  const setNoInput = (patch: IvrNoInput) => {
+    onChange({ wireExtras: { ...block.wireExtras, noInput: patch } });
   };
 
   const routeBlockOptions = routingTargets.filter((target) => target.kind === "block");
@@ -251,7 +251,7 @@ function NoInputFields({
               Number.isFinite(value) && value >= 1 && value <= 60
                 ? value
                 : undefined;
-            onChange({ gatherTimeoutSeconds: gathered } as Partial<ScriptBlock>);
+            onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
           }}
         />
       </FormField>

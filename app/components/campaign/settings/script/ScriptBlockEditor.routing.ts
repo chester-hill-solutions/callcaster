@@ -8,11 +8,13 @@ export type RoutingOption = { value: string; label: string };
 export function routingOptionsFor(
   routingTargets: RoutingTarget[],
   noTargetLabel = "(no target)",
+  blockPages?: Record<string, string>,
 ): RoutingOption[] {
   return [
     { value: NO_ROUTING_TARGET, label: noTargetLabel },
     ...routingTargets.map((target) => ({
-      value: target.id,
+      value: target.kind === "block" && blockPages?.[target.id]
+        ? `${blockPages[target.id]}:${target.id}` : target.id,
       label:
         target.kind === "block"
           ? `${target.pageTitle} — ${target.label}`

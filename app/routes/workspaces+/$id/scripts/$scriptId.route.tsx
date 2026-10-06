@@ -16,6 +16,7 @@ import {
   normalizeScriptForComparison,
 } from "@/lib/script-change";
 import type { Script } from "@/lib/types";
+import { toUserMessage } from "@/lib/user-message";
 
 import type { ScriptIdLoaderData } from "./$scriptId.loader.server";
 
@@ -70,8 +71,8 @@ export default function ScriptEditor() {
       setScript(savedScript);
       setInitScript(savedScript);
       toast.success("Script saved");
-    } catch {
-      toast.error("Couldn't save the script. Please try again.");
+    } catch (error) {
+      toast.error(toUserMessage(error, "Couldn't save the script. Please try again."));
     } finally {
       setIsSaving(false);
     }

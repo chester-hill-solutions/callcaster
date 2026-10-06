@@ -112,7 +112,7 @@ const renderTerminalTarget = async (
     }
   }
 
-  if (target.startsWith("page_") && script.pages[target]) {
+  if (script.pages[target]) {
     twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${target}/`);
     return;
   }

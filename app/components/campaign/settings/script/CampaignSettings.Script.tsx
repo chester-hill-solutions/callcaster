@@ -56,6 +56,7 @@ export default function CampaignSettingsScript({
       document={document}
       onChange={handleChange}
       audioFlow={audioFlow ?? isAudioScriptType(script.type)}
+      inboundFlow={script.type === "inbound_ivr"}
       mediaNames={mediaNames}
       audioPreviewUrl={audioPreviewUrl}
       onUploadAudio={onUploadAudio}

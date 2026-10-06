@@ -227,6 +227,9 @@ updates cannot prove driver serialization or first-write preservation.
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.
+Read current enum values before seeding companion rows. Script and campaign
+types can use different vocabularies; a script type does not prove a valid
+campaign enum.
 
 The scoped client's delete method returns no rows. When compensation depends
 on whether a row was removed, use a transaction-bound deletion with explicit

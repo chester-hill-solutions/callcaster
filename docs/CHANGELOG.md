@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Inbound phone menus reject invalid attachments and unsafe overwrites, keep drafts for retry, and show script validation in shared overlay details ([#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269)).
+
 - Fixed: CI rejects literal redirects to pages outside the registered route tree ([PR #2443](https://github.com/chester-hill-solutions/callcaster/pull/2443), [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278)).
 
 - Fixed: Admin panels no longer offer Add User or Add Workspace actions without an available creation flow ([#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111), [#2440](https://github.com/chester-hill-solutions/callcaster/pull/2440)).

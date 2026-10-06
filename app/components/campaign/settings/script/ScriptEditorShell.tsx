@@ -23,8 +23,11 @@ import {
   type IvrPlaybackMode,
 } from "@/lib/ivr-script-editor";
 import { validateIvrRouting } from "@/lib/ivr-script-validation";
+import { scripts } from "@/lib/call-script-service";
+import { validateInboundScriptSteps } from "@/lib/inbound-script-validation";
 import { cn } from "@/lib/utils";
 import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
+import { ScriptValidationDetails } from "./ScriptValidationDetails";
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   instruction: "Instruction",
@@ -39,6 +42,7 @@ export type ScriptEditorShellProps = {
   onChange: (doc: ScriptDocument) => void;
   /** Author audio steps for a recipient instead of form blocks for an agent. */
   audioFlow?: boolean;
+  inboundFlow?: boolean;
   mediaNames?: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
@@ -50,6 +54,7 @@ export function ScriptEditorShell({
   document,
   onChange,
   audioFlow = false,
+  inboundFlow = false,
   mediaNames = [],
   audioPreviewUrl,
   onUploadAudio,
@@ -69,14 +74,19 @@ export function ScriptEditorShell({
   // Routing validation (#1884): option `next` targets that dangle or form
   // cycles without a terminal are surfaced alongside scriptkit's structural
   // errors. Same logic runs server-side at the launch gate.
-  const routingIssues = useMemo(
-    () => validateIvrRouting(editor.document).issues,
-    [editor.document],
+  const validationErrors = useMemo(
+    () => {
+      if (inboundFlow) {
+        const validation = validateInboundScriptSteps(scripts.serializeToCallcasterFlow(editor.document));
+        return validation.ok ? [] : validation.errors;
+      }
+      return [
+        ...(editor.validation.ok ? [] : editor.validation.errors),
+        ...validateIvrRouting(editor.document).issues.map((issue) => issue.error),
+      ];
+    },
+    [editor.document, editor.validation, inboundFlow],
   );
-  const validationErrors = [
-    ...(editor.validation.ok ? [] : editor.validation.errors),
-    ...routingIssues.map((issue) => issue.error),
-  ];
 
   const activePageIndex = editor.orderedPages.findIndex(
     (page) => page.id === editor.activePageId,
@@ -211,6 +221,7 @@ export function ScriptEditorShell({
                     }
                   />
                   <div className="flex flex-wrap gap-1">
+                    <ScriptValidationDetails errors={validationErrors} inbound={inboundFlow} />
                     {!readOnly && (
                       <>
                         <Button
@@ -360,6 +371,7 @@ export function ScriptEditorShell({
                           block={block}
                           readOnly={readOnly}
                           audioFlow={audioFlow}
+                          inboundFlow={inboundFlow}
                           mediaNames={mediaNames}
                           audioPreviewUrl={audioPreviewUrl}
                           onUploadAudio={onUploadAudio}
@@ -391,19 +403,17 @@ export function ScriptEditorShell({
               </div>
             </>
           ) : (
-            <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-              Select a page from the list.
-            </p>
+            <>
+              <ScriptValidationDetails errors={validationErrors} inbound={inboundFlow} />
+              <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
+                Select a page from the list.
+              </p>
+            </>
           )}
 
         </div>
       </div>
 
-      {validationErrors.length > 0 && (
-        <div className="text-sm text-destructive-text" role="alert">
-          {validationErrors.join("; ")}
-        </div>
-      )}
     </div>
   );
 }

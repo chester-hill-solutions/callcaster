@@ -25,6 +25,8 @@ import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace
 import type { z } from "zod";
 import type { InboundRoutingPresetApplication } from "../../shared/inbound-routing-presets";
 import { applyRoutingPresetWithTenantDb } from "@/lib/routing-preset-write.server";
+import { AppError } from "@/lib/errors.server";
+import { validateInboundScriptAttachment, withInboundScriptWrite } from "@/server/inbound-script-write.server";
 import { createTenantDb } from "@/server/tenant-db";
 
 type PatchNumberInput = z.infer<typeof patchNumberBodySchema>;
@@ -115,11 +117,20 @@ export async function patchWorkspaceNumber(
     updates.friendly_name = input.friendly_name;
   }
 
-  const { data: number, error } = await updateWorkspacePhoneNumber({
-    numberId,
-    workspaceId,
-    updates,
-  });
+  let result;
+  const selectedScriptId = input.inbound_script_id;
+  try {
+    result = selectedScriptId != null
+      ? await withInboundScriptWrite(workspaceId, async (tdb) => {
+          await validateInboundScriptAttachment(tdb, workspaceId, selectedScriptId);
+          return updateWorkspacePhoneNumber({ numberId, workspaceId, updates, tdb });
+        })
+      : await updateWorkspacePhoneNumber({ numberId, workspaceId, updates });
+  } catch (error) {
+    if (error instanceof AppError) return { ok: false as const, error: error.message, status: error.statusCode };
+    throw error;
+  }
+  const { data: number, error } = result;
 
   if (error) {
     return { ok: false as const, error: error.message, status: 500 };
@@ -160,13 +171,13 @@ export async function applyWorkspaceNumberRoutingPreset(
   }
 
   try {
-    const tdb = createTenantDb(workspaceId);
-    return await applyRoutingPresetWithTenantDb(
-      tdb,
-      numberId,
-      application,
-    );
+    return application.presetId === "automated_menu"
+      ? await withInboundScriptWrite(workspaceId, (tdb) =>
+          applyRoutingPresetWithTenantDb(tdb, numberId, application, workspaceId),
+        )
+      : await applyRoutingPresetWithTenantDb(createTenantDb(workspaceId), numberId, application, workspaceId);
   } catch (error) {
+    if (error instanceof AppError) return { ok: false as const, error: error.message, status: error.statusCode };
     logger.error("applyWorkspaceNumberRoutingPreset error", error);
     return {
       ok: false as const,

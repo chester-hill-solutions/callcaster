@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   tdb: {
+    execute: vi.fn(),
     script: {
       findFirst: vi.fn(),
       insert: vi.fn(),
@@ -19,19 +20,22 @@ const mocks = vi.hoisted(() => ({
   createTenantDb: vi.fn(),
 }));
 
-vi.mock("@/server/db", () => ({
+vi.mock("@/server/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/db")>()),
   db: {
     transaction: mocks.transaction,
   },
 }));
 
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
   createTenantDb: mocks.createTenantDb,
 }));
 
 describe("script persistence", () => {
   beforeEach(() => {
     for (const table of Object.values(mocks.tdb)) {
+      if (typeof table === "function") { table.mockReset(); continue; }
       for (const fn of Object.values(table)) {
         fn.mockReset();
       }
@@ -40,6 +44,8 @@ describe("script persistence", () => {
     mocks.createTenantDb.mockReset();
     mocks.createTenantDb.mockReturnValue(mocks.tdb);
     mocks.transaction.mockImplementation(async (callback) => callback({ transaction: true }));
+    mocks.tdb.execute.mockResolvedValue([]);
+    mocks.tdb.script.findFirst.mockResolvedValue({ id: 4, name: "Survey", type: "script" });
     mocks.tdb.campaign.count.mockResolvedValue(0);
     mocks.tdb.workspace_number.count.mockResolvedValue(0);
   });
@@ -166,7 +172,7 @@ describe("script persistence", () => {
 
   test("updates in-place when an inbound number references the script and saveAsCopy is false", async () => {
     const { persistCampaignScript } = await import("@/lib/script-persistence.server");
-    mocks.tdb.script.findFirst.mockResolvedValueOnce({ id: 4, name: "Survey" });
+    mocks.tdb.script.findFirst.mockResolvedValueOnce({ id: 4, name: "Survey", type: "inbound_ivr" });
     mocks.tdb.workspace_number.count.mockResolvedValueOnce(1);
     mocks.tdb.script.update.mockResolvedValueOnce([{ id: 4, name: "Survey" }]);
     mocks.tdb.campaign.update.mockResolvedValueOnce([{ id: 9, script_id: 4 }]);
@@ -177,7 +183,7 @@ describe("script persistence", () => {
       scriptId: 4,
       actorId: "u1",
       saveAsCopy: false,
-      content: { name: "Survey", steps: {} },
+      content: { name: "Survey", steps: { startPageId: "page_1", pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { type: "synthetic", audioFile: "Hello", options: [{ value: "1", next: "end" }] } } } },
     });
 
     expect(result).toMatchObject({ id: 4, name: "Survey" });

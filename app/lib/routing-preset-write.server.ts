@@ -1,6 +1,8 @@
 import { and, eq } from "drizzle-orm";
-import { inbound_queue, script, workspace_number } from "@/db/schema";
+import { inbound_queue, workspace_number } from "@/db/schema";
 import type { TenantDb } from "@/server/tenant-db";
+import { validateInboundScriptAttachment } from "@/server/inbound-script-write.server";
+import { AppError } from "@/lib/errors.server";
 import {
   buildInboundRoutingPresetPatch,
   type InboundRoutingPresetApplication,
@@ -8,7 +10,7 @@ import {
 
 type RoutingTenantDb = Pick<
   TenantDb,
-  "inbound_queue" | "script" | "workspace_number"
+  "inbound_queue" | "script" | "workspace_number" | "execute"
 >;
 
 type RoutingPresetWriteResult =
@@ -29,6 +31,7 @@ export async function applyRoutingPresetWithTenantDb(
   tdb: RoutingTenantDb,
   numberId: string,
   application: InboundRoutingPresetApplication,
+  workspaceId: string,
 ): Promise<RoutingPresetWriteResult> {
   let patch;
   try {
@@ -66,16 +69,11 @@ export async function applyRoutingPresetWithTenantDb(
       break;
     }
     case "automated_menu": {
-      const selectedScript = await tdb.script.findFirst({
-        columns: { id: true },
-        where: eq(script.id, application.scriptId),
-      });
-      if (!selectedScript) {
-        return {
-          ok: false,
-          error: "Choose an automated menu in this workspace",
-          status: 400,
-        };
+      try {
+        await validateInboundScriptAttachment(tdb, workspaceId, application.scriptId);
+      } catch (error) {
+        if (error instanceof AppError) return { ok: false, error: error.message, status: 400 };
+        throw error;
       }
       break;
     }
