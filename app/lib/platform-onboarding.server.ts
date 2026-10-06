@@ -15,11 +15,13 @@ import { stripDisabledRcsChannel } from "@/lib/rcs-onboarding.server";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 import {
   loadWorkspaceOnboardingView,
+  resolveOnboardingInput,
   type OnboardingActionContext,
   type OnboardingHandlerResult,
   type WorkspaceOnboardingDetail,
 } from "@/lib/platform-onboarding-helpers.server";
 import { ONBOARDING_ACTION_HANDLERS } from "@/lib/platform-onboarding-handlers.server";
+import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 
 export type {
   OnboardingActionContext,
@@ -155,6 +157,14 @@ export async function runOnboardingAction(
   const admin = await requireOnboardingAdmin(userId, workspaceId);
   if (!admin.ok) {
     return admin;
+  }
+
+  if (actionName === "save_business_profile" || actionName === "save_channels") {
+    const form = resolveOnboardingInput(input);
+    const selection = form.get("tollFreeOptInType");
+    if (form.has("tollFreeOptInType") && selection !== "" && !parseTollFreeOptInType(selection)) {
+      return { ok: false, status: 400, error: "Choose a valid toll-free SMS consent method." };
+    }
   }
 
   const ctx: OnboardingActionContext = {

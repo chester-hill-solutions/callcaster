@@ -15,6 +15,7 @@ export const EMPTY_BUSINESS_PROFILE: WorkspaceMessagingBusinessProfile = {
   supportPhone: "",
   useCaseSummary: "",
   optInWorkflow: "",
+  tollFreeOptInType: null,
   optInKeywords: "",
   optOutKeywords: "",
   helpKeywords: "",

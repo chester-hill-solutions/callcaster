@@ -79,6 +79,24 @@ describe("OnboardingBusinessIdentityStep — Website URL required only for SMS (
 });
 
 describe("OnboardingBusinessIdentityStep — SMS identity fields (#1148)", () => {
+  test("toll-free consent starts unselected and uses the exact form value", () => {
+    renderStep(onboarding({ selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"] }));
+    expect(screen.getByRole("combobox", { name: /how do customers consent to sms/i })).toHaveTextContent("Choose a consent method");
+    const form = document.getElementById("onboarding-business-identity-form") as HTMLFormElement;
+    expect(new FormData(form).get("tollFreeOptInType")).toBe("");
+  });
+  test("a saved website selection retains its label and exact submitted value", () => {
+    renderStep(onboarding({ selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"], businessProfile: { tollFreeOptInType: "WEB_FORM" } }));
+    expect(screen.getByRole("combobox", { name: /how do customers consent to sms/i })).toHaveTextContent("Website form");
+    const form = document.getElementById("onboarding-business-identity-form") as HTMLFormElement;
+    expect(new FormData(form).get("tollFreeOptInType")).toBe("WEB_FORM");
+  });
+  test("a voice identity form does not add a consent attestation", () => {
+    renderStep(onboarding({ selectedGoal: "live_calling", selectedChannels: ["voice_compliance"] }));
+    expect(screen.queryByRole("combobox", { name: /how do customers consent to sms/i })).not.toBeInTheDocument();
+    const form = document.getElementById("onboarding-business-identity-form") as HTMLFormElement;
+    expect(new FormData(form).has("tollFreeOptInType")).toBe(false);
+  });
   test("shows toll-free business fields only for the selected SMS channel", () => {
     renderStep(
       onboarding({

@@ -2,9 +2,11 @@ import { Form } from "react-router";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { goalNeedsSmsCompliance } from "@/lib/messaging-onboarding/goals";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import { TOLL_FREE_OPT_IN_TYPES, type TollFreeOptInType } from "@/lib/toll-free-opt-in";
 import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 import { useRequiredBusinessProfileFields } from "./useRequiredBusinessProfileFields";
@@ -18,6 +20,16 @@ type BusinessProfile = WorkspaceMessagingOnboardingState["businessProfile"];
 type ProfileFieldsProps = {
   profile: BusinessProfile;
   isReadOnly: boolean;
+};
+
+const TOLL_FREE_CONSENT_LABELS: Record<TollFreeOptInType, string> = {
+  VERBAL: "Verbal consent",
+  WEB_FORM: "Website form",
+  PAPER_FORM: "Paper form",
+  VIA_TEXT: "Text message",
+  MOBILE_QR_CODE: "Mobile QR code",
+  IMPORT: "Imported consent",
+  IMPORT_PLEASE_REPLACE: "Imported consent (replace)",
 };
 
 function TollFreeVerificationFields({ profile, isReadOnly }: ProfileFieldsProps) {
@@ -61,6 +73,25 @@ function TollFreeVerificationFields({ profile, isReadOnly }: ProfileFieldsProps)
           </FormFieldControl>
         </FormField>
       </div>
+      <FormField
+        htmlFor="tollFreeOptInType"
+        label="How do customers consent to SMS?"
+        required
+        description="Choose the method your customers use. We send this selection to the carrier for toll-free verification."
+      >
+        <Select name="tollFreeOptInType" defaultValue={profile.tollFreeOptInType ?? undefined} disabled={isReadOnly} required>
+          <FormFieldControl>
+            <SelectTrigger id="tollFreeOptInType">
+              <SelectValue placeholder="Choose a consent method" />
+            </SelectTrigger>
+          </FormFieldControl>
+          <SelectContent>
+            {TOLL_FREE_OPT_IN_TYPES.map((type) => (
+              <SelectItem key={type} value={type}>{TOLL_FREE_CONSENT_LABELS[type]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FormField>
       <input type="hidden" name="ageGatedContent" value="false" />
       <FormField
         htmlFor="ageGatedContent"

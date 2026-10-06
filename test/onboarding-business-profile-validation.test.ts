@@ -109,6 +109,7 @@ const EMPTY_BUSINESS_PROFILE = {
   supportPhone: "",
   useCaseSummary: "",
   optInWorkflow: "",
+  tollFreeOptInType: null,
   optInKeywords: "",
   optOutKeywords: "",
   helpKeywords: "",
@@ -216,6 +217,51 @@ describe("save_business_profile validation", () => {
     mocks.getWorkspaceCredits.mockResolvedValue(0);
   });
 
+  test.each(["save_business_profile", "save_channels"])("%s refuses an invalid selection before writing", async (action) => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
+      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
+      businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Acme", tollFreeOptInType: "WEB_FORM" },
+    }));
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, action, {
+      legalBusinessName: "Acme", tollFreeOptInType: "NOT_VERBAL", selectedGoal: "sms_blast",
+    });
+    expect(outcome).toMatchObject({ ok: false, status: 400 });
+    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+    expect(mocks.enqueueWorkspaceComplianceJob).not.toHaveBeenCalled();
+  });
+
+  test("the toll-free identity step cannot advance without an explicit consent selection", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
+      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
+    }));
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", identityForm({ legalBusinessName: "Acme" }));
+    expect(outcome).toMatchObject({ ok: true, result: { kind: "payload", status: 400, data: { error: "Choose how customers consent to toll-free SMS in Business identity." } } });
+    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+  });
+
+  test("an exact consent selection is saved with the identity form", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
+      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
+    }));
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", identityForm({ legalBusinessName: "Acme", tollFreeOptInType: "MOBILE_QR_CODE" }));
+    expect(outcome.ok).toBe(true);
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(expect.objectContaining({
+      updates: expect.objectContaining({ businessProfile: expect.objectContaining({ tollFreeOptInType: "MOBILE_QR_CODE" }) }),
+    }));
+  });
+
+  test("saving a different wizard step preserves the previous consent selection", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
+      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
+      businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Acme", tollFreeOptInType: "PAPER_FORM" },
+    }));
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", programForm({ useCaseSummary: "Appointment reminders", sampleMessages: "Acme: Your appointment is tomorrow. Reply STOP to stop." }));
+    expect(outcome.ok).toBe(true);
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(expect.objectContaining({
+      updates: expect.objectContaining({ businessProfile: expect.objectContaining({ tollFreeOptInType: "PAPER_FORM" }) }),
+    }));
+  });
+
   // The intake gate must equal what the Identity screen collects. When it
   // demanded the two Program fields as well, every non-SMS goal was trapped in
   // onboarding forever (the Program step is only shown for sms_blast).
@@ -294,6 +340,7 @@ describe("save_business_profile validation", () => {
         legalBusinessName: "Northgate Services Inc.",
         websiteUrl: "https://www.northgateservices.example",
         doingBusinessAs: "Northgate",
+        tollFreeOptInType: "WEB_FORM",
         businessRegistrationNumber: "123456789RC0001",
         ageGatedContent: "true",
         channelSampleMessages:
@@ -312,6 +359,7 @@ describe("save_business_profile validation", () => {
         updates: expect.objectContaining({
           businessProfile: expect.objectContaining({
             doingBusinessAs: "Northgate",
+            tollFreeOptInType: "WEB_FORM",
             businessRegistrationNumber: "123456789RC0001",
             ageGatedContent: true,
             sampleMessages: [

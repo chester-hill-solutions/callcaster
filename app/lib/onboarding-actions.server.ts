@@ -1,6 +1,7 @@
 import type { CallerIdValidationRequest } from "@/lib/caller-id-verification.server";
 import { isWorkspaceOnboardingGoal } from "@/lib/messaging-onboarding/goals";
 import { EMPTY_BUSINESS_PROFILE } from "@/lib/messaging-onboarding/business-profile.server";
+import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 import type {
   WorkspaceMessagingBusinessProfile,
   WorkspaceOnboardingChannel,
@@ -101,6 +102,9 @@ export function readChannelInlineBusinessFields(
   current: WorkspaceMessagingBusinessProfile,
 ): WorkspaceMessagingBusinessProfile {
   const next: WorkspaceMessagingBusinessProfile = { ...current };
+  if (formData.has("tollFreeOptInType")) {
+    next.tollFreeOptInType = parseTollFreeOptInType(formData.get("tollFreeOptInType"));
+  }
   const stringFields: Array<keyof WorkspaceMessagingBusinessProfile> = [
     "doingBusinessAs",
     "businessRegistrationNumber",
