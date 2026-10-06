@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Admin billing reconciliation compares provider usage and credits over the same dates, including checks that cross midnight ([#2412](https://github.com/chester-hill-solutions/callcaster/issues/2412), [PR #2413](https://github.com/chester-hill-solutions/callcaster/pull/2413)).
+
 - Fixed: Billing reconciliation compares SMS segments and MMS messages separately, excludes overlapping usage totals, and marks unsupported usage as unavailable ([#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112), [PR #2411](https://github.com/chester-hill-solutions/callcaster/pull/2411)).
 
 - Fixed: Public campaign enqueues use server-reserved order ranges, so concurrent requests cannot select overlapping positions ([#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152), [PR #2410](https://github.com/chester-hill-solutions/callcaster/pull/2410)).

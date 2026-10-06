@@ -4,6 +4,7 @@ import {
   getWorkspaceTwilioPortalSnapshot,
 } from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import {
   getWorkspaceBillingReconciliationSnapshot,
@@ -78,11 +79,17 @@ export async function loadTwilioData(
     if (adminTwilioCreds?.sid) {
       const twilio = await createWorkspaceTwilioInstance({         workspace_id: workspaceId,
       });
+      const referenceDate = new Date();
+      const { startDate, endDate } = getTwilioUsageDateRange(referenceDate);
       const [account, numbers, usageRecords] = await Promise.all([
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
         twilio.incomingPhoneNumbers.list({ limit: 20 }),
         // Limit usage records fetch to prevent auto-paging the entire usage history.
-        twilio.usage.records.list({ limit: 200 }),
+        twilio.usage.records.list({
+          limit: 200,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        }),
       ]);
 
       twilioAccountInfo = projectTwilioAccountForClient(account);
@@ -112,6 +119,7 @@ export async function loadTwilioData(
       billingReconciliation = await loadBillingReconciliationReport({
         workspaceId,
         twilioUsage,
+        referenceDate,
       }).catch((reconcileError) => {
         logger.error("Error building billing reconciliation report:", reconcileError);
         return null;
