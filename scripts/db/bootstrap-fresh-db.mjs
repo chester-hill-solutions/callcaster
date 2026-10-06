@@ -130,6 +130,7 @@ const steps = [
   "client/migrations/20261006000000_number_purchase_recovery.sql",
   "client/migrations/20261006000001_number_release_recovery.sql",
   "client/migrations/20261006000002_predictive_machine_operation.sql",
+  "client/migrations/20261006000003_inbound_voicemail_delivery.sql",
 ];
 
 /**

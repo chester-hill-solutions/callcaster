@@ -17,6 +17,28 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+type PreparedDelivery = Awaited<ReturnType<typeof import("@/server/inbound-voicemail-store.server").prepareVoicemailDelivery>>;
+let preparedDelivery: PreparedDelivery | null = null;
+vi.mock("@/server/inbound-voicemail-store.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/inbound-voicemail-store.server")>()),
+  getInboundVoicemailRecipient: vi.fn(async () => null),
+  findVoicemailDelivery: vi.fn(async () => null),
+  prepareVoicemailDelivery: vi.fn(async (binding, data) => {
+    preparedDelivery = { id: "owned-delivery", workspace: binding.workspaceId, call_sid: binding.callSid,
+      recording_sid: binding.recordingSid, recording_url: binding.recordingUrl, phone_number: binding.phoneNumber,
+      recipient: data.recipient, signed_url: data.signedUrl, email_payload: data.payload, state: "prepared",
+      created_at: new Date("2026-10-06T12:00:00Z"), first_send_at: null, lease_token: null, lease_until: null,
+      sent_at: null, resend_email_id: null, last_error: null };
+    return preparedDelivery;
+  }),
+  claimVoicemailDelivery: vi.fn(async () => {
+    if (!preparedDelivery) throw new Error("Missing owned delivery fixture");
+    return { kind: "claimed", delivery: preparedDelivery, leaseToken: "owned-lease" };
+  }),
+  completeVoicemailDelivery: vi.fn(async () => preparedDelivery),
+  releaseVoicemailDelivery: vi.fn(async () => undefined),
+}));
+
 const telephonyDbMocks = vi.hoisted(() => ({
   findCallBySid: vi.fn(),
   updateCallRecordingUrlBySid: vi.fn(),
@@ -87,10 +109,12 @@ function setupEmailVmMocks(overrides?: {
     webhook: [],
   };
 
-  const callRow = overrides?.callRow ?? {
+  const callRow = {
     sid: "CA1",
     from: "+15550001111",
     to: "+15550002222",
+    workspace: workspace.id,
+    ...overrides?.callRow,
   };
 
   const numberRow = {
@@ -179,7 +203,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(mod.action({
@@ -198,6 +222,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       expect.objectContaining({
         to: ["notify@example.com"],
       }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     );
     expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -227,7 +252,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(mod.action({
@@ -253,7 +278,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     await asRouteResponse(mod.action({
@@ -300,7 +325,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect((logged?.[1] as Error).message).toMatch(/auth-token credentials/);
   });
 
-  test("success path with no matching webhook does not call sendWebhookNotification", async () => {
+  test("success delegates optional webhook policy to the canonical notification service", async () => {
     setupEmailVmMocks({
       workspace: {
         id: "w1",
@@ -314,7 +339,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(mod.action({
@@ -327,7 +352,9 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       params: {},
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+    expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ optional: true, eventCategory: "voicemail", eventType: "INSERT", workspaceId: "w1" }),
+    );
   });
 
   test("acks (does NOT send) when inbound_action is null — Twilio retries are drained via the recording_url guard (#1224)", async () => {
@@ -488,7 +515,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(mod.action({
@@ -523,7 +550,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(403);
 
     setupEmailVmMocks();
     credentialsMocks.readTwilioWorkspaceCredentials.mockReturnValueOnce(null);
@@ -578,7 +605,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+    mocks.sendEmail.mockResolvedValueOnce({ data: { id: "em1" }, error: null });
 
     const mod = await import("../app/routes/api+/email-vm");
     await asRouteResponse(mod.action({
@@ -599,7 +626,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
     mocks.sendEmail.mockImplementationOnce(async () => {
       order.push("email");
-      return { id: "em1" };
+      return { data: { id: "em1" }, error: null };
     });
     telephonyDbMocks.updateCallRecordingUrlBySid.mockImplementation(async () => {
       order.push("persist");

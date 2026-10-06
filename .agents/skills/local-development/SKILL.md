@@ -326,7 +326,10 @@ not itself expose the full row. Check serialized nested payloads separately.
 
 For global-table mutations, verify the actual UPDATE predicate with foreign and
 owned rows, then exercise the real API/form error responses. Access checks before
-a bare-ID write do not impose tenant scope. Keep a permitted-role and an explicit
+a bare-ID write do not impose tenant scope. For callback context reads, select the
+number by the stored call workspace as well as its phone. Test two workspace
+rows with the same phone: a workspace check after a phone-only `LIMIT 1` can
+block valid work after it selects the wrong row. Keep a permitted-role and an explicit
 global-admin control when their policies differ.
 
 ## RPC migration changes
@@ -415,6 +418,12 @@ validation; do not validate a value after this lossy conversion. Check raw scala
 types before string conversion: an array can stringify to a valid decimal despite
 the SDK declaring a numeric field. Retain page
 limits, later-page records, retry failures and valid zero controls.
+Provider mocks must use the installed SDK's response envelope. For Resend,
+success is `{ data: { id }, error: null }`; a top-level `{ id }` does not prove
+a delivery receipt. Keep rejected-result and missing-receipt controls when a
+write depends on provider success. A retry test must compare the actual repeated
+payload and key, including generated dates and signed links.
+
 When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
 push; run the full tier if the caller inventory is not complete.
@@ -449,7 +458,9 @@ check in the shell exit status. Inspect each required result before reporting it
 Before inserting a constant beside an export, find its first runtime use. An
 exported table can aggregate an earlier private table, so shared constants must
 precede that first construction. Anchor replacements to whole lines or complete
-declarations, and require a unique match before writing. Run the affected module
+declarations, and require a unique match before writing. Check existing object
+keys before adding a test fixture property; a repeated key can be only a build
+warning when the test files are outside the TypeScript gate. Run the affected module
 tests after the edit.
 Baseline experiments after staging must include staged and unstaged runtime
 changes against the pinned commit (`git diff HEAD`), not only the worktree diff.
@@ -481,7 +492,8 @@ proof. Parse whole statements and retain valid called-service/auth controls.
 
 For API surface changes, generate with `npm run tools:api:codegen` and
 `npm run tools:api:surface:report` before full CI. Review and stage the expected
-generated files. `ci:codegen:verify` compares unstaged output with the index;
+generated files. Run `git diff --cached --check` after staging so new files
+receive the same whitespace check as existing files. `ci:codegen:verify` compares unstaged output with the index;
 an intended un-staged API delta otherwise fails the final gate. Do not stage
 drift without its matching reviewed source change.
 

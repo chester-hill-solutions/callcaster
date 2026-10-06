@@ -20,6 +20,11 @@ const mocks = vi.hoisted(() => ({
   loadInboundIvrBlockContext: vi.fn(),
 }));
 
+vi.mock("@/server/inbound-voicemail-store.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/inbound-voicemail-store.server")>()),
+  bindInboundVoicemailRecipient: vi.fn(async (_binding, recipient) => recipient),
+}));
+
 vi.mock("@client/client-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/ivr-webhook-auth.server", () => ({
   requireTwilioSignatureForIvrResponse: (...a: unknown[]) =>

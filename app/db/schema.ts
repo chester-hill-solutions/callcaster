@@ -19,6 +19,7 @@ import {
 import { relations, sql } from "drizzle-orm";
 export { workspace_number_release } from "./schema-number-release";
 export { predictive_machine_operation } from "./schema-predictive-machine";
+export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
 import { isoTimestamps, textTimestamps, timestampTimestamps } from "./schema-timestamps";
 // Type-only import; the cycle with db-types (which type-imports this module)
