@@ -762,6 +762,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         },
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
+        "409": errorResponse("Release incomplete; retry to finish sender cleanup and number release"),
         "404": errorResponse("Number not found"),
       },
     },

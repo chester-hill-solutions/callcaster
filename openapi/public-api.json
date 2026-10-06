@@ -10248,6 +10248,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Release incomplete; retry to finish sender cleanup and number release",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
           }
         }
       }

@@ -215,6 +215,7 @@ export const jobParamsRegistry = [
   { type: "campaign_schedule_sync", params: noParams },
   { type: "number_rental_billing", params: numberRentalBillingParams },
   { type: "number_purchase_recovery", params: noParams },
+  { type: "number_release_recovery", params: noParams },
   { type: "audience_upload", params: audienceUploadParams },
   { type: "low_credit_notify", params: noParams },
   { type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE, params: twilioWebhookAuditParams },

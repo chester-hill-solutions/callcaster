@@ -35,6 +35,7 @@ export type WorkspaceReadinessNumber = {
 export type WorkspaceReadinessSenderPool = {
   inSync: boolean;
   missingFromPool: string[];
+  extraInPool: string[];
   livePhoneNumbers: string[];
 };
 
@@ -463,16 +464,28 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     id: "sender_pool_in_sync",
     test: (ctx) => {
       if (!ctx.senderPool || !sendViaMessagingService(ctx)) return true;
-      return ctx.senderPool.inSync && ctx.senderPool.missingFromPool.length === 0;
+      return (
+        ctx.senderPool.inSync && ctx.senderPool.missingFromPool.length === 0
+      );
     },
     blockingFor: ["sms"] as const,
     code: "sender_pool_missing_numbers",
     message: "Sender pool is missing numbers.",
     severity: "error" as const,
-    buildMessage: (ctx) =>
-      ctx.senderPool && ctx.senderPool.missingFromPool.length > 0
-        ? `Sender pool is missing numbers: ${ctx.senderPool.missingFromPool.join(", ")}.`
-        : "Sender pool is missing numbers.",
+    buildMessage: (ctx) => {
+      const messages: string[] = [];
+      if (ctx.senderPool?.missingFromPool.length) {
+        messages.push(
+          `Sender pool is missing numbers: ${ctx.senderPool.missingFromPool.join(", ")}.`,
+        );
+      }
+      if (ctx.senderPool?.extraInPool?.length) {
+        messages.push(
+          `Sender pool has unexpected numbers: ${ctx.senderPool.extraInPool.join(", ")}.`,
+        );
+      }
+      return messages.join(" ") || "Sender pool is missing numbers.";
+    },
   },
   {
     id: "sender_pool_has_senders",

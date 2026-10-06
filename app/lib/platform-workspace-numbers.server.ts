@@ -1,3 +1,4 @@
+import { NumberReleaseIncompleteError } from "@/lib/number-release.server";
 import { purchaseNumberForWorkspace } from "@/lib/number-purchase.server";
 import {
   createWorkspaceTwilioInstance,
@@ -193,7 +194,11 @@ export async function deleteWorkspaceNumber(
   if (error) {
     const message =
       error instanceof Error ? error.message : "Failed to remove phone number";
-    return { ok: false as const, error: message, status: 500 };
+    return {
+      ok: false as const,
+      error: message,
+      status: error instanceof NumberReleaseIncompleteError ? 409 : 500,
+    };
   }
 
   return { ok: true as const };

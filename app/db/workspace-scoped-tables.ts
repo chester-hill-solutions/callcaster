@@ -27,6 +27,7 @@ import {
   workspace_member,
   workspace_number,
   workspace_number_purchase,
+  workspace_number_release,
   workspace_users,
 } from "./schema";
 
@@ -53,6 +54,7 @@ export const WORKSPACE_SCOPED_TABLES = {
   webhook: { table: webhook, workspaceColumn: webhook.workspace, workspaceColumnName: "workspace" },
   workspace_number: { table: workspace_number, workspaceColumn: workspace_number.workspace, workspaceColumnName: "workspace" },
   workspace_number_purchase: { table: workspace_number_purchase, workspaceColumn: workspace_number_purchase.workspace, workspaceColumnName: "workspace" },
+  workspace_number_release: { table: workspace_number_release, workspaceColumn: workspace_number_release.workspace, workspaceColumnName: "workspace" },
   workspace_audio: { table: workspace_audio, workspaceColumn: workspace_audio.workspace_id, workspaceColumnName: "workspace_id" },
   workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace, workspaceColumnName: "workspace" },
   transaction_history: {
