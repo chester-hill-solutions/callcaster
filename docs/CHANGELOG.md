@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Test tools prevent mock redirects from reading protected or outside files in both npm and Bun installs ([#2431](https://github.com/chester-hill-solutions/callcaster/issues/2431)).
+- Security: Test tools prevent mock redirects from reading protected or outside files in both npm and Bun installs ([#2431](https://github.com/chester-hill-solutions/callcaster/issues/2431), [PR #2432](https://github.com/chester-hill-solutions/callcaster/pull/2432)).
 
 - Security: Development and test servers use the patched Vite file boundary in both npm and Bun installs ([#2428](https://github.com/chester-hill-solutions/callcaster/pull/2428), [#2427](https://github.com/chester-hill-solutions/callcaster/issues/2427)).
 
