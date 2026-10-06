@@ -128,7 +128,11 @@ function mount() {
     screen.getByPlaceholderText<HTMLTextAreaElement>("Type your message");
   const type = (body: string) =>
     fireEvent.change(textarea(), { target: { value: body } });
-  const send = () => fireEvent.submit(textarea().closest("form")!);
+  const send = () => {
+    const form = textarea().closest("form");
+    if (!form) throw new Error("Composer form is missing");
+    fireEvent.submit(form);
+  };
   const refresh = () => view.rerender(<Composer />);
   const start = () => {
     messageFetcher.state = "submitting";
