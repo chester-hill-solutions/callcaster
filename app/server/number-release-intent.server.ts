@@ -258,9 +258,16 @@ export async function finishNumberRelease(release: NumberRelease) {
     if (owned.state !== "released")
       throw new Error("Provider number release is not confirmed");
     const tdb = createTenantDb(release.workspace, tx);
-    const number = await tdb.workspace_number.findFirst({
-      where: eq(workspace_number.id, release.number_id),
-    });
+    const [number] = await tx
+      .select()
+      .from(workspace_number)
+      .where(
+        and(
+          eq(workspace_number.workspace, release.workspace),
+          eq(workspace_number.id, release.number_id),
+        ),
+      )
+      .for("update");
     if (
       number &&
       (number.phone_number !== owned.phone_number ||

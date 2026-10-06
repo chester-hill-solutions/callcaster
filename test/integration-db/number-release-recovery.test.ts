@@ -12,6 +12,7 @@ import {
   vi,
 } from "vitest";
 import { asRouteResponse } from "../helpers/route-result";
+import { checkNumberReleaseFinalWrite } from "../helpers/number-release-final-write";
 
 vi.hoisted(() => {
   process.env.TZ = "UTC";
@@ -771,6 +772,22 @@ describe.skipIf(!url)("number release recovers partial work (#2085)", () => {
       "2050-01-01T00:00:00.000Z",
     );
     expect(await receipt()).toMatchObject({ state: "released" });
+  });
+  test("final identity stays locked against a writer after the final read", async () => {
+    await checkNumberReleaseFinalWrite({
+      sql,
+      workspaceId,
+      numberId,
+      release,
+      armBarrier: (install) => {
+        provider.remove.mockImplementationOnce(async (id: string) => {
+          provider.active.delete(id);
+          await install();
+          return true;
+        });
+      },
+    });
+    await expectClean();
   });
   test("fresh final bookkeeping preserves concurrent onboarding changes", async () => {
     provider.remove.mockImplementationOnce(async (id: string) => {

@@ -282,7 +282,6 @@ async function applyRentalLifecycleAction(args: {
   const release = await removeWorkspacePhoneNumber({
     workspaceId: number.workspace,
     numberId: BigInt(number.id),
-    tdb,
   });
   if (release?.error) {
     throw release.error instanceof Error

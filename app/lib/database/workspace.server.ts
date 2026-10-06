@@ -475,7 +475,6 @@ export async function createWorkspaceTwilioInstance({
 export async function removeWorkspacePhoneNumber({ workspaceId, numberId }: {
   workspaceId: string;
   numberId: bigint;
-  tdb?: TenantDb;
   null?: never;
 }) {
   return releaseNumberForWorkspace({
