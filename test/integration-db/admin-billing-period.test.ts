@@ -1,4 +1,4 @@
-import { usageRecordPage } from "../helpers/twilio-usage-page";
+import { usageRecordsClient } from "../helpers/twilio-usage-page";
 import { randomUUID } from "node:crypto";
 import {
   afterAll,
@@ -38,45 +38,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
           },
         },
         incomingPhoneNumbers: { list: async () => [] },
-        usage: {
-          records: {
-            list: provider.list,
-            page: async ({
-              pageSize,
-              ...args
-            }: {
-              pageSize?: number;
-              startDate?: Date;
-              endDate?: Date;
-            }) =>
-              usageRecordPage(
-                (
-                  await provider.list({
-                    ...args,
-                    ...(pageSize === undefined ? {} : { limit: pageSize }),
-                  })
-                ).map(
-                  (record: {
-                    category: string;
-                    description: string;
-                    usage: string;
-                    usageUnit: string;
-                    price: number;
-                    startDate?: Date;
-                    endDate?: Date;
-                  }) => ({
-                    category: record.category,
-                    description: record.description,
-                    usage: record.usage,
-                    usage_unit: record.usageUnit,
-                    price: record.price,
-                    start_date: record.startDate?.toISOString().slice(0, 10),
-                    end_date: record.endDate?.toISOString().slice(0, 10),
-                  }),
-                ),
-              ),
-          },
-        },
+        usage: { records: usageRecordsClient(provider.list) },
       };
     },
   };

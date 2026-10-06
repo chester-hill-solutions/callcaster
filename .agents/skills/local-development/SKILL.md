@@ -412,6 +412,9 @@ validation; do not validate a value after this lossy conversion. Check raw scala
 types before string conversion: an array can stringify to a valid decimal despite
 the SDK declaring a numeric field. Retain page
 limits, later-page records, retry failures and valid zero controls.
+When an SDK method changes, inventory its caller fixtures in every test tier.
+`ci:local` omits the real database tier. Run the affected database cases before
+push; run the full tier if the caller inventory is not complete.
 
 ## Scripted source edits
 

@@ -1,3 +1,4 @@
+import { usageRecordsClient } from "../helpers/twilio-usage-page";
 import { randomUUID } from "node:crypto";
 import {
   afterAll,
@@ -27,7 +28,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
   createWorkspaceTwilioInstance: async () => ({
     accountSid: fixture.accountSid,
-    usage: { records: { list: fixture.list } },
+    usage: { records: usageRecordsClient(fixture.list) },
   }),
   removeWorkspacePhoneNumber: async () => {
     throw new Error("Provider writes are forbidden in this fixture");
