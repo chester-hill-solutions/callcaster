@@ -415,6 +415,12 @@ validation; do not validate a value after this lossy conversion. Check raw scala
 types before string conversion: an array can stringify to a valid decimal despite
 the SDK declaring a numeric field. Retain page
 limits, later-page records, retry failures and valid zero controls.
+Provider mocks must use the installed SDK's response envelope. For Resend,
+success is `{ data: { id }, error: null }`; a top-level `{ id }` does not prove
+a delivery receipt. Keep rejected-result and missing-receipt controls when a
+write depends on provider success. A retry test must compare the actual repeated
+payload and key, including generated dates and signed links.
+
 When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
 push; run the full tier if the caller inventory is not complete.
@@ -481,7 +487,8 @@ proof. Parse whole statements and retain valid called-service/auth controls.
 
 For API surface changes, generate with `npm run tools:api:codegen` and
 `npm run tools:api:surface:report` before full CI. Review and stage the expected
-generated files. `ci:codegen:verify` compares unstaged output with the index;
+generated files. Run `git diff --cached --check` after staging so new files
+receive the same whitespace check as existing files. `ci:codegen:verify` compares unstaged output with the index;
 an intended un-staged API delta otherwise fails the final gate. Do not stage
 drift without its matching reviewed source change.
 

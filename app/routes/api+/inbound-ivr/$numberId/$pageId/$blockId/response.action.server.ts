@@ -22,6 +22,8 @@ import {
 import { defineAction } from "@/lib/handler.server";
 import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
 import { appendInboundQueueTwiml } from "@/lib/inbound-queue-twiml.server";
+import { parseInboundTerminalTarget } from "@/lib/ivr-script-validation";
+import { bindInboundVoicemailRecipient } from "@/server/inbound-voicemail-store.server";
 
 interface Script extends IvrScript {
   pages: Record<string, { blocks: string[] }>;
@@ -88,6 +90,9 @@ const renderTerminalTarget = async (
   }
 
   if (target.startsWith("voicemail:")) {
+    const terminal = parseInboundTerminalTarget(target);
+    if (terminal?.kind !== "voicemail") { twiml.hangup(); return; }
+    await bindInboundVoicemailRecipient({ workspaceId: workspace, callSid: options.callSid, phoneNumber }, terminal.email);
     const voicemail = await resolveInboundVoicemailAudio({
       workspaceId: workspace,
       inboundAudio,
@@ -165,7 +170,7 @@ const renderInboundNoInputBranch = (
 export const action = defineAction({
   auth: ({ request, params }) =>
     requireTwilioSignatureForIvrResponse(request, [params.numberId, params.pageId, params.blockId]),
-  sideEffects: ["db-read", "external"],
+  sideEffects: ["db-read", "db-write", "external"],
   handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
   const twiml = createVoiceResponse();
@@ -185,7 +190,7 @@ export const action = defineAction({
     }
 
     const context = await loadInboundIvrBlockContext(Number(numberId));
-    if (!context || call.to !== context.number.phoneNumber) {
+    if (!context || call.to !== context.number.phoneNumber || call.workspace !== context.number.workspaceId) {
       return new Response(hangupTwiml(), {
         headers: { "Content-Type": "text/xml" },
       });

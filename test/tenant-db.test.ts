@@ -14,7 +14,7 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
   "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
-  "outreach_attempt", "predictive_machine_operation", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
+  "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
@@ -47,7 +47,7 @@ const hoisted = vi.hoisted(() => {
   };
   const TABLES = [
     "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
-    "outreach_attempt", "predictive_machine_operation", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
+    "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
     "agent_status", "agent_status_event", "handset_session", "workspace_users",

@@ -1,8 +1,7 @@
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { resolveTwilioRestBasicAuth } from "@/lib/twilio-workspace-credentials";
-import { Resend } from "resend";
+import { VoicemailEmailProvider } from "@/lib/voicemail-email-provider.server";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { findWorkspaceNumberVoicemailContextByPhone } from "@/lib/inbound-call-db.server";
@@ -10,8 +9,11 @@ import {
   findCallBySid,
   updateCallRecordingUrlBySid,
 } from "@/lib/telephony-db.server";
-import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
-import { voicemailObjectPath } from "@/lib/voicemail-media.server";
+import { prepareVoicemailEmail } from "@/lib/inbound-voicemail-email.server";
+import {
+  getInboundVoicemailRecipient, findVoicemailDelivery, prepareVoicemailDelivery,
+  claimVoicemailDelivery, completeVoicemailDelivery, releaseVoicemailDelivery,
+} from "@/server/inbound-voicemail-store.server";
 import { defineAction } from "@/lib/handler.server";
 import { isConservativeEmail } from "../../../shared/inbound-routing-presets";
 import type { ActionFunctionArgs } from "react-router";
@@ -49,7 +51,7 @@ export const action = defineAction({
       return routeData({ error: "Failed to process voicemail" }, { status: 500 });
     }
 
-    const resend = new Resend(env.RESEND_API_KEY());
+    const resend = new VoicemailEmailProvider(env.RESEND_API_KEY());
 
     try {
       const formData = await request.clone().formData();
@@ -85,20 +87,6 @@ export const action = defineAction({
         throw new Error("Call destination number not found");
       }
 
-      // Idempotency guard: Twilio retries the recordingStatusCallback on
-      // timeout, and the retry carries the exact same RecordingUrl/RecordingSid
-      // as the original. recording_url is persisted only AFTER the email is
-      // sent (below), so its presence means the voicemail was fully
-      // processed — ack success without sending a duplicate email. A run
-      // that failed mid-flight left it unset, so the retry reprocesses.
-      if (callRow.recording_url && callRow.recording_url === recordingUrl) {
-        logger.debug("Voicemail webhook retry detected; skipping duplicate processing", {
-          callSid,
-          recordingSid,
-        });
-        return routeData({ success: true, message: "Already processed" });
-      }
-
       const number = await findWorkspaceNumberVoicemailContextByPhone(callRow.to);
 
       if (!number) {
@@ -106,6 +94,21 @@ export const action = defineAction({
       }
       if (!number.workspace) {
         throw new Error("Workspace not found");
+      }
+      if (!callRow.workspace || callRow.workspace !== number.workspace.id) {
+        return routeData({ error: "Voicemail call binding does not match" }, { status: 403 });
+      }
+      const boundRecipient = await getInboundVoicemailRecipient({ workspaceId: number.workspace.id, callSid, phoneNumber: callRow.to });
+      if (!accountSid || !recordingSid) throw new Error("Missing recording identity");
+      if (callRow.account_sid && callRow.account_sid !== accountSid) {
+        return routeData({ error: "Voicemail account binding does not match" }, { status: 403 });
+      }
+      const binding = { workspaceId: number.workspace.id, callSid, phoneNumber: callRow.to, recordingSid, recordingUrl };
+      let delivery = await findVoicemailDelivery(binding);
+      // Legacy callbacks predate delivery receipts. A bound IVR recording must
+      // not be swallowed by an earlier general recording callback's URL write.
+      if (!boundRecipient && !delivery && callRow.recording_url === recordingUrl) {
+        return routeData({ success: true, message: "Already processed" });
       }
 
       // The workspace number's `inbound_action` doubles as the voicemail email
@@ -116,8 +119,7 @@ export const action = defineAction({
       // took an unverified sender path — Twilio then retried indefinitely.
       // Mark the callback processed with a distinct reason so support can see
       // why no email arrived without a burning retry loop.
-      const recipient =
-        typeof number.inbound_action === "string" ? number.inbound_action.trim() : "";
+      const recipient = delivery?.recipient ?? boundRecipient ?? (typeof number.inbound_action === "string" ? number.inbound_action.trim() : "");
       if (!recipient || !isConservativeEmail(recipient)) {
         logger.warn("email-vm: workspace number has no email recipient configured", {
           callSid,
@@ -140,115 +142,29 @@ export const action = defineAction({
         });
       }
 
-      // API Key first, Auth Token fallback (ADR-0011). Fetching the media
-      // with only the subaccount Auth Token meant a token that had gone
-      // stale in twilio_data — the failure mode behind the workspace-wide
-      // authentication errors in #1655 — silently killed every voicemail
-      // email for that workspace while live calls, which auth with the
-      // API Key, kept working (#1224).
-      const restAuth = resolveTwilioRestBasicAuth(number.workspace);
-      if (!restAuth) {
-        throw new Error("Workspace twilio data not found");
+      if (!delivery) {
+        const prepared = await prepareVoicemailEmail({ number, call: callRow, recipient, accountSid, recordingSid });
+        delivery = await prepareVoicemailDelivery(binding, { recipient, ...prepared });
       }
-
+      const claim = await claimVoicemailDelivery(binding, delivery.id);
+      if (claim.kind === "sent") {
+        if (callRow.recording_url !== recordingUrl && !await updateCallRecordingUrlBySid(callSid, recordingUrl)) throw new Error("Error updating call: not found");
+        return routeData({ success: true, message: "Already processed" });
+      }
+      if (claim.kind !== "claimed") return routeData({ error: claim.kind === "busy" ? "Voicemail delivery is already in progress" : "Voicemail delivery needs reconciliation" }, { status: 503 });
+      let result;
+      try {
+        result = await resend.emails.send(claim.delivery.email_payload, { idempotencyKey: `voicemail/${claim.delivery.id}` });
+        if (result.error) throw new Error(`Email send failed: ${result.error.message}`);
+        if (typeof result.data?.id !== "string" || !result.data.id.trim()) throw new Error("Email provider returned no delivery receipt");
+        await completeVoicemailDelivery(binding, delivery.id, claim.leaseToken, result.data.id);
+      } catch (error) {
+        await releaseVoicemailDelivery(binding, delivery.id, claim.leaseToken, error);
+        throw error;
+      }
+      const signedUrl = claim.delivery.signed_url;
       const call = callRow;
-      const now = new Date();
-
-      if (!accountSid || typeof accountSid !== "string") {
-        throw new Error("Missing or invalid AccountSid");
-      }
-      if (!recordingSid || typeof recordingSid !== "string") {
-        throw new Error("Missing or invalid RecordingSid");
-      }
-
-      const recordingResponse = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`,
-        {
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${restAuth.username}:${restAuth.password}`).toString("base64")}`,
-          },
-        },
-      );
-
-      if (!recordingResponse.ok) {
-        throw new Error(
-          `Failed to fetch recording (${recordingResponse.status} ${recordingResponse.statusText}) with ${restAuth.source} credentials for workspace ${number.workspace.id}`,
-        );
-      }
-
-      const recording = await recordingResponse.blob();
-
-      // Caller audio never lands in the library prefix: `voicemail/<ws>/…` is a
-      // disjoint namespace, so library lists and prompts can never mix caller
-      // messages in (see voicemail-media.server).
-      const fileName = voicemailObjectPath(
-        number.workspace.id,
-        `voicemail-${call.from}-${now.toISOString()}.mp3`,
-      );
-      try {
-        await uploadObject(
-          "workspaceAudio",
-          fileName,
-          recording,
-          {
-            contentType: "audio/mpeg",
-            cacheControl: "60",
-          },
-        );
-      } catch (error) {
-        throw new Error(`Error uploading to storage: ${error instanceof Error ? error.message : String(error)}`);
-      }
-
-      // SigV4 presigned URLs are capped at 7 days — the signer itself
-      // rejects anything longer, which is what silently killed every
-      // voicemail email after the S3 migration (#1224). The email also
-      // links to the voicemails page, which mints fresh URLs on demand.
-      const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
-      let signedUrl: string;
-      try {
-        signedUrl = await createSignedObjectUrl(
-          "workspaceAudio",
-          fileName,
-          SIGNED_URL_TTL_SECONDS,
-        );
-      } catch (error) {
-        throw new Error(`Error creating signed URL: ${error instanceof Error ? error.message : String(error)}`);
-      }
-
-      const result = await resend.emails.send({
-        from: "Callcaster <info@callcaster.ca>",
-        to: [recipient],
-        subject: `New Voicemail from ${call.from}`,
-        html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>New Voicemail Received</h2>
-          <p><strong>From:</strong> ${call.from}</p>
-          <p><strong>To:</strong> ${call.to}</p>
-          <p><strong>Workspace:</strong> ${number.workspace.name}</p>
-          <p><strong>Date:</strong> ${now.toLocaleString()}</p>
-          <p><a href="${signedUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Listen to Voicemail</a></p>
-          <p><a href="${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
-        </div>
-      `,
-        text: `
-        New Voicemail Received
-        
-        From: ${call.from}
-        To: ${call.to}
-        Workspace: ${number.workspace.name}
-        Date: ${now.toLocaleString()}
-        
-        Listen to voicemail: ${signedUrl}
-        View in workspace: ${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails
-      `,
-      });
-
-      // resend returns { data, error } and never throws on API errors — an
-      // unverified from-domain or bad recipient was previously reported as
-      // "email sent". Throwing keeps the callback retryable.
-      if (result.error) {
-        throw new Error(`Email send failed: ${result.error.message}`);
-      }
+      const now = claim.delivery.created_at;
 
       // Mark fully processed only now: persisting recording_url earlier made
       // the retry guard above swallow every retry after a mid-flight failure
