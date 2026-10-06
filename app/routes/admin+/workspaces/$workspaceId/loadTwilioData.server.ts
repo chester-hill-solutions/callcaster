@@ -4,7 +4,7 @@ import {
   getWorkspaceTwilioPortalSnapshot,
 } from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
-import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
+import { getTwilioUsageDateRange, type TwilioUsageRecord } from "@/lib/twilio-usage";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import {
   getWorkspaceBillingReconciliationSnapshot,
@@ -36,15 +36,7 @@ export interface TwilioPageData {
     addressRequirements?: string;
     status?: string;
   }>;
-  twilioUsage: Array<{
-    category: string;
-    description: string;
-    usage: string;
-    usageUnit: string;
-    price: string;
-    startDate?: string;
-    endDate?: string;
-  }>;
+  twilioUsage: TwilioUsageRecord[];
   portalSnapshot: WorkspaceTwilioPortalSnapshot;
   billingReconciliation: BillingReconciliationReport | null;
   billingReconciliationSnapshot: BillingReconciliationSnapshot | null;
@@ -111,7 +103,8 @@ export async function loadTwilioData(
         description: record.description,
         usage: record.usage,
         usageUnit: record.usageUnit,
-        price: record.price.toString(),
+        price: record.price?.toString() ?? "",
+        priceUnit: record.priceUnit,
         startDate: record.startDate?.toISOString(),
         endDate: record.endDate?.toISOString(),
       }));

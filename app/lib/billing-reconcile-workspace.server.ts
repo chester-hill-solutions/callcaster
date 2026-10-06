@@ -53,7 +53,8 @@ export async function reconcileWorkspaceBilling(args: {
     description: record.description,
     usage: record.usage,
     usageUnit: record.usageUnit,
-    price: record.price.toString(),
+    price: record.price?.toString() ?? "",
+    priceUnit: record.priceUnit,
     startDate: record.startDate?.toISOString(),
     endDate: record.endDate?.toISOString(),
   }));
