@@ -223,10 +223,8 @@ async function applyRentalLifecycleAction(args: {
     // clearable: a suspended customer who partially pays drops back to one
     // unpaid cycle and would get daily warn mail while still suspended.
     //
-    // The marker stores the CYCLE COUNT, not a boolean: if the customer pays
-    // some and falls behind again, the count differs from the stored one and a
-    // fresh warning is correct. A boolean would suppress that second,
-    // legitimate warning forever.
+    // The marker belongs to the current unpaid episode. Full payment resets
+    // it; partial payment must retain it so daily sweeps do not warn again.
     if (Number(number.rental_warned_cycle) === unpaidCycles) return "none";
 
     await tdb.workspace_number.update({
@@ -667,6 +665,22 @@ export async function runNumberRentalBilling(args: {
     // must not prevent the eventual release.
     const unpaidCyclesForNumber =
       dueDates.length - previouslyBilledCycles - chargedCyclesForNumber;
+
+    if (unpaidCyclesForNumber === 0 && number.rental_warned_cycle != null) {
+      try {
+        await tdb.workspace_number.update({
+          set: { rental_warned_cycle: null },
+          where: eq(workspaceNumberTable.id, number.id),
+        });
+      } catch (error) {
+        technicalFailures++;
+        logger.error("number_rental_billing.warning_reset_failed", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     if (unpaidCyclesForNumber > 0) {
       const action = rentalActionForUnpaidCycles(unpaidCyclesForNumber, {
