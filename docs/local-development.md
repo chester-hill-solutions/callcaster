@@ -21,6 +21,14 @@ npm test            # vitest node + UI suites, plus bun server-runtime tests
 make e2e            # full Playwright run against compose Postgres + MinIO
 ```
 
+## Redirect target checks
+
+`npm run check:redirect-targets` compares literal local redirects with the actual registered JSON route tree. It composes parent, pathless, index, parameter and wildcard routes through React Router's matcher. Query strings and hashes do not change the target page. All registered modules are scanned, including the root. Static imports and re-exports are followed within `app/routes/` and for direct `app/` siblings such as the root loader; directory index modules are resolved too. Imported assets are excluded from script discovery. Named `redirect`/`redirectDocument` imports, aliases, namespace imports, multiline calls and literal templates are supported. Lexical bindings keep shadowed names, comments and string examples out of the check.
+
+The gate does not validate runtime-computed arguments, interpolated templates, dynamic imports or helpers outside those source boundaries. External URLs and other non-absolute references remain unchecked. An auth wildcard proves route registration, not whether Better Auth accepts that endpoint. Keep runtime and end-to-end checks for those cases. The existing relative-redirect gate remains separate. Both gates run in full local CI and the quality workflow; absent literal targets fail without a suppression baseline.
+
+The CLI's `--routes-json <file>` option supplies a registered tree for isolated fixtures. Normal CI always reads the current tree from `react-router routes --json` and fails on empty output or a missing registered source file.
+
 ## Service control
 
 The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
