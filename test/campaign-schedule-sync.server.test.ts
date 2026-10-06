@@ -199,10 +199,10 @@ describe("runCampaignScheduleSync", () => {
     );
   });
 
-  test("rows missing workspace or dates are skipped", async () => {
+  test("rows missing workspace or with invalid dates are skipped", async () => {
     mocks.findMany.mockResolvedValueOnce([
       makeCampaign({ workspace: null }),
-      makeCampaign({ start_date: null }),
+      makeCampaign({ start_date: "not-a-date" }),
       makeCampaign({ end_date: "not-a-date" }),
     ]);
 
