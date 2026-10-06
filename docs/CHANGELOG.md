@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Development and test servers use the patched Vite file boundary in both npm and Bun installs ([#2427](https://github.com/chester-hill-solutions/callcaster/issues/2427)).
+- Security: Development and test servers use the patched Vite file boundary in both npm and Bun installs ([#2428](https://github.com/chester-hill-solutions/callcaster/pull/2428), [#2427](https://github.com/chester-hill-solutions/callcaster/issues/2427)).
 
 - Fixed: Rental reconciliation now reports renewal drift by billing month and retains the result in billing alerts. ([#2425](https://github.com/chester-hill-solutions/callcaster/pull/2425), [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113))
 
