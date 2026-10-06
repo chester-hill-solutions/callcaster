@@ -60,6 +60,11 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     const body = await res.text();
     expect(body).toContain("<Dial>");
     expect(body).toContain(">campaign-w1-1</Conference>");
+    expect(body).not.toMatch(/<Conference[^>]*\brecord=/);
+    expect(body).toContain('endConferenceOnExit="true"');
+    expect(body).toContain('startConferenceOnEnter="true"');
+    expect(body).toContain('beep="onEnter"');
+    expect(body).toContain('waitUrl="http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical"');
   });
 
   test("rejects unauthenticated Twilio requests", async () => {

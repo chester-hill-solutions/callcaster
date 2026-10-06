@@ -55,7 +55,6 @@ export const loader = defineLoader({
           waitUrl: "http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical",
           startConferenceOnEnter: true,
           beep: "onEnter",
-          record: "record-from-start",
         },
         `campaign-${workspaceId}-${campaignId}`,
       );
