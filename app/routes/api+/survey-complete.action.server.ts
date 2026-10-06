@@ -3,7 +3,7 @@ import {
   guardPublicSurveySubmission,
   resolvePublicSurveyContactId,
 } from "@/lib/survey-public-action.server";
-import { completeSurveyResponse } from "@/lib/survey-db.server";
+import { completePublicSurveyResponse } from "@/lib/survey-db.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -23,9 +23,10 @@ async function handleCompleteSurvey(request: Request) {
     return contact.response;
   }
 
-  const result = await completeSurveyResponse({
+  const result = await completePublicSurveyResponse({
     surveyInternalId: survey.id,
     resultId,
+    contactId: contact.contactId,
     completed: completed === "true",
   });
 

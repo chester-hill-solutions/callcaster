@@ -10,7 +10,7 @@ vi.hoisted(() => {
 });
 
 const surveyDbMocks = vi.hoisted(() => ({
-  completeSurveyResponse: vi.fn(async () => ({
+  completePublicSurveyResponse: vi.fn(async () => ({
     ok: true as const,
     result_id: "R1",
   })),
@@ -31,7 +31,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/survey-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/survey-db.server")>()),
-  completeSurveyResponse: (...args: unknown[]) => surveyDbMocks.completeSurveyResponse(...args),
+  completePublicSurveyResponse: (...args: unknown[]) => surveyDbMocks.completePublicSurveyResponse(...args),
   getActiveSurveyByPublicId: (...args: unknown[]) => surveyDbMocks.getActiveSurveyByPublicId(...args),
 }));
 
@@ -59,8 +59,8 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     vi.resetModules();
     resetRateLimitsForTests();
     mocks.logger.error.mockReset();
-    surveyDbMocks.completeSurveyResponse.mockReset();
-    surveyDbMocks.completeSurveyResponse.mockResolvedValue({
+    surveyDbMocks.completePublicSurveyResponse.mockReset();
+    surveyDbMocks.completePublicSurveyResponse.mockResolvedValue({
       ok: true,
       result_id: "R1",
     });
@@ -119,7 +119,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "S1", completed: "true", resultId: "chosen-plain-id", respondent_token: "" }) } as any));
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ error: "Respondent token is required" });
-    expect(surveyDbMocks.completeSurveyResponse).not.toHaveBeenCalled();
+    expect(surveyDbMocks.completePublicSurveyResponse).not.toHaveBeenCalled();
   });
 
   test("uses provided respondent token and marks response complete", async () => {
@@ -137,9 +137,10 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.respondent_token).toBe(token);
-    expect(surveyDbMocks.completeSurveyResponse).toHaveBeenCalledWith({
+    expect(surveyDbMocks.completePublicSurveyResponse).toHaveBeenCalledWith({
       surveyInternalId: 1,
       resultId: expect.any(String),
+      contactId: null,
       completed: false,
     });
   });
@@ -199,7 +200,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
   });
 
   test("returns 500 when completion fails and logs", async () => {
-    surveyDbMocks.completeSurveyResponse.mockResolvedValueOnce({
+    surveyDbMocks.completePublicSurveyResponse.mockResolvedValueOnce({
       ok: false,
       error: "Failed to complete survey",
       status: 500,
@@ -215,7 +216,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
     const mod = await import("../app/routes/api+/survey-complete");
     const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", completed: "true", resultId: "forged-id", respondent_token: token }) } as any));
     expect(res.status).toBe(200);
-    expect(surveyDbMocks.completeSurveyResponse).toHaveBeenCalledWith(expect.objectContaining({ resultId }));
+    expect(surveyDbMocks.completePublicSurveyResponse).toHaveBeenCalledWith(expect.objectContaining({ resultId }));
     expect(await res.json()).toMatchObject({ respondent_token: token });
   });
 
@@ -228,7 +229,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
       const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", completed: "true", respondent_token: invalid, resultId: "forged-id" }) } as any));
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ error: "Invalid or expired respondent token" });
-      expect(surveyDbMocks.completeSurveyResponse).not.toHaveBeenCalled();
+      expect(surveyDbMocks.completePublicSurveyResponse).not.toHaveBeenCalled();
     } finally { vi.restoreAllMocks(); }
   });
 

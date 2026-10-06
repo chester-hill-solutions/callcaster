@@ -109,14 +109,18 @@ describeDb("public survey respondent continuity (#2125)", () => {
     expect(finished[0].completed_at).not.toBeNull();
   });
 
-  test("completion of an identity with no saved response fails and changes no other respondent", async () => {
+  test("blank completion creates its own signed response and changes no other respondent", async () => {
     const first = await load();
     await post(answer, { surveyId: publicId, questionId: questions[0], pageId, answerValue: "Saved", respondent_token: first.body.respondentToken });
     const other = await load();
     const result = await post(complete, { surveyId: publicId, completed: "true", respondent_token: other.body.respondentToken, resultId: first.body.resultId });
-    expect(result).toMatchObject({ status: 404, body: { error: "Survey response not found" } });
-    const rows = await client`select result_id, completed_at from survey_response where survey_id = ${surveyId}`;
-    expect(rows).toEqual([{ result_id: first.body.resultId, completed_at: null }]);
+    expect(result).toMatchObject({ status: 200, body: { success: true, result_id: other.body.resultId } });
+    const rows = await client`select result_id, completed_at is not null as completed from survey_response where survey_id = ${surveyId}`;
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(expect.arrayContaining([
+      { result_id: first.body.resultId, completed: false },
+      { result_id: other.body.resultId, completed: true },
+    ]));
   });
 
   test("another survey's signed identity cannot write to this survey", async () => {

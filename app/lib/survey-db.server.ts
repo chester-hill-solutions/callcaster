@@ -430,6 +430,34 @@ async function getOrCreateSurveyResponse(args: {
   return { row: existing, created: false };
 }
 
+export async function completePublicSurveyResponse(args: {
+  surveyInternalId: number;
+  resultId: string;
+  contactId: number | null;
+  completed: boolean;
+}) {
+  if (args.completed) {
+    // A signed respondent can finish without saving any optional answer.
+    const created = await getOrCreateSurveyResponse({
+      surveyInternalId: args.surveyInternalId,
+      resultId: args.resultId,
+      contactId: args.contactId,
+      startedAt: new Date().toISOString(),
+      lastPageCompleted: null,
+    });
+    if ("error" in created) {
+      logger.error("Error creating survey response:", created.error);
+      return { ok: false as const, error: "Failed to create survey response", status: 500 };
+    }
+  }
+
+  return completeSurveyResponse({
+    surveyInternalId: args.surveyInternalId,
+    resultId: args.resultId,
+    completed: args.completed,
+  });
+}
+
 async function upsertResponseAnswer(args: {
   responseId: number;
   questionInternalId: number;
