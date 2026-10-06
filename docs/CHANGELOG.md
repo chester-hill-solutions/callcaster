@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Surveys with only optional questions can be submitted without answers, and retries keep the same saved response ([#2418](https://github.com/chester-hill-solutions/callcaster/issues/2418)).
+- Fixed: Surveys with only optional questions can be submitted without answers, and retries keep the same saved response ([#2418](https://github.com/chester-hill-solutions/callcaster/issues/2418), [PR #2420](https://github.com/chester-hill-solutions/callcaster/pull/2420)).
 - Fixed: Public surveys check required answers before advancing or completing, with stable field feedback and retained answers for retry ([#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107), [#2419](https://github.com/chester-hill-solutions/callcaster/pull/2419)).
 
 - Fixed: Phone-number release keeps a recovery record, reports incomplete cleanup clearly and allows safe retries after provider deletion ([PR #2416](https://github.com/chester-hill-solutions/callcaster/pull/2416), [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085)).
