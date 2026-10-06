@@ -314,7 +314,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
       message: "Campaign queue items reset successfully",
       affected_rows: 3,
     });
-    expect(mocks.requeueAllCampaignQueueForCampaign).toHaveBeenCalledWith(5);
+    expect(mocks.requeueAllCampaignQueueForCampaign).toHaveBeenCalledWith(5, "w1");
   });
 
   test("action returns 405 for unsupported method", async () => {

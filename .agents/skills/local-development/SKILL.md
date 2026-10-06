@@ -219,6 +219,11 @@ If sandbox process checks say a fixture stopped, verify the same PID and port
 with the required permissions before restarting. A failed process probe does
 not prove that the server stopped.
 
+For query predicates with several exclusion guards, seed each rejected case
+with only that guard's disqualifying value. Coexisting history or tenancy
+markers can hide a removed predicate. Remove each guard separately and require
+its corresponding real-row case to fail before accepting coverage.
+
 Use the real Postgres tier for query predicates; a mocked duplicate helper
 cannot check which rows the SQL counts. For a read-only query, a transaction-local
 temporary table can isolate the required columns without changing stored app

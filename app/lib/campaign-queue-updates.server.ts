@@ -17,9 +17,16 @@
  * never be made conditional for keyed updates and left unconditional elsewhere.
  */
 
-import { and, eq, type SQL } from "drizzle-orm";
-import { campaign_queue as campaignQueueTable } from "@/db/schema";
-import { buildQueuedQueueUpdate } from "@/lib/queue-status";
+import { eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import {
+  campaign_queue as campaignQueueTable,
+  contact as contactTable,
+} from "@/db/schema";
+import {
+  buildQueuedQueueUpdate,
+  QUEUE_LIFECYCLE_ASSIGNED,
+  QUEUE_STATUS_QUEUED,
+} from "@/lib/queue-status";
 import { updateCampaignQueueAndEmit } from "@/lib/campaign-queue-db.server";
 
 /**
@@ -68,12 +75,25 @@ export async function updateCampaignQueueByContactAndCampaign(args: {
 
 export async function requeueAllCampaignQueueForCampaign(
   campaignId: number,
-  workspaceId?: string,
+  workspaceId: string,
 ) {
-  const conditions: SQL[] = [eq(campaignQueueTable.campaign_id, campaignId)];
-  if (workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
-  }
+  // Ordinary reset releases unused assignments; it must not erase an attempt or opt-out.
+  const conditions = [
+    eq(campaignQueueTable.campaign_id, campaignId),
+    eq(campaignQueueTable.workspace, workspaceId),
+    inArray(
+      sql<string>`coalesce(${campaignQueueTable.queue_state}, ${QUEUE_STATUS_QUEUED})`,
+      [QUEUE_STATUS_QUEUED, QUEUE_LIFECYCLE_ASSIGNED],
+    ),
+    isNull(campaignQueueTable.dequeued_at),
+    isNull(campaignQueueTable.dequeued_by),
+    isNull(campaignQueueTable.dequeued_reason),
+    isNull(campaignQueueTable.provider_status),
+    sql`exists (select 1 from ${contactTable}
+      where ${contactTable.id} = ${campaignQueueTable.contact_id}
+        and ${contactTable.workspace} = ${workspaceId}
+        and ${contactTable.opt_out} is not true)`,
+  ];
 
   return updateCampaignQueueAndEmit({
     conditions,
