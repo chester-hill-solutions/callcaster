@@ -75,6 +75,10 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     // Manual dials no longer wait on AMD.
     expect(body).not.toContain("machineDetection");
     expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
+    expect(body).toMatch(/<Dial[^>]*record="record-from-answer"/);
+    expect(body).toMatch(/<Dial[^>]*recordingStatusCallback="https:\/\/base.example\/api\/recording"/);
+    expect(body).toMatch(/<Dial[^>]*recordingStatusCallbackEvent="completed"/);
+    expect(body).not.toContain('recordingStatusCallbackEvent="in-progress"');
     expect(body).toContain(">+15550001111</Number>");
   }, 30000);
 

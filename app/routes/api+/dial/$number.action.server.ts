@@ -66,7 +66,8 @@ export const action = defineAction({
             const dial = twiml.dial({
                 callerId: formData.get('From') as string,
                 record: 'record-from-answer',
-                recordingStatusCallbackEvent: ['in-progress']
+                recordingStatusCallback: `${env.BASE_URL()}/api/recording`,
+                recordingStatusCallbackEvent: ['completed']
             })
 
             // No machineDetection on a manual dial: the agent is on the

@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Manual-call recordings enter the storage pipeline after completion; campaign conferences stop creating recordings that cannot be stored ([#1989](https://github.com/chester-hill-solutions/callcaster/issues/1989), [#2439](https://github.com/chester-hill-solutions/callcaster/pull/2439)).
+
 - Fixed: Chat history stays stable when refreshed messages contain unchanged values, while real message updates still appear ([#2063](https://github.com/chester-hill-solutions/callcaster/issues/2063), [#2438](https://github.com/chester-hill-solutions/callcaster/pull/2438)).
 
 - Fixed: Failed chat sends restore the original text with accurate segment and credit counts, while keeping newer drafts ([#2110](https://github.com/chester-hill-solutions/callcaster/issues/2110), [#2437](https://github.com/chester-hill-solutions/callcaster/pull/2437)).
