@@ -6,6 +6,7 @@ import {
   type TwilioUsageRecord,
 } from "../../shared/billing-reconciliation";
 import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
+import { loadNumberRentalReconciliationInput } from "@/lib/number-rental-reconciliation.server";
 import {
   TERMINAL_BILLABLE_CALL_STATUSES,
   TERMINAL_BILLABLE_SMS_STATUSES,
@@ -112,12 +113,13 @@ export async function loadBillingReconciliationReport(args: {
   twilioUsage: TwilioUsageRecord[];
   referenceDate?: Date;
 }): Promise<BillingReconciliationReport> {
-  const period = getTwilioUsageDateRange(args.referenceDate);
+  const referenceDate = args.referenceDate ?? new Date();
+  const period = getTwilioUsageDateRange(referenceDate);
   const periodStart = `${period.startDate}T00:00:00.000Z`;
   const periodEnd = `${period.endDate}T23:59:59.999Z`;
   const tdb = createTenantDb(args.workspaceId);
 
-  const [ledgerRows, entityAudit] = await Promise.all([
+  const [ledgerRows, entityAudit, numberRentals] = await Promise.all([
     tdb.transaction_history.findMany({
       where: and(
         gte(transactionHistoryTable.created_at, periodStart),
@@ -136,6 +138,7 @@ export async function loadBillingReconciliationReport(args: {
       workspaceId: args.workspaceId,
       period,
     }),
+    loadNumberRentalReconciliationInput({ workspaceId: args.workspaceId, referenceDate }),
   ]);
 
   return buildBillingReconciliationReport({
@@ -143,5 +146,6 @@ export async function loadBillingReconciliationReport(args: {
     twilioUsage: args.twilioUsage,
     ledgerRows: ledgerRows as LedgerTransactionRow[],
     entityAudit,
+    numberRentals,
   });
 }

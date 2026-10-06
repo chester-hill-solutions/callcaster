@@ -210,7 +210,7 @@ suite("admin billing uses one provider/ledger period (#2412)", () => {
         ]);
         const result = await run(surface);
         expect(result.status).toBe(200);
-        expect(provider.list).toHaveBeenCalledExactlyOnceWith({
+        expect(provider.list).toHaveBeenCalledWith({
           startDate: new Date("2026-09-05"),
           endDate: new Date("2026-10-05"),
           ...(surface === "loader" ? { limit: 200 } : {}),
@@ -228,7 +228,12 @@ suite("admin billing uses one provider/ledger period (#2412)", () => {
             period: { startDate: "2026-09-05", endDate: "2026-10-05" },
           });
         }
-        expect(provider.workspaces).toEqual([workspace]);
+        expect(provider.list).toHaveBeenCalledWith({
+          startDate: new Date("2026-09-01"),
+          endDate: new Date("2026-09-30"),
+          includeSubaccounts: false,
+        });
+        expect(provider.workspaces).toEqual([workspace, workspace]);
         expect(provider.drift).not.toHaveBeenCalled();
       });
       test("one captured window survives a provider response after midnight", async () => {

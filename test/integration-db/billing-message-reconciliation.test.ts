@@ -132,7 +132,7 @@ suite(
       expect(saved.twilio_data.unrelated).toBe("retained");
       expect(provider.workspaces.length).toBeGreaterThan(0);
       expect(provider.workspaces.every((id) => id === workspace)).toBe(true);
-      expect(provider.list).toHaveBeenLastCalledWith({
+      expect(provider.list).toHaveBeenCalledWith({
         startDate: new Date("2026-09-05"),
         endDate: new Date("2026-10-05"),
       });

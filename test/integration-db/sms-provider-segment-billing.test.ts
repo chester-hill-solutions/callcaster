@@ -16,6 +16,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
     return {
       messages: Object.assign((sid: string) => ({ fetch: () => provider.fetch(sid) }), { list: provider.list }),
       calls: { list: async () => [] },
+      usage: { records: { list: async () => [] } },
     };
   },
 }));

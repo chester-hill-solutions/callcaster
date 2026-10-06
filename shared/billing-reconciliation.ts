@@ -1,3 +1,8 @@
+import {
+  buildNumberRentalReconciliation,
+  type NumberRentalReconciliation,
+  type NumberRentalReconciliationInput,
+} from "./number-rental-reconciliation";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS } from "./pricing";
 import { bucketFromIdempotencyKey, type BillingBucket } from "./billing-keys";
 
@@ -62,7 +67,7 @@ export type BillingReconciliationReport = {
     sms: BillingMessageReconciliation;
     mms: BillingMessageReconciliation;
     voice: BillingCategoryReconciliation;
-    numbers: BillingCategoryReconciliation;
+    numbers: NumberRentalReconciliation;
   };
   entityAudit: BillingEntityAudit;
   twilioTotalCostUsd: number;
@@ -218,6 +223,7 @@ export function buildBillingReconciliationReport(args: {
   twilioUsage: TwilioUsageRecord[];
   ledgerRows: LedgerTransactionRow[];
   entityAudit: BillingEntityAudit;
+  numberRentals: NumberRentalReconciliationInput;
 }): BillingReconciliationReport {
   const ledgerInPeriod = filterLedgerRowsInPeriod(args.ledgerRows, args.period);
   const ledgerSummary = summarizeLedger(ledgerInPeriod);
@@ -231,11 +237,7 @@ export function buildBillingReconciliationReport(args: {
     (category) =>
       category === "calls-outbound" || category.startsWith("calls-outbound-"),
   );
-  const numbersTwilioUnits = sumTwilioUsage(
-    args.twilioUsage,
-    (category) =>
-      category === "phonenumbers" || category.startsWith("phonenumbers-"),
-  );
+  const numbers = buildNumberRentalReconciliation(args.numberRentals);
 
   const twilioTotalCostUsd =
     sumTwilioCostUsd(args.twilioUsage, () => true) ||
@@ -275,13 +277,7 @@ export function buildBillingReconciliationReport(args: {
         // to Twilio's minutes.
         variance: voiceTwilioMinutes - args.entityAudit.billedVoiceMinutes,
       },
-      numbers: {
-        twilioUnits: numbersTwilioUnits,
-        twilioUnitLabel: "number-months",
-        ledgerEvents: ledgerSummary.numbers.events,
-        ledgerCredits: ledgerSummary.numbers.credits,
-        variance: numbersTwilioUnits - ledgerSummary.numbers.events,
-      },
+      numbers,
     },
     entityAudit: args.entityAudit,
     twilioTotalCostUsd,
@@ -312,6 +308,7 @@ export function hasMaterialBillingVariance(
     exceedsBillingVarianceThreshold(report.categories.sms.variance) ||
     exceedsBillingVarianceThreshold(report.categories.mms.variance) ||
     exceedsBillingVarianceThreshold(report.categories.voice.variance) ||
+    exceedsBillingVarianceThreshold(report.categories.numbers.variance) ||
     exceedsBillingVarianceThreshold(report.entityAudit.messageGap) ||
     exceedsBillingVarianceThreshold(report.entityAudit.callGap) ||
     report.unrecognizedDebitEvents > 0
@@ -323,6 +320,8 @@ export type BillingReconciliationAlertDetails = {
   smsVariance: number | null;
   mmsVariance: number | null;
   voiceVariance: number;
+  numbersVariance: number | null;
+  numbersPeriod: BillingReconciliationPeriod | null;
   messageGap: number;
   callGap: number;
   unrecognizedDebitEvents: number;
@@ -338,6 +337,8 @@ export function buildBillingReconciliationAlertDetails(
     smsVariance: report.categories.sms.variance,
     mmsVariance: report.categories.mms.variance,
     voiceVariance: report.categories.voice.variance,
+    numbersVariance: report.categories.numbers.variance,
+    numbersPeriod: report.categories.numbers.period ?? null,
     messageGap: report.entityAudit.messageGap,
     callGap: report.entityAudit.callGap,
     unrecognizedDebitEvents: report.unrecognizedDebitEvents,
@@ -354,6 +355,8 @@ export type BillingReconciliationSnapshot = {
   smsVariance: number | null;
   mmsVariance: number | null;
   voiceVariance: number;
+  numbersVariance: number | null;
+  numbersPeriod: BillingReconciliationPeriod | null;
   messageGap: number;
   callGap: number;
   unrecognizedDebitEvents: number;
@@ -371,6 +374,8 @@ export function buildBillingReconciliationSnapshot(
     smsVariance: report.categories.sms.variance,
     mmsVariance: report.categories.mms.variance,
     voiceVariance: report.categories.voice.variance,
+    numbersVariance: report.categories.numbers.variance,
+    numbersPeriod: report.categories.numbers.period ?? null,
     messageGap: report.entityAudit.messageGap,
     callGap: report.entityAudit.callGap,
     unrecognizedDebitEvents: report.unrecognizedDebitEvents,

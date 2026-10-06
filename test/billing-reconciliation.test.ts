@@ -32,7 +32,7 @@ describe("billing-reconciliation", () => {
       category: "phonenumbers-local",
       description: "Numbers",
       usage: "2",
-      usageUnit: "number-months",
+      usageUnit: "numbers",
       price: "2.00",
     },
   ];
@@ -134,6 +134,30 @@ describe("billing-reconciliation", () => {
       period,
       twilioUsage,
       ledgerRows,
+      numberRentals: {
+        period,
+        twilioUsage: [
+          ...twilioUsage,
+          {
+            category: "phonenumbers-setups",
+            description: "Setups",
+            usage: "0",
+            usageUnit: "number-setups",
+            price: "0",
+            startDate: period.startDate,
+            endDate: period.endDate,
+          },
+        ].map((record) => ({
+          ...record,
+          startDate: period.startDate,
+          endDate: period.endDate,
+        })),
+        ledgerRows,
+        history: [
+          { id: 42, createdAt: "2026-04-01T00:00:00Z" },
+          { id: 43, createdAt: "2026-04-02T00:00:00Z" },
+        ],
+      },
       entityAudit: {
         billableMessages: 118,
         debitedMessages: 2,
@@ -184,6 +208,7 @@ describe("billing-reconciliation", () => {
 
     const report = buildBillingReconciliationReport({
       period,
+      numberRentals: { period, ledgerRows: [], twilioUsage: [], history: [] },
       twilioUsage: [
         {
           category: "sms-outbound",
@@ -228,6 +253,7 @@ describe("billing-reconciliation", () => {
 
     const report = buildBillingReconciliationReport({
       period,
+      numberRentals: { period, ledgerRows: [], twilioUsage: [], history: [] },
       twilioUsage: [
         {
           category: "calls-outbound",

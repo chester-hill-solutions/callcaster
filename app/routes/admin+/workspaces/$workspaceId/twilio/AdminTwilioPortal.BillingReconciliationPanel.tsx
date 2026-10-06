@@ -57,7 +57,7 @@ export function BillingReconciliationPanel({
     { label: "SMS", data: report.categories.sms },
     { label: "MMS", data: report.categories.mms },
     { label: "Voice", data: report.categories.voice },
-    { label: "Phone numbers", data: report.categories.numbers },
+    { label: "Number renewals", data: report.categories.numbers },
   ];
 
   return (
@@ -67,7 +67,8 @@ export function BillingReconciliationPanel({
           <div>
             <CardTitle>Billing Reconciliation</CardTitle>
             <CardDescription>
-              Twilio vs ledger for {report.period.startDate} through {report.period.endDate}.
+              SMS, MMS and voice: {report.period.startDate} through {report.period.endDate}.
+              {report.categories.numbers.period ? ` Number renewals: ${report.categories.numbers.period.startDate} through ${report.categories.numbers.period.endDate}.` : " Rental period unavailable."}
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -27,6 +27,11 @@ Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.
 
+For a rejected-input test, keep all other required inputs valid. A missing
+companion record can hide a broken unit or identity check. Remove the specific
+guard in an isolated source copy and require an executed failure; keep the
+working branch unchanged while other reviews or gates read it.
+
 Before another isolated install or full gate in a long audit, check available
 disk space. Remove only reproducible dependencies/build output in owned
 temporary worktrees whose readers have stopped; keep source, proof artifacts
