@@ -6,6 +6,7 @@ import { mergeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboardi
 import {
   loadWorkspaceTwilioData,
   mergeWorkspaceTwilioData,
+  type TwilioDataExecutor,
 } from "@/lib/merge-workspace-twilio-data.server";
 
 export function getWorkspaceMessagingOnboardingFromTwilioData(
@@ -18,23 +19,26 @@ export function getWorkspaceMessagingOnboardingFromTwilioData(
   return normalizeWorkspaceMessagingOnboardingState(twilioData.onboarding);
 }
 
-export async function getWorkspaceMessagingOnboardingState({workspaceId,
+export async function getWorkspaceMessagingOnboardingState({workspaceId, transaction,
 }: {
   null?: never | null;
   workspaceId: string;
+  transaction?: TwilioDataExecutor;
 }) {
-  const twilioData = await loadWorkspaceTwilioData(workspaceId);
+  const twilioData = await loadWorkspaceTwilioData(workspaceId, transaction);
   return getWorkspaceMessagingOnboardingFromTwilioData(twilioData as TwilioAccountData);
 }
 
 export async function updateWorkspaceMessagingOnboardingState({workspaceId,
   updates,
   actorUserId,
+  transaction,
 }: {
   null?: never | null;
   workspaceId: string;
   updates: Partial<WorkspaceMessagingOnboardingState>;
   actorUserId: string | null;
+  transaction?: TwilioDataExecutor;
 }) {
   // Re-derive the current onboarding state from the FRESH row inside the atomic
   // merge, so a concurrent write (e.g. the compliance job persisting a brandSid)
@@ -53,7 +57,7 @@ export async function updateWorkspaceMessagingOnboardingState({workspaceId,
       ...current,
       onboarding: nextState,
     };
-  });
+  }, transaction);
 
   return nextState!;
 }

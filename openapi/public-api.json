@@ -9988,7 +9988,7 @@
             "secureSessionCookie": []
           }
         ],
-        "description": "Requires sufficient workspace credits and numbers-manager role.",
+        "description": "Requires sufficient available workspace credits and numbers-manager role. Concurrent purchases reserve their rental budget. A 409 means the number is already owned or a purchase is awaiting provider verification; do not retry that number until recovery completes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10000,8 +10000,18 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Number purchased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseNumberResponse"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Number purchased; Messaging Service attachment needs attention",
             "content": {
               "application/json": {
                 "schema": {
@@ -10042,6 +10052,16 @@
           },
           "403": {
             "description": "Numbers manager role required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Number already owned or purchase awaiting recovery",
             "content": {
               "application/json": {
                 "schema": {

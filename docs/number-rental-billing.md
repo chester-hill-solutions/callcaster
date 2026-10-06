@@ -34,12 +34,32 @@ edge function has been retired as part of the Postgres/Drizzle migration):
 
 ## Purchase-time debit
 
-When a number is rented via `POST /api/numbers`, we now write the initial debit with the shared idempotent helper:
+Both number-purchase APIs reserve 100 available credits before one provider create
+attempt. The durable `workspace_number_purchase` record prevents concurrent
+requests from spending the same purchase budget. The number row, onboarding data,
+canonical initial debit and reservation completion commit in one transaction.
+The debit key remains `number_rent_purchase:<workspace_id>:<twilio_number_sid>`.
+The balance is checked again before settlement so other billed traffic cannot
+make this purchase leave a negative balance.
 
-- `insertTransactionHistoryIdempotent(...)`
-- key: `number_rent_purchase:<workspace_id>:<twilio_number_sid>`
+If local settlement fails, the purchase releases the provider number before
+releasing its hold. An uncertain provider result or failed release keeps the
+hold and returns 409. Do not retry that number until recovery completes. The
+self-scheduling `number_purchase_recovery` worker checks expired leases every
+minute. It releases only a recorded SID on the original account, or exactly one
+number with the matching account, phone and purchase marker. An absent or
+ambiguous lookup retains the hold because a delayed create can still complete.
 
-This prevents duplicate initial charges during retries.
+For a hold that does not resolve, inspect the purchase record's state, original
+account, provider SID and last error. Verify the marked incoming number on that
+account. Restore the original account access or provider availability and let
+the worker retry. Do not delete a hold or change workspace credits to force a
+retry. Unknown creates with no matching provider resource need operator
+verification before a separate recovery action can safely cancel them.
+
+The provider friendly name contains the purchase marker for recovery. The app's
+saved display name retains the workspace and phone. Success returns 201; a
+completed purchase whose Messaging Service attachment failed returns 207.
 
 ## Daily renewal worker flow
 

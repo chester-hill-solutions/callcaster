@@ -2,6 +2,9 @@ import { eq, or, sql } from "drizzle-orm";
 import { workspace as workspaceTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { isObject } from "@/lib/type-safety-utils";
+import type { Database } from "@/server/db";
+
+export type TwilioDataExecutor = Pick<Database, "select" | "update">;
 
 export type WorkspaceTwilioData = Record<string, unknown>;
 
@@ -106,15 +109,16 @@ function stripOnboardingStepsForPersistence(
 
 export async function loadWorkspaceTwilioData(
   workspaceId: string,
+  transaction?: TwilioDataExecutor,
 ): Promise<WorkspaceTwilioData> {
   const cached = workspaceTwilioDataCache.get(workspaceId);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!transaction && cached && cached.expiresAt > Date.now()) {
     // Defensive clone: callers must not be able to corrupt the cache (or
     // each other) by mutating the object they got back.
     return structuredClone(cached.data);
   }
 
-  const [row] = await adminDb
+  const [row] = await (transaction ?? adminDb)
     .select({ twilio_data: workspaceTable.twilio_data })
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
@@ -126,10 +130,12 @@ export async function loadWorkspaceTwilioData(
 
   const data = parseTwilioData(row.twilio_data);
 
-  workspaceTwilioDataCache.set(workspaceId, {
-    data,
-    expiresAt: Date.now() + WORKSPACE_TWILIO_DATA_CACHE_TTL_MS,
-  });
+  if (!transaction) {
+    workspaceTwilioDataCache.set(workspaceId, {
+      data,
+      expiresAt: Date.now() + WORKSPACE_TWILIO_DATA_CACHE_TTL_MS,
+    });
+  }
 
   return structuredClone(data);
 }
@@ -163,8 +169,9 @@ export async function persistWorkspaceTwilioData(
 export async function mergeWorkspaceTwilioData(
   workspaceId: string,
   updater: (current: WorkspaceTwilioData) => WorkspaceTwilioData,
+  transaction?: TwilioDataExecutor,
 ): Promise<WorkspaceTwilioData> {
-  const next = await adminDb.transaction(async (tx) => {
+  const write = async (tx: TwilioDataExecutor) => {
     const [row] = await tx
       .select({ twilio_data: workspaceTable.twilio_data })
       .from(workspaceTable)
@@ -184,9 +191,10 @@ export async function mergeWorkspaceTwilioData(
       .where(eq(workspaceTable.id, workspaceId));
 
     return merged;
-  });
+  };
+  const next = transaction ? await write(transaction) : await adminDb.transaction(write);
 
-  invalidateWorkspaceTwilioData(workspaceId);
+  if (!transaction) invalidateWorkspaceTwilioData(workspaceId);
   return next;
 }
 

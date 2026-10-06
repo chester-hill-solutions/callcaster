@@ -44,6 +44,11 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+Discover uncertain module paths with `rg --files` before reading them. An ADR's
+planned layout can differ from the active source. A referenced skill can also
+exist only as a user file in the shared checkout; read it there without copying
+it into a worktree or replacing the user's file.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its

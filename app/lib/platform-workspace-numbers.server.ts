@@ -1,4 +1,11 @@
 import {
+  cancelNumberPurchase, finalizeNumberPurchase, numberPurchaseProviderMarker,
+  recordNumberPurchaseProvider, reserveNumberPurchase, startNumberPurchase, type NumberPurchase,
+} from "@/lib/number-purchase-reservation.server";
+import {
+  compensateNumberPurchase, isDefiniteNumberPurchaseRejection, retainNumberPurchaseForRecovery,
+} from "@/lib/number-purchase-recovery.server";
+import {
   createWorkspaceTwilioInstance,
   getUserRole,
   getWorkspaceInfo,
@@ -20,19 +27,10 @@ import {
   mergeWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import {
-  hasCreditsForNumberRental,
-  NUMBER_RENTAL_MONTHLY_CREDITS,
-} from "@/lib/number-rental";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { db } from "@/server/db";
 import { attachPhoneNumberToMessagingService } from "@/lib/twilio-bootstrap.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { normalizeInboundRingCount } from "../../shared/inbound-rings";
-import { debitAmountFromCredits } from "@/lib/pricing";
-import { numberRentalPurchaseKey } from "@/lib/billing-keys";
-import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import {
   isNanpTollFreeNumber,
@@ -112,6 +110,13 @@ export async function purchaseWorkspaceNumber(
     return access;
   }
 
+  let purchase: NumberPurchase | undefined;
+  let providerSid: string | undefined;
+  let providerAttemptStarted = false;
+  let purchaseCommitted = false;
+  let recoveryPending = false;
+  let purchaseTwilio: Awaited<ReturnType<typeof createWorkspaceTwilioInstance>> | undefined;
+
   try {
     const { data: users, error: usersError } = await getWorkspaceUsers({
       workspaceId,
@@ -126,18 +131,8 @@ export async function purchaseWorkspaceNumber(
     }
 
     const owner = users.find((u) => u.user_workspace_role === "owner");
-    const workspaceCredits = (await getWorkspaceCredits(workspaceId)) ?? 0;
-
-    if (!hasCreditsForNumberRental(workspaceCredits)) {
-      return {
-        ok: false as const,
-        error: "Insufficient credits for number rental",
-        status: 402,
-        creditsError: true as const,
-      };
-    }
-
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId });
+    purchaseTwilio = twilio;
     const onboarding = await getWorkspaceMessagingOnboardingState({
       workspaceId,
     });
@@ -160,6 +155,15 @@ export async function purchaseWorkspaceNumber(
 
     const { data: workspaceInfo } = await getWorkspaceInfo({ workspaceId });
     const workspaceName = workspaceInfo?.name ?? workspaceId;
+    const callbackBaseUrl = env.BASE_URL();
+    if (!twilio.accountSid) throw new Error("Workspace provider account is missing");
+    const reservation = await reserveNumberPurchase({ workspaceId, actorUserId: userId, phoneNumber, accountSid: twilio.accountSid });
+    if (!reservation.ok) return reservation;
+    const currentPurchase = reservation.purchase;
+    purchase = currentPurchase;
+    const friendlyName = `${workspaceName} / ${phoneNumber}`;
+    await startNumberPurchase(purchase);
+    providerAttemptStarted = true;
 
     // Attach a validated emergency (E911) address SID when we have one so the
     // number is E911-provisioned at purchase time.
@@ -176,20 +180,27 @@ export async function purchaseWorkspaceNumber(
       () =>
         twilio.incomingPhoneNumbers.create({
           phoneNumber,
-          friendlyName: `${workspaceName} / ${phoneNumber}`,
+          friendlyName: `${phoneNumber} ${numberPurchaseProviderMarker(currentPurchase)}`,
           // SMS delivery status (caller-ID verification keeps /api/caller-id/status).
-          statusCallback: `${env.BASE_URL()}/api/sms/status`,
+          statusCallback: `${callbackBaseUrl}/api/sms/status`,
           statusCallbackMethod: "POST",
-          voiceUrl: `${env.BASE_URL()}/api/inbound`,
+          voiceUrl: `${callbackBaseUrl}/api/inbound`,
           voiceMethod: "POST",
-          smsUrl: `${env.BASE_URL()}/api/inbound-sms`,
+          smsUrl: `${callbackBaseUrl}/api/inbound-sms`,
           smsMethod: "POST",
           ...(validatedEmergencyAddressSid
             ? { emergencyAddressSid: validatedEmergencyAddressSid }
             : {}),
         }),
-      { workspaceId, operation: "incomingPhoneNumbers.create" },
+      { workspaceId, operation: "incomingPhoneNumbers.create", maxAttempts: 1 },
     );
+
+    if (number.accountSid !== currentPurchase.account_sid || number.phoneNumber !== phoneNumber || !number.sid ||
+        !number.friendlyName.includes(numberPurchaseProviderMarker(currentPurchase))) {
+      throw new Error("Provider returned a different number or account");
+    }
+    providerSid = number.sid;
+    await recordNumberPurchaseProvider(purchase, providerSid);
 
     let messagingServiceAttachError: string | undefined;
     let messagingServiceAttached = true;
@@ -213,81 +224,88 @@ export async function purchaseWorkspaceNumber(
       Boolean(number.capabilities.voice) &&
       onboarding.emergencyVoice.address.status === "validated";
 
-    const tdb = createTenantDb(workspaceId);
-    const [newNumber] = await tdb.workspace_number.insert({
-      friendly_name: number.friendlyName,
-      phone_number: number.phoneNumber,
-      twilio_phone_number_sid: number.sid ?? null,
-      capabilities: {
-        verification_status:
-          number.capabilities.mms &&
-          number.capabilities.sms &&
-          number.capabilities.voice
-            ? "success"
-            : "pending",
-        emergency_address_status: onboarding.emergencyVoice.address.status,
-        emergency_address_sid: onboarding.emergencyVoice.address.addressSid,
-        emergency_eligible: emergencyEligible,
-        emergency_compliance_status: onboarding.emergencyVoice.status,
-        ...number.capabilities,
-      },
-      inbound_action: owner?.username ?? null,
-      type: "rented",
-      created_at: new Date().toISOString(),
-      // Q45/Q59: handset off, ring count 3 by default for a freshly rented
-      // number; owners can change both from the numbers table or the
-      // first-number onboarding step.
-      handset_enabled: false,
-      inbound_ring_count: FIRST_NUMBER_DEFAULT_RING_COUNT,
-    });
+    const { newNumber, workspacePhoneNumbers } = await finalizeNumberPurchase(purchase, providerSid, "Rented number - " + friendlyName, async (tx) => {
+      const tdb = createTenantDb(workspaceId, tx);
+      const currentOnboarding = await getWorkspaceMessagingOnboardingState({ workspaceId, transaction: tx });
+      const [newNumber] = await tdb.workspace_number.insert({
+        friendly_name: friendlyName,
+        phone_number: number.phoneNumber,
+        twilio_phone_number_sid: number.sid ?? null,
+        capabilities: {
+          verification_status:
+            number.capabilities.mms &&
+            number.capabilities.sms &&
+            number.capabilities.voice
+              ? "success"
+              : "pending",
+          emergency_address_status: onboarding.emergencyVoice.address.status,
+          emergency_address_sid: onboarding.emergencyVoice.address.addressSid,
+          emergency_eligible: emergencyEligible,
+          emergency_compliance_status: onboarding.emergencyVoice.status,
+          ...number.capabilities,
+        },
+        inbound_action: owner?.username ?? null,
+        type: "rented",
+        created_at: new Date().toISOString(),
+        // Q45/Q59: handset off, ring count 3 by default for a freshly rented
+        // number; owners can change both from the numbers table or the
+        // first-number onboarding step.
+        handset_enabled: false,
+        inbound_ring_count: FIRST_NUMBER_DEFAULT_RING_COUNT,
+      });
 
-    if (!newNumber) {
-      throw new Error("Failed to insert workspace number");
-    }
+      if (!newNumber) {
+        throw new Error("Failed to insert workspace number");
+      }
 
-    const mergedOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
-      messagingService: {
-        ...onboarding.messagingService,
-        attachedSenderPhoneNumbers: messagingServiceAttached
-          ? Array.from(
-              new Set([
-                ...onboarding.messagingService.attachedSenderPhoneNumbers,
-                number.phoneNumber,
-              ]),
-            )
-          : onboarding.messagingService.attachedSenderPhoneNumbers,
-        lastError:
-          messagingServiceAttachError ?? onboarding.messagingService.lastError,
-      },
-      emergencyVoice: {
-        ...onboarding.emergencyVoice,
-        emergencyEligiblePhoneNumbers: emergencyEligible
-          ? Array.from(
-              new Set([
-                ...onboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
-                number.phoneNumber,
-              ]),
-            )
-          : onboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
-      },
-      currentStep:
-        onboarding.currentStep === "first_number"
-          ? "provider_provisioning"
-          : onboarding.currentStep,
-    });
+      const mergedOnboarding = mergeWorkspaceMessagingOnboardingState(currentOnboarding, {
+        messagingService: {
+          ...currentOnboarding.messagingService,
+          attachedSenderPhoneNumbers: messagingServiceAttached
+            ? Array.from(
+                new Set([
+                  ...currentOnboarding.messagingService.attachedSenderPhoneNumbers,
+                  number.phoneNumber,
+                ]),
+              )
+            : currentOnboarding.messagingService.attachedSenderPhoneNumbers,
+          lastError:
+            messagingServiceAttachError ?? currentOnboarding.messagingService.lastError,
+        },
+        emergencyVoice: {
+          ...currentOnboarding.emergencyVoice,
+          emergencyEligiblePhoneNumbers: emergencyEligible
+            ? Array.from(
+                new Set([
+                  ...currentOnboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
+                  number.phoneNumber,
+                ]),
+              )
+            : currentOnboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
+        },
+        currentStep:
+          currentOnboarding.currentStep === "first_number"
+            ? "provider_provisioning"
+            : currentOnboarding.currentStep,
+      });
 
-    const { data: workspacePhoneNumbers } = await getWorkspacePhoneNumbers({
-      workspaceId,
+      const { data: workspacePhoneNumbers } = await getWorkspacePhoneNumbers({
+        workspaceId, tdb,
+      });
+      const nextOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
+        mergedOnboarding,
+        workspacePhoneNumbers ?? [newNumber],
+      );
+      await updateWorkspaceMessagingOnboardingState({
+        workspaceId,
+        updates: nextOnboarding,
+        actorUserId: owner?.id ?? null,
+        transaction: tx,
+      });
+
+      return { newNumber, workspacePhoneNumbers };
     });
-    const nextOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
-      mergedOnboarding,
-      workspacePhoneNumbers ?? [newNumber],
-    );
-    await updateWorkspaceMessagingOnboardingState({
-      workspaceId,
-      updates: nextOnboarding,
-      actorUserId: owner?.id ?? null,
-    });
+    purchaseCommitted = true;
 
     // Q39: re-derive smsSenderClass/smsTargetMps from the updated number
     // inventory now that this purchase changed it. Best-effort — a failure
@@ -316,14 +334,6 @@ export async function purchaseWorkspaceNumber(
       }
     }
 
-    await insertTransactionHistoryIdempotent(db, {
-      workspaceId,
-      type: "DEBIT",
-      amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-      note: "Rented number - " + number.friendlyName,
-      idempotencyKey: numberRentalPurchaseKey(workspaceId, number.sid),
-    });
-
     const partialSuccess =
       !messagingServiceAttached &&
       Boolean(onboarding.messagingService.serviceSid);
@@ -337,11 +347,27 @@ export async function purchaseWorkspaceNumber(
       status: messagingServiceAttached ? 201 : 207,
     };
   } catch (error) {
+    if (purchase && !purchaseCommitted) {
+      try {
+        if (!providerAttemptStarted || (!providerSid && isDefiniteNumberPurchaseRejection(error))) {
+          await cancelNumberPurchase(purchase);
+        } else if (purchaseTwilio && !await compensateNumberPurchase(purchase, purchaseTwilio, providerSid)) {
+          recoveryPending = true;
+          await retainNumberPurchaseForRecovery(purchase);
+        }
+      } catch (recoveryError) {
+        recoveryPending = true;
+        logger.error("Number purchase compensation failed", recoveryError);
+        await retainNumberPurchaseForRecovery(purchase);
+      }
+    }
     logger.error("Failed to register number", error);
     return {
       ok: false as const,
-      error: twilioErrorUserMessage(error),
-      status: 500,
+      error: recoveryPending
+        ? "This number purchase needs verification. Do not retry this number yet."
+        : twilioErrorUserMessage(error),
+      status: recoveryPending ? 409 : 500,
     };
   }
 }

@@ -50,6 +50,7 @@ export const action = defineAction({
         if ("creditsError" in result && result.creditsError) {
           return jsonResponse({ creditsError: true }, result.status);
         }
+        if (result.status === 409) return jsonError(result.error, 409);
         return createErrorResponse(
           new Error(result.error),
           "Failed to register number",

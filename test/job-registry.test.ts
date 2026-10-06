@@ -44,6 +44,7 @@ function requireRegistration(type: string): (typeof jobRegistry)[number] {
 // The exact `jobHandlers` key set that existed in handlers.server.ts before
 // the registry landed (job-types.server.ts constants + bare string literals).
 const EXPECTED_JOB_TYPES = [
+  "number_purchase_recovery",
   "twilio_open_sync",
   "workspace_twilio_compliance",
   "billing_reconcile",
@@ -76,6 +77,7 @@ const EXPECTED_PAGING_JOB_TYPES = [
 // must fail here until its name is recorded, so a new self-scheduling type is
 // an intentional diff rather than a silent schedule change.
 const EXPECTED_SELF_SCHEDULING_JOB_TYPES = [
+  "number_purchase_recovery",
   "low_credit_notify",
   "twilio_webhook_audit",
   "twilio_open_sync",
@@ -89,6 +91,7 @@ const EXPECTED_SELF_SCHEDULING_JOB_TYPES = [
 // `jobRegistry` (only twilio_open_sync has non-empty seed params; every other
 // self-scheduling type seeds with `{}`).
 const EXPECTED_SEED_PARAMS: Record<string, Record<string, unknown>> = {
+  number_purchase_recovery: {},
   low_credit_notify: {},
   twilio_webhook_audit: {},
   twilio_open_sync: { callLimit: 50, messageLimit: 50, maxAgeMinutes: 120 },
