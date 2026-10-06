@@ -447,6 +447,11 @@ failure/control counts. Keep restoration in `finally`.
 
 ## Structural guard fixtures
 
+Route discovery guards must include every registered source, including the root,
+its server loader and route-local directory index imports. Keep missing-root and
+invalid-target controls, plus a valid indexed-loader control that proves discovery.
+Ignore imported assets; keep CSS and image controls beside the script controls.
+
 For SQL write guards, cover raw SQL, conflict updates and tuple assignments.
 Keep reads, non-order writes, quoted values and unrelated-statement controls.
 Verify rejection through the actual CLI as well as the parser.
