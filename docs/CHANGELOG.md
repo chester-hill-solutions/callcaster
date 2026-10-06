@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Admin panels no longer offer Add User or Add Workspace actions without an available creation flow ([#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111)).
+- Fixed: Admin panels no longer offer Add User or Add Workspace actions without an available creation flow ([#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111), [#2440](https://github.com/chester-hill-solutions/callcaster/pull/2440)).
 
 - Fixed: Manual-call recordings enter the storage pipeline after completion; campaign conferences stop creating recordings that cannot be stored ([#1989](https://github.com/chester-hill-solutions/callcaster/issues/1989), [#2439](https://github.com/chester-hill-solutions/callcaster/pull/2439)).
 
