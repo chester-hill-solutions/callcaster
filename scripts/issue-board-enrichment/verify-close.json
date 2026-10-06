@@ -5339,7 +5339,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2411 merged into dev as f811e7dd6f6671db7e4997d7b639551971e09184. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2411 merged into dev as f811e7dd6f6671db7e4997d7b639551971e09184. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
       "app/lib/billing-reconciliation-alert.server.ts",
@@ -5360,7 +5360,7 @@
       "test/billing-reconcile-workspace.server.test.ts"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.",
@@ -5379,7 +5379,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2414 merged into dev as 7defe663d6d3847500ad74070e72758f92ad7301. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2414 merged into dev as 7defe663d6d3847500ad74070e72758f92ad7301. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
       "app/lib/campaign-queue-updates.server.ts",
@@ -5395,7 +5395,7 @@
       "test/queue-status.test.ts"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).",
@@ -5413,7 +5413,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2415 merged into dev as 4c5220df788701ef51bd6b6024d3e4a1a1e6416f. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2415 merged into dev as 4c5220df788701ef51bd6b6024d3e4a1a1e6416f. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
       "app/db/schema.ts",
@@ -5446,7 +5446,7 @@
       "test/tenant-db.test.ts"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.",
@@ -5465,7 +5465,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2416 merged into dev as 860372a7faff9af67fdd6b3bbbf7c01033cb6e2b. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2416 merged into dev as 860372a7faff9af67fdd6b3bbbf7c01033cb6e2b. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
       "app/db/schema-number-release.ts",
@@ -5500,7 +5500,7 @@
       "test/twilio-sender-pool.server.test.ts"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.",
@@ -5518,7 +5518,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Run the independent real-Postgres CI tier for application changes covered by its tests",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2417 merged into dev as c194cdb5767b8a5c050035130c1ebdd84e88cab0. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2417 merged into dev as c194cdb5767b8a5c050035130c1ebdd84e88cab0. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "rootCause": "The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
@@ -5532,7 +5532,7 @@
       "test/integration-db-workflow.test.ts"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.",
@@ -5550,7 +5550,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Require answers before public survey completion",
     "summary": "The source repair is merged to dev; release-candidate acceptance remains.",
-    "currentBehavior": "PR #2419 merged into dev as a691d7a7910153f4529902ebfb7e04e5159cbd81. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA and provider/historical acceptance remain separate; preserve the original criteria.",
+    "currentBehavior": "PR #2419 merged into dev as a691d7a7910153f4529902ebfb7e04e5159cbd81. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.",
     "resolution": "Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.",
     "lookIn": [
       "app/components/ui/form-field.tsx",
@@ -5569,7 +5569,7 @@
       "test/ui/survey-save-order.test.tsx"
     ],
     "missingTests": [
-      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as live provider or historical-data proof."
+      "Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA."
     ],
     "acceptanceCriteria": [
       "A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.",
