@@ -412,7 +412,7 @@ export function AudioRecorder({
     onCancel?.();
   }, [onCancel, releaseAll]);
 
-  const isActive = phase === "recording" || phase === "paused";
+  const isActive = ["recording", "paused"].includes(phase);
   const litSegments = Math.round((level / 100) * METER_SEGMENT_COUNT);
 
   return (
@@ -433,8 +433,7 @@ export function AudioRecorder({
           onValueChange={setSelectedMicId}
           disabled={
             disabled ||
-            phase === "starting" ||
-            isActive ||
+            ["starting", "recording", "paused"].includes(phase) ||
             microphones.length === 0
           }
         >
@@ -503,7 +502,7 @@ export function AudioRecorder({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        {phase === "idle" || phase === "starting" ? (
+        {["idle", "starting"].includes(phase) ? (
           <Button
             onClick={handleStart}
             disabled={disabled || phase === "starting"}
