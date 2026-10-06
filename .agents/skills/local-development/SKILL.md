@@ -54,6 +54,10 @@ planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
 it into a worktree or replacing the user's file.
 
+Read fresh audits for both dependency locks before the final source review and
+full gate. A compiler version that matches a parent range can still have a new
+advisory; check the primary patch range before freezing that source.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
@@ -347,6 +351,16 @@ terminating either socket. Await both close events before asserting that the
 server client set is empty; the server close callback alone can run earlier.
 Bound awaited transport events with a deadline so an old-package rejection
 control cannot leave an open connection after a test timeout.
+
+For loopback HTTP fixtures with several short-lived servers, disable the client
+agent or close its pooled connections between servers. Node can reuse a socket
+from a closed fixture when its port is allocated again. Resolve each dependency
+from the installed consumer entry; npm can link a local package while Bun copies
+it, so its source-directory resolver can silently test the wrong nested package.
+For optimized-dependency boundary cases, keep the dependency optimizer active.
+A disabled optimizer can bypass the vulnerable handler and produce false proof.
+Set the fixture cache directory to the path used by the traversal request. A
+wrong cache path can return the SPA page without testing the map handler.
 
 ## Inbound queue TwiML tests
 
