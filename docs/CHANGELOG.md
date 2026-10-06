@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Voice campaigns with optional date bounds show waiting outside their calling hours and running when calling is permitted ([#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119)).
+
 - Fixed: Fully paid number rentals can warn again after a later missed payment; partial payments keep the current warning state ([#2421](https://github.com/chester-hill-solutions/callcaster/pull/2421), [#2142](https://github.com/chester-hill-solutions/callcaster/issues/2142)).
 - Fixed: Surveys with only optional questions can be submitted without answers, and retries keep the same saved response ([#2418](https://github.com/chester-hill-solutions/callcaster/issues/2418), [PR #2420](https://github.com/chester-hill-solutions/callcaster/pull/2420)).
 - Fixed: Public surveys check required answers before advancing or completing, with stable field feedback and retained answers for retry ([#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107), [#2419](https://github.com/chester-hill-solutions/callcaster/pull/2419)).

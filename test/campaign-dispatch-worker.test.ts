@@ -167,9 +167,9 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
   });
 
-  test("terminalizes an expired campaign to complete instead of dispatching (#1512)", async () => {
+  test.each(["message", "robocall", "simple_ivr", "complex_ivr"])("terminalizes an expired %s campaign to complete instead of dispatching (#1512)", async (type) => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
-      runningMessageCampaign({ end_date: "2000-01-01T00:00:00.000Z" }),
+      runningMessageCampaign({ type, end_date: "2000-01-01T00:00:00.000Z" }),
     );
     const result = await campaignDispatchHandler(makeJob());
     expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
