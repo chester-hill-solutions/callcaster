@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Phone-number purchases reserve their credit budget and recover failed provisioning without duplicate charges or unpaid numbers ([#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084)).
+- Fixed: Phone-number purchases reserve their credit budget and recover failed provisioning without duplicate charges or unpaid numbers ([PR #2415](https://github.com/chester-hill-solutions/callcaster/pull/2415), [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084)).
 
 - Fixed: Ordinary campaign queue reset preserves completed history, opt-outs and active provider work while releasing unused assignments ([#2153](https://github.com/chester-hill-solutions/callcaster/issues/2153), [PR #2414](https://github.com/chester-hill-solutions/callcaster/pull/2414)).
 
