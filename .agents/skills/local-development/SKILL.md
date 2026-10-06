@@ -54,6 +54,18 @@ planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
 it into a worktree or replacing the user's file.
 
+After changing a local file package's test dependencies, verify its lock metadata
+and every installed consumer. Bun can retain the old local metadata after a
+normal install; refresh only that package with `bun update <local-package-name>`
+and verify a separate frozen install before accepting the lock.
+npm can also retain an invalid test subtree for a linked local package after
+a named update. Compare its declaration with `npm ls vitest --all`. Remove only
+proven retired lock nodes in the owned worktree, regenerate with `npm install`,
+and require a fresh `npm ci` and a valid installed tree before source freeze.
+When retiring a package, search all test consumers, including `createRequire`
+and `require.resolve` calls. Update fixtures to resolve the active installed
+consumer; do not restore a retired dependency to make collection pass.
+
 Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.
@@ -357,6 +369,10 @@ agent or close its pooled connections between servers. Node can reuse a socket
 from a closed fixture when its port is allocated again. Resolve each dependency
 from the installed consumer entry; npm can link a local package while Bun copies
 it, so its source-directory resolver can silently test the wrong nested package.
+For redirect-mock boundary fixtures, use a canonical temporary root and a fresh
+module ID for each target. An earlier transformed module can hide a rejected or
+accepted redirect in Vite's cache. Pair outside and denied in-root controls with
+a working allowed redirect through the same actual installed consumer.
 For optimized-dependency boundary cases, keep the dependency optimizer active.
 A disabled optimizer can bypass the vulnerable handler and produce false proof.
 Set the fixture cache directory to the path used by the traversal request. A

@@ -15,14 +15,12 @@ import WebSocket from "ws";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 const require = createRequire(import.meta.url);
-const viteNodeRequire = createRequire(require.resolve("vite-node"));
 const scriptkitRequire = createRequire(
   require.resolve("@chester-hill-solutions/scriptkit-call-script-react"),
 );
 const consumers = [
   { name: "direct Vite", require },
   { name: "Vitest", require: createRequire(require.resolve("vitest")) },
-  { name: "vite-node", require: viteNodeRequire },
   {
     name: "ScriptKit Vitest",
     require: createRequire(scriptkitRequire.resolve("vitest")),

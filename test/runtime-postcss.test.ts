@@ -7,7 +7,13 @@ import { compileStyle } from "@vue/compiler-sfc";
 import { afterAll, describe, expect, test } from "vitest";
 
 const require = createRequire(import.meta.url);
-const viteNodeRequire = createRequire(require.resolve("vite-node"));
+const vitestRequire = createRequire(require.resolve("vitest"));
+const scriptkitRequire = createRequire(
+  require.resolve("@chester-hill-solutions/scriptkit-call-script-react"),
+);
+const scriptkitVitestRequire = createRequire(
+  scriptkitRequire.resolve("vitest"),
+);
 const consumers = [
   { name: "direct PostCSS", require },
   {
@@ -17,8 +23,12 @@ const consumers = [
   { name: "Vite", require: createRequire(require.resolve("vite")) },
   { name: "shadcn CLI", require: createRequire(require.resolve("shadcn")) },
   {
-    name: "vite-node's Vite",
-    require: createRequire(viteNodeRequire.resolve("vite")),
+    name: "root Vitest's Vite",
+    require: createRequire(vitestRequire.resolve("vite")),
+  },
+  {
+    name: "ScriptKit Vitest's Vite",
+    require: createRequire(scriptkitVitestRequire.resolve("vite")),
   },
 ];
 
