@@ -198,7 +198,11 @@ const rows = [
 describeDb(
   "schedule sweep optional dates through real Postgres (#2119)",
   () => {
+    const schemaName = `schedule_sync_${randomUUID().replaceAll("-", "")}`;
     const workspace = randomUUID();
+    const publicWorkspace = randomUUID();
+    let publicId: number;
+    let fixtureDb: postgres.Sql;
     const sibling = randomUUID();
     let sql: postgres.Sql;
     let run: typeof import("@/lib/campaign-schedule-sync.server").runCampaignScheduleSync;
@@ -238,13 +242,36 @@ describeDb(
 
     beforeAll(async () => {
       if (!fixture.url) throw new Error("A database URL is required");
-      sql = postgres(fixture.url, { max: 2 });
+      fixtureDb = postgres(fixture.url, { max: 2 });
+      await fixtureDb.unsafe(`create schema "${schemaName}"`);
+      await fixtureDb.unsafe(
+        `create table "${schemaName}".workspace (like public.workspace including all)`,
+      );
+      await fixtureDb.unsafe(
+        `create table "${schemaName}".campaign (like public.campaign including all)`,
+      );
+      const scopedUrl = new URL(fixture.url);
+      scopedUrl.searchParams.set("search_path", `${schemaName},public`);
+      process.env.DATABASE_URL = scopedUrl.toString();
+      process.env.DATABASE_DIRECT_URL = scopedUrl.toString();
+      sql = postgres(scopedUrl.toString(), { max: 2 });
+      await fixtureDb`insert into public.workspace (id, name, credits)
+        values (${publicWorkspace}::uuid, 'Public schedule control', 0)`;
+      const [publicRow] =
+        await fixtureDb`insert into public.campaign (workspace, type, status, start_date, end_date, schedule, title)
+        values (${publicWorkspace}::uuid, 'robocall', 'running', null, null, ${fixtureDb.json(closed)}, 'Public schedule control') returning id`;
+      publicId = Number(publicRow.id);
       await sql`insert into workspace (id, name, credits) values
       (${workspace}::uuid, 'Schedule fixture', 0), (${sibling}::uuid, 'Sibling schedule fixture', 0)`;
       ({ runCampaignScheduleSync: run } =
         await import("@/lib/campaign-schedule-sync.server"));
       ({ checkSchedule } = await import("@/lib/database/campaign.server"));
       ({ adminDb } = await import("@/server/admin-db"));
+      const db = await import("@/server/db");
+      for (const client of [sql, db.pool, db.directPool]) {
+        const [bound] = await client`select current_schema() as name`;
+        expect(bound.name).toBe(schemaName);
+      }
       ({ emitCampaignStatusEvent: emit } =
         await import("@/lib/workspace-events.server"));
     });
@@ -253,22 +280,37 @@ describeDb(
       vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(fixture.now);
     });
-    afterEach(() => vi.useRealTimers());
+    afterEach(async () => {
+      vi.useRealTimers();
+      if (!fixtureDb || !publicId) return;
+      const [control] =
+        await fixtureDb`select status from public.campaign where id = ${publicId}`;
+      expect(control.status).toBe("running");
+    });
     afterAll(async () => {
+      vi.useRealTimers();
       try {
-        if (sql) {
-          await clearCampaigns();
-          await sql`delete from workspace where id in (${workspace}::uuid, ${sibling}::uuid)`;
-        }
         if (adminDb) {
           const db = await import("@/server/db");
           await Promise.all([db.pool.end(), db.directPool.end()]);
         }
       } finally {
-        if (sql) await sql.end();
-        for (const [key, value] of Object.entries(fixture.previous)) {
-          if (value === undefined) delete process.env[key];
-          else process.env[key] = value;
+        try {
+          if (sql) await sql.end();
+          if (fixtureDb) {
+            if (publicId)
+              await fixtureDb`delete from public.campaign where id = ${publicId} and workspace = ${publicWorkspace}::uuid`;
+            await fixtureDb`delete from public.workspace where id = ${publicWorkspace}::uuid`;
+            await fixtureDb.unsafe(
+              `drop schema if exists "${schemaName}" cascade`,
+            );
+          }
+        } finally {
+          if (fixtureDb) await fixtureDb.end();
+          for (const [key, value] of Object.entries(fixture.previous)) {
+            if (value === undefined) delete process.env[key];
+            else process.env[key] = value;
+          }
         }
       }
     });
