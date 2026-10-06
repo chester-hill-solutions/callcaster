@@ -83,6 +83,7 @@ export function useChatsPage() {
     composerKey: string;
     to: string;
     observedSubmission: boolean;
+    previousData: unknown;
     draftRevision: number;
   } | null>(null);
   const requestedPageRef = useRef(pagination.page);
@@ -416,6 +417,7 @@ export function useChatsPage() {
         composerKey,
         to: toNumber,
         observedSubmission: false,
+        previousData: messageFetcher.data,
         draftRevision: draft.revision,
       };
       chatActionsRef.current?.addOptimisticMessage?.({
@@ -457,8 +459,8 @@ export function useChatsPage() {
       pending.observedSubmission = true;
       return;
     }
-    // Clearing the draft renders before the fetcher starts; its old data is not a result.
-    if (!pending.observedSubmission) return;
+    // A fast result can skip the busy render; retained data still belongs to the old request.
+    if (!pending.observedSubmission && messageFetcher.data === pending.previousData) return;
 
     const data = messageFetcher.data as
       | { error?: string; billing?: { nextSendBlocked?: boolean } }

@@ -258,7 +258,7 @@ test("ignores idle re-renders and stale fetcher error data until the new request
   const c = mount();
   c.type("Retry draft");
   c.send();
-  messageFetcher.data = { error: "Previous failure" };
+  phoneNumber = "+15555550000";
   c.refresh();
   c.type("Newer draft");
   c.refresh();
@@ -348,5 +348,26 @@ test.each([true, false])(
     expect(c.textarea()).toHaveValue("");
     expect(screen.getByText("0/160")).toBeInTheDocument();
     expect(screen.getByText("≈ 0 credits")).toBeInTheDocument();
+  },
+);
+
+test.each([true, false])(
+  "handles a fresh result when the busy render is skipped (error=%s)",
+  (error) => {
+    messageFetcher.data = { error: "Old request" };
+    const c = mount();
+    const body = "a".repeat(340);
+    c.type(body);
+    c.send();
+    c.settle(error ? { error: "Fast result" } : {});
+    expect(c.textarea()).toHaveValue(error ? body : "");
+    expect(
+      screen.getByText(error ? "≈ 6 credits" : "≈ 0 credits"),
+    ).toBeInTheDocument();
+    if (!error) c.type(body);
+    c.send();
+    c.settle({ error: "Second result" });
+    expect(messageFetcher.submit).toHaveBeenCalledTimes(2);
+    expect(c.textarea()).toHaveValue(body);
   },
 );
