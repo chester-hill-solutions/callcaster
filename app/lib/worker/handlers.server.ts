@@ -1,3 +1,4 @@
+import { runNumberReleaseRecovery } from "@/lib/number-release-recovery.server";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
@@ -144,6 +145,21 @@ const registrations = [
     handler: (job) => withReschedule({
       type: "number_purchase_recovery", delayMs: 60_000, params: {}, completedJobId: job.id,
     }, runNumberPurchaseRecovery),
+  }),
+  defineJob({
+    type: "number_release_recovery",
+    params: noParams,
+    schedule: true,
+    handler: (job) =>
+      withReschedule(
+        {
+          type: "number_release_recovery",
+          delayMs: 60_000,
+          params: {},
+          completedJobId: job.id,
+        },
+        runNumberReleaseRecovery,
+      ),
   }),
   defineJob({
     type: "audience_upload",

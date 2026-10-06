@@ -59,7 +59,9 @@ export const action = defineAction({
         workspace_id,
         numberId,
       );
-      if (!result.ok) return { error: result.error };
+      if (!result.ok) {
+        return routeData({ error: result.error }, { status: result.status });
+      }
       return null;
     }
 

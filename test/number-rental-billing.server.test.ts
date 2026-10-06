@@ -464,7 +464,7 @@ describe("runNumberRentalBilling", () => {
 
     expect(result).toMatchObject({ released: 1 });
     expect(lifecycleMocks.removeWorkspacePhoneNumber).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: "workspace-1", numberId: BigInt(1) }),
+      { workspaceId: "workspace-1", numberId: BigInt(1) },
     );
     expect(opsMocks.notifyOps).toHaveBeenCalledWith(
       expect.objectContaining({ event: "billing.rental_released", severity: "page" }),
@@ -863,7 +863,7 @@ describe("runNumberRentalBilling — disabled workspaces (#2116)", () => {
 
     expect(result).toMatchObject({ charged: 0, released: 1 });
     expect(lifecycleMocks.removeWorkspacePhoneNumber).toHaveBeenCalledWith(
-      expect.objectContaining({ workspaceId: "workspace-1", numberId: BigInt(1) }),
+      { workspaceId: "workspace-1", numberId: BigInt(1) },
     );
   });
 

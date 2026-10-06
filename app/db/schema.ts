@@ -17,6 +17,7 @@ import {
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+export { workspace_number_release } from "./schema-number-release";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
 import { isoTimestamps, textTimestamps, timestampTimestamps } from "./schema-timestamps";
 // Type-only import; the cycle with db-types (which type-imports this module)
