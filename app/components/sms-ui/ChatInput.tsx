@@ -48,6 +48,8 @@ interface ChatInputProps {
   initialFrom: string;
   /** The workspace number this contact has most recently been texting, if any. */
   establishedFromNumber?: string;
+  bodyValue: string;
+  onBodyChange: (value: string) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleImageRemove: (imageUrl: string) => void;
@@ -87,6 +89,8 @@ export default function ChatInput({
   establishedFromNumber,
   workspaceNumbers,
   senderSelection,
+  bodyValue,
+  onBodyChange,
   handleSubmit,
   handleImageSelect,
   handleImageRemove,
@@ -97,7 +101,6 @@ export default function ChatInput({
   isValid,
 }: ChatInputProps) {
   const messagingServiceReady = senderSelection.messagingServiceReady;
-  const [bodyValue, setBodyValue] = useState("");
   const [selectedFrom, setSelectedFrom] = useState(() =>
     senderSelection.defaultMode === "messaging_service" && messagingServiceReady
       ? MESSAGING_SERVICE_SENDER_VALUE
@@ -209,7 +212,6 @@ export default function ChatInput({
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     submittedScheduleRef.current = sendLater;
     handleSubmit(e);
-    setBodyValue("");
   };
 
   const handleBodyKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -360,7 +362,8 @@ export default function ChatInput({
             className="min-h-[88px] resize-none rounded-none border-0 bg-transparent px-3 py-2.5 shadow-none focus-visible:ring-0"
             name="body"
             id="body"
-            onChange={(e) => setBodyValue(e.target.value)}
+            value={bodyValue}
+            onChange={(e) => onBodyChange(e.target.value)}
             onKeyDown={handleBodyKeyDown}
             aria-describedby="chat-input-meta"
           />

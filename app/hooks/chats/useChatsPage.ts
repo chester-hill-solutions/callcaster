@@ -77,9 +77,15 @@ export function useChatsPage() {
     }) => void;
     markOptimisticMessageFailed?: (sid: string) => void;
   } | null>(null);
-  const pendingOptimisticMessageRef = useRef<{ sid: string; body: string } | null>(
-    null,
-  );
+  const pendingOptimisticMessageRef = useRef<{
+    sid: string;
+    body: string;
+    composerKey: string;
+    to: string;
+    observedSubmission: boolean;
+    previousData: unknown;
+    draftRevision: number;
+  } | null>(null);
   const requestedPageRef = useRef(pagination.page);
   /**
    * The filter this accumulation belongs to. A page number cannot identify a
@@ -102,6 +108,22 @@ export function useChatsPage() {
   const params = useParams();
   const navigate = useNavigate();
   const contact_number = params["contact_number"] ?? "";
+  const composerKey = `${workspace.id}:${contact_number || "new"}`;
+  const [draft, setDraft] = useState({ key: composerKey, body: "", revision: 0 });
+  // Reset before rendering a different conversation, as the keyed composer did.
+  if (draft.key !== composerKey) {
+    setDraft({ key: composerKey, body: "", revision: draft.revision + 1 });
+  }
+  const bodyValue = draft.key === composerKey ? draft.body : "";
+  const onBodyChange = useCallback(
+    (body: string) =>
+      setDraft((current) => ({
+        key: composerKey,
+        body,
+        revision: current.revision + 1,
+      })),
+    [composerKey],
+  );
   const formatDate = formatMessageTimestamp;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const [loadedChats, setLoadedChats] = useState(chats);
@@ -361,7 +383,13 @@ export function useChatsPage() {
       e.preventDefault();
       const target = e.currentTarget;
       const toNumber = contact_number || phoneNumber;
-      if (!toNumber || messageFetcher.state !== "idle") return;
+      if (
+        !toNumber ||
+        messageFetcher.state !== "idle" ||
+        pendingOptimisticMessageRef.current
+      ) {
+        return;
+      }
 
       const formData = new FormData(target);
       // ChatInput only renders a hidden `contact_number` field for the
@@ -386,7 +414,15 @@ export function useChatsPage() {
           : selection.fromNumber || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
       const pendingSid = `pending-${Date.now()}`;
-      pendingOptimisticMessageRef.current = { sid: pendingSid, body };
+      pendingOptimisticMessageRef.current = {
+        sid: pendingSid,
+        body,
+        composerKey,
+        to: toNumber,
+        observedSubmission: false,
+        previousData: messageFetcher.data,
+        draftRevision: draft.revision,
+      };
       chatActionsRef.current?.addOptimisticMessage?.({
         body,
         from,
@@ -397,13 +433,12 @@ export function useChatsPage() {
 
       messageFetcher.submit(formData, { method: "POST" });
 
-      const messageBody =
-        target.querySelector<HTMLInputElement>("#body") ||
-        target.querySelector<HTMLTextAreaElement>("#body");
-      if (messageBody) messageBody.value = "";
+      setDraft((current) => ({ ...current, body: "" }));
       setSelectedImages([]);
     },
     [
+      composerKey,
+      draft.revision,
       contact_number,
       phoneNumber,
       messageFetcher,
@@ -416,16 +451,28 @@ export function useChatsPage() {
 
   /**
    * @effect When the message-send fetcher settles with an error, reconcile the optimistic UI: mark the pending optimistic message as failed and restore its text into the composer.
-   * @effect-deps messageFetcher.state, messageFetcher.data (react to the send fetcher settling)
-   * @effect-side-effects dom (reads/writes the #body input's value); no fetch itself (reacts to the existing send fetcher)
+   * @effect-deps messageFetcher.state, messageFetcher.data, composerKey, contact_number, phoneNumber (send lifecycle and current recipient)
+   * @effect-side-effects toast, optimistic message status, draft state; no DOM access or fetch
    * @effect-why-not-loader This reconciles optimistic client state against a fetcher action's result; it's inherently a "react after the fetcher settles" side effect, not something a loader or derived value can express.
    */
   useEffect(() => {
-    if (messageFetcher.state !== "idle") return;
     const pending = pendingOptimisticMessageRef.current;
     if (!pending) return;
+    if (messageFetcher.state !== "idle") {
+      pending.observedSubmission = true;
+      return;
+    }
+    // A fast result can skip the busy render; retained data still belongs to the old request.
+    const hasFreshResult = messageFetcher.data !== pending.previousData;
+    if (
+      !pending.observedSubmission &&
+      !hasFreshResult &&
+      pending.composerKey === composerKey
+    ) {
+      return;
+    }
 
-    const data = messageFetcher.data as
+    const data = (hasFreshResult ? messageFetcher.data : undefined) as
       | { error?: string; billing?: { nextSendBlocked?: boolean } }
       | undefined;
     if (!data || !data.error) {
@@ -439,16 +486,27 @@ export function useChatsPage() {
     }
 
     toast.error(data.error);
-    chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
-    const bodyField = document.getElementById("body") as
-      | HTMLTextAreaElement
-      | HTMLInputElement
-      | null;
-    if (bodyField && !bodyField.value) {
-      bodyField.value = pending.body;
+    if (
+      pending.composerKey === composerKey &&
+      pending.to === (contact_number || phoneNumber)
+    ) {
+      chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
+      setDraft((current) =>
+        current.key === pending.composerKey &&
+        current.revision === pending.draftRevision &&
+        !current.body
+          ? { ...current, body: pending.body }
+          : current,
+      );
     }
     pendingOptimisticMessageRef.current = null;
-  }, [messageFetcher.state, messageFetcher.data]);
+  }, [
+    messageFetcher.state,
+    messageFetcher.data,
+    composerKey,
+    contact_number,
+    phoneNumber,
+  ]);
 
   const markConversationReadForContact = useCallback(
     (number: string) => {
@@ -605,6 +663,8 @@ export function useChatsPage() {
     chatInputWorkspaceNumbers,
     initialFrom,
     establishedFromNumber,
+    bodyValue,
+    onBodyChange,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,
