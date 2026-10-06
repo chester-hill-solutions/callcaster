@@ -204,6 +204,24 @@ for (const surface of surfaces) {
       },
       { name: "zero total", price: 0, priceUnit: "usd", expected: 0 },
       {
+        name: "array price",
+        price: ["4.20"],
+        priceUnit: "usd",
+        expected: null,
+      },
+      {
+        name: "object price",
+        price: { toString: null },
+        priceUnit: "usd",
+        expected: null,
+      },
+      {
+        name: "object currency",
+        price: 4.2,
+        priceUnit: { value: "usd" },
+        expected: null,
+      },
+      {
         name: "unparseable wire start",
         price: 4.2,
         priceUnit: "usd",
@@ -253,8 +271,11 @@ for (const surface of surfaces) {
         if (!call)
           throw new Error("The adapter did not reach the report builder");
         expect(call[0].twilioUsage[0]).toMatchObject({
-          price: price === undefined ? "" : String(price),
-          priceUnit,
+          price:
+            typeof price === "number" || typeof price === "string"
+              ? String(price)
+              : "",
+          priceUnit: typeof priceUnit === "string" ? priceUnit : undefined,
           startDate: start,
           endDate: end,
         });

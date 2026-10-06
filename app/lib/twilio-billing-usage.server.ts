@@ -30,8 +30,12 @@ export async function listTwilioBillingUsage(
         description: record.description,
         usage: record.usage,
         usageUnit: record.usage_unit,
-        price: record.price?.toString() ?? "",
-        priceUnit: record.price_unit,
+        price:
+          typeof record.price === "number" || typeof record.price === "string"
+            ? String(record.price)
+            : "",
+        priceUnit:
+          typeof record.price_unit === "string" ? record.price_unit : undefined,
         startDate: wireDate(record.start_date),
         endDate: wireDate(record.end_date),
       });
