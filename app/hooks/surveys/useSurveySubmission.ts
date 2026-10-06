@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { submitForm } from "@/lib/api-client";
 import { isObject } from "@/lib/type-safety-utils";
 import { surveyAnswerKey } from "@/lib/survey-answer-state";
@@ -16,7 +17,6 @@ export function useSurveySubmission(identity: SurveyIdentity) {
   const alive = useRef(true);
   const busy = useRef(false);
   const [statuses, setStatuses] = useState<Record<string, AnswerStatus>>({});
-  const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
 
@@ -62,6 +62,7 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     const payload = response.data;
     if (!response.success || !isObject(payload) || payload.success !== true) {
       const message = response.error?.message ?? (isObject(payload) && typeof payload.error === "string" ? payload.error : "Your response could not be saved. Try again.");
+      toast.error(message);
       throw new Error(message);
     }
   }
@@ -80,7 +81,6 @@ export function useSurveySubmission(identity: SurveyIdentity) {
         await post(form, "/api/survey-answer");
       } catch (failure) {
         setStatus(entry, "error");
-        if (alive.current) setError(failure instanceof Error ? failure.message : "Your answer could not be saved. Try again.");
         throw failure;
       }
       if (pending.current.get(surveyAnswerKey(entry.pageId, entry.questionId)) === entry) {
@@ -100,7 +100,6 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     if (!alive.current || busy.current) return;
     pending.current.set(surveyAnswerKey(entry.pageId, entry.questionId), entry);
     setStatus(entry, "pending");
-    setError(null);
     clearTimer();
     // The Map retains other questions and any edit that arrives during a write.
     timer.current = setTimeout(() => { void flushPending().catch(() => {}); }, 1000);
@@ -110,7 +109,6 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     if (!alive.current || busy.current) return false;
     busy.current = true;
     setIsBusy(true);
-    setError(null);
     try {
       await flushPending();
       if (!alive.current) return false;
@@ -121,8 +119,7 @@ export function useSurveySubmission(identity: SurveyIdentity) {
         setIsCompleted(true);
       }
       return true;
-    } catch (failure) {
-      if (alive.current) setError(failure instanceof Error ? failure.message : "Your response could not be saved. Try again.");
+    } catch {
       return false;
     } finally {
       busy.current = false;
@@ -130,5 +127,5 @@ export function useSurveySubmission(identity: SurveyIdentity) {
     }
   }
 
-  return { queueAnswer, savePage, statusFor: (pageId: string, questionId: string) => statuses[surveyAnswerKey(pageId, questionId)], error, isBusy, isCompleted };
+  return { queueAnswer, savePage, statusFor: (pageId: string, questionId: string) => statuses[surveyAnswerKey(pageId, questionId)], isBusy, isCompleted };
 }

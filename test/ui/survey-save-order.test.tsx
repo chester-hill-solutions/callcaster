@@ -1,4 +1,6 @@
 import React from "react";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -6,7 +8,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import SurveyPage from "../../app/routes/survey+/$surveyId";
 
 vi.mock("../../app/routes/survey+/$surveyId.loader.server", () => ({ loader: vi.fn() }));
-afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { toast.dismiss(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 type Write = { path: string; fields: Record<string, FormDataEntryValue>; signal?: AbortSignal };
 type Reply = { status: number; body: { success?: boolean; error?: string } };
@@ -40,7 +42,7 @@ function setup(reply: (write: Write) => Promise<Reply> = async () => ({ status: 
     { path: "/api/survey-answer", action }, { path: "/api/survey-complete", action },
     { path: "/away", element: <div>Other page</div> },
   ], { initialEntries: ["/survey/public-survey"] });
-  const view = render(<RouterProvider router={router} />);
+  const view = render(<><RouterProvider router={router} /><Toaster position="top-right" /></>);
   return { ...view, router, writes, changeIdentity: () => { data = pageData("respondent-b", pageCount); router.revalidate(); } };
 }
 
@@ -78,7 +80,9 @@ describe("public survey save acknowledgements (#2108)", () => {
     const { writes } = setup(async write => reject && write.path === "/api/survey-answer" ? { status, body: { success, error: "Answer was not saved" } } : { status: 200, body: { success: true } });
     fireEvent.change(await screen.findByLabelText("Answer 1"), { target: { value: "Retained answer" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Answer was not saved");
+    expect(await screen.findByText("Answer was not saved")).toBeVisible();
+    expect(screen.getAllByText("Answer was not saved")).toHaveLength(1);
+    expect(screen.queryByText("Error saving")).not.toBeInTheDocument();
     expect(screen.queryByText("Thank You!")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Answer 1")).toHaveValue("Retained answer");
     expect(writes.every(write => write.path === "/api/survey-answer")).toBe(true);
@@ -93,7 +97,7 @@ describe("public survey save acknowledgements (#2108)", () => {
     const { writes } = setup(async write => reject && write.path === "/api/survey-complete" ? { status: 404, body: { error: "Survey response not found" } } : { status: 200, body: { success: true } });
     fireEvent.change(await screen.findByLabelText("Answer 1"), { target: { value: "Saved answer" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Survey response not found");
+    expect(await screen.findByText("Survey response not found")).toBeVisible();
     expect(screen.queryByText("Thank You!")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Answer 1")).toHaveValue("Saved answer");
     reject = false;
@@ -169,7 +173,7 @@ describe("public survey save acknowledgements (#2108)", () => {
     const { writes } = setup(async () => { if (fail) throw new TypeError("Network offline"); return { status: 200, body: { success: true } }; });
     fireEvent.change(await screen.findByLabelText("Answer 1"), { target: { value: "Offline answer" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
-    await screen.findByRole("alert");
+    await screen.findByText("Network offline");
     expect(screen.getByLabelText("Answer 1")).toHaveValue("Offline answer");
     expect(screen.queryByText("Thank You!")).not.toBeInTheDocument();
     fail = false;
