@@ -257,16 +257,24 @@ suite(
       const { pool } = await services();
       await pool`insert into workspace_number_purchase(id,workspace,actor_user_id,phone_number,account_sid,credits,state,provider_sid,lease_token,lease_expires_at) values (${randomUUID()},${ws},${ws === workspace ? owner : foreignOwner},${n.phone},${account},100,'completed',${n.sid},${randomUUID()},'2026-10-01T00:00:00Z')`;
     }
+    async function runRentalSweep() {
+      const s = await services();
+      const result = await s.runNumberRentalBilling({
+        workspaceId: workspace,
+        today: new Date(now),
+      });
+      // JavaScript fake timers do not change the ledger RPC's database clock.
+      await s.pool`update transaction_history set created_at=${now.toISOString()} where workspace=${workspace} and idempotency_key like 'number_rent:%'`;
+      return result;
+    }
     test("actual sweep catch-up pays September in October and reconciles by cycle", async () => {
       await number();
       fixture.units = 1;
       const s = await services();
-      expect(
-        await s.runNumberRentalBilling({
-          workspaceId: workspace,
-          today: new Date(now),
-        }),
-      ).toMatchObject({ charged: 1, technicalFailures: 0 });
+      expect(await runRentalSweep()).toMatchObject({
+        charged: 1,
+        technicalFailures: 0,
+      });
       const r = await reconcile();
       expect(r.report.categories.numbers).toMatchObject({
         variance: 0,
@@ -288,6 +296,21 @@ suite(
           idempotency_key: expect.stringContaining(":2026-09"),
         }),
       ]);
+    });
+    test("a debit after the captured timestamp stays outside the rental snapshot", async () => {
+      const n = await number();
+      fixture.units = 1;
+      await debit(n.id);
+      const { pool } = await services();
+      await pool`update transaction_history set created_at='2026-10-06T13:00:00.000Z' where workspace=${workspace} and idempotency_key=${`number_rent:${n.id}:2026-09`}`;
+      const r = await reconcile();
+      expect(r.report.categories.numbers).toMatchObject({
+        twilioUnits: 1,
+        ledgerEvents: 0,
+        ledgerCredits: 0,
+        variance: 1,
+      });
+      expect(r.credits).toBe(9900);
     });
     test("a prior cycle paid during the rolling window does not move to September", async () => {
       const n = await number();
@@ -417,11 +440,7 @@ suite(
         first.data.billingReconciliationDriftAlert,
       );
       expect(fixture.email).toHaveBeenCalledTimes(1);
-      const s = await services();
-      await s.runNumberRentalBilling({
-        workspaceId: workspace,
-        today: new Date(now),
-      });
+      await runRentalSweep();
       const balanced = await reconcile();
       expect(balanced.normalized).toMatchObject({
         numbersVariance: 0,
