@@ -7,6 +7,10 @@ import { buildBillingReconciliationReport } from "../../shared/billing-reconcili
 function renderReport(mmsUsage: string, usageUnit = "messages") {
   const report = buildBillingReconciliationReport({
     period: { startDate: "2026-05-01", endDate: "2026-05-31" },
+    numberRentals: {
+      period: { startDate: "2026-05-01", endDate: "2026-05-31" },
+      ledgerRows: [], twilioUsage: [], history: [],
+    },
     ledgerRows: [
       {
         type: "DEBIT",

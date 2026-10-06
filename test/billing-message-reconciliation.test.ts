@@ -55,6 +55,7 @@ function report(
     ledgerRows,
     twilioUsage,
     entityAudit: emptyAudit,
+    numberRentals: { period, ledgerRows: [], twilioUsage: [], history: [] },
   });
 }
 

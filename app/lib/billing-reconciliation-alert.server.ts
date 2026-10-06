@@ -49,6 +49,8 @@ function buildDriftEmail(args: {
           <li>SMS variance: ${args.details.smsVariance ?? "Unavailable (unsupported usage)"}</li>
           <li>MMS variance: ${args.details.mmsVariance ?? "Unavailable (unsupported usage)"}</li>
           <li>Voice variance: ${args.details.voiceVariance}</li>
+          <li>Number rental variance: ${args.details.numbersVariance ?? "Unavailable (rental coverage)"}</li>
+          <li>Rental period: ${args.details.numbersPeriod ? `${args.details.numbersPeriod.startDate} – ${args.details.numbersPeriod.endDate}` : "Not recorded"}</li>
           <li>Message entity gap: ${args.details.messageGap}</li>
           <li>Call entity gap: ${args.details.callGap}</li>
           <li>Unrecognized debit events: ${args.details.unrecognizedDebitEvents}</li>
@@ -65,6 +67,8 @@ Period: ${periodLabel}
 SMS variance: ${args.details.smsVariance ?? "Unavailable (unsupported usage)"}
 MMS variance: ${args.details.mmsVariance ?? "Unavailable (unsupported usage)"}
 Voice variance: ${args.details.voiceVariance}
+Number rental variance: ${args.details.numbersVariance ?? "Unavailable (rental coverage)"}
+Rental period: ${args.details.numbersPeriod ? `${args.details.numbersPeriod.startDate} – ${args.details.numbersPeriod.endDate}` : "Not recorded"}
 Message entity gap: ${args.details.messageGap}
 Call entity gap: ${args.details.callGap}
 Unrecognized debit events: ${args.details.unrecognizedDebitEvents}
@@ -181,6 +185,8 @@ export async function handleBillingReconciliationDrift(args: {
       smsVariance: args.snapshot.smsVariance,
       mmsVariance: args.snapshot.mmsVariance,
       voiceVariance: args.snapshot.voiceVariance,
+      numbersVariance: args.snapshot.numbersVariance,
+      numbersPeriod: args.snapshot.numbersPeriod,
       messageGap: args.snapshot.messageGap,
       callGap: args.snapshot.callGap,
     },

@@ -19,6 +19,8 @@ const DEFAULT_SNAPSHOT: BillingReconciliationSnapshot = {
   smsVariance: 0,
   mmsVariance: 0,
   voiceVariance: 0,
+  numbersVariance: 0,
+  numbersPeriod: null,
   messageGap: 0,
   callGap: 0,
   unrecognizedDebitEvents: 0,
@@ -32,6 +34,9 @@ export function normalizeBillingReconciliationSnapshot(
   }
 
   const period = isObject(value.period) ? value.period : null;
+  const numbersPeriod = isObject(value.numbersPeriod)
+    ? value.numbersPeriod
+    : null;
   const lastRunAt = parseOptionalString(value.lastRunAt);
   if (!lastRunAt) {
     return null;
@@ -40,7 +45,11 @@ export function normalizeBillingReconciliationSnapshot(
   return {
     lastRunAt,
     lastRunSource: value.lastRunSource === "cron" ? "cron" : "admin",
-    materialVariance: value.materialVariance === true || value.smsVariance === null || value.mmsVariance === null,
+    materialVariance:
+      value.materialVariance === true ||
+      value.smsVariance === null ||
+      value.mmsVariance === null ||
+      value.numbersVariance === null,
     period: {
       startDate: parseOptionalString(period?.startDate) ?? "",
       endDate: parseOptionalString(period?.endDate) ?? "",
@@ -49,6 +58,18 @@ export function normalizeBillingReconciliationSnapshot(
     mmsVariance: value.mmsVariance === null ? null : typeof value.mmsVariance === "number" ? value.mmsVariance : 0,
     voiceVariance:
       typeof value.voiceVariance === "number" ? value.voiceVariance : 0,
+    numbersVariance:
+      value.numbersVariance === null
+        ? null
+        : typeof value.numbersVariance === "number"
+          ? value.numbersVariance
+          : 0,
+    numbersPeriod: numbersPeriod
+      ? {
+          startDate: parseOptionalString(numbersPeriod.startDate) ?? "",
+          endDate: parseOptionalString(numbersPeriod.endDate) ?? "",
+        }
+      : null,
     messageGap: typeof value.messageGap === "number" ? value.messageGap : 0,
     callGap: typeof value.callGap === "number" ? value.callGap : 0,
     unrecognizedDebitEvents:

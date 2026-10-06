@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Rental reconciliation now reports renewal drift by billing month and retains the result in billing alerts. ([#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113))
+
 - Fixed: Predictive voicemail callbacks prevent repeated playback instructions and wait for acknowledgement before the next dialer turn. Calls with uncertain results stay recorded for recovery ([#2424](https://github.com/chester-hill-solutions/callcaster/pull/2424), [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396)).
 
 - Fixed: Voice campaigns with optional date bounds show waiting outside their calling hours and running when calling is permitted ([#2423](https://github.com/chester-hill-solutions/callcaster/pull/2423), [#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119)).
