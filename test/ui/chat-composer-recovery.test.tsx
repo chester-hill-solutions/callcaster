@@ -371,3 +371,39 @@ test.each([true, false])(
     expect(c.textarea()).toHaveValue(body);
   },
 );
+
+test("permits a reply after a first-send redirect skips busy and returns no data", () => {
+  contactNumber = "";
+  phoneNumber = "+15551234567";
+  const c = mount();
+  c.type("First message");
+  c.send();
+  contactNumber = phoneNumber;
+  phoneNumber = "";
+  c.refresh();
+  c.type("Reply");
+  c.send();
+  expect(messageFetcher.submit).toHaveBeenCalledTimes(2);
+  c.settle({ error: "Reply failed" });
+  expect(c.textarea()).toHaveValue("Reply");
+  expect(toastMocks.error).toHaveBeenCalledExactlyOnceWith("Reply failed");
+});
+
+test("does not replay retained old error data after a first-send redirect", () => {
+  messageFetcher.data = { error: "Previous request" };
+  contactNumber = "";
+  phoneNumber = "+15551234567";
+  const c = mount();
+  c.type("First message");
+  c.send();
+  contactNumber = phoneNumber;
+  phoneNumber = "";
+  c.refresh();
+  expect(toastMocks.error).not.toHaveBeenCalled();
+  c.type("Reply");
+  c.send();
+  c.settle({});
+  expect(messageFetcher.submit).toHaveBeenCalledTimes(2);
+  expect(c.textarea()).toHaveValue("");
+  expect(toastMocks.error).not.toHaveBeenCalled();
+});

@@ -116,9 +116,12 @@ export function useChatsPage() {
   }
   const bodyValue = draft.key === composerKey ? draft.body : "";
   const onBodyChange = useCallback(
-    (body: string) => setDraft((current) => ({
-      key: composerKey, body, revision: current.revision + 1,
-    })),
+    (body: string) =>
+      setDraft((current) => ({
+        key: composerKey,
+        body,
+        revision: current.revision + 1,
+      })),
     [composerKey],
   );
   const formatDate = formatMessageTimestamp;
@@ -460,9 +463,16 @@ export function useChatsPage() {
       return;
     }
     // A fast result can skip the busy render; retained data still belongs to the old request.
-    if (!pending.observedSubmission && messageFetcher.data === pending.previousData) return;
+    const hasFreshResult = messageFetcher.data !== pending.previousData;
+    if (
+      !pending.observedSubmission &&
+      !hasFreshResult &&
+      pending.composerKey === composerKey
+    ) {
+      return;
+    }
 
-    const data = messageFetcher.data as
+    const data = (hasFreshResult ? messageFetcher.data : undefined) as
       | { error?: string; billing?: { nextSendBlocked?: boolean } }
       | undefined;
     if (!data || !data.error) {

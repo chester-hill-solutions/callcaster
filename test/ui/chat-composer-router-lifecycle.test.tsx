@@ -5,7 +5,12 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  Outlet,
+  redirect,
+  RouterProvider,
+} from "react-router";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import ChatInput from "@/components/sms-ui/ChatInput";
 import { useChatsPage } from "@/hooks/chats/useChatsPage";
@@ -25,7 +30,7 @@ vi.mock("@/hooks/contact/useContactSearch", async (importOriginal) => ({
     isContactMenuOpen: false,
     searchError: null,
     contacts: [],
-    phoneNumber: "",
+    phoneNumber: newPhoneNumber,
     existingConversation: null,
     handleSearch: vi.fn(),
     toggleContactMenu: vi.fn(),
@@ -55,6 +60,7 @@ const loader = {
   },
   optOutKeywords: ["stop"],
 };
+let newPhoneNumber = "";
 const failed = vi.fn();
 function Composer() {
   const h = useChatsPage();
@@ -76,7 +82,7 @@ function Composer() {
         selectedImages={h.selectedImages}
         selectedContact={h.selectedContact}
         messageFetcher={h.messageFetcher}
-        phoneNumber={h.contact_number}
+        phoneNumber={h.contact_number || h.phoneNumber}
         isValid
       />
     </>
@@ -85,6 +91,7 @@ function Composer() {
 let router: ReturnType<typeof createMemoryRouter> | undefined;
 beforeEach(() => {
   createWorkspaceEventSourceMock();
+  newPhoneNumber = "";
   failed.mockReset();
   toastMocks.error.mockReset();
   toastMocks.warning.mockReset();
@@ -194,3 +201,49 @@ test.each(["synchronous", "microtask"])(
     expect(toastMocks.error).not.toHaveBeenCalled();
   },
 );
+
+test("real router releases a first-send redirect and permits a reply", async () => {
+  newPhoneNumber = "+15551234567";
+  let calls = 0;
+  router = createMemoryRouter(
+    [
+      {
+        path: "/",
+        element: <Outlet context={{ workspace: { id: "ws1" } }} />,
+        children: [
+          {
+            path: "workspaces/:id/chats/:contact_number?",
+            element: <Composer />,
+            loader: () => loader,
+            action: () =>
+              ++calls === 1
+                ? redirect("/workspaces/ws1/chats/+15551234567")
+                : { error: "Reply failed" },
+          },
+        ],
+      },
+    ],
+    { initialEntries: ["/workspaces/ws1/chats"] },
+  );
+  render(<RouterProvider router={router} />);
+  const field =
+    await screen.findByPlaceholderText<HTMLTextAreaElement>(
+      "Type your message",
+    );
+  const form = field.closest("form");
+  if (!form) throw new Error("Composer form is missing");
+  fireEvent.change(field, { target: { value: "First message" } });
+  fireEvent.submit(form);
+  await waitFor(() =>
+    expect(router?.state.location.pathname).toBe(
+      "/workspaces/ws1/chats/+15551234567",
+    ),
+  );
+  expect(field).toHaveValue("");
+  fireEvent.change(field, { target: { value: "Reply" } });
+  fireEvent.submit(form);
+  await waitFor(() => expect(failed).toHaveBeenCalledOnce());
+  expect(calls).toBe(2);
+  expect(field).toHaveValue("Reply");
+  expect(toastMocks.error).toHaveBeenCalledExactlyOnceWith("Reply failed");
+});
