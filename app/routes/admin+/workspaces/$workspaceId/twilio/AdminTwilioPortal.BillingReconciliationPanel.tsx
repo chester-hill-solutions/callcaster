@@ -141,7 +141,7 @@ export function BillingReconciliationPanel({
           <div className="rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Twilio cost (USD)</div>
             <div className="mt-1 text-lg font-semibold">
-              ${report.twilioTotalCostUsd.toFixed(2)}
+              {report.twilioTotalCostUsd === null ? "Unavailable" : `$${report.twilioTotalCostUsd.toFixed(2)}`}
             </div>
           </div>
           <div className="rounded-lg border p-4">

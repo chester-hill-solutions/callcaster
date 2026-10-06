@@ -1,10 +1,11 @@
+import { listTwilioBillingUsage } from "@/lib/twilio-billing-usage.server";
 import {
   buildDefaultWorkspaceTwilioPortalSnapshot,
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalSnapshot,
 } from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
-import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
+import { getTwilioUsageDateRange, type TwilioUsageRecord } from "@/lib/twilio-usage";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import {
   getWorkspaceBillingReconciliationSnapshot,
@@ -36,15 +37,7 @@ export interface TwilioPageData {
     addressRequirements?: string;
     status?: string;
   }>;
-  twilioUsage: Array<{
-    category: string;
-    description: string;
-    usage: string;
-    usageUnit: string;
-    price: string;
-    startDate?: string;
-    endDate?: string;
-  }>;
+  twilioUsage: TwilioUsageRecord[];
   portalSnapshot: WorkspaceTwilioPortalSnapshot;
   billingReconciliation: BillingReconciliationReport | null;
   billingReconciliationSnapshot: BillingReconciliationSnapshot | null;
@@ -85,7 +78,7 @@ export async function loadTwilioData(
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
         twilio.incomingPhoneNumbers.list({ limit: 20 }),
         // Limit usage records fetch to prevent auto-paging the entire usage history.
-        twilio.usage.records.list({
+        listTwilioBillingUsage(twilio.usage.records, {
           limit: 200,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
@@ -106,15 +99,7 @@ export async function loadTwilioData(
         status: number.status,
       }));
 
-      twilioUsage = usageRecords.map((record) => ({
-        category: record.category,
-        description: record.description,
-        usage: record.usage,
-        usageUnit: record.usageUnit,
-        price: record.price.toString(),
-        startDate: record.startDate?.toISOString(),
-        endDate: record.endDate?.toISOString(),
-      }));
+      twilioUsage = usageRecords;
 
       billingReconciliation = await loadBillingReconciliationReport({
         workspaceId,

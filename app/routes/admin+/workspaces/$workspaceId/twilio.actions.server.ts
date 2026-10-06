@@ -1,3 +1,4 @@
+import { listTwilioBillingUsage } from "@/lib/twilio-billing-usage.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { triggerTwilioOpenSync } from "@/lib/twilio-open-sync.server";
@@ -160,19 +161,10 @@ export const action = defineAction({
             });
             const referenceDate = new Date();
             const { startDate, endDate } = getTwilioUsageDateRange(referenceDate);
-            const usageRecords = await twilio.usage.records.list({
+            const twilioUsage = await listTwilioBillingUsage(twilio.usage.records, {
               startDate: new Date(startDate),
               endDate: new Date(endDate),
             });
-            const twilioUsage = usageRecords.map((record) => ({
-              category: record.category,
-              description: record.description,
-              usage: record.usage,
-              usageUnit: record.usageUnit,
-              price: record.price.toString(),
-              startDate: record.startDate?.toISOString(),
-              endDate: record.endDate?.toISOString(),
-            }));
 
             const report = await loadBillingReconciliationReport({
               workspaceId,

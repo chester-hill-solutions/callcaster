@@ -1,3 +1,4 @@
+import { usageRecordsClient } from "../helpers/twilio-usage-page";
 import { randomUUID } from "node:crypto";
 import {
   afterAll,
@@ -17,7 +18,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
   createWorkspaceTwilioInstance: async (args: { workspace_id: string }) => {
     provider.workspaces.push(args.workspace_id);
-    return { usage: { records: { list: provider.list } } };
+    return { usage: { records: usageRecordsClient(provider.list) } };
   },
 }));
 vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({

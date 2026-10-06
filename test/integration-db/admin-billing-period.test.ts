@@ -1,3 +1,4 @@
+import { usageRecordsClient } from "../helpers/twilio-usage-page";
 import { randomUUID } from "node:crypto";
 import {
   afterAll,
@@ -37,7 +38,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
           },
         },
         incomingPhoneNumbers: { list: async () => [] },
-        usage: { records: { list: provider.list } },
+        usage: { records: usageRecordsClient(provider.list) },
       };
     },
   };

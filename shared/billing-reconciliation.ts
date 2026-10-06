@@ -14,6 +14,7 @@ export type TwilioUsageRecord = {
   usage: string;
   usageUnit: string;
   price: string;
+  priceUnit?: string;
   startDate?: string;
   endDate?: string;
 };
@@ -70,7 +71,7 @@ export type BillingReconciliationReport = {
     numbers: NumberRentalReconciliation;
   };
   entityAudit: BillingEntityAudit;
-  twilioTotalCostUsd: number;
+  twilioTotalCostUsd: number | null;
   ledgerDebitCredits: number;
   ledgerCreditPurchases: number;
   unrecognizedDebitEvents: number;
@@ -135,19 +136,31 @@ function messageUsageUnits(
   return units;
 }
 
-function sumTwilioCostUsd(
+function providerTotalCostUsd(
   records: TwilioUsageRecord[],
-  categoryMatcher: (category: string) => boolean,
-): number {
-  return records.reduce((sum, record) => {
-    if (record.category === "totalprice") {
-      return sum;
-    }
-    if (!categoryMatcher(record.category)) {
-      return sum;
-    }
-    return sum + parseUsageAmount(record.price);
-  }, 0);
+  period: BillingReconciliationPeriod,
+): number | null {
+  const totals = records.filter((record) => record.category === "totalprice");
+  const total = totals[0];
+  if (!total || totals.length !== 1) return null;
+  if (total.priceUnit?.toLowerCase() !== "usd") return null;
+  if (
+    ![period.startDate, `${period.startDate}T00:00:00.000Z`].includes(
+      total.startDate ?? "",
+    ) ||
+    ![period.endDate, `${period.endDate}T00:00:00.000Z`].includes(
+      total.endDate ?? "",
+    )
+  )
+    return null;
+
+  // Category prices can overlap and can omit account costs. Only the provider
+  // total establishes the complete cost for this currency and reporting period.
+  const value = total.price.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))
+    return null;
+  const price = Number(value);
+  return Number.isFinite(price) ? price : null;
 }
 
 export function categorizeLedgerRow(row: LedgerTransactionRow): {
@@ -239,12 +252,7 @@ export function buildBillingReconciliationReport(args: {
   );
   const numbers = buildNumberRentalReconciliation(args.numberRentals);
 
-  const twilioTotalCostUsd =
-    sumTwilioCostUsd(args.twilioUsage, () => true) ||
-    parseUsageAmount(
-      args.twilioUsage.find((record) => record.category === "totalprice")
-        ?.price ?? "0",
-    );
+  const twilioTotalCostUsd = providerTotalCostUsd(args.twilioUsage, args.period);
 
   return {
     period: args.period,
@@ -325,7 +333,7 @@ export type BillingReconciliationAlertDetails = {
   messageGap: number;
   callGap: number;
   unrecognizedDebitEvents: number;
-  twilioTotalCostUsd: number;
+  twilioTotalCostUsd: number | null;
   ledgerDebitCredits: number;
 };
 
