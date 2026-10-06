@@ -14,6 +14,7 @@ import {
 import { useWorkspaceEventSubscription } from "./useWorkspaceEventSubscription";
 import { type RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
+import { deepEqual } from "@/lib/deep-equal";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
 
@@ -80,8 +81,7 @@ function reconcileLoaderMessages(current: Message[], initial: Message[]): Messag
       toConversationTimestamp(right?.date_created) ?? "",
     ),
   );
-  return merged.length === current.length && merged.every((msg, index) => msg === current[index])
-    ? current : merged;
+  return deepEqual(merged, current) ? current : merged;
 }
 
 /**
