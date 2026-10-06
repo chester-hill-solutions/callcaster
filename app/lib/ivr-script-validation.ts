@@ -25,10 +25,9 @@ export type IvrRoutingValidation = {
   issues: IvrRoutingIssue[];
 };
 
-export type IvrRoutingInput = Pick<
-  ScriptDocument,
-  "pages" | "blocks" | "startPageId"
->;
+export type IvrRoutingInput = Pick<ScriptDocument, "pages" | "startPageId"> & {
+  blocks: Record<string, ScriptDocument["blocks"][string] | { id: string; options?: Array<{ next?: string }> }>;
+};
 
 const TERMINAL_TARGETS = new Set(["hangup", "end"]);
 

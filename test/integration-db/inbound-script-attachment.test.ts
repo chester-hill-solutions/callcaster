@@ -153,6 +153,34 @@ suite("inbound script attachment and overwrite boundaries (#2269)", () => {
       },
     );
   }
+  for (const boundary of ["api", "form", "preset"] as const) {
+    test.each(["audio", "instruction", "textblock", "infotext"])(
+      `${boundary} checks targets on raw %s blocks before migration can drop them`, async (wireType) => {
+        const previous = await script(); const id = await number(previous);
+        for (const target of ["page_missing:block_missing", "forward:+0123", "voicemail:a..b@example.test"]) {
+          const content = steps(target); content.blocks.block_1.type = wireType;
+          const selected = await script({ content });
+          expect((await attach(boundary, id, selected)).status).toBe(400);
+          expect(await storedNumber(id)).toBe(previous);
+        }
+        const [queue] = await client`insert into inbound_queue (workspace_id, name)
+          values (${foreignWorkspaceId}, 'Foreign raw queue') returning id`;
+        const content = steps(`queue:${queue.id}`); content.blocks.block_1.type = wireType;
+        const selected = await script({ content });
+        expect((await attach(boundary, id, selected)).status).toBe(400);
+        expect(await storedNumber(id)).toBe(previous);
+      },
+    );
+    test.each(["audio", "instruction", "textblock", "infotext"])(
+      `${boundary} retains a valid target on raw %s blocks`, async (wireType) => {
+        const content = steps("forward:+15555550123"); content.blocks.block_1.type = wireType;
+        const selected = await script({ content }); const id = await number();
+        expect((await attach(boundary, id, selected)).status).toBe(200);
+        expect(await storedNumber(id)).toBe(selected);
+      },
+    );
+  }
+
   test.each(["api", "form"] as const)("%s can clear an attachment", async (boundary) => {
     const selected = await script(); const id = await number(selected);
     expect((await attach(boundary, id, null)).status).toBe(200);
@@ -245,44 +273,98 @@ suite("inbound script attachment and overwrite boundaries (#2269)", () => {
     });
   }
 
-  async function waitForBlockedWriters(count: number) {
+  test.each(["api", "form", "preset"] as const)(
+    "%s maps an actual UPDATE-time serialization failure to a retry response", async (boundary) => {
+      const selected = await script(); const id = await number();
+      const fixture = "cc2269_conflict_" + randomUUID().replaceAll("-", "");
+      let functionCreated = false, triggerCreated = false;
+      try {
+        await client.unsafe(`create function ${fixture}() returns trigger language plpgsql as $$
+          begin raise exception 'Owned serialization failure' using errcode = '40001'; end $$`);
+        functionCreated = true;
+        await client.unsafe(`create trigger ${fixture} before update on workspace_number for each row
+          when (new.workspace = '${workspaceId}'::uuid) execute function ${fixture}()`);
+        triggerCreated = true;
+        const response = await attach(boundary, id, selected);
+        expect(response.status).toBe(409);
+        expect(await response.json()).toMatchObject({ error: "The menu changed during this save. Review it and try again." });
+        expect(await storedNumber(id)).toBeNull();
+      } finally {
+        if (triggerCreated) await client.unsafe(`drop trigger ${fixture} on workspace_number`);
+        if (functionCreated) await client.unsafe(`drop function ${fixture}()`);
+      }
+    },
+  );
+
+  async function waitForBlockedWriters(count: number, blockerPid: number) {
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
       const [row] = await client`select count(*)::int as count from pg_stat_activity
         where datname = current_database() and wait_event_type = 'Lock'
-          and query like '%script%' and query like '%for update%'`;
+          and query like '%script%' and query like '%for update%'
+          and (${blockerPid} = any(pg_blocking_pids(pid)) or exists (
+            select 1 from unnest(pg_blocking_pids(pid)) as blocked(pid)
+              where ${blockerPid} = any(pg_blocking_pids(blocked.pid))))`;
       if (row.count >= count) return;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error(`Expected ${count} actual blocked menu writers`);
   }
 
+  async function runBlockedWriters(selected: number, writers: Array<() => Promise<unknown>>,
+    waitForWriters = waitForBlockedWriters) {
+    let release!: () => void;
+    let locked!: (pid: number) => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const ready = new Promise<number>((resolve) => { locked = resolve; });
+    const blocker = client.begin(async (tx) => {
+      await tx`select id from script where workspace = ${workspaceId} and id = ${selected} for update`;
+      const [connection] = await tx`select pg_backend_pid() as pid`;
+      locked(Number(connection.pid)); await gate;
+    });
+    const blockerPid = await ready;
+    const calls: Array<Promise<{ value: unknown } | { error: unknown }>> = [];
+    try {
+      for (const writer of writers) {
+        calls.push(writer().then((value) => ({ value }), (error) => ({ error })));
+        await waitForWriters(calls.length, blockerPid);
+      }
+    } finally {
+      release();
+      try { await blocker; } finally { await Promise.all(calls); }
+    }
+    return Promise.all(calls);
+  }
+
+  test("a lock-wait failure drains a started product write before cleanup", async () => {
+    const selected = await script(); let completed = false;
+    let pending: Promise<unknown> | undefined;
+    const write = () => pending = (async () => {
+      try { return await persistence.persistWorkspaceScript({ workspaceId, actorId, mode: "update", scriptId: selected,
+        content: { name: "Completed after release", type: "inbound_ivr", steps: steps() } }); }
+      finally { completed = true; }
+    })();
+    try {
+      await expect(runBlockedWriters(selected, [write], async (count, pid) => {
+        await waitForBlockedWriters(count, pid);
+        throw new Error("Owned lock-wait failure");
+      })).rejects.toThrow("Owned lock-wait failure");
+      expect(completed).toBe(true);
+      const [stored] = await client`select name from script where workspace = ${workspaceId} and id = ${selected}`;
+      expect(stored.name).toBe("Completed after release");
+    } finally {
+      await pending;
+    }
+  });
+
   for (const boundary of ["api", "form", "preset"] as const) {
     test.each(["save-first", "attach-first"] as const)(
       `${boundary} cannot race an attachment against an invalid overwrite (%s)`, async (order) => {
         const selected = await script(); const id = await number();
-        let release!: () => void;
-        let locked!: () => void;
-        const gate = new Promise<void>((resolve) => { release = resolve; });
-        const ready = new Promise<void>((resolve) => { locked = resolve; });
-        const blocker = client.begin(async (tx) => {
-          await tx`select id from script where workspace = ${workspaceId} and id = ${selected} for update`;
-          locked(); await gate;
-        });
-        await ready;
         const save = () => persistence.persistWorkspaceScript({ workspaceId, actorId, mode: "update", scriptId: selected,
           content: { name: "Invalid raced draft", steps: steps("missing"), type: "inbound_ivr" } });
         const attachment = () => attach(boundary, id, selected);
-        const calls: Array<Promise<unknown>> = [];
-        try {
-          calls.push((order === "save-first" ? save() : attachment()).then((value) => ({ value }), (error) => ({ error })));
-          await waitForBlockedWriters(1);
-          calls.push((order === "save-first" ? attachment() : save()).then((value) => ({ value }), (error) => ({ error })));
-          await waitForBlockedWriters(2);
-        } finally {
-          release(); await blocker;
-        }
-        const results = await Promise.all(calls);
+        const results = await runBlockedWriters(selected, order === "save-first" ? [save, attachment] : [attachment, save]);
         expect(results).toHaveLength(2);
         const [stored] = await client`select steps from script where workspace = ${workspaceId} and id = ${selected}`;
         const attached = await storedNumber(id);
@@ -293,11 +375,16 @@ suite("inbound script attachment and overwrite boundaries (#2269)", () => {
           expect(stored.steps).toEqual(steps("missing"));
         }
         const attachmentIndex = order === "save-first" ? 1 : 0;
-        const attachmentResult = results[attachmentIndex] as { value?: Response; error?: unknown };
-        expect(attachmentResult.error).toBeUndefined();
-        expect([200, 400, 409]).toContain(attachmentResult.value?.status);
-        if (attachmentResult.value?.status !== 200) {
-          expect(await attachmentResult.value?.json()).toMatchObject({ error: expect.any(String) });
+        const attachmentResult = results[attachmentIndex];
+        if (!("value" in attachmentResult) || !attachmentResult.value ||
+          typeof attachmentResult.value !== "object" || !("status" in attachmentResult.value) ||
+          typeof attachmentResult.value.status !== "number" || !("json" in attachmentResult.value) ||
+          typeof attachmentResult.value.json !== "function") {
+          throw new Error("Attachment must return its actual route response");
+        }
+        expect([200, 400, 409]).toContain(attachmentResult.value.status);
+        if (attachmentResult.value.status !== 200) {
+          expect(await attachmentResult.value.json()).toMatchObject({ error: expect.any(String) });
         }
       },
     );

@@ -60,6 +60,25 @@ describe("raw inbound document validation", () => {
     const { validateInboundScriptSteps } = await import("@/lib/inbound-script-validation");
     expect(validateInboundScriptSteps(wire()).ok).toBe(true);
   });
+  test.each(["audio", "instruction", "textblock", "infotext"])(
+    "collects queue ownership requirements from raw %s responses", async (type) => {
+      const { validateInboundScriptSteps } = await import("@/lib/inbound-script-validation");
+      const flow = wire();
+      const result = validateInboundScriptSteps({ ...flow, blocks: { greeting: {
+        ...flow.blocks.greeting, type, options: [{ value: "1", next: "queue:7" }],
+      } } });
+      expect(result).toMatchObject({ ok: true, queueIds: [7] });
+    },
+  );
+  test.each(["audio", "instruction", "textblock", "infotext"])(
+    "rejects a raw %s response that migration would erase", async (type) => {
+      const { validateInboundScriptSteps } = await import("@/lib/inbound-script-validation");
+      const flow = wire();
+      expect(validateInboundScriptSteps({ ...flow, blocks: { greeting: {
+        ...flow.blocks.greeting, type, options: [{ value: "1", next: "missing:step" }],
+      } } }).ok).toBe(false);
+    },
+  );
   test.each(["start", "block", "option", "no-input", "replay-limit"])("rejects raw %s errors before migration repairs them", async (fault) => {
     const { validateInboundScriptSteps } = await import("@/lib/inbound-script-validation");
     const flow = wire();

@@ -428,6 +428,10 @@ redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from
 a fresh result; verify a second send and later user edits.
 
+Route tests use `asRouteResponse` from `test/helpers/route-result.ts`. It returns
+a response-shaped adapter, not a native `Response`; narrow its documented fields
+when inspecting mixed concurrent-write results.
+
 ## Scripted source edits
 
 Run source faults only when no other test reads that worktree. Restore each

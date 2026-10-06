@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
+import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
+import type { Script } from "@/lib/types";
 import { scripts } from "@/lib/call-script-service";
 import { ScriptEditorShell } from "@/components/campaign/settings/script/ScriptEditorShell";
 import { ScriptValidationDetails } from "@/components/campaign/settings/script/ScriptValidationDetails";
@@ -22,6 +24,24 @@ describe("inbound script validation details", () => {
       const wire = scripts.serializeToCallcasterFlow(onChange.mock.calls.at(-1)?.[0]);
       expect(wire.blocks.greeting.options).toMatchObject([{ next: target, label: "New label" }]);
       expect(screen.getByRole("status")).toHaveTextContent("no issues");
+    },
+  );
+
+  test.each(["audio", "instruction", "textblock", "infotext"])(
+    "editing a raw %s menu preserves its wire type, body and response targets", (wireType) => {
+      const onChange = vi.fn();
+      const script: Script = { id: 7, name: "Raw menu", type: "inbound_ivr", workspace: "ws-1",
+        is_sample: false, created_at: "2026-10-06T00:00:00Z", created_by: null, updated_at: null, updated_by: null,
+        steps: { startPageId: "menu", pages: { menu: { blocks: ["greeting"] } },
+          blocks: { greeting: { type: wireType, body: "Retained instructions", audioFile: "Hello", customValue: "Retain",
+            options: [{ value: "1", label: "Continue", next: "forward:+15555550123" }] } } } };
+      render(<CampaignSettingsScript script={script} onChange={onChange} mediaNames={[]} />);
+      expect(screen.getByLabelText("Then go to")).toHaveTextContent("forward:+15555550123");
+      fireEvent.change(screen.getByLabelText("Answer label"), { target: { value: "New label" } });
+      expect(onChange.mock.calls.at(-1)?.[0].steps.blocks.greeting).toMatchObject({
+        type: wireType, body: "Retained instructions", customValue: "Retain",
+        options: [{ next: "forward:+15555550123", label: "New label" }],
+      });
     },
   );
 

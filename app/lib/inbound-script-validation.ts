@@ -1,6 +1,6 @@
 import { callcasterFlowSchema, type CallcasterFlow } from "@chester-hill-solutions/scriptkit-call-script-core";
 import { scripts } from "@/lib/call-script-service";
-import { parseInboundTerminalTarget, validateIvrRouting } from "@/lib/ivr-script-validation";
+import { parseInboundTerminalTarget, validateIvrRouting, type IvrRoutingInput } from "@/lib/ivr-script-validation";
 import { ivrNoInputSchema } from "@/lib/ivr-no-input";
 
 function rawPageErrors(flow: CallcasterFlow) {
@@ -54,6 +54,22 @@ function rawNoInputErrors(flow: CallcasterFlow) {
   return errors;
 }
 
+function rawRoutingInput(flow: CallcasterFlow, startPageId: string): IvrRoutingInput {
+  return {
+    startPageId,
+    pages: Object.fromEntries(Object.entries(flow.pages).map(([id, page]) =>
+      [id, { id, title: page.title ?? "Page", blockIds: page.blocks ?? [] }],
+    )),
+    blocks: Object.fromEntries(Object.entries(flow.blocks).map(([id, block]) => [id, {
+      id,
+      options: Array.isArray(block.options) ? block.options.flatMap((option) =>
+        option && typeof option === "object" && "next" in option && typeof option.next === "string"
+          ? [{ next: option.next }] : [],
+      ) : [],
+    }])),
+  };
+}
+
 /** Activation validates raw wire data before migration can repair it. Draft saves may retain errors. */
 export function validateInboundScriptSteps(steps: unknown) {
   const parsed = callcasterFlowSchema.safeParse(steps);
@@ -67,10 +83,11 @@ export function validateInboundScriptSteps(steps: unknown) {
     const document = scripts.migrateFromCallcasterFlow(flow);
     const structural = scripts.validateDocument(document);
     if (!structural.ok) return structural;
-    const routing = validateIvrRouting(document, { inbound: true });
+    const input = rawRoutingInput(flow, document.startPageId);
+    const routing = validateIvrRouting(input, { inbound: true });
     if (!routing.ok) return { ok: false as const, errors: routing.issues.map((issue) => issue.error) };
     const queueIds = new Set<number>();
-    for (const block of Object.values(document.blocks)) {
+    for (const block of Object.values(input.blocks)) {
       if (!("options" in block)) continue;
       for (const option of block.options ?? []) {
         const target = parseInboundTerminalTarget(option.next ?? "");
