@@ -419,6 +419,10 @@ When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
 push; run the full tier if the caller inventory is not complete.
 
+For React Aria controls, a DOM click can miss the native press action. If the
+control stays unchanged, inspect the current browser state and try native input.
+Confirm the dialog or selected value before claiming an interactive check.
+
 Finish full CI and codegen writers before live Vite browser acceptance.
 Generated file rewrites can reload an active request fixture. Require a completed
 stable browser run after those writers stop.

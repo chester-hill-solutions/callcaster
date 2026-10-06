@@ -34,9 +34,9 @@ export function ScriptValidationDetails({ errors, inbound }: { errors: string[];
           <Alert variant={hasErrors ? "destructive" : "success"} role={hasErrors ? "alert" : "status"}>
             <Icon aria-hidden />
             <AlertTitle>{hasErrors ? "Resolve script issues" : "No script issues"}</AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="min-w-0 break-words">
               {hasErrors
-                ? <ul>{errors.map((error, index) => <li key={`${index}:${error}`}>{error}</li>)}</ul>
+                ? <ul className="min-w-0">{errors.map((error, index) => <li key={`${index}:${error}`}>{error}</li>)}</ul>
                 : "The document and route targets passed validation."}
             </AlertDescription>
           </Alert>
