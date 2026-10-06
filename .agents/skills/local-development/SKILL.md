@@ -416,6 +416,15 @@ When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before
 push; run the full tier if the caller inventory is not complete.
 
+Finish full CI and codegen writers before live Vite browser acceptance.
+Generated file rewrites can reload an active request fixture. Require a completed
+stable browser run after those writers stop.
+
+For optimistic fetcher recovery, test real-browser fast results and first-send
+redirects, as well as delayed failures. A busy render can be skipped, and a
+redirect can complete without result data. Distinguish retained prior data from
+a fresh result; verify a second send and later user edits.
+
 ## Scripted source edits
 
 Run source faults only when no other test reads that worktree. Restore each
