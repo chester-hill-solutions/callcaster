@@ -11,6 +11,12 @@ function isWriteIn(option: Option) {
   return option.option_label.toLowerCase().includes("(write in)");
 }
 
+export function surveyOptionForAnswer(value: string, options: Option[]) {
+  return options.find(option => option.option_value === value)
+    ?? options.filter(isWriteIn).sort((a, b) => b.option_value.length - a.option_value.length)
+      .find(option => value.startsWith(`${option.option_value}: `));
+}
+
 export function hydrateSurveyAnswers(pages: Page[], existing: Record<string, SurveyAnswerValue>) {
   const answers: Record<string, SurveyAnswerValue> = {};
   const writeIns: Record<string, string> = {};
@@ -20,12 +26,10 @@ export function hydrateSurveyAnswers(pages: Page[], existing: Record<string, Sur
       const saved = existing[key];
       if (saved === undefined) continue;
       const options = question.question_option ?? [];
-      const writeInOptions = options.filter(isWriteIn).sort((a, b) => b.option_value.length - a.option_value.length);
       const decode = (value: string) => {
-        if (options.some(option => option.option_value === value)) return value;
-        const option = writeInOptions.find(candidate => value.startsWith(`${candidate.option_value}: `));
+        const option = surveyOptionForAnswer(value, options);
         if (!option) return value;
-        writeIns[key] = value.slice(option.option_value.length + 2);
+        if (value !== option.option_value) writeIns[key] = value.slice(option.option_value.length + 2);
         return option.option_value;
       };
       answers[key] = question.question_type === "radio" || question.question_type === "checkbox"

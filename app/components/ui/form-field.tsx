@@ -22,6 +22,8 @@ export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   labelTooltip?: string;
   description?: React.ReactNode;
   error?: React.ReactNode;
+  /** Reserves a feedback row even when empty; field errors take precedence. */
+  feedback?: React.ReactNode;
   htmlFor?: string;
   required?: boolean;
 }
@@ -31,6 +33,7 @@ export function FormField({
   className,
   description,
   error,
+  feedback,
   htmlFor,
   label,
   labelTooltip,
@@ -73,9 +76,9 @@ export function FormField({
             {description}
           </p>
         ) : null}
-        {error ? (
-          <p id={errorId} className="text-sm font-medium text-destructive-text">
-            {error}
+        {error || feedback !== undefined ? (
+          <p id={errorId} className={cn("text-sm", feedback !== undefined && "min-h-5", error ? "font-medium text-destructive-text" : "text-muted-foreground")}>
+            {error || feedback}
           </p>
         ) : null}
       </div>

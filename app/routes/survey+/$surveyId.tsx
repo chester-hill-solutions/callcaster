@@ -2,7 +2,7 @@ export { loader } from "./$surveyId.loader.server";
 import type { PublicSurveyLoaderData } from "./$surveyId.loader.server";
 
 import { useLoaderData } from "react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,8 @@ import { Progress } from "@/components/ui/progress";
 import { SurveyQuestionType } from "@/lib/types";
 import { useSurveySubmission } from "@/hooks/surveys/useSurveySubmission";
 import { hydrateSurveyAnswers, surveyAnswerKey, withSurveyWriteIn } from "@/lib/survey-answer-state";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
+import { hasRequiredSurveyAnswer } from "@/lib/survey-required-answer";
 
 type LoaderQuestionOption = {
   id: number;
@@ -32,11 +33,6 @@ type LoaderQuestion = {
   question_option?: LoaderQuestionOption[];
 };
 
-type ExistingAnswerRow = {
-  answer_value: string;
-  survey_question: { question_id: string };
-};
-
 export default function SurveyPage() {
   const data = useLoaderData<PublicSurveyLoaderData>();
   return <SurveyRespondentPage key={`${data.survey.survey_id}:${data.resultId}`} data={data} />;
@@ -45,13 +41,16 @@ export default function SurveyPage() {
 function SurveyRespondentPage({ data }: {
   data: PublicSurveyLoaderData;
 }) {
-  const { survey, resultId, respondentToken, contact, existingResponse, existingAnswers } = data;
-  const { queueAnswer, savePage, statusFor, error, isBusy, isCompleted } = useSurveySubmission({
+  const { survey, resultId, respondentToken, contact, existingAnswers } = data;
+  const { queueAnswer, savePage, statusFor, isBusy, isCompleted } = useSurveySubmission({
     surveyId: survey.survey_id, resultId, respondentToken, contactId: contact?.id ?? null,
   });
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [{ answers, writeIns }, setAnswerState] = useState(() => hydrateSurveyAnswers(survey.survey_page ?? [], existingAnswers));
+
+  const [requiredErrors, setRequiredErrors] = useState(new Set<number>());
+  const questionRows = useRef(new Map<number, HTMLDivElement>());
 
   const currentPage = survey.survey_page?.[currentPageIndex];
   const totalPages = survey.survey_page?.length || 0;
@@ -77,6 +76,14 @@ function SurveyRespondentPage({ data }: {
     if (isBusy) return;
     const key = surveyAnswerKey(currentPage.page_id, question.question_id);
     setAnswerState(prev => ({ ...prev, answers: { ...prev.answers, [key]: value } }));
+    if (hasRequiredSurveyAnswer(question, value)) {
+      setRequiredErrors(previous => {
+        if (!previous.has(question.id)) return previous;
+        const next = new Set(previous);
+        next.delete(question.id);
+        return next;
+      });
+    }
     queuePageAnswer(question.question_id, withSurveyWriteIn(value, writeIns[key] ?? "", question.question_option ?? []));
   };
 
@@ -88,7 +95,27 @@ function SurveyRespondentPage({ data }: {
   };
 
   const handleNext = async () => {
+    if (isBusy) return;
     const complete = currentPageIndex === totalPages - 1;
+    const missing = (survey.survey_page ?? []).flatMap((page, pageIndex) =>
+      complete || pageIndex === currentPageIndex
+        ? (page.survey_question ?? []).filter(question => question.is_required &&
+          !hasRequiredSurveyAnswer(question, answers[surveyAnswerKey(page.page_id, question.question_id)]))
+          .map(question => ({ question, pageIndex }))
+        : [],
+    );
+    setRequiredErrors(new Set(missing.map(({ question }) => question.id)));
+    const first = missing[0];
+    if (first) {
+      const focus = () => questionRows.current.get(first.question.id)
+        ?.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]), textarea')
+        ?.focus({ preventScroll: true });
+      if (first.pageIndex !== currentPageIndex) {
+        setCurrentPageIndex(first.pageIndex);
+        requestAnimationFrame(focus);
+      } else focus();
+      return;
+    }
     if (await savePage(complete) && !complete) setCurrentPageIndex(prev => prev + 1);
   };
 
@@ -105,42 +132,19 @@ function SurveyRespondentPage({ data }: {
     
     const status = statusFor(currentPage.page_id, questionId);
 
-    const renderStatusIndicator = () => {
-      if (!status || status === "pending") return null;
-      
-      return (
-        <div className="flex items-center gap-2 mt-1">
-          {status === 'saving' && (
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              Saving...
-            </div>
-          )}
-          {status === 'saved' && (
-            <div className="flex items-center gap-1 text-success-text text-xs">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Saved
-            </div>
-          )}
-          {status === 'error' && (
-            <div className="flex items-center gap-1 text-destructive-text text-xs">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              Error saving
-            </div>
-          )}
-        </div>
-      );
-    };
+    const feedback = <span role="status" className={status === "saved" ? "text-success-text" : undefined}>
+      {status === "saving" ? "Saving..." : status === "saved" ? "Saved" : ""}
+    </span>;
+    const error = requiredErrors.has(question.id)
+      ? question.question_type === "text" || question.question_type === "textarea"
+        ? "Answer this required question." : "Choose an answer."
+      : undefined;
+    const fieldProps = { label: question.question_text, required: question.is_required, error, feedback };
 
     switch (question.question_type as SurveyQuestionType) {
       case "text":
         return (
-          <div className="space-y-2">
-            <Label htmlFor={questionId}>{question.question_text}</Label>
+          <FormField {...fieldProps} htmlFor={questionId}>
             <Input
               className="bg-background text-foreground"
               id={questionId}
@@ -148,14 +152,12 @@ function SurveyRespondentPage({ data }: {
               onChange={(e) => handleAnswerChange(question, e.target.value)}
               required={question.is_required}
             />
-            {renderStatusIndicator()}
-          </div>
+          </FormField>
         );
 
       case "textarea":
         return (
-          <div className="space-y-2">
-            <Label htmlFor={questionId}>{question.question_text}</Label>
+          <FormField {...fieldProps} htmlFor={questionId}>
             <Textarea
               className="bg-background text-foreground"
               id={questionId}
@@ -164,31 +166,31 @@ function SurveyRespondentPage({ data }: {
               required={question.is_required}
               rows={4}
             />
-            {renderStatusIndicator()}
-          </div>
+          </FormField>
         );
 
       case "radio":
         return (
-          <div className="space-y-2">
-            <Label>{question.question_text}</Label>
-            <div className="space-y-2">
+          <FormField {...fieldProps}>
+            <div className="space-y-2" role="radiogroup" aria-label={question.question_text}>
               {question.question_option?.map((option) => {
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
                 return (
                   <div key={option.id} className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      id={`${questionId}-${option.id}`}
-                      name={questionId}
-                      value={option.option_value}
-                      checked={currentAnswer === option.option_value}
-                      onChange={(e) => handleAnswerChange(question, e.target.value)}
-                      required={question.is_required}
-                      className="w-4 h-4 text-primary bg-muted border-input focus:ring-ring"
-                    />
+                    <FormFieldControl>
+                      <input
+                        type="radio"
+                        id={`${questionId}-${option.id}`}
+                        name={questionId}
+                        value={option.option_value}
+                        checked={currentAnswer === option.option_value}
+                        onChange={(e) => handleAnswerChange(question, e.target.value)}
+                        required={question.is_required}
+                        className="w-4 h-4 text-primary bg-muted border-input focus:ring-ring"
+                      />
+                    </FormFieldControl>
                     <Label htmlFor={`${questionId}-${option.id}`}>{cleanLabel}</Label>
                   </div>
                 );
@@ -207,34 +209,34 @@ function SurveyRespondentPage({ data }: {
                 </div>
               )}
             </div>
-            {renderStatusIndicator()}
-          </div>
+          </FormField>
         );
 
       case "checkbox":
         return (
-          <div className="space-y-2">
-            <Label>{question.question_text}</Label>
-            <div className="space-y-2">
+          <FormField {...fieldProps}>
+            <div className="space-y-2" role="group" aria-label={question.question_text}>
               {question.question_option?.map((option) => {
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
                 return (
                   <div key={option.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      disabled={isBusy}
-                      id={`${questionId}-${option.id}`}
-                      checked={Array.isArray(currentAnswer) ? currentAnswer.includes(option.option_value) : false}
-                      onCheckedChange={(checked) => {
-                        const currentValues = Array.isArray(currentAnswer) ? currentAnswer : [];
-                        if (checked) {
-                          handleAnswerChange(question, [...currentValues, option.option_value]);
-                        } else {
-                          handleAnswerChange(question, currentValues.filter((v: string) => v !== option.option_value));
-                        }
-                      }}
-                    />
+                    <FormFieldControl>
+                      <Checkbox
+                        disabled={isBusy}
+                        id={`${questionId}-${option.id}`}
+                        checked={Array.isArray(currentAnswer) ? currentAnswer.includes(option.option_value) : false}
+                        onCheckedChange={(checked) => {
+                          const currentValues = Array.isArray(currentAnswer) ? currentAnswer : [];
+                          if (checked) {
+                            handleAnswerChange(question, [...currentValues, option.option_value]);
+                          } else {
+                            handleAnswerChange(question, currentValues.filter((v: string) => v !== option.option_value));
+                          }
+                        }}
+                      />
+                    </FormFieldControl>
                     <Label htmlFor={`${questionId}-${option.id}`}>{cleanLabel}</Label>
                   </div>
                 );
@@ -253,8 +255,7 @@ function SurveyRespondentPage({ data }: {
                 </div>
               )}
             </div>
-            {renderStatusIndicator()}
-          </div>
+          </FormField>
         );
 
       default:
@@ -305,10 +306,12 @@ function SurveyRespondentPage({ data }: {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
           <fieldset disabled={isBusy} className="space-y-6">
           {currentPage.survey_question?.map((question: LoaderQuestion) => (
-            <div key={question.id} className="space-y-4">
+            <div key={question.id} className="space-y-4" ref={node => {
+              if (node) questionRows.current.set(question.id, node);
+              else questionRows.current.delete(question.id);
+            }}>
               {renderQuestion(question)}
             </div>
           ))}

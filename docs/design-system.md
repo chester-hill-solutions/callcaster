@@ -63,6 +63,7 @@ For a nested control, or a compound component such as `Select`, wrap the focusab
 - Custom control components must forward ARIA attributes to their focusable input or trigger. The field does not search through arbitrary component trees or assign feedback to adjacent actions.
 - `required` on `FormField` displays the label marker. Set `required` on a native input or use the control's validation API to enforce a required value.
 - Keep plain-control CSS fallbacks in `@layer base`. Unlayered rules override Tailwind utilities, even with a zero-specificity `:where()` selector, and can hide invalid borders or replace component spacing.
+- For short field status and validation messages, pass `feedback` to reserve one row before feedback appears. An empty string reserves the row; `error` takes precedence and retains the control association. Keep action failures in the root Toaster. Verify the actual message lengths at the supported viewport widths.
 - Use the shared field contract for new forms. Do not rebuild the description and error association in each route. The app adapter owns this behavior; shad-cc owns the underlying control visuals and tokens.
 
 ## Page structure

@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Public surveys check required answers before advancing or completing, with stable field feedback and retained answers for retry ([#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107), [#2419](https://github.com/chester-hill-solutions/callcaster/pull/2419)).
+
 - Fixed: Phone-number release keeps a recovery record, reports incomplete cleanup clearly and allows safe retries after provider deletion ([PR #2416](https://github.com/chester-hill-solutions/callcaster/pull/2416), [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085)).
 
 - Fixed: Phone-number purchases reserve their credit budget and recover failed provisioning without duplicate charges or unpaid numbers ([PR #2415](https://github.com/chester-hill-solutions/callcaster/pull/2415), [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084)).

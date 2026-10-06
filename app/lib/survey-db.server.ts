@@ -18,6 +18,8 @@ import { formatSurveyAnswer } from "@/lib/survey-format";
 
 export { formatSurveyAnswer };
 import { createTenantDb } from "@/server/tenant-db";
+import { completeSurveyResponse } from "@/server/survey-completion";
+export { completeSurveyResponse };
 
 /**
  * Response reads and CSV export moved to `./survey-responses.server` (#2126), when
@@ -386,7 +388,6 @@ async function getOrCreateSurveyResponse(args: {
   contactId: number | null;
   startedAt: string;
   lastPageCompleted: string | null;
-  completedAt?: string | null;
 }): Promise<{ row: SurveyResponseRow; created: boolean } | { error: unknown }> {
   try {
     const [inserted] = await db
@@ -396,7 +397,6 @@ async function getOrCreateSurveyResponse(args: {
         result_id: args.resultId,
         contact_id: args.contactId ?? undefined,
         started_at: args.startedAt,
-        completed_at: args.completedAt ?? null,
         last_page_completed: args.lastPageCompleted,
         created_at: args.startedAt,
         updated_at: args.startedAt,
@@ -580,7 +580,6 @@ export async function submitSurveyResponse(args: {
     contactId: args.responseData.contact_id ?? null,
     startedAt: nowIso,
     lastPageCompleted: args.responseData.last_page_completed ?? null,
-    completedAt: args.responseData.completed ? nowIso : null,
   });
 
   if ("error" in created) {
@@ -592,7 +591,6 @@ export async function submitSurveyResponse(args: {
     await db
       .update(surveyResponseTable)
       .set({
-        completed_at: args.responseData.completed ? nowIso : null,
         last_page_completed: args.responseData.last_page_completed ?? null,
         updated_at: nowIso,
       })
@@ -648,40 +646,16 @@ export async function submitSurveyResponse(args: {
     }
   }
 
+  const completion = await completeSurveyResponse({
+    surveyInternalId: survey.id,
+    resultId: args.responseData.result_id,
+    completed: args.responseData.completed === true,
+  });
+  if (!completion.ok) return completion;
+
   return {
     ok: true as const,
     response_id: created.row.id,
     result_id: args.responseData.result_id,
   };
-}
-
-export async function completeSurveyResponse(args: {
-  surveyInternalId: number;
-  resultId: string;
-  completed: boolean;
-}) {
-  const nowIso = new Date().toISOString();
-  try {
-    const [response] = await db
-      .update(surveyResponseTable)
-      .set({
-        completed_at: args.completed ? nowIso : null,
-        updated_at: nowIso,
-      })
-      .where(
-        and(
-          eq(surveyResponseTable.survey_id, args.surveyInternalId),
-          eq(surveyResponseTable.result_id, args.resultId),
-        ),
-      )
-      .returning({ id: surveyResponseTable.id });
-    if (!response) {
-      return { ok: false as const, error: "Survey response not found", status: 404 };
-    }
-  } catch (error) {
-    logger.error("Error completing survey:", error);
-    return { ok: false as const, error: "Failed to complete survey", status: 500 };
-  }
-
-  return { ok: true as const, result_id: args.resultId };
 }

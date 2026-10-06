@@ -8,6 +8,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 describe("shared field accessibility (#1748)", () => {
+  test("reserved feedback changes preserve the control and attach only its current error", () => {
+    function Field({ error, feedback = "" }: { error?: string; feedback?: string }) {
+      return <FormField htmlFor="answer" label="Answer" error={error} feedback={feedback}>
+        <Input id="answer" defaultValue="My answer" />
+      </FormField>;
+    }
+    const { rerender } = render(<Field />);
+    const input = screen.getByLabelText("Answer");
+    const row = input.parentElement?.lastElementChild;
+    input.focus();
+    rerender(<Field error="Answer this required question." />);
+    expect(input).toHaveAccessibleDescription("Answer this required question.");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(input.parentElement?.lastElementChild).toBe(row);
+    rerender(<Field feedback="Saved" />);
+    expect(input.parentElement?.lastElementChild).toBe(row);
+    expect(screen.getByLabelText("Answer")).toBe(input);
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("My answer");
+    expect(input).not.toHaveAttribute("aria-invalid");
+    expect(input).not.toHaveAttribute("aria-describedby");
+  });
+
+
   test.each([
     ["input", <Input id="contact" key="input" />],
     ["textarea", <Textarea id="contact" key="textarea" />],
