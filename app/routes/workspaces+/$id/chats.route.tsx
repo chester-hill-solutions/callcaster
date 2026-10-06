@@ -50,6 +50,8 @@ export default function ChatsList() {
     chatInputWorkspaceNumbers,
     initialFrom,
     establishedFromNumber,
+    bodyValue,
+    onBodyChange,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,
@@ -108,6 +110,8 @@ export default function ChatsList() {
           senderSelection={senderSelection}
           initialFrom={initialFrom}
           establishedFromNumber={establishedFromNumber}
+          bodyValue={bodyValue}
+          onBodyChange={onBodyChange}
           handleSubmit={handleSubmit}
           handleImageSelect={handleImageSelect}
           handleImageRemove={handleImageRemove}

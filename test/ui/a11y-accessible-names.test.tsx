@@ -77,6 +77,8 @@ describe("app/components/sms-ui/ChatInput.tsx attach control", () => {
             messagingServiceReady: false,
           },
           initialFrom: "+15550000000",
+          bodyValue: "",
+          onBodyChange: vi.fn(),
           handleSubmit: vi.fn(),
           handleImageSelect: vi.fn(),
           handleImageRemove: vi.fn(),
