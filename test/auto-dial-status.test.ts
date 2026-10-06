@@ -80,6 +80,12 @@ vi.mock("@/lib/auto-dial.server", () => ({
   runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
 }));
 
+const machineOperationMock = vi.hoisted(() => vi.fn());
+vi.mock("@/server/predictive-machine-operation.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/predictive-machine-operation.server")>()),
+  getPredictiveMachineOperation: machineOperationMock,
+}));
+
 const emitPredictiveBroadcastMock = vi.hoisted(() => vi.fn(async () => null));
 // Several modules in this route's graph (twilio-call-status, campaign-queue-db,
 // transaction-history, …) also import from workspace-events.server, so keep
@@ -355,6 +361,8 @@ describe("api.auto-dial.status", () => {
     loggerMocks.info.mockReset();
     dequeueQueueEntryMock.mockReset();
     dequeueQueueEntryMock.mockImplementation(async () => {});
+    machineOperationMock.mockReset();
+    machineOperationMock.mockResolvedValue(null);
     runAutoDialerTurnMock.mockReset();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
     emitPredictiveBroadcastMock.mockReset();
@@ -699,6 +707,22 @@ describe("api.auto-dial.status", () => {
     expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
       expect.objectContaining({ campaign_id: 1, workspace_id: "w1" }),
     );
+  });
+
+  test.each(["issued", "uncertain", "continued"])("%s machine operation keeps billing but suppresses a second next turn", async state => {
+    twilioClientMock.conferences.list.mockResolvedValueOnce([{sid:"CONF1"}]);
+    machineOperationMock.mockResolvedValueOnce({state});
+    const mod=await import("../app/routes/api+/auto-dial/status.route");
+    const fd=new FormData();
+    fd.set("CallSid","CA_MACHINE");fd.set("CallStatus","busy");
+    fd.set("Timestamp",new Date().toISOString());fd.set("Duration","61");fd.set("CallDuration","61");fd.set("ConferenceSid","conf1");
+    const response=await asRouteResponse(mod.action({request:new Request("http://localhost/api/auto-dial/status",{method:"POST",headers:{"x-twilio-signature":"good"},body:fd})} as Parameters<typeof mod.action>[0]));
+    expect(response.status).toBe(200);
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+    expect(machineOperationMock).toHaveBeenCalledWith(expect.objectContaining({workspaceId:"w1",callSid:"CA_MACHINE"}));
+    expect(postgresStub._ledgerCalls).toHaveLength(1);
+    expect(postgresStub._ledgerCalls[0].idempotencyKey).toBe("call:CA_MACHINE");
+    expect(dequeueQueueEntryMock).toHaveBeenCalledTimes(1);
   });
 
   test("triggerAutoDialer error bubbles to 500 when the in-process dialer turn fails", async () => {

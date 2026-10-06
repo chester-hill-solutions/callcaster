@@ -34,3 +34,8 @@ export const ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE = "elevenlabs_batch_transcribe
  */
 export const WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE = "workspace_twilio_compliance";
 export const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
+
+export const PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE =
+  "predictive_machine_continue";
+export const PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE =
+  "predictive_machine_reconcile";
