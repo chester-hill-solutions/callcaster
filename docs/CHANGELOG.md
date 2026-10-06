@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Failed chat sends restore the original text with accurate segment and credit counts, while keeping newer drafts ([#2110](https://github.com/chester-hill-solutions/callcaster/issues/2110)).
+- Fixed: Failed chat sends restore the original text with accurate segment and credit counts, while keeping newer drafts ([#2110](https://github.com/chester-hill-solutions/callcaster/issues/2110), [#2437](https://github.com/chester-hill-solutions/callcaster/pull/2437)).
 
 - **Fixed** — Audio recording starts only once, releases cancelled microphone requests, and keeps error notices from moving the page ([PR #2436](https://github.com/chester-hill-solutions/callcaster/pull/2436), [#2155](https://github.com/chester-hill-solutions/callcaster/issues/2155)).
 
