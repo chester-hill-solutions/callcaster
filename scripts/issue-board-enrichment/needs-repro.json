@@ -308,5 +308,39 @@
       "No alert causes page layout to shift when it renders."
     ],
     "trackerRecommendation": "Native issue updated. Needs reproduction; app adapter classes are partial source evidence. Keep shared component ownership under #2300 visible."
+  },
+  {
+    "issueNumber": 2330,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Use verified client identity for public rate limits",
+    "summary": "The current rate key uses leftmost X-Forwarded-For. Actual ingress and spoof resistance must be verified before changing the trusted identity boundary.",
+    "currentBehavior": "clientRateLimitKey still reads the leftmost forwarded address and falls back to unknown. Official Railway employee guidance states its HTTP proxy sets and overwrites X-Real-IP and prevents direct access through that arrangement; stable peer CIDRs are not published. This is provider guidance, not proof of the actual CallCaster ingress. An additional proxy, direct/local request identity and forged-header controls remain unverified.",
+    "rootCause": "The rate-limit helper receives a Request without a verified transport identity and trusts forwarded input without an established CallCaster proxy boundary.",
+    "resolution": "Inspect the real CallCaster public ingress and direct/local server arrangement. Prove overwrite or append behavior using actual forged-header and valid-client controls, then implement the verified transport rule. Preserve PostgreSQL windows and authenticated-user limits. Do not infer trust from X-Railway-Edge or an undocumented private CIDR.",
+    "lookIn": [
+      "app/lib/platform-rate-limit.server.ts",
+      "app/lib/platform-auth-rate-limit.server.ts",
+      "server/bun.ts",
+      ".railway/"
+    ],
+    "existingTests": [
+      "test/platform-api.test.ts",
+      "test/auth-catch-all-rate-limit.route.test.ts"
+    ],
+    "missingTests": [
+      "Actual transport/proxy arrangement with client-supplied X-Forwarded-For/X-Real-IP, valid clients, IPv4/IPv6, missing/malformed headers and stable local peer identity."
+    ],
+    "acceptanceCriteria": [
+      "Derive public auth rate-limit identity from a verified transport/proxy boundary. A client cannot obtain a fresh bucket by varying the leftmost X-Forwarded-For or any other untrusted identity header.",
+      "Document the actual public ingress and trusted-hop rule, including direct/local requests and additional proxies where present.",
+      "Keep a real permitted-client control, IPv4/IPv6 controls and missing/malformed-header controls. Headerless local requests must not all share one unknown identity, and a fresh random key per request is not an acceptable fallback.",
+      "Test the actual production request arrangement, not only Request fixtures that set the supposed trusted header. Record what overwrites or appends each address field.",
+      "Preserve the existing distributed PostgreSQL window contract and authenticated user-based write limits.",
+      "Full npm run ci:local and final remote gates pass; deployed forged-header controls prove the rule before release promotion."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Unassigned native child of #2099. Required CallCaster ingress proof remains; primary provider guidance was added to the issue without claiming acceptance."
   }
 ]

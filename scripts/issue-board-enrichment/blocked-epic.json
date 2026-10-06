@@ -1320,5 +1320,40 @@
       "bun.lock"
     ],
     "trackerRecommendation": "Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments."
+  },
+  {
+    "issueNumber": 2099,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Harden public request rate limits",
+    "summary": "Retention source is merged. Trusted public client identity and deployed verification remain separate child tasks.",
+    "currentBehavior": "PR #2331 merged the indexed one-day retention repair at f877b636d963cf1154fbab81ef45ef1244bc61ec. The actual daily handler prunes bounded batches, protects reactivated rows, logs counts and preserves rescheduling after cleanup failure. #2329 remains open for deployed tick/retention acceptance. #2330 still owns client identity; current source reads leftmost X-Forwarded-For and falls back to unknown. The actual CallCaster ingress and header trust rule remain unverified.",
+    "resolution": "Complete and verify #2329 deployed retention and #2330 trusted client identity. Test the actual ingress and forged-header controls before selecting a new trusted source; do not reimplement the merged retention repair. Keep the parent open until both child outcomes are verified and promoted.",
+    "lookIn": [
+      "app/lib/platform-rate-limit.server.ts",
+      "app/lib/platform-rate-limit-db.server.ts",
+      "app/lib/worker/handlers/cron.server.ts",
+      "test/integration-db/rate-limit-retention.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/rate-limit-retention.test.ts",
+      "test/platform-api.test.ts",
+      "test/auth-catch-all-rate-limit.route.test.ts"
+    ],
+    "missingTests": [
+      "Actual deployed maintenance count/error and retained-row boundary; actual CallCaster ingress, direct/local peer identity, IPv4/IPv6 and forged-header controls in #2330."
+    ],
+    "acceptanceCriteria": [
+      "After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.",
+      "The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).",
+      "The job's row count is logged.",
+      "The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria)."
+    ],
+    "blockedBy": [
+      2329,
+      2330
+    ],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The parent tracks two independent child outcomes. Retention source completion does not complete trusted identity or release acceptance."
   }
 ]

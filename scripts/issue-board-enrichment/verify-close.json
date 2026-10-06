@@ -5651,5 +5651,523 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Source fixed on dev; verify candidate acceptance before default-branch closure."
+  },
+  {
+    "issueNumber": 2110,
+    "verdict": "verify-close",
+    "recommendedTitle": "Chat composer segment counter and credit estimate desync from the message text after a failed send",
+    "summary": "The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.",
+    "currentBehavior": "The chat composer repair merged into dev in [PR #2437](https://github.com/chester-hill-solutions/callcaster/pull/2437), at `c73ee65fc132b0318cc588f358d4fd2eb59a05e0`. One controlled draft now supplies text and send estimates. Failed sends restore the unchanged draft only for the same composer and recipient. Later typing and intentional clears remain intact. Immediate results and first-send redirects release the pending request; retained older results cannot replay. Accepted sends clear text; refused submissions preserve it.",
+    "resolution": "Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.",
+    "lookIn": [
+      "app/components/sms-ui/ChatInput.tsx",
+      "app/hooks/chats/useChatsPage.ts",
+      "app/routes/workspaces+/$id/chats.route.tsx",
+      "test/ui/chat-composer-recovery.test.tsx",
+      "test/ui/chat-composer-router-lifecycle.test.tsx",
+      "test/ui/hooks-chats-optimistic-failure.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/chat-composer-recovery.test.tsx",
+      "test/ui/chat-composer-router-lifecycle.test.tsx",
+      "test/ui/hooks-chats-optimistic-failure.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance."
+    ],
+    "acceptanceCriteria": [
+      "After a failed send of a 340-character message, the counter shows the real length, the real segment count and the real credit estimate (kill-check: keep the DOM write and confirm the test goes red).",
+      "The restored text is the user's, unchanged, and the cursor is at a sensible position.",
+      "A successful send still clears the composer.",
+      "The 160-character boundary warning still fires on the restored text."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source repair merged into dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2155,
+    "verdict": "verify-close",
+    "recommendedTitle": "Double-clicking Record leaks a microphone stream and corrupts the take",
+    "summary": "The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.",
+    "currentBehavior": "The recorder lifetime repair merged into dev in [PR #2436](https://github.com/chester-hill-solutions/callcaster/pull/2436), at `0c7adc518e5036245079782f6080ae712038a8e4`. Record takes synchronous ownership before permission; cancelled and unmounted attempts release late streams. Each take owns its chunks; stale stop/error callbacks and late rejections cannot alter a newer take. Starting controls lock and phase changes are announced. Safe errors use the existing root Toaster.",
+    "resolution": "Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.",
+    "lookIn": [
+      "app/components/file-assets/AudioRecorder.tsx",
+      "test/ui/audio-recorder.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audio-recorder.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A double-click on Record starts exactly one recording (kill-check: remove the latch and confirm the test goes red).",
+      "Only one `getUserMedia` stream is open at any time, and it is released on stop.",
+      "The recorded take contains one recording, not two.",
+      "The Record button is disabled while starting.",
+      "The phase is announced to assistive technology on start, pause, resume and stop."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source repair merged into dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2113,
+    "verdict": "verify-close",
+    "recommendedTitle": "hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot",
+    "summary": "The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.",
+    "currentBehavior": "The rental reconciliation repair is merged through [PR #2425](https://github.com/chester-hill-solutions/callcaster/pull/2425) at dev commit `4f00975aaf61ef60295ed699bd7deff866737a0b`. It compares the previous complete UTC month with non-overlapping rental subtypes in verified provider units. Initial purchases remain separate. Catch-up debits use their recorded billing cycle. Known rollout exemptions and released-number history are included. Missing or conflicting coverage remains explicit.",
+    "resolution": "Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.",
+    "lookIn": [
+      "shared/billing-reconciliation.ts",
+      "app/lib/billing-reconciliation-snapshot.server.ts",
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "app/lib/number-rental-reconciliation.server.ts",
+      "test/integration-db/billing-rental-reconciliation.test.ts",
+      "test/billing-reconciliation.test.ts",
+      "test/billing-reconciliation-alert.test.ts"
+    ],
+    "existingTests": [
+      "test/billing-reconciliation.test.ts",
+      "test/billing-reconciliation-alert.test.ts"
+    ],
+    "missingTests": [
+      "Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).",
+      "`numbersVariance` is present in the snapshot and survives a normalise round-trip.",
+      "The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).",
+      "A one-time purchase debit does not create a permanent variance."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Source repair merged into dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2119,
+    "verdict": "verify-close",
+    "recommendedTitle": "runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting",
+    "summary": "The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.",
+    "currentBehavior": "The optional-date schedule repair is merged through [PR #2423](https://github.com/chester-hill-solutions/callcaster/pull/2423) at dev commit `059cc376d11e564e6db72ca2efa027bedb9a2a4e`. Machine-voice campaigns with absent or one-sided date bounds now use the canonical dispatch policy to report waiting outside calling hours and running when permitted. Future starts do not dial early. Invalid supplied bounds retain their skip, and expired active campaigns remain the dispatch worker's completion responsibility. The tenant-scoped conditional writer preserves concurrent pause or completion.",
+    "resolution": "Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.",
+    "lookIn": [
+      "app/lib/campaign-schedule-sync.server.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/lib/worker/handlers/cron.server.ts",
+      "test/campaign-schedule-sync.server.test.ts",
+      "test/integration-db/campaign-schedule-sync-status-race.test.ts"
+    ],
+    "existingTests": [
+      "test/campaign-schedule-sync.server.test.ts",
+      "test/integration-db/campaign-schedule-sync-status-race.test.ts"
+    ],
+    "missingTests": [
+      "Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).",
+      "A campaign in range reports `running`.",
+      "A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).",
+      "The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.",
+      "The production count is recorded in the issue."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source repair merged into dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2396,
+    "verdict": "verify-close",
+    "recommendedTitle": "Make predictive machine playback and continuation retry-safe",
+    "summary": "The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.",
+    "currentBehavior": "The predictive machine operation repair is merged through [PR #2424](https://github.com/chester-hill-solutions/callcaster/pull/2424) at dev commit `db0e1686c72e65c8c8c5540f3ce4861954117289`. A durable operation binds playback, disposition and continuation to the workspace, call, outreach attempt, campaign, actor and conference. Signed replay cannot issue playback twice, and continuation waits for the playback acknowledgement. Issued or uncertain outcomes retain a recorded recovery policy.",
+    "rootCause": "Before the repair, a terminal outcome claim was used as operation completion. Playback was outside its winning branch and continuation ran before provider acknowledgement.",
+    "resolution": "Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.",
+    "lookIn": [
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/lib/telephony-db.server.ts",
+      "app/lib/outreach-disposition.ts",
+      "app/lib/twilio-twiml.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/lib/worker/enqueue-job.server.ts",
+      "app/lib/worker/poll-jobs.server.ts"
+    ],
+    "existingTests": [
+      "test/auto-dial-room.route.test.ts"
+    ],
+    "missingTests": [
+      "Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.",
+      "Continuation does not run while playback acknowledgement is pending.",
+      "Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.",
+      "Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.",
+      "Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required."
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "high",
+    "trackerRecommendation": "Source repair merged into dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2063,
+    "verdict": "verify-close",
+    "recommendedTitle": "Harden useChatRealtime against a fresh array with unchanged contents",
+    "summary": "The source repair is merged into dev. Candidate refresh acceptance and default-branch promotion remain.",
+    "currentBehavior": "PR #2438 merged into dev at 618fd4bc355413b35e3e2b803712f097ba527e2c. The existing deepEqual helper compares merged message values before changing state. Fresh objects with equal payloads retain the current array; real body, status, error, media and nested date changes update it. Existing SID matching, optimistic sends, retained history, order and conversation ownership remain. Both source reviews, full local CI before both pushes, all applicable remote gates, 700 Postgres 18 cases and both deployments passed. Recovery and branch, worktree and preview cleanup are verified.",
+    "rootCause": "The dependency is array identity rather than the conversation identity the effect actually cares about. Nothing in the type system or a guard distinguishes the two.",
+    "resolution": "Verify unchanged refreshes and real message updates on the release candidate through the original criteria. Keep the native issue open until candidate QA and default-branch promotion.",
+    "lookIn": [
+      "app/hooks/realtime/useChatRealtime.ts",
+      "test/ui/chat-content-identity.test.tsx",
+      "test/ui/chat-thread-history.test.tsx",
+      "test/ui/hooks-chats.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/chat-content-identity.test.tsx",
+      "test/ui/chat-thread-history.test.tsx",
+      "test/ui/hooks-chats.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed refresh and payload-change acceptance on the release candidate; default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "A contents-equal but freshly built `initial` does not re-seed the thread",
+      "The effect converges under StrictMode double-rendering",
+      "The live pagination-wipe symptom has its own tracked fix",
+      "A changed conversation resets the thread, while loader updates for the same conversation retain valid accumulated history."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source correction is merged and clean. Candidate acceptance and promotion remain."
+  },
+  {
+    "issueNumber": 1989,
+    "verdict": "verify-close",
+    "recommendedTitle": "Dead Twilio recording callbacks on dial/:number and connect-campaign-conference",
+    "summary": "The manual callback repair and unsupported conference recording removal are merged. Provider/storage acceptance and promotion remain.",
+    "currentBehavior": "PR #2439 merged into dev at bc74dd45bf7a5dca637988487aa1901227d75067. Manual Dial keeps record-from-answer and sends completed recording events to the canonical signed /api/recording endpoint. The campaign Conference path removes recording under the permitted removal option. Its ConferenceSid payload cannot be passed to the existing CallSid endpoint. Authentication, ordinary call-status callbacks and conference join settings remain. All 37 focused tests, three isolated faults with controls, both full local gates, both reviews, all applicable remote checks, 700 PostgreSQL 18 tests and both actual deployments passed. Recovery/source equivalence and topic/preview cleanup are verified.",
+    "resolution": "Verify actual manual-call recording download and persisted audio on the release candidate. Confirm that campaign conferences no longer request unsupported capture. Keep recording policy/lifecycle separate under #1873 and keep this issue open until deployed acceptance and default-branch promotion.",
+    "lookIn": [
+      "app/routes/api+/dial/$number.action.server.ts",
+      "app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.loader.server.ts",
+      "app/routes/api+/recording.action.server.ts"
+    ],
+    "existingTests": [
+      "test/dial-number.route.test.ts",
+      "test/connect-campaign-conference.route.test.ts",
+      "test/recording.route.test.ts",
+      "test/webhook-side-effects.test.ts"
+    ],
+    "missingTests": [
+      "Actual provider recording download and call audio_url persistence on the release candidate. Passing synthetic boundaries and deployments do not prove provider acceptance."
+    ],
+    "acceptanceCriteria": [
+      "No dial path records without a persisted callback",
+      "Conference recordings persist (or record is removed)"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Wire-or-remove source contract is merged and clean. General conference recording policy remains separate; candidate recording/storage acceptance and promotion remain."
+  },
+  {
+    "issueNumber": 2111,
+    "verdict": "verify-close",
+    "recommendedTitle": "Admin Add User and Add Workspace buttons have no action",
+    "summary": "The source removal repair is merged into dev. Deployed admin acceptance and default-branch promotion remain.",
+    "currentBehavior": "The two inert admin creation controls were removed through [PR #2440](https://github.com/chester-hill-solutions/callcaster/pull/2440), at 2991159ce9c9be62b383327739990972899bd7bc. This follows the native removal option because the creation routes do not exist. Search, Clear Filters, pagination and Sync Twilio remain. Both full local gates, final reviews, all applicable exact-head remote checks, E2E, 700 PostgreSQL18 cases and both actual deployments passed. Recovery/source equivalence and topic/preview cleanup are verified. Original scope and acceptance remain; no live admin geometry or candidate acceptance is claimed.",
+    "resolution": "Verify the original admin acceptance on the release candidate and promote the verified change. Keep the native issue open until then.",
+    "lookIn": [
+      "app/routes/admin+/panels/AdminUsersPanel.tsx",
+      "app/routes/admin+/panels/AdminWorkspacesPanel.tsx",
+      "test/ui/admin-pagination.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/admin-pagination.test.tsx",
+      "test/ui/admin-public-remediation.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed admin acceptance through the original criteria, release-candidate QA and default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "Each of the two buttons either navigates to a real route or is removed (kill-check: remove the `to` and confirm the test goes red).",
+      "A guard test asserts that creation controls in app/routes/admin+/panels/ have a reachable action, or are absent.",
+      "If the routes do not exist yet, the button is absent rather than inert."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev; verify the candidate before default-branch promotion and closure.",
+    "rootCause": "Before the repair, the admin panels rendered creation buttons without routes or handlers."
+  },
+  {
+    "issueNumber": 2434,
+    "verdict": "verify-close",
+    "recommendedTitle": "Patch proxy-addr across locked development consumers",
+    "summary": "Source repair merged through PR #2435; release-candidate acceptance and promotion remain.",
+    "currentBehavior": "Merged dev source c18f80a983b04fae4c2fa7f7c9a1ebbad9f9506a is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.",
+    "resolution": "Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "test/runtime-proxy-addr.test.ts",
+      "docs/CHANGELOG.md"
+    ],
+    "existingTests": [
+      "test/runtime-proxy-addr.test.ts"
+    ],
+    "missingTests": [
+      "Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Every actual Express consumer in independent immutable npm and Bun installs resolves proxy-addr 2.0.8, with valid installed dependency trees.",
+      "Finite real package tests reject unrelated IPv4 clients for short mapped/zero-leading IPv6 trust subnets; valid plain IPv4, correctly mapped IPv6, ordinary IPv6 and forwarded-hop controls remain correct.",
+      "Exercise both actual Express versions' request IP behavior through their resolved proxy-addr paths. The official old 2.0.7 control must fail at least one rejection case while valid controls pass.",
+      "Both dependency locks remain in sync. Fresh audits no longer report this package range; other #1803 families remain open.",
+      "Full local CI before each push, exact source specification/structural reviews, applicable remote checks and both deployments pass before merge.",
+      "Required candidate acceptance and default-branch promotion remain open until proved. No product exploit claim is required to verify this development package patch."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Merged on dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2431,
+    "verdict": "verify-close",
+    "recommendedTitle": "Use patched Vitest 4 for all installed test consumers",
+    "summary": "Source repair merged through PR #2432; release-candidate acceptance and promotion remain.",
+    "currentBehavior": "Merged dev source 263a549e8431b14bc13e892b21f87a729a148c46 is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.",
+    "resolution": "Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.",
+    "lookIn": [
+      ".agents/skills/local-development/SKILL.md",
+      "bun.lock",
+      "docs/CHANGELOG.md",
+      "package-lock.json",
+      "package.json",
+      "test/runtime-postcss.test.ts",
+      "test/runtime-vite.test.ts",
+      "test/runtime-vitest.test.ts",
+      "vendor/scriptkit/scriptkit-call-script-react/package.json"
+    ],
+    "existingTests": [
+      "test/runtime-postcss.test.ts",
+      "test/runtime-vite.test.ts",
+      "test/runtime-vitest.test.ts"
+    ],
+    "missingTests": [
+      "Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance."
+    ],
+    "acceptanceCriteria": [
+      "No installed npm or Bun Vitest/mocker copy remains in either cited affected range, including nested local-package copies.",
+      "An actual installed standalone interceptor fixture retains valid mocks and excludes owned outside and denied in-root marker files. Show the old installed failure with the same valid controls. Record Windows-specific cases as unexecuted unless tested on Windows.",
+      "Check API defaults and authenticated browser registration according to the installed tool contract. Keep proof separate from claims about product runtime reachability.",
+      "Both coverage providers resolve compatible versions and produce real coverage output. ScriptKit editor tests still execute through the app UI gate.",
+      "Generate both lockfiles with their installers. Finish with npm ci before Node gates. Run full npm run ci:local before each push.",
+      "Review one atomic diff; pass exact-head remote checks, all real database cases, and both deployment checks before merge. Continue from clean dev after #2428 lands.",
+      "Keep #1803 open for remaining families, deployed acceptance, promotion, and default-branch alert verification."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Merged on dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2427,
+    "verdict": "verify-close",
+    "recommendedTitle": "Use patched Vite 7 in the Bun install path",
+    "summary": "Source repair merged through PR #2428; release-candidate acceptance and promotion remain.",
+    "currentBehavior": "Merged dev source e25bc8b08c20617697ca090bcd0897274c412652 is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.",
+    "resolution": "Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.",
+    "lookIn": [
+      ".agents/skills/local-development/SKILL.md",
+      "bun.lock",
+      "docs/CHANGELOG.md",
+      "package-lock.json",
+      "package.json",
+      "test/runtime-vite.test.ts"
+    ],
+    "existingTests": [
+      "test/runtime-vite.test.ts"
+    ],
+    "missingTests": [
+      "Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance."
+    ],
+    "acceptanceCriteria": [
+      "Both npm and Bun resolve the affected Vite copies outside all current applicable advisory ranges. Keep the supported Vite 7 line; do not apply a major-version audit fix.",
+      "The actual installed Vite rejects the outside marker over HTTP and WebSocket, including `file:` raw-module access. A valid in-root module and HMR transport remain usable. The old 7.3.1 fixture must fail the denial assertion so the test cannot pass on mocks or a disconnected socket.",
+      "Add valid and denied query/source-map controls for the repaired file boundary. Keep platform-specific limitations explicit. Do not replace full dependency evidence with one fixture.",
+      "Check independently installed npm and frozen Bun paths, their resolved versions and fresh audits. Run both `npm install` and `bun install` if dependencies change, then `npm ci` for the Node gates. Review lock diffs for unrelated updates.",
+      "Full `npm run ci:local` passes before every push. Final specification and structural reviews, applicable remote checks and both deployments pass before merge into dev.",
+      "Preserve the signed-in preview, user files and environment. Candidate build/development acceptance and default-branch alert verification remain separate from dev-source proof."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Merged on dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2426,
+    "verdict": "verify-close",
+    "recommendedTitle": "Reconciliation cost total adds overlapping provider categories",
+    "summary": "Source repair merged through PR #2433; release-candidate acceptance and promotion remain.",
+    "currentBehavior": "Merged dev source 6d0bcdaefc10ee8190752f0b8953d2979b01167f is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.",
+    "resolution": "Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.",
+    "lookIn": [
+      ".agents/skills/local-development/SKILL.md",
+      "app/lib/billing-reconcile-workspace.server.ts",
+      "app/lib/platform-admin-twilio.server.ts",
+      "app/lib/twilio-billing-usage.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx",
+      "docs/CHANGELOG.md",
+      "shared/billing-reconciliation.ts",
+      "test/admin-response-projection.test.ts",
+      "test/admin-workspace-twilio.route.test.ts",
+      "test/billing-cost-adapters.test.ts",
+      "test/billing-cost-reconciliation.test.ts",
+      "test/billing-reconcile-workspace.server.test.ts",
+      "test/helpers/twilio-usage-page.ts",
+      "test/integration-db/admin-billing-period.test.ts",
+      "test/integration-db/billing-message-reconciliation.test.ts",
+      "test/integration-db/billing-rental-reconciliation.test.ts",
+      "test/twilio-billing-usage.server.test.ts",
+      "test/ui/billing-cost-reconciliation.test.tsx"
+    ],
+    "existingTests": [
+      "test/admin-response-projection.test.ts",
+      "test/admin-workspace-twilio.route.test.ts",
+      "test/billing-cost-adapters.test.ts",
+      "test/billing-cost-reconciliation.test.ts",
+      "test/billing-reconcile-workspace.server.test.ts",
+      "test/helpers/twilio-usage-page.ts",
+      "test/integration-db/admin-billing-period.test.ts",
+      "test/integration-db/billing-message-reconciliation.test.ts",
+      "test/integration-db/billing-rental-reconciliation.test.ts",
+      "test/twilio-billing-usage.server.test.ts",
+      "test/ui/billing-cost-reconciliation.test.tsx"
+    ],
+    "missingTests": [
+      "Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance."
+    ],
+    "acceptanceCriteria": [
+      "With a valid provider total of 4.20 USD for the requested period, overlapping rental aggregate and subtype rows still produce 4.20 USD. The rental subset alone is insufficient to prove a full-account total and must remain unknown.",
+      "A provider total record cannot be ignored in favor of overlapping categories.",
+      "Valid zero totals remain zero; missing, malformed or unsupported coverage remains explicit.",
+      "An isolated source fault that restores the overlapping sum makes the regression test fail while valid controls pass.",
+      "The admin display and structured alert details retain the correct period and cost state; credit mutations and material-variance thresholds do not change.",
+      "Full local CI before each push, specification/structural review, applicable exact-head remote checks and candidate acceptance pass before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged on dev; verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2329,
+    "verdict": "verify-close",
+    "recommendedTitle": "Prune expired public rate-limit buckets",
+    "summary": "Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "PR #2331 merged strict one-day, indexed rate-bucket retention in bounded batches. The delete-time predicate preserves reactivated rows. The actual daily handler logs counts including zero and preserves its successor after cleanup failure. Current source retains that repair. Trusted public client identity remains separate in #2330; scheduled deployed maintenance acceptance remains. Merge: f877b636d963cf1154fbab81ef45ef1244bc61ec. Recovery/source equivalence and topic cleanup are verified.",
+    "resolution": "Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.",
+    "lookIn": [
+      "app/lib/platform-rate-limit-db.server.ts",
+      "app/lib/worker/handlers/cron.server.ts",
+      "test/integration-db/rate-limit-retention.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/rate-limit-retention.test.ts"
+    ],
+    "missingTests": [
+      "Deployed release-candidate acceptance through the original criteria; default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "The daily maintenance tick deletes only buckets with reset_at strictly older than the one-day retention window. The boundary and live buckets remain.",
+      "Use the existing reset_at index for the retention predicate; do not add a duplicate index or return all deleted keys into app memory.",
+      "The maintenance log records the number of buckets removed, including zero. Failures log an error and do not break notification processing or its reschedule chain.",
+      "Real PostgreSQL tests prove expired, boundary, recent-expired and live rows plus the retained-key control. Making the prune a no-op or reversing the predicate fails those tests.",
+      "Exercise the real maintenance handler's success and failure paths; a prune failure must still let its daily chain continue.",
+      "Full npm run ci:local and final remote gates pass. Verify the deployed maintenance log and retained-row boundary before release promotion."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged source is available on clean dev. Verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2412,
+    "verdict": "verify-close",
+    "recommendedTitle": "Use the same billing period in admin reconciliation",
+    "summary": "Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "PR #2413 merged one captured reference date and bounded provider/ledger period into the admin loader and both manual actions. Tests reach the actual admin boundaries, real scoped ledger report and stored snapshot with synthetic provider responses. Tenant, auth, error and existing notification behavior remain. Candidate provider/admin acceptance remains. Merge: 5cf7db6256cd585cfe28f4451418b89f814042e4. Recovery/source equivalence and topic cleanup are verified.",
+    "resolution": "Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.",
+    "lookIn": [
+      "app/lib/platform-admin-twilio.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
+      "test/admin-workspace-twilio.route.test.ts",
+      "test/integration-db/admin-billing-period.test.ts"
+    ],
+    "existingTests": [
+      "test/admin-workspace-twilio.route.test.ts",
+      "test/integration-db/admin-billing-period.test.ts"
+    ],
+    "missingTests": [
+      "Deployed release-candidate acceptance through the original criteria; default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "The admin loader and both manual actions request bounded provider dates.",
+      "Each provider request and ledger report use the same captured reference date, including a midnight-boundary case.",
+      "Old provider activity outside the ledger period cannot create admin drift.",
+      "Both manual actions persist the correct admin snapshot. The loader retains its existing read behavior.",
+      "Existing auth, tenant scope, failures and notification behavior stay correct.",
+      "Tests execute the actual admin boundaries with synthetic provider responses and the real report/persistence path where practical. State the evidence limits.",
+      "Full local CI, applicable exact-head remote checks and both deployments pass before merge. Keep the issue open for release acceptance and default-branch promotion."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged source is available on clean dev. Verify candidate acceptance and promote before closure."
+  },
+  {
+    "issueNumber": 2429,
+    "verdict": "verify-close",
+    "recommendedTitle": "Rental sweep database tests depend on the real database clock",
+    "summary": "Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "PR #2430 merged explicit timestamps for owned rental sweep fixture rows. All 700 local PostgreSQL 17.6 and 700 remote PostgreSQL 18 tests passed without skips. Removing fixture clock control restores the two intended failures; the future-debit control protects the unchanged production cutoff. The separate patched Vite repair is also merged through PR #2428; the earlier pending-PR assessment is obsolete. Candidate/default-branch acceptance remains. Merge: 6b851b300c047352a78b90b3c7a031ae2cc6c181. Recovery/source equivalence and topic cleanup are verified.",
+    "resolution": "Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.",
+    "lookIn": [
+      "test/integration-db/billing-rental-reconciliation.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/billing-rental-reconciliation.test.ts"
+    ],
+    "missingTests": [
+      "Deployed release-candidate acceptance through the original criteria; default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "The two actual-sweep cases pass independent of the real database clock, with explicit owned ledger timestamps.",
+      "A debit stored after the captured timestamp remains excluded in a real-database control.",
+      "A source fault that removes fixture timestamp control restores the executed failures; valid controls still pass.",
+      "The full integration suite and final remote Postgres 18 gate pass without skips. Keep local database-version evidence explicit.",
+      "Run full ci:local before each push, final specification and structural reviews, applicable exact-head checks and both deployments before merge into dev.",
+      "Update the smallest local-development guide with the rule that JavaScript fake timers do not change database defaults. Preserve dev preview, environment and user files."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged source is available on clean dev. Verify candidate acceptance and promote before closure."
   }
 ]
