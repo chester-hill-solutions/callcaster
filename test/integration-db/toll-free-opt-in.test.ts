@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { onboardingFixture } from "../fixtures/onboarding";
 
 const databaseUrl = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
@@ -10,16 +10,19 @@ const foreignId = randomUUID();
 
 suite("stored explicit toll-free opt-in (#2145)", () => {
   let client: postgres.Sql;
+  let pools: Pick<typeof import("@/server/db"), "pool" | "directPool"> | undefined;
   let onboarding: typeof import("@/lib/messaging-onboarding/persistence.server");
   let actions: typeof import("@/lib/onboarding-actions.server");
   let invalidate: typeof import("@/lib/merge-workspace-twilio-data.server").invalidateWorkspaceTwilioData;
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Toll-free selection tests need a database");
-    process.env.DATABASE_URL = databaseUrl;
+    vi.stubEnv("DATABASE_URL", databaseUrl);
+    vi.stubEnv("DATABASE_DIRECT_URL", databaseUrl);
     client = postgres(databaseUrl, { max: 1 });
     for (const id of [workspaceId, foreignId]) {
       await client`insert into workspace (id, name, twilio_data) values (${id}::uuid, 'Opt-in fixture', '{}'::jsonb)`;
     }
+    pools = await import("@/server/db");
     onboarding = await import("@/lib/messaging-onboarding/persistence.server");
     actions = await import("@/lib/onboarding-actions.server");
     ({ invalidateWorkspaceTwilioData: invalidate } = await import("@/lib/merge-workspace-twilio-data.server"));
@@ -34,10 +37,19 @@ suite("stored explicit toll-free opt-in (#2145)", () => {
     try {
       if (client) await client`delete from workspace where id in (${workspaceId}::uuid, ${foreignId}::uuid)`;
     } finally {
-      await client?.end();
-      const { pool, directPool } = await import("@/server/db");
-      await Promise.all([pool.end(), directPool.end()]);
+      try {
+        await Promise.all([client?.end(), pools?.pool.end(), pools?.directPool.end()]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     }
+  });
+  test("both runtime pools use the selected fixture database", async () => {
+    if (!pools) throw new Error("Runtime database pools were not loaded");
+    const [primary] = await pools.pool`select twilio_data from workspace where id = ${workspaceId}::uuid`;
+    const [direct] = await pools.directPool`select twilio_data from workspace where id = ${foreignId}::uuid`;
+    expect(primary.twilio_data.marker).toBe("keep");
+    expect(direct.twilio_data.marker).toBe("foreign");
   });
   test.each(["VERBAL", "WEB_FORM", "PAPER_FORM", "VIA_TEXT", "MOBILE_QR_CODE", "IMPORT", "IMPORT_PLEASE_REPLACE"] as const)("%s survives a form save, database read and unrelated partial save", async (selection) => {
     const current = await onboarding.getWorkspaceMessagingOnboardingState({ workspaceId });
