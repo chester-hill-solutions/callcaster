@@ -228,6 +228,12 @@ gate on the app URL or import its direct client. The integration override alone
 can produce skipped tests and startup failures. Require the full count and zero
 skips before treating the run as proof.
 
+JavaScript fake timers do not change Postgres `now()` or column defaults.
+When a test freezes the app's captured timestamp, set owned SQL fixture timestamps
+explicitly after real billing writes. Keep the credit and cycle assertions and
+include a real future-row exclusion control. Do not widen a production timestamp
+filter to repair a fixture clock mismatch.
+
 For an owned native Postgres fixture, initialize with `--no-locale
 --encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
 fixture in a temporary directory and bind only loopback on an unused port;
