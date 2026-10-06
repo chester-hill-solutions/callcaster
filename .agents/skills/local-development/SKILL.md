@@ -44,6 +44,11 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+Discover uncertain module paths with `rg --files` before reading them. An ADR's
+planned layout can differ from the active source. A referenced skill can also
+exist only as a user file in the shared checkout; read it there without copying
+it into a worktree or replacing the user's file.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
@@ -75,6 +80,10 @@ Keep shared server module mock factories additive with `importOriginal`.
 When a real service adds a transaction callback, update each calling fixture's
 transaction and scoped-client boundary. Keep its existing behavior assertions;
 prove rollback and persisted state in the real Postgres tier.
+When extracting a transaction, keep storage and global claims in `app/server`.
+Do not add an unscoped client allowance to a product adapter. Derive a shared
+executor type from its existing database capability, and remove a stale guard
+entry only after its import is gone.
 Include route re-exports in a caller inventory. Older combined route tests can
 import the route barrel without naming the service or its action server file.
 Run those cases before relying on a focused caller result.

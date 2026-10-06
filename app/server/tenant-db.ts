@@ -172,7 +172,7 @@ void writeBoundaryContract;
  * never accidentally leak cross-tenant rows. Pass an optional `dbInstance` to
  * scope inside a transaction (e.g. compose with {@link withAppCurrentUser}).
  */
-export function createTenantDb(workspaceId: string, dbInstance: Database = db): TenantDb {
+export function createTenantDb(workspaceId: string, dbInstance: Pick<Database, "query" | "insert" | "update" | "delete" | "select" | "execute"> = db): TenantDb {
   const queryAny = dbInstance.query as unknown as Record<
     WorkspaceScopedTableName,
     { findMany: (config?: RelationalConfig) => Promise<unknown[]>; findFirst: (config?: RelationalConfig) => Promise<unknown> }

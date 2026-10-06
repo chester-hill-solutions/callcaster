@@ -273,6 +273,22 @@ export const workspace_number = pgTable("workspace_number", {
   workspace: uuid().notNull(),
 });
 
+export const workspace_number_purchase = pgTable("workspace_number_purchase", {
+  id: uuid().primaryKey(),
+  workspace: uuid().notNull(),
+  actor_user_id: text().notNull(),
+  phone_number: text().notNull(),
+  account_sid: text().notNull(),
+  credits: integer().notNull(),
+  state: text().$type<"reserved" | "creating" | "provisioned" | "completed" | "cancelled">().notNull().default("reserved"),
+  provider_sid: text(),
+  last_error: text(),
+  lease_token: uuid().notNull(),
+  lease_expires_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});
+
 // ─── Script ───────────────────────────────────────
 
 export const script = pgTable(
@@ -694,4 +710,3 @@ export const inbound_queue_entryRelations = relations(inbound_queue_entry, ({ on
 export const agent_statusRelations = relations(agent_status, ({ one }) => ({
   workspace: one(workspace, { fields: [agent_status.workspace_id], references: [workspace.id] }),
 }));
-

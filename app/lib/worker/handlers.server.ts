@@ -30,6 +30,7 @@ import {
   workspaceTwilioComplianceParams,
 } from "@/lib/worker/job-params.server";
 import { runRecordingRepairSweep } from "@/lib/call-recording-repair.server";
+import { runNumberPurchaseRecovery } from "@/lib/number-purchase-recovery.server";
 import { withReschedule } from "@/lib/worker/handlers/shared.server";
 import {
   billingReconcileHandler,
@@ -135,6 +136,14 @@ const registrations = [
     pages: true,
     schedule: true,
     handler: (job, params) => numberRentalBillingHandler(job, params),
+  }),
+  defineJob({
+    type: "number_purchase_recovery",
+    params: noParams,
+    schedule: true,
+    handler: (job) => withReschedule({
+      type: "number_purchase_recovery", delayMs: 60_000, params: {}, completedJobId: job.id,
+    }, runNumberPurchaseRecovery),
   }),
   defineJob({
     type: "audience_upload",
