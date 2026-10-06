@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- **Fixed** — Audio recording starts only once, releases cancelled microphone requests, and keeps error notices from moving the page ([#2155](https://github.com/chester-hill-solutions/callcaster/issues/2155)).
+
 - Security: Development Express tools use the patched proxy address check and reject unrelated IPv4 clients for IPv6 trust subnets ([#2434](https://github.com/chester-hill-solutions/callcaster/issues/2434)).
 
 - Fixed: Billing reconciliation uses the provider’s verified USD total for the reporting period and shows unavailable totals without counting category costs twice ([#2426](https://github.com/chester-hill-solutions/callcaster/issues/2426), PR [#2433](https://github.com/chester-hill-solutions/callcaster/pull/2433)).

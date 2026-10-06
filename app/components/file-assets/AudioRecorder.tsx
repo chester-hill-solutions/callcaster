@@ -1,12 +1,12 @@
 import type * as React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Mic, Pause, Play, RotateCcw, Square, X } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   getUsableAudioDevices,
   reconcileAudioDeviceId,
 } from "@/hooks/call/audio-device-selection";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,7 +28,15 @@ export type AudioRecorderProps = {
 };
 
 /** Phases of a take. `error` is not a phase — errors always return us to `idle`. */
-type RecorderPhase = "idle" | "recording" | "paused" | "recorded";
+type RecorderPhase = "idle" | "starting" | "recording" | "paused" | "recorded";
+
+const PHASE_MESSAGES: Record<RecorderPhase, string> = {
+  idle: "Ready to record",
+  starting: "Starting recording",
+  recording: "Recording",
+  paused: "Paused",
+  recorded: "Recording ready",
+};
 
 /** Preference order; the first supported type wins. */
 const PREFERRED_MIME_TYPES = [
@@ -94,14 +102,13 @@ export function AudioRecorder({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [level, setLevel] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Every releasable resource lives in a ref so cleanup never depends on render state.
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const takeTokenRef = useRef<symbol | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const takeRef = useRef<{ blob: Blob; mimeType: string; durationMs: number } | null>(
     null,
@@ -158,6 +165,7 @@ export function AudioRecorder({
 
   /** Full teardown: mic, audio graph, rAF loop, object URL. */
   const releaseAll = useCallback(() => {
+    takeTokenRef.current = null;
     releaseStream();
     releaseAudioGraph();
     revokePreview();
@@ -257,13 +265,21 @@ export function AudioRecorder({
   );
 
   const handleStart = useCallback(async () => {
-    setErrorMessage(null);
+    if (disabled || takeTokenRef.current !== null) return;
+    const token = Symbol("audio-take");
+    takeTokenRef.current = token;
+    setPhase("starting");
     revokePreview();
     takeRef.current = null;
 
     const mimeType = pickMimeType();
-    if (!mimeType || typeof navigator?.mediaDevices?.getUserMedia !== "function") {
-      setErrorMessage("Audio recording is not supported in this browser.");
+    if (
+      !mimeType ||
+      typeof navigator?.mediaDevices?.getUserMedia !== "function"
+    ) {
+      takeTokenRef.current = null;
+      setPhase("idle");
+      toast.error("Audio recording is not supported in this browser.");
       return;
     }
 
@@ -271,18 +287,27 @@ export function AudioRecorder({
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: selectedMicId ? { deviceId: { exact: selectedMicId } } : true,
       });
+      if (takeTokenRef.current !== token) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
 
       const recorder = new MediaRecorder(stream, { mimeType });
       recorderRef.current = recorder;
-      chunksRef.current = [];
+      const chunks: Blob[] = [];
 
       recorder.ondataavailable = (event: BlobEvent) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
+        if (takeTokenRef.current === token && event.data.size > 0) {
+          chunks.push(event.data);
+        }
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        chunksRef.current = [];
+        if (takeTokenRef.current !== token) return;
+        takeTokenRef.current = null;
+        releaseStream();
+        releaseAudioGraph();
+        const blob = new Blob(chunks, { type: mimeType });
         const durationMs = Math.round(accumulatedMsRef.current);
         takeRef.current = { blob, mimeType, durationMs };
         const url = URL.createObjectURL(blob);
@@ -292,10 +317,11 @@ export function AudioRecorder({
         setPhase("recorded");
       };
       recorder.onerror = () => {
+        if (takeTokenRef.current !== token) return;
         releaseAll();
         setPhase("idle");
         setElapsedMs(0);
-        setErrorMessage("Recording stopped unexpectedly. Please try again.");
+        toast.error("Recording stopped unexpectedly. Please try again.");
       };
 
       accumulatedMsRef.current = 0;
@@ -307,13 +333,23 @@ export function AudioRecorder({
       // Labels are only exposed once permission is granted; refresh to fill them in.
       void refreshDevices();
     } catch (error) {
+      if (takeTokenRef.current !== token) return;
       // Never leave the UI in a recording state after a failed start.
       releaseAll();
       setPhase("idle");
       setElapsedMs(0);
-      setErrorMessage(toMicErrorMessage(error));
+      toast.error(toMicErrorMessage(error));
     }
-  }, [releaseAll, refreshDevices, revokePreview, selectedMicId, startLevelMeter]);
+  }, [
+    disabled,
+    releaseAll,
+    releaseAudioGraph,
+    releaseStream,
+    refreshDevices,
+    revokePreview,
+    selectedMicId,
+    startLevelMeter,
+  ]);
 
   const handlePause = useCallback(() => {
     const recorder = recorderRef.current;
@@ -339,20 +375,25 @@ export function AudioRecorder({
       accumulatedMsRef.current += performance.now() - segmentStartedAtRef.current;
     }
     // `onstop` builds the blob and moves us to `recorded`; the mic is released here.
-    recorder.stop();
+    try {
+      recorder.stop();
+    } catch {
+      releaseAll();
+      setPhase("idle");
+      setElapsedMs(0);
+      toast.error("Recording stopped unexpectedly. Please try again.");
+    }
     recorderRef.current = null;
     releaseAudioGraph();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-  }, [releaseAudioGraph]);
+  }, [releaseAll, releaseAudioGraph]);
 
   const handleRetake = useCallback(() => {
     releaseAll();
     takeRef.current = null;
-    chunksRef.current = [];
     accumulatedMsRef.current = 0;
     setElapsedMs(0);
-    setErrorMessage(null);
     setPhase("idle");
   }, [releaseAll]);
 
@@ -365,7 +406,6 @@ export function AudioRecorder({
   const handleCancel = useCallback(() => {
     releaseAll();
     takeRef.current = null;
-    chunksRef.current = [];
     accumulatedMsRef.current = 0;
     setElapsedMs(0);
     setPhase("idle");
@@ -377,12 +417,26 @@ export function AudioRecorder({
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 text-card-foreground">
+      <div
+        role="status"
+        aria-label="Recording status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {PHASE_MESSAGES[phase]}
+      </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="audio-recorder-mic">Microphone</Label>
         <Select
           value={selectedMicId ?? undefined}
           onValueChange={setSelectedMicId}
-          disabled={disabled || isActive || microphones.length === 0}
+          disabled={
+            disabled ||
+            phase === "starting" ||
+            isActive ||
+            microphones.length === 0
+          }
         >
           <SelectTrigger id="audio-recorder-mic">
             <SelectValue
@@ -448,17 +502,14 @@ export function AudioRecorder({
         </div>
       ) : null}
 
-      {errorMessage ? (
-        <Alert variant="destructive">
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      ) : null}
-
       <div className="flex flex-wrap items-center gap-2">
-        {phase === "idle" ? (
-          <Button onClick={handleStart} disabled={disabled}>
+        {phase === "idle" || phase === "starting" ? (
+          <Button
+            onClick={handleStart}
+            disabled={disabled || phase === "starting"}
+          >
             <Mic className="mr-2 h-4 w-4" aria-hidden="true" />
-            Record
+            {phase === "starting" ? "Starting…" : "Record"}
           </Button>
         ) : null}
 
