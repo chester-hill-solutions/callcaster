@@ -408,7 +408,9 @@ editor migration can repair it. Keep legacy and explicit-page controls.
 For provider money or period checks, test the raw API payload through the actual
 SDK. An SDK can normalize an impossible calendar date or return an invalid date
 as a string despite its declared Date type. Preserve the raw page payload for
-validation; do not validate a value after this lossy conversion. Retain page
+validation; do not validate a value after this lossy conversion. Check raw scalar
+types before string conversion: an array can stringify to a valid decimal despite
+the SDK declaring a numeric field. Retain page
 limits, later-page records, retry failures and valid zero controls.
 
 ## Scripted source edits
