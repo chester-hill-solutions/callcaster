@@ -114,6 +114,7 @@ export function useSurveySubmission(identity: SurveyIdentity) {
       if (!alive.current) return false;
       if (complete) {
         const form = identityForm();
+        if (identity.contactId !== null) form.set("contactId", identity.contactId.toString());
         form.set("completed", "true");
         await post(form, "/api/survey-complete");
         setIsCompleted(true);

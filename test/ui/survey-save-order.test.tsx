@@ -13,8 +13,8 @@ afterEach(() => { toast.dismiss(); vi.unstubAllGlobals(); vi.useRealTimers(); })
 type Write = { path: string; fields: Record<string, FormDataEntryValue>; signal?: AbortSignal };
 type Reply = { status: number; body: { success?: boolean; error?: string } };
 function deferred<T>() { let resolve: (value: T) => void = () => {}; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
-function pageData(resultId = "respondent-a", pageCount = 1) {
-  return { resultId, respondentToken: `signed-${resultId}`, contact: null, existingResponse: null, existingAnswers: {},
+function pageData(resultId = "respondent-a", pageCount = 1, contact: { id: number; firstname: string; surname: string } | null = null) {
+  return { resultId, respondentToken: `signed-${resultId}`, contact, existingResponse: null, existingAnswers: {},
     survey: { id: 1, survey_id: "public-survey", title: "Public survey", survey_page: Array.from({ length: pageCount }, (_, i) => ({ page_id: `page-${i + 1}`, title: `Page ${i + 1}`, survey_question: [
       { id: i * 2 + 1, question_id: `Q${i * 2 + 1}`, question_text: `Answer ${i * 2 + 1}`, question_type: "text", is_required: false },
       { id: i * 2 + 2, question_id: `Q${i * 2 + 2}`, question_text: `Answer ${i * 2 + 2}`, question_type: "textarea", is_required: false },
@@ -47,6 +47,37 @@ function setup(reply: (write: Write) => Promise<Reply> = async () => ({ status: 
 }
 
 describe("public survey save acknowledgements (#2108)", () => {
+  test("blank contact-context completion sends the contact without requiring an answer save", async () => {
+    const { writes } = setup(undefined, 1, data => { data.contact = { id: 17, firstname: "Blank", surname: "Respondent" }; });
+    await screen.findByLabelText("Answer 1");
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Thank You!");
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ path: "/api/survey-complete", fields: {
+      contactId: "17", resultId: "respondent-a", respondent_token: "signed-respondent-a", completed: "true",
+    } });
+  });
+
+  test("blank anonymous completion has no contact and sends no answer save", async () => {
+    const { writes } = setup();
+    await screen.findByLabelText("Answer 1");
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Thank You!");
+    expect(writes).toHaveLength(1);
+    expect(writes[0].path).toBe("/api/survey-complete");
+    expect(writes[0].fields.contactId ?? "").toBe("");
+  });
+
+  test("contact-context answer and completion requests keep the same contact", async () => {
+    const { writes } = setup(undefined, 1, data => { data.contact = { id: 17, firstname: "Saved", surname: "Respondent" }; });
+    fireEvent.change(await screen.findByLabelText("Answer 1"), { target: { value: "Saved contact answer" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    await screen.findByText("Thank You!");
+    expect(writes.map(write => [write.path, write.fields.contactId])).toEqual([
+      ["/api/survey-answer", "17"], ["/api/survey-complete", "17"],
+    ]);
+  });
+
   test("an immediate final submit saves two pending questions before completion", async () => {
     const { writes } = setup();
     fireEvent.change(await screen.findByLabelText("Answer 1"), { target: { value: "First answer" } });
