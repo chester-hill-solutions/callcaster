@@ -1,4 +1,13 @@
-import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { usageRecordPage } from "./helpers/twilio-usage-page";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  vi,
+} from "vitest";
 import {
   buildBillingReconciliationReport,
   buildBillingReconciliationSnapshot,
@@ -40,7 +49,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
       },
     },
     incomingPhoneNumbers: { list: async () => [] },
-    usage: { records: { list: boundary.list } },
+    usage: { records: { page: boundary.list } },
   }),
   getWorkspaceTwilioPortalSnapshot: async () => null,
 }));
@@ -194,21 +203,50 @@ for (const surface of surfaces) {
         expected: null,
       },
       { name: "zero total", price: 0, priceUnit: "usd", expected: 0 },
+      {
+        name: "unparseable wire start",
+        price: 4.2,
+        priceUnit: "usd",
+        start: "2026-09-06garbage",
+        expected: null,
+      },
+      {
+        name: "overflowing wire start",
+        price: 4.2,
+        priceUnit: "usd",
+        start: "2026-08-37",
+        expected: null,
+      },
+      {
+        name: "overflowing wire end",
+        price: 4.2,
+        priceUnit: "usd",
+        end: "2026-09-36",
+        expected: null,
+      },
     ])(
       "retains $name through the real adapter and cost builder",
-      async ({ price, priceUnit, expected }) => {
-        boundary.list.mockResolvedValue([
-          {
-            category: "totalprice",
-            description: "All usage",
-            usage: "4.20",
-            usageUnit: "usd",
-            price,
-            priceUnit,
-            startDate: new Date("2026-09-06"),
-            endDate: new Date("2026-10-06"),
-          },
-        ]);
+      async ({
+        price,
+        priceUnit,
+        expected,
+        start = "2026-09-06",
+        end = "2026-10-06",
+      }) => {
+        boundary.list.mockResolvedValue(
+          usageRecordPage([
+            {
+              category: "totalprice",
+              description: "All usage",
+              usage: "4.20",
+              usage_unit: "usd",
+              price,
+              price_unit: priceUnit,
+              start_date: start,
+              end_date: end,
+            },
+          ]),
+        );
         await surface.run();
         expect(boundary.report).toHaveBeenCalledTimes(1);
         const call = boundary.report.mock.calls[0];
@@ -217,8 +255,8 @@ for (const surface of surfaces) {
         expect(call[0].twilioUsage[0]).toMatchObject({
           price: price === undefined ? "" : String(price),
           priceUnit,
-          startDate: "2026-09-06T00:00:00.000Z",
-          endDate: "2026-10-06T00:00:00.000Z",
+          startDate: start,
+          endDate: end,
         });
         const returned = boundary.report.mock.results[0];
         if (!returned) throw new Error("Missing actual report result");

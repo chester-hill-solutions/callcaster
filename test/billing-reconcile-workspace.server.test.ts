@@ -1,3 +1,4 @@
+import { usageRecordPage } from "./helpers/twilio-usage-page";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
@@ -44,9 +45,9 @@ import { reconcileWorkspaceBilling } from "@/lib/billing-reconcile-workspace.ser
 describe("reconcileWorkspaceBilling", () => {
   beforeEach(() => {
     for (const m of Object.values(mocks)) m.mockReset();
-    mocks.list.mockResolvedValue([]);
+    mocks.list.mockResolvedValue(usageRecordPage([]));
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({
-      usage: { records: { list: (...a: unknown[]) => mocks.list(...a) } },
+      usage: { records: { page: (...a: unknown[]) => mocks.list(...a) } },
     });
     mocks.loadBillingReconciliationReport.mockResolvedValue({ categories: {} });
     mocks.persistSnapshot.mockResolvedValue({ materialVariance: false });

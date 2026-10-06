@@ -1,3 +1,4 @@
+import { usageRecordPage } from "./helpers/twilio-usage-page";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
@@ -511,17 +512,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-06T12:00:00.000Z"));
 
-    const usageList = vi.fn().mockResolvedValue([
+    const usageList = vi.fn().mockResolvedValue(usageRecordPage([
       {
         category: "sms-outbound",
         description: "SMS Outbound",
         usage: "10",
-        usageUnit: "messages",
+        usage_unit: "messages",
         price: 1.25,
-        startDate: new Date("2026-02-05T00:00:00.000Z"),
-        endDate: new Date("2026-03-06T00:00:00.000Z"),
+        start_date: "2026-02-05",
+        end_date: "2026-03-06",
       },
-    ]);
+    ]));
 
     const dbClient = makeDbClient("sudo", "AC123");
     mocks.getWorkspaceTwilioPortalSnapshot.mockResolvedValueOnce(makePortalSnapshot());
@@ -544,7 +545,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       },
       usage: {
         records: {
-          list: usageList,
+          page: usageList,
         },
       },
     });
@@ -558,7 +559,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     // usage history, which is what pushed this admin loader past the SSR
     // stream timeout.
     expect(usageList).toHaveBeenCalledWith({
-      limit: 200,
+      pageSize: 200,
       startDate: new Date("2026-02-04T00:00:00.000Z"),
       endDate: new Date("2026-03-06T00:00:00.000Z"),
     });
@@ -566,8 +567,8 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       expect.objectContaining({
         category: "sms-outbound",
         price: "1.25",
-        startDate: "2026-02-05T00:00:00.000Z",
-        endDate: "2026-03-06T00:00:00.000Z",
+        startDate: "2026-02-05",
+        endDate: "2026-03-06",
       }),
     ]);
   });

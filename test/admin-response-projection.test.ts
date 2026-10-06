@@ -1,3 +1,4 @@
+import { usageRecordPage } from "./helpers/twilio-usage-page";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse, routeArgs } from "./helpers/route-result";
 import { withAdminRouteArgs } from "./helpers/route-context-mock";
@@ -179,7 +180,7 @@ beforeEach(() => {
     accountSid: "AC_workspace",
     api: { v2010: { accounts: boundary.accounts } },
     incomingPhoneNumbers: { list: async () => [] },
-    usage: { records: { list: async () => [] } },
+    usage: { records: { list: async () => [], page: async () => usageRecordPage([]) } },
   });
 });
 const surfaces = [

@@ -403,6 +403,14 @@ emitted TwiML for entry and next-page order. Editor round-trip tests alone canno
 prove caller flow. Campaign launch must check a declared raw entry before the
 editor migration can repair it. Keep legacy and explicit-page controls.
 
+## Provider wire data
+
+For provider money or period checks, test the raw API payload through the actual
+SDK. An SDK can normalize an impossible calendar date or return an invalid date
+as a string despite its declared Date type. Preserve the raw page payload for
+validation; do not validate a value after this lossy conversion. Retain page
+limits, later-page records, retry failures and valid zero controls.
+
 ## Scripted source edits
 
 Run source faults only when no other test reads that worktree. Restore each

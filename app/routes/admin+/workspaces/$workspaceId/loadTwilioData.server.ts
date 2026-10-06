@@ -1,3 +1,4 @@
+import { listTwilioBillingUsage } from "@/lib/twilio-billing-usage.server";
 import {
   buildDefaultWorkspaceTwilioPortalSnapshot,
   createWorkspaceTwilioInstance,
@@ -77,7 +78,7 @@ export async function loadTwilioData(
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
         twilio.incomingPhoneNumbers.list({ limit: 20 }),
         // Limit usage records fetch to prevent auto-paging the entire usage history.
-        twilio.usage.records.list({
+        listTwilioBillingUsage(twilio.usage.records, {
           limit: 200,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
@@ -98,16 +99,7 @@ export async function loadTwilioData(
         status: number.status,
       }));
 
-      twilioUsage = usageRecords.map((record) => ({
-        category: record.category,
-        description: record.description,
-        usage: record.usage,
-        usageUnit: record.usageUnit,
-        price: record.price?.toString() ?? "",
-        priceUnit: record.priceUnit,
-        startDate: record.startDate?.toISOString(),
-        endDate: record.endDate?.toISOString(),
-      }));
+      twilioUsage = usageRecords;
 
       billingReconciliation = await loadBillingReconciliationReport({
         workspaceId,
