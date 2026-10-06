@@ -334,3 +334,19 @@ test("retains the existing accepted MMS payload and flat media estimate", () => 
   expect(toastMocks.warning).toHaveBeenCalledOnce();
   expect(markOptimisticMessageFailed).not.toHaveBeenCalled();
 });
+
+test.each([true, false])(
+  "preserves a newer intentionally empty draft (error=%s)",
+  (error) => {
+    const c = mount();
+    c.type("Old request");
+    c.send();
+    c.start();
+    c.type("New draft");
+    c.type("");
+    c.settle(error ? { error: "Send failed" } : {});
+    expect(c.textarea()).toHaveValue("");
+    expect(screen.getByText("0/160")).toBeInTheDocument();
+    expect(screen.getByText("≈ 0 credits")).toBeInTheDocument();
+  },
+);

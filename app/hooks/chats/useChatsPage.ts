@@ -83,6 +83,7 @@ export function useChatsPage() {
     composerKey: string;
     to: string;
     observedSubmission: boolean;
+    draftRevision: number;
   } | null>(null);
   const requestedPageRef = useRef(pagination.page);
   /**
@@ -107,14 +108,16 @@ export function useChatsPage() {
   const navigate = useNavigate();
   const contact_number = params["contact_number"] ?? "";
   const composerKey = `${workspace.id}:${contact_number || "new"}`;
-  const [draft, setDraft] = useState({ key: composerKey, body: "" });
+  const [draft, setDraft] = useState({ key: composerKey, body: "", revision: 0 });
   // Reset before rendering a different conversation, as the keyed composer did.
   if (draft.key !== composerKey) {
-    setDraft({ key: composerKey, body: "" });
+    setDraft({ key: composerKey, body: "", revision: draft.revision + 1 });
   }
   const bodyValue = draft.key === composerKey ? draft.body : "";
   const onBodyChange = useCallback(
-    (body: string) => setDraft({ key: composerKey, body }),
+    (body: string) => setDraft((current) => ({
+      key: composerKey, body, revision: current.revision + 1,
+    })),
     [composerKey],
   );
   const formatDate = formatMessageTimestamp;
@@ -413,6 +416,7 @@ export function useChatsPage() {
         composerKey,
         to: toNumber,
         observedSubmission: false,
+        draftRevision: draft.revision,
       };
       chatActionsRef.current?.addOptimisticMessage?.({
         body,
@@ -424,11 +428,12 @@ export function useChatsPage() {
 
       messageFetcher.submit(formData, { method: "POST" });
 
-      setDraft({ key: composerKey, body: "" });
+      setDraft((current) => ({ ...current, body: "" }));
       setSelectedImages([]);
     },
     [
       composerKey,
+      draft.revision,
       contact_number,
       phoneNumber,
       messageFetcher,
@@ -475,8 +480,10 @@ export function useChatsPage() {
     ) {
       chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
       setDraft((current) =>
-        current.key === pending.composerKey && !current.body
-          ? { key: current.key, body: pending.body }
+        current.key === pending.composerKey &&
+        current.revision === pending.draftRevision &&
+        !current.body
+          ? { ...current, body: pending.body }
           : current,
       );
     }
