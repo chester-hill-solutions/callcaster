@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Inbound phone-menu voicemails use the script’s chosen inbox and retain it through edits and delivery retries, with stored receipts to prevent repeat emails ([#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268)).
+- Fixed: Inbound phone-menu voicemails use the script’s chosen inbox and retain it through edits and delivery retries, with stored receipts to prevent repeat emails ([#2446](https://github.com/chester-hill-solutions/callcaster/pull/2446), [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268)).
 
 - Fixed: Inbound phone menus reject invalid attachments and unsafe overwrites, keep drafts for retry, and show script validation in shared overlay details ([PR #2445](https://github.com/chester-hill-solutions/callcaster/pull/2445), [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269)).
 
