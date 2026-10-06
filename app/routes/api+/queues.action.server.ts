@@ -125,7 +125,7 @@ export const action = defineAction({
         workspaceId,
       });
 
-      const data = await requeueAllCampaignQueueForCampaign(Number(campaignId));
+      const data = await requeueAllCampaignQueueForCampaign(Number(campaignId), workspaceId);
 
       return routeData({
         message: "Campaign queue items reset successfully",
