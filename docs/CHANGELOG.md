@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Rental billing database checks keep one-time purchase timestamps within the test clock and verify that future debits stay outside the cash window ([PR #2448](https://github.com/chester-hill-solutions/callcaster/pull/2448), [#2429](https://github.com/chester-hill-solutions/callcaster/issues/2429)).
+
 - Fixed: Inbound phone-menu voicemails use the script’s chosen inbox and retain it through edits and delivery retries, with stored receipts to prevent repeat emails ([#2446](https://github.com/chester-hill-solutions/callcaster/pull/2446), [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268)).
 
 - Fixed: Inbound phone menus reject invalid attachments and unsafe overwrites, keep drafts for retry, and show script validation in shared overlay details ([PR #2445](https://github.com/chester-hill-solutions/callcaster/pull/2445), [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269)).
