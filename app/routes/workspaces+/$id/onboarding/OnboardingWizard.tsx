@@ -318,10 +318,9 @@ export function OnboardingWizard({
       {!showIntro && activeStep === "campaign_info" && continueTarget ? (
         <OnboardingChecklistLinkStep
           title="Campaign info"
-          description="Create a campaign that connects your audience, phone number, and script to your goal."
+          description="Create a campaign with a name that connects your audience, phone number, and script to your goal."
           complete={campaignCount > 0}
           completeLabel={`You have ${campaignCount} campaign${campaignCount === 1 ? "" : "s"} ready.`}
-          incompleteLabel="Create a campaign with a name and the assets you just set up."
           actionHref={checklistCreateHref(workspaceId, "campaigns/new", "campaign_info")}
           actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
           secondaryHref={`/workspaces/${workspaceId}/campaigns`}

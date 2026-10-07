@@ -54,7 +54,6 @@ export function OnboardingGoalStep({
       <SectionHeader
         compact
         title="What are you setting up?"
-        description="Pick the outcome you want first. Setup steps adapt to that goal so you can launch sooner."
       />
       <Form id={formId} method="post" className="space-y-4">
         <input type="hidden" name="_action" value="save_channels" />

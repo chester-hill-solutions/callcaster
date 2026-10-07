@@ -367,7 +367,7 @@ export function OnboardingBusinessIdentityStep({
         description={
           showSmsIdentity
             ? "Add your business details and the information carriers need for SMS."
-            : "Add the basic information for your business."
+            : undefined
         }
       />
       <Form id={formId} method="post" className="max-w-xl space-y-6">

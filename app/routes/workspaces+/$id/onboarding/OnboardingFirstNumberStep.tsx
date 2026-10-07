@@ -263,7 +263,7 @@ export function OnboardingFirstNumberStep({
           title="Phone number"
           description={hasFirstNumber
             ? rentedCount > 0
-              ? "Your number is added. Review how incoming calls are handled, then continue setup."
+              ? undefined
               : "Your caller ID is verified. Incoming calls stay with your current provider. Continue setup when you are ready."
             : "Get a new number, or verify a number your organization already owns."}
         />

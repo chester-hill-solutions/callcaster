@@ -62,7 +62,6 @@ export function OnboardingLaunchStep({
       <SectionHeader
         compact
         title="Review your setup"
-        description="See what is complete and choose your next step. You can return to setup from your workspace."
       />
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -111,11 +110,11 @@ export function OnboardingLaunchStep({
             </li>
           ))}
         </ul>
-        <p className="text-sm text-muted-foreground">
-          {onboarding.selectedGoal === "rent_number"
-            ? "You can create a campaign later if you need one."
-            : "Before launching, open your campaign and check its contacts, content, and sending settings."}
-        </p>
+        {onboarding.selectedGoal === "rent_number" ? (
+          <p className="text-sm text-muted-foreground">
+            You can create a campaign later if you need one.
+          </p>
+        ) : null}
         {nextItem ? (
           <Button variant="ghost" asChild>
             <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>

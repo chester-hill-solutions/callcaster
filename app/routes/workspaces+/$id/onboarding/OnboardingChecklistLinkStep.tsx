@@ -9,7 +9,7 @@ type OnboardingChecklistLinkStepProps = {
   description: string;
   complete: boolean;
   completeLabel: string;
-  incompleteLabel: string;
+  incompleteLabel?: string;
   actionHref: string;
   actionLabel: string;
   secondaryHref?: string;
@@ -45,7 +45,7 @@ export function OnboardingChecklistLinkStep({
       />
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          {complete ? completeLabel : incompleteLabel}
+          {complete ? completeLabel : incompleteLabel ?? description}
         </p>
         {helperText ? (
           <p className="text-sm text-muted-foreground">{helperText}</p>
