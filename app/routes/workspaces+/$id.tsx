@@ -40,7 +40,7 @@ type LoaderData = {
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
-  serviceAddressRequired?: boolean;
+  serviceAddressRequired: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -95,7 +95,7 @@ function WorkspaceResolvedView({
   today?: WorkspaceTodaySelection;
   showSidebar: boolean;
   isOnboarding: boolean;
-  serviceAddressRequired?: boolean;
+  serviceAddressRequired: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
