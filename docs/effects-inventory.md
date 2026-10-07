@@ -5,12 +5,13 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**121** documented / **123** total effects (2 grandfathered, ratcheting to 0).
+**122** documented / **124** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
 | `app/AudioStreamer.tsx` | Open a WebSocket connection to the media-stream host for this call/id and expose it as `socket`. | id, token, host — reconnects whenever the target stream (or auth token) changes. | subscription (opens a live WebSocket; closes it on cleanup/re-run) | A persistent bidirectional audio-streaming socket is live client state, not request/response data a loader can express. |
-| `app/components/audience/AudienceUploadHistory.tsx` | Keep the history failure and retry action in the root feedback host. | error and loading choose feedback; noticeId owns its lifetime; refresh retries the route loader. | dom: publish or dismiss persistent feedback after the root host subscribes. | The history is already route data; the browser host renders feedback outside page flow. |
+| `app/components/audience/AudienceUploadHistory.tsx` | Keep the history failure and retry action in the root feedback host. | error and loading choose feedback; noticeOwner selects the audience; refresh retries the route loader. | dom: publish or dismiss persistent feedback after the root host subscribes. | The history is already route data; the browser host renders feedback outside page flow. |
+| `app/components/audience/AudienceUploadHistory.tsx` | Remove owned feedback when the audience changes or the page exits. | noticeOwner identifies the current workspace and audience. | dom: dismiss the prior audience's root-host notice. | The shared browser host outlives the audience page. |
 | `app/components/audience/use-audience-upload-progress.ts` | Hand a completed upload off to the caller's callback exactly once. | progress (fires when the upload state machine reaches "completed") | none (invokes caller-provided completion callbacks via refs) | Completion arrives asynchronously via realtime/poll |
 | `app/components/call/CallScreen.CallArea.tsx` | Clean up the hang-up and dial-arm confirmation timers on unmount | [] — fire-once cleanup, no external state to track | timer (clearTimeout on unmount) | Component lifecycle cleanup, not data fetching. |
 | `app/components/call/CallScreen.CallArea.tsx` | Arm a "click again to dial" guard on the Dial button whenever it | [showInCall, predictive] — flip is only meaningful when | timer (arms + 3s auto-disarm) | Pure UI state, no data fetch. |

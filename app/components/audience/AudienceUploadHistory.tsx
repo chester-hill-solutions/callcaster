@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/typography";
@@ -24,21 +24,26 @@ export default function AudienceUploadHistory({
   refresh,
 }: AudienceUploadHistoryProps) {
   const uploads = useAudienceUploads({ workspaceId, audienceId, initialUploads });
-  const noticeId = `audience-upload-history:${workspaceId}:${audienceId}`;
+  const noticeOwner = `${workspaceId}:${audienceId}`;
+  const noticeId = useRef<string | number | undefined>(undefined);
 
   /**
    * @effect Keep the history failure and retry action in the root feedback host.
-   * @effect-deps error and loading choose feedback; noticeId owns its lifetime; refresh retries the route loader.
+   * @effect-deps error and loading choose feedback; noticeOwner selects the audience; refresh retries the route loader.
    * @effect-side-effects dom: publish or dismiss persistent feedback after the root host subscribes.
    * @effect-why-not-loader The history is already route data; the browser host renders feedback outside page flow.
    */
   useEffect(() => {
-    if (!error) return;
+    if (!error) {
+      if (noticeId.current !== undefined) toast.dismiss(noticeId.current);
+      noticeId.current = undefined;
+      return;
+    }
     let active = true;
     queueMicrotask(() => {
       if (!active) return;
-      toast.error("Error loading upload history", {
-        id: noticeId,
+      noticeId.current = toast.error("Error loading upload history", {
+        id: noticeId.current,
         description: error,
         duration: Infinity,
         closeButton: false,
@@ -47,8 +52,19 @@ export default function AudienceUploadHistory({
         </Button>,
       });
     });
-    return () => { active = false; toast.dismiss(noticeId); };
-  }, [error, loading, noticeId, refresh]);
+    return () => { active = false; };
+  }, [error, loading, noticeOwner, refresh]);
+
+  /**
+   * @effect Remove owned feedback when the audience changes or the page exits.
+   * @effect-deps noticeOwner identifies the current workspace and audience.
+   * @effect-side-effects dom: dismiss the prior audience's root-host notice.
+   * @effect-why-not-loader The shared browser host outlives the audience page.
+   */
+  useEffect(() => () => {
+    if (noticeId.current !== undefined) toast.dismiss(noticeId.current);
+    noticeId.current = undefined;
+  }, [noticeOwner]);
 
   if (uploads.length === 0) {
     return (

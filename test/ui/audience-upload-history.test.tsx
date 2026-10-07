@@ -164,6 +164,27 @@ function progressStyle(row: HTMLTableRowElement) { const progress = row.querySel
     expect(await screen.findByText("new.csv")).toBeInTheDocument();
     expect(screen.queryByText("old.csv")).not.toBeInTheDocument();
   });
+  test("updated failures and immediate reopen keep a persistent retry action", async () => {
+    let error: string | null = "First read failed";
+    const { router } = await setup((workspace, audience) => page(workspace, audience, error ? null : [], error));
+    await screen.findByRole("button", { name: "Try again" });
+    vi.useFakeTimers();
+    try {
+      error = "The retry also failed";
+      await act(async () => { await router.revalidate(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(screen.getByText("The retry also failed")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+      error = null;
+      await act(async () => { await router.revalidate(); });
+      error = "A new read failed";
+      await act(async () => { await router.revalidate(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(screen.getByText("A new read failed")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    } finally { vi.useRealTimers(); }
+  });
   test("INSERT, UPDATE and DELETE change current rows, deduplicate inserts and ignore foreign audience events", async () => {
     const { calls } = await setup((workspace, audience) => page(workspace, audience, [upload()]));
     expect(currentSubscription()).toMatchObject({ workspaceId: "ws-1", filter: "audience_id=eq.1" });
