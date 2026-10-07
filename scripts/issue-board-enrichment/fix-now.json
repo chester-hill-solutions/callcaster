@@ -401,7 +401,7 @@
       "app/db/schema.ts:102 (workspace.id is text() in the model — the drift)",
       "app/db/schema.ts:126,453,472 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)",
       "app/db/schema.ts:51,79 (schema-campaign: campaign_queue.workspace is uuid)",
-      "app/db/workspace-scoped-tables.ts:41-94 (the 27 registered tables)",
+      "app/db/workspace-scoped-tables.ts (32 registered tenant tables at dev@f1fc3ef5)",
       "client/migrations/20260713180000_chs_workspace_membership.sql:99-106 (workspace_member, role_id FK but no workspace_id FK)",
       "client/migrations/20260713120000_workspace_audit_event.sql:4 (workspace_audit_event.workspace_id is text)",
       "client/migrations/20260715120000_workspace_audio_metadata.sql:17 (workspace_audio.workspace_id is text)",
@@ -422,41 +422,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Native scope and all original acceptance criteria remain open. Current development catalog measurements are recorded in the issue; no rows or schema were changed. Production and staging integrity, migration validation and source implementation remain."
-  },
-  {
-    "issueNumber": 2288,
-    "verdict": "fix-now",
-    "recommendedTitle": "Move audience-upload history loading to route data",
-    "summary": "The current audience-history mount effect fetches server data. The syntax guard now exposes it as CANDIDATE-REMOVE; route data is the adopted policy.",
-    "currentBehavior": "Source audit at dev@24c4d810. useAudienceUploads calls fetchAudienceUploads on mount and workspace/audience changes, then maintains live history via workspace events. The old guard skipped this effect because its preceding comment ended in a dot. The guard fix only inventories the existing behavior; the runtime route-data change remains open under #2288.",
-    "rootCause": "Initial server history is owned by a client effect instead of the existing audience route data contract.",
-    "resolution": "Load initial upload history through the authenticated audience page loader, pass route data into the history UI/hook and retain React Router retry/revalidation plus current-audience event updates. Remove the fetch-on-mount effect and its candidate inventory row.",
-    "lookIn": [
-      "app/hooks/audience/useAudienceUploads.ts",
-      "app/components/audience/AudienceUploadHistory.tsx",
-      "app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts",
-      "app/routes/workspaces+/$id/audiences/$audience_id.route.tsx",
-      "app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.loader.server.ts"
-    ],
-    "existingTests": [
-      "test/ui/audience-upload-history.test.tsx"
-    ],
-    "missingTests": [
-      "Real route initial-history and foreign-audience denial cases.",
-      "Navigation/late-result isolation, retry and retained insert/update/delete event controls."
-    ],
-    "acceptanceCriteria": [
-      "Initial history is route data; the mount fetch effect is removed.",
-      "Workspace/audience changes cannot leak old history or accept late results for another audience.",
-      "Loading, empty, error retry and success behavior remain available.",
-      "Current-audience event updates and route tenant authorization are retained.",
-      "Tests fail if the required loader, isolation, retry or event behavior is removed.",
-      "Remove candidate inventory debt and pass full local/remote gates before merge."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104."
   },
   {
     "issueNumber": 2061,

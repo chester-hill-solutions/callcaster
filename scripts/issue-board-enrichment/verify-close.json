@@ -6538,5 +6538,46 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "PR #2450 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation."
+  },
+  {
+    "issueNumber": 2288,
+    "verdict": "verify-close",
+    "recommendedTitle": "Move audience-upload history loading to route data",
+    "summary": "Upload history loads with the authorized audience page. Retry, live updates and navigation retain the current call-list identity.",
+    "currentBehavior": "PR #2453 merged into dev at f1fc3ef5df1316c8f57b12d3c82afa7f4f001ba9. The existing scoped query feeds route data after audience access checks. Failed reads retain prior rows; retries use revalidation; prior workspace/audience callbacks and delayed responses cannot replace current rows. Persistent shared root feedback retains its action through notice updates and reopen. Both exact-source reviews, full local gates, all 875 local and remote database cases with zero skips, E2E and actual exact-head preview deployments passed. Six phone/desktop/wide light/dark geometry checks have zero background movement. Deployed acceptance and release promotion remain.",
+    "rootCause": "Initial server history is owned by a client effect instead of the existing audience route data contract.",
+    "resolution": "Verify deployed upload history, retry and realtime navigation in the release candidate before default-branch promotion and closure. Source implementation is complete; retain all original acceptance criteria.",
+    "lookIn": [
+      "app/components/audience/AudienceUploadHistory.tsx",
+      "app/hooks/audience/useAudienceUploads.ts",
+      "app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts",
+      "app/routes/workspaces+/$id/audiences/$audience_id.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audience-upload-history.test.tsx",
+      "test/integration-db/audience-upload-history.test.ts"
+    ],
+    "missingTests": [
+      "Release-candidate deployed browser/upload acceptance and default-branch promotion remain."
+    ],
+    "acceptanceCriteria": [
+      "Initial history is route data; the mount fetch effect is removed.",
+      "Workspace/audience changes cannot leak old history or accept late results for another audience.",
+      "Loading, empty, error retry and success behavior remain available.",
+      "Current-audience event updates and route tenant authorization are retained.",
+      "Tests fail if the required loader, isolation, retry or event behavior is removed.",
+      "Remove candidate inventory debt and pass full local/remote gates before merge.",
+      "Initial audience upload history is route data; the mount effect and raw fetch path are removed from the hook.",
+      "Workspace/audience navigation cannot show a prior audience's uploads or let a late result overwrite the current audience.",
+      "Loading, empty, failed-read retry and successful history display remain supported.",
+      "Existing upload progress updates still handle INSERT, UPDATE and DELETE for the current audience.",
+      "Route authorization and tenant filtering are retained; foreign audience/workspace rows are not returned.",
+      "Meaningful route/UI tests fail if initial loading, audience isolation, retry or event updates are broken. Use stable fetcher/session doubles.",
+      "Remove this effect's CANDIDATE-REMOVE inventory entry after the runtime fix. Full local CI and all remote gates pass before merge."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Native issue is OPEN; exact-head issue-on-dev workflow moved one item. Source evidence is complete and separate from deployed acceptance and release QA."
   }
 ]
