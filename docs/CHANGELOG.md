@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Load call-list upload history with the page and keep retries and live updates within the current call list ([#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288)).
+- Fixed: Load call-list upload history with the page and keep retries and live updates within the current call list ([#2453](https://github.com/chester-hill-solutions/callcaster/pull/2453), [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288)).
 
 - Fixed: New toll-free SMS registrations use the consent method selected by the operator, and request a selection when it is missing ([#2447](https://github.com/chester-hill-solutions/callcaster/pull/2447), [#2145](https://github.com/chester-hill-solutions/callcaster/issues/2145)).
 
