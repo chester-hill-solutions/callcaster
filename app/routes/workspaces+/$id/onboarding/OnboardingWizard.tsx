@@ -195,6 +195,8 @@ export function OnboardingWizard({
         ? "mx-auto w-full max-w-2xl"
         : activeStep === "business_identity"
           ? "mx-auto w-full max-w-xl"
+          : activeStep === "audience" || activeStep === "campaign_info"
+            ? "mx-auto w-full max-w-2xl"
           : "mx-auto w-full max-w-4xl";
 
   return (
