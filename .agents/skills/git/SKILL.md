@@ -46,6 +46,14 @@ branch, and delete only the verified remote topic ref. Preserve dirty worktrees,
 unproven branches and user files. Use the app archive tool for app-managed
 worktrees so their saved attachments remain recoverable.
 
+After a verified merge, the provider can remove the owned PR preview before
+manual cleanup starts. Read fresh project environments and compare the exact
+recorded preview ID and name. If that ID is absent, verify the other recorded
+environments remain and record provider cleanup; do not issue a deletion. If
+the ID exists, delete only that verified owned preview, then read back its
+absence and the preserved environments. An absent preview is not a reason to
+delete another environment.
+
 ### Interrupted worktree removal
 
 A short command deadline can leave an owned worktree partly deleted. Before
