@@ -160,7 +160,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Show an unavailable recording state instead of a raw provider link when the stored playback copy is missing ([#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166)).
+- Show an unavailable recording state instead of a raw provider link when the stored playback copy is missing ([#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166), [PR #2451](https://github.com/chester-hill-solutions/callcaster/pull/2451)).
 
 - Prepare and validate the A2P Messaging Profile before brand registration. Collect company and public-company data, retain provider IDs for retry, and keep failed prerequisites blocked through polling and SMS readiness. ([#2450](https://github.com/chester-hill-solutions/callcaster/pull/2450), [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282))
 
