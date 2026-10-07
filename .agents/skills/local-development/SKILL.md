@@ -77,6 +77,10 @@ executor. For authorized install work while the audit is held, use npm's
 `--no-audit` option so installation does not submit that inventory. Public
 advisory reads and local version comparisons do not replace a full audit.
 
+When publication is held, do not predict a PR number in the changelog. Keep
+the issue link during local preparation, add the verified PR link before final
+publication, then repeat full gates and source reviews for those exact bytes.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
