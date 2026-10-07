@@ -6,6 +6,9 @@
 #   make storage up|down      object storage (the stow binary, not a container)
 #   make postgres init        start that service and run only its bootstrap step
 #   make app | worker | media-stream   run a process in the foreground
+#   make tunnel                         start the local HTTPS Twilio tunnel
+#   make twiml                          create or update the local TwiML App
+#   make calling:sync                   sync one workspace to the tunnel URL
 #   make e2e                  compose-first Playwright run
 #
 # The compose file is the source of truth for service names; targets here only
@@ -23,7 +26,7 @@ TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init up down logs ps app worker media-stream e2e storage minio $(SERVICES)
+.PHONY: help init up down logs ps app worker media-stream e2e storage minio tunnel twiml calling\:sync $(SERVICES)
 
 help:
 	@sed -n '3,9p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -71,6 +74,18 @@ worker:
 
 media-stream:
 	bun run services/media-stream/index.ts
+
+tunnel:
+	npx --no-install lt --port 3000
+
+twiml:
+	bun scripts/local/provision-local-twiml-app.mjs
+
+calling\:sync:
+ifndef WORKSPACE_ID
+	$(error WORKSPACE_ID is required, for example: make calling:sync WORKSPACE_ID=<workspace-id>)
+endif
+	npm run dev:calling:sync -- --workspace-id "$(WORKSPACE_ID)" $(if $(BASE_URL),--base-url "$(BASE_URL)",)
 
 e2e:
 	npm run test:e2e:compose
