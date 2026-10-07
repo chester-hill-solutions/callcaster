@@ -36,6 +36,32 @@ in the local database that have real Twilio account credentials. Restart the
 app, worker, or media-stream process after changing environment files. Do not
 use `--all-workspaces` for normal development.
 
+## Stop Local Development
+
+Press `Ctrl-C` in each terminal running a foreground process:
+
+- `make tunnel`
+- `make app`
+- `make worker`
+- `make media-stream`
+
+Then stop the services that run in the background from any terminal in the
+repository:
+
+```bash
+make down          # stop Postgres and Inbucket
+make storage down  # stop the Stow object store
+```
+
+Check the remaining Compose services with:
+
+```bash
+make ps
+```
+
+Stopping the local services does not delete the database volume or local
+objects. Use `make init` later to start and repair the local environment.
+
 `make init` is not part of this daily flow. It starts Postgres, Stow object
 storage, and mail, applies the schema, creates the bucket, and seeds test users
 and workspaces. It does not start the app, worker, or media-stream process.
