@@ -4,7 +4,7 @@ import type { Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { householdKeyFor } from "@/lib/household-key";
 import { parsePhoneNumber } from "@/lib/phone";
-import { mapAudienceImportRow, type PreparedAudienceImport } from "@/lib/audience-import-map";
+import { mapAudienceImportRow, type PreparedAudienceImport } from "@/lib/audience-import-map.server";
 import type { audience_import_row, audience_import_run } from "@/db/schema";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];

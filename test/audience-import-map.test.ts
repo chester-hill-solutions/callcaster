@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { mapAudienceImportRow, prepareAudienceImport } from "@/lib/audience-import-map";
+import { mapAudienceImportRow, prepareAudienceImport } from "@/lib/audience-import-map.server";
 
 describe("audience import effective identity and mapping", () => {
   const csv = Buffer.from('Name,Phone,Consent,Extra\r\n"Doe, Jane",4165551234,maybe,custom');

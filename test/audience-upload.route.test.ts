@@ -133,8 +133,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   const makeReq = (fd: FormData, method = "POST") =>
     new Request("http://localhost/api/audience-upload", { method, body: fd });
 
-  test("exports: isOtherDataArray + generateUniqueId", async () => {
-    const mod = await import("../app/routes/api+/audience-upload");
+  test("server helpers: isOtherDataArray + generateUniqueId", async () => {
+    const mod = await import("@/lib/audience-upload-process.server");
     expect(mod.isOtherDataArray([{ key: "a", value: 1 }])).toBe(true);
     expect(mod.isOtherDataArray([{ key: "a" } as any])).toBe(false);
     expect(mod.isOtherDataArray("no" as any)).toBe(false);

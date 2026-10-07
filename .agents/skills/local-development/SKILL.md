@@ -552,3 +552,9 @@ drift without its matching reviewed source change.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.
 - Load the `github-cli` and `github-issues` skills for `gh` specifics.
+
+Route modules must export only route-facing handlers and components. Import
+server helpers directly in their tests. A helper re-export from a route can
+retain its server dependency graph in the browser build, even with a `.server`
+filename. Confirm the production build and client bundle guard after changing
+server imports.

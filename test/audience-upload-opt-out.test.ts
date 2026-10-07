@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { csvRow } from "@/lib/csv";
-import { mapAudienceImportRow, prepareAudienceImport } from "@/lib/audience-import-map";
+import { mapAudienceImportRow, prepareAudienceImport } from "@/lib/audience-import-map.server";
 
 const mapping = {
   "first name": "firstname",

@@ -16,7 +16,7 @@ import {
   audienceUploadChunkDelayMs,
   audienceUploadShouldWriteStatus,
 } from "../../shared/audience-upload";
-import { prepareAudienceImport } from "@/lib/audience-import-map";
+import { prepareAudienceImport } from "@/lib/audience-import-map.server";
 import { startAudienceImport, advanceAudienceImport, finishAudienceImport, recordAudienceImportFailure,
   type AudienceImportContext, type AudienceImportRun } from "@/server/audience-import-recovery.server";
 
