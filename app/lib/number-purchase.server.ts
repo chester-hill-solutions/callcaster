@@ -33,6 +33,10 @@ import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { createTenantDb } from "@/server/tenant-db";
 import { deriveAndPersistWorkspaceThroughput } from "@/lib/database/workspace-twilio-config.server";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace-twilio-sync.server";
+import {
+  numberPurchaseAddressRejection,
+  resolveNumberPurchaseAddress,
+} from "@/lib/number-regulatory-address.server";
 
 // First rentals start with three rings, independently of the generic input fallback.
 const FIRST_NUMBER_DEFAULT_RING_COUNT = 3;
@@ -129,6 +133,7 @@ async function createProviderNumber(
   purchase: NumberPurchase,
   phoneNumber: string,
   prepared: PreparedPurchase,
+  addressSid: string | null,
 ) {
   const { twilio, onboarding, callbackBaseUrl } = prepared;
   const workspaceId = purchase.workspace;
@@ -140,10 +145,6 @@ async function createProviderNumber(
         ? (onboarding.emergencyVoice.address.addressSid ?? undefined)
         : undefined;
 
-    // TODO(Q43): auto-apply `addressRequirements` when the number's regulation
-    // requires a registered address. Deferred: the Twilio SDK's create options
-    // do not expose a clean typed field here, so we set the emergency address
-    // SID only and leave regulatory address-requirement handling to a follow-up.
     const number = await withTwilioRetry(
       () =>
         twilio.incomingPhoneNumbers.create({
@@ -156,6 +157,7 @@ async function createProviderNumber(
           voiceMethod: "POST",
           smsUrl: `${callbackBaseUrl}/api/inbound-sms`,
           smsMethod: "POST",
+          ...(addressSid ? { addressSid } : {}),
           ...(validatedEmergencyAddressSid
             ? { emergencyAddressSid: validatedEmergencyAddressSid }
             : {}),
@@ -176,7 +178,7 @@ async function createProviderNumber(
     if (isDefiniteNumberPurchaseRejection(error)) {
       try {
         await cancelNumberPurchase(purchase);
-        return purchaseFailure(error);
+        return numberPurchaseAddressRejection(error) ?? purchaseFailure(error);
       } catch (cancelError) {
         logger.error("Number purchase cancellation failed", cancelError);
       }
@@ -389,7 +391,16 @@ export async function purchaseNumberForWorkspace(
     });
     if (!reserved.ok) return reserved;
     const purchase = reserved.purchase;
+    let addressSid: string | null;
     try {
+      const address = await resolveNumberPurchaseAddress(
+        prepared.twilio, workspaceId, phoneNumber,
+      );
+      if (!address.ok) {
+        await cancelNumberPurchase(purchase);
+        return address;
+      }
+      addressSid = address.addressSid;
       await startNumberPurchase(purchase);
     } catch (error) {
       try {
@@ -400,7 +411,9 @@ export async function purchaseNumberForWorkspace(
         return recoverPurchase(purchase, prepared.twilio, error);
       }
     }
-    const created = await createProviderNumber(purchase, phoneNumber, prepared);
+    const created = await createProviderNumber(
+      purchase, phoneNumber, prepared, addressSid,
+    );
     if (!created.ok) return created;
     const settled = await settlePurchase(purchase, created.number, prepared);
     if (settled.result.ok)

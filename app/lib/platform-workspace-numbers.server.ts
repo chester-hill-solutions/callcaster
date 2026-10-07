@@ -14,13 +14,6 @@ import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { normalizeInboundRingCount } from "../../shared/inbound-rings";
-import {
-  isNanpTollFreeNumber,
-  normalizeAddressRequirement,
-  resolveAddressForRequirement,
-  type AddressRequirement,
-  type CandidateAddress,
-} from "@/lib/number-address-requirements";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import type { z } from "zod";
 import type { InboundRoutingPresetApplication } from "../../shared/inbound-routing-presets";

@@ -687,7 +687,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Purchase and provision a phone number",
       tags: ["Platform API", "Workspace", "Telephony"],
       security: sessionCookieSecurity,
-      description: "Requires sufficient available workspace credits and numbers-manager role. Concurrent purchases reserve their rental budget. A 409 means the number is already owned or a purchase is awaiting provider verification; do not retry that number until recovery completes.",
+      description: "Requires sufficient available workspace credits and numbers-manager role. Purchases check current Canadian inventory and a validated regulatory address on the purchasing account when required. Missing or rejected regulatory addresses return 400 before a completed purchase. Concurrent purchases reserve their rental budget. A 409 can mean the number is unavailable, already owned, or awaiting provider verification. Follow the returned message; do not retry a purchase awaiting verification until recovery completes.",
       requestBody: {
         required: true,
         content: {
@@ -710,8 +710,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/PurchaseNumberResponse" } } },
         },
         "402": errorResponse("Insufficient credits"),
-        "409": errorResponse("Number already owned or purchase awaiting recovery"),
-        "400": errorResponse("Validation error"),
+        "409": errorResponse("Number unavailable, already owned or purchase awaiting recovery"),
+        "400": errorResponse("Invalid input or missing or rejected regulatory address"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
       },

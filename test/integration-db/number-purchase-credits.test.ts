@@ -15,6 +15,10 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/database/workspace.server")>();
   return { ...original, createWorkspaceTwilioInstance: vi.fn(async () => ({
     accountSid: provider.accountSid,
+    availablePhoneNumbers: () => ({
+      local: { list: async ({ contains }: { contains: string }) => [{ phoneNumber: contains, isoCountry: "CA", addressRequirements: "none" }] },
+      tollFree: { list: async ({ contains }: { contains: string }) => [{ phoneNumber: contains, isoCountry: "CA", addressRequirements: "none" }] },
+    }),
     incomingPhoneNumbers: Object.assign((sid: string) => ({ remove: () => provider.remove(sid) }), { create: provider.create, list: provider.list }),
   })) };
 });

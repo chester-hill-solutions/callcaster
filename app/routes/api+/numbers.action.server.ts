@@ -50,6 +50,13 @@ export const action = defineAction({
         if ("creditsError" in result && result.creditsError) {
           return jsonResponse({ creditsError: true }, result.status);
         }
+        if (
+          "addressRequirementError" in result && result.addressRequirementError
+        ) {
+          return jsonResponse(
+            { addressRequirementError: true, error: result.error }, result.status,
+          );
+        }
         if (result.status === 409) return jsonError(result.error, 409);
         return createErrorResponse(
           new Error(result.error),

@@ -11,7 +11,7 @@
  * - `foreign` — a validated address outside the number's ISO country.
  *
  * This module is pure (no Twilio/DB access) so the satisfaction rules are
- * unit-testable; `platform-workspace-numbers.server.ts` wires it to live data.
+ * unit-testable; `number-regulatory-address.server.ts` wires it to live data.
  */
 
 import { stripPhoneNumber } from "@/lib/phone";
