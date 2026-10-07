@@ -41,6 +41,15 @@ export const handleRoleTextStyles = (memberRole: MemberRole): string =>
     memberRole === MemberRole.Admin && "text-purple-500",
   );
 
+function memberManagementPermissions(userRole: MemberRole, memberRole: string, platformAdmin: boolean) {
+  return {
+    canOpen: platformAdmin || userRole !== MemberRole.Caller,
+    canEdit: platformAdmin || userRole === MemberRole.Owner ||
+      (userRole === MemberRole.Admin && memberRole !== MemberRole.Admin),
+    canTransfer: !platformAdmin && userRole === MemberRole.Owner,
+  };
+}
+
 export default function TeamMember({
   member,
   userRole,
@@ -56,6 +65,7 @@ export default function TeamMember({
   platformAdmin?: boolean;
 }) {  
   const memberRole = member.role;
+  const permissions = memberManagementPermissions(userRole, memberRole, platformAdmin);
   const memberName =
     [member.first_name, member.last_name]
       .filter((name): name is string => Boolean(name))
@@ -80,7 +90,7 @@ export default function TeamMember({
         <p className={roleTextStyles}>{roleDisplayName}</p>
         {(!memberIsOwner || platformAdmin) && (
           <Sheet>
-            {(platformAdmin || userRole !== MemberRole.Caller) && memberRole !== "invited" && (
+            {permissions.canOpen && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button
                   className="h-fit rounded-full bg-transparent p-2"
@@ -102,7 +112,7 @@ export default function TeamMember({
                 </Button>
               </SheetTrigger>
             )}
-            {(platformAdmin || userRole !== MemberRole.Caller) && memberRole === "invited" && (
+            {permissions.canOpen && memberRole === "invited" && (
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
@@ -140,9 +150,7 @@ export default function TeamMember({
                 <h4 className="text-center text-2xl font-bold text-black dark:text-white">
                   {memberName}
                 </h4>
-                {platformAdmin || userRole === MemberRole.Owner ||
-                (userRole === MemberRole.Admin &&
-                  memberRole !== MemberRole.Admin) ? (
+                {permissions.canEdit ? (
                   <>
                     <Form method="POST" className="flex w-full flex-col gap-4">
                       <input type="hidden" name="formName" value="updateUser" />
@@ -185,7 +193,7 @@ export default function TeamMember({
                       </Button>
                     </Form>
 
-                    {userRole === MemberRole.Owner && !platformAdmin && (
+                    {permissions.canTransfer && (
                       <Form
                         method="POST"
                         name="transferWorkspaceOwnership"

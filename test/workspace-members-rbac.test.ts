@@ -19,6 +19,7 @@ const membersDbMocks = vi.hoisted(() => ({
 }));
 
 const txDb = vi.hoisted(() => ({
+  execute: vi.fn(async () => []),
   workspace_member: {
     findFirst: vi.fn(async () => null as any),
     update: vi.fn(async () => [{ id: "u2" }] as any[]),
@@ -111,6 +112,8 @@ function resetAll() {
   membersDbMocks.listWorkspaceMembersEnriched.mockReset();
   membersDbMocks.updateWorkspaceMemberRole.mockReset();
   membersDbMocks.removeWorkspaceMember.mockReset();
+  txDb.execute.mockReset();
+  txDb.execute.mockResolvedValue([]);
   txDb.workspace_member.findFirst.mockReset();
   txDb.workspace_member.update.mockReset();
   dbMock.transaction.mockReset();

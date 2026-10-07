@@ -34,6 +34,18 @@ async function role(actor: Actor, id = workspace) {
     where workspace_id = ${id} and user_id = ${identity(actor).id}`;
   return rows[0]?.role_id ?? null;
 }
+async function waitForMembershipWriters(count: number) {
+  const deadline = Date.now() + 5_000;
+  let blocked = 0;
+  while (blocked < count && Date.now() < deadline) {
+    const [row] = await sql`select count(*)::int as blocked from pg_stat_activity
+      where datname = current_database() and wait_event_type = 'Lock'
+      and query like '%workspace%' and pid <> pg_backend_pid()`;
+    blocked = row.blocked;
+    if (blocked < count) await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  expect(blocked).toBeGreaterThanOrEqual(count);
+}
 async function cleanupWorkspaces() {
   await sql`delete from workspace_member where workspace_id in (${workspace}, ${foreign})`;
   await sql`delete from workspace where id in (${workspace}, ${foreign})`;
@@ -219,6 +231,59 @@ describe.skipIf(!databaseUrl)("platform membership safety with real sessions and
       await succeeded(await mutate(surface, "update", { target: "owner", role: "owner" }));
       expect(await role("owner")).toBe("owner");
     });
+  });
+  test.each([
+    ["tab", "api", "remove"], ["tab", "api", "update"],
+    ["api", "user-form", "remove"], ["api", "user-form", "update"],
+    ["tab", "member", "remove"], ["tab", "member", "update"],
+  ] as const)("concurrent %s/%s %s changes retain an owner", async (first, second, operation) => {
+    await sql`update workspace_member set role_id = 'owner'
+      where workspace_id = ${workspace} and user_id = ${identity("target").id}`;
+    const barrier = await sql.reserve();
+    const pending: Promise<{ status: number }>[] = [];
+    try {
+      await barrier`begin`;
+      // Hold both target rows so both requests reach the write before release.
+      await barrier`select id from workspace_member where workspace_id = ${workspace} for update`;
+      pending.push(mutate(first, operation, { target: "owner", role: "member" }));
+      if (second === "member") {
+        const service = await import("@/lib/platform-members.server");
+        pending.push((operation === "remove"
+          ? service.removeWorkspaceMember(identity("owner").id, workspace, identity("target").id)
+          : service.updateWorkspaceMemberRole(identity("owner").id, workspace, identity("target").id, "member"))
+          .then(result => ({ status: result.ok ? 200 : result.status })));
+      } else pending.push(mutate(second, operation, { role: "member" }));
+      await waitForMembershipWriters(2);
+    } finally {
+      try { await barrier`rollback`; } finally { barrier.release(); }
+      await Promise.allSettled(pending);
+    }
+    const results = await Promise.all(pending);
+    const [row] = await sql`select count(*)::int as owners from workspace_member
+      where workspace_id = ${workspace} and role_id = 'owner'`;
+    expect({ statuses: results.map(result => result.status).sort(), owners: row.owners })
+      .toEqual({ statuses: [200, 403], owners: 1 });
+  });
+  test("ownership transfer and sudo removal cannot leave the workspace ownerless", async () => {
+    const { transferWorkspaceOwnership } = await import("@/lib/workspace-members-db.server");
+    const barrier = await sql.reserve();
+    const pending: Promise<{ status: number }>[] = [];
+    try {
+      await barrier`begin`;
+      await barrier`select id from workspace_member where workspace_id = ${workspace} for update`;
+      pending.push(transferWorkspaceOwnership({ workspaceId: workspace,
+        currentOwnerUserId: identity("owner").id, newOwnerUserId: identity("target").id })
+        .then(() => ({ status: 200 })));
+      await waitForMembershipWriters(1);
+      pending.push(mutate("tab", "remove"));
+      await waitForMembershipWriters(2);
+    } finally {
+      try { await barrier`rollback`; } finally { barrier.release(); }
+      await Promise.allSettled(pending);
+    }
+    expect((await Promise.all(pending)).map(result => result.status)).toEqual([200, 403]);
+    expect(await role("owner")).toBe("admin");
+    expect(await role("target")).toBe("owner");
   });
   test.each(["owner", "admin"])("JSON membership creation requires enrollment for %s", async nextRole => {
     await sql`delete from workspace_member where workspace_id = ${workspace} and user_id = ${identity("target").id}`;

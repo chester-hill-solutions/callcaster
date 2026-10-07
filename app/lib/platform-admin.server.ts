@@ -1,3 +1,4 @@
+import { AuthzError } from "@chester-hill-solutions/auth";
 import {
   repointAllWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
@@ -318,7 +319,7 @@ export async function updateUserWorkspaceRoleAdmin(
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Failed to update role",
-      status: 500,
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }
@@ -339,7 +340,7 @@ export async function removeUserFromWorkspaceAdmin(
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Failed to remove user",
-      status: 500,
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }
