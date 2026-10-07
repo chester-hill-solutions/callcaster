@@ -58,22 +58,27 @@ function renderTable(rows: CallLogRow[]) {
 
 describe("CallLogTable voicemail cell (#1844)", () => {
   test("plays the stored copy in-app when a signed playback URL exists", () => {
-    renderTable([row({ recordingPlaybackUrl: "https://signed.example/rec.mp3" })]);
+    renderTable([
+      row({
+        recordingPlaybackUrl: "https://signed.example/rec.mp3",
+        recordingUrl: "https://api.twilio.com/rec",
+      }),
+    ]);
 
     const audio = document.querySelector("audio");
     expect(audio).not.toBeNull();
     expect(audio?.getAttribute("src")).toBe("https://signed.example/rec.mp3");
-    // The external Twilio link is not used when a stored copy exists.
     expect(screen.queryByRole("link", { name: "Listen" })).toBeNull();
+    expect(screen.queryByText("Recording unavailable")).toBeNull();
+    expect(document.querySelector('a[href*="api.twilio.com"]')).toBeNull();
   });
 
-  test("falls back to the Twilio link when there is no stored copy", () => {
+  test("shows unavailable recording without a provider link when there is no stored copy", () => {
     renderTable([row({ recordingUrl: "https://api.twilio.com/rec" })]);
 
-    expect(screen.getByRole("link", { name: "Listen" })).toHaveAttribute(
-      "href",
-      "https://api.twilio.com/rec",
-    );
+    expect(screen.getByText("Recording unavailable")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Listen" })).toBeNull();
+    expect(document.querySelector('a[href*="api.twilio.com"]')).toBeNull();
     expect(document.querySelector("audio")).toBeNull();
   });
 
@@ -82,6 +87,8 @@ describe("CallLogTable voicemail cell (#1844)", () => {
 
     expect(screen.queryByRole("link", { name: "Listen" })).toBeNull();
     expect(document.querySelector("audio")).toBeNull();
-    expect(screen.getByRole("link", { name: "Voicemails" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Voicemails" }),
+    ).toBeInTheDocument();
   });
 });
