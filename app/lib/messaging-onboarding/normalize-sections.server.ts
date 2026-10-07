@@ -16,8 +16,10 @@ import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 import {
-  DEFAULT_WORKSPACE_ONBOARDING_STEPS,
-} from "@/lib/messaging-onboarding/defaults.server";
+  parseA2pCompanyType,
+  parseA2pStockExchange,
+} from "@/lib/a2p-messaging-profile";
+import { DEFAULT_WORKSPACE_ONBOARDING_STEPS } from "@/lib/messaging-onboarding/defaults.server";
 
 export function parseString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -73,7 +75,9 @@ export function mergeStoredOnboardingSteps(
   });
 }
 
-export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAddressState {
+export function normalizeEmergencyAddress(
+  value: unknown,
+): WorkspaceEmergencyAddressState {
   if (!isObject(value)) {
     return {
       addressSid: null,
@@ -107,7 +111,9 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
   };
 }
 
-export function normalizeReviewState(value: unknown): WorkspaceOnboardingReviewState {
+export function normalizeReviewState(
+  value: unknown,
+): WorkspaceOnboardingReviewState {
   if (!isObject(value)) {
     return {
       blockingIssues: [],
@@ -146,7 +152,14 @@ export function normalizeBusinessProfile(
     sampleMessages: parseStringArray(value.sampleMessages),
     doingBusinessAs: parseString(value.doingBusinessAs),
     businessRegistrationNumber: parseString(value.businessRegistrationNumber),
-    ageGatedContent: typeof value.ageGatedContent === "boolean" ? value.ageGatedContent : false,
+    ageGatedContent:
+      typeof value.ageGatedContent === "boolean"
+        ? value.ageGatedContent
+        : false,
+    a2pCompanyType: parseA2pCompanyType(value.a2pCompanyType),
+    a2pStockExchange: parseA2pStockExchange(value.a2pStockExchange),
+    a2pStockTicker: parseString(value.a2pStockTicker),
+    a2pBrandContactEmail: parseString(value.a2pBrandContactEmail),
     ein: parseString(value.ein),
     industry: parseString(value.industry),
     authorizedRepName: parseString(value.authorizedRepName),
@@ -172,7 +185,9 @@ export function normalizeMessagingServiceSection(
       WORKSPACE_ONBOARDING_STATUS_VALUES,
       "not_started",
     ),
-    attachedSenderPhoneNumbers: parseStringArray(value.attachedSenderPhoneNumbers),
+    attachedSenderPhoneNumbers: parseStringArray(
+      value.attachedSenderPhoneNumbers,
+    ),
     supportedChannels: parseStringArray(value.supportedChannels).filter(
       (channel): channel is WorkspaceOnboardingChannel =>
         WORKSPACE_ONBOARDING_CHANNEL_VALUES.includes(
@@ -260,7 +275,17 @@ export function normalizeA2p10dlcSection(
     brandSid: parseOptionalString(value.brandSid),
     campaignSid: parseOptionalString(value.campaignSid),
     trustProductSid: parseOptionalString(value.trustProductSid),
-    customerProfileBundleSid: parseOptionalString(value.customerProfileBundleSid),
+    messagingProfileEndUserSid: parseOptionalString(
+      value.messagingProfileEndUserSid,
+    ),
+    messagingProfileStatus: pickEnumValue(
+      value.messagingProfileStatus,
+      ["not_started", "ready", "action_needed"] as const,
+      "not_started",
+    ),
+    customerProfileBundleSid: parseOptionalString(
+      value.customerProfileBundleSid,
+    ),
     brandType: parseOptionalString(value.brandType),
     tcrId: parseOptionalString(value.tcrId),
     rejectionReason: parseOptionalString(value.rejectionReason),

@@ -20,11 +20,7 @@ export type ReadinessResult = {
 };
 
 export type WorkspaceReadinessChannel =
-  | "a2p10dlc"
-  | "rcs"
-  | "voice_compliance"
-  | "sms"
-  | "all";
+  "a2p10dlc" | "rcs" | "voice_compliance" | "sms" | "all";
 
 export type WorkspaceReadinessNumber = {
   phone_number?: string | null;
@@ -52,7 +48,10 @@ export type WorkspaceReadinessContext = {
   /** Populated by the send-gate evaluator (sender pool requires a live Twilio call). */
   senderPool?: WorkspaceReadinessSenderPool;
   portalConfig?: { sendMode?: string | null };
-  syncSnapshot?: { tollFreeVerificationBlocked?: boolean; lastSyncError?: string | null };
+  syncSnapshot?: {
+    tollFreeVerificationBlocked?: boolean;
+    lastSyncError?: string | null;
+  };
   /** Derived RCS sender draft (server evaluators hydrate this from business profile). */
   rcsDraft?: WorkspaceMessagingOnboardingState["rcs"];
 };
@@ -69,11 +68,8 @@ export type WorkspaceReadinessPredicate = {
   buildMessage?: (ctx: WorkspaceReadinessContext) => string;
 };
 
-const CHANNELS_REQUIRING_BUSINESS_PROFILE: readonly (keyof typeof BUSINESS_PROFILE_REQUIRED_FIELDS)[] = [
-  "a2p10dlc",
-  "rcs",
-  "sms",
-];
+const CHANNELS_REQUIRING_BUSINESS_PROFILE: readonly (keyof typeof BUSINESS_PROFILE_REQUIRED_FIELDS)[] =
+  ["a2p10dlc", "rcs", "sms"];
 
 /**
  * Per-channel business-profile required fields — one source of truth.
@@ -158,7 +154,9 @@ export function findMissingBusinessProfileFields(
   profile: WorkspaceMessagingBusinessProfile,
   fields: readonly BusinessProfileFieldKey[] = BUSINESS_PROFILE_BASELINE_REQUIRED_FIELDS,
 ): BusinessProfileFieldKey[] {
-  return fields.filter((field) => !isBusinessProfileFieldComplete(profile, field));
+  return fields.filter(
+    (field) => !isBusinessProfileFieldComplete(profile, field),
+  );
 }
 
 /**
@@ -257,6 +255,14 @@ const BUSINESS_PROFILE_FIELD_MESSAGES: Record<
     sms: "Add the business registration number (BN) for toll-free verification.",
   },
   ageGatedContent: {},
+  a2pCompanyType: {
+    a2p10dlc: "Choose the A2P company type in Business identity.",
+  },
+  a2pStockExchange: { a2p10dlc: "Choose the public company stock exchange." },
+  a2pStockTicker: { a2p10dlc: "Add the public company stock ticker." },
+  a2pBrandContactEmail: {
+    a2p10dlc: "Add the public brand representative organization email.",
+  },
   ein: {},
   industry: {},
   authorizedRepName: {},
@@ -343,18 +349,39 @@ const RCS_SENDER_PACKAGE_FIELDS: Array<{
   message: string;
 }> = [
   { field: "displayName", message: "Add the RCS sender display name." },
-  { field: "publicDescription", message: "Add the public RCS sender description." },
+  {
+    field: "publicDescription",
+    message: "Add the public RCS sender description.",
+  },
   { field: "notificationEmail", message: "Add the RCS notification email." },
-  { field: "representativeName", message: "Add the authorized representative name." },
-  { field: "representativeTitle", message: "Add the authorized representative title." },
-  { field: "representativeEmail", message: "Add the authorized representative email." },
-  { field: "logoImageUrl", message: "Upload a square logo image URL for the sender package." },
-  { field: "bannerImageUrl", message: "Upload a banner image URL for the sender package." },
+  {
+    field: "representativeName",
+    message: "Add the authorized representative name.",
+  },
+  {
+    field: "representativeTitle",
+    message: "Add the authorized representative title.",
+  },
+  {
+    field: "representativeEmail",
+    message: "Add the authorized representative email.",
+  },
+  {
+    field: "logoImageUrl",
+    message: "Upload a square logo image URL for the sender package.",
+  },
+  {
+    field: "bannerImageUrl",
+    message: "Upload a banner image URL for the sender package.",
+  },
   {
     field: "optInPolicyImageUrl",
     message: "Upload an opt-in policy or consent screenshot URL.",
   },
-  { field: "useCaseVideoUrl", message: "Upload a use case video URL for Twilio review." },
+  {
+    field: "useCaseVideoUrl",
+    message: "Upload a use case video URL for Twilio review.",
+  },
 ];
 
 function buildRcsSenderPackagePredicates(): WorkspaceReadinessPredicate[] {
@@ -388,7 +415,10 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     id: "a2p_approved",
     test: (ctx) =>
       !a2pApplies(ctx) ||
-      (Boolean(ctx.onboarding.a2p10dlc.brandSid) &&
+      (ctx.onboarding.a2p10dlc.messagingProfileStatus === "ready" &&
+        Boolean(ctx.onboarding.a2p10dlc.messagingProfileEndUserSid) &&
+        Boolean(ctx.onboarding.a2p10dlc.trustProductSid) &&
+        Boolean(ctx.onboarding.a2p10dlc.brandSid) &&
         Boolean(ctx.onboarding.a2p10dlc.campaignSid) &&
         (ctx.onboarding.a2p10dlc.status === "approved" ||
           ctx.onboarding.a2p10dlc.status === "live")),
@@ -507,15 +537,17 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     blockingFor: ["sms"] as const,
     code: "toll_free_verification_blocked",
     message: TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE,
-    buildMessage: (ctx) => ctx.syncSnapshot?.lastSyncError
-      ? `${TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE} Sync error: ${ctx.syncSnapshot.lastSyncError}`
-      : TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE,
+    buildMessage: (ctx) =>
+      ctx.syncSnapshot?.lastSyncError
+        ? `${TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE} Sync error: ${ctx.syncSnapshot.lastSyncError}`
+        : TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE,
     severity: "error" as const,
   },
   {
     id: "a2p_customer_profile_bundle",
     test: (ctx) =>
-      !a2pApplies(ctx) || Boolean(ctx.onboarding.a2p10dlc.customerProfileBundleSid),
+      !a2pApplies(ctx) ||
+      Boolean(ctx.onboarding.a2p10dlc.customerProfileBundleSid),
     blockingFor: ["a2p10dlc"] as const,
     code: "a2p_customer_profile_bundle_required",
     message:
@@ -524,7 +556,8 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   },
   {
     id: "a2p_trust_product",
-    test: (ctx) => !a2pApplies(ctx) || Boolean(ctx.onboarding.a2p10dlc.trustProductSid),
+    test: (ctx) =>
+      !a2pApplies(ctx) || Boolean(ctx.onboarding.a2p10dlc.trustProductSid),
     blockingFor: ["a2p10dlc"] as const,
     code: "a2p_trust_product_required",
     message:
@@ -550,11 +583,12 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   },
 ];
 
-export const WORKSPACE_READINESS_PREDICATES: readonly WorkspaceReadinessPredicate[] = [
-  ...CORE_PREDICATES,
-  ...buildBusinessProfileFieldPredicates(),
-  ...buildRcsSenderPackagePredicates(),
-];
+export const WORKSPACE_READINESS_PREDICATES: readonly WorkspaceReadinessPredicate[] =
+  [
+    ...CORE_PREDICATES,
+    ...buildBusinessProfileFieldPredicates(),
+    ...buildRcsSenderPackagePredicates(),
+  ];
 
 export function predicateAppliesTo(
   predicate: WorkspaceReadinessPredicate,
@@ -580,7 +614,7 @@ function resultFromPredicate(
 ): ReadinessResult {
   const message = predicate.buildMessage
     ? predicate.buildMessage(ctx)
-    : messageOverrides?.[predicate.code] ?? predicate.message;
+    : (messageOverrides?.[predicate.code] ?? predicate.message);
   return {
     code: predicate.code,
     message,
@@ -593,9 +627,7 @@ export function evaluateWorkspaceReadiness(
   options: EvaluateWorkspaceReadinessOptions = {},
 ): ReadinessResult[] {
   const channel = options.forChannel ?? "all";
-  const include = options.include
-    ? new Set(options.include)
-    : null;
+  const include = options.include ? new Set(options.include) : null;
   const exclude = options.exclude ? new Set(options.exclude) : null;
   const results: ReadinessResult[] = [];
   for (const predicate of WORKSPACE_READINESS_PREDICATES) {
@@ -644,7 +676,9 @@ export function predicatePassed(
   predicateId: string,
   ctx: WorkspaceReadinessContext,
 ): boolean {
-  const predicate = WORKSPACE_READINESS_PREDICATES.find((p) => p.id === predicateId);
+  const predicate = WORKSPACE_READINESS_PREDICATES.find(
+    (p) => p.id === predicateId,
+  );
   return predicate ? predicate.test(ctx) : true;
 }
 
@@ -672,7 +706,8 @@ function isVerifiedCallerIdNumber(number: WorkspaceReadinessNumber): boolean {
     return false;
   }
   return (
-    (number.capabilities as Record<string, unknown>).verification_status === "success"
+    (number.capabilities as Record<string, unknown>).verification_status ===
+    "success"
   );
 }
 

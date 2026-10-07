@@ -17,7 +17,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   loadWorkspaceTwilioData: vi.fn(),
-  patchWorkspaceTwilioData: vi.fn(),
+  mergeWorkspaceTwilioData: vi.fn(),
   getWorkspaceMessagingOnboardingFromTwilioData: vi.fn(),
   mergeWorkspaceMessagingOnboardingState: vi.fn(),
   fetchBrand: vi.fn(),
@@ -34,9 +34,13 @@ vi.mock("@/lib/logger.server", async (importOriginal) => ({
   logger: mocks.logger,
 }));
 vi.mock("@/lib/merge-workspace-twilio-data.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/merge-workspace-twilio-data.server")>()),
-  loadWorkspaceTwilioData: (...a: unknown[]) => mocks.loadWorkspaceTwilioData(...a),
-  patchWorkspaceTwilioData: (...a: unknown[]) => mocks.patchWorkspaceTwilioData(...a),
+  ...(await importOriginal<
+    typeof import("@/lib/merge-workspace-twilio-data.server")
+  >()),
+  loadWorkspaceTwilioData: (...a: unknown[]) =>
+    mocks.loadWorkspaceTwilioData(...a),
+  mergeWorkspaceTwilioData: (...a: unknown[]) =>
+    mocks.mergeWorkspaceTwilioData(...a),
 }));
 vi.mock("@/lib/messaging-onboarding.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/messaging-onboarding.server")>()),
@@ -68,6 +72,8 @@ function storedOnboarding(overrides: Record<string, unknown> = {}) {
       brandSid: "BR00000000000000000000000000000001",
       campaignSid: "MG00000000000000000000000000000001",
       rejectionReason: null,
+      messagingProfileStatus: "ready",
+      trustProductSid: "BUprofile",
       ...overrides,
     },
     messagingService: { serviceSid: "MG00000000000000000000000000000002" },
@@ -76,18 +82,26 @@ function storedOnboarding(overrides: Record<string, unknown> = {}) {
 
 /** The merged state the sync wrote, i.e. what a later read of the gate sees. */
 function writtenStatus(): string | null {
-  const [, update] = mocks.mergeWorkspaceMessagingOnboardingState.mock.calls.at(-1) ?? [];
-  return (update as { a2p10dlc?: { status?: string } } | undefined)?.a2p10dlc?.status ?? null;
+  const [, update] =
+    mocks.mergeWorkspaceMessagingOnboardingState.mock.calls.at(-1) ?? [];
+  return (
+    (update as { a2p10dlc?: { status?: string } } | undefined)?.a2p10dlc
+      ?.status ?? null
+  );
 }
 
-function wire(options: {
-  onboarding?: Record<string, unknown>;
-  brand?: { status: string; failureReason?: string } | null;
-  campaign?: { campaignStatus: string } | null;
-} = {}) {
+function wire(
+  options: {
+    onboarding?: Record<string, unknown>;
+    brand?: { status: string; failureReason?: string } | null;
+    campaign?: { campaignStatus: string } | null;
+  } = {},
+) {
   const onboarding = options.onboarding ?? storedOnboarding();
   mocks.loadWorkspaceTwilioData.mockResolvedValue({});
-  mocks.getWorkspaceMessagingOnboardingFromTwilioData.mockReturnValue(onboarding);
+  mocks.getWorkspaceMessagingOnboardingFromTwilioData.mockReturnValue(
+    onboarding,
+  );
   // The real merge is a deep merge over a2p10dlc; this reproduces that shape
   // closely enough that writtenStatus() reads the value the sync computed.
   mocks.mergeWorkspaceMessagingOnboardingState.mockImplementation(
@@ -97,8 +111,21 @@ function wire(options: {
       a2p10dlc: { ...(onboarding as any).a2p10dlc, ...(update.a2p10dlc ?? {}) },
     }),
   );
-  mocks.patchWorkspaceTwilioData.mockResolvedValue(undefined);
+  mocks.mergeWorkspaceTwilioData.mockImplementation(
+    async (_workspaceId, merge) => merge({}),
+  );
   mocks.createWorkspaceTwilioClient.mockResolvedValue({
+    trusthub: {
+      v1: {
+        trustProducts: () => ({
+          fetch: async () => ({
+            sid: "BUprofile",
+            policySid: "RNb0d4771c2c98518d916a3d4cd70a8f8b",
+            status: "twilio-approved",
+          }),
+        }),
+      },
+    },
     messaging: {
       v1: {
         brandRegistrations: (sid: string) => ({
@@ -156,10 +183,22 @@ describe("mergeA2pStatus — the aggregate, from authoritative reads only (#2143
   });
 
   test.each([
-    { brand: { fetched: A, exists: true }, campaign: { fetched: null, exists: false } },
-    { brand: { fetched: null, exists: false }, campaign: { fetched: A, exists: true } },
-    { brand: { fetched: A, exists: true }, campaign: { fetched: A, exists: false } },
-    { brand: { fetched: A, exists: true }, campaign: { fetched: J, exists: false } },
+    {
+      brand: { fetched: A, exists: true },
+      campaign: { fetched: null, exists: false },
+    },
+    {
+      brand: { fetched: null, exists: false },
+      campaign: { fetched: A, exists: true },
+    },
+    {
+      brand: { fetched: A, exists: true },
+      campaign: { fetched: A, exists: false },
+    },
+    {
+      brand: { fetched: A, exists: true },
+      campaign: { fetched: J, exists: false },
+    },
   ])("both required resources must exist before approval: %j", (resources) => {
     expect(mergeA2pStatus(resources)).toBe(R);
   });
@@ -220,10 +259,51 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
     vi.clearAllMocks();
   });
 
-  test("a brand re-entering review demotes the stored status", async () => {
-    wire({ brand: { status: "in_review" }, campaign: { campaignStatus: "approved" } });
+  test.each(["brandSid", "campaignSid", "trustProductSid", "serviceSid"])(
+    "a changed %s returns the fresh state without writing old provider results",
+    async (field) => {
+      const previous = storedOnboarding();
+      const fresh = {
+        ...previous,
+        a2p10dlc: {
+          ...previous.a2p10dlc,
+          messagingProfileStatus: "not_started",
+        },
+        messagingService: { ...previous.messagingService },
+      };
+      if (field === "serviceSid")
+        fresh.messagingService.serviceSid = "MGchanged";
+      else Object.assign(fresh.a2p10dlc, { [field]: "changed" });
+      wire({
+        onboarding: previous,
+        brand: { status: "approved" },
+        campaign: { campaignStatus: "approved" },
+      });
+      mocks.getWorkspaceMessagingOnboardingFromTwilioData
+        .mockReturnValueOnce(previous)
+        .mockReturnValueOnce(fresh);
+      const result = await syncWorkspaceA2pStatus({
+        workspaceId: WORKSPACE_ID,
+        actorUserId: null,
+      });
+      expect(
+        mocks.mergeWorkspaceMessagingOnboardingState,
+      ).not.toHaveBeenCalled();
+      expect(result).toBe(fresh);
+      expect(result.a2p10dlc.messagingProfileStatus).toBe("not_started");
+    },
+  );
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+  test("a brand re-entering review demotes the stored status", async () => {
+    wire({
+      brand: { status: "in_review" },
+      campaign: { campaignStatus: "approved" },
+    });
+
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     // Both resources were fetched, and only one is approved, so the aggregate
     // cannot be `approved`. The old code returned the *previous* status here.
@@ -239,23 +319,38 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
       brand: { status: "in_review" },
     });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).toBe("in_review");
   });
 
   test("a rejected brand demotes to rejected", async () => {
-    wire({ brand: { status: "failed" }, campaign: { campaignStatus: "approved" } });
+    wire({
+      brand: { status: "failed" },
+      campaign: { campaignStatus: "approved" },
+    });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).toBe("rejected");
   });
 
   test("a rejected campaign demotes to rejected", async () => {
-    wire({ brand: { status: "approved" }, campaign: { campaignStatus: "rejected" } });
+    wire({
+      brand: { status: "approved" },
+      campaign: { campaignStatus: "rejected" },
+    });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).toBe("rejected");
   });
@@ -267,7 +362,10 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
       campaign: { campaignStatus: "approved" },
     });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).toBe("approved");
   });
@@ -275,9 +373,15 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
   test("a brand that is no longer approved never contributes `approved`", async () => {
     // A brand moving approved -> provisioning is `mapBrandStatus`'s default, so
     // an unrecognised provider status must demote rather than pass through.
-    wire({ brand: { status: "something_new" }, campaign: { campaignStatus: "approved" } });
+    wire({
+      brand: { status: "something_new" },
+      campaign: { campaignStatus: "approved" },
+    });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).not.toBe("approved");
   });
@@ -287,6 +391,17 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
     // from the aggregate, and wrote the old status back with a fresh timestamp.
     wire({ onboarding: storedOnboarding(), brand: { status: "in_review" } });
     mocks.createWorkspaceTwilioClient.mockResolvedValue({
+      trusthub: {
+        v1: {
+          trustProducts: () => ({
+            fetch: async () => ({
+              sid: "BUprofile",
+              policySid: "RNb0d4771c2c98518d916a3d4cd70a8f8b",
+              status: "twilio-approved",
+            }),
+          }),
+        },
+      },
       messaging: {
         v1: {
           brandRegistrations: () => ({
@@ -303,7 +418,10 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
       },
     });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     // The brand is authoritative and it is not approved, so the gate must close
     // even though the campaign could not be read.
@@ -314,8 +432,19 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
     // Nothing authoritative was read, so the honest outcome is to leave the
     // stored state alone rather than guess. Guessing conservatively here would
     // drop a live workspace's gate on a transient network error.
-    wire({ onboarding: storedOnboarding() });
+    wire({ onboarding: storedOnboarding({ trustProductSid: null }) });
     mocks.createWorkspaceTwilioClient.mockResolvedValue({
+      trusthub: {
+        v1: {
+          trustProducts: () => ({
+            fetch: async () => ({
+              sid: "BUprofile",
+              policySid: "RNb0d4771c2c98518d916a3d4cd70a8f8b",
+              status: "twilio-approved",
+            }),
+          }),
+        },
+      },
       messaging: {
         v1: {
           brandRegistrations: () => ({
@@ -341,12 +470,18 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
 
     // No write at all, so `lastSyncedAt` is not bumped and the record does not
     // look freshly verified.
-    expect(mocks.patchWorkspaceTwilioData).not.toHaveBeenCalled();
+    expect(mocks.mergeWorkspaceTwilioData).not.toHaveBeenCalled();
     expect((result as any).a2p10dlc.status).toBe("approved");
   });
 
   test("with no brand and no campaign, nothing is fetched and nothing is written", async () => {
-    wire({ onboarding: storedOnboarding({ brandSid: null, campaignSid: null }) });
+    wire({
+      onboarding: storedOnboarding({
+        brandSid: null,
+        campaignSid: null,
+        trustProductSid: null,
+      }),
+    });
 
     const result = await syncWorkspaceA2pStatus({
       workspaceId: WORKSPACE_ID,
@@ -354,7 +489,7 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
     });
 
     expect(mocks.createWorkspaceTwilioClient).not.toHaveBeenCalled();
-    expect(mocks.patchWorkspaceTwilioData).not.toHaveBeenCalled();
+    expect(mocks.mergeWorkspaceTwilioData).not.toHaveBeenCalled();
     expect((result as any).a2p10dlc.status).toBe("approved");
   });
 
@@ -365,20 +500,35 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
       brand: { status: "approved" },
     });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
     expect(writtenStatus()).toBe("in_review");
   });
 
   test("provider VERIFIED campaign and approved brand establish approval", async () => {
-    wire({ brand: { status: "APPROVED" }, campaign: { campaignStatus: "VERIFIED" } });
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    wire({
+      brand: { status: "APPROVED" },
+      campaign: { campaignStatus: "VERIFIED" },
+    });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
     expect(writtenStatus()).toBe("approved");
   });
 
   test("provider IN_PROGRESS campaign remains in review", async () => {
-    wire({ brand: { status: "APPROVED" }, campaign: { campaignStatus: "IN_PROGRESS" } });
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    wire({
+      brand: { status: "APPROVED" },
+      campaign: { campaignStatus: "IN_PROGRESS" },
+    });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
     expect(writtenStatus()).toBe("in_review");
   });
 
@@ -388,9 +538,15 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
       campaign: { campaignStatus: "approved" },
     });
 
-    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    await syncWorkspaceA2pStatus({
+      workspaceId: WORKSPACE_ID,
+      actorUserId: null,
+    });
 
-    const [, update] = mocks.mergeWorkspaceMessagingOnboardingState.mock.calls.at(-1) ?? [];
-    expect((update as any).a2p10dlc.rejectionReason).toBe("Business identity mismatch");
+    const [, update] =
+      mocks.mergeWorkspaceMessagingOnboardingState.mock.calls.at(-1) ?? [];
+    expect((update as any).a2p10dlc.rejectionReason).toBe(
+      "Business identity mismatch",
+    );
   });
 });

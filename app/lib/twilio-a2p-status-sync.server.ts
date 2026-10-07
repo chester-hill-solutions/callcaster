@@ -1,4 +1,3 @@
-import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
@@ -6,9 +5,13 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import {
   loadWorkspaceTwilioData,
-  patchWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
-import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
+import { resolveA2pPolicySid } from "@/lib/a2p-messaging-profile.server";
+import {
+  createWorkspaceTwilioClient,
+  fetchA2pTrustProduct,
+} from "@/lib/twilio-client.server";
 import type { TwilioAccountData, WorkspaceOnboardingStatus } from "@/lib/types";
 
 function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
@@ -74,7 +77,8 @@ export async function syncWorkspaceA2pStatus({
   const brandSid = onboarding.a2p10dlc.brandSid;
   const campaignSid = onboarding.a2p10dlc.campaignSid;
 
-  if (!brandSid && !campaignSid) {
+  const trustProductSid = onboarding.a2p10dlc.trustProductSid;
+  if (!brandSid && !campaignSid && !trustProductSid) {
     return onboarding;
   }
 
@@ -89,6 +93,29 @@ export async function syncWorkspaceA2pStatus({
   let brandStatus: WorkspaceOnboardingStatus | null = null;
   let campaignStatus: WorkspaceOnboardingStatus | null = null;
   let rejectionReason = onboarding.a2p10dlc.rejectionReason;
+  let productAccepted = false;
+  let productError: string | null = null;
+  if (trustProductSid) {
+    try {
+      const product = await fetchA2pTrustProduct(twilio, trustProductSid, {
+        workspaceId,
+        operation: "trusthub.trustProducts.fetch",
+      });
+      productAccepted =
+        product.sid === trustProductSid &&
+        product.policySid === resolveA2pPolicySid() &&
+        ["pending-review", "in-review", "twilio-approved"].includes(
+          product.status,
+        );
+      if (!productAccepted)
+        productError =
+          "A2P Messaging Profile is not accepted for review. Correct its business information and retry preparation.";
+    } catch (error) {
+      logger.error("A2P Messaging Profile status read failed:", error);
+      productError =
+        "A2P Messaging Profile status could not be verified. Retry preparation before sending.";
+    }
+  }
 
   try {
     if (brandSid) {
@@ -112,7 +139,7 @@ export async function syncWorkspaceA2pStatus({
     // either way, so the return below is shared.
   }
 
-  if (brandStatus === null && campaignStatus === null) {
+  if (brandStatus === null && campaignStatus === null && !trustProductSid) {
     // Nothing authoritative was read. Leave the state exactly as it is rather
     // than guessing: guessing conservatively would close a live workspace's
     // send gate on a transient network error, and no write means `lastSyncedAt`
@@ -120,23 +147,57 @@ export async function syncWorkspaceA2pStatus({
     return onboarding;
   }
 
-  const mergedStatus = mergeA2pStatus({
+  const resourceStatus = mergeA2pStatus({
     brand: { fetched: brandStatus, exists: Boolean(brandSid) },
     campaign: { fetched: campaignStatus, exists: Boolean(campaignSid) },
   });
 
-  const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
-    a2p10dlc: {
-      ...onboarding.a2p10dlc,
-      status: mergedStatus,
-      rejectionReason,
-      lastSyncedAt: new Date().toISOString(),
-    },
-    lastUpdatedBy: actorUserId,
-  });
-
-  await patchWorkspaceTwilioData(workspaceId, {
-    onboarding: nextOnboarding,
+  let nextOnboarding = onboarding;
+  await mergeWorkspaceTwilioData(workspaceId, (current) => {
+    const fresh = getWorkspaceMessagingOnboardingFromTwilioData(current);
+    nextOnboarding = fresh;
+    if (
+      fresh.a2p10dlc.brandSid !== brandSid ||
+      fresh.a2p10dlc.campaignSid !== campaignSid ||
+      fresh.a2p10dlc.trustProductSid !== trustProductSid ||
+      fresh.messagingService.serviceSid !==
+        onboarding.messagingService.serviceSid
+    )
+      return current;
+    const preparation = productError
+      ? "action_needed"
+      : fresh.a2p10dlc.messagingProfileStatus;
+    const mergedStatus =
+      preparation === "ready" && productAccepted
+        ? resourceStatus
+        : preparation === "action_needed"
+          ? "rejected"
+          : "in_review";
+    nextOnboarding = mergeWorkspaceMessagingOnboardingState(fresh, {
+      a2p10dlc: {
+        messagingProfileStatus: preparation,
+        status: mergedStatus,
+        rejectionReason:
+          productError ??
+          (preparation === "action_needed"
+            ? fresh.a2p10dlc.rejectionReason
+            : rejectionReason),
+        lastSyncedAt: new Date().toISOString(),
+      },
+      ...(productError
+        ? {
+            reviewState: {
+              ...fresh.reviewState,
+              lastError: productError,
+              blockingIssues: [
+                ...new Set([...fresh.reviewState.blockingIssues, productError]),
+              ],
+            },
+          }
+        : {}),
+      lastUpdatedBy: actorUserId,
+    });
+    return { ...current, onboarding: nextOnboarding };
   });
 
   return nextOnboarding;

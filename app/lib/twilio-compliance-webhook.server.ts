@@ -2,9 +2,8 @@
  * Shared helpers for the Twilio compliance webhook receivers (Trust Hub status
  * callbacks and A2P Event Streams events).
  *
- * `twilio_data` is stored as a JSON text column, so workspace resolution casts
- * it to jsonb and matches the relevant compliance SID inside the onboarding
- * state. Guarded so a single malformed row cannot break the lookup.
+ * The runtime column is JSONB; its text cast also permits the legacy text
+ * declaration's empty-value guard.
  */
 
 import { sql } from "drizzle-orm";
@@ -13,7 +12,7 @@ import { logger } from "@/lib/logger.server";
 
 /**
  * Resolve the workspace whose onboarding state references `sid` as its Trust Hub
- * customer profile bundle, A2P brand, or A2P campaign SID. Returns null when no
+ * customer profile bundle, Messaging Profile, brand, or campaign SID. Returns null when no
  * workspace matches.
  */
 export async function findWorkspaceIdByComplianceSid(
@@ -25,10 +24,11 @@ export async function findWorkspaceIdByComplianceSid(
       SELECT id
       FROM workspace
       WHERE twilio_data IS NOT NULL
-        AND twilio_data <> ''
+        AND twilio_data::text <> ''
         AND jsonb_typeof(twilio_data::jsonb) = 'object'
         AND (
           (twilio_data::jsonb #>> '{onboarding,a2p10dlc,customerProfileBundleSid}') = ${sid}
+          OR (twilio_data::jsonb #>> '{onboarding,a2p10dlc,trustProductSid}') = ${sid}
           OR (twilio_data::jsonb #>> '{onboarding,a2p10dlc,brandSid}') = ${sid}
           OR (twilio_data::jsonb #>> '{onboarding,a2p10dlc,campaignSid}') = ${sid}
         )

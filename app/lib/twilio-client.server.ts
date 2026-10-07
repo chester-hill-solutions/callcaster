@@ -8,7 +8,10 @@ import type { SubscriptionListInstanceCreateOptions } from "twilio/lib/rest/even
 
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
-import { isRetryableTwilioError, presentTwilioError } from "@/lib/twilio-errors";
+import {
+  isRetryableTwilioError,
+  presentTwilioError,
+} from "@/lib/twilio-errors";
 
 export type TwilioClientCallOptions = {
   workspaceId?: string;
@@ -150,18 +153,20 @@ export async function createTrustHubCustomerProfile(
   options: TwilioClientCallOptions,
 ): Promise<{ sid: string | null; status: string | null }> {
   return withTwilioRetry(async () => {
-    const trusthub = (twilio as unknown as {
-      trusthub?: {
-        v1?: {
-          customerProfiles?: {
-            create: (params: Record<string, unknown>) => Promise<{
-              sid?: string;
-              status?: string;
-            }>;
+    const trusthub = (
+      twilio as unknown as {
+        trusthub?: {
+          v1?: {
+            customerProfiles?: {
+              create: (params: Record<string, unknown>) => Promise<{
+                sid?: string;
+                status?: string;
+              }>;
+            };
           };
         };
-      };
-    }).trusthub;
+      }
+    ).trusthub;
     const create = trusthub?.v1?.customerProfiles?.create;
     if (!create) {
       throw new Error("Twilio Trust Hub customerProfiles API is unavailable");
@@ -278,10 +283,10 @@ export async function createA2pTrustProduct(
   input: A2pTrustProductCreateInput,
   options: TwilioClientCallOptions,
 ) {
-  return withTwilioRetry(
-    () => twilio.trusthub.v1.trustProducts.create(input),
-    options,
-  );
+  return withTwilioRetry(() => twilio.trusthub.v1.trustProducts.create(input), {
+    ...options,
+    maxAttempts: 1,
+  });
 }
 
 export async function fetchA2pTrustProduct(
@@ -295,10 +300,79 @@ export async function fetchA2pTrustProduct(
   );
 }
 
+export async function listA2pTrustProducts(
+  twilio: Twilio.Twilio,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () => twilio.trusthub.v1.trustProducts.list(),
+    options,
+  );
+}
+
+export async function listA2pMessagingProfileEndUsers(
+  twilio: Twilio.Twilio,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(() => twilio.trusthub.v1.endUsers.list(), options);
+}
+
+export async function createA2pMessagingProfileEndUser(
+  twilio: Twilio.Twilio,
+  input: { friendlyName: string; attributes: Record<string, unknown> },
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () =>
+      twilio.trusthub.v1.endUsers.create({
+        ...input,
+        type: "us_a2p_messaging_profile_information",
+      }),
+    { ...options, maxAttempts: 1 },
+  );
+}
+
+export async function fetchA2pMessagingProfileEndUser(
+  twilio: Twilio.Twilio,
+  endUserSid: string,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () => twilio.trusthub.v1.endUsers(endUserSid).fetch(),
+    options,
+  );
+}
+
+export async function updateA2pMessagingProfileEndUser(
+  twilio: Twilio.Twilio,
+  endUserSid: string,
+  attributes: Record<string, unknown>,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () => twilio.trusthub.v1.endUsers(endUserSid).update({ attributes }),
+    options,
+  );
+}
+
+export async function evaluateA2pTrustProduct(
+  twilio: Twilio.Twilio,
+  trustProductSid: string,
+  policySid: string,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () =>
+      twilio.trusthub.v1
+        .trustProducts(trustProductSid)
+        .trustProductsEvaluations.create({ policySid }),
+    options,
+  );
+}
+
 /**
- * Attach an object (e.g. the Secondary Customer Profile bundle) to a Trust
- * Product as an entity assignment. Idempotent at the caller: Twilio returns the
- * existing assignment if the object is already attached.
+ * The caller recovers an existing assignment after an uncertain response;
+ * repeating this POST inside the transport retry can duplicate an assignment.
  */
 export async function assignA2pTrustProductEntity(
   twilio: Twilio.Twilio,
@@ -311,7 +385,7 @@ export async function assignA2pTrustProductEntity(
       twilio.trusthub.v1
         .trustProducts(trustProductSid)
         .trustProductsEntityAssignments.create({ objectSid }),
-    options,
+    { ...options, maxAttempts: 1 },
   );
 }
 
@@ -325,12 +399,12 @@ export async function listA2pTrustProductEntities(
     () =>
       twilio.trusthub.v1
         .trustProducts(trustProductSid)
-        .trustProductsEntityAssignments.list({ limit: 200 }),
+        .trustProductsEntityAssignments.list(),
     options,
   );
 }
 
-/** Submit a Trust Product for review (transition its status to `submitted`). */
+/** Submit a Trust Product for review (transition its status to `pending-review`). */
 export async function submitA2pTrustProduct(
   twilio: Twilio.Twilio,
   trustProductSid: string,
@@ -343,7 +417,7 @@ export async function submitA2pTrustProduct(
         status: "pending-review",
         ...(statusCallback ? { statusCallback } : {}),
       }),
-    options,
+    { ...options, maxAttempts: 1 },
   );
 }
 
@@ -357,6 +431,16 @@ export async function createA2pBrandRegistration(
 ) {
   return withTwilioRetry(
     () => twilio.messaging.v1.brandRegistrations.create(input),
+    { ...options, maxAttempts: 1 },
+  );
+}
+
+export async function listA2pBrandRegistrations(
+  twilio: Twilio.Twilio,
+  options: TwilioClientCallOptions,
+) {
+  return withTwilioRetry(
+    () => twilio.messaging.v1.brandRegistrations.list(),
     options,
   );
 }
@@ -385,9 +469,8 @@ export async function createA2pCampaign(
   options: TwilioClientCallOptions,
 ) {
   return withTwilioRetry(
-    () =>
-      twilio.messaging.v1.services(serviceSid).usAppToPerson.create(input),
-    options,
+    () => twilio.messaging.v1.services(serviceSid).usAppToPerson.create(input),
+    { ...options, maxAttempts: 1 },
   );
 }
 
@@ -397,8 +480,7 @@ export async function listA2pCampaigns(
   options: TwilioClientCallOptions,
 ) {
   return withTwilioRetry(
-    () =>
-      twilio.messaging.v1.services(serviceSid).usAppToPerson.list({ limit: 200 }),
+    () => twilio.messaging.v1.services(serviceSid).usAppToPerson.list(),
     options,
   );
 }

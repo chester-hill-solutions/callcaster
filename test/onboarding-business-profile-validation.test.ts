@@ -26,7 +26,10 @@ vi.mock("@/lib/messaging-onboarding.server", () => ({
     mocks.getWorkspaceMessagingOnboardingState(...args),
   applyOnboardingStepsWithWorkspaceNumbers: (state: unknown) => state,
   applyWorkspaceOnboardingChannelPolicy: (state: unknown) => state,
-  deriveWorkspaceMessagingReadiness: () => ({ ready: false, blockingIssues: [] }),
+  deriveWorkspaceMessagingReadiness: () => ({
+    ready: false,
+    blockingIssues: [],
+  }),
   isWizardOnboardingStepId: () => true,
 }));
 
@@ -152,7 +155,10 @@ function onboardingState(overrides: Record<string, unknown> = {}) {
         lastValidatedAt: null,
       },
     },
-    messagingService: { serviceSid: null, desiredSendMode: "messaging_service" },
+    messagingService: {
+      serviceSid: null,
+      desiredSendMode: "messaging_service",
+    },
     a2p10dlc: { status: "not_started" },
     rcs: { status: "not_started", regions: [] as string[] },
     reviewState: { blockingIssues: [] as string[], lastError: null },
@@ -201,7 +207,10 @@ function completeBaselineForm(): FormData {
   formData.set("legalBusinessName", "Northgate Services Inc.");
   formData.set("websiteUrl", "https://www.northgateservices.example");
   formData.set("useCaseSummary", "Appointment reminders for booked clients.");
-  formData.set("sampleMessages", "Northgate: your appointment is tomorrow at 9:30 AM.");
+  formData.set(
+    "sampleMessages",
+    "Northgate: your appointment is tomorrow at 9:30 AM.",
+  );
   formData.set("operatingCountry", "CA");
   return formData;
 }
@@ -212,54 +221,125 @@ describe("save_business_profile validation", () => {
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     mocks.getUserRole.mockResolvedValue({ role: "owner" });
     mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [] });
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState());
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState(),
+    );
     mocks.persistWorkspaceOnboardingState.mockResolvedValue(undefined);
     mocks.getWorkspaceCredits.mockResolvedValue(0);
   });
 
-  test.each(["save_business_profile", "save_channels"])("%s refuses an invalid selection before writing", async (action) => {
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
-      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
-      businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Acme", tollFreeOptInType: "WEB_FORM" },
-    }));
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, action, {
-      legalBusinessName: "Acme", tollFreeOptInType: "NOT_VERBAL", selectedGoal: "sms_blast",
-    });
-    expect(outcome).toMatchObject({ ok: false, status: 400 });
-    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
-    expect(mocks.enqueueWorkspaceComplianceJob).not.toHaveBeenCalled();
-  });
+  test.each(["save_business_profile", "save_channels"])(
+    "%s refuses an invalid selection before writing",
+    async (action) => {
+      mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+        onboardingState({
+          selectedGoal: "sms_blast",
+          selectedChannels: ["toll_free_bulk_sms"],
+          businessProfile: {
+            ...EMPTY_BUSINESS_PROFILE,
+            legalBusinessName: "Acme",
+            tollFreeOptInType: "WEB_FORM",
+          },
+        }),
+      );
+      const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, action, {
+        legalBusinessName: "Acme",
+        tollFreeOptInType: "NOT_VERBAL",
+        selectedGoal: "sms_blast",
+      });
+      expect(outcome).toMatchObject({ ok: false, status: 400 });
+      expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+      expect(mocks.enqueueWorkspaceComplianceJob).not.toHaveBeenCalled();
+    },
+  );
 
   test("the toll-free identity step cannot advance without an explicit consent selection", async () => {
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
-      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
-    }));
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", identityForm({ legalBusinessName: "Acme" }));
-    expect(outcome).toMatchObject({ ok: true, result: { kind: "payload", status: 400, data: { error: "Choose how customers consent to toll-free SMS in Business identity." } } });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["toll_free_bulk_sms"],
+      }),
+    );
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({ legalBusinessName: "Acme" }),
+    );
+    expect(outcome).toMatchObject({
+      ok: true,
+      result: {
+        kind: "payload",
+        status: 400,
+        data: {
+          error:
+            "Choose how customers consent to toll-free SMS in Business identity.",
+        },
+      },
+    });
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 
   test("an exact consent selection is saved with the identity form", async () => {
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
-      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
-    }));
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", identityForm({ legalBusinessName: "Acme", tollFreeOptInType: "MOBILE_QR_CODE" }));
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["toll_free_bulk_sms"],
+      }),
+    );
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({
+        legalBusinessName: "Acme",
+        tollFreeOptInType: "MOBILE_QR_CODE",
+      }),
+    );
     expect(outcome.ok).toBe(true);
-    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(expect.objectContaining({
-      updates: expect.objectContaining({ businessProfile: expect.objectContaining({ tollFreeOptInType: "MOBILE_QR_CODE" }) }),
-    }));
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          businessProfile: expect.objectContaining({
+            tollFreeOptInType: "MOBILE_QR_CODE",
+          }),
+        }),
+      }),
+    );
   });
 
   test("saving a different wizard step preserves the previous consent selection", async () => {
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState({
-      selectedGoal: "sms_blast", selectedChannels: ["toll_free_bulk_sms"],
-      businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Acme", tollFreeOptInType: "PAPER_FORM" },
-    }));
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", programForm({ useCaseSummary: "Appointment reminders", sampleMessages: "Acme: Your appointment is tomorrow. Reply STOP to stop." }));
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["toll_free_bulk_sms"],
+        businessProfile: {
+          ...EMPTY_BUSINESS_PROFILE,
+          legalBusinessName: "Acme",
+          tollFreeOptInType: "PAPER_FORM",
+        },
+      }),
+    );
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      programForm({
+        useCaseSummary: "Appointment reminders",
+        sampleMessages:
+          "Acme: Your appointment is tomorrow. Reply STOP to stop.",
+      }),
+    );
     expect(outcome.ok).toBe(true);
-    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(expect.objectContaining({
-      updates: expect.objectContaining({ businessProfile: expect.objectContaining({ tollFreeOptInType: "PAPER_FORM" }) }),
-    }));
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          businessProfile: expect.objectContaining({
+            tollFreeOptInType: "PAPER_FORM",
+          }),
+        }),
+      }),
+    );
   });
 
   // The intake gate must equal what the Identity screen collects. When it
@@ -275,7 +355,9 @@ describe("save_business_profile validation", () => {
   });
 
   test("maps legacy business_profile persisted step to business_identity", () => {
-    expect(resolvePersistedWizardStep("business_profile")).toBe("business_identity");
+    expect(resolvePersistedWizardStep("business_profile")).toBe(
+      "business_identity",
+    );
     expect(resolvePersistedWizardStep(null)).toBe("path_selection");
   });
 
@@ -292,7 +374,9 @@ describe("save_business_profile validation", () => {
     expect(outcome.result.kind).toBe("payload");
     if (outcome.result.kind !== "payload") return;
     expect(outcome.result.status).toBe(400);
-    expect(outcome.result.data.error).toContain("Legal business name is required.");
+    expect(outcome.result.data.error).toContain(
+      "Legal business name is required.",
+    );
     // websiteUrl is optional at intake — plenty of customers have no website.
     // Messaging channels still demand it via the per-channel predicates.
     expect(outcome.result.data.error).not.toContain("Website URL is required.");
@@ -316,7 +400,10 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "business_program" });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "business_program",
+    });
     expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
       expect.objectContaining({
         updates: expect.objectContaining({ currentStep: "business_program" }),
@@ -345,6 +432,7 @@ describe("save_business_profile validation", () => {
         ageGatedContent: "true",
         channelSampleMessages:
           "Northgate: your appointment is tomorrow.\nReply STOP to opt out.",
+        a2pCompanyType: "private",
         ein: "12-3456789",
         industry: "Healthcare",
         authorizedRepName: "Jordan Smith",
@@ -395,7 +483,10 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "audience",
+    });
   });
 
   test("identity save preserves previously saved program fields", async () => {
@@ -446,8 +537,12 @@ describe("save_business_profile validation", () => {
     expect(outcome.result.kind).toBe("payload");
     if (outcome.result.kind !== "payload") return;
     expect(outcome.result.status).toBe(400);
-    expect(outcome.result.data.error).toContain("Use case summary is required.");
-    expect(outcome.result.data.error).toContain("At least one sample message is required.");
+    expect(outcome.result.data.error).toContain(
+      "Use case summary is required.",
+    );
+    expect(outcome.result.data.error).toContain(
+      "At least one sample message is required.",
+    );
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
 
@@ -468,8 +563,15 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
-    const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "audience",
+    });
+    const mapped = mapOnboardingHandlerResult(
+      outcome.result,
+      outcome.detail,
+      "ui",
+    );
     expect(mapped).toMatchObject({ kind: "ui_redirect", step: "audience" });
   });
 
@@ -480,7 +582,10 @@ describe("save_business_profile validation", () => {
         status: "collecting_business",
         currentStep: "business_program",
         selectedGoal: "sms_blast",
-        businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Northgate Clinic" },
+        businessProfile: {
+          ...EMPTY_BUSINESS_PROFILE,
+          legalBusinessName: "Northgate Clinic",
+        },
       }),
     );
 
@@ -496,7 +601,10 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "audience",
+    });
   });
 
   test("a hint-less save after intake still returns to the capability surface", async () => {
@@ -504,7 +612,10 @@ describe("save_business_profile validation", () => {
       onboardingState({
         status: "collecting_business",
         selectedGoal: "sms_blast",
-        businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Northgate Clinic" },
+        businessProfile: {
+          ...EMPTY_BUSINESS_PROFILE,
+          legalBusinessName: "Northgate Clinic",
+        },
       }),
     );
     const form = programForm({
@@ -515,11 +626,19 @@ describe("save_business_profile validation", () => {
     form.set("legalBusinessName", "Northgate Clinic");
     form.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings`);
 
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", form);
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      form,
+    );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect_path", path: `/workspaces/${WORKSPACE_ID}/settings` });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect_path",
+      path: `/workspaces/${WORKSPACE_ID}/settings`,
+    });
   });
 
   test("full baseline submit without wizardStep advances to audience", async () => {
@@ -536,15 +655,23 @@ describe("save_business_profile validation", () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
+    expect(outcome.result).toMatchObject({
+      kind: "redirect",
+      step: "audience",
+    });
   });
   test("rejects a JSON API submit with blank required fields", async () => {
-    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", {
-      legalBusinessName: "",
-      websiteUrl: "",
-      useCaseSummary: "",
-      sampleMessages: [],
-    });
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      {
+        legalBusinessName: "",
+        websiteUrl: "",
+        useCaseSummary: "",
+        sampleMessages: [],
+      },
+    );
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
@@ -553,4 +680,122 @@ describe("save_business_profile validation", () => {
     expect(outcome.result.status).toBe(400);
     expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
   });
+});
+
+describe("A2P identity save requirements (#2282)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
+    mocks.requireWorkspaceAccess.mockResolvedValue({ role: "owner" });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["a2p10dlc"],
+      }),
+    );
+    mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [] });
+    mocks.getWorkspaceCredits.mockResolvedValue(0);
+    mocks.persistWorkspaceOnboardingState.mockResolvedValue(onboardingState());
+  });
+  test.each([""])(
+    "company type %s cannot advance identity or write",
+    async (company) => {
+      const outcome = await runOnboardingAction(
+        USER_ID,
+        WORKSPACE_ID,
+        "save_business_profile",
+        identityForm({
+          legalBusinessName: "Acme",
+          websiteUrl: "https://acme.example",
+          a2pCompanyType: company,
+        }),
+      );
+      expect(outcome).toMatchObject({
+        ok: true,
+        result: { kind: "payload", status: 400 },
+      });
+      expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+    },
+  );
+  test.each(["a2pStockExchange", "a2pStockTicker", "a2pBrandContactEmail"])(
+    "missing public %s prevents advancement",
+    async (field) => {
+      const form = identityForm({
+        legalBusinessName: "Acme",
+        websiteUrl: "https://acme.example",
+        a2pCompanyType: "public",
+        a2pStockExchange: "NASDAQ",
+        a2pStockTicker: "ACME",
+        a2pBrandContactEmail: "jordan@acme.example",
+      });
+      form.delete(field);
+      const outcome = await runOnboardingAction(
+        USER_ID,
+        WORKSPACE_ID,
+        "save_business_profile",
+        form,
+      );
+      expect(outcome).toMatchObject({
+        ok: true,
+        result: { kind: "payload", status: 400 },
+      });
+      expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+    },
+  );
+  test("complete public fields advance and persist exact provider codes", async () => {
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({
+        legalBusinessName: "Acme",
+        websiteUrl: "https://acme.example",
+        a2pCompanyType: "public",
+        a2pStockExchange: "TSX",
+        a2pStockTicker: "ACME",
+        a2pBrandContactEmail: "jordan@acme.example",
+      }),
+    );
+    expect(outcome).toMatchObject({
+      ok: true,
+      result: { kind: "redirect", step: "business_program" },
+    });
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          businessProfile: expect.objectContaining({
+            a2pCompanyType: "public",
+            a2pStockExchange: "TSX",
+            a2pStockTicker: "ACME",
+            a2pBrandContactEmail: "jordan@acme.example",
+          }),
+        }),
+      }),
+    );
+  });
+  test("invalid JSON email is rejected before persistence", async () => {
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      { a2pCompanyType: "public", a2pBrandContactEmail: "bad-email" },
+    );
+    expect(outcome).toMatchObject({ ok: false, status: 400 });
+    expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+  });
+  test.each(["save_business_profile", "save_channels"])(
+    "%s rejects an invalid company enum before any write",
+    async (action) => {
+      const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, action, {
+        a2pCompanyType: "Public",
+      });
+      expect(outcome).toMatchObject({
+        ok: false,
+        status: 400,
+        error: "Choose a valid A2P company type.",
+      });
+      expect(mocks.persistWorkspaceOnboardingState).not.toHaveBeenCalled();
+      expect(mocks.enqueueWorkspaceComplianceJob).not.toHaveBeenCalled();
+    },
+  );
 });
