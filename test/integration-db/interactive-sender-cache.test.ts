@@ -111,10 +111,10 @@ describe.skipIf(!databaseUrl)(
       values (${workspaceId}::uuid,${`owned-cache-${workspaceId}`},100,'{}'::jsonb,false,'{}'::jsonb,${`SK${"4".repeat(32)}`},'owned-api-secret')`;
       await sql`insert into "user" (id,username) values (${actorId}::uuid,${`owned-cache-${actorId}@example.test`})`;
       await sql`insert into workspace_member (id,workspace_id,user_id,role_id) values (${`owned-cache-${actorId}`},${workspaceId},${actorId},'owner')`;
+      pools = await import("@/server/db");
       chat = await import("@/lib/chat-sms.server");
       data = await import("@/lib/merge-workspace-twilio-data.server");
       senderPool = await import("@/lib/twilio-sender-pool.server");
-      pools = await import("@/server/db");
     });
     beforeEach(async () => {
       await sql`delete from workspace_events where workspace_id=${workspaceId}::uuid`;
@@ -198,6 +198,7 @@ describe.skipIf(!databaseUrl)(
       vi.useRealTimers();
     });
     afterAll(async () => {
+      const failures: unknown[] = [];
       try {
         if (sql) {
           await sql`delete from workspace_events where workspace_id=${workspaceId}::uuid`;
@@ -211,15 +212,29 @@ describe.skipIf(!databaseUrl)(
           await sql`delete from workspace where id=${workspaceId}::uuid`;
           await sql`delete from "user" where id=${actorId}::uuid`;
         }
+      } catch (error) {
+        failures.push(error);
       } finally {
-        if (pools)
-          await Promise.all([pools.pool.end(), pools.directPool.end()]);
-        if (sql) await sql.end();
-        for (const [name, value] of Object.entries(originalEnv)) {
-          if (value === undefined) delete process.env[name];
-          else process.env[name] = value;
+        try {
+          const closed = await Promise.allSettled([
+            Promise.resolve().then(() => pools?.pool.end()),
+            Promise.resolve().then(() => pools?.directPool.end()),
+            Promise.resolve().then(() => sql?.end()),
+          ]);
+          failures.push(
+            ...closed.flatMap((result) =>
+              result.status === "rejected" ? [result.reason] : [],
+            ),
+          );
+        } finally {
+          for (const [name, value] of Object.entries(originalEnv)) {
+            if (value === undefined) delete process.env[name];
+            else process.env[name] = value;
+          }
         }
       }
+      if (failures.length)
+        throw new AggregateError(failures, "Owned sender-cache cleanup failed");
     });
     async function campaignBatch() {
       const [campaign] = await sql`insert into campaign

@@ -3,19 +3,45 @@ import { Twilio } from "twilio";
 import RequestClient from "twilio/lib/base/RequestClient";
 import { onboardingFixture } from "./fixtures/onboarding";
 
-const fixture = vi.hoisted(() => ({ data: {} as Record<string, unknown> }));
+const fixture = vi.hoisted(() => ({
+  data: {} as Record<string, unknown>,
+  beforeDataRead: null as (() => Promise<void>) | null,
+  afterDataReturn: null as (() => Promise<void>) | null,
+}));
 vi.mock("@/server/admin-db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/admin-db")>()),
   adminDb: {
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [{ twilio_data: fixture.data }],
+          limit: async () => {
+            const twilioData = structuredClone(fixture.data);
+            await fixture.beforeDataRead?.();
+            return [{ twilio_data: twilioData }];
+          },
         }),
       }),
     }),
   },
 }));
+vi.mock("@/lib/merge-workspace-twilio-data.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("@/lib/merge-workspace-twilio-data.server")
+    >();
+  return {
+    ...actual,
+    loadWorkspaceTwilioData: async (
+      ...args: Parameters<typeof actual.loadWorkspaceTwilioData>
+    ) => {
+      const value = await actual.loadWorkspaceTwilioData(...args);
+      const hook = fixture.afterDataReturn;
+      fixture.afterDataReturn = null;
+      await hook?.();
+      return value;
+    },
+  };
+});
 let sdk: Twilio;
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
@@ -123,6 +149,8 @@ describe("interactive sender snapshots through installed Twilio SDK", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-07T09:00:00Z"));
     setupData();
+    fixture.beforeDataRead = null;
+    fixture.afterDataReturn = null;
     livePhones = [phone];
     liveChannels = [];
     rejected = false;
@@ -234,6 +262,49 @@ describe("interactive sender snapshots through installed Twilio SDK", () => {
       if (change === "RCS sender") expect(result.rcsSenderId).toBe(senderSid);
     },
   );
+  test("an old data SELECT cannot restore approval after invalidation or allow a retry", async () => {
+    let release!: () => void, entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fixture.beforeDataRead = async () => {
+      entered();
+      await pending;
+    };
+    const initial = assertWorkspaceCanSendSms(interactive).then(
+      () => "allowed",
+      () => "refused",
+    );
+    await started;
+    onboarding().a2p10dlc.status = "rejected";
+    invalidateWorkspaceTwilioData("w1");
+    fixture.beforeDataRead = null;
+    release();
+    expect(await initial).toBe("refused");
+    await expect(assertWorkspaceCanSendSms(interactive)).rejects.toThrow(
+      "not approved",
+    );
+    expect(readCount()).toBe(1);
+  });
+  test("a completed data read cannot mix old toll-free approval with newer sender checks", async () => {
+    fixture.afterDataReturn = async () => {
+      fixture.data.portalSync = {
+        lastSyncStatus: "healthy",
+        tollFreeVerificationBlocked: true,
+        tollFreeVerificationCheckedAt: "2026-10-07T09:00:00Z",
+      };
+      invalidateWorkspaceTwilioData("w1");
+    };
+    await expect(assertWorkspaceCanSendSms(interactive)).rejects.toThrow(
+      "configuration changed",
+    );
+    await expect(assertWorkspaceCanSendSms(interactive)).rejects.toThrow(
+      "Toll-free verification",
+    );
+  });
   test("changed config rejects every caller waiting on the old request", async () => {
     let release!: () => void;
     let entered!: () => void;
@@ -248,8 +319,8 @@ describe("interactive sender snapshots through installed Twilio SDK", () => {
       await pending;
     };
     const results = Promise.allSettled([
-      assertWorkspaceCanSendSms(interactive),
-      assertWorkspaceCanSendSms(interactive),
+      verifyWorkspaceMessagingSenderPool(interactive),
+      verifyWorkspaceMessagingSenderPool(interactive),
     ]);
     await started;
     invalidateWorkspaceTwilioData("w1");
@@ -259,7 +330,7 @@ describe("interactive sender snapshots through installed Twilio SDK", () => {
       "rejected",
     ]);
     beforeRead = undefined;
-    await assertWorkspaceCanSendSms(interactive);
+    await verifyWorkspaceMessagingSenderPool(interactive);
     expect(readCount()).toBe(2);
   });
   test("RCS bursts share both phone and channel list requests", async () => {

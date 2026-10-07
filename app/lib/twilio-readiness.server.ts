@@ -11,7 +11,10 @@ import {
   getWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
 } from "@/lib/database/workspace.server";
-import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  getWorkspaceTwilioDataVersion,
+  loadWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 export class WorkspaceSmsNotReadyError extends Error {
@@ -38,6 +41,7 @@ export async function assertWorkspaceCanSendSms({
   workspaceId: string;
   reuseProviderSnapshot?: boolean;
 }): Promise<void> {
+  const version = getWorkspaceTwilioDataVersion(workspaceId);
   const twilioData = (await loadWorkspaceTwilioData(
     workspaceId,
   )) as unknown as TwilioAccountData;
@@ -47,6 +51,12 @@ export async function assertWorkspaceCanSendSms({
     getWorkspaceTwilioPortalConfig({ workspaceId }),
     verifyWorkspaceMessagingSenderPool({ workspaceId, reuseProviderSnapshot }),
   ]);
+
+  if (getWorkspaceTwilioDataVersion(workspaceId) !== version) {
+    throw new Error(
+      "Messaging configuration changed during readiness checks. Try again.",
+    );
+  }
 
   const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData);
 

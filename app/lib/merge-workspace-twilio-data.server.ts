@@ -110,6 +110,7 @@ export async function loadWorkspaceTwilioData(
   workspaceId: string,
   transaction?: TwilioDataExecutor,
 ): Promise<WorkspaceTwilioData> {
+  const version = getWorkspaceTwilioDataVersion(workspaceId);
   const cached = workspaceTwilioDataCache.get(workspaceId);
   if (!transaction && cached && cached.expiresAt > Date.now()) {
     // Defensive clone: callers must not be able to corrupt the cache (or
@@ -122,6 +123,10 @@ export async function loadWorkspaceTwilioData(
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
+
+  if (!transaction && getWorkspaceTwilioDataVersion(workspaceId) !== version) {
+    throw new Error("Workspace Twilio configuration changed while reading. Try again.");
+  }
 
   if (!row) {
     throw new Error(`Workspace ${workspaceId} not found`);
