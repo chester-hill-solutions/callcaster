@@ -23,6 +23,7 @@ const authToken = "owned-inbound-prompt-fixture";
 const phone = "+14165552148";
 const documented = JSON.parse(readFileSync(new URL("../fixtures/script-wire/documented-format.json", import.meta.url), "utf8"));
 let sql: postgres.Sql;
+const closePools: Array<() => Promise<void>> = [];
 let scriptId: number, numberId: number;
 let action: typeof import("../../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server").action;
 
@@ -59,6 +60,9 @@ describe.skipIf(!databaseUrl)("inbound prompt playback with real route and tenan
     vi.stubEnv("BASE_URL", "https://ivr-prompt.example");
     vi.stubEnv("TWILIO_VALIDATE_WEBHOOKS", "true");
     sql = postgres(databaseUrl, { max: 2 });
+    closePools.push(async () => { await sql.end(); });
+    const { pool, directPool } = await import("@/server/db");
+    closePools.push(() => pool.end(), () => directPool.end());
     ({ action } = await import("../../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server"));
   });
   beforeEach(async () => {
@@ -79,13 +83,14 @@ describe.skipIf(!databaseUrl)("inbound prompt playback with real route and tenan
     invalidateWorkspaceTwilioData(workspaceId);
   });
   afterAll(async () => {
-    try { if (sql) await cleanup(); }
-    finally {
-      await sql?.end();
-      const { pool, directPool } = await import("@/server/db");
-      await Promise.all([pool.end(), directPool.end()]);
-      vi.unstubAllEnvs();
-    }
+    try {
+      const failures: unknown[] = [];
+      try { if (sql) await cleanup(); }
+      catch (error) { failures.push(error); }
+      const results = await Promise.allSettled(closePools.map(async (close) => close()));
+      for (const result of results) if (result.status === "rejected") failures.push(result.reason);
+      if (failures.length) throw new AggregateError(failures, "Owned inbound prompt cleanup failed");
+    } finally { vi.unstubAllEnvs(); }
   });
 
   test("a signed inbound request speaks persisted documented content and keeps the inbound redirect", async () => {
