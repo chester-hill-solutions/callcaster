@@ -25,15 +25,16 @@ make worker
 # Terminal 4, optional: dashboard audio, transcription, and coaching
 make media-stream
 
-# After the app is running, update the phone callbacks for your workspace.
-make calling:sync WORKSPACE_ID=<workspace-id>
+# After the app is running, update the phone callbacks for all local workspaces.
+make calling:sync-local
 ```
 
 The tunnel URL can change each session. `make twiml` updates the same
 environment-level TwiML App, and `make calling:sync` updates the selected
-workspace's phone callbacks. Restart the app, worker, or media-stream process
-after changing environment files. Do not use `--all-workspaces` for normal
-development.
+workspace's phone callbacks. `make calling:sync-local` discovers all workspaces
+in the local database that have real Twilio account credentials. Restart the
+app, worker, or media-stream process after changing environment files. Do not
+use `--all-workspaces` for normal development.
 
 `make init` is not part of this daily flow. It starts Postgres, Stow object
 storage, and mail, applies the schema, creates the bucket, and seeds test users
@@ -275,6 +276,16 @@ Sync one workspace's phone callbacks:
 make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
+Sync every credential-bearing workspace in the local database:
+
+```bash
+make calling:sync-local
+```
+
+This is the normal command after a new Localtunnel URL. It discovers the
+workspaces in the local database, so you do not need to remember their IDs.
+It refuses to run in Railway environments and requires `ENV=local`.
+
 Sync every workspace with stored Twilio credentials:
 
 ```bash
@@ -360,7 +371,7 @@ Node 24+.
 2. Update `BASE_URL` in `.env.local` and `.env` if the tunnel changed
 3. Run `make twiml`
 4. Start the app with `make app` and the worker with `make worker` when needed
-5. Run `make calling:sync WORKSPACE_ID=<workspace-id>`
+5. Run `make calling:sync-local`
 6. Test the calling flow
 
 ## E2E tests (Playwright)
