@@ -220,7 +220,7 @@ async function requireOwnerForOwnerChange(
   return { ok: true };
 }
 
-async function requireSoleOwnerProtection(
+export async function requireSoleOwnerProtection(
   workspaceId: string,
   targetUserId: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
@@ -436,7 +436,7 @@ export async function updateWorkspaceMemberRole(
     return {
       ok: false as const,
       error: error instanceof Error ? error.message : "Failed to update member",
-      status: 500,
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }
@@ -481,7 +481,7 @@ export async function removeWorkspaceMember(
     return {
       ok: false as const,
       error: error instanceof Error ? error.message : "Failed to remove member",
-      status: 500,
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }

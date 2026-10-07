@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
-import { InviteError } from "@chester-hill-solutions/auth";
+import { AuthzError, InviteError } from "@chester-hill-solutions/auth";
 import {
   campaign as campaignTable,
   user as userTable,
@@ -116,40 +116,50 @@ export async function listWorkspaceInvitesEnriched(workspaceId: string) {
   }));
 }
 
+async function writeProtectedWorkspaceMembership(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole | null,
+) {
+  return db.transaction(async (tx) => {
+    // Every owner-reducing writer locks this row before checking owner count.
+    await tx.execute(sql`select id from workspace where id = ${workspaceId}::uuid for update`);
+    const tdb = createTenantDb(workspaceId, tx);
+    const member = await tdb.workspace_member.findFirst({
+      where: eq(workspaceMemberTable.user_id, userId),
+    });
+    if (!member) return null;
+    if (member.role_id === "owner" && role !== "owner") {
+      const owners = await tdb.workspace_member.count({
+        where: eq(workspaceMemberTable.role_id, "owner"),
+      });
+      if (owners <= 1) throw new AuthzError("Cannot remove the sole owner", "SOLE_OWNER", 403);
+    }
+    if (role === null) {
+      await tdb.workspace_member.delete({ where: eq(workspaceMemberTable.user_id, userId) });
+      return { ...member, role: member.role_id };
+    }
+    const [updated] = await tdb.workspace_member.update({
+      set: { role_id: memberRoleToRoleId(role) },
+      where: eq(workspaceMemberTable.user_id, userId),
+    });
+    return updated ? { ...updated, role: updated.role_id } : null;
+  });
+}
+
 export async function updateWorkspaceMemberRole(args: {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
-  tdb?: TenantDb;
 }) {
-  const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const roleId = memberRoleToRoleId(args.role);
-  const rows = await tdb.workspace_member.update({
-    set: { role_id: roleId },
-    where: and(eq(workspaceMemberTable.user_id, args.userId)),
-  });
-  const row = rows[0] ?? null;
-  if (!row) return null;
-  return { ...row, role: row.role_id };
+  return writeProtectedWorkspaceMembership(args.workspaceId, args.userId, args.role);
 }
 
 export async function removeWorkspaceMember(args: {
   workspaceId: string;
   userId: string;
-  tdb?: TenantDb;
 }) {
-  const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const rows = await tdb.workspace_member.findMany({
-    where: eq(workspaceMemberTable.user_id, args.userId),
-  });
-  const member = rows[0] ?? null;
-  if (!member) {
-    return null;
-  }
-  await tdb.workspace_member.delete({
-    where: eq(workspaceMemberTable.user_id, args.userId),
-  });
-  return { ...member, role: member.role_id };
+  return writeProtectedWorkspaceMembership(args.workspaceId, args.userId, null);
 }
 
 export async function removeWorkspaceInviteForUser(args: {
@@ -194,6 +204,7 @@ export async function transferWorkspaceOwnership(args: {
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select id from workspace where id = ${args.workspaceId}::uuid for update`);
     const tdb = createTenantDb(args.workspaceId, tx as unknown as typeof db);
 
     const newOwnerMembership = await findWorkspaceMembership(
@@ -493,34 +504,14 @@ export async function updateAdminWorkspaceMemberRole(args: {
   userId: string;
   role: WorkspaceRole;
 }) {
-  const roleId = memberRoleToRoleId(args.role);
-  const rows = await adminDb
-    .update(workspaceMemberTable)
-    .set({ role_id: roleId })
-    .where(
-      and(
-        eq(workspaceMemberTable.user_id, args.userId),
-        eq(workspaceMemberTable.workspace_id, args.workspaceId),
-      ),
-    )
-    .returning();
-  const row = rows[0] ?? null;
-  if (!row) return null;
-  return { ...row, role: row.role_id };
+  return updateWorkspaceMemberRole(args);
 }
 
 export async function deleteAdminWorkspaceMember(args: {
   workspaceId: string;
   userId: string;
 }) {
-  await adminDb
-    .delete(workspaceMemberTable)
-    .where(
-      and(
-        eq(workspaceMemberTable.user_id, args.userId),
-        eq(workspaceMemberTable.workspace_id, args.workspaceId),
-      ),
-    );
+  return removeWorkspaceMember(args);
 }
 
 export async function insertAdminWorkspaceMember(args: {

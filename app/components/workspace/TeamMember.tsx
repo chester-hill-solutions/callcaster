@@ -41,18 +41,31 @@ export const handleRoleTextStyles = (memberRole: MemberRole): string =>
     memberRole === MemberRole.Admin && "text-purple-500",
   );
 
+function memberManagementPermissions(userRole: MemberRole, memberRole: string, platformAdmin: boolean) {
+  return {
+    canOpen: platformAdmin || userRole !== MemberRole.Caller,
+    canEdit: platformAdmin || userRole === MemberRole.Owner ||
+      (userRole === MemberRole.Admin && memberRole !== MemberRole.Admin),
+    canTransfer: !platformAdmin && userRole === MemberRole.Owner,
+  };
+}
+
 export default function TeamMember({
   member,
   userRole,
   memberIsUser,
   workspaceOwner,
+  platformAdmin = false,
 }: {
   member: WorkspaceMemberDisplay;
   userRole: MemberRole;
   memberIsUser: boolean;
   workspaceOwner: WorkspaceMemberDisplay;
+  /** Verified platform management page; workspace role remains display data. */
+  platformAdmin?: boolean;
 }) {  
   const memberRole = member.role;
+  const permissions = memberManagementPermissions(userRole, memberRole, platformAdmin);
   const memberName =
     [member.first_name, member.last_name]
       .filter((name): name is string => Boolean(name))
@@ -75,9 +88,9 @@ export default function TeamMember({
       </div>
       <div className="flex items-center gap-2">
         <p className={roleTextStyles}>{roleDisplayName}</p>
-        {!memberIsOwner && (
+        {(!memberIsOwner || platformAdmin) && (
           <Sheet>
-            {userRole !== MemberRole.Caller && memberRole !== "invited" && (
+            {permissions.canOpen && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button
                   className="h-fit rounded-full bg-transparent p-2"
@@ -99,7 +112,7 @@ export default function TeamMember({
                 </Button>
               </SheetTrigger>
             )}
-            {userRole !== MemberRole.Caller && memberRole === "invited" && (
+            {permissions.canOpen && memberRole === "invited" && (
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
@@ -137,9 +150,7 @@ export default function TeamMember({
                 <h4 className="text-center text-2xl font-bold text-black dark:text-white">
                   {memberName}
                 </h4>
-                {userRole === MemberRole.Owner ||
-                (userRole === MemberRole.Admin &&
-                  memberRole !== MemberRole.Admin) ? (
+                {permissions.canEdit ? (
                   <>
                     <Form method="POST" className="flex w-full flex-col gap-4">
                       <input type="hidden" name="formName" value="updateUser" />
@@ -157,8 +168,8 @@ export default function TeamMember({
                           required
                         >
                           {Object.values(MemberRole).map((role) => {
-                            if (role.valueOf() === "owner") {
-                              return <></>;
+                            if (role.valueOf() === "owner" && !platformAdmin) {
+                              return null;
                             }
                             return (
                               <option
@@ -166,13 +177,16 @@ export default function TeamMember({
                                 value={role.valueOf()}
                                 className=""
                               >
-                                {getWorkspaceRoleDisplayName(role)}
+                                {role === MemberRole.Owner && platformAdmin
+                                  ? "Workspace owner"
+                                  : getWorkspaceRoleDisplayName(role)}
                               </option>
                             );
                           })}
                         </select>
                       </label>
                       <Button
+                        type="submit"
                         className="border-2 border-black dark:border-white"
                         variant="outline"
                       >
@@ -180,7 +194,7 @@ export default function TeamMember({
                       </Button>
                     </Form>
 
-                    {userRole === MemberRole.Owner && (
+                    {permissions.canTransfer && (
                       <Form
                         method="POST"
                         name="transferWorkspaceOwnership"
@@ -197,7 +211,7 @@ export default function TeamMember({
                           value={workspaceOwner.id}
                         />
                         <input type="hidden" name="user_id" value={member.id} />
-                        <Button className="w-full bg-orange-400 hover:bg-orange-700">
+                        <Button type="submit" className="w-full bg-orange-400 hover:bg-orange-700">
                           Transfer Workspace Ownership
                         </Button>
                       </Form>
@@ -206,7 +220,7 @@ export default function TeamMember({
                     <Form method="POST" className="w-full">
                       <input type="hidden" name="formName" value="deleteUser" />
                       <input type="hidden" name="user_id" value={member.id} />
-                      <Button className="w-full" variant="destructive">
+                      <Button type="submit" className="w-full" variant="destructive">
                         Remove Team Member
                       </Button>
                     </Form>
