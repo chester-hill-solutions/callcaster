@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Number release repairs a rejected workspace API key only on its verified original subaccount, preserves incomplete work when repair cannot finish, and gives an actionable provider-connection error ([#2469](https://github.com/chester-hill-solutions/callcaster/pull/2469), [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170)).
+- Fixed: Number release repairs a rejected workspace API key only on its verified original subaccount, preserves incomplete work when repair cannot finish, and gives an actionable provider-connection error ([#2473](https://github.com/chester-hill-solutions/callcaster/pull/2473), [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170)).
 
 - Fixed: Phone-number purchase checks regulatory addresses before purchase, shows address requirements in search results, and gives a clear address error while preserving credits and recovery holds ([#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144), [PR #2468](https://github.com/chester-hill-solutions/callcaster/pull/2468)).
 
