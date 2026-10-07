@@ -1,6 +1,6 @@
 // DANGER: this file is hand-synced introspection output, not the source of
-// truth for the database schema. It has zero `.references()` declared and
-// there is no drizzle/meta journal checked in, so running
+// truth for the database schema. Its `.references()` declarations are incomplete
+// and there is no drizzle/meta journal checked in, so running
 // `drizzle-kit generate` against this schema (see drizzle.config.ts) can
 // emit DESTRUCTIVE DDL (dropped/recreated constraints, tables, etc.).
 //
@@ -127,7 +127,7 @@ export const workspace = pgTable("workspace", {
                                                               pauseThresholdMs: 1500,
                                                               disclosureEnabled: false,
                                                             }),
-  id: text().notNull().primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid().notNull().primaryKey().default(sql`gen_random_uuid()`),
   key: text(),
   name: text().notNull(),
   owner: text(),
@@ -159,7 +159,7 @@ export const workspace_member = pgTable(
   "workspace_member",
   {
     id: text().notNull().primaryKey(),
-    workspace_id: text().notNull(),
+    workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
     user_id: text().notNull(),
     role_id: text().notNull(),
     invited_by: text(),
@@ -487,12 +487,12 @@ export const outreach_attempt = pgTable("outreach_attempt", {
   user_id: uuid(),
   volunteer_interest: text(),
   vote_by_mail: boolean(),
-  workspace: uuid().notNull(),
+  workspace: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
 });
 
 export const workspace_events = pgTable("workspace_events", {
   id: serial().notNull().primaryKey(),
-  workspace_id: uuid().notNull(),
+  workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
   event_type: text().notNull(),
   payload: jsonb().notNull(),
   created_at: text().notNull().default(sql`now()`),
@@ -500,7 +500,7 @@ export const workspace_events = pgTable("workspace_events", {
 
 export const workspace_audit_event = pgTable("workspace_audit_event", {
   id: bigserial({ mode: "number" }).notNull().primaryKey(),
-  workspace_id: text().notNull(),
+  workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
   created_at: text().notNull().default(sql`now()`),
   actor_type: text().notNull(),
   actor_id: text(),
@@ -519,7 +519,7 @@ export const workspace_audit_event = pgTable("workspace_audit_event", {
 // See client/migrations/20260715120000_workspace_audio_metadata.sql.
 export const workspace_audio = pgTable("workspace_audio", {
   id: bigserial({ mode: "number" }).notNull().primaryKey(),
-  workspace_id: text().notNull(),
+  workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
   file_name: text().notNull(),
   origin: text().notNull().default("upload"),
   duration_ms: integer(),

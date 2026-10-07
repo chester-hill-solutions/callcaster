@@ -12,7 +12,6 @@ import {
   workspace_member,
   workspace_number,
 } from "@/db/schema";
-import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { PG_ERROR_CODES } from "@/lib/parse-utils.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -102,7 +101,7 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
       .from(workspace_member)
       .innerJoin(
         workspace,
-        eqChsTextToUuid(workspace_member.workspace_id, workspace.id),
+        eq(workspace_member.workspace_id, workspace.id),
       )
       .where(eq(workspace_member.user_id, userId))
       .orderBy(desc(workspace.created_at));

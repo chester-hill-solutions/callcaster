@@ -270,12 +270,17 @@ suite("campaign SMS delivery results against Postgres (#2149)", () => {
     await send();
     const { pool, runSmsStatusSideEffects } = await services();
     const foreignWorkspace = randomUUID();
-    await pool`update outreach_attempt set workspace = ${foreignWorkspace} where campaign_id = ${campaignId}`;
+    await pool`insert into workspace (id, name) values (${foreignWorkspace}, 'Foreign attempt fixture')`;
     try {
+      await pool`update outreach_attempt set workspace = ${foreignWorkspace} where campaign_id = ${campaignId}`;
       await runSmsStatusSideEffects({ messageSid: sid, twilioParams: { MessageStatus: "delivered" } });
       expect((await pool`select disposition from outreach_attempt where campaign_id = ${campaignId}`)[0].disposition).toBeNull();
     } finally {
-      await pool`update outreach_attempt set workspace = ${workspaceId} where campaign_id = ${campaignId}`;
+      try {
+        await pool`update outreach_attempt set workspace = ${workspaceId} where campaign_id = ${campaignId}`;
+      } finally {
+        await pool`delete from workspace where id = ${foreignWorkspace}`;
+      }
     }
   });
 
