@@ -465,6 +465,10 @@ untouched classes and expand old test formatting. Restore only those unrelated
 hunks from the pinned base; format edited blocks or new files, then inspect the
 actual diff before source freeze.
 
+Database fault controls can leave deliberately broken rows. Clean only the owned
+fixture rows after each case, before the next control runs. A passing control
+must not inherit orphan rows or missing receipts from the preceding mutation.
+
 Run source faults only when no other test reads that worktree. Restore each
 fault before starting the next reader, then rerun the fixed source. A passing
 report from overlapping runs does not identify which source it tested.

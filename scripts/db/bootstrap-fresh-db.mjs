@@ -135,6 +135,7 @@ const steps = [
   "client/migrations/20261007000002_workspace_audio_workspace_reference.sql",
   "client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql",
   "client/migrations/20261007000004_workspace_member_workspace_reference.sql",
+  "client/migrations/20261007000005_audience_import_recovery.sql",
 ];
 
 /**
