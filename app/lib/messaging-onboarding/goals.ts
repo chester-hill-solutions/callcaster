@@ -3,7 +3,6 @@
  * client UI and server actions.
  */
 
-import { AUTOMATED_PHONE_MENU_LABEL } from "@/lib/campaign-goals";
 import {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
   type WorkspaceOnboardingGoal,
@@ -31,7 +30,7 @@ export const ONBOARDING_GOAL_OPTIONS: Array<{
   },
   {
     id: "ivr",
-    label: AUTOMATED_PHONE_MENU_LABEL,
+    label: "Robocall or Interactive Voice Recording (IVR)",
     description: "Build an automated call flow that plays prompts and collects responses.",
   },
   {
