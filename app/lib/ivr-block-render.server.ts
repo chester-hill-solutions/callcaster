@@ -10,7 +10,7 @@ import {
 import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 /**
- * Shared outbound IVR block renderer.
+ * Shared inbound and outbound IVR block renderer.
  *
  * The flow-entry page route used to answer with a `<Redirect>` to the first
  * block's URL, so every call paid an extra Twilio round-trip (and a second
