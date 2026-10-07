@@ -147,6 +147,6 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByText("12 credits")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add credits/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Continue to review/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue for now/i })).toBeInTheDocument();
   });
 });

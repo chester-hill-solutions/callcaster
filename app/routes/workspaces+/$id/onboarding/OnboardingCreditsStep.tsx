@@ -29,7 +29,7 @@ export function OnboardingCreditsStep({
               {creditsBalance.toLocaleString()} credits
             </div>
           </div>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" asChild>
             <Link to={`/workspaces/${workspaceId}/billing`}>Add credits</Link>
           </Button>
         </div>
@@ -41,7 +41,7 @@ export function OnboardingCreditsStep({
           <Form method="post">
             <input type="hidden" name="_action" value="advance_step" />
             <input type="hidden" name="targetStep" value="launch_checks" />
-            <Button type="submit">Continue to review</Button>
+            <Button type="submit" variant="ghost">Continue for now</Button>
           </Form>
         ) : null}
       </div>
