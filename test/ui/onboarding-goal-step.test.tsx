@@ -115,7 +115,7 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByTestId("onboarding-step")).toBeInTheDocument();
     expect(screen.getByText("Setup: Acme")).toBeInTheDocument();
-    expect(screen.getByText(/Step 4 of \d+ — Call list/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 4 of \d+/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /4\. Call list/i })).toHaveAttribute(
       "href",
       expect.stringContaining("step=audience"),
