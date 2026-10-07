@@ -334,6 +334,7 @@ export default function AudienceUploader({
                 status="processing"
                 workspaceId={workspaceId}
                 uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -350,6 +351,7 @@ export default function AudienceUploader({
                 status="completed"
                 workspaceId={workspaceId}
                 uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -365,6 +367,7 @@ export default function AudienceUploader({
                 status="error"
                 workspaceId={workspaceId}
                 uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}

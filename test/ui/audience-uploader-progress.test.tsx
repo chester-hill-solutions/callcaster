@@ -215,7 +215,7 @@ describe("AudienceUploader progress polling", () => {
     const { container } = render(<AudienceUploader audienceName="A1" />);
     await startUpload(container, "Phone\n4165551234");
     await act(async () => {
-      mocks.realtimeOpts.onChange({ eventType: "UPDATE", new: { status: "error", error_message: "Import interrupted",
+      mocks.realtimeOpts.onChange({ eventType: "UPDATE", new: { status: "error", error_message: "Import interrupted", report_available:true,
         processed_contacts: 40, total_contacts: 45, skipped_invalid_contacts: 1 } });
     });
     expect(screen.getByText("40 / 45 contacts")).toBeInTheDocument();

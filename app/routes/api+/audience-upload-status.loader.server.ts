@@ -166,6 +166,7 @@ function buildSnapshot(
 ): AudienceUploadServerSnapshot {
   return {
         uploadId: uploadData.id,
+        report_available: Boolean(durable),
         audience_id: uploadData.audience_id,
         status: uploadData.status,
         file_name: uploadData.file_name,

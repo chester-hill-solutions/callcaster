@@ -63,7 +63,7 @@ export function useAudienceUploadProgress({
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
     const audienceId = progress.audienceId;
-    if (workspaceId && progress.uploadId != null) {
+    if (workspaceId && progress.uploadId != null && progress.reportAvailable) {
       const reportUrl = audienceImportReportUrl(workspaceId, progress.uploadId);
       toast.success("Call-list upload completed", {
         id: `audience-import-report-${workspaceId}-${progress.uploadId}`,
@@ -86,6 +86,8 @@ export function useAudienceUploadProgress({
       }
 
       const nextStatus = snapshot.status || null;
+      const reportAvailable = snapshot.report_available ?? (snapshot.import_run_id !== undefined
+        ? Boolean(snapshot.import_run_id) : prev.reportAvailable ?? false);
       const serverTotal =
         typeof snapshot.total_contacts === "number"
           ? snapshot.total_contacts
@@ -129,6 +131,7 @@ export function useAudienceUploadProgress({
 
         return {
           kind: "completed",
+          reportAvailable,
           uploadId: prev.kind === "processing" ? prev.uploadId : snapshot.uploadId ?? null,
           audienceId: completedAudienceId,
           totalContacts,
@@ -142,6 +145,7 @@ export function useAudienceUploadProgress({
       if (nextStatus === "error") {
         return {
           kind: "error",
+          reportAvailable,
           uploadId: prev.kind === "processing" ? prev.uploadId : snapshot.uploadId ?? null,
           audienceId: nextAudienceId,
           totalContacts,
@@ -170,6 +174,7 @@ export function useAudienceUploadProgress({
 
       return {
         kind: "processing",
+        reportAvailable,
         uploadId: uploadIdForState,
         audienceId: nextAudienceId ?? prevAudienceId,
         totalContacts,
@@ -293,6 +298,7 @@ export function useAudienceUploadProgress({
 
   const fail = (message: string) => {
     setProgress(prev => ({ kind: "error", message,
+      reportAvailable: prev.kind === "idle" ? false : prev.reportAvailable,
       uploadId: prev.kind === "processing" || prev.kind === "completed" || prev.kind === "error" ? prev.uploadId : null,
       audienceId: audienceIdRef.current,
       totalContacts: prev.kind === "idle" ? 0 : prev.totalContacts,

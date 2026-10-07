@@ -194,6 +194,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         audience_id: 2,
         status: "pending",
         file_name: "f.csv",
@@ -216,7 +217,7 @@ describe("api.audience-upload-status loader", () => {
     setDualAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/audience-upload-status");
     const res = await asRouteResponse(mod.loader(withRouteUrl({ request: new Request("http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1") } as any)));
-    expect(await res.json()).toMatchObject({ ok: true, snapshot: { status: "completed", total_contacts: 4, processed_contacts: 4,
+    expect(await res.json()).toMatchObject({ ok: true, snapshot: { status: "completed", report_available: true, total_contacts: 4, processed_contacts: 4,
       error_message: null, stage: "Upload completed", skipped_invalid_contacts: 1, skipped_duplicate_contacts: 2 } });
   });
 
@@ -270,6 +271,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 2,
+        report_available: false,
         audience_id: 2,
         status: "pending",
         file_name: "a.csv",
@@ -326,6 +328,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 3,
+        report_available: false,
         audience_id: 2,
         status: "error",
         file_name: "a.csv",
@@ -357,6 +360,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         file_name: "f.csv",
         processed_contacts: 1,
       },
@@ -380,6 +384,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         file_name: "f.csv",
         processed_contacts: 1,
       },

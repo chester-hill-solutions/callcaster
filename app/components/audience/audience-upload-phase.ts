@@ -25,6 +25,8 @@ export type AudienceUploadServerSnapshot = {
   /** Rows dropped as duplicates (within the file or already in the audience). */
   skipped_duplicate_contacts?: number | null;
   uploadId?: number | null;
+  import_run_id?: string | null;
+  report_available?: boolean;
   file_name?: string | null;
   file_size?: number | null;
 };
@@ -74,6 +76,7 @@ export type AudienceUploadProgressStatus =
 
 /** Contact counters shared by every in-flight/terminal upload variant. */
 type UploadCounters = {
+  reportAvailable?: boolean;
   totalContacts: number;
   processedContacts: number;
   progress: number;
@@ -137,6 +140,7 @@ export function resolveAudienceUploadPhase(args: {
         kind: "processing",
         draft,
         uploadId: progress.uploadId,
+        reportAvailable: progress.reportAvailable,
         audienceId: progress.audienceId,
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
@@ -149,6 +153,7 @@ export function resolveAudienceUploadPhase(args: {
       return {
         kind: "completed",
         uploadId: progress.uploadId,
+        reportAvailable: progress.reportAvailable,
         audienceId: progress.audienceId,
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,

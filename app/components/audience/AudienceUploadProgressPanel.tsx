@@ -17,6 +17,7 @@ export type AudienceUploadProgressPanelProps = {
   totalContacts: number;
   workspaceId?: string;
   uploadId?: number | null;
+  reportAvailable?: boolean;
   errorMessage?: string | null;
   warning?: string | null;
   /** Rows dropped for invalid/unparseable phone numbers. */
@@ -55,6 +56,7 @@ export function AudienceUploadProgressPanel({
   totalContacts,
   workspaceId,
   uploadId,
+  reportAvailable = false,
   errorMessage,
   warning,
   skippedInvalidContacts,
@@ -64,7 +66,7 @@ export function AudienceUploadProgressPanel({
 }: AudienceUploadProgressPanelProps) {
   const notice = errorMessage || warning || null;
   const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
-  const reportUrl = workspaceId && uploadId != null ? audienceImportReportUrl(workspaceId, uploadId) : null;
+  const reportUrl = reportAvailable && workspaceId && uploadId != null ? audienceImportReportUrl(workspaceId, uploadId) : null;
   const skippedLine = skippedSummary(
     skippedDuplicateContacts ?? 0,
     skippedInvalidContacts ?? 0,
