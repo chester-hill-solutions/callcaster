@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Inbound phone menus speak text prompts and use available WAV recordings through the shared phone-menu renderer ([#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148)).
+- Fixed: Inbound phone menus speak text prompts and use available WAV recordings through the shared phone-menu renderer ([#2456](https://github.com/chester-hill-solutions/callcaster/pull/2456), [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148)).
 
 - Fixed: Load call-list upload history with the page and keep retries and live updates within the current call list ([#2453](https://github.com/chester-hill-solutions/callcaster/pull/2453), [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288)).
 
