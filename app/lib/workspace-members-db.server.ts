@@ -770,10 +770,7 @@ export async function listUserWorkspaceMembershipsWithWorkspace(userId: string) 
       : await adminDb
           .select()
           .from(workspaceTable)
-          .where(
-            // CHS stores workspace_id as text; workspace.id is uuid in Postgres.
-            inArray(sql`(${workspaceTable.id})::text`, workspaceIds),
-          );
+          .where(inArray(workspaceTable.id, workspaceIds));
   const workspaceById = new Map(workspaces.map((row) => [row.id, row]));
 
   return memberships.map((membership) => ({

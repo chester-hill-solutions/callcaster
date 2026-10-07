@@ -1,6 +1,6 @@
 // DANGER: this file is hand-synced introspection output, not the source of
-// truth for the database schema. It has zero `.references()` declared and
-// there is no drizzle/meta journal checked in, so running
+// truth for the database schema. Its `.references()` declarations are incomplete
+// and there is no drizzle/meta journal checked in, so running
 // `drizzle-kit generate` against this schema (see drizzle.config.ts) can
 // emit DESTRUCTIVE DDL (dropped/recreated constraints, tables, etc.).
 //
