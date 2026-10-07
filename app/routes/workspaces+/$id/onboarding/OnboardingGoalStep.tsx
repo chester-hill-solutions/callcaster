@@ -17,6 +17,7 @@ import { GOAL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
 type SmsNumberPath = "local" | "toll_free";
+export type GoalSelection = { goal: WorkspaceOnboardingGoal | null; numberPath: SmsNumberPath | null };
 
 export function readSmsNumberPath(onboarding: Pick<WorkspaceMessagingOnboardingState, "selectedGoal" | "selectedChannels">): SmsNumberPath | null {
   if (onboarding.selectedGoal !== "sms_blast") return null;
@@ -31,21 +32,24 @@ export function isGoalSelectionValid(goal: WorkspaceOnboardingGoal | null, count
     path !== null;
 }
 
-export function OnboardingGoalStep({
-  formId = "onboarding-channels-form",
-  onboarding,
-  isReadOnly,
-  onSelectionValidityChange,
-}: Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & {
-  formId?: string;
-  onSelectionValidityChange?: (isValid: boolean) => void;
+export function readGoalSelection(onboarding: Pick<WorkspaceMessagingOnboardingState, "selectedGoal" | "selectedChannels">): GoalSelection {
+  return { goal: onboarding.selectedGoal, numberPath: readSmsNumberPath(onboarding) };
+}
+
+type GoalStepProps = Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & { formId?: string };
+
+export function OnboardingGoalStep(props: GoalStepProps) {
+  const [selection, setSelection] = useState(() => readGoalSelection(props.onboarding));
+  return <OnboardingGoalForm {...props} selection={selection} onSelectionChange={setSelection} />;
+}
+
+export function OnboardingGoalForm({
+  formId = "onboarding-channels-form", onboarding, isReadOnly, selection, onSelectionChange,
+}: GoalStepProps & {
+  selection: GoalSelection;
+  onSelectionChange: (selection: GoalSelection) => void;
 }) {
-  const [selectedGoal, setSelectedGoal] = useState<WorkspaceOnboardingGoal | null>(
-    () => onboarding.selectedGoal,
-  );
-  const [smsNumberPath, setSmsNumberPath] = useState<SmsNumberPath | null>(
-    () => readSmsNumberPath(onboarding),
-  );
+  const { goal: selectedGoal, numberPath: smsNumberPath } = selection;
 
   const derivedChannels = useMemo<WorkspaceOnboardingChannel[]>(() => {
     if (!selectedGoal) return [];
@@ -64,8 +68,7 @@ export function OnboardingGoalStep({
   }, [derivedChannels, offersTollFree, smsNumberPath]);
 
   const selectNumberPath = (path: SmsNumberPath) => {
-    setSmsNumberPath(path);
-    onSelectionValidityChange?.(isGoalSelectionValid(selectedGoal, onboarding.operatingCountry, path));
+    onSelectionChange({ goal: selectedGoal, numberPath: path });
   };
 
   return (
@@ -104,9 +107,7 @@ export function OnboardingGoalStep({
                   value={option.id}
                   checked={checked}
                   onChange={() => {
-                    setSelectedGoal(option.id);
-                    setSmsNumberPath(null);
-                    onSelectionValidityChange?.(isGoalSelectionValid(option.id, onboarding.operatingCountry, null));
+                    onSelectionChange({ goal: option.id, numberPath: null });
                   }}
                   disabled={isReadOnly}
                   className="mt-1"

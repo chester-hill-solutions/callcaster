@@ -15,7 +15,7 @@ import { OnboardingBusinessProgramStep } from "./OnboardingBusinessProgramStep";
 import { OnboardingChecklistLinkStep } from "./OnboardingChecklistLinkStep";
 import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
-import { OnboardingGoalStep, isGoalSelectionValid as validateGoalSelection, readSmsNumberPath } from "./OnboardingGoalStep";
+import { OnboardingGoalForm, isGoalSelectionValid as validateGoalSelection, readGoalSelection } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep, buildOnboardingLaunchItems } from "./OnboardingLaunchStep";
 import { readWizardStep } from "./wizard-step-resolution";
@@ -203,9 +203,8 @@ export function OnboardingWizard({
   const [introSession, setIntroSession] = useState<
     "auto" | "force_show" | "force_hide"
   >("auto");
-  const [isGoalSelectionValid, setIsGoalSelectionValid] = useState(() =>
-    validateGoalSelection(onboarding.selectedGoal, onboarding.operatingCountry, readSmsNumberPath(onboarding)),
-  );
+  const [goalSelection, setGoalSelection] = useState(() => readGoalSelection(onboarding));
+  const isGoalSelectionValid = validateGoalSelection(goalSelection.goal, onboarding.operatingCountry, goalSelection.numberPath);
   const launchItems = buildOnboardingLaunchItems({
     onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
     scriptCount: scripts.length, creditsBalance,
@@ -363,12 +362,13 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep === "path_selection" ? (
-          <OnboardingGoalStep
+          <OnboardingGoalForm
             formId="onboarding-channels-form"
             onboarding={onboarding}
             isReadOnly={isReadOnly}
             pending={pending}
-            onSelectionValidityChange={setIsGoalSelectionValid}
+            selection={goalSelection}
+            onSelectionChange={setGoalSelection}
           />
       ) : null}
 

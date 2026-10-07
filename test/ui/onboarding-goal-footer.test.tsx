@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test } from "vitest";
 import { OnboardingWizard } from "@/routes/workspaces+/$id/onboarding/OnboardingWizard";
@@ -30,12 +30,12 @@ function renderGoal(overrides: Partial<WorkspaceMessagingOnboardingState> = {}) 
     />,
   }], { initialEntries: ["/?step=path_selection"] });
   render(<RouterProvider router={router} />);
-  return screen.getByRole("button", { name: "Save & continue" });
+  return { router, submit: screen.getByRole("button", { name: "Save & continue" }) };
 }
 
 describe("goal selection and the wizard footer", () => {
   test("Canadian SMS requires a number path and resets it when the goal changes", () => {
-    const submit = renderGoal();
+    const { submit } = renderGoal();
     fireEvent.click(screen.getByRole("radio", { name: /SMS blast/i }));
     expect(submit).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /Continue with Local Number/i }));
@@ -49,17 +49,38 @@ describe("goal selection and the wizard footer", () => {
   });
 
   test("a saved Canadian SMS path is valid on the first render", () => {
-    expect(renderGoal({ selectedGoal: "sms_blast", selectedChannels: ["local_number"] })).toBeEnabled();
+    expect(renderGoal({ selectedGoal: "sms_blast", selectedChannels: ["local_number"] }).submit).toBeEnabled();
   });
 
   test("Canadian SMS without a saved path is invalid on the first render", () => {
-    expect(renderGoal({ selectedGoal: "sms_blast" })).toBeDisabled();
+    expect(renderGoal({ selectedGoal: "sms_blast" }).submit).toBeDisabled();
   });
 
   test("US SMS can continue without a Canadian toll-free choice", () => {
-    const submit = renderGoal({ operatingCountry: "US" });
+    const { submit } = renderGoal({ operatingCountry: "US" });
     fireEvent.click(screen.getByRole("radio", { name: /SMS blast/i }));
     expect(screen.queryByRole("group", { name: "SMS number path" })).toBeNull();
     expect(submit).toBeEnabled();
   });
+
+  test("a valid draft and its footer stay together after leaving and returning", async () => {
+    const { router } = renderGoal({ selectedGoal: "sms_blast" });
+    fireEvent.click(screen.getByRole("radio", { name: /Live call session/i }));
+    await act(async () => { await router.navigate("/?step=business_identity"); });
+    await act(async () => { await router.navigate("/?step=path_selection"); });
+    expect(screen.getByRole("radio", { name: /Live call session/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Save & continue" })).toBeEnabled();
+  });
+
+  test("an incomplete SMS draft stays invalid after leaving and returning", async () => {
+    const { router } = renderGoal({ selectedGoal: "ivr" });
+    fireEvent.click(screen.getByRole("radio", { name: /SMS blast/i }));
+    await act(async () => { await router.navigate("/?step=business_identity"); });
+    await act(async () => { await router.navigate("/?step=path_selection"); });
+    expect(screen.getByRole("radio", { name: /SMS blast/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Save & continue" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Continue with Local Number/i }));
+    expect(screen.getByRole("button", { name: "Save & continue" })).toBeEnabled();
+  });
+
 });
