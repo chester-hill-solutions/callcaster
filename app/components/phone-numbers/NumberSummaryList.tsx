@@ -232,7 +232,9 @@ function PresetFields({
                 </option>
               ))}
             </select>
-          ) : null}
+          ) : (
+            <input type="hidden" name="audioName" value={number.inbound_audio ?? ""} />
+          )}
         </div>
       );
     case "forward":
@@ -279,77 +281,16 @@ function PresetFields({
   }
 }
 
-function NumberSummaryRow({
+function NumberSummaryHeader({
   number,
-  queues,
-  scripts,
-  mediaNames,
-  verifiedCallerIds,
-  isBusy,
-  presetOrder,
-  presentation = "default",
-  onApplyPreset,
-  onEdit,
+  presentation,
+  inference,
 }: {
   number: NonNullable<WorkspaceNumbers>;
-  queues: NamedOption[];
-  scripts: NamedOption[];
-  mediaNames: MediaOption[];
-  verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
-  isBusy: boolean;
-  presetOrder?: readonly InboundRoutingPresetId[];
-  presentation?: "default" | "onboarding";
-  onApplyPreset: NumberSummaryListProps["onApplyPreset"];
-  onEdit: () => void;
+  presentation: "default" | "onboarding";
+  inference: ReturnType<typeof inferInboundRoutingPreset>;
 }) {
-  const inference = inferInboundRoutingPreset(number);
-  const effective = summarizeEffectiveInboundRouting(number, { queues, scripts });
-  const rankedPresets = orderedPresets(presetOrder);
-  const initialPreset =
-    presentation === "onboarding"
-      ? "voicemail"
-      : inference.presetId === "custom"
-      ? (rankedPresets[0]?.id as Exclude<InboundRoutingPresetId, "custom">) ??
-        "agent"
-      : inference.presetId;
-  const [presetId, setPresetId] =
-    useState<Exclude<InboundRoutingPresetId, "custom">>(initialPreset);
-
-  if (number.type === "caller_id") {
-    return (
-      <Card>
-        <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle>{number.phone_number}</CardTitle>
-            <CardDescription>{number.friendly_name}</CardDescription>
-          </div>
-          <Badge variant="outline">Outbound only</Badge>
-        </CardHeader>
-        <CardContent className="flex items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            Verified caller ID for outbound calls and messages.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onEdit}
-            aria-label={`Edit ${number.phone_number ?? "phone number"}`}
-          >
-            Edit
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card
-      className={
-        presentation === "onboarding"
-          ? "mx-auto w-full max-w-xl gap-3 py-3"
-          : undefined
-      }
-    >
       <CardHeader
         className={
           presentation === "onboarding"
@@ -375,6 +316,97 @@ function NumberSummaryRow({
           ) : null}
         </div>
       </CardHeader>
+  );
+}
+
+function CallerIdSummary({ number, onEdit }: {
+  number: NonNullable<WorkspaceNumbers>;
+  onEdit: () => void;
+}) {
+    return (
+      <Card>
+        <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{number.phone_number}</CardTitle>
+            <CardDescription>{number.friendly_name}</CardDescription>
+          </div>
+          <Badge variant="outline">Outbound only</Badge>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Verified caller ID for outbound calls and messages.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onEdit}
+            aria-label={`Edit ${number.phone_number ?? "phone number"}`}
+          >
+            Edit
+          </Button>
+        </CardContent>
+      </Card>
+    );
+
+}
+
+function NumberSummaryRow({
+  number,
+  queues,
+  scripts,
+  mediaNames,
+  verifiedCallerIds,
+  isBusy,
+  presetOrder,
+  presentation: requestedPresentation = "default",
+  onApplyPreset,
+  onEdit,
+}: {
+  number: NonNullable<WorkspaceNumbers>;
+  queues: NamedOption[];
+  scripts: NamedOption[];
+  mediaNames: MediaOption[];
+  verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
+  isBusy: boolean;
+  presetOrder?: readonly InboundRoutingPresetId[];
+  presentation?: "default" | "onboarding";
+  onApplyPreset: NumberSummaryListProps["onApplyPreset"];
+  onEdit: () => void;
+}) {
+  const inference = inferInboundRoutingPreset(number);
+  // The compact email editor can only edit an existing voicemail route.
+  // Other routes keep their current selection and explicit routing controls.
+  const presentation =
+    requestedPresentation === "onboarding" && inference.presetId === "voicemail"
+      ? "onboarding"
+      : "default";
+  const effective = summarizeEffectiveInboundRouting(number, { queues, scripts });
+  const rankedPresets = orderedPresets(presetOrder);
+  const initialPreset =
+    inference.presetId === "custom"
+      ? (rankedPresets[0]?.id as Exclude<InboundRoutingPresetId, "custom">) ??
+        "agent"
+      : inference.presetId;
+  const [presetId, setPresetId] =
+    useState<Exclude<InboundRoutingPresetId, "custom">>(initialPreset);
+
+  if (number.type === "caller_id") {
+    return <CallerIdSummary number={number} onEdit={onEdit} />;
+  }
+
+  return (
+    <Card
+      className={
+        presentation === "onboarding"
+          ? "mx-auto w-full max-w-xl gap-3 py-3"
+          : undefined
+      }
+    >
+      <NumberSummaryHeader
+        number={number}
+        presentation={presentation}
+        inference={inference}
+      />
       <CardContent className="space-y-4">
         {presentation !== "onboarding" ? (
           <div>

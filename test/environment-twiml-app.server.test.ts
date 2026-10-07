@@ -3,7 +3,6 @@ import {
   ensureEnvironmentTwimlApp,
   isManagedEnvironment,
   environmentTwimlAppName,
-  localEnvironmentName,
 } from "@/server/environment-twiml-app.server";
 
 const twilioMocks = vi.hoisted(() => ({
@@ -40,12 +39,6 @@ function managedEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 describe("environmentTwimlAppName", () => {
   it("namespaces the app by environment so environments are prunable", () => {
     expect(environmentTwimlAppName("callcaster-pr-1047")).toBe("env:callcaster-pr-1047");
-  });
-});
-
-describe("localEnvironmentName", () => {
-  it("combines the developer and local environment identity", () => {
-    expect(localEnvironmentName(" sai ", " local ")).toBe("sai-local");
   });
 });
 

@@ -39,10 +39,6 @@ export type ButtonProps = VariantProps<typeof buttonVariants> & {
  */
 const DESTRUCTIVE_HOVER_OVERRIDE = "hover:text-black";
 
-/** Keep selected buttons filled in dark mode instead of exposing outline transparency. */
-const PRESSED_BUTTON_OVERRIDE =
-  "aria-pressed:bg-secondary aria-pressed:text-secondary-foreground dark:aria-pressed:bg-secondary dark:aria-pressed:text-secondary-foreground";
-
 /**
  * CallCaster Button: shad-cc React Aria button + `asChild` + `disabled` alias.
  */
@@ -70,7 +66,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       cursorPointer ? "cursor-pointer" : "cursor-default",
       "disabled:cursor-default aria-disabled:cursor-default",
       variantOverride,
-      PRESSED_BUTTON_OVERRIDE,
       className,
     );
 

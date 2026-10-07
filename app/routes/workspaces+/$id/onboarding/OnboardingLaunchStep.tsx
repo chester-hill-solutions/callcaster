@@ -1,5 +1,4 @@
 import { Link } from "react-router";
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -18,20 +17,13 @@ type OnboardingLaunchStepProps = Pick<
   campaignCount: number;
   scriptCount: number;
   creditsBalance: number;
-  onNextItemChange?: (hasNextItem: boolean) => void;
+  items?: ReturnType<typeof buildWorkspaceLaunchChecklist>;
 };
 
-export function OnboardingLaunchStep({
-  onboarding,
-  readiness,
-  workspaceId,
-  phoneNumbers,
-  audienceCount,
-  campaignCount,
-  scriptCount,
-  creditsBalance,
-  onNextItemChange,
-}: OnboardingLaunchStepProps) {
+export function buildOnboardingLaunchItems({
+  onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+  scriptCount, creditsBalance,
+}: Omit<OnboardingLaunchStepProps, "readiness" | "items">) {
   const checklist = buildWorkspaceLaunchChecklist({
     workspaceId,
     onboarding,
@@ -57,18 +49,25 @@ export function OnboardingLaunchStep({
     },
     ...checklist.filter((item) => item.id !== "goal"),
   ];
-  const nextItem = items.find((item) => !item.complete);
-  const hasNextItem = Boolean(nextItem);
+  return items;
+}
 
-  /**
-   * @effect Keep the shared wizard footer aligned with the review checklist state.
-   * @effect-deps onNextItemChange, hasNextItem
-   * @effect-side-effects parent state update only
-   * @effect-why-not-loader The footer is client-rendered outside this step component.
-   */
-  useEffect(() => {
-    onNextItemChange?.(hasNextItem);
-  }, [hasNextItem, onNextItemChange]);
+export function OnboardingLaunchStep({
+  onboarding,
+  readiness,
+  workspaceId,
+  phoneNumbers,
+  audienceCount,
+  campaignCount,
+  scriptCount,
+  creditsBalance,
+  items: suppliedItems,
+}: OnboardingLaunchStepProps) {
+  const items = suppliedItems ?? buildOnboardingLaunchItems({
+    onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+    scriptCount, creditsBalance,
+  });
+  const nextItem = items.find((item) => !item.complete);
 
   return (
     <Section variant="flat">

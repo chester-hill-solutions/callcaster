@@ -30,17 +30,6 @@ describe("Button", () => {
     expect(button.className).not.toContain("hover:bg-primary/90");
   });
 
-  test("keeps pressed buttons filled in dark mode", () => {
-    render(
-      <Button variant="outline" aria-pressed>
-        Selected
-      </Button>,
-    );
-    const button = screen.getByRole("button", { name: "Selected" });
-
-    expect(button.className).toContain("dark:aria-pressed:bg-secondary");
-  });
-
   // upstream shad-cc destructive variant hovers to a lightened
   // red while keeping near-white text — reads as low-contrast on the
   // "Leave Campaign" / "Delete" buttons the design team flagged. The

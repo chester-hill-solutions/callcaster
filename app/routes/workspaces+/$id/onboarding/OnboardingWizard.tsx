@@ -17,7 +17,7 @@ import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
 import { OnboardingGoalStep } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
-import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
+import { OnboardingLaunchStep, buildOnboardingLaunchItems } from "./OnboardingLaunchStep";
 import { readWizardStep } from "./wizard-step-resolution";
 import type { OnboardingPendingActions } from "./types";
 
@@ -38,6 +38,138 @@ function checklistCreateHref(
     `/workspaces/${workspaceId}/onboarding?step=${step}`,
   );
   return `/workspaces/${workspaceId}/${resourcePath}?returnTo=${returnTo}`;
+}
+
+function BusinessContinueButton({ form, isSaving }: {
+  form: string;
+  isSaving: boolean;
+}) {
+  return (
+    <Button type="submit" form={form} disabled={isSaving} aria-busy={isSaving}>
+      {isSaving ? "Saving…" : "Save & continue"}
+    </Button>
+  );
+}
+
+function ResourceContinueForm({ targetStep, resourceCount, isSubmitting }: {
+  targetStep: string;
+  resourceCount: number;
+  isSubmitting: boolean;
+}) {
+  return (
+    <Form method="post">
+      <input type="hidden" name="_action" value="advance_step" />
+      <input type="hidden" name="targetStep" value={targetStep} />
+      <Button
+        type="submit"
+        variant={resourceCount > 0 ? "default" : "outline"}
+        disabled={isSubmitting}
+      >
+        {resourceCount > 0 ? "Continue" : "Continue for now"}
+      </Button>
+    </Form>
+  );
+}
+
+function FooterContinue({
+  activeStep, isReadOnly, pending, isGoalSelectionValid, hasFirstNumber,
+  continueTarget, isFormSubmitting, audienceCount, hasLaunchNextItem,
+  workspaceId, campaignCount,
+}: {
+  activeStep: ReturnType<typeof readWizardStep> | null;
+  isReadOnly: boolean;
+  pending: OnboardingPendingActions;
+  isGoalSelectionValid: boolean;
+  hasFirstNumber: boolean;
+  continueTarget: string | null;
+  isFormSubmitting: boolean;
+  audienceCount: number;
+  hasLaunchNextItem: boolean;
+  workspaceId: string;
+  campaignCount: number;
+}) {
+    if (!activeStep || isReadOnly) {
+      return null;
+    }
+    switch (activeStep) {
+      case "business_identity":
+        return (
+          <BusinessContinueButton
+            form="onboarding-business-identity-form"
+            isSaving={pending.isSavingBusinessProfile}
+          />
+        );
+      case "business_program":
+        return (
+          <BusinessContinueButton
+            form="onboarding-business-program-form"
+            isSaving={pending.isSavingBusinessProfile}
+          />
+        );
+      case "path_selection":
+        return (
+          <Button
+            type="submit"
+            form="onboarding-channels-form"
+            disabled={pending.isSavingChannels || !isGoalSelectionValid}
+            aria-busy={pending.isSavingChannels}
+          >
+            {pending.isSavingChannels ? "Saving…" : "Save & continue"}
+          </Button>
+        );
+      case "first_number":
+        if (hasFirstNumber && continueTarget) {
+          return (
+            <Form method="post">
+              <input type="hidden" name="_action" value="advance_step" />
+              <input type="hidden" name="targetStep" value={continueTarget} />
+              <Button type="submit" disabled={isFormSubmitting}>
+                Continue
+              </Button>
+            </Form>
+          );
+        }
+        return null;
+      case "audience":
+        return continueTarget ? (
+          <ResourceContinueForm
+            targetStep={continueTarget}
+            resourceCount={audienceCount}
+            isSubmitting={isFormSubmitting}
+          />
+        ) : null;
+      case "launch_checks":
+        return hasLaunchNextItem ? (
+          <Button variant="outline" asChild>
+            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
+          </Button>
+        ) : null;
+      case "script":
+        return null;
+      case "campaign_info":
+        return continueTarget ? (
+          <ResourceContinueForm
+            targetStep={continueTarget}
+            resourceCount={campaignCount}
+            isSubmitting={isFormSubmitting}
+          />
+        ) : null;
+      case "credits":
+        return (
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value="launch_checks" />
+            <Button type="submit" variant="outline" disabled={isFormSubmitting}>
+              Continue for now
+            </Button>
+          </Form>
+        );
+      default: {
+        const _exhaustive: never = activeStep;
+        return _exhaustive;
+      }
+    }
+
 }
 
 export function OnboardingWizard({
@@ -77,7 +209,11 @@ export function OnboardingWizard({
     onboarding.selectedChannels.includes("toll_free_bulk_sms") ||
     onboarding.selectedChannels.includes("local_number"),
   );
-  const [hasLaunchNextItem, setHasLaunchNextItem] = useState(true);
+  const launchItems = buildOnboardingLaunchItems({
+    onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+    scriptCount: scripts.length, creditsBalance,
+  });
+  const hasLaunchNextItem = launchItems.some((item) => !item.complete);
   const showIntro =
     introSession === "force_hide"
       ? false
@@ -121,109 +257,21 @@ export function OnboardingWizard({
     navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
   };
 
-  const footerContinue = (() => {
-    if (!activeStep || isReadOnly) {
-      return null;
-    }
-    switch (activeStep) {
-      case "business_identity":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-business-identity-form"
-            disabled={pending.isSavingBusinessProfile}
-            aria-busy={pending.isSavingBusinessProfile}
-          >
-            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "business_program":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-business-program-form"
-            disabled={pending.isSavingBusinessProfile}
-            aria-busy={pending.isSavingBusinessProfile}
-          >
-            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "path_selection":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-channels-form"
-            disabled={pending.isSavingChannels || !isGoalSelectionValid}
-            aria-busy={pending.isSavingChannels}
-          >
-            {pending.isSavingChannels ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "first_number":
-        if (hasFirstNumber && continueTarget) {
-          return (
-            <Form method="post">
-              <input type="hidden" name="_action" value="advance_step" />
-              <input type="hidden" name="targetStep" value={continueTarget} />
-              <Button type="submit" disabled={isFormSubmitting}>
-                Continue
-              </Button>
-            </Form>
-          );
-        }
-        return null;
-      case "audience":
-        return continueTarget ? (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value={continueTarget} />
-            <Button
-              type="submit"
-              variant={audienceCount > 0 ? "default" : "outline"}
-              disabled={isFormSubmitting}
-            >
-              {audienceCount > 0 ? "Continue" : "Continue for now"}
-            </Button>
-          </Form>
-        ) : null;
-      case "launch_checks":
-        return hasLaunchNextItem ? (
-          <Button variant="outline" asChild>
-            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
-          </Button>
-        ) : null;
-      case "script":
-        return null;
-      case "campaign_info":
-        return continueTarget ? (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value={continueTarget} />
-            <Button
-              type="submit"
-              variant={campaignCount > 0 ? "default" : "outline"}
-              disabled={isFormSubmitting}
-            >
-              {campaignCount > 0 ? "Continue" : "Continue for now"}
-            </Button>
-          </Form>
-        ) : null;
-      case "credits":
-        return (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value="launch_checks" />
-            <Button type="submit" variant="outline" disabled={isFormSubmitting}>
-              Continue for now
-            </Button>
-          </Form>
-        );
-      default: {
-        const _exhaustive: never = activeStep;
-        return _exhaustive;
-      }
-    }
-  })();
+  const footerContinue = (
+    <FooterContinue
+      activeStep={activeStep}
+      isReadOnly={isReadOnly}
+      pending={pending}
+      isGoalSelectionValid={isGoalSelectionValid}
+      hasFirstNumber={hasFirstNumber}
+      continueTarget={continueTarget}
+      isFormSubmitting={isFormSubmitting}
+      audienceCount={audienceCount}
+      hasLaunchNextItem={hasLaunchNextItem}
+      workspaceId={workspaceId}
+      campaignCount={campaignCount}
+    />
+  );
 
   // Onboarding content reads better narrow (#1318). The first-number step is
   // the exception: it embeds the number-search table and routing presets and
@@ -406,6 +454,7 @@ export function OnboardingWizard({
 
       {!showIntro && activeStep === "launch_checks" ? (
           <OnboardingLaunchStep
+          items={launchItems}
           onboarding={onboarding}
           readiness={readiness}
           workspaceId={workspaceId}
@@ -414,7 +463,6 @@ export function OnboardingWizard({
           campaignCount={campaignCount}
           scriptCount={scripts.length}
             creditsBalance={creditsBalance}
-            onNextItemChange={setHasLaunchNextItem}
           />
       ) : null}
 

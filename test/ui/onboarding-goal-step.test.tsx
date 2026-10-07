@@ -39,7 +39,7 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByText("What are you setting up?")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Live call session/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /Robocall or Interactive Voice Recording \(IVR\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Automated phone menu/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /SMS blast/i })).toBeInTheDocument();
     expect(screen.queryByText("Choose channels")).toBeNull();
     expect(screen.queryByText("Provider setup")).toBeNull();
@@ -115,7 +115,7 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByTestId("onboarding-step")).toBeInTheDocument();
     expect(screen.getByText("Setup: Acme")).toBeInTheDocument();
-    expect(screen.getByText(/Step 4 of \d+/)).toBeInTheDocument();
+    expect(screen.getByText(/Step 4 of \d+ — Call list/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /4\. Call list/i })).toHaveAttribute(
       "href",
       expect.stringContaining("step=audience"),
@@ -147,5 +147,6 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByText("12 credits")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Add credits/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue to review/i })).toBeInTheDocument();
   });
 });

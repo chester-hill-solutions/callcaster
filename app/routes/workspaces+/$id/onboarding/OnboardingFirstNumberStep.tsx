@@ -136,7 +136,7 @@ export function OnboardingFirstNumberStep({
     if (error) {
       toast.error(error);
     } else if (formName === "apply-routing-preset") {
-      toast.success("Voicemail notification email saved");
+      toast.success("Number routing saved");
     } else {
       toast.success("Number settings saved");
     }
