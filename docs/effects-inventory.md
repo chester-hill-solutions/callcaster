@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**122** documented / **124** total effects (2 grandfathered, ratcheting to 0).
+**123** documented / **125** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -128,6 +128,7 @@
 | `app/routes/docs.tsx` | Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec. | config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes. | dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run. | Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree. |
 | `app/routes/workspaces+/$id/campaigns/$selected_id/settings.route.tsx` | Redirect legacy #campaign-launch hash deep-links to the dedicated launch route. | location.hash, location.search, navigate | navigate (client redirect) | Hash fragments are not available to loaders; this preserves old bookmarks. |
 | `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx` | Open the verification-code dialog when the route action returns a validationRequest | validationRequest from useActionData via the parent route | setState for dialog open + retained request payload | Action data arrives after the mutation; opening a modal is client-only. |
+| `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx` | Notify the wizard footer when the selected goal requires an SMS number path. | onSelectionValidityChange, selectionIsValid | parent state update only | This is client-side form state shared with the wizard footer. |
 | `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx` | Keep the `?step=` search param aligned with the resolved active wizard step after goal-driven step lists change. | activeStep (canonical step after goal/visibility resolution); urlStep (current query); showIntro (skip while intro is showing); navigate (replace navigation) | navigation — `navigate(..., { replace: true })` updates the URL without adding history entries | Step resolution depends on client-only intro state and goal-derived visibility; a loader cannot replace the query mid-wizard without a client redirect. |
 | `app/routes/workspaces+/index.tsx` | Display the server-owned invitation receipt once through the root toast. | flash (the signed, allow-listed receipt returned by the loader) | toast.success | The loader consumes the cookie; only the browser can show a toast. |
 | `app/routes/workspaces+/index.tsx` | Reopen the create-workspace dialog when the action comes back with an | actionError (the action's error, per submission) | none (local setState) | The error is already action data — this only drives |

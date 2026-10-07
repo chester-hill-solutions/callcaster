@@ -71,6 +71,12 @@ export function OnboardingWizard({
   const [introSession, setIntroSession] = useState<
     "auto" | "force_show" | "force_hide"
   >("auto");
+  const [isGoalSelectionValid, setIsGoalSelectionValid] = useState(() =>
+    onboarding.selectedGoal !== "sms_blast" ||
+    onboarding.operatingCountry === "US" ||
+    onboarding.selectedChannels.includes("toll_free_bulk_sms") ||
+    onboarding.selectedChannels.includes("local_number"),
+  );
   const showIntro =
     introSession === "force_hide"
       ? false
@@ -146,7 +152,7 @@ export function OnboardingWizard({
           <Button
             type="submit"
             form="onboarding-channels-form"
-            disabled={pending.isSavingChannels}
+            disabled={pending.isSavingChannels || !isGoalSelectionValid}
             aria-busy={pending.isSavingChannels}
           >
             {pending.isSavingChannels ? "Saving…" : "Save & continue"}
@@ -255,12 +261,13 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep === "path_selection" ? (
-        <OnboardingGoalStep
-          formId="onboarding-channels-form"
-          onboarding={onboarding}
-          isReadOnly={isReadOnly}
-          pending={pending}
-        />
+          <OnboardingGoalStep
+            formId="onboarding-channels-form"
+            onboarding={onboarding}
+            isReadOnly={isReadOnly}
+            pending={pending}
+            onSelectionValidityChange={setIsGoalSelectionValid}
+          />
       ) : null}
 
       {!showIntro && activeStep === "audience" && continueTarget ? (

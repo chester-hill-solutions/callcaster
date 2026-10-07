@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Form } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -20,8 +20,10 @@ export function OnboardingGoalStep({
   formId = "onboarding-channels-form",
   onboarding,
   isReadOnly,
+  onSelectionValidityChange,
 }: Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & {
   formId?: string;
+  onSelectionValidityChange?: (isValid: boolean) => void;
 }) {
   const [selectedGoal, setSelectedGoal] = useState<WorkspaceOnboardingGoal | null>(
     () => onboarding.selectedGoal,
@@ -48,6 +50,19 @@ export function OnboardingGoalStep({
       channel === "toll_free_bulk_sms" ? "local_number" : channel,
     );
   }, [derivedChannels, offersTollFree, smsNumberPath]);
+
+  const selectionIsValid =
+    selectedGoal !== "sms_blast" || !offersTollFree || smsNumberPath !== null;
+
+  /**
+   * @effect Notify the wizard footer when the selected goal requires an SMS number path.
+   * @effect-deps onSelectionValidityChange, selectionIsValid
+   * @effect-side-effects parent state update only
+   * @effect-why-not-loader This is client-side form state shared with the wizard footer.
+   */
+  useEffect(() => {
+    onSelectionValidityChange?.(selectionIsValid);
+  }, [onSelectionValidityChange, selectionIsValid]);
 
   return (
     <Section variant="flat">
