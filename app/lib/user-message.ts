@@ -16,7 +16,8 @@
 
 const ALLOW_SENTENCE_RE = /^[A-Z][A-Za-z0-9 '(),./:;!?-]{0,138}[.!]?$/;
 
-const INFRA_DENY = /econn|pgrst|duplicate key|typeerror|referenceerror|syntaxerror|fetch failed|supabase|connection (terminated|reset|closed)|timeout exceeded|query read timeout|terminated unexpectedly|socket hang|epipe|the pool/i;
+const INFRA_DENY =
+  /econn|pgrst|duplicate key|typeerror|referenceerror|syntaxerror|fetch failed|supabase|connection (terminated|reset|closed)|timeout exceeded|query read timeout|terminated unexpectedly|socket hang|epipe|the pool|internal database|failed query/i;
 
 function isLikelyUserFacing(message: string): boolean {
   if (!message || message.length >= 140) return false;
@@ -43,6 +44,26 @@ export function toUserMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+export function toResponseMessage(data: unknown, fallback: string): string {
+  let message = data;
+  if (typeof data === "object" && data !== null) {
+    message =
+      "message" in data && typeof data.message === "string"
+        ? data.message
+        : "error" in data
+          ? data.error
+          : undefined;
+  }
+  // Bare HTTP status names do not explain what the user can do next.
+  if (
+    typeof message === "string" &&
+    /^(unauthorized|forbidden)[.!]?$/i.test(message.trim())
+  ) {
+    return fallback;
+  }
+  return toUserMessage(message, fallback);
 }
 
 /**

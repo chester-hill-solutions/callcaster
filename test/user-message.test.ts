@@ -82,6 +82,15 @@ describe("app/lib/user-message.ts", () => {
     });
   });
 
+  test.each([
+    "Internal database detail",
+    "Internal database connection failed.",
+    "Failed query: select workspace from campaign",
+    "Failed query: update campaign set status to running",
+  ])("replaces internal response sentences: %s (#2123)", (message) => {
+    expect(toUserMessage(message, FALLBACK)).toBe(FALLBACK);
+  });
+
   describe("getErrorDetail", () => {
     test("extracts raw message from strings and Errors", () => {
       expect(getErrorDetail("raw detail")).toBe("raw detail");
