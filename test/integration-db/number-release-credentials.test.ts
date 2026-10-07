@@ -219,14 +219,30 @@ describe("number release credential recovery through SDK and PostgreSQL (#2170)"
     ).toBe(true);
     expect(provider.accountReads()[0].username).toBe(RELEASE_PARENT);
   });
-  test("rejected key and token recover with the verified current subaccount token", async () => {
-    provider.state.rejectOldKey = true;
+  test("rejected stored Auth Token recovers with the verified current subaccount token", async () => {
+    await fixture`update public.workspace set key = null, token = null where id = ${workspaceId}::uuid`;
+    const { invalidateWorkspaceTwilioData } =
+      await import("@/lib/merge-workspace-twilio-data.server");
+    invalidateWorkspaceTwilioData(workspaceId);
     provider.state.rejectStoredToken = true;
     expect((await release()).error).toBeNull();
+    const rejectedIndex = provider.calls().findIndex((request) =>
+      request.username === RELEASE_ACCOUNT &&
+      request.password === "stored-fixture-token",
+    );
+    expect(rejectedIndex).toBeGreaterThanOrEqual(0);
+    const rejectedResponse =
+      await provider.request.mock.results[rejectedIndex].value;
+    expect(rejectedResponse.statusCode).toBe(401);
+    expect(JSON.parse(rejectedResponse.body).code).toBe(20003);
     const row = await completed();
+    expect(row.key).toBe(RELEASE_NEW_KEY);
+    expect(row.token).toBe("new-fixture-secret");
     expect(row.twilio_data.authToken).toBe("current-fixture-token");
+    expect(provider.accountReads()).toHaveLength(1);
     expect(provider.keyCreates()).toHaveLength(1);
     expect(provider.keyCreates()[0].password).toBe("current-fixture-token");
+    expect(provider.deletes().every((r) => r.username === RELEASE_NEW_KEY)).toBe(true);
   });
   test.each([
     {
