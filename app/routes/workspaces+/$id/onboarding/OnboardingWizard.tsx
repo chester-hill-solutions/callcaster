@@ -77,6 +77,7 @@ export function OnboardingWizard({
     onboarding.selectedChannels.includes("toll_free_bulk_sms") ||
     onboarding.selectedChannels.includes("local_number"),
   );
+  const [hasLaunchNextItem, setHasLaunchNextItem] = useState(true);
   const showIntro =
     introSession === "force_hide"
       ? false
@@ -172,7 +173,11 @@ export function OnboardingWizard({
         }
         return null;
       case "launch_checks":
-        return null;
+        return hasLaunchNextItem ? (
+          <Button variant="outline" asChild>
+            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
+          </Button>
+        ) : null;
       case "audience":
       case "script":
       case "campaign_info":
@@ -197,9 +202,11 @@ export function OnboardingWizard({
           ? "mx-auto w-full max-w-xl"
           : activeStep === "audience" || activeStep === "campaign_info"
             ? "mx-auto w-full max-w-2xl"
-            : activeStep === "credits"
-              ? "mx-auto w-full max-w-md"
-          : "mx-auto w-full max-w-4xl";
+          : activeStep === "credits"
+            ? "mx-auto w-full max-w-md"
+            : activeStep === "launch_checks"
+              ? "mx-auto w-full max-w-2xl"
+              : "mx-auto w-full max-w-4xl";
 
   return (
     <div className={`space-y-6 ${widthCap}`}>
@@ -357,7 +364,7 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep === "launch_checks" ? (
-        <OnboardingLaunchStep
+          <OnboardingLaunchStep
           onboarding={onboarding}
           readiness={readiness}
           workspaceId={workspaceId}
@@ -365,8 +372,9 @@ export function OnboardingWizard({
           audienceCount={audienceCount}
           campaignCount={campaignCount}
           scriptCount={scripts.length}
-          creditsBalance={creditsBalance}
-        />
+            creditsBalance={creditsBalance}
+            onNextItemChange={setHasLaunchNextItem}
+          />
       ) : null}
 
       {!showIntro && activeStep ? (

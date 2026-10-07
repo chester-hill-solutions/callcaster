@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -17,6 +18,7 @@ type OnboardingLaunchStepProps = Pick<
   campaignCount: number;
   scriptCount: number;
   creditsBalance: number;
+  onNextItemChange?: (hasNextItem: boolean) => void;
 };
 
 export function OnboardingLaunchStep({
@@ -28,6 +30,7 @@ export function OnboardingLaunchStep({
   campaignCount,
   scriptCount,
   creditsBalance,
+  onNextItemChange,
 }: OnboardingLaunchStepProps) {
   const checklist = buildWorkspaceLaunchChecklist({
     workspaceId,
@@ -56,30 +59,37 @@ export function OnboardingLaunchStep({
   ];
   const nextItem = items.find((item) => !item.complete);
   const completeCount = items.filter((item) => item.complete).length;
+  const hasNextItem = Boolean(nextItem);
+
+  /**
+   * @effect Keep the shared wizard footer aligned with the review checklist state.
+   * @effect-deps onNextItemChange, hasNextItem
+   * @effect-side-effects parent state update only
+   * @effect-why-not-loader The footer is client-rendered outside this step component.
+   */
+  useEffect(() => {
+    onNextItemChange?.(hasNextItem);
+  }, [hasNextItem, onNextItemChange]);
 
   return (
     <Section variant="flat">
       <SectionHeader
         compact
         title="Review your setup"
+        actions={
+          <div className="flex flex-col items-end gap-2">
+            <p className="text-sm font-medium">
+              {completeCount} of {items.length} setup items complete
+            </p>
+            <Button asChild>
+              <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
+                {nextItem ? "Continue setup" : "Go to workspace"}
+              </Link>
+            </Button>
+          </div>
+        }
       />
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-medium">{completeCount} of {items.length} setup items complete</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {nextItem
-                ? `Next: ${nextItem.label}.`
-                : "Your setup checklist is complete. Check any notices below before you start."}
-            </p>
-          </div>
-          <Button asChild>
-            <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
-              {nextItem ? "Continue setup" : "Go to workspace"}
-            </Link>
-          </Button>
-        </div>
-
         {readiness.warnings.length > 0 ? (
           <section aria-labelledby="setup-notices" className="space-y-2 rounded-md bg-muted/40 p-4">
             <h3 id="setup-notices" className="text-sm font-medium">Before you start</h3>
@@ -114,11 +124,6 @@ export function OnboardingLaunchStep({
           <p className="text-sm text-muted-foreground">
             You can create a campaign later if you need one.
           </p>
-        ) : null}
-        {nextItem ? (
-          <Button variant="ghost" asChild>
-            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
-          </Button>
         ) : null}
       </div>
     </Section>
