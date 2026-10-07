@@ -464,6 +464,51 @@ describe("number release credential recovery through SDK and PostgreSQL (#2170)"
     expect(provider.accountReads()).toHaveLength(0);
     expect(provider.deletes()).toHaveLength(0);
   });
+  test.each([
+    { target: "sender", kind: "network" },
+    { target: "sender", kind: "server" },
+    { target: "incoming", kind: "network" },
+    { target: "incoming", kind: "server" },
+    { target: "outgoing", kind: "network" },
+    { target: "outgoing", kind: "server" },
+  ] as const)(
+    "$target delete with $kind uncertainty stays pending without a second DELETE",
+    async ({ target, kind }) => {
+      if (target === "outgoing") {
+        await fixture`update public.workspace_number set type = 'caller_id' where workspace = ${workspaceId}::uuid`;
+        provider.state.outgoing = true;
+      }
+      provider.state.deleteFailure = { target, kind };
+      expect((await release()).error).not.toBeNull();
+      const targetDeletes = provider.deletes().filter((request) => {
+        const url = new URL(request.uri);
+        return target === "sender"
+          ? url.hostname === "messaging.twilio.com"
+          : url.pathname.includes(
+              target === "incoming" ? "/IncomingPhoneNumbers/" : "/OutgoingCallerIds/",
+            );
+      });
+      expect(targetDeletes).toHaveLength(1);
+      expect(provider.accountReads()).toHaveLength(0);
+      expect(provider.keyCreates()).toHaveLength(0);
+      expect(await receipt()).toMatchObject({ state: "releasing" });
+      const [row] = await fixture`select count(*)::int as numbers from public.workspace_number where workspace = ${workspaceId}::uuid`;
+      expect(row.numbers).toBe(1);
+    },
+  );
+  test("transient read retries retain normal release without credential repair", async () => {
+    provider.state.firstFailure = { status: 500, code: 20500 };
+    expect((await release()).error).toBeNull();
+    await completed();
+    const numberReads = provider.calls().filter((request) =>
+      request.method.toLowerCase() === "get" &&
+      new URL(request.uri).pathname.includes("/IncomingPhoneNumbers/"),
+    );
+    expect(numberReads).toHaveLength(2);
+    expect(provider.accountReads()).toHaveLength(0);
+    expect(provider.keyCreates()).toHaveLength(0);
+    expect(provider.deletes()).toHaveLength(2);
+  });
   test.each(["api", "form"] as const)(
     "%s reports actionable credential degradation as incomplete release",
     async (surface) => {

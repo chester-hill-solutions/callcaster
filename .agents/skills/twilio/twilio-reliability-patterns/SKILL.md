@@ -26,6 +26,12 @@ Twilio enforces per-resource rate limits. At scale, 429 errors are expected beha
 
 ## Key Patterns
 
+### Provider writes with uncertain results
+
+Choose retry rules for each operation before using a shared retry helper. A read can retry a transient failure. A number-release DELETE must use one provider attempt: a lost response or HTTP 5xx does not prove that the deletion failed. Keep the saved release intent and local number until completion is confirmed. A definite HTTP 401 with Twilio code 20003 can select the separately verified, bounded credential-repair path.
+
+Test sender detach, incoming-number deletion and caller-ID deletion through the actual SDK HTTP boundary. Simulate both a server error and a deletion that completes before its response is lost. Count DELETE requests and require one request per target in that release attempt. Keep valid-key, read-retry and release-recovery controls. A GET-only uncertainty test does not prove that destructive writes avoid replay.
+
 ### 1. Exponential Backoff with Jitter
 
 When you receive a 429 (Too Many Requests), wait and retry. Naive fixed-interval retry creates thundering herds. Use exponential backoff with randomized jitter.

@@ -27,6 +27,9 @@ export function numberReleaseAuthProvider() {
     attached: true,
     resourceAccount: RELEASE_ACCOUNT,
     firstFailure: undefined as { status: number; code: number } | undefined,
+    deleteFailure: undefined as
+      | { target: "sender" | "incoming" | "outgoing"; kind: "network" | "server" }
+      | undefined,
     onRejectedKey: undefined as (() => Promise<void>) | undefined,
     onAccountRead: undefined as (() => Promise<void>) | undefined,
     onKeyCreate: undefined as (() => Promise<void>) | undefined,
@@ -53,6 +56,31 @@ export function numberReleaseAuthProvider() {
       const method = args.method.toLowerCase();
       let body: object;
       let statusCode = 200;
+      if (
+        method === "delete" &&
+        state.deleteFailure &&
+        ((state.deleteFailure.target === "sender" &&
+          url.hostname === "messaging.twilio.com") ||
+          (state.deleteFailure.target === "incoming" &&
+            path.includes("/IncomingPhoneNumbers/")) ||
+          (state.deleteFailure.target === "outgoing" &&
+            path.includes("/OutgoingCallerIds/")))
+      ) {
+        const failure = state.deleteFailure;
+        state.deleteFailure = undefined;
+        if (failure.kind === "network") {
+          if (failure.target === "sender") state.attached = false;
+          else state.active = false;
+          throw Object.assign(new Error("Owned delete acknowledgement lost"), {
+            code: "ECONNRESET",
+          });
+        }
+        return {
+          statusCode: 500,
+          headers: {},
+          body: JSON.stringify({ code: 20500, message: "Owned server failure" }),
+        };
+      }
       if (state.firstFailure && path.includes("/IncomingPhoneNumbers/")) {
         const failure = state.firstFailure;
         state.firstFailure = undefined;

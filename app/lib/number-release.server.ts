@@ -58,10 +58,18 @@ function verifiedResourceSid(
   return resource.sid;
 }
 
+type NumberReleaseOperation =
+  | "incoming.fetch"
+  | "incoming.list"
+  | "outgoing.list"
+  | "sender.detach"
+  | "outgoing.release"
+  | "incoming.release";
+
 async function providerOperation<T>(
   release: NumberRelease,
   provider: NumberReleaseProvider,
-  operation: string,
+  operation: NumberReleaseOperation,
   fn: () => Promise<T>,
 ) {
   let uncertainResponse = false;
@@ -86,6 +94,12 @@ async function providerOperation<T>(
       {
         workspaceId: release.workspace,
         operation: `numberRelease.${operation}`,
+        maxAttempts:
+          operation === "sender.detach" ||
+          operation === "outgoing.release" ||
+          operation === "incoming.release"
+            ? 1
+            : undefined,
       },
     );
   } catch (error) {
@@ -165,7 +179,7 @@ async function resolveOutgoingSids(
 async function removeResource(
   release: NumberRelease,
   provider: NumberReleaseProvider,
-  operation: string,
+  operation: NumberReleaseOperation,
   remove: () => Promise<boolean>,
 ) {
   try {
