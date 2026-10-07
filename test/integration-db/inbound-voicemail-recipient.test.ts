@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import twilio from "twilio";
+import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { RouterContextProvider } from "react-router";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "../helpers/route-result";
@@ -109,6 +110,115 @@ suite("inbound voicemail recipient delivery (#2268)", () => {
       RecordingDuration: "12", ...options.fields,
     }, options.authToken), params: {}, context: new RouterContextProvider() }));
   }
+
+  async function storedCopies() {
+    vi.stubEnv("S3_ENDPOINT", "https://owned-storage.example.test");
+    vi.stubEnv("S3_REGION", "us-east-1");
+    vi.stubEnv("S3_ACCESS_KEY_ID", "owned-storage-key");
+    vi.stubEnv("S3_SECRET_ACCESS_KEY", "owned-storage-secret");
+    vi.stubEnv("S3_BUCKET_AUDIO", "owned-voicemail-copies");
+    const storage = await vi.importActual<
+      typeof import("@/lib/object-storage.server")
+    >("@/lib/object-storage.server");
+    provider.upload.mockImplementation(storage.uploadObject);
+    const objects = new Map<string, string>();
+    const writes: Array<{ key: string; condition: string | undefined }> = [];
+    const transport = vi
+      .spyOn(S3Client.prototype, "send")
+      .mockImplementation(async (command) => {
+        if (command instanceof HeadObjectCommand) {
+          if (command.input.Key && objects.has(command.input.Key)) return {};
+          throw Object.assign(new Error("Missing object"), {
+            name: "NotFound",
+            $metadata: { httpStatusCode: 404 },
+          });
+        }
+        if (!(command instanceof PutObjectCommand))
+          throw new Error("Unexpected storage command");
+        const { Bucket, Key, Body, IfNoneMatch } = command.input;
+        if (
+          Bucket !== "owned-voicemail-copies" ||
+          !Key ||
+          !Buffer.isBuffer(Body)
+        )
+          throw new Error("Invalid object write");
+        writes.push({ key: Key, condition: IfNoneMatch });
+        if (IfNoneMatch === "*" && objects.has(Key)) {
+          throw Object.assign(new Error("Existing object"), {
+            name: "PreconditionFailed",
+            $metadata: { httpStatusCode: 412 },
+          });
+        }
+        objects.set(Key, Body.toString());
+        return {};
+      });
+    return { objects, writes, restore: () => transport.mockRestore() };
+  }
+
+  test("a preparation retry replaces the same voicemail object through the actual storage adapter", async () => {
+    const copies = await storedCopies();
+    const key = `voicemail/${workspace}/voicemail-${callSid}-${recordingSid}.mp3`;
+    const started = new Date();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(started);
+    try {
+      await route();
+      provider.sign.mockRejectedValueOnce(new Error("Owned signing failure"));
+      provider.fetch.mockResolvedValueOnce(
+        new Response("first copy", {
+          headers: { "Content-Type": "audio/mpeg" },
+        }),
+      );
+      expect((await callback()).status).toBe(500);
+      expect(copies.objects.get(key)).toBe("first copy");
+      expect(provider.send).not.toHaveBeenCalled();
+      vi.setSystemTime(new Date(started.getTime() + 10_000));
+      provider.fetch.mockResolvedValueOnce(
+        new Response("replacement copy", {
+          headers: { "Content-Type": "audio/mpeg" },
+        }),
+      );
+      expect((await callback()).status).toBe(200);
+      expect((await callback()).status).toBe(200);
+      expect([...copies.objects.entries()]).toEqual([
+        [key, "replacement copy"],
+      ]);
+      expect(copies.writes).toEqual([
+        { key, condition: undefined },
+        { key, condition: undefined },
+      ]);
+      expect(provider.fetch).toHaveBeenCalledTimes(2);
+      expect(provider.send).toHaveBeenCalledTimes(1);
+    } finally {
+      copies.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  test("another RecordingSid keeps a separate voicemail object for the same call", async () => {
+    const copies = await storedCopies();
+    const firstKey = `voicemail/${workspace}/voicemail-${callSid}-${recordingSid}.mp3`;
+    const started = new Date();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(started);
+    try {
+      await route();
+      expect((await callback()).status).toBe(200);
+      vi.setSystemTime(new Date(started.getTime() + 10_000));
+      recordingSid = `RE${randomUUID().replaceAll("-", "")}`;
+      const secondKey = `voicemail/${workspace}/voicemail-${callSid}-${recordingSid}.mp3`;
+      expect((await callback()).status).toBe(200);
+      expect([...copies.objects.keys()]).toEqual([firstKey, secondKey]);
+      expect(copies.writes).toEqual([
+        { key: firstKey, condition: undefined },
+        { key: secondKey, condition: undefined },
+      ]);
+      expect(provider.send).toHaveBeenCalledTimes(2);
+    } finally {
+      copies.restore();
+      vi.useRealTimers();
+    }
+  });
 
   test("the bound recipient survives an old workspace row for the same phone", async () => {
     await client`delete from workspace_number where workspace = ${workspace} and phone_number = ${phone}`;
