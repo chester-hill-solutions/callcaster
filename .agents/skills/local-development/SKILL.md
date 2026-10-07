@@ -66,6 +66,12 @@ When retiring a package, search all test consumers, including `createRequire`
 and `require.resolve` calls. Update fixtures to resolve the active installed
 consumer; do not restore a retired dependency to make collection pass.
 
+For a frozen install fixture, copy the tracked `.npmrc`, both locks,
+`package.json` and the local vendor packages. Verify that auth fields remain
+environment placeholders. Missing project settings can fail peer resolution
+before a package check runs; repair the fixture context and require executed
+checks before accepting the result.
+
 Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.
