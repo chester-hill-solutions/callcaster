@@ -30,7 +30,7 @@ export const action = defineAction({
     }
 
     const context = await loadInboundIvrBlockContext(Number(numberId));
-    if (!context || call.to !== context.number.phoneNumber) {
+    if (!context || call.to !== context.number.phoneNumber || call.workspace !== context.number.workspaceId) {
       return new Response(hangupTwiml(), {
         headers: { "Content-Type": "text/xml" },
       });

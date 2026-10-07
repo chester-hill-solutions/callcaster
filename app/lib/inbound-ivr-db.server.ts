@@ -62,6 +62,7 @@ async function loadScriptSteps(
 export async function loadInboundIvrPageContext(numberId: number): Promise<{
   inbound_script_id: number;
   phoneNumber: string | null;
+  workspaceId: string;
   steps: InboundIvrScriptSteps;
 } | null> {
   const number = await findWorkspaceNumberById(numberId);
@@ -74,7 +75,7 @@ export async function loadInboundIvrPageContext(numberId: number): Promise<{
     return null;
   }
 
-  return { inbound_script_id: number.inbound_script_id, phoneNumber: number.phoneNumber, steps };
+  return { inbound_script_id: number.inbound_script_id, phoneNumber: number.phoneNumber, workspaceId: number.workspaceId, steps };
 }
 
 export async function loadInboundIvrBlockContext(numberId: number): Promise<{
