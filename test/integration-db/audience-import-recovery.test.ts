@@ -23,7 +23,7 @@ suite("audience import durable source recovery (#2479)", () => {
   let native: postgres.Sql; let client: postgres.Sql;
   let pools: typeof import("@/server/db");
   let processor: typeof import("@/lib/audience-upload-process.server");
-  let protocol: typeof import("@/lib/audience-import-recovery.server");
+  let protocol: typeof import("@/server/audience-import-recovery.server");
   let mapper: typeof import("@/lib/audience-import-map");
   let worker: typeof import("@/lib/worker/poll-jobs.server");
   let handlers: typeof import("@/lib/worker/handlers.server");
@@ -43,7 +43,7 @@ suite("audience import durable source recovery (#2479)", () => {
     const [control] = await native`insert into public.job (type, status, workspace_id) values ('audience_upload', 'queued', ${foreign}::uuid) returning id`;
     publicJob = Number(control.id);
     pools = await import("@/server/db"); processor = await import("@/lib/audience-upload-process.server");
-    protocol = await import("@/lib/audience-import-recovery.server"); mapper = await import("@/lib/audience-import-map");
+    protocol = await import("@/server/audience-import-recovery.server"); mapper = await import("@/lib/audience-import-map");
     worker = await import("@/lib/worker/poll-jobs.server"); handlers = await import("@/lib/worker/handlers.server");
     expect((await pools.pool`select current_schema() as schema`)[0].schema).toBe(schema);
   });

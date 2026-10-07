@@ -2,7 +2,7 @@ import { and, count, eq, sql } from "drizzle-orm";
 import { audience, audience_upload, audience_import_run, audience_import_row, contact_audience } from "@/db/schema";
 import { db, type Database } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
-import { commitAudienceImportRows } from "@/lib/audience-import-effects.server";
+import { commitAudienceImportRows } from "@/server/audience-import-effects.server";
 import type { PreparedAudienceImport } from "@/lib/audience-import-map";
 import { AUDIENCE_UPLOAD_CHUNK_SIZE } from "../../shared/audience-upload";
 

@@ -18,7 +18,7 @@ import {
 } from "../../shared/audience-upload";
 import { prepareAudienceImport } from "@/lib/audience-import-map";
 import { startAudienceImport, advanceAudienceImport, finishAudienceImport, recordAudienceImportFailure,
-  type AudienceImportContext, type AudienceImportRun } from "@/lib/audience-import-recovery.server";
+  type AudienceImportContext, type AudienceImportRun } from "@/server/audience-import-recovery.server";
 
 interface CSVContact {
   [key: string]: string;

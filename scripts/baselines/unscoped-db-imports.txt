@@ -3,7 +3,6 @@ app/lib/acd/acd-router.server.ts::@/server/db
 app/lib/admin-jobs.server.ts::@/server/admin-db
 app/lib/audience-detail.server.ts::@/server/db
 app/lib/audience-upload-db.server.ts::@/server/db
-app/lib/audience-upload-process.server.ts::@/server/db
 app/lib/audit-event.server.ts::@/server/db
 app/lib/auth.server.ts::@/server/admin-db
 app/lib/auto-dial.server.ts::@/server/db
