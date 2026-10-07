@@ -186,6 +186,7 @@ export default function TeamMember({
                         </select>
                       </label>
                       <Button
+                        type="submit"
                         className="border-2 border-black dark:border-white"
                         variant="outline"
                       >
@@ -210,7 +211,7 @@ export default function TeamMember({
                           value={workspaceOwner.id}
                         />
                         <input type="hidden" name="user_id" value={member.id} />
-                        <Button className="w-full bg-orange-400 hover:bg-orange-700">
+                        <Button type="submit" className="w-full bg-orange-400 hover:bg-orange-700">
                           Transfer Workspace Ownership
                         </Button>
                       </Form>
@@ -219,7 +220,7 @@ export default function TeamMember({
                     <Form method="POST" className="w-full">
                       <input type="hidden" name="formName" value="deleteUser" />
                       <input type="hidden" name="user_id" value={member.id} />
-                      <Button className="w-full" variant="destructive">
+                      <Button type="submit" className="w-full" variant="destructive">
                         Remove Team Member
                       </Button>
                     </Form>

@@ -1,8 +1,8 @@
 import { createElement } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider, type ActionFunction, type ActionFunctionArgs } from "react-router";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 vi.mock("next-themes", () => ({ useTheme: () => ({ theme: "light" }) }));
@@ -10,9 +10,9 @@ const target = { id: "owned-target", username: "owned-target@example.test", firs
 const owner = { ...target, id: "owned-owner", username: "owned-owner@example.test", role: "owner" };
 const routers: ReturnType<typeof createMemoryRouter>[] = [];
 afterEach(() => { for (const router of routers.splice(0)) router.dispose(); });
-function mount(role: MemberRole, platformAdmin = false, member = target) {
+function mount(role: MemberRole, platformAdmin = false, member = target, action?: ActionFunction) {
   const element = <TeamMember member={member} userRole={role} memberIsUser={false} workspaceOwner={owner} platformAdmin={platformAdmin} />;
-  const router = createMemoryRouter([{ path: "/", element }], { initialEntries: ["/"] });
+  const router = createMemoryRouter([{ path: "/", element, action }], { initialEntries: ["/"] });
   routers.push(router);
   render(createElement(RouterProvider, { router }));
 }
@@ -32,6 +32,44 @@ describe("explicit platform membership controls (#2138)", () => {
       expect(screen.queryByRole("button", { name: "Transfer Workspace Ownership" })).not.toBeInTheDocument();
     },
   );
+  test("platform owner recovery submits the selected role to the existing form action", async () => {
+    const action = vi.fn(async ({ request }: ActionFunctionArgs) => Object.fromEntries(await request.formData()));
+    const user = userEvent.setup();
+    mount(MemberRole.Member, true, target, action);
+    await user.click(screen.getByRole("button", { name: "Manage owned-target@example.test" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Workspace Role" }), "owner");
+    await user.click(screen.getByRole("button", { name: "Update Team Member" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(await action.mock.results[0].value).toEqual({ formName: "updateUser",
+      user_id: "owned-target", updated_workspace_role: "owner" });
+  });
+  test("platform member removal submits the existing scoped form contract", async () => {
+    const action = vi.fn(async ({ request }: ActionFunctionArgs) => Object.fromEntries(await request.formData()));
+    const user = userEvent.setup();
+    mount(MemberRole.Member, true, target, action);
+    await user.click(screen.getByRole("button", { name: "Manage owned-target@example.test" }));
+    await user.click(screen.getByRole("button", { name: "Remove Team Member" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(await action.mock.results[0].value).toEqual({ formName: "deleteUser", user_id: "owned-target" });
+  });
+  test("platform invitation cancellation submits the existing action fields", async () => {
+    const action = vi.fn(async ({ request }: ActionFunctionArgs) => Object.fromEntries(await request.formData()));
+    const user = userEvent.setup();
+    mount(MemberRole.Member, true, { ...target, role: "invited" }, action);
+    await user.click(screen.getByRole("button", { name: "Cancel invite for owned-target@example.test" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(await action.mock.results[0].value).toEqual({ formName: "cancelInvite", userId: "owned-target" });
+  });
+  test("ordinary owner transfer still submits its existing form action", async () => {
+    const action = vi.fn(async ({ request }: ActionFunctionArgs) => Object.fromEntries(await request.formData()));
+    const user = userEvent.setup();
+    mount(MemberRole.Owner, false, target, action);
+    await user.click(screen.getByRole("button", { name: "Manage owned-target@example.test" }));
+    await user.click(screen.getByRole("button", { name: "Transfer Workspace Ownership" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(await action.mock.results[0].value).toEqual({ formName: "transferWorkspaceOwnership",
+      user_id: "owned-target", workspace_owner_id: "owned-owner" });
+  });
   test("platform management exposes the existing owner's controls", async () => {
     const user = userEvent.setup();
     mount(MemberRole.Member, true, owner);
