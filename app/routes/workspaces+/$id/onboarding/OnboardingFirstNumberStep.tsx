@@ -394,7 +394,11 @@ export function OnboardingFirstNumberStep({
                 {verifiedCallerIdCount > 0
                   ? `${verifiedCallerIdCount} verified caller ID${verifiedCallerIdCount === 1 ? "" : "s"} ready for outbound.`
                   : null}{" "}
-                Continue when you are ready. You can add more numbers in Settings.
+                 Continue when you are ready. You can add more numbers in{" "}
+                 <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
+                   Phone Numbers
+                 </Link>
+                 .
               </AlertDescription>
             </Alert>
           ) : null}
@@ -511,13 +515,6 @@ export function OnboardingFirstNumberStep({
             </div>
           ) : null}
 
-          <p className="text-sm text-muted-foreground">
-            Manage numbers later in{" "}
-            <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
-              Phone Numbers
-            </Link>
-            .
-          </p>
         </div>
       </Section>
     </>

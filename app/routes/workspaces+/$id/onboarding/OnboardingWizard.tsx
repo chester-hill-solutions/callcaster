@@ -172,17 +172,52 @@ export function OnboardingWizard({
           );
         }
         return null;
+      case "audience":
+        return continueTarget ? (
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value={continueTarget} />
+            <Button
+              type="submit"
+              variant={audienceCount > 0 ? "default" : "outline"}
+              disabled={isFormSubmitting}
+            >
+              {audienceCount > 0 ? "Continue" : "Continue for now"}
+            </Button>
+          </Form>
+        ) : null;
       case "launch_checks":
         return hasLaunchNextItem ? (
           <Button variant="outline" asChild>
             <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
           </Button>
         ) : null;
-      case "audience":
       case "script":
-      case "campaign_info":
-      case "credits":
         return null;
+      case "campaign_info":
+        return continueTarget ? (
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value={continueTarget} />
+            <Button
+              type="submit"
+              variant={campaignCount > 0 ? "default" : "outline"}
+              disabled={isFormSubmitting}
+            >
+              {campaignCount > 0 ? "Continue" : "Continue for now"}
+            </Button>
+          </Form>
+        ) : null;
+      case "credits":
+        return (
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value="launch_checks" />
+            <Button type="submit" variant="outline" disabled={isFormSubmitting}>
+              Continue for now
+            </Button>
+          </Form>
+        );
       default: {
         const _exhaustive: never = activeStep;
         return _exhaustive;
@@ -298,10 +333,11 @@ export function OnboardingWizard({
           actionHref={checklistCreateHref(workspaceId, "audiences/new", "audience")}
           actionLabel={audienceCount > 0 ? "Add another call list" : "Upload call list"}
           secondaryHref={`/workspaces/${workspaceId}/audiences`}
-          secondaryLabel="View call lists"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
-        />
+           secondaryLabel="View call lists"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+           continueInFooter
+         />
       ) : null}
 
       {!showIntro && activeStep === "first_number" ? (
@@ -333,11 +369,11 @@ export function OnboardingWizard({
           incompleteLabel="Create a script, then return here to continue."
           actionHref={checklistCreateHref(workspaceId, "scripts/new", "script")}
           actionLabel={scripts.length > 0 ? "Manage scripts" : "Create script"}
-          secondaryHref={`/workspaces/${workspaceId}/scripts`}
-          secondaryLabel="View scripts"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
-        />
+           secondaryHref={`/workspaces/${workspaceId}/scripts`}
+           secondaryLabel="View scripts"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+         />
       ) : null}
 
       {!showIntro && activeStep === "campaign_info" && continueTarget ? (
@@ -347,11 +383,12 @@ export function OnboardingWizard({
           complete={campaignCount > 0}
           completeLabel={`You have ${campaignCount} campaign${campaignCount === 1 ? "" : "s"} ready.`}
           actionHref={checklistCreateHref(workspaceId, "campaigns/new", "campaign_info")}
-          actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
-          secondaryHref={`/workspaces/${workspaceId}/campaigns`}
-          secondaryLabel="View campaigns"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
+           actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
+           secondaryHref={`/workspaces/${workspaceId}/campaigns`}
+           secondaryLabel="View campaigns"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+           continueInFooter
         />
       ) : null}
 

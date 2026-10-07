@@ -1,4 +1,4 @@
-import { Form, Link } from "react-router";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { NUMBER_RENTAL_MONTHLY_CREDITS } from "@/lib/number-rental";
@@ -37,13 +37,6 @@ export function OnboardingCreditsStep({
           Number rental is about {NUMBER_RENTAL_MONTHLY_CREDITS.toLocaleString()} credits /
           30 days. You can add credits before launch.
         </p>
-        {!isReadOnly ? (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value="launch_checks" />
-            <Button type="submit" variant="ghost">Continue for now</Button>
-          </Form>
-        ) : null}
       </div>
     </Section>
   );

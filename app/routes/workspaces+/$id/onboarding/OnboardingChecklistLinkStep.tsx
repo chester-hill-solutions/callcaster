@@ -18,6 +18,7 @@ type OnboardingChecklistLinkStepProps = {
   skipLabel?: string;
   isReadOnly: boolean;
   helperText?: string;
+  continueInFooter?: boolean;
 };
 
 export function OnboardingChecklistLinkStep({
@@ -34,6 +35,7 @@ export function OnboardingChecklistLinkStep({
   skipLabel = "Continue for now",
   isReadOnly,
   helperText,
+  continueInFooter = false,
 }: OnboardingChecklistLinkStepProps) {
   return (
     <Section variant="flat">
@@ -61,7 +63,7 @@ export function OnboardingChecklistLinkStep({
               <Link to={secondaryHref}>{secondaryLabel}</Link>
             </Button>
           ) : null}
-          {!isReadOnly ? (
+          {!isReadOnly && !continueInFooter ? (
             <Form method="post">
               <input type="hidden" name="_action" value="advance_step" />
               <input type="hidden" name="targetStep" value={nextStep} />
