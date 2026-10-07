@@ -62,6 +62,11 @@ npm can also retain an invalid test subtree for a linked local package after
 a named update. Compare its declaration with `npm ls vitest --all`. Remove only
 proven retired lock nodes in the owned worktree, regenerate with `npm install`,
 and require a fresh `npm ci` and a valid installed tree before source freeze.
+For untrusted source-map offset tests, prove constructor rejection before any
+expansion. Keep valid position and source-content controls. Do not expand or
+serialize malicious large maps in the test process; use a bounded owned child
+if an expansion proof is necessary.
+
 When retiring a package, search all test consumers, including `createRequire`
 and `require.resolve` calls. Update fixtures to resolve the active installed
 consumer; do not restore a retired dependency to make collection pass.
