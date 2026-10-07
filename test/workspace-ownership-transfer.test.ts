@@ -65,7 +65,7 @@ beforeEach(() => {
     role_id: "member",
   });
   mocks.transaction.mockImplementation(
-    async (run: (tx: object) => Promise<unknown>) => run({}),
+    async (run: (tx: object) => Promise<unknown>) => run({ execute: async () => [] }),
   );
   mocks.update.mockImplementation(
     async ({ set }: { set: { role_id: string } }) => [

@@ -34,13 +34,18 @@ async function role(actor: Actor, id = workspace) {
     where workspace_id = ${id} and user_id = ${identity(actor).id}`;
   return rows[0]?.role_id ?? null;
 }
-async function waitForMembershipWriters(count: number) {
+async function waitForMembershipWriters(count: number, barrierPid: number) {
   const deadline = Date.now() + 5_000;
   let blocked = 0;
   while (blocked < count && Date.now() < deadline) {
-    const [row] = await sql`select count(*)::int as blocked from pg_stat_activity
-      where datname = current_database() and wait_event_type = 'Lock'
-      and query like '%workspace%' and pid <> pg_backend_pid()`;
+    const [row] = await sql`with recursive owned_waiters(pid) as (
+      select pid from pg_stat_activity
+      where datname = current_database() and ${barrierPid} = any(pg_blocking_pids(pid))
+      union
+      select activity.pid from pg_stat_activity activity
+      join owned_waiters on owned_waiters.pid = any(pg_blocking_pids(activity.pid))
+      where activity.datname = current_database()
+    ) select count(*)::int as blocked from owned_waiters`;
     blocked = row.blocked;
     if (blocked < count) await new Promise(resolve => setTimeout(resolve, 10));
   }
@@ -242,6 +247,7 @@ describe.skipIf(!databaseUrl)("platform membership safety with real sessions and
     const barrier = await sql.reserve();
     const pending: Promise<{ status: number }>[] = [];
     try {
+      const [{ pid: barrierPid }] = await barrier`select pg_backend_pid() as pid`;
       await barrier`begin`;
       // Hold both target rows so both requests reach the write before release.
       await barrier`select id from workspace_member where workspace_id = ${workspace} for update`;
@@ -253,10 +259,11 @@ describe.skipIf(!databaseUrl)("platform membership safety with real sessions and
           : service.updateWorkspaceMemberRole(identity("owner").id, workspace, identity("target").id, "member"))
           .then(result => ({ status: result.ok ? 200 : result.status })));
       } else pending.push(mutate(second, operation, { role: "member" }));
-      await waitForMembershipWriters(2);
+      await waitForMembershipWriters(2, barrierPid);
     } finally {
-      try { await barrier`rollback`; } finally { barrier.release(); }
-      await Promise.allSettled(pending);
+      try {
+        try { await barrier`rollback`; } finally { barrier.release(); }
+      } finally { await Promise.allSettled(pending); }
     }
     const results = await Promise.all(pending);
     const [row] = await sql`select count(*)::int as owners from workspace_member
@@ -269,17 +276,19 @@ describe.skipIf(!databaseUrl)("platform membership safety with real sessions and
     const barrier = await sql.reserve();
     const pending: Promise<{ status: number }>[] = [];
     try {
+      const [{ pid: barrierPid }] = await barrier`select pg_backend_pid() as pid`;
       await barrier`begin`;
       await barrier`select id from workspace_member where workspace_id = ${workspace} for update`;
       pending.push(transferWorkspaceOwnership({ workspaceId: workspace,
         currentOwnerUserId: identity("owner").id, newOwnerUserId: identity("target").id })
         .then(() => ({ status: 200 })));
-      await waitForMembershipWriters(1);
+      await waitForMembershipWriters(1, barrierPid);
       pending.push(mutate("tab", "remove"));
-      await waitForMembershipWriters(2);
+      await waitForMembershipWriters(2, barrierPid);
     } finally {
-      try { await barrier`rollback`; } finally { barrier.release(); }
-      await Promise.allSettled(pending);
+      try {
+        try { await barrier`rollback`; } finally { barrier.release(); }
+      } finally { await Promise.allSettled(pending); }
     }
     expect((await Promise.all(pending)).map(result => result.status)).toEqual([200, 403]);
     expect(await role("owner")).toBe("admin");
