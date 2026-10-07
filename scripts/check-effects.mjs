@@ -27,10 +27,11 @@ const SCAN_DIRS = [path.join(ROOT, "app")];
 const SKIP_DIR_NAMES = new Set(["node_modules", "archive", "deprecated", "__tests__"]);
 const SKIP_FILE = [/\.test\.[jt]sx?$/, /\.spec\.[jt]sx?$/, /\/test\//, /\/e2e\//];
 const BASELINE_PATH = path.join(ROOT, "scripts", "effects-baseline.json");
+const DEPS_BASELINE_PATH = path.join(ROOT, "scripts", "effects-deps-baseline.json");
 const INVENTORY_PATH = path.join(ROOT, "docs", "effects-inventory.md");
 
 // Required tags for a NEW effect to count as compliant.
-import { effectCallOffsets, isEffectCompliant } from "./lib/effects-lib.mjs";
+import { effectCalls, effectDependencyViolations, isEffectCompliant } from "./lib/effects-lib.mjs";
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -91,13 +92,22 @@ function collect() {
   for (const full of files) {
     const rel = path.relative(ROOT, full);
     const src = fs.readFileSync(full, "utf8");
-    for (const offset of effectCallOffsets(src, full)) {
-      const block = precedingBlock(src, offset);
+    for (const call of effectCalls(src, full)) {
+      const block = precedingBlock(src, call.offset);
       const tags = parseTags(block);
       const compliant = isEffectCompliant(tags);
-      perFile[rel] ??= { annotated: [], unannotated: 0 };
-      if (compliant) perFile[rel].annotated.push({ rel, tags });
-      else perFile[rel].unannotated += 1;
+      perFile[rel] ??= { annotated: [], unannotated: 0, dependencies: {} };
+      if (compliant) {
+        perFile[rel].annotated.push({ rel, tags });
+        for (const violation of effectDependencyViolations(call, tags["@effect-deps"])) {
+          const key = `${rel}::${call.symbol}::${violation}`;
+          const previous = perFile[rel].dependencies[key];
+          perFile[rel].dependencies[key] = {
+            count: (previous?.count ?? 0) + 1,
+            line: call.line,
+          };
+        }
+      } else perFile[rel].unannotated += 1;
     }
   }
   return perFile;
@@ -150,9 +160,13 @@ if (args.includes("--update-baseline")) {
   const baseline = {};
   for (const [rel, f] of Object.entries(perFile)) if (f.unannotated > 0) baseline[rel] = f.unannotated;
   fs.writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + "\n");
+  const dependencies = Object.fromEntries(
+    Object.values(perFile).flatMap((file) => Object.entries(file.dependencies).map(([key, value]) => [key, value.count])),
+  );
+  fs.writeFileSync(DEPS_BASELINE_PATH, JSON.stringify(dependencies, null, 2) + "\n");
   writeInventory(perFile);
   const total = Object.values(baseline).reduce((a, n) => a + n, 0);
-  console.log(`Baseline written: ${Object.keys(baseline).length} files, ${total} grandfathered effects.`);
+  console.log(`Baseline written: ${Object.keys(baseline).length} files, ${total} grandfathered effects; ${Object.values(dependencies).reduce((sum, count) => sum + count, 0)} dependency mismatches.`);
   process.exit(0);
 }
 
@@ -166,8 +180,31 @@ for (const [rel, f] of Object.entries(perFile)) {
   }
 }
 
+for (const [rel, allowed] of Object.entries(baseline)) {
+  const actual = perFile[rel]?.unannotated ?? 0;
+  if (actual < allowed) regressions.push(`  ${rel}: stale unannotated allowance ${allowed}, current ${actual}`);
+}
+const dependencies = Object.fromEntries(Object.values(perFile).flatMap((file) => Object.entries(file.dependencies)));
+const dependenciesBaseline = fs.existsSync(DEPS_BASELINE_PATH)
+  ? JSON.parse(fs.readFileSync(DEPS_BASELINE_PATH, "utf8"))
+  : {};
+for (const [key, allowed] of Object.entries(dependenciesBaseline)) {
+  if (!Number.isSafeInteger(allowed) || allowed < 1) {
+    regressions.push(`  ${key}: invalid dependency allowance ${allowed}`);
+    continue;
+  }
+  const actual = dependencies[key]?.count ?? 0;
+  if (actual < allowed) regressions.push(`  ${key}: stale dependency allowance ${allowed}, current ${actual}`);
+}
+for (const [key, value] of Object.entries(dependencies)) {
+  const allowed = dependenciesBaseline[key] ?? 0;
+  if (value.count > allowed) {
+    regressions.push(`  ${key} (line ${value.line}): ${value.count} occurrence(s), baseline allows ${allowed}`);
+  }
+}
+
 if (regressions.length) {
-  console.error("Effects strictness check FAILED — new un-annotated effect(s):\n");
+  console.error("Effects strictness check FAILED — annotation or dependency ratchet:\n");
   console.error(regressions.join("\n"));
   console.error(
     "\nAdd an @effect annotation (see docs/effects-strictness.md). If you annotated an\n" +
