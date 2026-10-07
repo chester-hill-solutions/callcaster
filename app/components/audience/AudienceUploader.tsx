@@ -332,6 +332,8 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="processing"
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -346,6 +348,8 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="completed"
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -359,9 +363,13 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="error"
-                progress={0}
-                processedContacts={0}
-                totalContacts={phase.draft.rowCount}
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
+                progress={phase.progress}
+                processedContacts={phase.processedContacts}
+                totalContacts={phase.totalContacts}
+                skippedInvalidContacts={phase.skippedInvalidContacts}
+                skippedDuplicateContacts={phase.skippedDuplicateContacts}
                 errorMessage={phase.message}
                 showCompletionChrome
                 onTryAgain={() => {

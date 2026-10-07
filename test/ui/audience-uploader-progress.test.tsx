@@ -210,6 +210,22 @@ describe("AudienceUploader progress polling", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
+  test("failed partial imports keep their truthful counters and report identity", async () => {
+    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { container } = render(<AudienceUploader audienceName="A1" />);
+    await startUpload(container, "Phone\n4165551234");
+    await act(async () => {
+      mocks.realtimeOpts.onChange({ eventType: "UPDATE", new: { status: "error", error_message: "Import interrupted",
+        processed_contacts: 40, total_contacts: 45, skipped_invalid_contacts: 1 } });
+    });
+    expect(screen.getByText("40 / 45 contacts")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Upload failed" });
+    expect(within(dialog).getByRole("link", { name: "Download row report" })).toHaveAttribute("href", "/workspaces/w1/audience-imports/9/report");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("link", { name: "Download row report" })).toHaveAttribute("href", "/workspaces/w1/audience-imports/9/report");
+  });
+
   test("polling status=processing updates counts and progress", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
@@ -350,7 +366,7 @@ describe("AudienceUploader progress polling", () => {
     ).toBeInTheDocument();
   });
 
-  test("polling status=processing with total_contacts=0 keeps client-seeded total", async () => {
+  test("polling status=processing preserves a truthful server total of zero", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
     const { container } = render(<AudienceUploader audienceName="A1" />);
@@ -394,14 +410,14 @@ describe("AudienceUploader progress polling", () => {
     });
     await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
-    expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
+    expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument();
 
     await act(async () => {
       await mocks.interval.cb?.();
     });
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    expect(screen.getByText("0 / 1 contacts")).toBeInTheDocument();
+    expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument();
     expect(screen.getByRole("progressbar").textContent).toBe("0");
   });
 

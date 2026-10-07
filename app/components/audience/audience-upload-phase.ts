@@ -90,14 +90,15 @@ type ProcessingFields = UploadCounters & {
   warning: string | null;
 };
 
-type CompletedFields = UploadCounters & { audienceId: string };
+type CompletedFields = UploadCounters & { audienceId: string; uploadId: number | null };
+type FailedFields = UploadCounters & { message: string; uploadId: number | null; audienceId: string | null };
 
 export type AudienceUploadProgressState =
   | { kind: "idle" }
   | ({ kind: "submitting" } & SubmittingFields)
   | ({ kind: "processing" } & ProcessingFields)
   | ({ kind: "completed" } & CompletedFields)
-  | { kind: "error"; message: string };
+  | ({ kind: "error" } & FailedFields);
 
 /**
  * Single UI phase derived from wizard step + upload progress.
@@ -110,7 +111,7 @@ export type AudienceUploadPhase =
   | ({ kind: "submitting"; draft: AudienceUploadDraft } & SubmittingFields)
   | ({ kind: "processing"; draft: AudienceUploadDraft } & ProcessingFields)
   | ({ kind: "completed" } & CompletedFields)
-  | { kind: "error"; draft: AudienceUploadDraft; message: string };
+  | ({ kind: "error"; draft: AudienceUploadDraft } & FailedFields);
 
 export function resolveAudienceUploadPhase(args: {
   wizard: AudienceUploadWizardKind;
@@ -147,6 +148,7 @@ export function resolveAudienceUploadPhase(args: {
     case "completed":
       return {
         kind: "completed",
+        uploadId: progress.uploadId,
         audienceId: progress.audienceId,
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
@@ -156,7 +158,7 @@ export function resolveAudienceUploadPhase(args: {
       };
     case "error":
       if (!draft) return { kind: "file" };
-      return { kind: "error", draft, message: progress.message };
+      return { ...progress, draft };
     case "idle":
       break;
     default: {

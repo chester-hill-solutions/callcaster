@@ -118,6 +118,10 @@ before retrying with the needed permissions. Keep the existing lockfiles.
 Install locked dependencies before committing in a new worktree. The effects
 pre-commit guard imports TypeScript even for a Markdown-only change.
 
+For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.ts`
+with the file paths. `npm run test:node -- <file>` appends that path to the final
+Bun command and still runs the entire Node suite.
+
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
 checkout has no dependencies. Use the prepared worktree instead of fetching a
@@ -169,6 +173,10 @@ before trusting a guard's floor result.
 
 `asRouteResponse` normalizes thrown Responses. To verify that an auth redirect
 stays thrown, call the raw loader or action and inspect its rejected Response.
+Normalize a middleware result only once, outside its `next` callback. A nested
+response wrapper can become a JSON 200 and hide a real status or download. Keep
+a streaming Response raw until the intended concurrent write has occurred; the
+normalizer consumes its body and would hide a broken capture boundary.
 
 API services should call the domain service, then map its result or exception to
 JSON. A React Router form helper returns a data wrapper; checking a top-level

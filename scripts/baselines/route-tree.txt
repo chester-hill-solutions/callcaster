@@ -114,6 +114,7 @@ api/verify-pin-input
 api/workspace-api-keys
 api/workspaces
 archive
+audience-imports/:uploadId/report
 audience-uploads/:uploadId
 audiences
 audios

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
@@ -51,8 +53,8 @@ export function useAudienceUploadProgress({
 
   /**
    * @effect Hand a completed upload off to the caller's callback exactly once.
-   * @effect-deps progress (fires when the upload state machine reaches "completed")
-   * @effect-side-effects none (invokes caller-provided completion callbacks via refs)
+   * @effect-deps [progress, workspaceId] — completion state and tenant report destination
+   * @effect-side-effects DOM (root toast report action), completion callbacks via refs
    * @effect-why-not-loader Completion arrives asynchronously via realtime/poll
    * snapshots, not a route transition; the callbacks advance the wizard or
    * schedule the standalone redirect.
@@ -61,12 +63,21 @@ export function useAudienceUploadProgress({
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
     const audienceId = progress.audienceId;
+    if (workspaceId && progress.uploadId != null) {
+      const reportUrl = audienceImportReportUrl(workspaceId, progress.uploadId);
+      toast.success("Call-list upload completed", {
+        id: `audience-import-report-${workspaceId}-${progress.uploadId}`,
+        description: "Download the row report to review imported, skipped and consent-warning rows.",
+        duration: Infinity,
+        action: { label: "Download row report", onClick: () => window.location.assign(reportUrl) },
+      });
+    }
     if (onUploadCompleteRef.current) {
       onUploadCompleteRef.current(audienceId);
     } else if (onStandaloneCompleteRef.current) {
       onStandaloneCompleteRef.current(audienceId);
     }
-  }, [progress]);
+  }, [progress, workspaceId]);
 
   const applyServerSnapshot = (snapshot: AudienceUploadServerSnapshot) => {
     setProgress((prev) => {
@@ -84,12 +95,12 @@ export function useAudienceUploadProgress({
           ? snapshot.processed_contacts
           : null;
 
-      if (serverTotal != null && serverTotal > 0) {
+      if (serverTotal != null && serverTotal >= 0) {
         totalContactsRef.current = serverTotal;
       }
 
       const totalContacts =
-        serverTotal != null && serverTotal > 0
+        serverTotal != null && serverTotal >= 0
           ? serverTotal
           : prev.totalContacts || totalContactsRef.current;
 
@@ -118,6 +129,7 @@ export function useAudienceUploadProgress({
 
         return {
           kind: "completed",
+          uploadId: prev.kind === "processing" ? prev.uploadId : snapshot.uploadId ?? null,
           audienceId: completedAudienceId,
           totalContacts,
           processedContacts: serverProcessed ?? totalContacts,
@@ -130,6 +142,13 @@ export function useAudienceUploadProgress({
       if (nextStatus === "error") {
         return {
           kind: "error",
+          uploadId: prev.kind === "processing" ? prev.uploadId : snapshot.uploadId ?? null,
+          audienceId: nextAudienceId,
+          totalContacts,
+          processedContacts: serverProcessed ?? prev.processedContacts,
+          progress: prev.progress,
+          skippedInvalidContacts,
+          skippedDuplicateContacts,
           message:
             snapshot.error_message || "An error occurred during upload",
         };
@@ -273,7 +292,13 @@ export function useAudienceUploadProgress({
   };
 
   const fail = (message: string) => {
-    setProgress({ kind: "error", message });
+    setProgress(prev => ({ kind: "error", message,
+      uploadId: prev.kind === "processing" || prev.kind === "completed" || prev.kind === "error" ? prev.uploadId : null,
+      audienceId: audienceIdRef.current,
+      totalContacts: prev.kind === "idle" ? 0 : prev.totalContacts,
+      processedContacts: prev.kind === "idle" ? 0 : prev.processedContacts,
+      progress: prev.kind === "idle" ? 0 : prev.progress,
+    }));
   };
 
   const reset = () => {

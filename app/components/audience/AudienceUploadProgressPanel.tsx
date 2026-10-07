@@ -1,7 +1,10 @@
-import { MdCheck } from "react-icons/md";
+import { useState } from "react";
+import { Check } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import {
   audienceUploadProgressLabel,
   type AudienceUploadProgressStatus,
@@ -12,6 +15,8 @@ export type AudienceUploadProgressPanelProps = {
   progress: number;
   processedContacts: number;
   totalContacts: number;
+  workspaceId?: string;
+  uploadId?: number | null;
   errorMessage?: string | null;
   warning?: string | null;
   /** Rows dropped for invalid/unparseable phone numbers. */
@@ -37,11 +42,19 @@ function skippedSummary(
   return parts.join(" / ");
 }
 
+function ReportDownloadAction({ url }: { url: string | null }) {
+  return <Button asChild variant="outline" disabled={!url}>
+    <a href={url ?? undefined} tabIndex={url ? undefined : -1}>Download row report</a>
+  </Button>;
+}
+
 export function AudienceUploadProgressPanel({
   status,
   progress,
   processedContacts,
   totalContacts,
+  workspaceId,
+  uploadId,
   errorMessage,
   warning,
   skippedInvalidContacts,
@@ -49,26 +62,15 @@ export function AudienceUploadProgressPanel({
   showCompletionChrome,
   onTryAgain,
 }: AudienceUploadProgressPanelProps) {
+  const notice = errorMessage || warning || null;
+  const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
+  const reportUrl = workspaceId && uploadId != null ? audienceImportReportUrl(workspaceId, uploadId) : null;
   const skippedLine = skippedSummary(
     skippedDuplicateContacts ?? 0,
     skippedInvalidContacts ?? 0,
   );
   return (
     <div className="space-y-2">
-      {errorMessage ? (
-        <Alert variant="destructive">
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      {warning && !errorMessage ? (
-        <Alert>
-          <AlertTitle>Upload still running</AlertTitle>
-          <AlertDescription>{warning}</AlertDescription>
-        </Alert>
-      ) : null}
-
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">
           {audienceUploadProgressLabel(status)}
@@ -79,15 +81,34 @@ export function AudienceUploadProgressPanel({
       </div>
       <Progress value={progress} className="h-2" />
 
-      {skippedLine ? (
-        <p className="text-xs text-muted-foreground">{skippedLine}</p>
-      ) : null}
+      <p className="min-h-8 text-xs text-muted-foreground" aria-live="polite">{skippedLine}</p>
 
-      <div className="flex justify-center">
+      <div className="flex flex-wrap gap-2">
+        <ReportDownloadAction url={reportUrl} />
+        <Dialog open={notice != null && notice !== dismissedNotice}
+          onOpenChange={open => setDismissedNotice(open ? null : notice)}>
+          <DialogTrigger asChild>
+            <Button type="button" variant="ghost" disabled={!notice}>Upload details</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>{errorMessage ? "Upload failed" : "Upload still running"}</DialogTitle></DialogHeader>
+            <Alert variant={errorMessage ? "destructive" : "warning"}>
+              <AlertTitle>{errorMessage ? "Error" : "Progress delayed"}</AlertTitle>
+              <AlertDescription>{notice}</AlertDescription>
+            </Alert>
+            <DialogFooter>
+              <ReportDownloadAction url={reportUrl} />
+              {errorMessage ? <Button type="button" onClick={onTryAgain}>Try Again</Button> : null}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="flex min-h-24 justify-center">
         {status === "completed" ? (
           showCompletionChrome ? (
-            <div className="text-center text-green-500">
-              <MdCheck className="mx-auto text-4xl" />
+            <div className="text-center text-success">
+              <Check className="mx-auto h-9 w-9" />
               <p>Upload completed successfully!</p>
               <p className="text-sm">Redirecting to audience page...</p>
             </div>
