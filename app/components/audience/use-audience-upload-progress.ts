@@ -125,6 +125,11 @@ export function useAudienceUploadProgress({
           ? snapshot.skipped_duplicate_contacts
           : (prev.skippedDuplicateContacts ?? null);
 
+      let progressPct = prev.progress;
+      if (serverProcessed != null && totalContacts > 0) {
+        progressPct = Math.round((serverProcessed / totalContacts) * 100);
+      }
+
       if (nextStatus === "completed") {
         const completedAudienceId = nextAudienceId ?? audienceIdRef.current;
         if (!completedAudienceId) return prev;
@@ -150,7 +155,7 @@ export function useAudienceUploadProgress({
           audienceId: nextAudienceId,
           totalContacts,
           processedContacts: serverProcessed ?? prev.processedContacts,
-          progress: prev.progress,
+          progress: progressPct,
           skippedInvalidContacts,
           skippedDuplicateContacts,
           message:
@@ -166,11 +171,6 @@ export function useAudienceUploadProgress({
       const uploadIdForState =
         prev.kind === "processing" ? prev.uploadId : null;
       if (uploadIdForState == null) return prev;
-
-      let progressPct = prev.progress;
-      if (serverProcessed != null && totalContacts > 0) {
-        progressPct = Math.round((serverProcessed / totalContacts) * 100);
-      }
 
       return {
         kind: "processing",

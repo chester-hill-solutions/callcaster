@@ -219,6 +219,7 @@ describe("AudienceUploader progress polling", () => {
         processed_contacts: 40, total_contacts: 45, skipped_invalid_contacts: 1 } });
     });
     expect(screen.getByText("40 / 45 contacts")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { hidden: true }).textContent).toBe("89");
     const dialog = screen.getByRole("dialog", { name: "Upload failed" });
     expect(within(dialog).getByRole("link", { name: "Download row report" })).toHaveAttribute("href", "/workspaces/w1/audience-imports/9/report");
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
