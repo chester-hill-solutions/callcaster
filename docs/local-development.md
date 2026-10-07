@@ -4,16 +4,41 @@ This app runs as a React Router 8 app on `http://localhost:3000`, backed by Post
 
 ## Quick start
 
+This is the normal startup flow for a local environment that has already been
+initialized. If this is your first local environment, complete
+[Initial environment setup](#initial-environment-setup) first.
+
 ```bash
-npm install
-make init         # npm run setup — idempotent; re-run to repair a broken local environment
-make app          # terminal 1: web app → http://localhost:3000
-make worker       # terminal 2: background jobs, including list uploads
-# Optional, terminal 3: live dashboard audio, transcription, and coaching
+# Terminal 1: start a new public HTTPS URL for this session
+make tunnel
+
+# Update BASE_URL in .env.local and .env with the URL printed by Localtunnel.
+# Keep the tunnel terminal running.
+
+# Terminal 2: create or update env:<DEV_NAME>-<ENV>, then start the app
+make twiml
+make app
+
+# Terminal 3: background jobs, including list uploads
+make worker
+
+# Terminal 4, optional: dashboard audio, transcription, and coaching
 make media-stream
+
+# After the app is running, update the phone callbacks for your workspace.
+make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
-`make init` (`npm run setup`) starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
+The tunnel URL can change each session. `make twiml` updates the same
+environment-level TwiML App, and `make calling:sync` updates the selected
+workspace's phone callbacks. Restart the app, worker, or media-stream process
+after changing environment files. Do not use `--all-workspaces` for normal
+development.
+
+`make init` is not part of this daily flow. It starts Postgres, Stow object
+storage, and mail, applies the schema, creates the bucket, and seeds test users
+and workspaces. It does not start the app, worker, or media-stream process.
+Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts).
 
 Verify the setup:
 
@@ -69,15 +94,89 @@ The local stack uses these endpoints:
 - Stow S3 API: `http://127.0.0.1:9000`
 - Inbucket email UI: `http://127.0.0.1:9002`
 
-## Environment Setup
+## Initial Environment Setup
 
-1. Copy the template and fill in your values:
+Complete this once for each local developer/environment identity. It creates
+the local services, the environment-level TwiML App, and the first local
+database. A workspace is created separately in the app because `make twiml`
+does not need or use a workspace.
+
+1. Copy the template to the local override file:
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-2. Update the required values in `.env`.
+2. Update `.env.local`. Set these values for your developer:
+
+```env
+DEV_NAME=developer-name
+ENV=local
+```
+
+Also set the real parent Twilio credentials and any other required values.
+
+3. Install dependencies:
+
+```bash
+npm install
+```
+
+4. Start Localtunnel in a separate terminal and keep it running:
+
+```bash
+make tunnel
+```
+
+5. Set the HTTPS URL printed by Localtunnel as `BASE_URL` in `.env.local`.
+
+6. Copy the completed local configuration to the file used by existing local
+commands:
+
+```bash
+cp .env.local .env
+```
+
+7. Initialize the local services and database:
+
+```bash
+make init
+```
+
+8. Create or update the environment-level TwiML App:
+
+```bash
+make twiml
+```
+
+This creates or updates `env:${DEV_NAME}-${ENV}` in the parent Twilio account
+and writes its SID to `.env.local` and `.env`. It does not need a workspace.
+
+9. Start the app, worker, and optional media-stream service in separate
+terminals:
+
+```bash
+make app
+make worker
+make media-stream
+```
+
+10. Sign in and create a real workspace in the app. Copy the workspace ID from
+the URL:
+
+```text
+/workspaces/<workspace-id>
+```
+
+11. Sync that workspace's phone callbacks to the current tunnel:
+
+```bash
+make calling:sync WORKSPACE_ID=<workspace-id>
+```
+
+The sync command must run after the app is reachable. It updates workspace
+phone-number callbacks and stored onboarding callback metadata. It does not
+create the workspace or the environment TwiML App.
 
 Notes:
 - The `DATABASE_URL` and `S3_*` defaults in `.env.example` match the compose dev stack as-is.
@@ -114,51 +213,42 @@ node scripts/e2e/start-stow.mjs --start
 node scripts/e2e/ensure-bucket.mjs
 ```
 
-5. Start the media-stream Bun service when you need dashboard audio, live transcription, or coaching (optional):
+5. The service processes are not part of `make init`. Start them using the
+commands in [Initial environment setup](#initial-environment-setup) or the
+[Quick start](#quick-start).
 
-```bash
-make media-stream
-```
-
-The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
+The media-stream service listens on `MEDIA_STREAM_PORT` (default `3001`). Set
+`MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change
+defaults.
 
 Transcription and coaching need two optional API keys (both are skipped when unset, so local demos run without them):
 
 - `ELEVENLABS_API_KEY` — live speech-to-text (`scribe_v2_realtime`) and the post-call `elevenlabs_batch_transcribe` worker job (`scribe_v2`). If unset, live STT is skipped and the batch job throws and dead-letters roughly every 15 minutes, so set it wherever the worker runs.
 - `COHERE_API_KEY` — live coaching cues (`api.cohere.com`). If unset, coaching cues are skipped.
 
-6. Start the app in a separate terminal:
-
-```bash
-make app
-```
-
-7. Confirm the local services are up:
+6. Confirm the local services are up:
    - app at `http://localhost:3000`
    - media-stream at `http://localhost:3001/healthz`
    - Stow S3 API at `http://127.0.0.1:9000`
    - Inbucket at `http://127.0.0.1:9002`
 
-8. Start the worker in another terminal when you need background jobs such as list uploads:
-
-```bash
-make worker
-```
+7. Start the app, worker, and media-stream service separately when needed.
 
 ## Calling Setup With Localtunnel
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Install Localtunnel if you do not already have it. It should already be a dev dep:
+1. Install the repository dependencies. Localtunnel is a repository dev
+dependency; do not install it globally:
 
 ```bash
-npm install -g localtunnel
+npm install
 ```
 
 2. Start Localtunnel against the local app:
 
 ```bash
-lt --port 3000
+make tunnel
 ```
 
 3. Copy the HTTPS forwarding URL from Localtunnel.
@@ -184,10 +274,17 @@ Localtunnel quickstart reference:
 
 This repo includes a helper script to update Twilio when your tunnel URL changes.
 
-Sync one workspace:
+Create or update the environment-level TwiML App. This is separate from a
+workspace and is safe to run before a workspace exists:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id>
+make twiml
+```
+
+Sync one workspace's phone callbacks:
+
+```bash
+make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
 Sync every workspace with stored Twilio credentials:
@@ -199,21 +296,18 @@ npm run dev:calling:sync -- --all-workspaces
 Pass the current Localtunnel URL explicitly:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
+make calling:sync WORKSPACE_ID=<workspace-id> BASE_URL=https://your-subdomain.loca.lt
 ```
 
 What the script updates:
-- the TwiML App referenced by `TWILIO_APP_SID` so browser/device calls keep using `${BASE_URL}/api/call`
+- the environment TwiML App named `env:${DEV_NAME}-${ENV}` so browser/device calls keep using `${BASE_URL}/api/call`
 - Twilio incoming phone number webhooks for the selected workspace(s)
 - stored onboarding callback metadata in the workspace `twilio_data`
 
-> **Use your own TwiML App for local dev.** A TwiML App holds exactly one voice
-> URL, so pointing a shared app at your tunnel breaks browser calling for every
-> environment using it — and keeps it broken after your tunnel closes, with
-> Twilio only ever saying "an unexpected error has occurred" (error 11200).
-> Create a personal TwiML App in the
-> [Twilio console](https://console.twilio.com/us1/develop/voice/manage/twiml-apps)
-> and point your `.env` `TWILIO_APP_SID` at it before running this script.
+> **Use your own environment TwiML App for local dev.** `make twiml` creates or
+> reuses `env:${DEV_NAME}-${ENV}`. A TwiML App holds exactly one voice URL, so
+> pointing a shared app at your tunnel breaks browser calling for every
+> environment using it.
 
 The script reads the public URL in this order:
 - `--base-url`
@@ -274,11 +368,11 @@ Node 24+.
 
 ## Suggested Daily Workflow
 
-1. Start services with `make up`
-2. Start the app with `make app` (and `make worker` in a second terminal when you need queued jobs to run)
-3. Start Localtunnel with `lt --port 3000`
-4. Update `BASE_URL` in `.env` if the tunnel changed
-5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
+1. Start Localtunnel with `make tunnel`
+2. Update `BASE_URL` in `.env.local` and `.env` if the tunnel changed
+3. Run `make twiml`
+4. Start the app with `make app` and the worker with `make worker` when needed
+5. Run `make calling:sync WORKSPACE_ID=<workspace-id>`
 6. Test the calling flow
 
 ## E2E tests (Playwright)
