@@ -778,7 +778,6 @@ test/twilio-open-sync.server.test.ts::@/lib/worker/enqueue-job.server#1
 test/twilio-readiness.server.test.ts::@/lib/database/workspace.server#1
 test/twilio-readiness.server.test.ts::@/lib/messaging-onboarding.server#1
 test/twilio-readiness.server.test.ts::@/lib/twilio-sender-pool.server#1
-test/twilio-sender-pool.server.test.ts::@/lib/merge-workspace-twilio-data.server#1
 test/twilio-sender-pool.server.test.ts::@/lib/twilio-client.server#1
 test/twilio-webhook-validation.test.ts::@/lib/env.server#1
 test/twilio-webhook.server.test.ts::@/lib/env.server#1

@@ -120,14 +120,18 @@ if (process.argv.includes("--update")) {
 const baseline = fs.existsSync(BASELINE_PATH)
   ? JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8"))
   : { allowed: [] };
-const allowed = new Set(
-  (baseline.allowed ?? []).map((e) => `${e.file}:${e.line}:${e.target}`),
-);
-const seen = new Set(current.map((e) => `${e.file}:${e.line}:${e.target}`));
-
-const regressions = current.filter(
-  (e) => !allowed.has(`${e.file}:${e.line}:${e.target}`),
-);
+const remainingAllowed = new Map();
+for (const entry of baseline.allowed ?? []) {
+  const key = `${entry.file}:${entry.line}:${entry.target}`;
+  remainingAllowed.set(key, (remainingAllowed.get(key) ?? 0) + 1);
+}
+const regressions = current.filter((entry) => {
+  const key = `${entry.file}:${entry.line}:${entry.target}`;
+  const count = remainingAllowed.get(key) ?? 0;
+  if (count === 0) return true;
+  remainingAllowed.set(key, count - 1);
+  return false;
+});
 
 if (regressions.length) {
   console.error(
@@ -154,12 +158,13 @@ if (regressions.length) {
 
 // Detect drift: baseline entries that no longer exist (either the line
 // moved or the redirect was fixed). Prompt the operator to ratchet down.
-const stale = [...allowed].filter((k) => !seen.has(k));
+const stale = [...remainingAllowed].filter(([, count]) => count > 0);
 if (stale.length) {
   console.error(
     `Relative-redirect gate FAILED: ${stale.length} stale baseline entries.`,
   );
-  for (const key of stale) console.error(`  ${key}`);
+  for (const [key, count] of stale)
+    console.error(`  ${key}: ${count} missing occurrence(s)`);
   console.error(
     "Run `npm run tools:relative-redirects:baseline` to remove repaired entries; the baseline may only shrink.",
   );

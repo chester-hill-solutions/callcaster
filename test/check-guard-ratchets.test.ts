@@ -54,6 +54,26 @@ beforeEach(() => {
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
 describe("actual relative-redirect CLI ratchet", () => {
+  test("an identical second redirect on the same line exceeds one allowed occurrence", () => {
+    write(route, 'redirect("./foo"); redirect("./foo");\n');
+    const entry = { file: route, line: 1, target: "./foo" };
+    redirectBaseline([entry]);
+    const result = run(redirectScript);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("new route-relative");
+    redirectBaseline([entry, entry]);
+    expect(run(redirectScript).status).toBe(0);
+  });
+  test("removing one of two identical redirects makes its unused allowance stale", () => {
+    write(route, 'redirect("./foo");\n');
+    const entry = { file: route, line: 1, target: "./foo" };
+    redirectBaseline([entry, entry]);
+    const result = run(redirectScript);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("stale baseline");
+    expect(run(redirectScript, "--update").status).toBe(0);
+    expect(run(redirectScript).status).toBe(0);
+  });
   test.each(['"./foo"', "'../foo'", "`./foo`", "`../${id}`"])(
     "rejects a multiline relative redirect with %s",
     (target) => {
