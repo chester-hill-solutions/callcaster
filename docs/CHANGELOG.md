@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
+
 - Fixed: Onboarding keeps existing inbound routes and voicemail greetings when number settings are saved ([PR #2476](https://github.com/chester-hill-solutions/callcaster/pull/2476)).
 
 - Fixed: Number release repairs a rejected workspace API key only on its verified original subaccount, preserves incomplete work when repair cannot finish, and gives an actionable provider-connection error ([#2473](https://github.com/chester-hill-solutions/callcaster/pull/2473), [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170)).
