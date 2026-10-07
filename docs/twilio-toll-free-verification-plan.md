@@ -37,6 +37,18 @@ closure.
 
 ## Verification application data
 
+New submissions require an explicit consent method in **Business identity**.
+The saved `tollFreeOptInType` uses an exact provider enum. Workflow descriptions,
+including negated consent statements, never select it. Missing or invalid stored
+values stay unselected and return an action-needed result before submission.
+There is no prose or `WEB_FORM` fallback. Other wizard steps preserve the saved
+selection; invalid posted selections are rejected before saving.
+
+Existing provider registrations remain readable without a new selection or
+resubmission. This field does not change the approved-sender send gate. Already
+submitted registrations require a separate authorized live audit; synthetic
+source tests do not establish that their previous attestations were correct.
+
 Provider registration uses business name, website, use case, opt-in workflow,
 message samples and contact email. Provider review remains separate from the
 source fix. This gate does not submit or approve a verification application.

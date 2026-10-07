@@ -334,6 +334,12 @@ rows with the same phone: a workspace check after a phone-only `LIMIT 1` can
 block valid work after it selects the wrong row. Keep a permitted-role and an explicit
 global-admin control when their policies differ.
 
+For provider enums stored in onboarding JSON, exercise the actual normalizer,
+partial form save, database round trip and installed SDK payload. An untyped
+section can be discarded before a defensive provider read sees it. Include a
+non-default explicit value, missing/invalid values and negated prose. Never let
+a workflow description or an implicit default become an operator attestation.
+
 ## RPC migration changes
 
 Trace the latest function definition and both bootstrap lists before editing an

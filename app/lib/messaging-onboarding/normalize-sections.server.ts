@@ -14,6 +14,7 @@ import {
 } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isObject } from "@/lib/type-safety-utils";
+import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
 } from "@/lib/messaging-onboarding/defaults.server";
@@ -138,6 +139,7 @@ export function normalizeBusinessProfile(
     supportPhone: parseString(value.supportPhone),
     useCaseSummary: parseString(value.useCaseSummary),
     optInWorkflow: parseString(value.optInWorkflow),
+    tollFreeOptInType: parseTollFreeOptInType(value.tollFreeOptInType),
     optInKeywords: parseString(value.optInKeywords),
     optOutKeywords: parseString(value.optOutKeywords),
     helpKeywords: parseString(value.helpKeywords),

@@ -242,6 +242,9 @@ const BUSINESS_PROFILE_FIELD_MESSAGES: Record<
   optInWorkflow: {
     rcs: "Describe the opt-in workflow in Business basics.",
   },
+  tollFreeOptInType: {
+    sms: "Choose how customers consent to toll-free SMS in Business identity.",
+  },
   businessType: {},
   supportPhone: {},
   optInKeywords: {},

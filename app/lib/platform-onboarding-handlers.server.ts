@@ -296,6 +296,9 @@ async function handleSaveBusinessProfile(
     wizardStepRaw === "business_identity" || wizardStepRaw === "business_program"
       ? wizardStepRaw
       : null;
+  const identityRequiredFields = current.selectedChannels.includes("toll_free_bulk_sms")
+    ? [...BUSINESS_IDENTITY_REQUIRED_FIELDS, "tollFreeOptInType" as const]
+    : BUSINESS_IDENTITY_REQUIRED_FIELDS;
 
   // Identity / Program screens validate a subset; capability gates and API posts
   // without a wizard hint still require the full baseline.
@@ -303,7 +306,7 @@ async function handleSaveBusinessProfile(
     wizardStep === "business_identity"
       ? findMissingBusinessProfileFields(
           businessProfile,
-          BUSINESS_IDENTITY_REQUIRED_FIELDS,
+          identityRequiredFields,
         )
       : wizardStep === "business_program"
         ? findMissingBusinessProfileFields(

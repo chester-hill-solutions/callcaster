@@ -18,6 +18,7 @@ import type {
   ComplianceStepStatus,
 } from "@/lib/twilio-compliance-types";
 import { logger } from "@/lib/logger.server";
+import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 import { env } from "@/lib/env.server";
 import { presentTwilioError } from "@/lib/twilio-errors";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
@@ -52,22 +53,18 @@ function mapTfvStatus(raw: string | null | undefined): ComplianceStepStatus {
   return "pending";
 }
 
-/** Best-effort defensive read of TFV-specific onboarding inputs. The parallel
- * onboarding agent may add a `tollFreeVerification` sub-object and/or extra
- * business-profile fields; we read them without requiring the type to exist. */
+/** Legacy auxiliary inputs are optional. Consent type is a validated profile field. */
 function readTfvInputs(onboarding: WorkspaceMessagingOnboardingState): {
   optInImageUrls: string[];
   messageVolume: string;
   useCaseCategories: string[];
-  optInType: TollFreeVerificationCreateInput["optInType"];
   additionalInformation: string | undefined;
 } {
-  // type-cast justified: tollFreeVerification is added by onboarding agent, not in base type
+  // type-cast justified: legacy auxiliary TFV fields have no typed onboarding model
   const tfv =
     (onboarding as unknown as { tollFreeVerification?: Record<string, unknown> })
       .tollFreeVerification ?? {};
-  // type-cast justified: defensive read for dynamic properties added to businessProfile
-  const bp = onboarding.businessProfile as unknown as Record<string, unknown>;
+  const bp = onboarding.businessProfile;
 
   const optInImageUrls = Array.isArray(tfv.optInImageUrls)
     ? (tfv.optInImageUrls as unknown[]).filter(
@@ -87,22 +84,6 @@ function readTfvInputs(onboarding: WorkspaceMessagingOnboardingState): {
         )
       : ["MIXED"];
 
-  const optInTypeRaw = String(
-    (tfv.optInType as string | undefined) ??
-      onboarding.businessProfile.optInWorkflow ??
-      "",
-  ).toUpperCase();
-  const optInType: TollFreeVerificationCreateInput["optInType"] =
-    optInTypeRaw.includes("VERBAL")
-      ? "VERBAL"
-      : optInTypeRaw.includes("PAPER")
-        ? "PAPER_FORM"
-        : optInTypeRaw.includes("TEXT")
-          ? "VIA_TEXT"
-          : optInTypeRaw.includes("QR")
-            ? "MOBILE_QR_CODE"
-            : "WEB_FORM";
-
   const additionalInformation =
     typeof bp.doingBusinessAs === "string" && bp.doingBusinessAs.trim()
       ? `Doing business as: ${bp.doingBusinessAs.trim()}`
@@ -114,7 +95,6 @@ function readTfvInputs(onboarding: WorkspaceMessagingOnboardingState): {
     optInImageUrls,
     messageVolume,
     useCaseCategories,
-    optInType,
     additionalInformation,
   };
 }
@@ -198,42 +178,17 @@ export async function provisionTollFreeVerification(
     });
   }
 
-  const inputs = readTfvInputs(onboarding);
-  const address = onboarding.emergencyVoice.address;
-  const bp = onboarding.businessProfile;
-  const notificationEmail =
-    bp.supportEmail.trim() || env.TWILIO_COMPLIANCE_NOTIFY_EMAIL() || "";
-  const [contactFirst, ...contactRest] = (
-    address.customerName.trim() || bp.legalBusinessName.trim()
-  ).split(/\s+/);
-
-  const createInput: TollFreeVerificationCreateInput = {
-    businessName: bp.legalBusinessName.trim(),
-    businessWebsite: bp.websiteUrl.trim(),
-    notificationEmail,
-    useCaseCategories: inputs.useCaseCategories,
-    useCaseSummary: bp.useCaseSummary.trim(),
-    productionMessageSample: bp.sampleMessages[0] ?? bp.useCaseSummary.trim(),
-    optInImageUrls: inputs.optInImageUrls,
-    optInType: inputs.optInType,
-    messageVolume: inputs.messageVolume,
-    tollfreePhoneNumberSid: tollFree.phoneNumberSid,
-    customerProfileSid: customerProfileBundleSid,
-    businessStreetAddress: address.street || undefined,
-    businessCity: address.city || undefined,
-    businessStateProvinceRegion: address.region || undefined,
-    businessPostalCode: address.postalCode || undefined,
-    businessCountry: address.countryCode || undefined,
-    businessContactFirstName: contactFirst || undefined,
-    businessContactLastName: contactRest.join(" ") || undefined,
-    businessContactEmail: notificationEmail || undefined,
-    businessContactPhone: bp.supportPhone || undefined,
-    // Echoed back on status retrieval; lets us correlate webhook/status polls.
-    externalReferenceId: workspaceId,
-    ...(inputs.additionalInformation
-      ? { additionalInformation: inputs.additionalInformation }
-      : {}),
-  };
+  const optInType = parseTollFreeOptInType(onboarding.businessProfile.tollFreeOptInType);
+  if (!optInType) {
+    return {
+      status: "action_needed",
+      blockingIssues: ["Choose how customers consent to toll-free SMS in Business identity before submitting verification."],
+    };
+  }
+  const createInput = buildTollFreeVerificationInput({
+    onboarding, workspaceId, customerProfileBundleSid,
+    phoneNumberSid: tollFree.phoneNumberSid, optInType,
+  });
 
   logger.info("twilio.compliance.toll_free.submitting", {
     workspaceId,
@@ -254,6 +209,53 @@ export async function provisionTollFreeVerification(
   });
 
   return buildResult(created.status, created.sid, created.rejectionReason);
+}
+
+function buildTollFreeVerificationInput({
+  onboarding, workspaceId, customerProfileBundleSid, phoneNumberSid, optInType,
+}: {
+  onboarding: WorkspaceMessagingOnboardingState;
+  workspaceId: string;
+  customerProfileBundleSid: ComplianceStepArgs["customerProfileBundleSid"];
+  phoneNumberSid: string;
+  optInType: TollFreeVerificationCreateInput["optInType"];
+}): TollFreeVerificationCreateInput {
+  const inputs = readTfvInputs(onboarding);
+  const address = onboarding.emergencyVoice.address;
+  const bp = onboarding.businessProfile;
+  const notificationEmail =
+    bp.supportEmail.trim() || env.TWILIO_COMPLIANCE_NOTIFY_EMAIL() || "";
+  const [contactFirst, ...contactRest] = (
+    address.customerName.trim() || bp.legalBusinessName.trim()
+  ).split(/\s+/);
+
+  return {
+    businessName: bp.legalBusinessName.trim(),
+    businessWebsite: bp.websiteUrl.trim(),
+    notificationEmail,
+    useCaseCategories: inputs.useCaseCategories,
+    useCaseSummary: bp.useCaseSummary.trim(),
+    productionMessageSample: bp.sampleMessages[0] ?? bp.useCaseSummary.trim(),
+    optInImageUrls: inputs.optInImageUrls,
+    optInType,
+    messageVolume: inputs.messageVolume,
+    tollfreePhoneNumberSid: phoneNumberSid,
+    customerProfileSid: customerProfileBundleSid,
+    businessStreetAddress: address.street || undefined,
+    businessCity: address.city || undefined,
+    businessStateProvinceRegion: address.region || undefined,
+    businessPostalCode: address.postalCode || undefined,
+    businessCountry: address.countryCode || undefined,
+    businessContactFirstName: contactFirst || undefined,
+    businessContactLastName: contactRest.join(" ") || undefined,
+    businessContactEmail: notificationEmail || undefined,
+    businessContactPhone: bp.supportPhone || undefined,
+    // Echoed back on status retrieval; lets us correlate webhook/status polls.
+    externalReferenceId: workspaceId,
+    ...(inputs.additionalInformation
+      ? { additionalInformation: inputs.additionalInformation }
+      : {}),
+  };
 }
 
 function buildResult(

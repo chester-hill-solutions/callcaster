@@ -4,6 +4,7 @@ export type { WorkspaceTwilioSyncSnapshot, WorkspaceTwilioSyncStatus } from "@/l
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
 import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
+import type { TollFreeOptInType } from "@/lib/toll-free-opt-in";
 export {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
   type WorkspaceOnboardingGoal,
@@ -341,6 +342,7 @@ export interface WorkspaceMessagingBusinessProfile {
   supportPhone: string;
   useCaseSummary: string;
   optInWorkflow: string;
+  tollFreeOptInType: TollFreeOptInType | null;
   optInKeywords: string;
   optOutKeywords: string;
   helpKeywords: string;
@@ -780,4 +782,3 @@ export function generateSurveyLink(contactId: number, surveyId: string, baseUrl:
   const encoded = btoa(`${contactId}:${surveyId}`);
   return `${baseUrl}/?q=${encoded}`;
 }
-    

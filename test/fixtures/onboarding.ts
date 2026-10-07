@@ -22,6 +22,7 @@ export function onboardingFixture(
       supportPhone: "",
       useCaseSummary: "",
       optInWorkflow: "",
+      tollFreeOptInType: null,
       optInKeywords: "",
       optOutKeywords: "",
       helpKeywords: "",
@@ -138,4 +139,3 @@ export function onboardingNumberFixture(overrides: Partial<Tables<"workspace_num
     ...overrides,
   };
 }
-
