@@ -149,7 +149,7 @@ make worker
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Install Localtunnel if you do not already have it:
+1. Install Localtunnel if you do not already have it. It should already be a dev dep:
 
 ```bash
 npm install -g localtunnel
