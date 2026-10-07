@@ -48,6 +48,47 @@ export function numberReleaseAuthProvider() {
       state.rejectStoredToken &&
       password === "stored-fixture-token") ||
     (username === RELEASE_NEW_KEY && state.rejectNewKey);
+  const failureResponse = (method: string, url: URL) => {
+    const path = url.pathname;
+    if (
+      method === "delete" &&
+      state.deleteFailure &&
+      ((state.deleteFailure.target === "sender" &&
+        url.hostname === "messaging.twilio.com") ||
+        (state.deleteFailure.target === "incoming" &&
+          path.includes("/IncomingPhoneNumbers/")) ||
+        (state.deleteFailure.target === "outgoing" &&
+          path.includes("/OutgoingCallerIds/")))
+    ) {
+      const failure = state.deleteFailure;
+      state.deleteFailure = undefined;
+      if (failure.kind === "network") {
+        if (failure.target === "sender") state.attached = false;
+        else state.active = false;
+        throw Object.assign(
+          new Error("ECONNRESET: owned delete acknowledgement lost"),
+          { code: "ECONNRESET" },
+        );
+      }
+      return {
+        statusCode: 500,
+        headers: {},
+        body: JSON.stringify({ code: 20500, message: "Owned server failure" }),
+      };
+    }
+    if (state.firstFailure && path.includes("/IncomingPhoneNumbers/")) {
+      const failure = state.firstFailure;
+      state.firstFailure = undefined;
+      return {
+        statusCode: failure.status,
+        headers: {},
+        body: JSON.stringify({
+          ...failure,
+          message: "Owned failure control",
+        }),
+      };
+    }
+  };
   const request = vi
     .spyOn(RequestClient.prototype, "request")
     .mockImplementation(async (args) => {
@@ -56,43 +97,8 @@ export function numberReleaseAuthProvider() {
       const method = args.method.toLowerCase();
       let body: object;
       let statusCode = 200;
-      if (
-        method === "delete" &&
-        state.deleteFailure &&
-        ((state.deleteFailure.target === "sender" &&
-          url.hostname === "messaging.twilio.com") ||
-          (state.deleteFailure.target === "incoming" &&
-            path.includes("/IncomingPhoneNumbers/")) ||
-          (state.deleteFailure.target === "outgoing" &&
-            path.includes("/OutgoingCallerIds/")))
-      ) {
-        const failure = state.deleteFailure;
-        state.deleteFailure = undefined;
-        if (failure.kind === "network") {
-          if (failure.target === "sender") state.attached = false;
-          else state.active = false;
-          throw Object.assign(new Error("ECONNRESET: owned delete acknowledgement lost"), {
-            code: "ECONNRESET",
-          });
-        }
-        return {
-          statusCode: 500,
-          headers: {},
-          body: JSON.stringify({ code: 20500, message: "Owned server failure" }),
-        };
-      }
-      if (state.firstFailure && path.includes("/IncomingPhoneNumbers/")) {
-        const failure = state.firstFailure;
-        state.firstFailure = undefined;
-        return {
-          statusCode: failure.status,
-          headers: {},
-          body: JSON.stringify({
-            ...failure,
-            message: "Owned failure control",
-          }),
-        };
-      }
+      const failure = failureResponse(method, url);
+      if (failure) return failure;
       if (
         rejectedCredentials(args.username, args.password, url.hostname, method)
       ) {
