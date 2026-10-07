@@ -44,9 +44,11 @@ export function OnboardingChecklistLinkStep({
         actions={<StatusBadge status={complete ? "complete" : "pending"} />}
       />
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {complete ? completeLabel : incompleteLabel ?? description}
-        </p>
+        {complete || incompleteLabel ? (
+          <p className="text-sm text-muted-foreground">
+            {complete ? completeLabel : incompleteLabel}
+          </p>
+        ) : null}
         {helperText ? (
           <p className="text-sm text-muted-foreground">{helperText}</p>
         ) : null}
