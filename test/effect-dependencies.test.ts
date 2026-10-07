@@ -115,9 +115,9 @@ describe("effect dependency annotation CLI (#2067)", () => {
 
   test("the next tag cannot supply a missing dependency name", () => {
     source(
-      effect("[shown]", "[shown, omitted]").replace(
-        "External view update.",
-        "omitted updates the view.",
+      effect("shown starts the timer", "[shown, omitted]").replace(
+        " * @effect-side-effects External view update.",
+        " * @example omitted is a sample word.\n * @effect-side-effects External view update.",
       ),
     );
     const result = run();
