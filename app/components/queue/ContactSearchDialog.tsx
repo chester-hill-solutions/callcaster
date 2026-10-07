@@ -36,7 +36,7 @@ export function ContactSearchDialog({
   /**
    * @effect When the create POST resolves, add the new contact to the queue and
    * refresh the search so the row shows as Added — no page navigation (#1726).
-   * @effect-deps [createFetcher.state, createFetcher.data, searchQuery]
+   * @effect-deps [createFetcher.state, createFetcher.data, searchQuery, campaignId, workspaceId, contactFetcher, onAddToQueue]
    * @effect-side-effects queue enqueue + search refetch
    * @effect-why-not-loader Client-side search-panel flow, no loader needed.
    */

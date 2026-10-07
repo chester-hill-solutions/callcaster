@@ -54,6 +54,28 @@ legitimate effects.
   hit 0 and all dep warnings were resolved). Intentional omissions need an inline
   `eslint-disable-next-line` with a reason, mirrored in the `@effect-deps` tag.
 
+## Dependency annotation checks
+
+The guard compares the actual literal dependency array with dependency names in
+`@effect-deps`. Use a bracket list for an exact declaration; explanations can
+follow it. Wrapped tag values continue until the next tag or comment end. Prose
+remains supported: every actual dependency must be named, and
+ordinary explanatory words are not extra dependencies. `none` means an empty
+array. Optional member access is normalized, so `entry?.isIntersecting` and
+`entry.isIntersecting` name the same dependency. A member's name must match;
+`fetcher.state` does not account for `fetcher.data`.
+
+Unsupported array expressions or bracket declarations fail rather than silently
+skip the check. Existing annotation mismatches are counted by file, containing
+symbol and mismatch identity in
+[`effects-deps-baseline.json`](../scripts/effects-deps-baseline.json).
+The guard rejects new or increased mismatches and stale reduced or missing
+allowances. The existing unannotated-effect baseline also rejects stale entries.
+After correcting an annotation, run `npm run tools:effects:baseline` and review
+both baselines plus the generated inventory. Never raise an existing allowance
+to clear a new mismatch. The initial baseline is measured from the existing
+source; it does not authorize future mismatches.
+
 ## Pre-commit enforcement
 
 A checked-in `pre-commit` hook (`.githooks/pre-commit`, wired via

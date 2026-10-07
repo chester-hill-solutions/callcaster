@@ -1,0 +1,23 @@
+{
+  "app/components/shared/SaveBar.tsx::SaveBar::undocumented dependency: placement": 1,
+  "app/components/sms-ui/ChatAddContactDialog.tsx::ChatAddContactDialog::undocumented dependency: createFetcher.data": 1,
+  "app/components/sms-ui/ChatAddContactDialog.tsx::ChatAddContactDialog::undocumented dependency: createFetcher.state": 1,
+  "app/components/sms-ui/ChatInput.tsx::ChatInput::undocumented dependency: selectedFrom": 1,
+  "app/components/sms-ui/ChatInput.tsx::ChatInput::undocumented dependency: messagingServiceReady": 1,
+  "app/hooks/call/useAudioDeviceTest.ts::useAudioDeviceTest::undocumented dependency: stopMicMonitor": 1,
+  "app/hooks/call/useAudioDeviceTest.ts::useAudioDeviceTest::undocumented dependency: stopSpeakerTest": 1,
+  "app/hooks/useIntersectionObserver.ts::useInfiniteScroll::undocumented dependency: onLoadMore": 1,
+  "app/hooks/useIntersectionObserver.ts::useLazyImage::undocumented dependency: onLoad": 1,
+  "app/hooks/useIntersectionObserver.ts::useLazyImage::undocumented dependency: onError": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: errorMessage": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: getError": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: getWarning": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: warningMessage": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: getSuccess": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: onError": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: onSuccess": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: onWarning": 1,
+  "app/hooks/utils/useActionFeedback.ts::useActionFeedback::undocumented dependency: successMessage": 1,
+  "app/hooks/utils/useDebouncedSave.ts::useDebouncedSave::undocumented dependency: isMeaningful": 1,
+  "app/hooks/utils/useDebouncedSave.ts::useDebouncedSave::undocumented dependency: silent": 1
+}

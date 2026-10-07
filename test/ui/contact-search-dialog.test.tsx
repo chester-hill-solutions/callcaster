@@ -60,7 +60,7 @@ describe("ContactSearchDialog add-from-search (#1726)", () => {
 
   test("creates the contact from the query and queues it in place", async () => {
     const onAddToQueue = vi.fn();
-    renderDialog(onAddToQueue);
+    const { router } = renderDialog(onAddToQueue);
 
     fireEvent.change(
       screen.getByPlaceholderText("Search by name or phone..."),
@@ -76,5 +76,7 @@ describe("ContactSearchDialog add-from-search (#1726)", () => {
         expect.objectContaining({ id: 1, firstname: "Ada" }),
       ]);
     });
+    expect(onAddToQueue).toHaveBeenCalledTimes(1);
+    expect(router.state.location.pathname).toBe("/workspaces/w1/campaigns/1/queue");
   });
 });
