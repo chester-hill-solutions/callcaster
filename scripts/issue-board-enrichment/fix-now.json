@@ -386,9 +386,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "Add the five workspace foreign keys missing from the active bootstrap lineage",
     "summary": "Five tenant tables lack a workspace FK in the active fresh-bootstrap SQL: outreach_attempt, workspace_events, workspace_member, workspace_audit_event and workspace_audio. Six originally listed tables are already constrained in drizzle/0006_app_schema_tail.sql.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The fresh bootstrap adds campaign_queue/inbound/agent workspace constraints. No live database was inspected, so actual deployed lineage drift remains unverified.",
+    "currentBehavior": "Source verified at dev@51d7ac3de73c32c6e96beca9117a59b9c0d45bbf and read-only actual development PostgreSQL 18 on 7 October 2026 UTC: five registered tenant tables still lack workspace foreign keys. outreach_attempt and workspace_events use UUID tenancy; workspace_member, workspace_audit_event and workspace_audio use text; workspace.id is UUID. Development counts are 3,341/2/46/0/0 rows respectively, with zero orphan references and zero invalid UUID values. The 633 orphan workspace_events rows in the separate owned local diagnostic database are synthetic test residue, not a deployed count.",
     "rootCause": "Original audit checked only 0000_baseline.sql and missed 0006_app_schema_tail.sql plus the campaign_queue tenancy migration. Five constraint gaps remain. Three have text tenancy columns requiring a database conversion, not only a Drizzle model edit.",
-    "resolution": "First inventory supported DB lineages. Add the two missing UUID constraints for outreach_attempt and workspace_events. Convert the three text tenancy columns separately with data validation. Add a real catalog/cascade guard.",
+    "resolution": "Validate the supported upgrade and fresh-bootstrap lineages, then add the two missing UUID constraints. Convert and constrain each text tenancy column in separately validated work or explicit blocking tasks. Recheck data inside the migration; a zero-orphan read does not reserve integrity against later writes. Prove registered-table constraints, cascade behavior and model/catalog type agreement through real Postgres.",
     "lookIn": [
       "scripts/e2e/bootstrap-compose-db.mjs:33",
       "drizzle/0006_app_schema_tail.sql:84",
@@ -421,7 +421,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Keep Fix now with corrected five-table scope. Do not re-add six existing constraints or assume model-only uuid correction makes text foreign keys possible."
+    "trackerRecommendation": "Native scope and all original acceptance criteria remain open. Current development catalog measurements are recorded in the issue; no rows or schema were changed. Production and staging integrity, migration validation and source implementation remain."
   },
   {
     "issueNumber": 2288,
