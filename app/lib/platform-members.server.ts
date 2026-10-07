@@ -220,7 +220,7 @@ async function requireOwnerForOwnerChange(
   return { ok: true };
 }
 
-async function requireSoleOwnerProtection(
+export async function requireSoleOwnerProtection(
   workspaceId: string,
   targetUserId: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {

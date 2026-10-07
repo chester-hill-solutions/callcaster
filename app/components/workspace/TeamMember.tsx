@@ -46,11 +46,14 @@ export default function TeamMember({
   userRole,
   memberIsUser,
   workspaceOwner,
+  platformAdmin = false,
 }: {
   member: WorkspaceMemberDisplay;
   userRole: MemberRole;
   memberIsUser: boolean;
   workspaceOwner: WorkspaceMemberDisplay;
+  /** Verified platform management page; workspace role remains display data. */
+  platformAdmin?: boolean;
 }) {  
   const memberRole = member.role;
   const memberName =
@@ -75,9 +78,9 @@ export default function TeamMember({
       </div>
       <div className="flex items-center gap-2">
         <p className={roleTextStyles}>{roleDisplayName}</p>
-        {!memberIsOwner && (
+        {(!memberIsOwner || platformAdmin) && (
           <Sheet>
-            {userRole !== MemberRole.Caller && memberRole !== "invited" && (
+            {(platformAdmin || userRole !== MemberRole.Caller) && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button
                   className="h-fit rounded-full bg-transparent p-2"
@@ -99,7 +102,7 @@ export default function TeamMember({
                 </Button>
               </SheetTrigger>
             )}
-            {userRole !== MemberRole.Caller && memberRole === "invited" && (
+            {(platformAdmin || userRole !== MemberRole.Caller) && memberRole === "invited" && (
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
@@ -137,7 +140,7 @@ export default function TeamMember({
                 <h4 className="text-center text-2xl font-bold text-black dark:text-white">
                   {memberName}
                 </h4>
-                {userRole === MemberRole.Owner ||
+                {platformAdmin || userRole === MemberRole.Owner ||
                 (userRole === MemberRole.Admin &&
                   memberRole !== MemberRole.Admin) ? (
                   <>
@@ -157,8 +160,8 @@ export default function TeamMember({
                           required
                         >
                           {Object.values(MemberRole).map((role) => {
-                            if (role.valueOf() === "owner") {
-                              return <></>;
+                            if (role.valueOf() === "owner" && !platformAdmin) {
+                              return null;
                             }
                             return (
                               <option
@@ -166,7 +169,9 @@ export default function TeamMember({
                                 value={role.valueOf()}
                                 className=""
                               >
-                                {getWorkspaceRoleDisplayName(role)}
+                                {role === MemberRole.Owner && platformAdmin
+                                  ? "Workspace owner"
+                                  : getWorkspaceRoleDisplayName(role)}
                               </option>
                             );
                           })}
@@ -180,7 +185,7 @@ export default function TeamMember({
                       </Button>
                     </Form>
 
-                    {userRole === MemberRole.Owner && (
+                    {userRole === MemberRole.Owner && !platformAdmin && (
                       <Form
                         method="POST"
                         name="transferWorkspaceOwnership"
