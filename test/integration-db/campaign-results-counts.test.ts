@@ -97,6 +97,7 @@ suite("campaign results units and ended-call retries (#2034)", () => {
   });
 
   afterAll(async () => {
+    const errors: unknown[] = [];
     try {
       if (sql) {
         await sql`delete from public.call where workspace=${workspace}`;
@@ -104,21 +105,30 @@ suite("campaign results units and ended-call retries (#2034)", () => {
         await sql`delete from public.workspace where id=${workspace}`;
         await sql`delete from public."user" where id=${actor}`;
       }
+    } catch (error) {
+      errors.push(error);
+    }
+    const closes: (() => Promise<unknown>)[] = [];
+    if (pools) {
+      closes.push(() => pools.pool.end({ timeout: 5 }));
+      closes.push(() => pools.directPool.end({ timeout: 5 }));
+    }
+    if (sql) closes.push(() => sql.end({ timeout: 5 }));
+    try {
+      const results = await Promise.allSettled(
+        closes.map(async (close) => close()),
+      );
+      for (const result of results) {
+        if (result.status === "rejected") errors.push(result.reason);
+      }
     } finally {
-      try {
-        if (pools)
-          await Promise.all([
-            pools.pool.end({ timeout: 5 }),
-            pools.directPool.end({ timeout: 5 }),
-          ]);
-      } finally {
-        if (sql) await sql.end({ timeout: 5 });
-        for (const [key, value] of Object.entries(fixture.previous)) {
-          if (value === undefined) delete process.env[key];
-          else process.env[key] = value;
-        }
+      for (const [key, value] of Object.entries(fixture.previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
       }
     }
+    if (errors.length)
+      throw new AggregateError(errors, "Results fixture cleanup failed");
   });
 
   async function childCall() {
