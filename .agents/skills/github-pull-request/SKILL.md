@@ -21,6 +21,15 @@ subcommand manual and installed `gh <command> --help` before using a command.
 9. Merge only when the user requested the merge or explicitly approved it. Select the merge strategy deliberately, then verify `state`, `mergedAt`, `mergeCommit`, and the base branch.
 10. If `--delete-branch` is used, verify the remote branch no longer exists. A checked-out local branch may remain.
 
+## Late deployment contexts
+
+A first empty commit-status read does not prove that a PR has no deployment
+gates. Determine applicable deployments from the current repository and provider
+configuration. Wait for the expected exact-head app and worker contexts and
+verify their actual deployments. Require the current PR head, tested source,
+base and clean merge state immediately before merging. A deployment from a
+previous PR head cannot clear the current head.
+
 ## Structural review declaration
 
 Read `.github/pull_request_template.md` and `review-coverage.yml` before creating
