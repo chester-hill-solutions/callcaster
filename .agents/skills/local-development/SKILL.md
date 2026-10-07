@@ -558,3 +558,8 @@ server helpers directly in their tests. A helper re-export from a route can
 retain its server dependency graph in the browser build, even with a `.server`
 filename. Confirm the production build and client bundle guard after changing
 server imports.
+
+For exact-file import identity and coordinates, test the real multipart upload
+boundary through its queued worker bytes. A decoder/encoder round trip can strip
+a UTF-8 BOM or replace invalid bytes while direct parser tests stay green. Keep
+worker and stored-original bytes equal, and reject invalid UTF-8 before writes.

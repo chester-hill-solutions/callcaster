@@ -148,7 +148,12 @@ export const action = defineAction({
     }
 
     const fileContent = await contactsFile.arrayBuffer();
-    const fileContentText = new TextDecoder().decode(fileContent);
+    let fileContentText: string;
+    try {
+      fileContentText = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(fileContent);
+    } catch {
+      return routeData({ error: "CSV must be valid UTF-8" }, { status: 400, headers });
+    }
     const parsedFile = parseCSV(fileContentText);
     const availableHeaders = new Set(parsedFile.headers.map((header) => header.toLowerCase()));
     const missingHeaders = Object.keys(parsedHeaderMapping).filter(
@@ -193,14 +198,8 @@ export const action = defineAction({
       finalAudienceId = audienceData.id;
     }
 
-    // Convert file to base64 for processing
-    // Use a safer encoding method that can handle non-ASCII characters
-    // First encode the string as UTF-8, then encode to base64
-    const encoder = new TextEncoder();
-    const utf8Bytes = encoder.encode(fileContentText);
-    
-    // Convert the UTF-8 bytes to base64
-    const fileBase64 = Buffer.from(utf8Bytes).toString('base64');
+    // Worker identity and source coordinates must use the saved original bytes.
+    const fileBase64 = Buffer.from(fileContent).toString("base64");
 
     const uploadData = await createAudienceUploadRecord({
       workspaceId,

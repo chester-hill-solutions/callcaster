@@ -387,4 +387,46 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(await res.json()).toEqual({ error: "Unknown error" });
   }, 30000);
 
+  test("real multipart upload preserves original BOM bytes through worker hashing and source coordinates", async () => {
+    const mod = await import("../app/routes/api+/audience-upload");
+    const { prepareAudienceImport } = await import("@/lib/audience-import-map.server");
+    const raw = Buffer.from("\uFEFFPhone\r\n4165551234");
+    let workerFile: string | undefined;
+    const enqueueJob = vi.fn(async (job: { params: { fileContent: string } }) => {
+      workerFile = job.params.fileContent;
+      return { enqueued: true, jobId: 1 };
+    });
+    const fd = new FormData(); fd.set("workspace_id", "w1"); fd.set("audience_id", "1");
+    fd.set("contacts", new File([raw], "bom.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
+    const result = await asRouteResponse(mod.action({ request:makeReq(fd), deps:{
+      verifyAuth:async () => ({ headers:new Headers(), user:{id:"u1"} }), enqueueJob,
+    } } as any));
+    expect(result.status).toBe(200);
+    const original = objectStorageMocks.uploads.find(upload => upload.path.endsWith("/original.csv"));
+    expect(original?.body).toEqual(new Uint8Array(raw));
+    if (!workerFile) throw new Error("Upload did not enqueue source bytes");
+    const prepared = prepareAudienceImport(Buffer.from(workerFile, "base64"), { Phone:"phone" }, null, null);
+    expect(prepared.fileSha256).toBe("ac154b1275fb94a369c31ca0468817a37112bcb4784115e95920cc1f5383d46d");
+    expect(prepared.contacts[0].source).toEqual({recordNumber:2,startLine:2,endLine:2,byteStart:10,byteEnd:20});
+    expect(prepared.identity).not.toBe(prepareAudienceImport(Buffer.from("Phone\r\n4165551234"), { Phone:"phone" }, null, null).identity);
+  });
+
+  test("invalid UTF-8 is rejected at the multipart boundary before any audience or upload writes", async () => {
+    const mod = await import("../app/routes/api+/audience-upload");
+    const fd = new FormData(); fd.set("workspace_id", "w1"); fd.set("audience_name", "New audience");
+    fd.set("contacts", new File([new Uint8Array([80,104,111,110,101,10,255])], "invalid.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone:"phone" }));
+    const enqueueJob = vi.fn(async () => ({ enqueued:true, jobId:1 }));
+    const result = await asRouteResponse(mod.action({ request:makeReq(fd), deps:{
+      verifyAuth:async () => ({ headers:new Headers(), user:{id:"u1"} }), enqueueJob,
+    } } as any));
+    expect(result.status).toBe(400);
+    expect(await result.json()).toEqual({error:"CSV must be valid UTF-8"});
+    expect(dbMocks.createAudienceForUpload).not.toHaveBeenCalled();
+    expect(dbMocks.createAudienceUploadRecord).not.toHaveBeenCalled();
+    expect(objectStorageMocks.uploadObject).not.toHaveBeenCalled();
+    expect(enqueueJob).not.toHaveBeenCalled();
+  });
+
 });
