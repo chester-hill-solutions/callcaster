@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: API documentation dependencies use the patched Vue renderer to reject unsafe HTML attribute names ([PR #2483](https://github.com/chester-hill-solutions/callcaster/pull/2483), [#2474](https://github.com/chester-hill-solutions/callcaster/issues/2474)).
+
 - Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([PR #2481](https://github.com/chester-hill-solutions/callcaster/pull/2481), [#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
 
 - Fixed: Onboarding keeps existing inbound routes and voicemail greetings when number settings are saved ([PR #2476](https://github.com/chester-hill-solutions/callcaster/pull/2476)).
