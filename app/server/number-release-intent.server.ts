@@ -12,7 +12,10 @@ import {
   getWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding/persistence.server";
-import { invalidateWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  invalidateWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 export type NumberRelease = typeof workspace_number_release.$inferSelect;
@@ -157,6 +160,93 @@ async function lockOwnedRelease(
 
 export async function getOwnedNumberRelease(release: NumberRelease) {
   return db.transaction((tx) => lockOwnedRelease(tx, release));
+}
+
+export type NumberReleaseCredentials = {
+  key: string | null;
+  token: string | null;
+  accountSid: string;
+  authToken: string;
+};
+function snapshot(
+  row: { key: string | null; token: string | null; twilio_data: unknown },
+  release: NumberRelease,
+): NumberReleaseCredentials {
+  const data =
+    typeof row.twilio_data === "string"
+      ? JSON.parse(row.twilio_data)
+      : row.twilio_data;
+  const creds = readTwilioWorkspaceCredentials(data);
+  if (!creds || creds.sid !== release.account_sid)
+    throw new Error("Original release account configuration is required");
+  return {
+    key: row.key,
+    token: row.token,
+    accountSid: creds.sid,
+    authToken: creds.authToken,
+  };
+}
+
+export async function getNumberReleaseCredentials(release: NumberRelease) {
+  return db.transaction(async (tx) => {
+    await lockOwnedRelease(tx, release);
+    const [row] = await tx
+      .select({
+        key: workspace.key,
+        token: workspace.token,
+        twilio_data: workspace.twilio_data,
+      })
+      .from(workspace)
+      .where(eq(workspace.id, release.workspace));
+    if (!row) throw new Error("Release workspace not found");
+    return snapshot(row, release);
+  });
+}
+
+export function numberReleaseCredentialsMatch(
+  current: NumberReleaseCredentials,
+  expected: NumberReleaseCredentials,
+) {
+  return (
+    current.key === expected.key &&
+    current.token === expected.token &&
+    current.accountSid === expected.accountSid &&
+    current.authToken === expected.authToken
+  );
+}
+
+export async function persistNumberReleaseCredentials(
+  release: NumberRelease,
+  original: NumberReleaseCredentials,
+  credentials: { key: string; token: string; authToken: string },
+) {
+  await db.transaction(async (tx) => {
+    await lockOwnedRelease(tx, release);
+    const [row] = await tx
+      .select({
+        key: workspace.key,
+        token: workspace.token,
+        twilio_data: workspace.twilio_data,
+      })
+      .from(workspace)
+      .where(eq(workspace.id, release.workspace))
+      .for("update");
+    if (
+      !row ||
+      !numberReleaseCredentialsMatch(snapshot(row, release), original)
+    )
+      throw new Error("Release credentials changed before repair persistence");
+    await mergeWorkspaceTwilioData(
+      release.workspace,
+      (current) => ({ ...current, authToken: credentials.authToken }),
+      tx,
+    );
+    await tx
+      .update(workspace)
+      .set({ key: credentials.key, token: credentials.token })
+      .where(eq(workspace.id, release.workspace));
+  });
+  invalidateWorkspaceTwilioData(release.workspace);
 }
 
 export async function saveNumberReleaseTargets(

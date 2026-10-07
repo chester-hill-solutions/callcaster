@@ -1,4 +1,8 @@
 import type Twilio from "twilio";
+import {
+  recoverNumberReleaseClient,
+  isNumberReleaseCredentialRejection,
+} from "@/lib/number-release-credentials.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { isObject } from "@/lib/type-safety-utils";
 import { logger } from "@/lib/logger.server";
@@ -23,6 +27,17 @@ export class NumberReleaseIncompleteError extends Error {
   }
 }
 
+export class NumberReleaseCredentialError extends NumberReleaseIncompleteError {
+  constructor(phone: string) {
+    super(phone);
+    this.name = "NumberReleaseCredentialError";
+    this.message +=
+      " The workspace's phone provider connection needs repair. Contact support to finish this release.";
+  }
+}
+
+type NumberReleaseProvider = { client: Twilio.Twilio; recovered: boolean };
+
 function isResourceAbsent(error: unknown) {
   return isObject(error) && error.status === 404 && error.code === 20404;
 }
@@ -43,26 +58,71 @@ function verifiedResourceSid(
   return resource.sid;
 }
 
+type NumberReleaseOperation =
+  | "incoming.fetch"
+  | "incoming.list"
+  | "outgoing.list"
+  | "sender.detach"
+  | "outgoing.release"
+  | "incoming.release";
+
 async function providerOperation<T>(
   release: NumberRelease,
-  twilio: Twilio.Twilio,
-  operation: string,
+  provider: NumberReleaseProvider,
+  operation: NumberReleaseOperation,
   fn: () => Promise<T>,
 ) {
-  return withTwilioRetry(
-    async () => {
-      await getOwnedNumberRelease(release);
-      if (twilio.accountSid !== release.account_sid)
-        throw new Error("Number release needs the original provider account");
-      return fn();
-    },
-    { workspaceId: release.workspace, operation: `numberRelease.${operation}` },
-  );
+  let uncertainResponse = false;
+  try {
+    return await withTwilioRetry(
+      async () => {
+        await getOwnedNumberRelease(release);
+        if (provider.client.accountSid !== release.account_sid)
+          throw new Error("Number release needs the original provider account");
+        try {
+          return await fn();
+        } catch (error) {
+          if (
+            !isObject(error) ||
+            typeof error.status !== "number" ||
+            error.status >= 500
+          )
+            uncertainResponse = true;
+          throw error;
+        }
+      },
+      {
+        workspaceId: release.workspace,
+        operation: `numberRelease.${operation}`,
+        maxAttempts:
+          operation === "sender.detach" ||
+          operation === "outgoing.release" ||
+          operation === "incoming.release"
+            ? 1
+            : undefined,
+      },
+    );
+  } catch (error) {
+    if (uncertainResponse || !isNumberReleaseCredentialRejection(error))
+      throw error;
+    if (provider.recovered)
+      throw new NumberReleaseCredentialError(release.phone_number);
+    provider.recovered = true;
+    try {
+      provider.client = await recoverNumberReleaseClient(
+        release,
+        provider.client,
+      );
+    } catch {
+      throw new NumberReleaseCredentialError(release.phone_number);
+    }
+    return providerOperation(release, provider, operation, fn);
+  }
 }
 
 async function resolveIncomingSids(
   release: NumberRelease,
-  twilio: Twilio.Twilio,
+  provider: NumberReleaseProvider,
 ) {
   if (release.number_type === "caller_id") return [];
   const recordedSid = release.provider_sid;
@@ -73,9 +133,9 @@ async function resolveIncomingSids(
     try {
       const resource = await providerOperation(
         release,
-        twilio,
+        provider,
         "incoming.fetch",
-        () => twilio.incomingPhoneNumbers(recordedSid).fetch(),
+        () => provider.client.incomingPhoneNumbers(recordedSid).fetch(),
       );
       if (verifiedResourceSid(release, resource) !== recordedSid)
         throw new Error("Number release SID changed");
@@ -86,10 +146,10 @@ async function resolveIncomingSids(
   }
   const resources = await providerOperation(
     release,
-    twilio,
+    provider,
     "incoming.list",
     () =>
-      twilio.incomingPhoneNumbers.list({
+      provider.client.incomingPhoneNumbers.list({
         phoneNumber: release.phone_number,
         limit: 100,
       }),
@@ -101,14 +161,14 @@ async function resolveIncomingSids(
 
 async function resolveOutgoingSids(
   release: NumberRelease,
-  twilio: Twilio.Twilio,
+  provider: NumberReleaseProvider,
 ) {
   const resources = await providerOperation(
     release,
-    twilio,
+    provider,
     "outgoing.list",
     () =>
-      twilio.outgoingCallerIds.list({
+      provider.client.outgoingCallerIds.list({
         phoneNumber: release.phone_number,
         limit: 100,
       }),
@@ -118,12 +178,17 @@ async function resolveOutgoingSids(
 
 async function removeResource(
   release: NumberRelease,
-  twilio: Twilio.Twilio,
-  operation: string,
+  provider: NumberReleaseProvider,
+  operation: NumberReleaseOperation,
   remove: () => Promise<boolean>,
 ) {
   try {
-    const removed = await providerOperation(release, twilio, operation, remove);
+    const removed = await providerOperation(
+      release,
+      provider,
+      operation,
+      remove,
+    );
     if (!removed)
       throw new Error("Provider resource removal was not confirmed");
   } catch (error) {
@@ -134,23 +199,26 @@ async function removeResource(
 
 async function releaseProviderResources(
   release: NumberRelease,
-  twilio: Twilio.Twilio,
+  provider: NumberReleaseProvider,
 ) {
   for (const serviceSid of release.messaging_service_sids) {
     for (const sid of release.incoming_sids ?? []) {
-      await removeResource(release, twilio, "sender.detach", () =>
-        twilio.messaging.v1.services(serviceSid).phoneNumbers(sid).remove(),
+      await removeResource(release, provider, "sender.detach", () =>
+        provider.client.messaging.v1
+          .services(serviceSid)
+          .phoneNumbers(sid)
+          .remove(),
       );
     }
   }
   for (const sid of release.outgoing_sids ?? []) {
-    await removeResource(release, twilio, "outgoing.release", () =>
-      twilio.outgoingCallerIds(sid).remove(),
+    await removeResource(release, provider, "outgoing.release", () =>
+      provider.client.outgoingCallerIds(sid).remove(),
     );
   }
   for (const sid of release.incoming_sids ?? []) {
-    await removeResource(release, twilio, "incoming.release", () =>
-      twilio.incomingPhoneNumbers(sid).remove(),
+    await removeResource(release, provider, "incoming.release", () =>
+      provider.client.incomingPhoneNumbers(sid).remove(),
     );
   }
 }
@@ -162,13 +230,17 @@ export async function resumeNumberRelease(
   release = await getOwnedNumberRelease(release);
   if (release.state !== "released") {
     if (!twilio) throw new Error("Number release provider client is required");
+    const provider: NumberReleaseProvider = {
+      client: twilio,
+      recovered: false,
+    };
     if (release.incoming_sids === null || release.outgoing_sids === null) {
-      const incoming = await resolveIncomingSids(release, twilio);
-      const outgoing = await resolveOutgoingSids(release, twilio);
+      const incoming = await resolveIncomingSids(release, provider);
+      const outgoing = await resolveOutgoingSids(release, provider);
       release = await saveNumberReleaseTargets(release, incoming, outgoing);
     }
     release = await prepareNumberReleaseBookkeeping(release);
-    await releaseProviderResources(release, twilio);
+    await releaseProviderResources(release, provider);
     release = await recordNumberReleaseProvider(release);
   }
   await finishNumberRelease(release);
@@ -213,7 +285,12 @@ async function executeNumberRelease(
       });
     }
     await retainNumberReleaseForRecovery(release);
-    return { error: new NumberReleaseIncompleteError(release.phone_number) };
+    return {
+      error:
+        error instanceof NumberReleaseCredentialError
+          ? error
+          : new NumberReleaseIncompleteError(release.phone_number),
+    };
   }
 }
 
