@@ -5,6 +5,7 @@ import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
   isWorkspaceIntakeComplete,
+  predicatePassed,
 } from "@/lib/messaging-onboarding.server";
 import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/readiness.server";
 import {
@@ -33,6 +34,7 @@ type LoaderData = {
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
+  serviceAddressRequired: boolean;
   complianceOnboarding?: Awaited<
     ReturnType<typeof getWorkspaceMessagingOnboardingState>
   >;
@@ -142,6 +144,10 @@ export const loader = defineLoader({
         userRole,
         workspaceData,
         onboardingReadiness: readiness,
+        serviceAddressRequired: !predicatePassed("emergency_address_present", {
+          onboarding,
+          workspaceNumbers,
+        }),
         ...(today ? { today } : {}),
         ...(isExactWorkspaceRoot && !intakeIncomplete
           ? {

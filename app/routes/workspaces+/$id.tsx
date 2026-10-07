@@ -9,6 +9,7 @@ import {
   useOutletContext,
   useRevalidator,
   useLocation,
+  Link,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
@@ -39,6 +40,7 @@ type LoaderData = {
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
+  serviceAddressRequired: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -80,6 +82,7 @@ function WorkspaceResolvedView({
   today,
   showSidebar,
   isOnboarding,
+  serviceAddressRequired,
   complianceOnboarding,
   a2pBlockingIssues,
   campaignQueueProgress,
@@ -92,6 +95,7 @@ function WorkspaceResolvedView({
   today?: WorkspaceTodaySelection;
   showSidebar: boolean;
   isOnboarding: boolean;
+  serviceAddressRequired: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -133,7 +137,7 @@ function WorkspaceResolvedView({
   });
 
   const liveCredits = workspace.credits;
-  const canManageBilling = userRole === "admin" || userRole === "owner";
+  const canManageWorkspace = userRole === "admin" || userRole === "owner";
   const location = useLocation();
   // Credits page is where users top up — keep the low-credit banner off it (#1097).
   const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
@@ -179,7 +183,7 @@ function WorkspaceResolvedView({
                 ? "No credits yet. Add credits to start campaigns and calls."
                 : "Credit balance is depleted. Add credits to resume campaigns and calls."}
             </AlertDescription>
-            {canManageBilling && outlet && !isCallScreen ? (
+            {canManageWorkspace && outlet && !isCallScreen ? (
               <Button asChild variant="destructive" className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -193,7 +197,7 @@ function WorkspaceResolvedView({
               Credits are running low ({liveCredits} left). Add credits to keep
               campaigns active.
             </AlertDescription>
-            {canManageBilling && outlet && !isCallScreen ? (
+            {canManageWorkspace && outlet && !isCallScreen ? (
               <Button asChild className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -214,7 +218,17 @@ function WorkspaceResolvedView({
               {onboardingReadiness.shouldShowOnboardingBanner ? (
                 <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
                   <div className="font-medium">
-                    Continue workspace setup
+                    {canManageWorkspace && serviceAddressRequired ? (
+                      <Link
+                        to={`/workspaces/${workspace.id}/phone-numbers#service-address`}
+                        aria-label="Continue workspace setup: add service address"
+                        className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        Continue workspace setup
+                      </Link>
+                    ) : (
+                      "Continue workspace setup"
+                    )}
                   </div>
                   <p className="mt-1 text-muted-foreground">
                     {onboardingReadiness.warnings.length > 0
@@ -256,7 +270,8 @@ export default function Workspace() {
     userRole,
     onboardingReadiness,
     today,
-    complianceOnboarding,
+    serviceAddressRequired,
+  complianceOnboarding,
     a2pBlockingIssues,
     campaignQueueProgress,
   } =
@@ -295,6 +310,7 @@ export default function Workspace() {
           today={today}
           showSidebar={showSidebar}
           isOnboarding={Boolean(onboardingStrip)}
+          serviceAddressRequired={serviceAddressRequired}
           complianceOnboarding={complianceOnboarding}
           a2pBlockingIssues={a2pBlockingIssues}
           campaignQueueProgress={campaignQueueProgress}

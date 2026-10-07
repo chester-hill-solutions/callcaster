@@ -58,7 +58,7 @@ export function ServiceAddressGate({
   const showForm = !complete || isEditing;
 
   return (
-    <div data-testid="service-address-gate" className="max-w-xl space-y-3">
+    <div id="service-address" tabIndex={-1} data-testid="service-address-gate" className="max-w-xl space-y-3">
       <div>
         <h3 className="text-sm font-medium">Service address</h3>
         <p className="mt-1 text-sm text-muted-foreground">
