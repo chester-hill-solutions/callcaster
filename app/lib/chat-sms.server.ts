@@ -83,7 +83,7 @@ export const sendMessage = async ({
     schedule = { scheduleType: "fixed", sendAt: validatedDate };
   }
 
-  await assertWorkspaceCanSendSms({workspaceId: workspace });
+  await assertWorkspaceCanSendSms({ workspaceId: workspace, reuseProviderSnapshot: true });
 
   // Ownership of the sending number, checked here rather than in each caller.
   //

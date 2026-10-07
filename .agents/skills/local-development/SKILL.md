@@ -311,6 +311,11 @@ Bind the selected URL to both app pool variables before importing the runtime
 database module, then restore the worker environment. Verify override-only
 and differing-URL controls so the fixture cannot use the wrong database.
 
+Capture owned app pools before importing a dependent runtime graph in a database
+fixture. Attempt each pool and client close independently; restore worker
+environment values in an innermost `finally`, even when a close fails. Collect
+cleanup errors and report them after `finally`; do not throw from `finally`.
+
 For database failure controls, keep the isolated relation present. Renaming it
 can make an unqualified query resolve to a public table on the search path.
 Use a failure inside the isolated relation, such as a rejecting trigger, and

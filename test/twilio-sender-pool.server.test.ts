@@ -10,7 +10,8 @@ const twilioClientMocks = vi.hoisted(() => ({
   createChannelSender: vi.fn(async () => ({})),
 }));
 
-vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+vi.mock("@/lib/merge-workspace-twilio-data.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/merge-workspace-twilio-data.server")>()),
   loadWorkspaceTwilioData: vi.fn(async () => twilioDataMocks.data),
 }));
 
