@@ -155,8 +155,13 @@ async function lockOwnedRelease(
   return owned;
 }
 
-export async function getOwnedNumberRelease(release: NumberRelease) {
-  return db.transaction((tx) => lockOwnedRelease(tx, release));
+export async function getOwnedNumberRelease(
+  release: NumberRelease,
+  transaction?: ReleaseTransaction,
+) {
+  return transaction
+    ? lockOwnedRelease(transaction, release)
+    : db.transaction((tx) => lockOwnedRelease(tx, release));
 }
 
 export async function saveNumberReleaseTargets(
