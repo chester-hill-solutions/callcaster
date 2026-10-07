@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Inbound phone-menu pages and prompts require the signed call and requested number to belong to the same workspace ([#2455](https://github.com/chester-hill-solutions/callcaster/issues/2455)).
+- Security: Inbound phone-menu pages and prompts require the signed call and requested number to belong to the same workspace ([#2455](https://github.com/chester-hill-solutions/callcaster/issues/2455), [PR #2457](https://github.com/chester-hill-solutions/callcaster/pull/2457)).
 
 - Fixed: Inbound phone menus speak text prompts and use available WAV recordings through the shared phone-menu renderer ([#2456](https://github.com/chester-hill-solutions/callcaster/pull/2456), [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148)).
 
