@@ -3,7 +3,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import dotenv from "dotenv";
-import Twilio from "twilio";
+import {
+  localEnvironmentName,
+  normalizeEnvironmentBaseUrl,
+  provisionEnvironmentTwimlApp,
+} from "../../app/server/environment-twiml-app.server.ts";
 
 const rootDir = process.cwd();
 const envPath = path.join(rootDir, ".env");
@@ -20,14 +24,13 @@ const environment = requireConfig("ENV");
 const accountSid = requireConfig("TWILIO_SID");
 const authToken = requireConfig("TWILIO_AUTH_TOKEN");
 const baseUrl = normalizeBaseUrl(requireConfig("BASE_URL"));
-const friendlyName = `env:${devName}-${environment}`;
-const voiceUrl = `${baseUrl}/api/call`;
-
-const client = Twilio(accountSid, authToken);
-const [existing] = await client.applications.list({ friendlyName, limit: 1 });
-const application = existing
-  ? await client.applications(existing.sid).update({ voiceUrl, voiceMethod: "POST" })
-  : await client.applications.create({ friendlyName, voiceUrl, voiceMethod: "POST" });
+const environmentName = localEnvironmentName(devName, environment);
+const application = await provisionEnvironmentTwimlApp({
+  accountSid,
+  authToken,
+  environmentName,
+  baseUrl,
+});
 
 for (const filePath of [localEnvPath, envPath]) {
   if (fs.existsSync(filePath)) {
@@ -35,9 +38,9 @@ for (const filePath of [localEnvPath, envPath]) {
   }
 }
 
-console.log(`${existing ? "Updated" : "Created"} ${friendlyName}`);
+console.log(`${application.created ? "Created" : "Updated"} ${application.friendlyName}`);
 console.log(`TWILIO_APP_SID=${application.sid}`);
-console.log(`Voice URL: ${voiceUrl}`);
+console.log(`Voice URL: ${application.voiceUrl}`);
 
 function readEnvFile(filePath) {
   return fs.existsSync(filePath) ? dotenv.parse(fs.readFileSync(filePath)) : null;
@@ -64,7 +67,7 @@ function normalizeBaseUrl(value) {
   url.pathname = "";
   url.search = "";
   url.hash = "";
-  return url.toString().replace(/\/$/, "");
+  return normalizeEnvironmentBaseUrl(url.toString());
 }
 
 function updateEnvValue(filePath, name, value) {
