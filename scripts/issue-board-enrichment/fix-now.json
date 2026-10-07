@@ -101,39 +101,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2114,
-    "verdict": "fix-now",
-    "recommendedTitle": "Message campaign credit estimates assume one segment per contact while billing charges per segment",
-    "summary": "The estimate still assumes one segment per message and has no template/media input. Its copy says per segment while total is contact count times 2.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The estimate still assumes one segment per message and has no template/media input. Its copy says per segment while total is contact count times 2.",
-    "resolution": "Estimate rendered template segment counts or state a clear minimum assumption; include/exclude MMS explicitly.",
-    "lookIn": [
-      "shared/campaign-billing.ts:23",
-      "shared/campaign-billing.ts:32",
-      "app/lib/campaign-billing.server.ts:30",
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/lib/sms-segments.ts",
-      "app/lib/worker/webhook-side-effects.server.ts:207-209",
-      "the Launch page cost panel component and `loadCampaignBillingSummary"
-    ],
-    "existingTests": [
-      "test/campaign-billing.test.ts"
-    ],
-    "missingTests": [
-      "Summary-level multi-segment and media examples must compare estimate assumptions with billed rates."
-    ],
-    "acceptanceCriteria": [
-      "For a campaign whose template produces 2 segments per message, the estimate equals the ledger debit (kill-check: revert to per-contact and confirm the test goes red).",
-      "The panel's `rateDescription` states the assumption it actually makes.",
-      "MMS is either estimated or explicitly excluded in the copy.",
-      "A `loadCampaignBillingSummary`-level test asserts estimate == debit for a representative campaign."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2123,
     "verdict": "fix-now",
     "recommendedTitle": "The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors",
@@ -312,39 +279,6 @@
     "trackerRecommendation": "Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter."
   },
   {
-    "issueNumber": 2145,
-    "verdict": "fix-now",
-    "recommendedTitle": "The regulatory optInType submitted to Twilio is derived by substring-matching free-text prose",
-    "summary": "optInType still falls back to free-text workflow and substring matches VERBAL/PAPER/TEXT/QR. Explicit input is also substring-normalized rather than checked as an exact enum.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. optInType still falls back to free-text workflow and substring matches VERBAL/PAPER/TEXT/QR. Explicit input is also substring-normalized rather than checked as an exact enum.",
-    "resolution": "Use an explicit validated exact enum from onboarding. Do not infer from prose. Decide and document handling of existing missing selections; blindly defaulting WEB_FORM can also make a false attestation. Audit already submitted registrations separately with authorized provider access.",
-    "lookIn": [
-      "app/lib/twilio-toll-free-provision.server.ts:90",
-      "app/lib/twilio-toll-free-provision.server.ts:96",
-      "app/lib/twilio-toll-free-provision.server.ts:218",
-      "app/lib/twilio-toll-free-provision.server.ts:66-68,232",
-      "app/lib/twilio-toll-free.server.ts",
-      "app/components/other-services/`, the toll-free onboarding step",
-      "app/lib/twilio-a2p-provision.server.ts (the sibling fields)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Negated verbal workflow, every exact valid enum passthrough, invalid explicit type, absent legacy field. No live provider registration audit was performed."
-    ],
-    "acceptanceCriteria": [
-      "Free-text workflow descriptions never determine optInType.",
-      "Each supported explicit enum value passes through exactly; invalid explicit values are refused.",
-      "Missing selections follow an explicit recorded product policy and cannot silently produce an unsupported consent statement.",
-      "Any allowed legacy fallback logs the workspace and reason.",
-      "Tests cover negated verbal prose, explicit enum values, invalid values and missing selections.",
-      "The provisioning sweep result is recorded; any live registration audit is tracked separately."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2148,
     "verdict": "fix-now",
     "recommendedTitle": "The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say",
@@ -448,64 +382,26 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2166,
-    "verdict": "fix-now",
-    "recommendedTitle": "Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback",
-    "summary": "Failure propagation and the repair sweep landed. Raw Twilio playback fallback and timestamped voicemail keys remain; recording_url retention still needs a decision.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Failure propagation and the repair sweep landed. Raw Twilio playback fallback and timestamped voicemail keys remain; recording_url retention still needs a decision.",
-    "rootCause": "The original design treated the copy as best-effort and swallowed the failure, which made an unrecoverable data loss look like success. A second, independent problem: recording_sid was written AFTER the copy, so a failed copy left no searchable row — the failure was unrepresentable in the database. #2169 fixed the ordering, which is what made the repair sweep's find query possible.",
-    "resolution": "Failure propagation and repair sweep are complete. Remaining concrete fixes: replace the raw Twilio playback link with a clear storage-unavailable state; make voicemail keys stable per recording identity. The S3 upload helper overwrites by default unless upsert:false, so the defect is the timestamp key, not a required upsert:true option. Decide recording_url retention separately.",
-    "lookIn": [
-      "app/components/calls/CallLogTable.tsx:234",
-      "app/routes/api+/email-vm.action.server.ts:186",
-      "app/lib/object-storage.server.ts:225",
-      "app/lib/call-recording-storage.server.ts (persistCallRecordingToStorage — throws on every failure mode)",
-      "app/lib/worker/webhook-side-effects.server.ts (runRecordingSideEffects — writes recording identity before the copy)",
-      "app/lib/call-recording-repair.server.ts (repair sweep, PR #2173)",
-      "app/components/calls/CallLogTable.tsx:234 (Twilio-URL playback fallback — step 3)",
-      "app/lib/call-log.server.ts:49-52 (CallLogRow.recordingUrl is the raw Twilio URL, documented as 'a fallback that leaves the app')",
-      "app/routes/api+/email-vm.action.server.ts:185-197 (voicemail object key and upload — step 4)"
-    ],
-    "existingTests": [
-      "test/call-recording-storage.server.test.ts — inverted to assert the throwing behaviour",
-      "test/webhook-side-effects.test.ts — asserts identity is written before the copy",
-      "test/call-recording-repair.server.test.ts — 13 tests, including a schema-contract test proving the swept payload is accepted by the real job-params schema"
-    ],
-    "missingTests": [
-      "Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link."
-    ],
-    "acceptanceCriteria": [
-      "Failure propagation and the repair sweep remain covered by their existing regression tests.",
-      "Missing stored playback has a clear unavailable state and no raw Twilio recording link.",
-      "Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.",
-      "An explicit recording_url retention decision is recorded."
-    ],
-    "blockedBy": [],
-    "size": "M-L",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2215,
     "verdict": "fix-now",
     "recommendedTitle": "Add the five workspace foreign keys missing from the active bootstrap lineage",
     "summary": "Five tenant tables lack a workspace FK in the active fresh-bootstrap SQL: outreach_attempt, workspace_events, workspace_member, workspace_audit_event and workspace_audio. Six originally listed tables are already constrained in drizzle/0006_app_schema_tail.sql.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The fresh bootstrap adds campaign_queue/inbound/agent workspace constraints. No live database was inspected, so actual deployed lineage drift remains unverified.",
+    "currentBehavior": "Source verified at dev@51d7ac3de73c32c6e96beca9117a59b9c0d45bbf and read-only actual development PostgreSQL 18 on 7 October 2026 UTC: five registered tenant tables still lack workspace foreign keys. outreach_attempt and workspace_events use UUID tenancy; workspace_member, workspace_audit_event and workspace_audio use text; workspace.id is UUID. Development counts are 3,341/2/46/0/0 rows respectively, with zero orphan references and zero invalid UUID values. The 633 orphan workspace_events rows in the separate owned local diagnostic database are synthetic test residue, not a deployed count.",
     "rootCause": "Original audit checked only 0000_baseline.sql and missed 0006_app_schema_tail.sql plus the campaign_queue tenancy migration. Five constraint gaps remain. Three have text tenancy columns requiring a database conversion, not only a Drizzle model edit.",
-    "resolution": "First inventory supported DB lineages. Add the two missing UUID constraints for outreach_attempt and workspace_events. Convert the three text tenancy columns separately with data validation. Add a real catalog/cascade guard.",
+    "resolution": "Validate the supported upgrade and fresh-bootstrap lineages, then add the two missing UUID constraints. Convert and constrain each text tenancy column in separately validated work or explicit blocking tasks. Recheck data inside the migration; a zero-orphan read does not reserve integrity against later writes. Prove registered-table constraints, cascade behavior and model/catalog type agreement through real Postgres.",
     "lookIn": [
-      "scripts/e2e/bootstrap-compose-db.mjs:33",
+      "scripts/e2e/bootstrap-compose-db.mjs:29",
       "drizzle/0006_app_schema_tail.sql:84",
       "drizzle/0006_app_schema_tail.sql:133",
       "drizzle/0006_app_schema_tail.sql:283",
       "drizzle/0002_workspace_events.sql:4",
-      "app/db/schema.ts:127",
-      "client/migrations/20260705000200_add_campaign_queue_workspace.sql:43",
+      "app/db/schema.ts:162",
+      "client/migrations/20260705000200_add_campaign_queue_workspace.sql:38",
       "drizzle/0000_baseline.sql:5320 (workspace.id is uuid in the database)",
-      "app/db/schema.ts:102 (workspace.id is text() in the model — the drift)",
-      "app/db/schema.ts:126,453,472 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)",
-      "app/db/schema.ts:51,79 (schema-campaign: campaign_queue.workspace is uuid)",
-      "app/db/workspace-scoped-tables.ts:41-94 (the 27 registered tables)",
+      "app/db/schema.ts:130 (workspace.id is text() in the model — the drift)",
+      "app/db/schema.ts:162,503,522 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)",
+      "app/db/schema-campaign.ts:145 (campaign_queue.workspace is uuid)",
+      "app/db/workspace-scoped-tables.ts (32 registered tenant tables at dev@f1fc3ef5)",
       "client/migrations/20260713180000_chs_workspace_membership.sql:99-106 (workspace_member, role_id FK but no workspace_id FK)",
       "client/migrations/20260713120000_workspace_audit_event.sql:4 (workspace_audit_event.workspace_id is text)",
       "client/migrations/20260715120000_workspace_audio_metadata.sql:17 (workspace_audio.workspace_id is text)",
@@ -525,172 +421,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Keep Fix now with corrected five-table scope. Do not re-add six existing constraints or assume model-only uuid correction makes text foreign keys possible."
-  },
-  {
-    "issueNumber": 2268,
-    "verdict": "fix-now",
-    "recommendedTitle": "Deliver inbound IVR voicemail to the script recipient",
-    "summary": "The documented voicemail email target is dropped; delivery reads the number default instead.",
-    "currentBehavior": "Source audit dev@f6d02f91: the terminal branch discards the voicemail target payload. The recording callback uses number.inbound_action. The platform plan documents a voicemail email destination and builder picker; no ADR found changes that contract.",
-    "rootCause": "No trusted recipient metadata is carried from the selected IVR target into recording delivery.",
-    "resolution": "Bind the validated target email to trusted workspace-scoped call metadata before recording. Read that recipient after callback signature, call and workspace checks. Preserve legacy number/queue delivery and processed-recording retry protection. Verify storage field and migration/bootstrap coverage if needed; do not trust an arbitrary callback field or URL override.",
-    "lookIn": [
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-      "app/lib/inbound-voicemail-twiml.server.ts",
-      "app/routes/api+/email-vm.action.server.ts",
-      "app/lib/telephony-db.server.ts",
-      "docs/contact-center-platform-plan.md"
-    ],
-    "existingTests": [
-      "test/email-vm.route.test.ts (existing number-recipient and recording controls)"
-    ],
-    "missingTests": [
-      "Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection."
-    ],
-    "acceptanceCriteria": [
-      "The script target recipient receives the voicemail.",
-      "Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.",
-      "Retries and later script edits retain the bound recipient without duplicate emails.",
-      "Runtime, docs, tests and deployed verification agree before promotion."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery."
-  },
-  {
-    "issueNumber": 2269,
-    "verdict": "fix-now",
-    "recommendedTitle": "Validate inbound IVR scripts before number attachment",
-    "summary": "Attachment services accept scripts without full inbound target validation, and workspace/campaign saves can invalidate an attached script.",
-    "currentBehavior": "Source audit dev@c1d3a34e, confirmed unchanged at eaaffaf4: the phone-number form delegates to patchWorkspaceNumber. The automated-menu preset separately checks workspace presence only. Workspace and campaign script saves can overwrite an attached valid configuration. Generic editor validation misreads inbound terminal targets and displays errors in a conditional flow row.",
-    "rootCause": "Inbound activation and attached-script editing have no shared ownership/routing validation boundary.",
-    "resolution": "Use one inbound validator in the platform attachment service, automated-menu preset and both attached-script save paths. Align client/server checks for documented queue, forward and voicemail email targets, validate workspace ownership and reject before writes. Preserve the draft and last valid configuration; use canonical shared feedback without page movement. Clearing remains valid.",
-    "lookIn": [
-      "app/lib/platform-workspace-numbers.server.ts",
-      "app/routes/workspaces+/$id/phone-numbers.action.server.ts",
-      "app/lib/routing-preset-write.server.ts",
-      "app/lib/script-persistence.server.ts",
-      "app/components/campaign/settings/script/ScriptEditorShell.tsx",
-      "app/lib/inbound-ivr-db.server.ts",
-      "docs/contact-center-platform-plan.md"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Real platform/form and preset attachment boundaries, plus workspace/campaign attached-script saves: foreign/missing/type-invalid scripts, dangling/malformed targets, valid targets and clearing.",
-      "Client/server target agreement, preserved draft/configuration, usable shared validation feedback and no layout movement."
-    ],
-    "acceptanceCriteria": [
-      "Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.",
-      "Valid targets and clearing remain usable.",
-      "API, editor and target docs agree; real write-boundary regressions and deployed checks pass.",
-      "Draft/configuration are preserved and canonical shared validation feedback does not move the page."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Current native scope corrected after the write-boundary audit. Source defect remains Fix now; playback and recipient delivery are separate concerns."
-  },
-  {
-    "issueNumber": 2278,
-    "verdict": "fix-now",
-    "recommendedTitle": "Validate literal redirect targets against the route tree",
-    "summary": "The existing gate checks dot-relative redirects but cannot detect an absent absolute target.",
-    "currentBehavior": "Source audit dev@c261919e: check-relative-redirects freezes dot-relative calls only. The wide absolute-target gate requested by #2075 is now a separate Task.",
-    "rootCause": "The existing guard has no route-tree matching for absolute redirect literals.",
-    "resolution": "Parse literal absolute redirects with the TypeScript AST, compare normalized pathnames to the generated route tree with explicit parameter and wildcard matching, test absent/real/multiline targets, resolve current violations and wire the gate into local and quality CI.",
-    "lookIn": [
-      "scripts/check-relative-redirects.mjs",
-      "scripts/baselines/route-tree.txt",
-      "app/routes/",
-      "package.json",
-      ".github/workflows/ci.yml"
-    ],
-    "existingTests": [
-      "test/check-relative-redirects.test.ts"
-    ],
-    "missingTests": [
-      "Absolute-target parser, registered/missing route, multiline, query/hash, parameterized and wildcard fixtures."
-    ],
-    "acceptanceCriteria": [
-      "Literal absolute redirect pathnames match registered routes, including multiline calls.",
-      "Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.",
-      "Existing violations are corrected or tracked before enabling the gate.",
-      "Local and quality CI run the gate; the relative redirect check remains."
-    ],
-    "blockedBy": [],
-    "size": "S-M",
-    "risk": "low",
-    "trackerRecommendation": "Independent preventive Task split from #2075; no blocking edge."
-  },
-  {
-    "issueNumber": 2282,
-    "verdict": "fix-now",
-    "recommendedTitle": "Prepare a valid A2P Messaging Profile before brand registration",
-    "summary": "The canonical A2P chain omits the required Messaging Profile EndUser, suppresses product submission errors and does not resubmit a repaired existing product.",
-    "currentBehavior": "Source audit: dev@aacb17ac, 2026-10-03. provisionA2pRegistration creates the Trust Product and assigns the customer profile, leaves the required EndUser as a TODO, catches submission failure and continues to the brand step. Existing-product retries only check customer-profile assignment.",
-    "resolution": "Collect and validate the required provider business inputs, create/reuse and assign the Messaging Profile EndUser, evaluate and submit before brand registration, and make repair retries idempotent. Provider and input failures must stop the brand step with visible action-needed details. Do not infer regulatory attributes from prose.",
-    "lookIn": [
-      "app/lib/twilio-a2p-provision.server.ts",
-      "app/lib/twilio-client.server.ts",
-      "app/lib/types.ts",
-      "app/lib/messaging-onboarding/predicates.ts",
-      "app/components/onboarding/"
-    ],
-    "existingTests": [
-      "test/twilio-a2p-provision.server.test.ts exercises campaign phases with an existing Trust Product; it does not claim product preparation is complete."
-    ],
-    "missingTests": [
-      "Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.",
-      "Real persistence/readiness and deployed provider preparation verification."
-    ],
-    "acceptanceCriteria": [
-      "Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.",
-      "Create/reuse and assign the required EndUser and customer profile before evaluation/submission.",
-      "Provider/input failure blocks brand creation with visible details.",
-      "Retry repairs and resubmits incomplete existing products without duplicates.",
-      "Private/public business controls and deployed provider checks pass before promotion and closure."
-    ],
-    "blockedBy": [],
-    "size": "L",
-    "risk": "high",
-    "trackerRecommendation": "Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation."
-  },
-  {
-    "issueNumber": 2288,
-    "verdict": "fix-now",
-    "recommendedTitle": "Move audience-upload history loading to route data",
-    "summary": "The current audience-history mount effect fetches server data. The syntax guard now exposes it as CANDIDATE-REMOVE; route data is the adopted policy.",
-    "currentBehavior": "Source audit at dev@24c4d810. useAudienceUploads calls fetchAudienceUploads on mount and workspace/audience changes, then maintains live history via workspace events. The old guard skipped this effect because its preceding comment ended in a dot. The guard fix only inventories the existing behavior; the runtime route-data change remains open under #2288.",
-    "rootCause": "Initial server history is owned by a client effect instead of the existing audience route data contract.",
-    "resolution": "Load initial upload history through the authenticated audience page loader, pass route data into the history UI/hook and retain React Router retry/revalidation plus current-audience event updates. Remove the fetch-on-mount effect and its candidate inventory row.",
-    "lookIn": [
-      "app/hooks/audience/useAudienceUploads.ts",
-      "app/components/audience/AudienceUploadHistory.tsx",
-      "app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts",
-      "app/routes/workspaces+/$id/audiences/$audience_id.route.tsx",
-      "app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.loader.server.ts"
-    ],
-    "existingTests": [
-      "test/ui/audience-upload-history.test.tsx"
-    ],
-    "missingTests": [
-      "Real route initial-history and foreign-audience denial cases.",
-      "Navigation/late-result isolation, retry and retained insert/update/delete event controls."
-    ],
-    "acceptanceCriteria": [
-      "Initial history is route data; the mount fetch effect is removed.",
-      "Workspace/audience changes cannot leak old history or accept late results for another audience.",
-      "Loading, empty, error retry and success behavior remain available.",
-      "Current-audience event updates and route tenant authorization are retained.",
-      "Tests fail if the required loader, isolation, retry or event behavior is removed.",
-      "Remove candidate inventory debt and pass full local/remote gates before merge."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104."
+    "trackerRecommendation": "Native scope and all original acceptance criteria remain open. Current development catalog measurements are recorded in the issue; no rows or schema were changed. Production and staging integrity, migration validation and source implementation remain."
   },
   {
     "issueNumber": 2061,
