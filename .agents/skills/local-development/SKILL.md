@@ -460,6 +460,11 @@ when inspecting mixed concurrent-write results.
 
 ## Scripted source edits
 
+Keep formatter changes within the requested diff. A whole-file format can reorder
+untouched classes and expand old test formatting. Restore only those unrelated
+hunks from the pinned base; format edited blocks or new files, then inspect the
+actual diff before source freeze.
+
 Run source faults only when no other test reads that worktree. Restore each
 fault before starting the next reader, then rerun the fixed source. A passing
 report from overlapping runs does not identify which source it tested.

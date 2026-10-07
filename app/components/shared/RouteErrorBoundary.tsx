@@ -2,30 +2,10 @@ import { isRouteErrorResponse, Link, useRouteError } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Heading, Text } from "@/components/ui/typography";
-import { toUserMessage } from "@/lib/user-message";
+import { toResponseMessage, toUserMessage } from "@/lib/user-message";
 
 const FALLBACK_MESSAGE =
   "Something went wrong. Please try again or contact support if the problem persists.";
-
-function accessMessage(data: unknown, fallback: string): string {
-  let message = data;
-  if (typeof data === "object" && data !== null) {
-    message =
-      "message" in data && typeof data.message === "string"
-        ? data.message
-        : "error" in data
-          ? data.error
-          : undefined;
-  }
-  // Bare HTTP status names do not explain what the user can do next.
-  if (
-    typeof message === "string" &&
-    /^(unauthorized|forbidden)[.!]?$/i.test(message.trim())
-  ) {
-    return fallback;
-  }
-  return toUserMessage(message, fallback);
-}
 
 /** Route-module ErrorBoundary compatible with React Router 7 typegen. */
 export function RouteErrorBoundary() {
@@ -36,7 +16,7 @@ export function RouteErrorBoundary() {
     (error.status === 401 || error.status === 403)
   ) {
     const signIn = error.status === 401;
-    const message = accessMessage(
+    const message = toResponseMessage(
       error.data,
       signIn
         ? "Sign in to continue to this page."
@@ -84,7 +64,7 @@ export function RouteErrorBoundary() {
   }
 
   const message = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}`
+    ? toResponseMessage(error.data, `${error.status} ${error.statusText}`)
     : toUserMessage(error, FALLBACK_MESSAGE);
 
   return (

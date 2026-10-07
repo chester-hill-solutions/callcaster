@@ -16,6 +16,7 @@ import { useCallback } from "react";
 import Navbar from "@/components/layout/Navbar";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
+import { toResponseMessage } from "@/lib/user-message";
 import stylesheet from "@/tailwind.css?url";
 
 import type { RootLoaderData } from "./root.loader.server";
@@ -246,9 +247,10 @@ export function ErrorBoundary() {
         body={
           isNotFound
             ? "The page you're looking for doesn't exist or may have moved."
-            : typeof error.data === "string" && error.data
-              ? error.data
-              : "Something went wrong handling your request."
+            : toResponseMessage(
+                error.data,
+                "Something went wrong handling your request.",
+              )
         }
       />
     );
