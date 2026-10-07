@@ -42,6 +42,14 @@ describe("app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.
     expect(screen.queryByText("of 40")).not.toBeInTheDocument();
   });
 
+  test("message results name messages as the disposition unit", async () => {
+    const { DispositionBreakdown } =
+      await import("@/components/campaign/home/CampaignHomeScreen/ResultsScreen.Disposition");
+    render(<DispositionBreakdown unit="messages" results={null} totalsByDisposition={{}} totalOfAllResults={0} />);
+    expect(screen.getByRole("heading", { name: "Message Dispositions" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Attempt Dispositions" })).not.toBeInTheDocument();
+  });
+
   test("TotalMessages does not use queue contacts as a message denominator", async () => {
     const { TotalMessages } =
       await import("@/components/campaign/home/CampaignHomeScreen/ResultsScreen.TotalCalls");
@@ -89,6 +97,8 @@ describe("app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.
     );
     render(<RouterProvider router={router} />);
 
+    expect(screen.getByRole("heading", { name: "Attempt Dispositions" })).toBeInTheDocument();
+    expect(screen.getByText("2 (100.0%)")).toBeInTheDocument();
     expect(screen.getByText("Contacts Completed: 1")).toBeInTheDocument();
     expect(screen.getByText("of 1")).toBeInTheDocument();
     // The attempt count (2) is not the headline numerator.
