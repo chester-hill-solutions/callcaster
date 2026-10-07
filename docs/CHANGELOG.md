@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Load call-list upload history with the page and keep retries and live updates within the current call list ([#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288)).
+
 - Fixed: New toll-free SMS registrations use the consent method selected by the operator, and request a selection when it is missing ([#2447](https://github.com/chester-hill-solutions/callcaster/pull/2447), [#2145](https://github.com/chester-hill-solutions/callcaster/issues/2145)).
 
 - Fixed: Rental billing database checks keep one-time purchase timestamps within the test clock and verify that future debits stay outside the cash window ([PR #2448](https://github.com/chester-hill-solutions/callcaster/pull/2448), [#2429](https://github.com/chester-hill-solutions/callcaster/issues/2429)).

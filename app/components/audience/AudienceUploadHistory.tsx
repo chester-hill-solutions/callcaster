@@ -1,51 +1,62 @@
 import { formatDistanceToNow } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { useEffect } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/typography";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useAudienceUploads, type AudienceUpload } from "@/hooks/audience/useAudienceUploads";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
   workspaceId: string;
+  initialUploads: AudienceUpload[] | null;
+  error: string | null;
+  loading: boolean;
+  refresh: () => void;
 }
 
 export default function AudienceUploadHistory({
   audienceId,
   workspaceId,
-  }: AudienceUploadHistoryProps) {
-  const { uploads, loading, error, refresh } = useAudienceUploads({
-    workspaceId,
-    audienceId,
-  });
+  initialUploads,
+  error,
+  loading,
+  refresh,
+}: AudienceUploadHistoryProps) {
+  const uploads = useAudienceUploads({ workspaceId, audienceId, initialUploads });
+  const noticeId = `audience-upload-history:${workspaceId}:${audienceId}`;
 
-  if (loading) {
-    return (
-      <div className="p-8 text-center">
-        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-brand-primary" />
-        <p>Loading upload history...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 border border-destructive/30 rounded-md bg-destructive/10 text-destructive-text">
-        <p className="font-semibold">Error loading upload history</p>
-        <p className="text-sm">{error}</p>
-        <button
-          onClick={() => refresh()}
-          className="mt-2 text-sm underline hover:text-destructive-text/80"
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
+  /**
+   * @effect Keep the history failure and retry action in the root feedback host.
+   * @effect-deps error and loading choose feedback; noticeId owns its lifetime; refresh retries the route loader.
+   * @effect-side-effects dom: publish or dismiss persistent feedback after the root host subscribes.
+   * @effect-why-not-loader The history is already route data; the browser host renders feedback outside page flow.
+   */
+  useEffect(() => {
+    if (!error) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      toast.error("Error loading upload history", {
+        id: noticeId,
+        description: error,
+        duration: Infinity,
+        closeButton: false,
+        action: <Button type="button" variant="outline" size="sm" disabled={loading} onClick={refresh}>
+          {loading ? "Retrying..." : "Try again"}
+        </Button>,
+      });
+    });
+    return () => { active = false; toast.dismiss(noticeId); };
+  }, [error, loading, noticeId, refresh]);
 
   if (uploads.length === 0) {
     return (
-      <p className="py-8 text-center text-muted-foreground">
-        No upload history found for this audience
-      </p>
+      <div className="flex h-24 items-center justify-center text-center" aria-busy={loading}>
+        <Text as="p" variant="muted">
+          {loading ? "Loading upload history..." : error ? "Upload history is unavailable" : "No upload history found for this audience"}
+        </Text>
+      </div>
     );
   }
 
@@ -70,7 +81,7 @@ export default function AudienceUploadHistory({
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-border">
+    <div className="overflow-hidden rounded-md border border-border" aria-busy={loading}>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-border">
           <thead className="bg-muted">

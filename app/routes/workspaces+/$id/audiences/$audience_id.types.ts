@@ -1,3 +1,4 @@
+import type { AudienceUpload } from "@/lib/audience-upload.types";
 import type { Database } from "@/lib/db-types";
 import type { ContactListRow } from "@/lib/contacts-loader.types";
 
@@ -18,6 +19,8 @@ export type AudienceDetailLoaderData = {
     sortKey: string;
     sortDirection: "asc" | "desc";
   };
+  uploadHistory: AudienceUpload[] | null;
+  uploadHistoryError: string | null;
   latestUpload?: {
     id: number;
     status: string;

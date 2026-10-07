@@ -28,6 +28,8 @@ export default function AudienceView() {
     pagination,
     sorting,
     latestUpload,
+    uploadHistory,
+    uploadHistoryError,
   } = useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
   useOutletContext<{ }>();
@@ -154,6 +156,10 @@ export default function AudienceView() {
 
         <TabsContent value="history">
           <AudienceUploadHistory
+            initialUploads={uploadHistory}
+            error={uploadHistoryError}
+            loading={revalidator.state === "loading"}
+            refresh={revalidator.revalidate}
             audienceId={Number(audience_id)}
             workspaceId={workspace_id ?? ""}
           />
