@@ -161,7 +161,8 @@ suite("audience import durable source recovery (#2479)", () => {
     expect((await evidence()).contacts).toHaveLength(40);
     await worker.resetStaleClaims(); const claimed=await worker.claimNextJob("next-worker"); expect(claimed?.id).toBe(job);
     await expect(protocol.advanceAudienceImport(ctx(),run.id,prepared)).rejects.toThrow("claim lost");
-    await processor.processAudienceUpload({...args(csv(45,false),{...mapping,Phone:"ignore"}),claim:{jobId:job,attemptCount:claimed!.attempt_count}});
+    if (!claimed) throw new Error("Recovery claim missing");
+    await processor.processAudienceUpload({...args(csv(45,false),{...mapping,Phone:"ignore"}),claim:{jobId:job,attemptCount:claimed.attempt_count}});
     expect((await evidence()).contacts).toHaveLength(45);
   });
   test("claim expiry during a batch rolls back contacts, links, households and receipts",async()=>{
@@ -292,7 +293,9 @@ suite("audience import durable source recovery (#2479)", () => {
     server.listen(0,"127.0.0.1");await once(server,"listening");const address=server.address();
     if(!address||typeof address==="string")throw new Error("Fixture address missing");
     const applicationName=`import_kill_${randomUUID().replaceAll("-", "")}`;
-    const scoped=new URL(process.env.DATABASE_URL!);scoped.searchParams.set("application_name",applicationName);
+    const boundUrl = process.env.DATABASE_URL;
+    if (!boundUrl) throw new Error("Bound fixture database URL missing");
+    const scoped=new URL(boundUrl);scoped.searchParams.set("application_name",applicationName);
     function start(){return spawn(process.env.BUN_BINARY??"bun",["test/fixtures/audience-import-worker.ts",String(job)],{cwd:process.cwd(),env:{...process.env,
       DATABASE_URL:scoped.toString(),DATABASE_DIRECT_URL:scoped.toString(),S3_ENDPOINT:`http://127.0.0.1:${address.port}`,
       S3_REGION:"us-east-1",S3_BUCKET:"owned-import-fixture",S3_ACCESS_KEY_ID:"fixture",S3_SECRET_ACCESS_KEY:"fixture"},stdio:["ignore","pipe","pipe"]});}
