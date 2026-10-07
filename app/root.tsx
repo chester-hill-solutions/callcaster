@@ -124,8 +124,8 @@ export default function App() {
           <Toaster
             position="top-right"
             visibleToasts={3}
-            offset={{ top: "4rem" }}
-            mobileOffset={{ top: "4rem" }}
+            offset={{ top: "5rem" }}
+            mobileOffset={{ top: "5rem" }}
           />
           <ScrollRestoration />
           <Scripts />
