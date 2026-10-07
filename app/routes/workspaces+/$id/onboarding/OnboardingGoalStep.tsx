@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Form } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -9,12 +9,27 @@ import {
 import type {
   WorkspaceOnboardingChannel,
   WorkspaceOnboardingGoal,
+  WorkspaceMessagingOnboardingState,
+  WorkspaceOperatingCountry,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GOAL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
 type SmsNumberPath = "local" | "toll_free";
+
+export function readSmsNumberPath(onboarding: Pick<WorkspaceMessagingOnboardingState, "selectedGoal" | "selectedChannels">): SmsNumberPath | null {
+  if (onboarding.selectedGoal !== "sms_blast") return null;
+  if (onboarding.selectedChannels.includes("toll_free_bulk_sms")) return "toll_free";
+  if (onboarding.selectedChannels.includes("local_number")) return "local";
+  return null;
+}
+
+export function isGoalSelectionValid(goal: WorkspaceOnboardingGoal | null, country: WorkspaceOperatingCountry, path: SmsNumberPath | null): boolean {
+  return goal !== "sms_blast" ||
+    !channelsForOnboardingGoal(goal, country).includes("toll_free_bulk_sms") ||
+    path !== null;
+}
 
 export function OnboardingGoalStep({
   formId = "onboarding-channels-form",
@@ -28,12 +43,9 @@ export function OnboardingGoalStep({
   const [selectedGoal, setSelectedGoal] = useState<WorkspaceOnboardingGoal | null>(
     () => onboarding.selectedGoal,
   );
-  const [smsNumberPath, setSmsNumberPath] = useState<SmsNumberPath | null>(() => {
-    if (onboarding.selectedGoal !== "sms_blast") return null;
-    if (onboarding.selectedChannels.includes("toll_free_bulk_sms")) return "toll_free";
-    if (onboarding.selectedChannels.includes("local_number")) return "local";
-    return null;
-  });
+  const [smsNumberPath, setSmsNumberPath] = useState<SmsNumberPath | null>(
+    () => readSmsNumberPath(onboarding),
+  );
 
   const derivedChannels = useMemo<WorkspaceOnboardingChannel[]>(() => {
     if (!selectedGoal) return [];
@@ -51,18 +63,10 @@ export function OnboardingGoalStep({
     );
   }, [derivedChannels, offersTollFree, smsNumberPath]);
 
-  const selectionIsValid =
-    selectedGoal !== "sms_blast" || !offersTollFree || smsNumberPath !== null;
-
-  /**
-   * @effect Notify the wizard footer when the selected goal requires an SMS number path.
-   * @effect-deps onSelectionValidityChange, selectionIsValid
-   * @effect-side-effects parent state update only
-   * @effect-why-not-loader This is client-side form state shared with the wizard footer.
-   */
-  useEffect(() => {
-    onSelectionValidityChange?.(selectionIsValid);
-  }, [onSelectionValidityChange, selectionIsValid]);
+  const selectNumberPath = (path: SmsNumberPath) => {
+    setSmsNumberPath(path);
+    onSelectionValidityChange?.(isGoalSelectionValid(selectedGoal, onboarding.operatingCountry, path));
+  };
 
   return (
     <Section variant="flat">
@@ -102,6 +106,7 @@ export function OnboardingGoalStep({
                   onChange={() => {
                     setSelectedGoal(option.id);
                     setSmsNumberPath(null);
+                    onSelectionValidityChange?.(isGoalSelectionValid(option.id, onboarding.operatingCountry, null));
                   }}
                   disabled={isReadOnly}
                   className="mt-1"
@@ -135,7 +140,7 @@ export function OnboardingGoalStep({
                   size="sm"
                   variant="outline"
                   aria-pressed={smsNumberPath === "toll_free"}
-                  onClick={() => setSmsNumberPath("toll_free")}
+                  onClick={() => selectNumberPath("toll_free")}
                   disabled={isReadOnly}
                 >
                   Set Up Toll Free (BN required)
@@ -145,7 +150,7 @@ export function OnboardingGoalStep({
                   size="sm"
                   variant="outline"
                   aria-pressed={smsNumberPath === "local"}
-                  onClick={() => setSmsNumberPath("local")}
+                  onClick={() => selectNumberPath("local")}
                   disabled={isReadOnly}
                 >
                   Continue with Local Number

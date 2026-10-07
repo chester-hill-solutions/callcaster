@@ -15,7 +15,7 @@ import { OnboardingBusinessProgramStep } from "./OnboardingBusinessProgramStep";
 import { OnboardingChecklistLinkStep } from "./OnboardingChecklistLinkStep";
 import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
-import { OnboardingGoalStep } from "./OnboardingGoalStep";
+import { OnboardingGoalStep, isGoalSelectionValid as validateGoalSelection, readSmsNumberPath } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep, buildOnboardingLaunchItems } from "./OnboardingLaunchStep";
 import { readWizardStep } from "./wizard-step-resolution";
@@ -204,10 +204,7 @@ export function OnboardingWizard({
     "auto" | "force_show" | "force_hide"
   >("auto");
   const [isGoalSelectionValid, setIsGoalSelectionValid] = useState(() =>
-    onboarding.selectedGoal !== "sms_blast" ||
-    onboarding.operatingCountry === "US" ||
-    onboarding.selectedChannels.includes("toll_free_bulk_sms") ||
-    onboarding.selectedChannels.includes("local_number"),
+    validateGoalSelection(onboarding.selectedGoal, onboarding.operatingCountry, readSmsNumberPath(onboarding)),
   );
   const launchItems = buildOnboardingLaunchItems({
     onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
