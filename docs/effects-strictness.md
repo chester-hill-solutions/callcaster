@@ -58,7 +58,8 @@ legitimate effects.
 
 The guard compares the actual literal dependency array with dependency names in
 `@effect-deps`. Use a bracket list for an exact declaration; explanations can
-follow it. Prose remains supported: every actual dependency must be named, and
+follow it. Wrapped tag values continue until the next tag or comment end. Prose
+remains supported: every actual dependency must be named, and
 ordinary explanatory words are not extra dependencies. `none` means an empty
 array. Optional member access is normalized, so `entry?.isIntersecting` and
 `entry.isIntersecting` name the same dependency. A member's name must match;

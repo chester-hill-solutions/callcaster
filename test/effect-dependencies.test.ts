@@ -84,6 +84,47 @@ describe("effect dependency annotation CLI (#2067)", () => {
     expect(run().status).toBe(0);
   });
 
+  test.each([
+    ["[shown,\n * omitted]", "[shown, omitted]"],
+    ["shown starts the timer;\n * omitted stops it", "[shown, omitted]"],
+    [
+      "[fetcher.state,\n * fetcher.data] — wait for the result",
+      "[fetcher.state, fetcher.data]",
+    ],
+    [
+      "fetcher.state starts the request;\n * fetcher.data contains the result",
+      "[fetcher.state, fetcher.data]",
+    ],
+    ["[shown,\n * omitted,]\n * — both changes matter", "[shown, omitted]"],
+  ])("reads complete wrapped dependency tags %#", (doc, deps) => {
+    source(effect(doc, deps));
+    expect(run().status).toBe(0);
+  });
+
+  test("a wrapped list still rejects an omitted member", () => {
+    source(
+      effect(
+        "[fetcher.state,\n * fetcher.other]",
+        "[fetcher.state, fetcher.data]",
+      ),
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("undocumented dependency: fetcher.data");
+  });
+
+  test("the next tag cannot supply a missing dependency name", () => {
+    source(
+      effect("[shown]", "[shown, omitted]").replace(
+        "External view update.",
+        "omitted updates the view.",
+      ),
+    );
+    const result = run();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("undocumented dependency: omitted");
+  });
+
   test("an explicit list cannot claim an unused dependency", () => {
     source(effect("[shown, obsolete]", "[shown]"));
     const result = run();

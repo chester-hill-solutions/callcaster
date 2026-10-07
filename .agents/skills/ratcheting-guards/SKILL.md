@@ -10,6 +10,9 @@ runner before changing a guard. Keep one concern per issue and PR.
 
 - Scan syntax across the whole file when a rule concerns calls; comments and
   string samples are not executable occurrences.
+- Read complete structured annotations, including continuation lines through
+  the next tag or comment end. Test wrapped valid and invalid declarations
+  before measuring debt; parser truncation must not become a baseline exception.
 - Record occurrence counts per stable file/rule identity. A second violation
   must not disappear into a set containing the first.
 - Fail new or increased violations. Fail missing or reduced baseline entries

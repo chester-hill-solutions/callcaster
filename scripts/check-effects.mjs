@@ -73,14 +73,22 @@ function precedingBlock(src, offset) {
 
 function parseTags(block) {
   const tags = {};
+  let currentTag = "";
   for (const line of block.split("\n")) {
     const m = line.match(/@effect(-[a-z-]+)?\s+(.*)$/);
     if (m) {
       const key = m[1] ? `@effect${m[1]}` : "@effect";
       tags[key] = (m[2] || "").trim();
+      currentTag = key;
     } else if (/@effect(-[a-z-]+)?\s*$/.test(line)) {
       const k = line.match(/@effect(-[a-z-]+)?/)[0];
       tags[k] = "";
+      currentTag = k;
+    } else if (/^\s*\*?\s*@/.test(line)) {
+      currentTag = "";
+    } else if (currentTag === "@effect-deps") {
+      const continuation = line.replace(/^\s*\*?\s?/, "").trim();
+      if (continuation) tags[currentTag] += ` ${continuation}`;
     }
   }
   return tags;
