@@ -15,7 +15,7 @@
  * workspaceId/campaignId/etc. that's already in scope in the auth or
  * loader args. This gate freezes the current list of route-relative
  * redirects in `scripts/baselines/relative-redirects.json` and fails CI
- * on any NEW one. Migrating an existing entry to an absolute URL and
+ * on any new one or stale baseline entry. Migrating an existing entry to an absolute URL and
  * running `npm run tools:relative-redirects:baseline` ratchets the list
  * DOWN.
  *
@@ -25,8 +25,10 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
-const ROOT = process.cwd();
+const rootOption = process.argv.find((arg) => arg.startsWith("--root="));
+const ROOT = rootOption ? path.resolve(rootOption.slice(7)) : process.cwd();
 const SCAN_ROOT = path.join(ROOT, "app", "routes");
 const BASELINE_PATH = path.join(
   ROOT,
@@ -40,13 +42,6 @@ const BASELINE_PATH = path.join(
 // `redirect(...)` from `react-router` lives in the `.action.server.ts`
 // and `.loader.server.ts` files.
 const FILE_MATCH = /\.(action|loader)\.server\.ts$/;
-
-// Match `redirect("…")` / `redirect('…')` / `redirect(\`…\`)` where the
-// first argument starts with `.` (relative path). Excludes calls where
-// the first argument is a variable — we can't statically decide those
-// and the false-positive rate is low enough that a runtime bug would
-// still show up in e2e.
-const REDIRECT_RE = /\bredirect\s*\(\s*(?:throw\s+)?["'`](\.[^"'`]*)["'`]/;
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -65,16 +60,42 @@ function collect() {
   const hits = [];
   for (const file of walk(SCAN_ROOT)) {
     const rel = path.relative(ROOT, file);
-    const lines = fs.readFileSync(file, "utf8").split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trimStart();
-      if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
-      const match = line.match(REDIRECT_RE);
-      if (match) {
-        hits.push({ file: rel, line: i + 1, target: match[1] });
+    const source = fs.readFileSync(file, "utf8");
+    const parsed = ts.createSourceFile(
+      file,
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    function visit(node) {
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        const name = ts.isIdentifier(callee)
+          ? callee.text
+          : ts.isPropertyAccessExpression(callee)
+            ? callee.name.text
+            : undefined;
+        const arg = node.arguments[0];
+        const target =
+          arg &&
+          (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg))
+            ? arg.text
+            : arg && ts.isTemplateExpression(arg)
+              ? arg.getText(parsed).slice(1, -1)
+              : undefined;
+        if (name === "redirect" && target?.startsWith(".")) {
+          hits.push({
+            file: rel,
+            line:
+              parsed.getLineAndCharacterOfPosition(callee.getStart(parsed))
+                .line + 1,
+            target,
+          });
+        }
       }
+      ts.forEachChild(node, visit);
     }
+    visit(parsed);
   }
   hits.sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file.localeCompare(b.file),
@@ -110,7 +131,7 @@ const regressions = current.filter(
 
 if (regressions.length) {
   console.error(
-    "Relative-redirect gate FAILED — new route-relative `redirect(\"…\")` call(s):",
+    'Relative-redirect gate FAILED — new route-relative `redirect("…")` call(s):',
   );
   console.error("");
   for (const r of regressions) {
@@ -122,8 +143,8 @@ if (regressions.length) {
       "appended), so refactors that move a file up or down the URL tree\n" +
       "silently reroute it. Prefer an absolute URL built from the auth\n" +
       "context (workspaceId, campaignId, etc.):\n" +
-      '\n' +
-      '  return redirect(`/workspaces/${workspaceId}/audios?uploaded=1`, { headers });\n' +
+      "\n" +
+      "  return redirect(`/workspaces/${workspaceId}/audios?uploaded=1`, { headers });\n" +
       "\n" +
       "See #1396 / #1413 for the flow this gate protects. To ratchet DOWN\n" +
       "after removing an existing entry, run `npm run tools:relative-redirects:baseline`.",
@@ -135,10 +156,14 @@ if (regressions.length) {
 // moved or the redirect was fixed). Prompt the operator to ratchet down.
 const stale = [...allowed].filter((k) => !seen.has(k));
 if (stale.length) {
-  console.log(
-    `Relative-redirect gate passed: ${current.length} allowed (${stale.length} baseline entrie(s) no longer present — run \`npm run tools:relative-redirects:baseline\` to ratchet).`,
+  console.error(
+    `Relative-redirect gate FAILED: ${stale.length} stale baseline entries.`,
   );
-  process.exit(0);
+  for (const key of stale) console.error(`  ${key}`);
+  console.error(
+    "Run `npm run tools:relative-redirects:baseline` to remove repaired entries; the baseline may only shrink.",
+  );
+  process.exit(1);
 }
 
 console.log(

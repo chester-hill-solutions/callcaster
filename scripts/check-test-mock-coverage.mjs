@@ -13,26 +13,28 @@
  * Factories that spread `await importOriginal()` stay correct by construction.
  *
  * Ratchet: existing replacing factories are baselined in
- * scripts/baselines/test-mock-replace.txt (file::module lines). This check
- * fails only on NEW offenders, so the pattern can be adopted gradually but
- * drift never grows.
+ * scripts/baselines/test-mock-replace.txt (file::module#count lines). This check
+ * fails on new occurrences and stale baseline entries, so repaired debt
+ * cannot silently return. Legacy keys without a count mean one occurrence.
  *
  * Usage:
  *   node scripts/check-test-mock-coverage.mjs            # gate
  *   node scripts/check-test-mock-coverage.mjs --baseline # rewrite baseline
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import ts from "typescript";
 
-const ROOT = join(import.meta.dirname, "..");
+const rootOption = process.argv.find((arg) => arg.startsWith("--root="));
+const ROOT = rootOption
+  ? resolve(rootOption.slice(7))
+  : join(import.meta.dirname, "..");
 const TEST_DIR = join(ROOT, "test");
-const BASELINE = join(import.meta.dirname, "baselines", "test-mock-replace.txt");
+const BASELINE = join(ROOT, "scripts", "baselines", "test-mock-replace.txt");
 
 // Only guarded for shared server modules: client modules and one-off helpers
 // rarely gain exports consumed by route code.
 const GUARDED_PATTERN = /^@\/(lib|server)\/.+\.server$/;
-
-const VI_MOCK_RE = /vi\.mock\(\s*(["'])(.+?)\1\s*,\s*(?:async\s*)?\(([^)]*)\)\s*=>/g;
 
 function listTestFiles(dir) {
   const out = [];
@@ -45,56 +47,125 @@ function listTestFiles(dir) {
 }
 
 /** vi.mock factories whose parameter list does not bind importOriginal. */
-function findReplacingMocks(source) {
+function findReplacingMocks(source, fileName) {
+  const parsed = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+  );
   const offenders = [];
-  for (const match of source.matchAll(VI_MOCK_RE)) {
-    const modulePath = match[2];
-    const params = match[3];
-    if (!GUARDED_PATTERN.test(modulePath)) continue;
-    if (/\bimportOriginal\b/.test(params)) continue;
-    offenders.push(modulePath);
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === "vi" &&
+      node.expression.name.text === "mock"
+    ) {
+      const [module, factory] = node.arguments;
+      if (
+        module &&
+        ts.isStringLiteral(module) &&
+        GUARDED_PATTERN.test(module.text) &&
+        factory &&
+        ts.isArrowFunction(factory) &&
+        !factory.parameters.some((param) =>
+          /\bimportOriginal\b/.test(param.name.getText(parsed)),
+        )
+      ) {
+        offenders.push(module.text);
+      }
+    }
+    ts.forEachChild(node, visit);
   }
+  visit(parsed);
   return offenders;
 }
 
 function readBaseline() {
-  try {
-    return readFileSync(BASELINE, "utf8")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
+  const counts = new Map();
+  if (!existsSync(BASELINE)) return counts;
+  for (const line of readFileSync(BASELINE, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)) {
+    const match = /^(.*)#([1-9]\d*)$/.exec(line);
+    const key = match ? match[1] : line;
+    const count = match ? Number(match[2]) : 1;
+    const module = key.split("::")[1];
+    if (
+      !module ||
+      !GUARDED_PATTERN.test(module) ||
+      counts.has(key) ||
+      !Number.isSafeInteger(count)
+    ) {
+      throw new Error(
+        `Invalid or duplicate mock baseline entry: ${line}. Run npm run tools:test-mocks:baseline.`,
+      );
+    }
+    counts.set(key, count);
   }
+  return counts;
 }
 
 function main() {
-  const current = new Map(); // "file::module" -> true
+  const current = new Map(); // "file::module" -> occurrence count
   for (const file of listTestFiles(TEST_DIR)) {
     const rel = relative(ROOT, file);
-    for (const modulePath of findReplacingMocks(readFileSync(file, "utf8"))) {
-      current.set(`${rel}::${modulePath}`, true);
+    for (const modulePath of findReplacingMocks(
+      readFileSync(file, "utf8"),
+      file,
+    )) {
+      const key = `${rel}::${modulePath}`;
+      current.set(key, (current.get(key) ?? 0) + 1);
     }
   }
 
+  const totalFactories = [...current.values()].reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+
   if (process.argv.includes("--baseline")) {
-    writeFileSync(BASELINE, `${[...current.keys()].sort().join("\n")}\n`, "utf8");
+    writeFileSync(
+      BASELINE,
+      `${[...current]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, count]) => `${key}#${count}`)
+        .join("\n")}\n`,
+      "utf8",
+    );
     console.log(
-      `[check-test-mocks] baseline rewritten: ${current.size} replacing factories`,
+      `[check-test-mocks] baseline rewritten: ${totalFactories} replacing factories across ${current.size} file/module pairs`,
     );
     return;
   }
 
-  const baselined = new Set(readBaseline());
-  const fresh = [...current.keys()].filter((key) => !baselined.has(key)).sort();
+  const baselined = readBaseline();
+  const fresh = [...current].filter(
+    ([key, count]) => count > (baselined.get(key) ?? 0),
+  );
+  const stale = [...baselined].filter(
+    ([key, count]) => count > (current.get(key) ?? 0),
+  );
+  if (stale.length) {
+    console.error(`check-test-mocks: ${stale.length} stale baseline entries.`);
+    for (const [key, count] of stale)
+      console.error(`  ${key}: ${count} -> ${current.get(key) ?? 0}`);
+    console.error(
+      "Run `npm run tools:test-mocks:baseline` to remove repaired occurrences; the baseline may only shrink.",
+    );
+  }
 
-  if (fresh.length === 0) {
+  if (fresh.length === 0 && stale.length === 0) {
     console.log(
-      `check-test-mocks: ${current.size} replacing factories, all baselined — no new drift.`,
+      `check-test-mocks: ${totalFactories} replacing factories across ${current.size} file/module pairs, all baselined — no new drift.`,
     );
     return;
   }
 
+  if (fresh.length === 0) process.exit(1);
   console.error(
     [
       `check-test-mocks: ${fresh.length} new replacing vi.mock factories for shared server modules.`,
@@ -106,7 +177,9 @@ function main() {
       "}));",
       "",
       "New offenders:",
-      ...fresh.map((key) => `  ${key}`),
+      ...fresh.map(
+        ([key, count]) => `  ${key}: ${baselined.get(key) ?? 0} -> ${count}`,
+      ),
       "",
       "If the replacement is genuinely complete and intended to stay frozen,",
       `add the entries to ${relative(ROOT, BASELINE)} (ratchet baseline).`,
