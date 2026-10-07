@@ -2,12 +2,16 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
-import { buildWorkspaceLaunchChecklist } from "@/lib/workspace-launch-checklist";
+import { buildWorkspaceLaunchChecklist, type LaunchChecklistItem } from "@/lib/workspace-launch-checklist";
 import {
   BUSINESS_IDENTITY_REQUIRED_FIELDS,
   findMissingBusinessProfileFields,
 } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingStepProps } from "./types";
+
+type OnboardingLaunchItem = Omit<LaunchChecklistItem, "id" | "due"> & {
+  id: LaunchChecklistItem["id"] | "business_identity";
+};
 
 type OnboardingLaunchStepProps = Pick<
   OnboardingStepProps,
@@ -17,13 +21,13 @@ type OnboardingLaunchStepProps = Pick<
   campaignCount: number;
   scriptCount: number;
   creditsBalance: number;
-  items?: ReturnType<typeof buildWorkspaceLaunchChecklist>;
+  items?: OnboardingLaunchItem[];
 };
 
 export function buildOnboardingLaunchItems({
   onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
   scriptCount, creditsBalance,
-}: Omit<OnboardingLaunchStepProps, "readiness" | "items">) {
+}: Omit<OnboardingLaunchStepProps, "readiness" | "items">): OnboardingLaunchItem[] {
   const checklist = buildWorkspaceLaunchChecklist({
     workspaceId,
     onboarding,
@@ -36,7 +40,7 @@ export function buildOnboardingLaunchItems({
     onboarding.selectedGoal !== "rent_number" ||
     item.id === "goal" || item.id === "phone_number" || item.id === "credits"
   ));
-  const items = [
+  const items: OnboardingLaunchItem[] = [
     ...checklist.filter((item) => item.id === "goal"),
     {
       id: "business_identity",
