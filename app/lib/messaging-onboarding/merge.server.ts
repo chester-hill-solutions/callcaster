@@ -1,26 +1,44 @@
-import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import type {
+  WorkspaceMessagingOnboardingState,
+  WorkspaceMessagingOnboardingUpdates,
+} from "@/lib/types";
+import { a2pBusinessProfileChanged } from "@/lib/a2p-messaging-profile.server";
 import {
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
   normalizeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding/normalize.server";
 
-export function mergeUniqueStrings(values: Array<string | null | undefined>): string[] {
+export function mergeUniqueStrings(
+  values: Array<string | null | undefined>,
+): string[] {
   return Array.from(
-    new Set(values.filter((value): value is string => typeof value === "string" && value.length > 0)),
+    new Set(
+      values.filter(
+        (value): value is string =>
+          typeof value === "string" && value.length > 0,
+      ),
+    ),
   );
 }
 
 export function mergeWorkspaceMessagingOnboardingState(
   currentState: WorkspaceMessagingOnboardingState,
-  updates: Partial<WorkspaceMessagingOnboardingState>,
+  updates: WorkspaceMessagingOnboardingUpdates,
 ): WorkspaceMessagingOnboardingState {
+  const businessProfile = {
+    ...currentState.businessProfile,
+    ...(updates.businessProfile ?? {}),
+  };
+  const a2p10dlc = { ...currentState.a2p10dlc, ...(updates.a2p10dlc ?? {}) };
+  if (
+    a2pBusinessProfileChanged(currentState.businessProfile, businessProfile)
+  ) {
+    a2p10dlc.messagingProfileStatus = "not_started";
+  }
   return normalizeWorkspaceMessagingOnboardingState({
     ...currentState,
     ...updates,
-    businessProfile: {
-      ...currentState.businessProfile,
-      ...(updates.businessProfile ?? {}),
-    },
+    businessProfile,
     messagingService: {
       ...currentState.messagingService,
       ...(updates.messagingService ?? {}),
@@ -61,10 +79,7 @@ export function mergeWorkspaceMessagingOnboardingState(
         ...(updates.emergencyVoice?.address ?? {}),
       },
     },
-    a2p10dlc: {
-      ...currentState.a2p10dlc,
-      ...(updates.a2p10dlc ?? {}),
-    },
+    a2p10dlc,
     rcs: {
       ...currentState.rcs,
       ...(updates.rcs ?? {}),

@@ -1,3 +1,4 @@
+import type { A2pCompanyType, A2pStockExchange } from "@/lib/a2p-messaging-profile";
 import type { Database, Tables } from "@/lib/db-types";
 import type { WorkspaceTwilioSyncSnapshot } from "@/lib/workspace-twilio-sync";
 export type { WorkspaceTwilioSyncSnapshot, WorkspaceTwilioSyncStatus } from "@/lib/workspace-twilio-sync";
@@ -353,6 +354,10 @@ export interface WorkspaceMessagingBusinessProfile {
   businessRegistrationNumber: string;
   ageGatedContent: boolean;
   // --- US A2P 10DLC Trust Hub brand inputs: ---
+  a2pCompanyType: A2pCompanyType | null;
+  a2pStockExchange: A2pStockExchange | null;
+  a2pStockTicker: string;
+  a2pBrandContactEmail: string;
   ein: string;
   industry: string;
   authorizedRepName: string;
@@ -417,6 +422,8 @@ export interface WorkspaceA2POnboardingState {
   brandSid: string | null;
   campaignSid: string | null;
   trustProductSid: string | null;
+  messagingProfileEndUserSid: string | null;
+  messagingProfileStatus: "not_started" | "ready" | "action_needed";
   customerProfileBundleSid: string | null;
   brandType: string | null;
   tcrId: string | null;
@@ -424,6 +431,13 @@ export interface WorkspaceA2POnboardingState {
   lastSubmittedAt: string | null;
   lastSyncedAt: string | null;
 }
+
+export type WorkspaceMessagingOnboardingUpdates = Omit<
+  Partial<WorkspaceMessagingOnboardingState>,
+  "a2p10dlc"
+> & {
+  a2p10dlc?: Partial<WorkspaceA2POnboardingState>;
+};
 
 export interface WorkspaceRcsOnboardingState {
   status: WorkspaceOnboardingStatus;

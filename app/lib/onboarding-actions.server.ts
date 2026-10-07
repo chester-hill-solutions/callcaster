@@ -2,6 +2,10 @@ import type { CallerIdValidationRequest } from "@/lib/caller-id-verification.ser
 import { isWorkspaceOnboardingGoal } from "@/lib/messaging-onboarding/goals";
 import { EMPTY_BUSINESS_PROFILE } from "@/lib/messaging-onboarding/business-profile.server";
 import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
+import {
+  parseA2pCompanyType,
+  parseA2pStockExchange,
+} from "@/lib/a2p-messaging-profile";
 import type {
   WorkspaceMessagingBusinessProfile,
   WorkspaceOnboardingChannel,
@@ -35,15 +39,23 @@ export function asWorkspaceOnboardingStatus(
   }
 }
 
-export function readSelectedChannels(formData: FormData): WorkspaceOnboardingChannel[] {
+export function readSelectedChannels(
+  formData: FormData,
+): WorkspaceOnboardingChannel[] {
   const values = formData.getAll("selectedChannels").map(String);
   return values.filter((value): value is WorkspaceOnboardingChannel =>
-    WORKSPACE_ONBOARDING_CHANNEL_VALUES.includes(value as WorkspaceOnboardingChannel),
+    WORKSPACE_ONBOARDING_CHANNEL_VALUES.includes(
+      value as WorkspaceOnboardingChannel,
+    ),
   );
 }
 
-export function readSelectedGoal(formData: FormData): WorkspaceOnboardingGoal | null {
-  const raw = String(formData.get("selectedGoal") ?? formData.get("selected_goal") ?? "");
+export function readSelectedGoal(
+  formData: FormData,
+): WorkspaceOnboardingGoal | null {
+  const raw = String(
+    formData.get("selectedGoal") ?? formData.get("selected_goal") ?? "",
+  );
   return isWorkspaceOnboardingGoal(raw) ? raw : null;
 }
 
@@ -102,12 +114,24 @@ export function readChannelInlineBusinessFields(
   current: WorkspaceMessagingBusinessProfile,
 ): WorkspaceMessagingBusinessProfile {
   const next: WorkspaceMessagingBusinessProfile = { ...current };
+  if (formData.has("a2pCompanyType")) {
+    next.a2pCompanyType = parseA2pCompanyType(formData.get("a2pCompanyType"));
+  }
+  if (formData.has("a2pStockExchange")) {
+    next.a2pStockExchange = parseA2pStockExchange(
+      formData.get("a2pStockExchange"),
+    );
+  }
   if (formData.has("tollFreeOptInType")) {
-    next.tollFreeOptInType = parseTollFreeOptInType(formData.get("tollFreeOptInType"));
+    next.tollFreeOptInType = parseTollFreeOptInType(
+      formData.get("tollFreeOptInType"),
+    );
   }
   const stringFields: Array<keyof WorkspaceMessagingBusinessProfile> = [
     "doingBusinessAs",
     "businessRegistrationNumber",
+    "a2pStockTicker",
+    "a2pBrandContactEmail",
     "ein",
     "industry",
     "authorizedRepName",
@@ -127,7 +151,9 @@ export function readChannelInlineBusinessFields(
   }
   // The SMS identity fields use a separate form name for their TFV samples.
   if (formData.has("channelSampleMessages")) {
-    next.sampleMessages = parseSampleMessages(formData.get("channelSampleMessages"));
+    next.sampleMessages = parseSampleMessages(
+      formData.get("channelSampleMessages"),
+    );
   }
   return next;
 }
@@ -161,6 +187,8 @@ export const ONBOARDING_ACTION_NAMES = new Set<OnboardingActionName>([
   "verify_caller_id",
 ]);
 
-export function isOnboardingActionName(value: string): value is OnboardingActionName {
+export function isOnboardingActionName(
+  value: string,
+): value is OnboardingActionName {
   return ONBOARDING_ACTION_NAMES.has(value as OnboardingActionName);
 }

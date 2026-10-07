@@ -2,9 +2,7 @@ import {
   getUserRole,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import {
-  isWizardOnboardingStepId,
-} from "@/lib/messaging-onboarding.server";
+import { isWizardOnboardingStepId } from "@/lib/messaging-onboarding.server";
 import {
   asWorkspaceOnboardingStatus,
   isOnboardingActionName,
@@ -22,6 +20,7 @@ import {
 } from "@/lib/platform-onboarding-helpers.server";
 import { ONBOARDING_ACTION_HANDLERS } from "@/lib/platform-onboarding-handlers.server";
 import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
+import { validatePostedA2pProfileFields } from "@/lib/a2p-messaging-profile.server";
 
 export type {
   OnboardingActionContext,
@@ -90,7 +89,11 @@ export async function patchWorkspaceOnboarding(
   updates: {
     current_step?: string;
     selected_channels?: Array<
-      "a2p10dlc" | "rcs" | "voice_compliance" | "toll_free_bulk_sms" | "local_number"
+      | "a2p10dlc"
+      | "rcs"
+      | "voice_compliance"
+      | "toll_free_bulk_sms"
+      | "local_number"
     >;
     status?: ReturnType<typeof asWorkspaceOnboardingStatus>;
   },
@@ -113,7 +116,9 @@ export async function patchWorkspaceOnboarding(
   }
 
   if (updates.selected_channels !== undefined) {
-    persistUpdates.selectedChannels = stripDisabledRcsChannel(updates.selected_channels);
+    persistUpdates.selectedChannels = stripDisabledRcsChannel(
+      updates.selected_channels,
+    );
   }
 
   if (updates.status !== undefined) {
@@ -161,15 +166,25 @@ export async function runOnboardingAction(
 
   if (actionName === "save_business_profile" || actionName === "save_channels") {
     const form = resolveOnboardingInput(input);
+    const profileError = validatePostedA2pProfileFields(form);
+    if (profileError) return { ok: false, status: 400, error: profileError };
     const selection = form.get("tollFreeOptInType");
-    if (form.has("tollFreeOptInType") && selection !== "" && !parseTollFreeOptInType(selection)) {
-      return { ok: false, status: 400, error: "Choose a valid toll-free SMS consent method." };
+    if (
+      form.has("tollFreeOptInType") &&
+      selection !== "" &&
+      !parseTollFreeOptInType(selection)
+    ) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Choose a valid toll-free SMS consent method.",
+      };
     }
   }
 
   const ctx: OnboardingActionContext = {
     input,
-    workspaceId, 
+    workspaceId,
     user: { id: userId },
     actorUserId: userId,
   };

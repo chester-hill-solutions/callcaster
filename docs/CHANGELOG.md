@@ -160,6 +160,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Prepare and validate the A2P Messaging Profile before brand registration. Collect company and public-company data, retain provider IDs for retry, and keep failed prerequisites blocked through polling and SMS readiness. ([#2450](https://github.com/chester-hill-solutions/callcaster/pull/2450), [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282))
+
 - Compare each environment’s ledger and schema with its deployed code branch ([#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064), [PR #2401](https://github.com/chester-hill-solutions/callcaster/pull/2401)).
 
 - Retain the original audience CSV before its import starts, so a storage failure does not queue an import without its source file ([#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350), [PR #2351](https://github.com/chester-hill-solutions/callcaster/pull/2351)).

@@ -30,6 +30,10 @@ export function onboardingFixture(
       doingBusinessAs: "",
       businessRegistrationNumber: "",
       ageGatedContent: false,
+      a2pCompanyType: null,
+      a2pStockExchange: null,
+      a2pStockTicker: "",
+      a2pBrandContactEmail: "",
       ein: "",
       industry: "",
       authorizedRepName: "",
@@ -88,6 +92,8 @@ export function onboardingFixture(
       brandSid: null,
       campaignSid: null,
       trustProductSid: null,
+      messagingProfileEndUserSid: null,
+      messagingProfileStatus: "not_started",
       customerProfileBundleSid: null,
       brandType: null,
       tcrId: null,
@@ -128,8 +134,9 @@ export function onboardingFixture(
   };
 }
 
-
-export function onboardingNumberFixture(overrides: Partial<Tables<"workspace_number">> = {}): Tables<"workspace_number"> {
+export function onboardingNumberFixture(
+  overrides: Partial<Tables<"workspace_number">> = {},
+): Tables<"workspace_number"> {
   return {
     id: 1, workspace: "w1", type: "rented", phone_number: "+14165550100",
     friendly_name: "Team", capabilities: {}, created_at: "2026-09-09",

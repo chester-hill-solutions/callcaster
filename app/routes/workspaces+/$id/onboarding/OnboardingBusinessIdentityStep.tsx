@@ -1,12 +1,28 @@
+import { useState } from "react";
 import { Form } from "react-router";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { goalNeedsSmsCompliance } from "@/lib/messaging-onboarding/goals";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
-import { TOLL_FREE_OPT_IN_TYPES, type TollFreeOptInType } from "@/lib/toll-free-opt-in";
+import {
+  TOLL_FREE_OPT_IN_TYPES,
+  type TollFreeOptInType,
+} from "@/lib/toll-free-opt-in";
+import {
+  A2P_COMPANY_TYPES,
+  A2P_STOCK_EXCHANGES,
+  parseA2pCompanyType,
+  type A2pCompanyType,
+} from "@/lib/a2p-messaging-profile";
 import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 import { useRequiredBusinessProfileFields } from "./useRequiredBusinessProfileFields";
@@ -32,12 +48,15 @@ const TOLL_FREE_CONSENT_LABELS: Record<TollFreeOptInType, string> = {
   IMPORT_PLEASE_REPLACE: "Imported consent (replace)",
 };
 
-function TollFreeVerificationFields({ profile, isReadOnly }: ProfileFieldsProps) {
+function TollFreeVerificationFields({
+  profile,
+  isReadOnly,
+}: ProfileFieldsProps) {
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-medium">Toll-free verification details</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Toll-free setup uses your CRA business number (BN). Carriers use it to
           approve higher-volume texting on a toll-free number.
         </p>
@@ -106,7 +125,7 @@ function TollFreeVerificationFields({ profile, isReadOnly }: ProfileFieldsProps)
             value="true"
             defaultChecked={profile.ageGatedContent}
             disabled={isReadOnly}
-            className="size-4 rounded border border-input"
+            className="border-input size-4 rounded border"
           />
         </FormFieldControl>
       </FormField>
@@ -127,16 +146,115 @@ function TollFreeVerificationFields({ profile, isReadOnly }: ProfileFieldsProps)
   );
 }
 
+const A2P_COMPANY_LABELS: Record<A2pCompanyType, string> = {
+  government: "Government",
+  "non-profit": "Non-profit",
+  private: "Private",
+  public: "Publicly traded",
+};
+
 function A2pRegistrationFields({ profile, isReadOnly }: ProfileFieldsProps) {
+  const [companyType, setCompanyType] = useState<A2pCompanyType | "">(
+    profile.a2pCompanyType ?? "",
+  );
+  const isPublic = companyType === "public";
   return (
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-medium">US brand registration details</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Needed for application-to-person texting on US local numbers.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
+        <FormField
+          htmlFor="a2pCompanyType"
+          label="Company type"
+          required
+          description="Choose the company classification for US brand registration."
+        >
+          <Select
+            name="a2pCompanyType"
+            value={companyType}
+            onValueChange={(value) =>
+              setCompanyType(parseA2pCompanyType(value) ?? "")
+            }
+            disabled={isReadOnly}
+            required
+          >
+            <FormFieldControl>
+              <SelectTrigger id="a2pCompanyType">
+                <SelectValue placeholder="Choose a company type" />
+              </SelectTrigger>
+            </FormFieldControl>
+            <SelectContent>
+              {A2P_COMPANY_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {A2P_COMPANY_LABELS[type]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+        <FormField
+          htmlFor="a2pStockExchange"
+          label="Stock exchange"
+          required={isPublic}
+          description="Required for publicly traded companies."
+        >
+          <Select
+            name="a2pStockExchange"
+            defaultValue={profile.a2pStockExchange ?? undefined}
+            disabled={isReadOnly || !isPublic}
+            required={isPublic}
+          >
+            <FormFieldControl>
+              <SelectTrigger id="a2pStockExchange">
+                <SelectValue placeholder="Choose a stock exchange" />
+              </SelectTrigger>
+            </FormFieldControl>
+            <SelectContent>
+              {A2P_STOCK_EXCHANGES.map((exchange) => (
+                <SelectItem key={exchange} value={exchange}>
+                  {exchange}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+        <FormField
+          htmlFor="a2pStockTicker"
+          label="Stock ticker"
+          required={isPublic}
+          description="Required for publicly traded companies."
+        >
+          <FormFieldControl>
+            <Input
+              id="a2pStockTicker"
+              name="a2pStockTicker"
+              defaultValue={profile.a2pStockTicker}
+              disabled={isReadOnly || !isPublic}
+              required={isPublic}
+            />
+          </FormFieldControl>
+        </FormField>
+        <FormField
+          htmlFor="a2pBrandContactEmail"
+          label="Brand representative organization email"
+          required={isPublic}
+          description="Public company representatives must complete the carrier email verification. Use an individual organization email, not a personal or distribution address."
+        >
+          <FormFieldControl>
+            <Input
+              id="a2pBrandContactEmail"
+              name="a2pBrandContactEmail"
+              type="email"
+              defaultValue={profile.a2pBrandContactEmail}
+              disabled={isReadOnly || !isPublic}
+              required={isPublic}
+            />
+          </FormFieldControl>
+        </FormField>
         <FormField htmlFor="ein" label="EIN (US tax ID)">
           <FormFieldControl>
             <Input
@@ -226,6 +344,7 @@ export function OnboardingBusinessIdentityStep({
   formId = "onboarding-business-identity-form",
   onboarding,
   isReadOnly,
+  pending,
 }: Props) {
   const { requiredFieldProps, requiredFieldError } =
     useRequiredBusinessProfileFields();
@@ -279,7 +398,9 @@ export function OnboardingBusinessIdentityStep({
                 ? "Required — carriers ask for it during SMS registration."
                 : "Optional. Only required later if you switch to a goal that sends SMS."
             }
-            error={requiredFieldError("websiteUrl", { required: websiteRequired })}
+            error={requiredFieldError("websiteUrl", {
+              required: websiteRequired,
+            })}
           >
             <Input
               id="websiteUrl"
@@ -299,7 +420,7 @@ export function OnboardingBusinessIdentityStep({
               name="operatingCountry"
               defaultValue={onboarding.operatingCountry}
               disabled={isReadOnly}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {OPERATING_COUNTRY_OPTIONS.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -318,7 +439,11 @@ export function OnboardingBusinessIdentityStep({
         {showA2pFields ? (
           <A2pRegistrationFields
             profile={onboarding.businessProfile}
-            isReadOnly={isReadOnly}
+            isReadOnly={
+              isReadOnly ||
+              pending.isSavingBusinessProfile ||
+              pending.isProvisioningA2P
+            }
           />
         ) : null}
       </Form>
