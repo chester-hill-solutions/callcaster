@@ -216,6 +216,21 @@ suite(
       });
       await pool`update transaction_history set created_at='2026-10-06T01:00:00.000Z' where workspace=${ws} and idempotency_key=${key}`;
     }
+    async function purchaseDebit(
+      n: Awaited<ReturnType<typeof number>>,
+      createdAt = now,
+    ) {
+      const { pool, db, insertTransactionHistoryIdempotent } = await services();
+      const key = `number_rent_purchase:${workspace}:${n.sid}`;
+      await insertTransactionHistoryIdempotent(db, {
+        workspaceId: workspace,
+        type: "DEBIT",
+        amount: -100,
+        note: "Rented number",
+        idempotencyKey: key,
+      });
+      await pool`update transaction_history set created_at=${createdAt.toISOString()} where workspace=${workspace} and idempotency_key=${key}`;
+    }
     async function reconcile() {
       const s = await services();
       const result = await s.reconcileWorkspaceBilling({
@@ -328,14 +343,7 @@ suite(
       const n = await number("2026-09-12T12:00:00Z");
       fixture.units = 1;
       fixture.setups = 1;
-      const { db, insertTransactionHistoryIdempotent } = await services();
-      await insertTransactionHistoryIdempotent(db, {
-        workspaceId: workspace,
-        type: "DEBIT",
-        amount: -100,
-        note: "Rented number",
-        idempotencyKey: `number_rent_purchase:${workspace}:${n.sid}`,
-      });
+      await purchaseDebit(n);
       const r = await reconcile();
       expect(r.report.categories.numbers).toMatchObject({
         variance: 0,
@@ -343,6 +351,21 @@ suite(
         ledgerEvents: 0,
       });
       expect(r.report.ledgerDebitCredits).toBe(100);
+      expect(r.credits).toBe(9900);
+    });
+    test("a prepaid debit after the fixed cash window is excluded without undoing its credit write", async () => {
+      const n = await number("2026-09-12T12:00:00Z");
+      fixture.units = 1;
+      fixture.setups = 1;
+      await purchaseDebit(n, new Date("2026-10-07T12:00:00Z"));
+      const r = await reconcile();
+      expect(r.report.categories.numbers).toMatchObject({
+        variance: 0,
+        ledgerCredits: 0,
+        ledgerEvents: 0,
+      });
+      expect(r.report.ledgerDebitCredits).toBe(0);
+      expect(r.credits).toBe(9900);
     });
     test("the existing grandfather exemption remains balanced without a debit", async () => {
       await number("2026-03-10T12:00:00Z");

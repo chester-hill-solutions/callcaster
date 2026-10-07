@@ -252,6 +252,8 @@ When a test freezes the app's captured timestamp, set owned SQL fixture timestam
 explicitly after real billing writes. Keep the credit and cycle assertions and
 include a real future-row exclusion control. Do not widen a production timestamp
 filter to repair a fixture clock mismatch.
+Apply this to every real ledger insert in the suite, including one-time purchases.
+A rolling cash window can fail at UTC midnight even when the cycle checks pass.
 
 For an owned native Postgres fixture, initialize with `--no-locale
 --encoding=UTF8`. An inherited `LC_ALL=C.UTF-8` can fail on macOS. Keep the
