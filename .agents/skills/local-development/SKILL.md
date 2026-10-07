@@ -470,10 +470,20 @@ declarations, and require a unique match before writing. Check existing object
 keys before adding a test fixture property; a repeated key can be only a build
 warning when the test files are outside the TypeScript gate. Run the affected module
 tests after the edit.
-Baseline experiments after staging must include staged and unstaged runtime
-changes against the pinned commit (`git diff HEAD`), not only the worktree diff.
-Restore each tracked runtime file from that commit and check the actual collected
-failure/control counts. Keep restoration in `finally`.
+For an original-source experiment, record an immutable base SHA before editing.
+Use `git show BASE_SHA:path`; the topic HEAD can already contain the fix.
+Compare staged and unstaged runtime changes against that base, not only the
+worktree diff. Record the base and collected failure/control counts. Restore the
+saved candidate in `finally`, then verify its committed and live file hashes.
+
+Before running an adapted proof or publication helper, verify its issue number,
+branch, worktree, source identity and expected test counts. Derive these from one
+explicit task configuration. Reject stale identity before any publication.
+
+Pass the current tab handle into browser measurement helpers in a persistent
+REPL. A closure can retain a closed tab after the outer binding changes. Check
+the tab identity and count unique landmarks. A fixture-target failure is not a
+product failure.
 
 ## Structural guard fixtures
 
