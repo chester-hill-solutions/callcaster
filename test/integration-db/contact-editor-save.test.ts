@@ -36,6 +36,11 @@ const initialOther = [
   { score: 7 },
   null,
 ];
+function identity(actor: string) {
+  const value = identities.get(actor);
+  if (!value) throw new Error("Owned contact identity missing");
+  return value;
+}
 async function clean() {
   await sql`delete from contact_audience where contact_id in (select id from contact where workspace in (${workspace},${foreign}))`;
   await sql`delete from contact where workspace in (${workspace},${foreign})`;
@@ -90,7 +95,7 @@ async function load(id = contactId) {
   const request = new Request(
     `http://127.0.0.1:3038/workspaces/${workspace}/contacts/${id}`,
     {
-      headers: { Cookie: identities.get("member")!.cookie },
+      headers: { Cookie: identity("member").cookie },
     },
   );
   const args = {
@@ -161,7 +166,7 @@ describe.skipIf(!databaseUrl)(
       await sql`insert into workspace (id,name) values (${workspace},'Owned contact editor'),(${foreign},'Owned foreign editor')`;
       for (const actor of ["member", "caller"])
         await sql`insert into workspace_member (id,workspace_id,user_id,role_id)
-      values (${randomUUID()},${workspace},${identities.get(actor)!.id},${actor})`;
+      values (${randomUUID()},${workspace},${identity(actor).id},${actor})`;
       const contacts =
         await sql`insert into contact (workspace,firstname,phone,other_data)
       values (${workspace},'Original','+14165550123',${sql.json(initialOther)}),(${foreign},'Foreign','+14165550124','[]'::jsonb) returning id`;

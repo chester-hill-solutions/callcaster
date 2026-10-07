@@ -83,7 +83,9 @@ async function page(
           submissions.push(values);
           await pending;
           if (options.refuse) return { error: "Owned refusal" };
-          const id = params.contactId === "new" ? "7" : params.contactId!;
+          if (!params.contactId)
+            throw new Error("Owned route fixture ID missing");
+          const id = params.contactId === "new" ? "7" : params.contactId;
           const next = {
             ...saved,
             id: Number(id),
@@ -163,8 +165,12 @@ describe("contact route single Save and draft identity (#2127)", () => {
     expect(screen.getByPlaceholderText("Enter first name")).toHaveValue("Jane");
     expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "notes" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Remove notes field" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Field Name" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Remove notes field" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Field Name" }),
+    ).toBeInTheDocument();
   });
   test("Save, Reset and edits stay disabled until the actual pending save completes", async () => {
     const { submissions, finish } = await page({ delayed: true });
@@ -175,7 +181,9 @@ describe("contact route single Save and draft identity (#2127)", () => {
     expect(screen.getByRole("button", { name: "Reset" })).toBeDisabled();
     expect(screen.getByPlaceholderText("Enter first name")).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "List 2" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Remove notes field" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Remove notes field" }),
+    ).toBeDisabled();
     expect(screen.getByRole("textbox", { name: "Field Name" })).toBeDisabled();
     await act(async () => finish());
   });
