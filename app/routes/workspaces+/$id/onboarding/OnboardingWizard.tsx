@@ -230,7 +230,9 @@ export function OnboardingWizard({
   // keeps the full shell width until #1110 reworks that page.
   const widthCap =
     activeStep === "first_number"
-      ? ""
+      ? hasFirstNumber
+        ? "mx-auto w-full max-w-xl"
+        : "mx-auto w-full max-w-4xl"
       : activeStep === "path_selection"
         ? "mx-auto w-full max-w-2xl"
         : activeStep === "business_identity"
@@ -244,7 +246,9 @@ export function OnboardingWizard({
               : "mx-auto w-full max-w-4xl";
 
   return (
-    <div className={`space-y-6 ${widthCap}`}>
+    <div
+      className={`space-y-6 [&>section]:border-b-0 [&>section]:pb-0 ${widthCap}`}
+    >
       {/*
         Compliance state is computed by the loader and was previously dropped on
         the floor here, so a workspace stuck in "Action needed by CallCaster

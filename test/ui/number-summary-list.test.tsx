@@ -32,6 +32,7 @@ function renderList(
     phoneNumbers?: WorkspaceNumbers[];
     presetOrder?: readonly InboundRoutingPresetId[];
     verifiedCallerIds?: WorkspaceNumbers[];
+    presentation?: "default" | "onboarding";
   } = {},
 ) {
   render(
@@ -40,6 +41,7 @@ function renderList(
         phoneNumbers={options.phoneNumbers ?? [number]}
         presetOrder={options.presetOrder}
         verifiedCallerIds={options.verifiedCallerIds}
+        presentation={options.presentation}
         users={[]}
         mediaNames={[]}
         queues={[{ id: 7, name: "Support" }]}
@@ -69,6 +71,26 @@ describe("NumberSummaryList", () => {
     expect(
       screen.getByRole("combobox", { name: "Routing preset" }),
     ).toBeInTheDocument();
+  });
+
+  test("keeps onboarding routing fixed and exposes only voicemail email editing", () => {
+    renderList(
+      makeNumber({
+        friendly_name: "Test / +14165550100",
+        inbound_queue_id: null,
+        inbound_action: "sai@example.test",
+      }),
+      vi.fn(),
+      { presentation: "onboarding" },
+    );
+
+    expect(screen.queryByText("Test / +14165550100")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Routing preset" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Advanced routing/ })).toBeNull();
+    expect(screen.getByLabelText("Voicemail notification email")).toHaveValue(
+      "sai@example.test",
+    );
+    expect(screen.queryByRole("combobox", { name: "Voicemail greeting" })).toBeNull();
   });
 
   test("explains conflicting legacy routing", () => {

@@ -43,7 +43,11 @@ export function OnboardingChecklistLinkStep({
         compact
         title={title}
         description={description}
-        actions={<StatusBadge status={complete ? "complete" : "pending"} />}
+        actions={
+          <div className="sm:mt-2">
+            <StatusBadge status={complete ? "complete" : "pending"} />
+          </div>
+        }
       />
       <div className="space-y-4">
         {complete || incompleteLabel ? (

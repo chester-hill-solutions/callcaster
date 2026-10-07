@@ -111,6 +111,7 @@ function PresetFields({
   scripts,
   mediaNames,
   verifiedCallerIds,
+  onboarding,
 }: {
   number: NonNullable<WorkspaceNumbers>;
   presetId: Exclude<InboundRoutingPresetId, "custom">;
@@ -118,6 +119,7 @@ function PresetFields({
   scripts: NamedOption[];
   mediaNames: MediaOption[];
   verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
+  onboarding: boolean;
 }) {
   const emailDefault =
     number.inbound_action && isConservativeEmail(number.inbound_action)
@@ -187,28 +189,50 @@ function PresetFields({
       );
     case "voicemail":
       return (
-        <div className="grid gap-3 @min-[360px]:grid-cols-2">
-          <Input
-            name="notificationEmail"
-            type="email"
-            required
-            defaultValue={emailDefault}
-            placeholder="notifications@example.com"
-            aria-label="Voicemail notification email"
-          />
-          <select
-            name="audioName"
-            defaultValue={number.inbound_audio ?? ""}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            aria-label="Voicemail greeting"
-          >
-            <option value="">Standard greeting</option>
-            {audioOptions.map((media) => (
-              <option key={media.id} value={media.name}>
-                {media.name}
-              </option>
-            ))}
-          </select>
+        <div className={onboarding ? "space-y-3" : "grid grid-cols-[minmax(0,1fr)_auto] gap-3"}>
+          {onboarding ? (
+            <FormField
+              htmlFor={`voicemail-email-${number.id}`}
+              label="Voicemail notification email"
+              className="min-w-0"
+            >
+              <FormFieldControl>
+                <Input
+                  id={`voicemail-email-${number.id}`}
+                  name="notificationEmail"
+                  type="email"
+                  required
+                  defaultValue={emailDefault}
+                  placeholder="notifications@example.com"
+                  aria-label="Voicemail notification email"
+                />
+              </FormFieldControl>
+            </FormField>
+          ) : (
+            <Input
+              name="notificationEmail"
+              type="email"
+              required
+              defaultValue={emailDefault}
+              placeholder="notifications@example.com"
+              aria-label="Voicemail notification email"
+            />
+          )}
+          {!onboarding ? (
+            <select
+              name="audioName"
+              defaultValue={number.inbound_audio ?? ""}
+              className="h-10 w-36 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Voicemail greeting"
+            >
+              <option value="">Standard greeting</option>
+              {audioOptions.map((media) => (
+                <option key={media.id} value={media.name}>
+                  {media.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
       );
     case "forward":
@@ -282,7 +306,9 @@ function NumberSummaryRow({
   const effective = summarizeEffectiveInboundRouting(number, { queues, scripts });
   const rankedPresets = orderedPresets(presetOrder);
   const initialPreset =
-    inference.presetId === "custom"
+    presentation === "onboarding"
+      ? "voicemail"
+      : inference.presetId === "custom"
       ? (rankedPresets[0]?.id as Exclude<InboundRoutingPresetId, "custom">) ??
         "agent"
       : inference.presetId;
@@ -317,15 +343,27 @@ function NumberSummaryRow({
   }
 
   return (
-    <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <Card
+      className={
+        presentation === "onboarding"
+          ? "mx-auto w-full max-w-xl gap-3 py-3"
+          : undefined
+      }
+    >
+      <CardHeader
+        className={
+          presentation === "onboarding"
+            ? "flex flex-row items-end justify-between gap-3"
+            : "gap-3 sm:flex-row sm:items-start sm:justify-between"
+        }
+      >
         <div className="min-w-0 space-y-1">
           <CardTitle className="break-words">{number.phone_number}</CardTitle>
           {presentation !== "onboarding" ? (
             <CardDescription>{number.friendly_name}</CardDescription>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="ml-auto flex shrink-0 flex-wrap gap-2">
           <Badge variant={verificationStatusVariant(verificationStatus(number))}>
             {verificationStatus(number)}
           </Badge>
@@ -338,19 +376,21 @@ function NumberSummaryRow({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <p className="text-sm font-medium">{effective.label}</p>
-          {effective.detail ? (
-            <p className="break-words text-sm text-muted-foreground">{effective.detail}</p>
-          ) : null}
-          {inference.presetId === "custom" ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-700 dark:text-amber-300">
-              {inference.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        {presentation !== "onboarding" ? (
+          <div>
+            <p className="text-sm font-medium">{effective.label}</p>
+            {effective.detail ? (
+              <p className="break-words text-sm text-muted-foreground">{effective.detail}</p>
+            ) : null}
+            {inference.presetId === "custom" ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-700 dark:text-amber-300">
+                {inference.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <form
           className="@container space-y-3"
           onSubmit={(event) => {
@@ -367,67 +407,98 @@ function NumberSummaryRow({
           }}
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <FormField
-              htmlFor={`preset-${number.id}`}
-              label="Routing preset"
-              className="min-w-0 flex-1"
-            >
-              <FormFieldControl>
-                <select
-                  id={`preset-${number.id}`}
-                  value={presetId}
-                  onChange={(event) =>
-                    setPresetId(
-                      event.target.value as Exclude<
-                        InboundRoutingPresetId,
-                        "custom"
-                      >,
-                    )
-                  }
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  aria-label="Routing preset"
-                >
-                  {rankedPresets.map((preset) => (
-                    <option
-                      key={preset.id}
-                      value={preset.id}
-                      disabled={
-                        preset.id === "forward" && verifiedCallerIds.length === 0
-                      }
-                    >
-                      {preset.id === "forward" && verifiedCallerIds.length === 0
-                        ? "Forward call — verify caller ID first"
-                        : preset.label}
-                    </option>
-                  ))}
-                </select>
-              </FormFieldControl>
-            </FormField>
-            <Button
-              type="submit"
-              disabled={isBusy}
-              aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
-            >
-              Apply
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onEdit}
-              aria-label={`Advanced routing for ${number.phone_number ?? "phone number"}`}
-            >
-              Advanced
-            </Button>
+            {presentation === "onboarding" ? null : (
+              <FormField
+                htmlFor={`preset-${number.id}`}
+                label="Routing preset"
+                className="min-w-0 flex-1"
+              >
+                <FormFieldControl>
+                  <select
+                    id={`preset-${number.id}`}
+                    value={presetId}
+                    onChange={(event) =>
+                      setPresetId(
+                        event.target.value as Exclude<
+                          InboundRoutingPresetId,
+                          "custom"
+                        >,
+                      )
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    aria-label="Routing preset"
+                  >
+                    {rankedPresets.map((preset) => (
+                      <option
+                        key={preset.id}
+                        value={preset.id}
+                        disabled={
+                          preset.id === "forward" && verifiedCallerIds.length === 0
+                        }
+                      >
+                        {preset.id === "forward" && verifiedCallerIds.length === 0
+                          ? "Forward call — verify caller ID first"
+                          : preset.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormFieldControl>
+              </FormField>
+            )}
+            {presentation !== "onboarding" ? (
+              <Button
+                type="submit"
+                disabled={isBusy}
+                aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
+              >
+                Apply
+              </Button>
+            ) : null}
+            {presentation !== "onboarding" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onEdit}
+                aria-label={`Advanced routing for ${number.phone_number ?? "phone number"}`}
+              >
+                Advanced
+              </Button>
+            ) : null}
           </div>
-          <PresetFields
-            key={presetId}
-            number={number}
-            presetId={presetId}
-            queues={queues}
-            scripts={scripts}
-            mediaNames={mediaNames}
-            verifiedCallerIds={verifiedCallerIds}
-          />
+          {presentation === "onboarding" ? (
+            <div className="flex items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <PresetFields
+                  key={presetId}
+                  number={number}
+                  presetId={presetId}
+                  queues={queues}
+                  scripts={scripts}
+                  mediaNames={mediaNames}
+                  verifiedCallerIds={verifiedCallerIds}
+                  onboarding
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={isBusy}
+                aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
+              >
+                Apply
+              </Button>
+            </div>
+          ) : (
+            <PresetFields
+              key={presetId}
+              number={number}
+              presetId={presetId}
+              queues={queues}
+              scripts={scripts}
+              mediaNames={mediaNames}
+              verifiedCallerIds={verifiedCallerIds}
+              onboarding={false}
+            />
+          )}
         </form>
       </CardContent>
     </Card>

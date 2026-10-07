@@ -1,9 +1,11 @@
 import { Link, useFetcher, useRevalidator, useSearchParams } from "react-router";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { NumberSummaryList } from "@/components/phone-numbers/NumberSummaryList";
 import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
@@ -18,7 +20,6 @@ import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import {
   countRentedWorkspaceNumbers,
-  countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
   workspaceHasFirstNumber,
 } from "@/lib/messaging-onboarding/predicates";
@@ -109,6 +110,7 @@ export function OnboardingFirstNumberStep({
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
   const revalidator = useRevalidator();
   const {
+    fetcher: routingFetcher,
     isBusy: isRoutingBusy,
     onIncomingActivityChange,
     onIncomingVoiceMessageChange,
@@ -120,6 +122,25 @@ export function OnboardingFirstNumberStep({
     onNumberRemoval,
     onApplyPreset,
   } = useWorkspaceNumberSettingsMutations(workspaceId);
+  const pendingRoutingFormNameRef = useRef<string | null>(null);
+  if (routingFetcher.formData) {
+    pendingRoutingFormNameRef.current = String(
+      routingFetcher.formData.get("formName") ?? "",
+    );
+  }
+  useFetcherOnIdle(routingFetcher, (data) => {
+    const formName = pendingRoutingFormNameRef.current;
+    if (!formName) return;
+    pendingRoutingFormNameRef.current = null;
+    const error = (data as { error?: string } | undefined)?.error;
+    if (error) {
+      toast.error(error);
+    } else if (formName === "apply-routing-preset") {
+      toast.success("Voicemail notification email saved");
+    } else {
+      toast.success("Number settings saved");
+    }
+  });
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(
     () => Boolean(validationRequest),
   );
@@ -142,7 +163,6 @@ export function OnboardingFirstNumberStep({
   const numbers = phoneNumbers ?? [];
   const rentedCount = countRentedWorkspaceNumbers(numbers);
   const rentedNumbers = numbers.filter((number) => number?.type === "rented");
-  const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
   const isVerifying = pending.isVerifyingCallerId;
@@ -384,25 +404,6 @@ export function OnboardingFirstNumberStep({
               ) : null}
             </div>
           ) : null}
-          {hasFirstNumber ? (
-            <Alert variant="success">
-              <AlertDescription>
-                {rentedCount > 0
-                  ? `You have ${rentedCount} rented number${rentedCount === 1 ? "" : "s"} on this workspace.`
-                  : null}
-                {rentedCount > 0 && verifiedCallerIdCount > 0 ? " " : null}
-                {verifiedCallerIdCount > 0
-                  ? `${verifiedCallerIdCount} verified caller ID${verifiedCallerIdCount === 1 ? "" : "s"} ready for outbound.`
-                  : null}{" "}
-                 Continue when you are ready. You can add more numbers in{" "}
-                 <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
-                   Phone Numbers
-                 </Link>
-                 .
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
           {numberStep === "rent" ? (
               <FirstNumberActionGroup title="Rent a Canadian number" flat>
                 <p className="text-sm text-muted-foreground">
@@ -490,7 +491,7 @@ export function OnboardingFirstNumberStep({
               <div>
                 <h3 className="font-medium">When someone calls your number</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose where incoming calls go for each rented number. You can change this later in Settings.
+                  Choose where incoming calls go for each rented number.
                 </p>
               </div>
               <NumberSummaryList
@@ -513,6 +514,13 @@ export function OnboardingFirstNumberStep({
                 presetOrder={presetOrderForGoal(onboarding.selectedGoal)}
                 isBusy={isRoutingBusy}
               />
+              <p className="text-sm text-muted-foreground">
+                You can add more numbers in{" "}
+                <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
+                  Phone Numbers
+                </Link>
+                .
+              </p>
             </div>
           ) : null}
 

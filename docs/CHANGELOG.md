@@ -6,6 +6,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Number release repairs a rejected workspace API key only on its verified original subaccount, preserves incomplete work when repair cannot finish, and gives an actionable provider-connection error ([#2473](https://github.com/chester-hill-solutions/callcaster/pull/2473), [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170)).
 
+- Fixed: Global toast notifications now appear below the navigation bar instead of covering it.
+
+- Fixed: Phone-number rental and onboarding routing changes now show success or error toasts, onboarding navigation no longer has the extra section divider spacing, and onboarding status badges align to the bottom of their title lines.
+
 - Fixed: Phone-number purchase checks regulatory addresses before purchase, shows address requirements in search results, and gives a clear address error while preserving credits and recovery holds ([#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144), [PR #2468](https://github.com/chester-hill-solutions/callcaster/pull/2468)).
 
 - Security: Platform administrators can manage workspace access without membership, with sole-owner and target two-factor protections on membership changes ([PR #2458](https://github.com/chester-hill-solutions/callcaster/pull/2458), [#2138](https://github.com/chester-hill-solutions/callcaster/issues/2138)).
