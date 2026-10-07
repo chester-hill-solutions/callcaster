@@ -101,9 +101,9 @@ suite("audience import durable source recovery (#2479)", () => {
   }
   function args(content = csv(), fields = mapping, uploadId = upload, jobId = job, audienceId = audience, tenant = workspace) {
     return { uploadId, audienceId, workspaceId: tenant, userId: actor, fileContent: Buffer.from(content).toString("base64"),
-      headerMapping: fields, splitNameColumn: null, claim: { jobId, attemptCount: 1 } };
+      headerMapping: fields, splitNameColumn: null, claim: { jobId, attemptCount: 1, claimedBy: "fixture" } };
   }
-  function ctx() { return { uploadId: upload, audienceId: audience, workspaceId: workspace, userId: actor, claim: { jobId: job, attemptCount: 1 } }; }
+  function ctx() { return { uploadId: upload, audienceId: audience, workspaceId: workspace, userId: actor, claim: { jobId: job, attemptCount: 1, claimedBy: "fixture" } }; }
   async function evidence(audienceId = audience) {
     const contacts = await native`select c.id, c.firstname, c.opt_out, c.household_id from contact c join contact_audience ca on ca.contact_id=c.id where ca.audience_id=${audienceId} order by c.id`;
     const receipts = await native`select r.* from audience_import_row r join audience_import_run run on run.id=r.run_id where run.audience_id=${audienceId} order by record_number`;
@@ -162,7 +162,22 @@ suite("audience import durable source recovery (#2479)", () => {
     await worker.resetStaleClaims(); const claimed=await worker.claimNextJob("next-worker"); expect(claimed?.id).toBe(job);
     await expect(protocol.advanceAudienceImport(ctx(),run.id,prepared)).rejects.toThrow("claim lost");
     if (!claimed) throw new Error("Recovery claim missing");
-    await processor.processAudienceUpload({...args(csv(45,false),{...mapping,Phone:"ignore"}),claim:{jobId:job,attemptCount:claimed.attempt_count}});
+    await processor.processAudienceUpload({...args(csv(45,false),{...mapping,Phone:"ignore"}),claim:{jobId:job,attemptCount:claimed.attempt_count,claimedBy:claimed.claimed_by ?? "missing"}});
+    expect((await evidence()).contacts).toHaveLength(45);
+  });
+  test("a revived job with the same attempt count rejects the original worker owner",async()=>{
+    const content=csv(45,false);const fields={...mapping,Phone:"ignore"};
+    const prepared=mapper.prepareAudienceImport(Buffer.from(content),fields,null,null);
+    const oldContext={...ctx(),claim:{jobId:job,attemptCount:1,claimedBy:"fixture"}};
+    const run=await protocol.startAudienceImport(oldContext,prepared);await protocol.advanceAudienceImport(oldContext,run.id,prepared);
+    const before=await evidence();expect(before.contacts).toHaveLength(40);
+    await client`update job set status='dead_letter',attempt_count=3,params=${client.json({...args(content,fields),voterListSource:null})} where id=${job}`;
+    const admin=await import("@/lib/admin-jobs.server");
+    expect(await admin.requeueDeadLetteredJob(job,actor)).toMatchObject({ok:true,jobId:job});
+    const reclaimed=await worker.claimNextJob("revival-peer");expect(reclaimed?.id).toBe(job);expect(reclaimed?.attempt_count).toBe(1);
+    await expect(protocol.advanceAudienceImport(oldContext,run.id,prepared)).rejects.toThrow("claim lost");
+    expect((await evidence()).contacts).toEqual(before.contacts);
+    await processor.processAudienceUpload({...args(content,fields),claim:{jobId:job,attemptCount:1,claimedBy:"revival-peer"}});
     expect((await evidence()).contacts).toHaveLength(45);
   });
   test("claim expiry during a batch rolls back contacts, links, households and receipts",async()=>{
@@ -178,12 +193,12 @@ suite("audience import durable source recovery (#2479)", () => {
     await native.unsafe(`drop function "${schema}".reject_import() cascade`);
     await worker.resetStaleClaims();const claimed=await worker.claimNextJob("expiry-recovery");
     if(!claimed)throw new Error("Recovery claim missing");
-    await processor.processAudienceUpload({...args(),claim:{jobId:job,attemptCount:claimed.attempt_count}});
+    await processor.processAudienceUpload({...args(),claim:{jobId:job,attemptCount:claimed.attempt_count,claimedBy:claimed.claimed_by ?? "missing"}});
     expect((await evidence()).contacts).toHaveLength(1);
   });
   test("legacy retries without receipts stop before contact writes",async()=>{
     await client`update job set attempt_count=2 where id=${job}`;
-    await expect(processor.processAudienceUpload({...args(),claim:{jobId:job,attemptCount:2}})).rejects.toThrow("no recovery evidence");
+    await expect(processor.processAudienceUpload({...args(),claim:{jobId:job,attemptCount:2,claimedBy:"fixture"}})).rejects.toThrow("no recovery evidence");
     expect((await evidence()).contacts).toHaveLength(0);
     await client`update job set attempt_count=1 where id=${job}`;
     const [legacy] = await native`insert into contact (workspace,firstname) values (${workspace}::uuid,'Legacy preserved') returning id`;
@@ -230,6 +245,7 @@ suite("audience import durable source recovery (#2479)", () => {
     const u=await newUpload(audience);const j=await newJob(u,audience);
     expect((await processor.processAudienceUpload(args(content,mapping,u,j))).runId).toBe(original.runId);
     expect((await evidence()).contacts).toEqual(first.contacts);
+    expect((await native`select status from audience where id=${audience}`)[0].status).toBe("completed");
   });
   test("existing formatted phones in this audience are preserved and skipped",async()=>{
     const [existing]=await native`insert into contact (workspace,firstname,phone) values (${workspace}::uuid,'Existing preserved','(416) 555-1000') returning id`;

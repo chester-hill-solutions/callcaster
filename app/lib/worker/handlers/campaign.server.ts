@@ -60,11 +60,13 @@ export async function audienceUploadHandler(
     throw new Error("audience_upload: missing workspaceId or userId");
   }
 
+  if (!job.claimed_by) throw new Error("audience_upload: worker claim owner missing");
+
   return processAudienceUpload({
     uploadId: params.uploadId, audienceId: params.audienceId, workspaceId, userId,
     fileContent: params.fileContent, headerMapping: params.headerMapping,
     splitNameColumn: params.splitNameColumn, voterListSource: normalizeVoterListSource(params.voterListSource),
-    claim: { jobId: job.id, attemptCount: job.attempt_count },
+    claim: { jobId: job.id, attemptCount: job.attempt_count, claimedBy: job.claimed_by },
   });
 }
 

@@ -6,7 +6,7 @@ import { commitAudienceImportRows } from "@/lib/audience-import-effects.server";
 import type { PreparedAudienceImport } from "@/lib/audience-import-map";
 import { AUDIENCE_UPLOAD_CHUNK_SIZE } from "../../shared/audience-upload";
 
-export type AudienceImportClaim = { jobId: number; attemptCount: number };
+export type AudienceImportClaim = { jobId: number; attemptCount: number; claimedBy: string };
 export type AudienceImportContext = { workspaceId: string; audienceId: number; uploadId: number; userId: string; claim: AudienceImportClaim };
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export type AudienceImportRun = typeof audience_import_run.$inferSelect;
@@ -19,6 +19,7 @@ async function lockClaim(tx: Transaction, ctx: AudienceImportContext) {
     and type = 'audience_upload' and workspace_id = ${ctx.workspaceId}::uuid
     and coalesce(user_id::text, params->>'userId') = ${ctx.userId}
     and status = 'running' and attempt_count = ${ctx.claim.attemptCount}
+    and claimed_by = ${ctx.claim.claimedBy}
     and claimed_until > clock_timestamp()
     and params->>'uploadId' = ${String(ctx.uploadId)} and params->>'audienceId' = ${String(ctx.audienceId)}
     for update`);
