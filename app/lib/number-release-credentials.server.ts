@@ -1,73 +1,19 @@
 import Twilio from "twilio";
-import { eq } from "drizzle-orm";
-import { workspace } from "@/db/schema";
-import { db } from "@/server/db";
 import {
   getOwnedNumberRelease,
+  getNumberReleaseCredentials,
+  persistNumberReleaseCredentials,
+  numberReleaseCredentialsMatch,
+  type NumberReleaseCredentials,
   type NumberRelease,
 } from "@/server/number-release-intent.server";
 import { env } from "@/lib/env.server";
 import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import {
-  invalidateWorkspaceTwilioData,
-  mergeWorkspaceTwilioData,
-} from "@/lib/merge-workspace-twilio-data.server";
+import { invalidateWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { isObject } from "@/lib/type-safety-utils";
 
 export function isNumberReleaseCredentialRejection(error: unknown) {
   return isObject(error) && error.status === 401 && error.code === 20003;
-}
-
-type CredentialSnapshot = {
-  key: string | null;
-  token: string | null;
-  accountSid: string;
-  authToken: string;
-};
-function snapshot(
-  row: { key: string | null; token: string | null; twilio_data: unknown },
-  release: NumberRelease,
-): CredentialSnapshot {
-  const data =
-    typeof row.twilio_data === "string"
-      ? JSON.parse(row.twilio_data)
-      : row.twilio_data;
-  const creds = readTwilioWorkspaceCredentials(data);
-  if (!creds || creds.sid !== release.account_sid)
-    throw new Error("Original release account configuration is required");
-  return {
-    key: row.key,
-    token: row.token,
-    accountSid: creds.sid,
-    authToken: creds.authToken,
-  };
-}
-
-async function readCredentials(release: NumberRelease) {
-  await getOwnedNumberRelease(release);
-  const [row] = await db
-    .select({
-      key: workspace.key,
-      token: workspace.token,
-      twilio_data: workspace.twilio_data,
-    })
-    .from(workspace)
-    .where(eq(workspace.id, release.workspace));
-  if (!row) throw new Error("Release workspace not found");
-  return snapshot(row, release);
-}
-
-function sameCredentials(
-  current: CredentialSnapshot,
-  expected: CredentialSnapshot,
-) {
-  return (
-    current.key === expected.key &&
-    current.token === expected.token &&
-    current.accountSid === expected.accountSid &&
-    current.authToken === expected.authToken
-  );
 }
 
 function keyClient(accountSid: string, key: string, token: string) {
@@ -111,7 +57,7 @@ type RepairedCredentials = { key: string; token: string; authToken: string };
 
 async function mintReleaseKey(
   release: NumberRelease,
-  original: CredentialSnapshot,
+  original: NumberReleaseCredentials,
 ): Promise<RepairedCredentials> {
   const parentSid = env.TWILIO_SID();
   if (parentSid === release.account_sid)
@@ -130,7 +76,12 @@ async function mintReleaseKey(
       "Active original subaccount ownership could not be verified",
     );
   }
-  if (!sameCredentials(await readCredentials(release), original))
+  if (
+    !numberReleaseCredentialsMatch(
+      await getNumberReleaseCredentials(release),
+      original,
+    )
+  )
     throw new Error("Release credentials changed during repair");
   const authToken = account.authToken.trim();
   const issuer = new Twilio.Twilio(release.account_sid, authToken, {
@@ -144,42 +95,11 @@ async function mintReleaseKey(
   return { key: key.sid, token: key.secret.trim(), authToken };
 }
 
-async function persistReleaseKey(
-  release: NumberRelease,
-  original: CredentialSnapshot,
-  credentials: RepairedCredentials,
-) {
-  await db.transaction(async (tx) => {
-    await getOwnedNumberRelease(release, tx);
-    const [row] = await tx
-      .select({
-        key: workspace.key,
-        token: workspace.token,
-        twilio_data: workspace.twilio_data,
-      })
-      .from(workspace)
-      .where(eq(workspace.id, release.workspace))
-      .for("update");
-    if (!row || !sameCredentials(snapshot(row, release), original))
-      throw new Error("Release credentials changed before repair persistence");
-    await mergeWorkspaceTwilioData(
-      release.workspace,
-      (current) => ({ ...current, authToken: credentials.authToken }),
-      tx,
-    );
-    await tx
-      .update(workspace)
-      .set({ key: credentials.key, token: credentials.token })
-      .where(eq(workspace.id, release.workspace));
-  });
-  invalidateWorkspaceTwilioData(release.workspace);
-}
-
 export async function recoverNumberReleaseClient(
   release: NumberRelease,
   failedClient: Twilio.Twilio,
 ) {
-  const original = await readCredentials(release);
+  const original = await getNumberReleaseCredentials(release);
   let client: Twilio.Twilio;
   if (
     original.key?.trim() &&
@@ -195,7 +115,7 @@ export async function recoverNumberReleaseClient(
     );
   } else {
     const credentials = await mintReleaseKey(release, original);
-    await persistReleaseKey(release, original, credentials);
+    await persistNumberReleaseCredentials(release, original, credentials);
     client = keyClient(release.account_sid, credentials.key, credentials.token);
   }
   await verifyRecoveredResources(release, client);
