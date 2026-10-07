@@ -161,22 +161,10 @@ make worker
 make media-stream
 ```
 
-10. Sign in and create a real workspace in the app. Copy the workspace ID from
-the URL:
-
-```text
-/workspaces/<workspace-id>
-```
-
-11. Sync that workspace's phone callbacks to the current tunnel:
-
-```bash
-make calling:sync WORKSPACE_ID=<workspace-id>
-```
-
-The sync command must run after the app is reachable. It updates workspace
-phone-number callbacks and stored onboarding callback metadata. It does not
-create the workspace or the environment TwiML App.
+10. Sign in and create a real workspace in the app. If the workspace already
+has a Twilio number, use the [daily calling sync](#sync-twilio-to-the-current-tunnel)
+after the app is running. Newly rented numbers receive callbacks from the
+current `BASE_URL` during number purchase.
 
 Notes:
 - The `DATABASE_URL` and `S3_*` defaults in `.env.example` match the compose dev stack as-is.
