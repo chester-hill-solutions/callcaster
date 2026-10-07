@@ -168,7 +168,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Route error pages show clear validation and conflict messages while hiding database details ([#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123)).
+- Route error pages show clear validation and conflict messages while hiding database details ([#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123), [PR #2464](https://github.com/chester-hill-solutions/callcaster/pull/2464)).
 
 - Reuse recent sender checks during chat bursts while keeping messaging approval checks on each send ([#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151), [PR #2462](https://github.com/chester-hill-solutions/callcaster/pull/2462)).
 
