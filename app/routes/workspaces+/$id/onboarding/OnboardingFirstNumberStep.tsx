@@ -495,6 +495,7 @@ export function OnboardingFirstNumberStep({
               </div>
               <NumberSummaryList
                 phoneNumbers={rentedNumbers}
+                presentation="onboarding"
                 users={workspaceUsers}
                 mediaNames={mediaNames}
                 queues={inboundQueues}

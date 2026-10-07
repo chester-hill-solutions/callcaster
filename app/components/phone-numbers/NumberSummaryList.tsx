@@ -57,6 +57,7 @@ export type NumberSummaryListProps = {
   onInboundQueueChange?: (id: number, value: string) => void;
   onInboundScriptChange?: (id: number, value: string) => void;
   onNumberRemoval: (id: number) => void;
+  presentation?: "default" | "onboarding";
 };
 
 const configurablePresets = INBOUND_ROUTING_PRESETS.filter(
@@ -74,6 +75,23 @@ function verificationStatus(number: NonNullable<WorkspaceNumbers>): string {
     return String(capabilities.verification_status);
   }
   return number.type === "rented" ? "active" : "pending";
+}
+
+function verificationStatusVariant(
+  status: string,
+): "success" | "warning" | "destructive" | "outline" {
+  switch (status.toLowerCase()) {
+    case "success":
+    case "active":
+    case "verified":
+      return "success";
+    case "pending":
+      return "warning";
+    case "failed":
+      return "destructive";
+    default:
+      return "outline";
+  }
 }
 
 function orderedPresets(order?: readonly InboundRoutingPresetId[]) {
@@ -245,6 +263,7 @@ function NumberSummaryRow({
   verifiedCallerIds,
   isBusy,
   presetOrder,
+  presentation = "default",
   onApplyPreset,
   onEdit,
 }: {
@@ -255,6 +274,7 @@ function NumberSummaryRow({
   verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
   isBusy: boolean;
   presetOrder?: readonly InboundRoutingPresetId[];
+  presentation?: "default" | "onboarding";
   onApplyPreset: NumberSummaryListProps["onApplyPreset"];
   onEdit: () => void;
 }) {
@@ -301,14 +321,20 @@ function NumberSummaryRow({
       <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <CardTitle className="break-words">{number.phone_number}</CardTitle>
-          <CardDescription>{number.friendly_name}</CardDescription>
+          {presentation !== "onboarding" ? (
+            <CardDescription>{number.friendly_name}</CardDescription>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{verificationStatus(number)}</Badge>
-          <Badge variant={inference.presetId === "custom" ? "warning" : "secondary"}>
-            {INBOUND_ROUTING_PRESETS.find((preset) => preset.id === inference.presetId)
-              ?.label ?? "Custom routing"}
+          <Badge variant={verificationStatusVariant(verificationStatus(number))}>
+            {verificationStatus(number)}
           </Badge>
+          {presentation !== "onboarding" ? (
+            <Badge variant={inference.presetId === "custom" ? "warning" : "secondary"}>
+              {INBOUND_ROUTING_PRESETS.find((preset) => preset.id === inference.presetId)
+                ?.label ?? "Custom routing"}
+            </Badge>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -417,6 +443,7 @@ export function NumberSummaryList({
   verifiedCallerIds: suppliedCallerIds,
   isBusy,
   presetOrder,
+  presentation = "default",
   onApplyPreset,
   ...tableCallbacks
 }: NumberSummaryListProps) {
@@ -453,6 +480,7 @@ export function NumberSummaryList({
               verifiedCallerIds={verifiedCallerIds}
               isBusy={isBusy}
               presetOrder={presetOrder}
+              presentation={presentation}
               onApplyPreset={onApplyPreset}
               onEdit={() => setAdvancedNumberId(number.id)}
             />
