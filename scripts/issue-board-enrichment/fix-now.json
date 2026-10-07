@@ -69,182 +69,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2067,
-    "verdict": "fix-now",
-    "recommendedTitle": "check:effects never verifies @effect-deps against the real dependency array",
-    "summary": "The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.",
-    "rootCause": "The guard checks for the presence of an annotation, not its truth. An annotation nobody verifies is a comment, and a comment about behaviour is worse than no comment because it is trusted.",
-    "resolution": "Implement dependency comparison with a documented escape rule; coordinate scope with #2104 scanner repair.",
-    "lookIn": [
-      "scripts/check-effects.mjs:101",
-      "scripts/lib/effects-lib.mjs:18",
-      "scripts/check-effects.mjs:124,145",
-      "scripts/effects-baseline.json",
-      "app/components/ui/datetime.tsx (the live passing violation, and also the un-gated React.useEffect call)"
-    ],
-    "existingTests": [
-      "test/effects-compliance.test.ts covers annotation compliance rules; dependency-array/scanner fixtures remain missing."
-    ],
-    "missingTests": [
-      "Fixture tests must fail mismatched annotations and accept matching arrays plus a justified escape."
-    ],
-    "acceptanceCriteria": [
-      "A disagreeing annotation fails `check:effects`",
-      "The comparison rule is written down, with its escape hatch",
-      "The guard has fixture tests for both the fail and the pass case",
-      "A `React.useEffect(` call is not silently skipped"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2123,
-    "verdict": "fix-now",
-    "recommendedTitle": "The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors",
-    "summary": "The nested boundary still drops response data. The issue understates the contract: middleware and error mapper often supply JSON {error,...}, while root only accepts string data; not all mapper data is sanitized.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Nested boundary discards all response data. Common 403 data is a JSON error object; the root handles strings only. Raw mapper messages cannot be trusted unconditionally.",
-    "resolution": "Extract recognized response message shapes with sanitization; do not blindly render error.data or copy the root string-only logic.",
-    "lookIn": [
-      "app/components/shared/RouteErrorBoundary.tsx:34",
-      "app/lib/workspace-middleware.server.ts:69",
-      "app/lib/errors.server.ts:85",
-      "app/root.tsx:249",
-      "the nested `RouteErrorBoundary` component",
-      "app/lib/handler.server (`createErrorResponse`)",
-      "app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts",
-      "app/root.tsx (the correct reader)"
-    ],
-    "existingTests": [
-      "test/ui/components-shared-smoke.test.tsx"
-    ],
-    "missingTests": [
-      "Existing shared smoke tests cover 404 and raw-driver fallback, but the 403 test pins status-only text. Add safe string data, safe JSON error data, unknown/driver response data, and empty-data fallback."
-    ],
-    "acceptanceCriteria": [
-      "A 403 thrown as \"You do not have access to this workspace\" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).",
-      "A 404 still renders its not-found treatment (the existing correct behaviour must stay green).",
-      "A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.",
-      "Safe string response data and recognized structured error payloads both produce the intended message.",
-      "Response data containing a driver/internal message produces a safe fallback.",
-      "Missing or unrecognized response data uses the status fallback."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2124,
-    "verdict": "fix-now",
-    "recommendedTitle": "Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow",
-    "summary": "Both guards still accept stale baseline entries. Redirect scanning also remains line-based, and replacing mocks are stored as a set rather than occurrence counts.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Both guards still accept stale baseline entries. Redirect scanning also remains line-based, and replacing mocks are stored as a set rather than occurrence counts.",
-    "resolution": "Make both ratchets fail stale entries; parse multiline redirects and count mock occurrences.",
-    "lookIn": [
-      "scripts/check-relative-redirects.mjs:66",
-      "scripts/check-relative-redirects.mjs:137",
-      "scripts/check-test-mock-coverage.mjs:74",
-      "scripts/check-test-mock-coverage.mjs:89",
-      "scripts/check-relative-redirects.mjs:36,134-142 (the regex is correct; the stale branch is not)",
-      "scripts/check-test-mock-coverage.mjs:15-16,72-76,80-93,112",
-      "scripts/check-queue-rpc-contract.mjs:135-145 (the correct pattern to copy)",
-      "scripts/baselines/relative-redirects.json",
-      "scripts/baselines/test-mock-replace.txt"
-    ],
-    "existingTests": [
-      "None. Neither guard has a fixture test that proves it can fail in the stale direction."
-    ],
-    "missingTests": [
-      "A multiline relative redirect such as redirect(\n \"./foo\"\n) fails.",
-      "A stale baseline fails with a rewrite hint.",
-      "Repeated replacing mocks for one file/module increase the count and fail."
-    ],
-    "acceptanceCriteria": [
-      "A multiline relative redirect fails. An absolute /foo redirect remains outside the relative-redirect guard.",
-      "Both guards reject stale baselines.",
-      "The mock baseline records per-occurrence counts.",
-      "Fixture tests prove fail and pass cases."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2127,
-    "verdict": "fix-now",
-    "recommendedTitle": "The contact page's \"Call lists\" checkboxes and the whole \"Other Data\" editor are discarded, yet Save reports success",
-    "summary": "Both contact editor defects remain. Checkbox changes and Other Data callbacks only mark changes; the imperative Save contract and action transport only text fields.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The handlers still discard both values. Save reads only fieldValues and the action handles text fields, so this needs UI contract and server persistence work.",
-    "resolution": "Lift both edits into the Save contract and validate workspace-scoped membership/other_data writes, or remove these controls. Cover save and reload, reset, and existing text fields as a positive control.",
-    "lookIn": [
-      "app/components/contact/ContactDetails.tsx:137",
-      "app/components/contact/ContactDetails.tsx:232",
-      "app/components/contact/ContactDetails.tsx:94",
-      "app/routes/workspaces+/$id/contacts/$contactId.action.server.ts:59",
-      "app/components/contact/ContactDetails.tsx:137-148,232-240",
-      "the `OtherDataFields` component it passes the setter to",
-      "the contact update action and `ContactUpdateData",
-      "app/lib/contacts/`, `app/routes/workspaces+/$id/contacts*"
-    ],
-    "existingTests": [
-      "test/ui/contact-details-form-values.test.tsx"
-    ],
-    "missingTests": [
-      "Current contact-details-form-values tests verify text capture and Other Data accessible names only, not changed data persistence."
-    ],
-    "acceptanceCriteria": [
-      "Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).",
-      "Editing an \"Other Data\" field persists and survives a reload (kill-check).",
-      "If the controls are removed instead, they are absent rather than inert.",
-      "The unfinished-wiring comment is gone."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2138,
-    "verdict": "fix-now",
-    "recommendedTitle": "Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards",
-    "summary": "Non-member sudo still cannot use Access tab. Tab mutations call member helpers that now enforce protection; the separate sudo membership API calls admin writers that omit sole-owner/MFA guards.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Access tab remains membership-gated and its update/delete adapters call member helpers with protection. A separate sudo API bypasses those helpers and uses unguarded platform-admin membership writers.",
-    "resolution": "Derive Access tab authorization from verified sudo context. Use shared protected admin mutation services on both tab and sudo JSON API; enforce sole-owner and MFA policy there and define recovery for existing ownerless workspaces.",
-    "lookIn": [
-      "app/lib/platform-admin.server.ts:375",
-      "app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts:31",
-      "app/lib/platform-members.server.ts:416",
-      "app/lib/platform-admin.server.ts:277",
-      "app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts:103",
-      "app/routes/admin+/workspaces/$workspaceId/invite.loader.server.ts",
-      "app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts",
-      "app/lib/platform-members.server.ts:220-235,440-475",
-      "app/lib/two-factor.server.ts:181-204",
-      "app/routes/workspaces+/$id/settings.action.server.ts:66-75",
-      "app/routes/workspaces+/$id/settings.route.tsx:84-86,235"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Need non-member sudo access, sole-owner refuse, target MFA refuse on sudo API/tab, permitted admin change and member-path controls."
-    ],
-    "acceptanceCriteria": [
-      "A verified sudo user can open the Access tab without workspace membership.",
-      "A user without sudo access cannot open the admin route, regardless of workspace role.",
-      "Access-tab and sudo API mutations refuse sole-owner removal or demotion.",
-      "Access-tab and sudo API mutations refuse owner/admin grants to a target without required two-factor enrollment.",
-      "Permitted sudo mutations and existing member-path protections continue to work."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "rootCause": "Platform role and workspace role are mixed in the Access tab; parallel sudo writer APIs bypass the product membership safety policy."
-  },
-  {
     "issueNumber": 2144,
     "verdict": "fix-now",
     "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500",
@@ -277,77 +101,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter."
-  },
-  {
-    "issueNumber": 2148,
-    "verdict": "fix-now",
-    "recommendedTitle": "The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say",
-    "summary": "Inbound IVR still renders synthesized audio from audioFile only, while content may contain the spoken text. Recorded audio also bypasses the shared WAV-sidecar renderer.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Inbound IVR still renders synthesized audio from audioFile only, while content may contain the spoken text. Recorded audio also bypasses the shared WAV-sidecar renderer.",
-    "resolution": "Use the shared IVR block audio renderer on inbound routes with the loaded workspace context.",
-    "lookIn": [
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts:25",
-      "the inbound IVR block route under `app/routes/api+/inbound-ivr/",
-      "app/lib/ivr-block-render.server.ts (`renderIvrBlock`)",
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/lib/ivr-wav.server.ts",
-      "docs/script-json-format.md`, `test/fixtures/script-wire/documented-format.json"
-    ],
-    "existingTests": [
-      "test/inbound-ivr-block.route.test.ts",
-      "test/ivr-wav.server.test.ts"
-    ],
-    "missingTests": [
-      "Inbound content-only speech must be audible; recorded blocks use the supported sidecar path."
-    ],
-    "acceptanceCriteria": [
-      "A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).",
-      "A block with an `audioFile` still plays the recording.",
-      "A block with a WAV sidecar still uses the sidecar.",
-      "There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing)."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2151,
-    "verdict": "fix-now",
-    "recommendedTitle": "Cache interactive SMS readiness checks and measure Twilio read cost",
-    "summary": "Campaign per-contact readiness overhead is fixed by PR #2228 (#2081). Chat remains per send without a TTL.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. One readiness evaluation per campaign dispatch; chat still verifies the live sender pool per message.",
-    "resolution": "Add a short workspace-keyed TTL with sender/config invalidation for interactive sends and record measured request cost. Do not move the campaign gate again.",
-    "lookIn": [
-      "app/lib/campaign-sms-dispatch.server.ts:154",
-      "app/lib/campaign-sms-pre-dispatch-gate.server.ts:119",
-      "app/lib/chat-sms.server.ts:86",
-      "app/lib/twilio-readiness.server.ts:46",
-      "test/campaign-sms-workspace-readiness.test.ts:173",
-      "app/lib/campaign-sms-send.server.ts:75-82",
-      "app/lib/twilio-readiness.server.ts:66-88",
-      "app/lib/messaging-onboarding/predicates.ts:458-471 (`sender_pool_in_sync`)",
-      "app/lib/campaign-sms-dispatch.server.ts (the tick)",
-      "app/lib/campaign-sms-guards` / the chat send path"
-    ],
-    "existingTests": [
-      "test/campaign-sms-workspace-readiness.test.ts covers whole-dispatch readiness deferral and no per-row attempt burn.",
-      "test/campaign-sms-send.server.test.ts"
-    ],
-    "missingTests": [
-      "Chat burst/cache-expiry/invalidation test and representative before/after request counts."
-    ],
-    "acceptanceCriteria": [
-      "A dispatch tick of N messages performs **one** readiness evaluation, not N (kill-check: revert to the per-message call and confirm the test goes red).",
-      "A chat burst re-lists the sender pool at most once per TTL window.",
-      "A non-ready campaign dispatch defers before row selection and does not spend queue attempts; this behavior is already implemented by PR #2228.",
-      "The before/after Twilio request count for a representative tick is recorded in the issue.",
-      "The chat readiness cache expires and invalidates after relevant sender/configuration changes."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Partial fix. Keep Fix now for the remaining chat/cache and measurement scope. Related PR evidence: #2228. A PR reference alone does not prove deployed behavior."
   },
   {
     "issueNumber": 2170,
@@ -494,10 +247,10 @@
     "issueNumber": 2298,
     "verdict": "fix-now",
     "recommendedTitle": "Remove obsolete STRIPE_API_KEY configuration",
-    "summary": "Four active Railway configuration lists still preserve or copy STRIPE_API_KEY. App and worker use STRIPE_SECRET_KEY.",
-    "currentBehavior": "Source audit dev@8ae867ed, 2026-10-04: dev, staging and production IaC plus the staging app copy list retain the obsolete key. No app runtime use was found. External runtime use is not yet verified.",
-    "rootCause": "The active environment preservation and staging copy lists still include the old variable.",
-    "resolution": "Verify that no external runtime consumer needs the old key, then remove it from the four active lists while preserving STRIPE_SECRET_KEY for app and worker.",
+    "summary": "Reviewed source and PR #2466 are green; live cleanup approval remains pending before merge.",
+    "currentBehavior": "PR #2466 at 4a940591db5116c156c3d270529d471ab1970f23 removes four obsolete-key entries and adds Railway plan guidance. All local/remote gates and exact-head preview deployments pass. Each of three read-only plans deletes only the obsolete app key. The dev push workflow refuses that destructive drift if the live old key remains.",
+    "rootCause": "Preservation lists and staging sync retained STRIPE_API_KEY although the verified deployed app and worker sources use STRIPE_SECRET_KEY.",
+    "resolution": "After explicit approval, commit only the three old app-key deletions through the verified explicit patch with skipDeploys. Preserve all other variables, resources and staged changes; verify no redeploy and fresh plan convergence before merging. Do not apply a broad environment plan or bypass the destructive-drift guard.",
     "lookIn": [
       ".railway/environments/dev.ts:22",
       ".railway/environments/staging.ts:35",
@@ -506,7 +259,7 @@
     ],
     "existingTests": [],
     "missingTests": [
-      "Confirm external runtime consumers before removal. Verify required Stripe secret configuration and full repository checks."
+      "Live deletion approval, exact read-back preservation and fresh converged plans remain. No live mutation has been executed."
     ],
     "acceptanceCriteria": [
       "STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.",
@@ -514,6 +267,36 @@
       "Repository checks pass.",
       "Confirm no external runtime consumer depends on STRIPE_API_KEY."
     ],
-    "trackerRecommendation": "Native issue updated with source proof. Fix now; keep the external-consumer acceptance check open until verified."
+    "trackerRecommendation": "Keep source and live configuration acceptance distinct. PR #2466 remains draft until the live cleanup decision is resolved; it is not merged or release-ready."
+  },
+  {
+    "issueNumber": 2459,
+    "verdict": "fix-now",
+    "acceptanceCriteria": [
+      "One recovery click produces one result notice after loader revalidation. Measure request/write counts before claiming a duplicate mutation or repairing that boundary.",
+      "A later valid action still produces its own result, including the same message. Error and warning results remain visible and are not suppressed by a previous success.",
+      "Navigation, revalidation and ordinary renders do not replay a handled result. Preserve pending controls, owner safety, target enrollment and saved data.",
+      "Success/error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths. Keep the shared component library and single root host.",
+      "Add an executed failing regression with valid controls, then prove restored behavior. Pass full local CI, independent source reviews, applicable exact-head remote gates and deployments before an atomic merge. Keep deployed release acceptance separate."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "recommendedTitle": "The Access form shows two success notices for one recovery click",
+    "summary": "One click was measured as one POST, one membership update and two notices. A local existing-panel repair is tested; final browser approval remains pending.",
+    "currentBehavior": "Local 784265970c6d40f09667938c80a4909e22ff073c on older dev@8672297b1b3a97dcf2744b31e80f421b860a1da0 uses TabsContent around the admin Outlet. Six real parent/Access Router cases, full local CI, 1,001 actual PostgreSQL cases and both source reviews pass. There is no PR or candidate browser acceptance.",
+    "rootCause": "The routed Access child was rendered in both the React Aria Tabs collection builder and visible tree because it lacked a TabPanel boundary. The measured original full-app case has one request and one write, so it is a presentation defect.",
+    "resolution": "Complete the explicitly approved isolated browser role tests, require one notice per result and zero page-landmark movement at phone/desktop widths, then refresh onto current dev and repeat full gates/reviews before one atomic PR. Preserve repeat messages, pending controls, owner safety and the single root host.",
+    "lookIn": [
+      "app/routes/admin+/workspaces/$workspaceId.route.tsx",
+      "app/components/ui/tabs.tsx",
+      "app/hooks/utils/useActionFeedback.ts",
+      "app/root.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Candidate full-app notice/request/write counts, repeat Owner action, sole-owner refusal and phone/desktop landmarks await role-test approval. Local test/ui/admin-access-result-notices.test.tsx has six passing Router cases but is not on dev."
+    ],
+    "trackerRecommendation": "Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain."
   }
 ]
