@@ -71,7 +71,7 @@ export function numberReleaseAuthProvider() {
         if (failure.kind === "network") {
           if (failure.target === "sender") state.attached = false;
           else state.active = false;
-          throw Object.assign(new Error("Owned delete acknowledgement lost"), {
+          throw Object.assign(new Error("ECONNRESET: owned delete acknowledgement lost"), {
             code: "ECONNRESET",
           });
         }
