@@ -33,7 +33,6 @@ import {
 } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import type { WorkspaceTodaySelection } from "@/lib/workspace-today.server";
-import { predicatePassed } from "@/lib/messaging-onboarding/predicates";
 import { LOW_CREDIT_THRESHOLD } from "../../../shared/pricing";
 
 type LoaderData = {
@@ -41,6 +40,7 @@ type LoaderData = {
   workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
+  serviceAddressRequired?: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -82,6 +82,7 @@ function WorkspaceResolvedView({
   today,
   showSidebar,
   isOnboarding,
+  serviceAddressRequired,
   complianceOnboarding,
   a2pBlockingIssues,
   campaignQueueProgress,
@@ -94,6 +95,7 @@ function WorkspaceResolvedView({
   today?: WorkspaceTodaySelection;
   showSidebar: boolean;
   isOnboarding: boolean;
+  serviceAddressRequired?: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -136,13 +138,6 @@ function WorkspaceResolvedView({
 
   const liveCredits = workspace.credits;
   const canManageWorkspace = userRole === "admin" || userRole === "owner";
-  const needsServiceAddress = Boolean(
-    complianceOnboarding &&
-      !predicatePassed("emergency_address_present", {
-        onboarding: complianceOnboarding,
-        workspaceNumbers: [],
-      }),
-  );
   const location = useLocation();
   // Credits page is where users top up — keep the low-credit banner off it (#1097).
   const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
@@ -223,7 +218,7 @@ function WorkspaceResolvedView({
               {onboardingReadiness.shouldShowOnboardingBanner ? (
                 <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
                   <div className="font-medium">
-                    {canManageWorkspace && needsServiceAddress ? (
+                    {canManageWorkspace && serviceAddressRequired ? (
                       <Link
                         to={`/workspaces/${workspace.id}/phone-numbers#service-address`}
                         aria-label="Continue workspace setup: add service address"
@@ -275,7 +270,8 @@ export default function Workspace() {
     userRole,
     onboardingReadiness,
     today,
-    complianceOnboarding,
+    serviceAddressRequired,
+  complianceOnboarding,
     a2pBlockingIssues,
     campaignQueueProgress,
   } =
@@ -314,6 +310,7 @@ export default function Workspace() {
           today={today}
           showSidebar={showSidebar}
           isOnboarding={Boolean(onboardingStrip)}
+          serviceAddressRequired={serviceAddressRequired}
           complianceOnboarding={complianceOnboarding}
           a2pBlockingIssues={a2pBlockingIssues}
           campaignQueueProgress={campaignQueueProgress}

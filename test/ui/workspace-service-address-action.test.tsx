@@ -16,7 +16,7 @@ const warning = "Add the emergency service address before renting a voice number
 const workspaceId = "00000000-0000-4000-8000-000000000001";
 const path = `/workspaces/${workspaceId}`;
 
-function renderWorkspace({ role = "owner", showWarning = true, addressComplete = false } = {}) {
+function renderWorkspace({ role = "owner", showWarning = true, addressComplete = false, showCompliance = true } = {}) {
   const onboarding = onboardingFixture();
   if (addressComplete) {
     onboarding.emergencyVoice.address = {
@@ -35,7 +35,8 @@ function renderWorkspace({ role = "owner", showWarning = true, addressComplete =
           audiences: [], campaigns: [], phoneNumbers: [],
         },
         onboardingReadiness: { shouldShowOnboardingBanner: showWarning, warnings: [warning] },
-        complianceOnboarding: onboarding,
+        serviceAddressRequired: !addressComplete,
+        ...(showCompliance ? { complianceOnboarding: onboarding } : {}),
         campaignQueueProgress: {},
       }),
       Component: Workspace,
@@ -60,6 +61,11 @@ describe("workspace service-address remedy", () => {
     expect(router.state.location.hash).toBe("#service-address");
     expect(screen.getByTestId("service-address-gate")).toHaveAttribute("id", "service-address");
     expect(screen.getByRole("button", { name: "Save address" })).toBeEnabled();
+  });
+
+  test("keeps the remedy available before the compliance panel is shown", async () => {
+    renderWorkspace({ showCompliance: false });
+    expect(await screen.findByRole("link", { name: "Continue workspace setup: add service address" })).toBeVisible();
   });
 
   test.each(["member", "caller", ""])("%s has the warning but no address-edit remedy", async (role) => {
