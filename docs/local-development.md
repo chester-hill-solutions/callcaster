@@ -1,16 +1,19 @@
 # Local Development
 
-This app runs as a React Router v7 app on `http://localhost:3000`, backed by Postgres (Drizzle ORM), an S3-compatible object store (MinIO locally), and Better Auth. Local services run via Docker Compose. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
+This app runs as a React Router 8 app on `http://localhost:3000`, backed by Postgres (Drizzle ORM), an S3-compatible object store (Stow locally), and Better Auth. Local services run via Docker Compose. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
 
 ## Quick start
 
 ```bash
 npm install
 make init         # npm run setup — idempotent; re-run to repair a broken local environment
-make app          # npm run dev → http://localhost:3000
+make app          # terminal 1: web app → http://localhost:3000
+make worker       # terminal 2: background jobs, including list uploads
+# Optional, terminal 3: live dashboard audio, transcription, and coaching
+make media-stream
 ```
 
-`make init` (`npm run setup`) starts Postgres, MinIO, and mail via docker compose, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
+`make init` (`npm run setup`) starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
 
 Verify the setup:
 
@@ -18,7 +21,7 @@ Verify the setup:
 npm run typecheck   # react-router typegen + tsc
 npm run lint
 npm test            # vitest node + UI suites, plus bun server-runtime tests
-make e2e            # full Playwright run against compose Postgres + MinIO
+make e2e            # full Playwright run against compose Postgres + Stow
 ```
 
 ## Redirect target checks
@@ -35,11 +38,14 @@ The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scri
 
 | Command | What it does |
 |---|---|
-| `make up` / `make down` / `make logs` | Start, stop, or follow logs for postgres, minio, and inbucket |
-| `make postgres up`, `make postgres minio logs` | The same for one or more services |
-| `make postgres init` | Start Postgres and bootstrap the schema only (`make minio init` creates the bucket) |
+| `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
+| `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
+| `make storage up` / `make storage down` | Start or stop the Stow S3-compatible object store |
+| `make postgres init` | Start Postgres and bootstrap the schema only (`make storage init` creates the bucket) |
 | `make ps` | Compose status |
-| `make app`, `make worker`, `make media-stream` | Run the app, the job worker, or the media-stream service in the foreground |
+| `make app` | Run the React Router web app in the foreground |
+| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
+| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
 | `make help` | This list |
 
 Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
@@ -56,11 +62,11 @@ Tail an app process by running it in its own terminal; the compose services are 
 
 ## Local Services And Ports
 
-Started with `docker compose -f docker-compose.dev.yml up -d`:
+The local stack uses these endpoints:
 
 - App: `http://localhost:3000`
 - Postgres: `127.0.0.1:5433` (user/pass/db: `callcaster`)
-- MinIO S3 API: `http://127.0.0.1:9000`; console: `http://127.0.0.1:9001`
+- Stow S3 API: `http://127.0.0.1:9000`
 - Inbucket email UI: `http://127.0.0.1:9002`
 
 ## Environment Setup
@@ -108,10 +114,10 @@ node scripts/e2e/start-stow.mjs --start
 node scripts/e2e/ensure-bucket.mjs
 ```
 
-5. Start the media-stream Bun service (optional; needed for the dashboard audio stream):
+5. Start the media-stream Bun service when you need dashboard audio, live transcription, or coaching (optional):
 
 ```bash
-bun run services/media-stream/index.ts
+make media-stream
 ```
 
 The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
@@ -121,17 +127,23 @@ Transcription and coaching need two optional API keys (both are skipped when uns
 - `ELEVENLABS_API_KEY` — live speech-to-text (`scribe_v2_realtime`) and the post-call `elevenlabs_batch_transcribe` worker job (`scribe_v2`). If unset, live STT is skipped and the batch job throws and dead-letters roughly every 15 minutes, so set it wherever the worker runs.
 - `COHERE_API_KEY` — live coaching cues (`api.cohere.com`). If unset, coaching cues are skipped.
 
-6. Start the app:
+6. Start the app in a separate terminal:
 
 ```bash
-npm run dev
+make app
 ```
 
 7. Confirm the local services are up:
    - app at `http://localhost:3000`
    - media-stream at `http://localhost:3001/healthz`
-   - MinIO console at `http://127.0.0.1:9001`
+   - Stow S3 API at `http://127.0.0.1:9000`
    - Inbucket at `http://127.0.0.1:9002`
+
+8. Start the worker in another terminal when you need background jobs such as list uploads:
+
+```bash
+make worker
+```
 
 ## Calling Setup With Localtunnel
 
