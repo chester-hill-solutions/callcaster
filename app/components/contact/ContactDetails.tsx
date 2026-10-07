@@ -8,8 +8,8 @@ import RecentContacts from "./RecentContacts";
 import type { Audience, Contact, ContactAudience } from "@/lib/types";
 import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
+import { buildContactEditorDraft } from "@/lib/contact-editor";
 
-// Enhanced type definitions
 export interface ContactDetailsProps {
   contact?: Contact & { contact_audience?: ContactAudience[] };
   audiences: Audience[];
@@ -23,6 +23,7 @@ export interface ContactDetailsProps {
    * overwrite.
    */
   startEditable?: boolean;
+  disabled?: boolean;
 }
 
 export interface ContactDetailsState {
@@ -35,36 +36,9 @@ export interface ContactUpdateData {
   [key: string]: unknown;
 }
 
-/** Text fields editable via ContactFields — the set the Save button submits. */
-const EDITABLE_FIELD_NAMES = [
-  "firstname",
-  "surname",
-  "phone",
-  "email",
-  "address",
-  "city",
-  "province",
-  "postal",
-] as const;
-
-/** Imperative handle so the route's single header Save/Reset can read and
- * clear this component's in-progress edits without lifting all field state
- * up (audiences/other-data stay local; only the persisted text fields need
- * to reach the action). */
 export interface ContactDetailsHandle {
   getFormValues: () => Record<string, string>;
   reset: () => void;
-}
-
-function buildFieldValues(
-  contact?: Contact | null,
-): Record<string, string> {
-  const values: Record<string, string> = {};
-  for (const name of EDITABLE_FIELD_NAMES) {
-    const value = contact?.[name];
-    values[name] = value != null ? String(value) : "";
-  }
-  return values;
 }
 
 const ContactDetails = React.forwardRef<
@@ -78,39 +52,39 @@ const ContactDetails = React.forwardRef<
     onDirtyChange,
     onChangesChange,
     startEditable = false,
+    disabled = false,
   },
   ref,
 ) {
   const [editMode, setEditMode] = useState<boolean>(startEditable);
   const [isDirty, setIsDirty] = useState<boolean>(false);
-  const [hasChanges, setHasChanges] = useState<boolean>(false);
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
-    buildFieldValues(contact),
-  );
+  const [resetVersion, setResetVersion] = useState(0);
+  const [draft, setDraft] = useState(() => buildContactEditorDraft(contact));
 
   useImperativeHandle(
     ref,
     () => ({
-      getFormValues: () => fieldValues,
+      getFormValues: () => ({
+        ...draft.fields,
+        audience_ids: JSON.stringify(draft.audienceIds),
+        other_data: JSON.stringify(draft.otherData),
+      }),
       reset: () => {
-        setFieldValues(buildFieldValues(contact));
+        setDraft(buildContactEditorDraft(contact));
+        setResetVersion(version => version + 1);
         setIsDirty(false);
-        setHasChanges(false);
         onDirtyChange?.(false);
         onChangesChange?.(false);
       },
     }),
-    [fieldValues, contact, onDirtyChange, onChangesChange],
+    [draft, contact, onDirtyChange, onChangesChange],
   );
 
-  // The values ContactFields renders: saved contact data overlaid with
-  // whatever the user has typed so far, so edits are visible immediately.
   const effectiveContact = useMemo(
-    () => ({ ...(contact ?? {}), ...fieldValues }) as Contact,
-    [contact, fieldValues],
+    () => ({ ...(contact ?? {}), ...draft.fields }) as Contact,
+    [contact, draft.fields],
   );
 
-  // Enhanced handlers with better type safety
   const handleEdit = useCallback((): void => {
     try {
       setEditMode(true);
@@ -124,9 +98,8 @@ const ContactDetails = React.forwardRef<
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
       const { name, value } = e.target;
-      setFieldValues((prev) => ({ ...prev, [name]: value }));
+      setDraft((prev) => ({ ...prev, fields: { ...prev.fields, [name]: value } }));
       setIsDirty(true);
-      setHasChanges(true);
       onDirtyChange?.(true);
       onChangesChange?.(true);
     } catch (error) {
@@ -137,29 +110,18 @@ const ContactDetails = React.forwardRef<
   const handleAudienceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
       const { checked, value } = e.target;
-      const audienceId = parseInt(value);
-      
-      // Handle audience changes (this would typically be passed from parent)
-      setHasChanges(true);
+      const audienceId = Number(value);
+      setDraft(prev => ({ ...prev, audienceIds: checked
+        ? [...new Set([...prev.audienceIds, audienceId])]
+        : prev.audienceIds.filter(id => id !== audienceId) }));
+      setIsDirty(true);
+      onDirtyChange?.(true);
       onChangesChange?.(true);
     } catch (error) {
       logger.error('Error handling audience change:', error);
     }
-  }, [onChangesChange]);
+  }, [onChangesChange, onDirtyChange]);
 
-  // Helper function to check if contact is in audience
-  const isContactInAudience = useCallback((audienceId: number): boolean => {
-    try {
-      return contact?.contact_audience?.some(
-        (contactAud) => contactAud?.audience_id === audienceId
-      ) || false;
-    } catch (error) {
-      logger.error('Error checking audience membership:', error);
-      return false;
-    }
-  }, [contact]);
-
-  // Helper function to safely get audience name
   const getAudienceName = useCallback((audience: Audience): string => {
     try {
       return audience.name || `Call list ${audience.id}`;
@@ -182,7 +144,7 @@ const ContactDetails = React.forwardRef<
 
       <ContactFields
         contact={effectiveContact}
-        editMode={editMode}
+        editMode={editMode && !disabled}
         onInputChange={handleInputChange}
       />
 
@@ -194,11 +156,11 @@ const ContactDetails = React.forwardRef<
               <input
                 type="checkbox"
                 value={audience.id}
-                checked={isContactInAudience(audience.id)}
+                checked={draft.audienceIds.includes(audience.id)}
                 name={getAudienceName(audience)}
                 id={`audience-${audience.id}`}
                 onChange={handleAudienceChange}
-                disabled={!editMode}
+                disabled={!editMode || disabled}
                 className="rounded border-input"
               />
               <label
@@ -213,30 +175,16 @@ const ContactDetails = React.forwardRef<
       </div>
 
       <OtherDataFields
-        otherData={(() => {
-          // other_data is a jsonb array since 20260722110000; tolerate a
-          // legacy stringified value defensively (pre-migration snapshots).
-          const raw: unknown = contact?.other_data;
-          if (Array.isArray(raw)) return raw as Json[];
-          if (typeof raw === "string") {
-            try {
-              const parsed = JSON.parse(raw) as Json[];
-              return Array.isArray(parsed) ? parsed : [];
-            } catch {
-              return [];
-            }
-          }
-          return [];
-        })()}
+        key={resetVersion}
+        otherData={draft.otherData}
         editMode={editMode}
+        disabled={disabled}
         setContact={(data: ContactUpdateData) => {
-          try {
-            // Handle other data changes
-            setHasChanges(true);
-            onChangesChange?.(true);
-          } catch (error) {
-            logger.error('Error updating other data:', error);
-          }
+          if (!Array.isArray(data.other_data)) return;
+          setDraft(prev => ({ ...prev, otherData: data.other_data as Json[] }));
+          setIsDirty(true);
+          onDirtyChange?.(true);
+          onChangesChange?.(true);
         }}
       />
 
@@ -247,7 +195,7 @@ const ContactDetails = React.forwardRef<
           for existing contacts. New contacts start editable and skip it. */}
       {!editMode && (
         <div className="flex justify-end border-t border-border pt-4">
-          <Button onClick={handleEdit}>
+          <Button onClick={handleEdit} disabled={disabled}>
             <FaEdit className="mr-2" /> Edit
           </Button>
         </div>
