@@ -71,13 +71,25 @@ describe("contact editor complete draft (#2127)", () => {
       { source: "Door" },
     ]);
   });
-  test("removing Other Data reaches Save and retains non-rendered rows", () => {
+  test("removing a displayed field retains sibling keys and non-rendered rows", () => {
     const { ref } = editor();
     fireEvent.click(screen.getByRole("button", { name: "Remove notes field" }));
     expect(
       screen.queryByRole("textbox", { name: "notes" }),
     ).not.toBeInTheDocument();
-    expect(json(ref, "other_data")).toEqual([{ score: 7 }, null]);
+    expect(json(ref, "other_data")).toEqual([
+      { hidden: { enabled: true, count: 3 } },
+      { score: 7 },
+      null,
+    ]);
+  });
+  test("removing a row's only field removes that row and leaves all others intact", () => {
+    const { ref } = editor();
+    fireEvent.click(screen.getByRole("button", { name: "Remove score field" }));
+    expect(json(ref, "other_data")).toEqual([saved.other_data[0], null]);
+    expect(
+      screen.queryByRole("textbox", { name: "score" }),
+    ).not.toBeInTheDocument();
   });
   test("Reset restores text, call lists, JSON and the dirty flag", () => {
     const { ref, changed } = editor();

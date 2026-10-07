@@ -65,14 +65,19 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
   }, [newKey, newValue, otherData, setContact]);
 
   // Enhanced remove function with validation
-  const removeOtherData = useCallback((index: number): void => {
+  const removeOtherData = useCallback((index: number, key: string): void => {
     try {
       if (!otherData || index < 0 || index >= otherData.length) {
         logger.warn('Invalid index for removal');
         return;
       }
 
-      const updatedOtherData = otherData.filter((_, i) => i !== index);
+      const item = otherData[index];
+      if (!item || typeof item !== "object" || Array.isArray(item)) return;
+      const { [key]: _removed, ...remaining } = item;
+      const updatedOtherData = Object.keys(remaining).length === 0
+        ? otherData.filter((_, i) => i !== index)
+        : otherData.map((row, i) => i === index ? remaining : row);
       setContact({ other_data: updatedOtherData });
     } catch (error) {
       logger.error('Error removing other data:', error);
@@ -127,7 +132,7 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
             </FormField>
             {editMode && (
               <Button
-                onClick={() => removeOtherData(index)}
+                onClick={() => removeOtherData(index, key)}
                 disabled={disabled}
                 variant="destructive"
                 size="sm"

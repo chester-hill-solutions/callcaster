@@ -41,6 +41,21 @@ function identity(actor: string) {
   if (!value) throw new Error("Owned contact identity missing");
   return value;
 }
+async function removeOwnedFailure(trigger: string, fn: string) {
+  const failures: unknown[] = [];
+  try {
+    await sql.unsafe(`drop trigger if exists ${trigger} on contact_audience`);
+  } catch (error) {
+    failures.push(error);
+  }
+  try {
+    await sql.unsafe(`drop function if exists ${fn}()`);
+  } catch (error) {
+    failures.push(error);
+  }
+  if (failures.length)
+    throw new AggregateError(failures, "Owned contact failure cleanup failed");
+}
 async function clean() {
   await sql`delete from contact_audience where contact_id in (select id from contact where workspace in (${workspace},${foreign}))`;
   await sql`delete from contact where workspace in (${workspace},${foreign})`;
@@ -233,6 +248,14 @@ describe.skipIf(!databaseUrl)(
           .sort((a: number, b: number) => a - b),
       ).toEqual([hiddenId, addedId].sort((a, b) => a - b));
     });
+    test("removing one displayed Other Data key preserves its siblings after save and reload", async () => {
+      const other = [{ hidden: { enabled: true } }, { score: 7 }, null];
+      expect(
+        (await save(fields({ other_data: JSON.stringify(other) }))).status,
+      ).toBe(200);
+      expect((await stored()).other_data).toEqual(other);
+      expect((await (await load()).json()).contact.other_data).toEqual(other);
+    });
     test("empty arrays intentionally clear memberships and Other Data", async () => {
       expect(
         (await save(fields({ audience_ids: "[]", other_data: "[]" }))).status,
@@ -379,10 +402,7 @@ describe.skipIf(!databaseUrl)(
           await sql`select id from contact where workspace=${workspace}`,
         ).toEqual(before);
       } finally {
-        await sql.unsafe(
-          `drop trigger if exists ${trigger} on contact_audience`,
-        );
-        await sql.unsafe(`drop function if exists ${fn}()`);
+        await removeOwnedFailure(trigger, fn);
       }
     });
     test("a failed membership write rolls back text and Other Data", async () => {
@@ -400,10 +420,7 @@ describe.skipIf(!databaseUrl)(
         expect((await save()).status).toBe(500);
         expect(await stored()).toEqual(before);
       } finally {
-        await sql.unsafe(
-          `drop trigger if exists ${trigger} on contact_audience`,
-        );
-        await sql.unsafe(`drop function if exists ${fn}()`);
+        await removeOwnedFailure(trigger, fn);
       }
     });
   },
