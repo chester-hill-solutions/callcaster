@@ -168,6 +168,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Reuse recent sender checks during chat bursts while keeping messaging approval checks on each send ([#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151)).
+
 - Contact Save now keeps call-list and Other Data edits, and Reset restores the full draft ([#2127](https://github.com/chester-hill-solutions/callcaster/issues/2127), [PR #2460](https://github.com/chester-hill-solutions/callcaster/pull/2460)).
 
 - Show an unavailable recording state instead of a raw provider link when the stored playback copy is missing ([#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166), [PR #2451](https://github.com/chester-hill-solutions/callcaster/pull/2451)).

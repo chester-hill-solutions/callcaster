@@ -33,8 +33,10 @@ export class WorkspaceSmsNotReadyError extends Error {
  */
 export async function assertWorkspaceCanSendSms({
   workspaceId,
+  reuseProviderSnapshot = false,
 }: {
   workspaceId: string;
+  reuseProviderSnapshot?: boolean;
 }): Promise<void> {
   const twilioData = (await loadWorkspaceTwilioData(
     workspaceId,
@@ -43,7 +45,7 @@ export async function assertWorkspaceCanSendSms({
   const [onboarding, portalConfig, senderPool] = await Promise.all([
     getWorkspaceMessagingOnboardingState({ workspaceId }),
     getWorkspaceTwilioPortalConfig({ workspaceId }),
-    verifyWorkspaceMessagingSenderPool({ workspaceId }),
+    verifyWorkspaceMessagingSenderPool({ workspaceId, reuseProviderSnapshot }),
   ]);
 
   const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData);
