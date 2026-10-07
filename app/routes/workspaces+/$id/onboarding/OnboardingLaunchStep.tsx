@@ -58,7 +58,6 @@ export function OnboardingLaunchStep({
     ...checklist.filter((item) => item.id !== "goal"),
   ];
   const nextItem = items.find((item) => !item.complete);
-  const completeCount = items.filter((item) => item.complete).length;
   const hasNextItem = Boolean(nextItem);
 
   /**
@@ -76,11 +75,8 @@ export function OnboardingLaunchStep({
       <SectionHeader
         compact
         title="Review your setup"
-        actions={
-          <div className="flex flex-col items-end gap-2">
-            <p className="text-sm font-medium">
-              {completeCount} of {items.length} setup items complete
-            </p>
+          actions={
+          <div className="flex flex-col items-end">
             <Button asChild>
               <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
                 {nextItem ? "Continue setup" : "Go to workspace"}

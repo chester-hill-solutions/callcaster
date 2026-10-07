@@ -8,7 +8,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Global toast notifications now appear below the navigation bar instead of covering it.
 
-- Fixed: Phone-number rental and onboarding routing changes now show success or error toasts, onboarding navigation no longer has the extra section divider spacing, and onboarding status badges align to the bottom of their title lines.
+- Fixed: Phone-number rental and onboarding routing changes now show success or error toasts, onboarding navigation no longer has the extra section divider spacing, onboarding status badges align to the bottom of their title lines, and the launch review omits its redundant setup count.
 
 - Fixed: Phone-number purchase checks regulatory addresses before purchase, shows address requirements in search results, and gives a clear address error while preserving credits and recovery holds ([#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144), [PR #2468](https://github.com/chester-hill-solutions/callcaster/pull/2468)).
 
