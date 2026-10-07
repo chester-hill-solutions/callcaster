@@ -746,7 +746,7 @@ export async function listUserWorkspaceMembershipsForProfile(userId: string) {
     .from(workspaceMemberTable)
     .innerJoin(
       workspaceTable,
-      eqChsTextToUuid(workspaceMemberTable.workspace_id, workspaceTable.id),
+      eq(workspaceMemberTable.workspace_id, workspaceTable.id),
     )
     .where(eq(workspaceMemberTable.user_id, userId))
     .orderBy(desc(workspaceMemberTable.created_at));

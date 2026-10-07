@@ -27,6 +27,9 @@ suite("workspace ownership changes real distinct memberships (#2079)", () => {
     try {
       await db.transaction(async (transaction) => {
         const tx = transaction as unknown as Database;
+        await tx.execute(sql`insert into public.workspace (id, name) values
+          (${workspace}, 'Ownership fixture'),
+          (${otherWorkspace}, 'Ownership control')`);
         await tx.execute(sql`insert into public.workspace_member (id, workspace_id, user_id, role_id) values
           ('ownership-owner', ${workspace}, ${owner}, 'owner'),
           ('ownership-target', ${workspace}, ${target}, 'member'),

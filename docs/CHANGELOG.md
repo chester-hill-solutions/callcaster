@@ -170,6 +170,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Workspace deletion now removes related outreach history, events, audio metadata, audit entries and memberships through validated workspace references. ([PR #2471](https://github.com/chester-hill-solutions/callcaster/pull/2471), [#2215](https://github.com/chester-hill-solutions/callcaster/issues/2215))
+
 - Workspace setup links directly to the emergency service-address form when an address is missing ([#2470](https://github.com/chester-hill-solutions/callcaster/pull/2470), [#2469](https://github.com/chester-hill-solutions/callcaster/issues/2469)).
 
 - Route error pages show clear validation and conflict messages while hiding database details ([#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123), [PR #2464](https://github.com/chester-hill-solutions/callcaster/pull/2464)).

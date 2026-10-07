@@ -131,6 +131,10 @@ const steps = [
   "client/migrations/20261006000001_number_release_recovery.sql",
   "client/migrations/20261006000002_predictive_machine_operation.sql",
   "client/migrations/20261006000003_inbound_voicemail_delivery.sql",
+  "client/migrations/20261007000001_uuid_workspace_references.sql",
+  "client/migrations/20261007000002_workspace_audio_workspace_reference.sql",
+  "client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql",
+  "client/migrations/20261007000004_workspace_member_workspace_reference.sql",
 ];
 
 /**

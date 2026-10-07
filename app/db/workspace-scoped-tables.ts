@@ -88,7 +88,7 @@ export const WORKSPACE_SCOPED_TABLES = {
   },
   handset_session: { table: handset_session, workspaceColumn: handset_session.workspace_id, workspaceColumnName: "workspace_id" },
   workspace_users: { table: workspace_users, workspaceColumn: workspace_users.workspace_id, workspaceColumnName: "workspace_id" },
-  /** CHS membership; `workspace_id` is text (CallCaster workspace ids stored as text). */
+  /** CHS membership; workspace tenancy is UUID, user identifiers remain text. */
   workspace_member: {
     table: workspace_member,
     workspaceColumn: workspace_member.workspace_id,
