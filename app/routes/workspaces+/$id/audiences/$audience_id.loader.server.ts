@@ -1,4 +1,7 @@
 import { data as routeData } from "react-router";
+import { listAudienceUploadsByAudienceId } from "@/lib/audience-upload-db.server";
+import { logger } from "@/lib/logger.server";
+import type { AudienceUpload } from "@/lib/audience-upload.types";
 import { getAudienceDetailApi } from "@/lib/audience-detail.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -26,6 +29,8 @@ export const loader = defineLoader({
           audience_id,
           error: "Audience ID is required",
           contactsError: null,
+          uploadHistory: null,
+          uploadHistoryError: null,
           pagination: {
             currentPage: page,
             pageSize,
@@ -63,6 +68,8 @@ export const loader = defineLoader({
           audience_id,
           error: detailResult.error,
           contactsError: null,
+          uploadHistory: null,
+          uploadHistoryError: null,
           pagination: {
             currentPage: page,
             pageSize,
@@ -78,6 +85,18 @@ export const loader = defineLoader({
       );
     }
 
+    let uploadHistory: AudienceUpload[] | null = null;
+    let uploadHistoryError: string | null = null;
+    try {
+      const rows = await listAudienceUploadsByAudienceId(workspace_id, Number(audience_id));
+      uploadHistory = rows.map(({ id, audience_id, created_at, status, file_name, file_size, total_contacts, processed_contacts, processed_at, error_message }) => ({
+        id, audience_id, created_at, status, file_name, file_size, total_contacts, processed_contacts, processed_at, error_message,
+      }));
+    } catch (error) {
+      logger.error("Audience upload history lookup failed", { workspaceId: workspace_id, audienceId: audience_id, error });
+      uploadHistoryError = "Upload history could not be loaded. Try again.";
+    }
+
     return routeData<AudienceDetailLoaderData>(
       {
         contacts: detailResult.contacts,
@@ -86,6 +105,8 @@ export const loader = defineLoader({
         audience_id,
         error: null,
         contactsError: detailResult.contacts_error,
+        uploadHistory,
+        uploadHistoryError,
         pagination: {
           currentPage: detailResult.pagination.page,
           pageSize: detailResult.pagination.page_size,
