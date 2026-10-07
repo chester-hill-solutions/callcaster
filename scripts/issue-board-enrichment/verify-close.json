@@ -6579,5 +6579,274 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Native issue is OPEN; exact-head issue-on-dev workflow moved one item. Source evidence is complete and separate from deployed acceptance and release QA."
+  },
+  {
+    "issueNumber": 2148,
+    "verdict": "verify-close",
+    "recommendedTitle": "The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2456 merged at 4d9bbde26016fa3cea3753d5b4ce4919b66c3914. The inbound IVR action uses the canonical audio renderer with its workspace context. Content-only speech, recordings and WAV sidecars are covered.",
+    "resolution": "Provider playback, storage behavior and release-candidate routing still require acceptance. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/lib/ivr-block-render.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/inbound-ivr-block.route.test.ts",
+      "test/integration-db/inbound-ivr-prompt.test.ts"
+    ],
+    "missingTests": [
+      "Provider playback, storage behavior and release-candidate routing still require acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).",
+      "A block with an `audioFile` still plays the recording.",
+      "A block with a WAV sidecar still uses the sidecar.",
+      "There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing)."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2456 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "The inbound action had a separate renderer that read audioFile for synthesized speech and omitted shared sidecar lookup."
+  },
+  {
+    "issueNumber": 2138,
+    "verdict": "verify-close",
+    "recommendedTitle": "Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2458 merged at 9e5bbdb38d77c7b6480aa650e4afc097bcf1e75d. Verified non-member sudo access and protected admin membership writes are implemented. Shared services lock membership changes and enforce sole-owner and target enrollment rules.",
+    "resolution": "Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/components/workspace/TeamMember.tsx",
+      "app/lib/platform-admin.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/lib/workspace-members-db.server.ts",
+      "app/routes/admin+/users/$userId/workspaces.action.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/invite.route.tsx",
+      "app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/platform-membership-safety.test.ts",
+      "test/ui/platform-member-controls.test.tsx",
+      "test/workspace-members-rbac.test.ts",
+      "test/workspace-ownership-transfer.test.ts"
+    ],
+    "missingTests": [
+      "Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459."
+    ],
+    "acceptanceCriteria": [
+      "A verified sudo user can open the Access tab without workspace membership.",
+      "A user without sudo access cannot open the admin route, regardless of workspace role.",
+      "Access-tab and sudo API mutations refuse sole-owner removal or demotion.",
+      "Access-tab and sudo API mutations refuse owner/admin grants to a target without required two-factor enrollment.",
+      "Permitted sudo mutations and existing member-path protections continue to work."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2458 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "The Access route mixed platform and workspace roles, while separate admin writers omitted membership safety rules."
+  },
+  {
+    "issueNumber": 2127,
+    "verdict": "verify-close",
+    "recommendedTitle": "The contact page's \"Call lists\" checkboxes and the whole \"Other Data\" editor are discarded, yet Save reports success",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2460 merged at 8672297b1b3a97dcf2744b31e80f421b860a1da0. The contact editor sends list membership and Other Data drafts through Save and persists them atomically with tenant validation. Reset, reload, create and refused edits are covered.",
+    "resolution": "Validate the released contact editor with candidate data and complete default-branch promotion. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/components/contact/ContactDetails.tsx",
+      "app/components/contact/ContactDetailsOtherFields.tsx",
+      "app/lib/contact-editor.ts",
+      "app/routes/workspaces+/$id/contacts/$contactId.action.server.ts",
+      "app/routes/workspaces+/$id/contacts/$contactId.route.tsx",
+      "app/server/contact-editor.server.ts"
+    ],
+    "existingTests": [
+      "test/contact-detail-action.route.test.ts",
+      "test/integration-db/contact-editor-save.test.ts",
+      "test/ui/_helpers/contact-editor.ts",
+      "test/ui/contact-editor-drafts.test.tsx",
+      "test/ui/contact-editor-route.test.tsx"
+    ],
+    "missingTests": [
+      "Validate the released contact editor with candidate data and complete default-branch promotion."
+    ],
+    "acceptanceCriteria": [
+      "Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).",
+      "Editing an \"Other Data\" field persists and survives a reload (kill-check).",
+      "If the controls are removed instead, they are absent rather than inert.",
+      "The unfinished-wiring comment is gone."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2460 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "The draft and action transport omitted call-list membership and Other Data values."
+  },
+  {
+    "issueNumber": 2151,
+    "verdict": "verify-close",
+    "recommendedTitle": "Cache interactive SMS readiness checks and measure Twilio read cost",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2462 merged at b2e8c712d9baab0b8f8f75a08b0b31be8df7d3a3. Interactive chat uses a 30-second sender-pool cache with version-fenced invalidation. Campaign ticks retain a fresh gate. Measured ten-message chat bursts use one sender read; three-message campaign ticks use one.",
+    "resolution": "Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/lib/chat-sms.server.ts",
+      "app/lib/merge-workspace-twilio-data.server.ts",
+      "app/lib/twilio-readiness.server.ts",
+      "app/lib/twilio-sender-pool.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/interactive-sender-cache.test.ts",
+      "test/interactive-sender-pool-cache.test.ts",
+      "test/twilio-sender-pool.server.test.ts"
+    ],
+    "missingTests": [
+      "Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A dispatch tick of N messages performs **one** readiness evaluation, not N (kill-check: revert to the per-message call and confirm the test goes red).",
+      "A chat burst re-lists the sender pool at most once per TTL window.",
+      "A non-ready campaign dispatch defers before row selection and does not spend queue attempts; this behavior is already implemented by PR #2228.",
+      "The before/after Twilio request count for a representative tick is recorded in the issue.",
+      "The chat readiness cache expires and invalidates after relevant sender/configuration changes."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2462 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "Chat readiness listed the live sender pool on each send without a bounded cache; campaign gating was already present."
+  },
+  {
+    "issueNumber": 2124,
+    "verdict": "verify-close",
+    "recommendedTitle": "Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2463 merged at c26088ad5f34c68d7cd32883405dffb11a0bb5c4. The redirect scanner reads whole-file syntax and both ratchets reject stale baseline entries. Replacing mocks are counted per occurrence; 24 stale keys were removed without new exceptions.",
+    "resolution": "Validate the guards on the final release candidate and promote through the default branch. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "scripts/baselines/test-mock-replace.txt",
+      "scripts/check-relative-redirects.mjs",
+      "scripts/check-test-mock-coverage.mjs"
+    ],
+    "existingTests": [
+      "test/check-guard-ratchets.test.ts"
+    ],
+    "missingTests": [
+      "Validate the guards on the final release candidate and promote through the default branch."
+    ],
+    "acceptanceCriteria": [
+      "A multiline relative redirect fails. An absolute /foo redirect remains outside the relative-redirect guard.",
+      "Both guards reject stale baselines.",
+      "The mock baseline records per-occurrence counts.",
+      "Fixture tests prove fail and pass cases."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2463 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "Line-based redirect scanning and set-based mock keys missed multiline calls and repeated occurrences, while stale entries were tolerated."
+  },
+  {
+    "issueNumber": 2123,
+    "verdict": "verify-close",
+    "recommendedTitle": "The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2464 merged at 171f6fca4c7ec5be368d62a521c8063037af5d59. Root and nested error boundaries now extract recognized safe response messages through the shared sanitizer. Internal database/query data falls back to safe text; 404 handling remains.",
+    "resolution": "Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/components/shared/RouteErrorBoundary.tsx",
+      "app/lib/user-message.ts",
+      "app/root.tsx"
+    ],
+    "existingTests": [
+      "test/user-message.test.ts",
+      "test/ui/route-error-messages.test.tsx"
+    ],
+    "missingTests": [
+      "Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim."
+    ],
+    "acceptanceCriteria": [
+      "A 403 thrown as \"You do not have access to this workspace\" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).",
+      "A 404 still renders its not-found treatment (the existing correct behaviour must stay green).",
+      "A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.",
+      "Safe string response data and recognized structured error payloads both produce the intended message.",
+      "Response data containing a driver/internal message produces a safe fallback.",
+      "Missing or unrecognized response data uses the status fallback."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2464 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.",
+    "rootCause": "The nested boundary discarded response messages, while the root accepted only strings and unsafe response data needed filtering."
+  },
+  {
+    "issueNumber": 2067,
+    "verdict": "verify-close",
+    "recommendedTitle": "check:effects never verifies @effect-deps against the real dependency array",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2465 merged at cd9a3e22d16f3114c00e8069556cfab70c155eb8. The effects guard compares complete @effect-deps tags with actual arrays, checks qualified calls and stale entries, and supports a documented escape. Four omitted ContactSearchDialog dependency annotations were corrected.",
+    "rootCause": "The guard checked annotation presence but not dependency agreement; wrapped tags require complete parsing before debt is recorded.",
+    "resolution": "Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/components/queue/ContactSearchDialog.tsx",
+      "docs/effects-inventory.md",
+      "docs/effects-strictness.md",
+      "scripts/check-effects.mjs",
+      "scripts/effects-deps-baseline.json",
+      "scripts/lib/effects-lib.mjs"
+    ],
+    "existingTests": [
+      "test/effect-dependencies.test.ts",
+      "test/ui/contact-search-dialog.test.tsx"
+    ],
+    "missingTests": [
+      "Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed."
+    ],
+    "acceptanceCriteria": [
+      "A disagreeing annotation fails `check:effects`",
+      "The comparison rule is written down, with its escape hatch",
+      "The guard has fixture tests for both the fail and the pass case",
+      "A `React.useEffect(` call is not silently skipped"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2465 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified."
+  },
+  {
+    "issueNumber": 2455,
+    "acceptanceCriteria": [
+      "A valid B-workspace signed call cannot render, redirect to or sign audio for an A-workspace number, even when the called phone matches.",
+      "Missing call workspace and missing/foreign number or script fail closed before audio signing.",
+      "Correct workspace calls retain documented speech, MP3/WAV playback, Gather nesting and routing.",
+      "Invalid signatures and changed called phones remain denied.",
+      "Real signed HTTP/database tests cover page, block and response boundaries. Remove each workspace guard separately and require an executed failure with valid controls.",
+      "One atomic PR; full local CI before every push and exact-head remote database/E2E/deployment gates before merge. Deployed acceptance and default-branch promotion remain required for closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "recommendedTitle": "Bind inbound IVR page and block requests to the signed call workspace",
+    "verdict": "verify-close",
+    "summary": "Source repair merged into dev; candidate acceptance and default-branch promotion remain.",
+    "currentBehavior": "Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2457 merged at 31230d93b5a47396cf1b040860339ab5c89ec1f0. Inbound page and block actions bind the signed persisted call to the verified number workspace before routing, rendering or signing audio.",
+    "rootCause": "Page and block actions checked phone matching but omitted the signed call-to-number workspace comparison; the response action already had it.",
+    "resolution": "Live signed-call and storage acceptance, release QA and default-branch promotion remain. Do not close from dev source evidence alone.",
+    "lookIn": [
+      "app/lib/inbound-ivr-db.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/inbound-ivr-workspace.test.ts"
+    ],
+    "missingTests": [
+      "Live signed-call and storage acceptance, release QA and default-branch promotion remain."
+    ],
+    "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2457 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified."
   }
 ]

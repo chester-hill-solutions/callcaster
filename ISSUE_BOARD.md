@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f1fc3ef5df1316c8f57b12d3c82afa7f4f001ba9; merged fixes and native source evidence, 7 October 2026 UTC` · 330 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 332 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks read:project. IN PROGRESS markers are retained from the prior board at dev@bebfbe7096eb20d35bd7c8d4d1672eeb4ef1bb39 (with earlier cached evidence from dev@8cb8c0f7); they are not current verification results. Native issue state, labels and assignees come from the complete REST snapshot at 2026-10-07T03:56:07.702516+00:00. Source descriptions separate merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers. Eligible work excludes issues assigned or co-assigned to other developers. No current Project Status read is claimed.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,9 +31,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 15
+## Fix now — 9
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170) Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
+- A 2026-09-28 run found 18 rejected workspace credentials. Current code still selects API-key auth without rejection-time fallback, and number release uses the same client. Current credential liveness was not measured in this audit.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The 18 stale-credential failures are historical incident evidence. Current client selection has no fallback after an API-key rejection; release still uses that client.
+- Root cause: Stored credentials were rejected in the incident; the rotation cause is not proved. Client construction prefers a key, but does not automatically retry a rejected key with the Auth Token.
+- Resolution: Detect and report provider credential rejection. Select a reviewed recovery path using the existing re-auth capability or platform-owned release path. Coordinate release ordering with #2085; verify current credential liveness separately.
+- Look in: `app/lib/database/workspace.server.ts:461`, `app/lib/database/workspace.server.ts:497`, `app/lib/database/workspace-twilio-subaccount.server.ts (createSubaccount/createKeys; the place credentials are minted and would be rotated)`, `app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber — authenticates with the workspace credential)`, `master.api.v2010.accounts(subAccountSid) — the working path for platform-operated calls`
+- Existing tests: none that exercise a stale or rejected subaccount credential
+- Missing tests: Inject provider auth rejection and prove recovery or a named degraded state; verify current liveness separately.
+- Done when: Rejected workspace credentials produce a named degraded state or a tested recovery path.; A customer can release their own platform-owned number under the selected credential-recovery contract.; Valid credentials retain supported operations without unnecessary re-authentication.; The current live credential state is measured separately; the historical 18 failures are not reported as a fresh result.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2215](https://github.com/chester-hill-solutions/callcaster/issues/2215) Add the five workspace foreign keys missing from the active bootstrap lineage
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
@@ -46,29 +58,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Inspect the supported database lineages and record the actual missing workspace constraints.; Add workspace(id) foreign keys with ON DELETE CASCADE for outreach_attempt and workspace_events after checking orphan rows.; Convert and constrain workspace_member.workspace_id, workspace_audit_event.workspace_id and workspace_audio.workspace_id in separate validated changes, or track explicit blocking tasks.; A real-Postgres test checks every registered tenancy table for the intended workspace FK and proves cascade behavior.; A model/database type check covers workspace.id and tenancy columns.
 - Tracker: Native scope and all original acceptance criteria remain open. Current development catalog measurements are recorded in the issue; no rows or schema were changed. Production and staging integrity, migration validation and source implementation remain.
 
-### [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170) Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-10-02
-- A 2026-09-28 run found 18 rejected workspace credentials. Current code still selects API-key auth without rejection-time fallback, and number release uses the same client. Current credential liveness was not measured in this audit.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The 18 stale-credential failures are historical incident evidence. Current client selection has no fallback after an API-key rejection; release still uses that client.
-- Root cause: Stored credentials were rejected in the incident; the rotation cause is not proved. Client construction prefers a key, but does not automatically retry a rejected key with the Auth Token.
-- Resolution: Detect and report provider credential rejection. Select a reviewed recovery path using the existing re-auth capability or platform-owned release path. Coordinate release ordering with #2085; verify current credential liveness separately.
-- Look in: `app/lib/database/workspace.server.ts:461`, `app/lib/database/workspace.server.ts:497`, `app/lib/database/workspace-twilio-subaccount.server.ts (createSubaccount/createKeys; the place credentials are minted and would be rotated)`, `app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber — authenticates with the workspace credential)`, `master.api.v2010.accounts(subAccountSid) — the working path for platform-operated calls`
-- Existing tests: none that exercise a stale or rejected subaccount credential
-- Missing tests: Inject provider auth rejection and prove recovery or a named degraded state; verify current liveness separately.
-- Done when: Rejected workspace credentials produce a named degraded state or a tested recovery path.; A customer can release their own platform-owned number under the selected credential-recovery contract.; Valid credentials retain supported operations without unnecessary re-authentication.; The current live credential state is measured separately; the historical 18 failures are not reported as a fresh result.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151) Cache interactive SMS readiness checks and measure Twilio read cost
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Campaign per-contact readiness overhead is fixed by PR #2228 (#2081). Chat remains per send without a TTL.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. One readiness evaluation per campaign dispatch; chat still verifies the live sender pool per message.
-- Resolution: Add a short workspace-keyed TTL with sender/config invalidation for interactive sends and record measured request cost. Do not move the campaign gate again.
-- Look in: `app/lib/campaign-sms-dispatch.server.ts:154`, `app/lib/campaign-sms-pre-dispatch-gate.server.ts:119`, `app/lib/chat-sms.server.ts:86`, `app/lib/twilio-readiness.server.ts:46`, `test/campaign-sms-workspace-readiness.test.ts:173`, `app/lib/campaign-sms-send.server.ts:75-82`, `app/lib/twilio-readiness.server.ts:66-88`, `app/lib/messaging-onboarding/predicates.ts:458-471 (`sender_pool_in_sync`)`, `app/lib/campaign-sms-dispatch.server.ts (the tick)`, `app/lib/campaign-sms-guards` / the chat send path`
-- Existing tests: test/campaign-sms-workspace-readiness.test.ts covers whole-dispatch readiness deferral and no per-row attempt burn.; test/campaign-sms-send.server.test.ts
-- Missing tests: Chat burst/cache-expiry/invalidation test and representative before/after request counts.
-- Done when: A dispatch tick of N messages performs **one** readiness evaluation, not N (kill-check: revert to the per-message call and confirm the test goes red).; A chat burst re-lists the sender pool at most once per TTL window.; A non-ready campaign dispatch defers before row selection and does not spend queue attempts; this behavior is already implemented by PR #2228.; The before/after Twilio request count for a representative tick is recorded in the issue.; The chat readiness cache expires and invalidates after relevant sender/configuration changes.
-- Tracker: Partial fix. Keep Fix now for the remaining chat/cache and measurement scope. Related PR evidence: #2228. A PR reference alone does not prove deployed behavior.
-
 ### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - Number purchase still has explicit deferred-Q43 code and no regulatory addressSid. Its service-address precheck and validated emergencyAddressSid do not resolve local/foreign regulatory requirements.
@@ -79,39 +68,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A number with `addressRequirements: "local"` and no validated address returns 400 with the address-specific message, and no Twilio number is created (kill-check: remove the resolve call and confirm the test goes red).; With a compliant address, the purchase succeeds and passes `addressSid`.; A `foreign` requirement is satisfied by a foreign address.; The badge is visible on the search row.; No purchase path returns 500 for an address requirement.
 - Tracker: Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter.
 
-### [#2138](https://github.com/chester-hill-solutions/callcaster/issues/2138) Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Non-member sudo still cannot use Access tab. Tab mutations call member helpers that now enforce protection; the separate sudo membership API calls admin writers that omit sole-owner/MFA guards.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Access tab remains membership-gated and its update/delete adapters call member helpers with protection. A separate sudo API bypasses those helpers and uses unguarded platform-admin membership writers.
-- Root cause: Platform role and workspace role are mixed in the Access tab; parallel sudo writer APIs bypass the product membership safety policy.
-- Resolution: Derive Access tab authorization from verified sudo context. Use shared protected admin mutation services on both tab and sudo JSON API; enforce sole-owner and MFA policy there and define recovery for existing ownerless workspaces.
-- Look in: `app/lib/platform-admin.server.ts:375`, `app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts:31`, `app/lib/platform-members.server.ts:416`, `app/lib/platform-admin.server.ts:277`, `app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts:103`, `app/routes/admin+/workspaces/$workspaceId/invite.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts`, `app/lib/platform-members.server.ts:220-235,440-475`, `app/lib/two-factor.server.ts:181-204`, `app/routes/workspaces+/$id/settings.action.server.ts:66-75`, `app/routes/workspaces+/$id/settings.route.tsx:84-86,235`
-- Missing tests: Need non-member sudo access, sole-owner refuse, target MFA refuse on sudo API/tab, permitted admin change and member-path controls.
-- Done when: A verified sudo user can open the Access tab without workspace membership.; A user without sudo access cannot open the admin route, regardless of workspace role.; Access-tab and sudo API mutations refuse sole-owner removal or demotion.; Access-tab and sudo API mutations refuse owner/admin grants to a target without required two-factor enrollment.; Permitted sudo mutations and existing member-path protections continue to work.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2127](https://github.com/chester-hill-solutions/callcaster/issues/2127) The contact page's "Call lists" checkboxes and the whole "Other Data" editor are discarded, yet Save reports success
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Both contact editor defects remain. Checkbox changes and Other Data callbacks only mark changes; the imperative Save contract and action transport only text fields.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The handlers still discard both values. Save reads only fieldValues and the action handles text fields, so this needs UI contract and server persistence work.
-- Resolution: Lift both edits into the Save contract and validate workspace-scoped membership/other_data writes, or remove these controls. Cover save and reload, reset, and existing text fields as a positive control.
-- Look in: `app/components/contact/ContactDetails.tsx:137`, `app/components/contact/ContactDetails.tsx:232`, `app/components/contact/ContactDetails.tsx:94`, `app/routes/workspaces+/$id/contacts/$contactId.action.server.ts:59`, `app/components/contact/ContactDetails.tsx:137-148,232-240`, `the `OtherDataFields` component it passes the setter to`, `the contact update action and `ContactUpdateData`, `app/lib/contacts/`, `app/routes/workspaces+/$id/contacts*`
-- Existing tests: test/ui/contact-details-form-values.test.tsx
-- Missing tests: Current contact-details-form-values tests verify text capture and Other Data accessible names only, not changed data persistence.
-- Done when: Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).; Editing an "Other Data" field persists and survives a reload (kill-check).; If the controls are removed instead, they are absent rather than inert.; The unfinished-wiring comment is gone.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2067](https://github.com/chester-hill-solutions/callcaster/issues/2067) check:effects never verifies @effect-deps against the real dependency array
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.
-- Root cause: The guard checks for the presence of an annotation, not its truth. An annotation nobody verifies is a comment, and a comment about behaviour is worse than no comment because it is trusted.
-- Resolution: Implement dependency comparison with a documented escape rule; coordinate scope with #2104 scanner repair.
-- Look in: `scripts/check-effects.mjs:101`, `scripts/lib/effects-lib.mjs:18`, `scripts/check-effects.mjs:124,145`, `scripts/effects-baseline.json`, `app/components/ui/datetime.tsx (the live passing violation, and also the un-gated React.useEffect call)`
-- Existing tests: test/effects-compliance.test.ts covers annotation compliance rules; dependency-array/scanner fixtures remain missing.
-- Missing tests: Fixture tests must fail mismatched annotations and accept matching arrays plus a justified escape.
-- Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+### [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459) The Access form shows two success notices for one recovery click
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- One click was measured as one POST, one membership update and two notices. A local existing-panel repair is tested; final browser approval remains pending.
+- Current behavior: Local 784265970c6d40f09667938c80a4909e22ff073c on older dev@8672297b1b3a97dcf2744b31e80f421b860a1da0 uses TabsContent around the admin Outlet. Six real parent/Access Router cases, full local CI, 1,001 actual PostgreSQL cases and both source reviews pass. There is no PR or candidate browser acceptance.
+- Root cause: The routed Access child was rendered in both the React Aria Tabs collection builder and visible tree because it lacked a TabPanel boundary. The measured original full-app case has one request and one write, so it is a presentation defect.
+- Resolution: Complete the explicitly approved isolated browser role tests, require one notice per result and zero page-landmark movement at phone/desktop widths, then refresh onto current dev and repeat full gates/reviews before one atomic PR. Preserve repeat messages, pending controls, owner safety and the single root host.
+- Look in: `app/routes/admin+/workspaces/$workspaceId.route.tsx`, `app/components/ui/tabs.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`
+- Missing tests: Candidate full-app notice/request/write counts, repeat Owner action, sole-owner refusal and phone/desktop landmarks await role-test approval. Local test/ui/admin-access-result-notices.test.tsx has six passing Router cases but is not on dev.
+- Done when: One recovery click produces one result notice after loader revalidation. Measure request/write counts before claiming a duplicate mutation or repairing that boundary.; A later valid action still produces its own result, including the same message. Error and warning results remain visible and are not suppressed by a previous success.; Navigation, revalidation and ordinary renders do not replay a handled result. Preserve pending controls, owner safety, target enrollment and saved data.; Success/error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths. Keep the shared component library and single root host.; Add an executed failing regression with valid controls, then prove restored behavior. Pass full local CI, independent source reviews, applicable exact-head remote gates and deployments before an atomic merge. Keep deployed release acceptance separate.
+- Tracker: Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain.
 
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
@@ -125,40 +91,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
 - Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
 
-### [#2124](https://github.com/chester-hill-solutions/callcaster/issues/2124) Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Both guards still accept stale baseline entries. Redirect scanning also remains line-based, and replacing mocks are stored as a set rather than occurrence counts.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Both guards still accept stale baseline entries. Redirect scanning also remains line-based, and replacing mocks are stored as a set rather than occurrence counts.
-- Resolution: Make both ratchets fail stale entries; parse multiline redirects and count mock occurrences.
-- Look in: `scripts/check-relative-redirects.mjs:66`, `scripts/check-relative-redirects.mjs:137`, `scripts/check-test-mock-coverage.mjs:74`, `scripts/check-test-mock-coverage.mjs:89`, `scripts/check-relative-redirects.mjs:36,134-142 (the regex is correct; the stale branch is not)`, `scripts/check-test-mock-coverage.mjs:15-16,72-76,80-93,112`, `scripts/check-queue-rpc-contract.mjs:135-145 (the correct pattern to copy)`, `scripts/baselines/relative-redirects.json`, `scripts/baselines/test-mock-replace.txt`
-- Existing tests: None. Neither guard has a fixture test that proves it can fail in the stale direction.
-- Missing tests: A multiline relative redirect such as redirect(
- "./foo"
-) fails.; A stale baseline fails with a rewrite hint.; Repeated replacing mocks for one file/module increase the count and fail.
-- Done when: A multiline relative redirect fails. An absolute /foo redirect remains outside the relative-redirect guard.; Both guards reject stale baselines.; The mock baseline records per-occurrence counts.; Fixture tests prove fail and pass cases.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123) The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- The nested boundary still drops response data. The issue understates the contract: middleware and error mapper often supply JSON {error,...}, while root only accepts string data; not all mapper data is sanitized.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Nested boundary discards all response data. Common 403 data is a JSON error object; the root handles strings only. Raw mapper messages cannot be trusted unconditionally.
-- Resolution: Extract recognized response message shapes with sanitization; do not blindly render error.data or copy the root string-only logic.
-- Look in: `app/components/shared/RouteErrorBoundary.tsx:34`, `app/lib/workspace-middleware.server.ts:69`, `app/lib/errors.server.ts:85`, `app/root.tsx:249`, `the nested `RouteErrorBoundary` component`, `app/lib/handler.server (`createErrorResponse`)`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/root.tsx (the correct reader)`
-- Existing tests: test/ui/components-shared-smoke.test.tsx
-- Missing tests: Existing shared smoke tests cover 404 and raw-driver fallback, but the 403 test pins status-only text. Add safe string data, safe JSON error data, unknown/driver response data, and empty-data fallback.
-- Done when: A 403 thrown as "You do not have access to this workspace" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).; A 404 still renders its not-found treatment (the existing correct behaviour must stay green).; A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.; Safe string response data and recognized structured error payloads both produce the intended message.; Response data containing a driver/internal message produces a safe fallback.; Missing or unrecognized response data uses the status fallback.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148) The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Inbound IVR still renders synthesized audio from audioFile only, while content may contain the spoken text. Recorded audio also bypasses the shared WAV-sidecar renderer.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Inbound IVR still renders synthesized audio from audioFile only, while content may contain the spoken text. Recorded audio also bypasses the shared WAV-sidecar renderer.
-- Resolution: Use the shared IVR block audio renderer on inbound routes with the loaded workspace context.
-- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts:25`, `the inbound IVR block route under `app/routes/api+/inbound-ivr/`, `app/lib/ivr-block-render.server.ts (`renderIvrBlock`)`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-wav.server.ts`, `docs/script-json-format.md`, `test/fixtures/script-wire/documented-format.json`
-- Existing tests: test/inbound-ivr-block.route.test.ts; test/ivr-wav.server.test.ts
-- Missing tests: Inbound content-only speech must be audible; recorded blocks use the supported sidecar path.
-- Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
+- Reviewed source and PR #2466 are green; live cleanup approval remains pending before merge.
+- Current behavior: PR #2466 at 4a940591db5116c156c3d270529d471ab1970f23 removes four obsolete-key entries and adds Railway plan guidance. All local/remote gates and exact-head preview deployments pass. Each of three read-only plans deletes only the obsolete app key. The dev push workflow refuses that destructive drift if the live old key remains.
+- Root cause: Preservation lists and staging sync retained STRIPE_API_KEY although the verified deployed app and worker sources use STRIPE_SECRET_KEY.
+- Resolution: After explicit approval, commit only the three old app-key deletions through the verified explicit patch with skipDeploys. Preserve all other variables, resources and staged changes; verify no redeploy and fresh plan convergence before merging. Do not apply a broad environment plan or bypass the destructive-drift guard.
+- Look in: `.railway/environments/dev.ts:22`, `.railway/environments/staging.ts:35`, `.railway/environments/production.ts:28`, `scripts/railway/sync-staging-vars.sh:33`
+- Missing tests: Live deletion approval, exact read-back preservation and fresh converged plans remain. No live mutation has been executed.
+- Done when: STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.; STRIPE_SECRET_KEY remains configured for the app and worker where required.; Repository checks pass.; Confirm no external runtime consumer depends on STRIPE_API_KEY.
+- Tracker: Keep source and live configuration acceptance distinct. PR #2466 remains draft until the live cleanup decision is resolved; it is not merged or release-ready.
 
 ### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
@@ -171,17 +113,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-04
-- Four active Railway configuration lists still preserve or copy STRIPE_API_KEY. App and worker use STRIPE_SECRET_KEY.
-- Current behavior: Source audit dev@8ae867ed, 2026-10-04: dev, staging and production IaC plus the staging app copy list retain the obsolete key. No app runtime use was found. External runtime use is not yet verified.
-- Root cause: The active environment preservation and staging copy lists still include the old variable.
-- Resolution: Verify that no external runtime consumer needs the old key, then remove it from the four active lists while preserving STRIPE_SECRET_KEY for app and worker.
-- Look in: `.railway/environments/dev.ts:22`, `.railway/environments/staging.ts:35`, `.railway/environments/production.ts:28`, `scripts/railway/sync-staging-vars.sh:33`
-- Missing tests: Confirm external runtime consumers before removal. Verify required Stripe secret configuration and full repository checks.
-- Done when: STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.; STRIPE_SECRET_KEY remains configured for the app and worker where required.; Repository checks pass.; Confirm no external runtime consumer depends on STRIPE_API_KEY.
-- Tracker: Native issue updated with source proof. Fix now; keep the external-consumer acceptance check open until verified.
 
 ### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -208,9 +139,105 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 205
+## Verify and close — 213
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2067](https://github.com/chester-hill-solutions/callcaster/issues/2067) check:effects never verifies @effect-deps against the real dependency array
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2465 merged at cd9a3e22d16f3114c00e8069556cfab70c155eb8. The effects guard compares complete @effect-deps tags with actual arrays, checks qualified calls and stale entries, and supports a documented escape. Four omitted ContactSearchDialog dependency annotations were corrected.
+- Root cause: The guard checked annotation presence but not dependency agreement; wrapped tags require complete parsing before debt is recorded.
+- Resolution: Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed. Do not close from dev source evidence alone.
+- Look in: `app/components/queue/ContactSearchDialog.tsx`, `docs/effects-inventory.md`, `docs/effects-strictness.md`, `scripts/check-effects.mjs`, `scripts/effects-deps-baseline.json`, `scripts/lib/effects-lib.mjs`
+- Existing tests: test/effect-dependencies.test.ts; test/ui/contact-search-dialog.test.tsx
+- Missing tests: Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed.
+- Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2465 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123) The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2464 merged at 171f6fca4c7ec5be368d62a521c8063037af5d59. Root and nested error boundaries now extract recognized safe response messages through the shared sanitizer. Internal database/query data falls back to safe text; 404 handling remains.
+- Root cause: The nested boundary discarded response messages, while the root accepted only strings and unsafe response data needed filtering.
+- Resolution: Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim. Do not close from dev source evidence alone.
+- Look in: `app/components/shared/RouteErrorBoundary.tsx`, `app/lib/user-message.ts`, `app/root.tsx`
+- Existing tests: test/user-message.test.ts; test/ui/route-error-messages.test.tsx
+- Missing tests: Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim.
+- Done when: A 403 thrown as "You do not have access to this workspace" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).; A 404 still renders its not-found treatment (the existing correct behaviour must stay green).; A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.; Safe string response data and recognized structured error payloads both produce the intended message.; Response data containing a driver/internal message produces a safe fallback.; Missing or unrecognized response data uses the status fallback.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2464 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2124](https://github.com/chester-hill-solutions/callcaster/issues/2124) Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2463 merged at c26088ad5f34c68d7cd32883405dffb11a0bb5c4. The redirect scanner reads whole-file syntax and both ratchets reject stale baseline entries. Replacing mocks are counted per occurrence; 24 stale keys were removed without new exceptions.
+- Root cause: Line-based redirect scanning and set-based mock keys missed multiline calls and repeated occurrences, while stale entries were tolerated.
+- Resolution: Validate the guards on the final release candidate and promote through the default branch. Do not close from dev source evidence alone.
+- Look in: `scripts/baselines/test-mock-replace.txt`, `scripts/check-relative-redirects.mjs`, `scripts/check-test-mock-coverage.mjs`
+- Existing tests: test/check-guard-ratchets.test.ts
+- Missing tests: Validate the guards on the final release candidate and promote through the default branch.
+- Done when: A multiline relative redirect fails. An absolute /foo redirect remains outside the relative-redirect guard.; Both guards reject stale baselines.; The mock baseline records per-occurrence counts.; Fixture tests prove fail and pass cases.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2463 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151) Cache interactive SMS readiness checks and measure Twilio read cost
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2462 merged at b2e8c712d9baab0b8f8f75a08b0b31be8df7d3a3. Interactive chat uses a 30-second sender-pool cache with version-fenced invalidation. Campaign ticks retain a fresh gate. Measured ten-message chat bursts use one sender read; three-message campaign ticks use one.
+- Root cause: Chat readiness listed the live sender pool on each send without a bounded cache; campaign gating was already present.
+- Resolution: Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance. Do not close from dev source evidence alone.
+- Look in: `app/lib/chat-sms.server.ts`, `app/lib/merge-workspace-twilio-data.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/twilio-sender-pool.server.ts`
+- Existing tests: test/integration-db/interactive-sender-cache.test.ts; test/interactive-sender-pool-cache.test.ts; test/twilio-sender-pool.server.test.ts
+- Missing tests: Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance.
+- Done when: A dispatch tick of N messages performs **one** readiness evaluation, not N (kill-check: revert to the per-message call and confirm the test goes red).; A chat burst re-lists the sender pool at most once per TTL window.; A non-ready campaign dispatch defers before row selection and does not spend queue attempts; this behavior is already implemented by PR #2228.; The before/after Twilio request count for a representative tick is recorded in the issue.; The chat readiness cache expires and invalidates after relevant sender/configuration changes.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2462 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2127](https://github.com/chester-hill-solutions/callcaster/issues/2127) The contact page's "Call lists" checkboxes and the whole "Other Data" editor are discarded, yet Save reports success
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2460 merged at 8672297b1b3a97dcf2744b31e80f421b860a1da0. The contact editor sends list membership and Other Data drafts through Save and persists them atomically with tenant validation. Reset, reload, create and refused edits are covered.
+- Root cause: The draft and action transport omitted call-list membership and Other Data values.
+- Resolution: Validate the released contact editor with candidate data and complete default-branch promotion. Do not close from dev source evidence alone.
+- Look in: `app/components/contact/ContactDetails.tsx`, `app/components/contact/ContactDetailsOtherFields.tsx`, `app/lib/contact-editor.ts`, `app/routes/workspaces+/$id/contacts/$contactId.action.server.ts`, `app/routes/workspaces+/$id/contacts/$contactId.route.tsx`, `app/server/contact-editor.server.ts`
+- Existing tests: test/contact-detail-action.route.test.ts; test/integration-db/contact-editor-save.test.ts; test/ui/_helpers/contact-editor.ts; test/ui/contact-editor-drafts.test.tsx; test/ui/contact-editor-route.test.tsx
+- Missing tests: Validate the released contact editor with candidate data and complete default-branch promotion.
+- Done when: Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).; Editing an "Other Data" field persists and survives a reload (kill-check).; If the controls are removed instead, they are absent rather than inert.; The unfinished-wiring comment is gone.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2460 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2138](https://github.com/chester-hill-solutions/callcaster/issues/2138) Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2458 merged at 9e5bbdb38d77c7b6480aa650e4afc097bcf1e75d. Verified non-member sudo access and protected admin membership writes are implemented. Shared services lock membership changes and enforce sole-owner and target enrollment rules.
+- Root cause: The Access route mixed platform and workspace roles, while separate admin writers omitted membership safety rules.
+- Resolution: Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459. Do not close from dev source evidence alone.
+- Look in: `app/components/workspace/TeamMember.tsx`, `app/lib/platform-admin.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/admin+/users/$userId/workspaces.action.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.route.tsx`, `app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts`
+- Existing tests: test/integration-db/platform-membership-safety.test.ts; test/ui/platform-member-controls.test.tsx; test/workspace-members-rbac.test.ts; test/workspace-ownership-transfer.test.ts
+- Missing tests: Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459.
+- Done when: A verified sudo user can open the Access tab without workspace membership.; A user without sudo access cannot open the admin route, regardless of workspace role.; Access-tab and sudo API mutations refuse sole-owner removal or demotion.; Access-tab and sudo API mutations refuse owner/admin grants to a target without required two-factor enrollment.; Permitted sudo mutations and existing member-path protections continue to work.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2458 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2455](https://github.com/chester-hill-solutions/callcaster/issues/2455) Bind inbound IVR page and block requests to the signed call workspace
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2457 merged at 31230d93b5a47396cf1b040860339ab5c89ec1f0. Inbound page and block actions bind the signed persisted call to the verified number workspace before routing, rendering or signing audio.
+- Root cause: Page and block actions checked phone matching but omitted the signed call-to-number workspace comparison; the response action already had it.
+- Resolution: Live signed-call and storage acceptance, release QA and default-branch promotion remain. Do not close from dev source evidence alone.
+- Look in: `app/lib/inbound-ivr-db.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/integration-db/inbound-ivr-workspace.test.ts
+- Missing tests: Live signed-call and storage acceptance, release QA and default-branch promotion remain.
+- Done when: A valid B-workspace signed call cannot render, redirect to or sign audio for an A-workspace number, even when the called phone matches.; Missing call workspace and missing/foreign number or script fail closed before audio signing.; Correct workspace calls retain documented speech, MP3/WAV playback, Gather nesting and routing.; Invalid signatures and changed called phones remain denied.; Real signed HTTP/database tests cover page, block and response boundaries. Remove each workspace guard separately and require an executed failure with valid controls.; One atomic PR; full local CI before every push and exact-head remote database/E2E/deployment gates before merge. Deployed acceptance and default-branch promotion remain required for closure.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2457 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148) The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2456 merged at 4d9bbde26016fa3cea3753d5b4ce4919b66c3914. The inbound IVR action uses the canonical audio renderer with its workspace context. Content-only speech, recordings and WAV sidecars are covered.
+- Root cause: The inbound action had a separate renderer that read audioFile for synthesized speech and omitted shared sidecar lookup.
+- Resolution: Provider playback, storage behavior and release-candidate routing still require acceptance. Do not close from dev source evidence alone.
+- Look in: `app/lib/ivr-block-render.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/inbound-ivr-block.route.test.ts; test/integration-db/inbound-ivr-prompt.test.ts
+- Missing tests: Provider playback, storage behavior and release-candidate routing still require acceptance.
+- Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2456 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
 
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
@@ -1907,16 +1934,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
-### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
-- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The shared guard encoded one route's requirement as an untyped string list.
-- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
-- Look in: `app/lib/survey-public-action.server.ts`
-- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
-- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
 ### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
@@ -1925,6 +1942,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
 - Existing tests: test/ui/campaign-export-button.test.tsx
 - Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The shared guard encoded one route's requirement as an untyped string list.
+- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
+- Look in: `app/lib/survey-public-action.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
+- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
 ### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) verify-close: admin pagination consolidated onto TablePagination (#1920)
@@ -2858,6 +2885,17 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
 - Tracker: Keeps blocking #1316 until the state is decided.
 
+### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
+- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
+- Root cause: Feature gap.
+- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
+- Missing tests: preview plays selected voice text; membership enforced
+- Done when: Speak step previews audibly; voice matches the block; workspace-gated
+- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
+
 ### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) feature(audience): client-side preview + column-mapping step (gocanvass parity)
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
@@ -2869,17 +2907,6 @@ Product, security, or operations decision required before implementation can be 
 - Missing tests: preview renders parsed headers/rows; mapping submitted with upload
 - Done when: parsed preview before start; columns mappable; server validation still gates
 - Tracker: Scope with #1771 (can ship together or split).
-
-### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
-- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
-- Root cause: Feature gap.
-- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
-- Missing tests: preview plays selected voice text; membership enforced
-- Done when: Speak step previews audibly; voice matches the block; workspace-gated
-- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
 
 ### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) change(ivr): make simple/complex a script property, not a campaign type
 - Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -3052,7 +3079,7 @@ Product, security, or operations decision required before implementation can be 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
 ### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-06
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-07
 - Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.
 - Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
