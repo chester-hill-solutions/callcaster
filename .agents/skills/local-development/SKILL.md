@@ -38,6 +38,12 @@ temporary worktrees whose readers have stopped; keep source, proof artifacts
 and user files. A disk-space failure is not a green gate: rerun the full gate
 after recovery.
 
+Scope an isolated integration-test DATABASE_URL to the bootstrap and database test
+commands. The reset compose fixture deliberately has no deployment ledger. Do not
+carry that test URL into ci:local and then claim its ledger failure is code drift.
+Keep the full normal-environment CI result and the real database proof separate;
+never mark missing migrations as applied merely to pass the ledger guard.
+
 Full `ci:local` must run where the vendor guard can restore its generated
 files through Git and Bun can write its temporary files. A permission failure
 is not lockfile drift: retain the dependency files, restore only the owned
