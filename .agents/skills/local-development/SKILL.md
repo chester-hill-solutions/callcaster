@@ -72,6 +72,19 @@ environment placeholders. Missing project settings can fail peer resolution
 before a package check runs; repair the fixture context and require executed
 checks before accepting the result.
 
+If network access is blocked, use an owned fixture with npm's cached packages:
+`npm ci --offline --no-audit --no-fund --ignore-scripts`. Bun 1.3.5 has no
+`--offline` option. Run its frozen install under an OS rule that denies network
+access to the process and its children. Verify that rule with an owned loopback
+connection that fails with `EPERM`. Require completed consumer tests in both
+fresh trees. These installs do not replace an audit or deployed checks.
+
+Before an audit can export internal package metadata, check repository visibility
+and compare the exact candidate name/version pairs with files fetched without
+authentication from an immutable public commit. Public app metadata does not
+make a private upstream repository public. After an approval rejection, retry
+only with a safer action or new evidence that resolves the stated concern.
+
 Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.

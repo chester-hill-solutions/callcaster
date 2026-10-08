@@ -4,8 +4,6 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: Patch development archive tooling against crashes when listing selected members with long paths ([PR #2482](https://github.com/chester-hill-solutions/callcaster/pull/2482), [#2477](https://github.com/chester-hill-solutions/callcaster/issues/2477)).
-
 - Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([PR #2481](https://github.com/chester-hill-solutions/callcaster/pull/2481), [#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
 
 - Fixed: Onboarding keeps existing inbound routes and voicemail greetings when number settings are saved ([PR #2476](https://github.com/chester-hill-solutions/callcaster/pull/2476)).
@@ -126,6 +124,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Security: PostCSS updates reject source-map annotations outside their CSS directory and retain valid maps and styles. ([#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342), [PR #2346](https://github.com/chester-hill-solutions/callcaster/pull/2346))
 
 - Security: WebSocket dependency updates limit buffered fragments and reject unsupported close-reason types. ([#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340), [PR #2343](https://github.com/chester-hill-solutions/callcaster/pull/2343))
+- Security: Patch development archive tooling against crashes when listing selected members with long paths ([PR #2482](https://github.com/chester-hill-solutions/callcaster/pull/2482), [#2477](https://github.com/chester-hill-solutions/callcaster/issues/2477)).
 
 - Fixed: Daily maintenance removes public rate-limit buckets that expired more than 24 hours ago and logs the cleanup result. ([#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329), [PR #2331](https://github.com/chester-hill-solutions/callcaster/pull/2331))
 
