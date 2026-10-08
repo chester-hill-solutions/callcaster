@@ -230,6 +230,8 @@ For a production hydration error, record the exact rejected DOM node before
 assuming the theme is at fault. Check server and browser stylesheet URLs.
 Use the React Router route CSS manifest for root styles; test the frozen Bun
 build and an actual deployed page, since a Node developer build can pass.
+Match the Docker source context, including its excluded `.gitignore`. Tailwind
+source discovery can otherwise hide a server/client asset disagreement.
 
 ## UI fixture contracts
 
