@@ -9,7 +9,7 @@ type OnboardingChecklistLinkStepProps = {
   description: string;
   complete: boolean;
   completeLabel: string;
-  incompleteLabel: string;
+  incompleteLabel?: string;
   actionHref: string;
   actionLabel: string;
   secondaryHref?: string;
@@ -18,6 +18,7 @@ type OnboardingChecklistLinkStepProps = {
   skipLabel?: string;
   isReadOnly: boolean;
   helperText?: string;
+  continueInFooter?: boolean;
 };
 
 export function OnboardingChecklistLinkStep({
@@ -34,6 +35,7 @@ export function OnboardingChecklistLinkStep({
   skipLabel = "Continue for now",
   isReadOnly,
   helperText,
+  continueInFooter = false,
 }: OnboardingChecklistLinkStepProps) {
   return (
     <Section variant="flat">
@@ -41,12 +43,18 @@ export function OnboardingChecklistLinkStep({
         compact
         title={title}
         description={description}
-        actions={<StatusBadge status={complete ? "complete" : "pending"} />}
+        actions={
+          <div className="sm:mt-2">
+            <StatusBadge status={complete ? "complete" : "pending"} />
+          </div>
+        }
       />
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {complete ? completeLabel : incompleteLabel}
-        </p>
+        {complete || incompleteLabel ? (
+          <p className="text-sm text-muted-foreground">
+            {complete ? completeLabel : incompleteLabel}
+          </p>
+        ) : null}
         {helperText ? (
           <p className="text-sm text-muted-foreground">{helperText}</p>
         ) : null}
@@ -59,7 +67,7 @@ export function OnboardingChecklistLinkStep({
               <Link to={secondaryHref}>{secondaryLabel}</Link>
             </Button>
           ) : null}
-          {!isReadOnly ? (
+          {!isReadOnly && !continueInFooter ? (
             <Form method="post">
               <input type="hidden" name="_action" value="advance_step" />
               <input type="hidden" name="targetStep" value={nextStep} />

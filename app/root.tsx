@@ -121,7 +121,12 @@ export default function App() {
           <div className="flex min-h-0 w-full flex-1 flex-col">
             <Outlet context={{} satisfies Record<string, never>} />
           </div>
-          <Toaster position="top-right" visibleToasts={3} />
+          <Toaster
+            position="top-right"
+            visibleToasts={3}
+            offset={{ top: "5rem" }}
+            mobileOffset={{ top: "5rem" }}
+          />
           <ScrollRestoration />
           <Scripts />
         </ThemeProvider>

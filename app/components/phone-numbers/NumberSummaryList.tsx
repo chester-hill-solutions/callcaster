@@ -57,6 +57,7 @@ export type NumberSummaryListProps = {
   onInboundQueueChange?: (id: number, value: string) => void;
   onInboundScriptChange?: (id: number, value: string) => void;
   onNumberRemoval: (id: number) => void;
+  presentation?: "default" | "onboarding";
 };
 
 const configurablePresets = INBOUND_ROUTING_PRESETS.filter(
@@ -76,6 +77,23 @@ function verificationStatus(number: NonNullable<WorkspaceNumbers>): string {
   return number.type === "rented" ? "active" : "pending";
 }
 
+function verificationStatusVariant(
+  status: string,
+): "success" | "warning" | "destructive" | "outline" {
+  switch (status.toLowerCase()) {
+    case "success":
+    case "active":
+    case "verified":
+      return "success";
+    case "pending":
+      return "warning";
+    case "failed":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
 function orderedPresets(order?: readonly InboundRoutingPresetId[]) {
   if (!order?.length) return configurablePresets;
   const rank = new Map(order.map((id, index) => [id, index]));
@@ -93,6 +111,7 @@ function PresetFields({
   scripts,
   mediaNames,
   verifiedCallerIds,
+  onboarding,
 }: {
   number: NonNullable<WorkspaceNumbers>;
   presetId: Exclude<InboundRoutingPresetId, "custom">;
@@ -100,6 +119,7 @@ function PresetFields({
   scripts: NamedOption[];
   mediaNames: MediaOption[];
   verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
+  onboarding: boolean;
 }) {
   const emailDefault =
     number.inbound_action && isConservativeEmail(number.inbound_action)
@@ -169,28 +189,52 @@ function PresetFields({
       );
     case "voicemail":
       return (
-        <div className="grid gap-3 @min-[360px]:grid-cols-2">
-          <Input
-            name="notificationEmail"
-            type="email"
-            required
-            defaultValue={emailDefault}
-            placeholder="notifications@example.com"
-            aria-label="Voicemail notification email"
-          />
-          <select
-            name="audioName"
-            defaultValue={number.inbound_audio ?? ""}
-            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-            aria-label="Voicemail greeting"
-          >
-            <option value="">Standard greeting</option>
-            {audioOptions.map((media) => (
-              <option key={media.id} value={media.name}>
-                {media.name}
-              </option>
-            ))}
-          </select>
+        <div className={onboarding ? "space-y-3" : "grid grid-cols-[minmax(0,1fr)_auto] gap-3"}>
+          {onboarding ? (
+            <FormField
+              htmlFor={`voicemail-email-${number.id}`}
+              label="Voicemail notification email"
+              className="min-w-0"
+            >
+              <FormFieldControl>
+                <Input
+                  id={`voicemail-email-${number.id}`}
+                  name="notificationEmail"
+                  type="email"
+                  required
+                  defaultValue={emailDefault}
+                  placeholder="notifications@example.com"
+                  aria-label="Voicemail notification email"
+                />
+              </FormFieldControl>
+            </FormField>
+          ) : (
+            <Input
+              name="notificationEmail"
+              type="email"
+              required
+              defaultValue={emailDefault}
+              placeholder="notifications@example.com"
+              aria-label="Voicemail notification email"
+            />
+          )}
+          {!onboarding ? (
+            <select
+              name="audioName"
+              defaultValue={number.inbound_audio ?? ""}
+              className="h-10 w-36 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label="Voicemail greeting"
+            >
+              <option value="">Standard greeting</option>
+              {audioOptions.map((media) => (
+                <option key={media.id} value={media.name}>
+                  {media.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input type="hidden" name="audioName" value={number.inbound_audio ?? ""} />
+          )}
         </div>
       );
     case "forward":
@@ -237,39 +281,48 @@ function PresetFields({
   }
 }
 
-function NumberSummaryRow({
+function NumberSummaryHeader({
   number,
-  queues,
-  scripts,
-  mediaNames,
-  verifiedCallerIds,
-  isBusy,
-  presetOrder,
-  onApplyPreset,
-  onEdit,
+  presentation,
+  inference,
 }: {
   number: NonNullable<WorkspaceNumbers>;
-  queues: NamedOption[];
-  scripts: NamedOption[];
-  mediaNames: MediaOption[];
-  verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
-  isBusy: boolean;
-  presetOrder?: readonly InboundRoutingPresetId[];
-  onApplyPreset: NumberSummaryListProps["onApplyPreset"];
+  presentation: "default" | "onboarding";
+  inference: ReturnType<typeof inferInboundRoutingPreset>;
+}) {
+  return (
+      <CardHeader
+        className={
+          presentation === "onboarding"
+            ? "flex flex-row items-end justify-between gap-3"
+            : "gap-3 sm:flex-row sm:items-start sm:justify-between"
+        }
+      >
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="break-words">{number.phone_number}</CardTitle>
+          {presentation !== "onboarding" ? (
+            <CardDescription>{number.friendly_name}</CardDescription>
+          ) : null}
+        </div>
+        <div className="ml-auto flex shrink-0 flex-wrap gap-2">
+          <Badge variant={verificationStatusVariant(verificationStatus(number))}>
+            {verificationStatus(number)}
+          </Badge>
+          {presentation !== "onboarding" ? (
+            <Badge variant={inference.presetId === "custom" ? "warning" : "secondary"}>
+              {INBOUND_ROUTING_PRESETS.find((preset) => preset.id === inference.presetId)
+                ?.label ?? "Custom routing"}
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+  );
+}
+
+function CallerIdSummary({ number, onEdit }: {
+  number: NonNullable<WorkspaceNumbers>;
   onEdit: () => void;
 }) {
-  const inference = inferInboundRoutingPreset(number);
-  const effective = summarizeEffectiveInboundRouting(number, { queues, scripts });
-  const rankedPresets = orderedPresets(presetOrder);
-  const initialPreset =
-    inference.presetId === "custom"
-      ? (rankedPresets[0]?.id as Exclude<InboundRoutingPresetId, "custom">) ??
-        "agent"
-      : inference.presetId;
-  const [presetId, setPresetId] =
-    useState<Exclude<InboundRoutingPresetId, "custom">>(initialPreset);
-
-  if (number.type === "caller_id") {
     return (
       <Card>
         <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -294,37 +347,82 @@ function NumberSummaryRow({
         </CardContent>
       </Card>
     );
+
+}
+
+function NumberSummaryRow({
+  number,
+  queues,
+  scripts,
+  mediaNames,
+  verifiedCallerIds,
+  isBusy,
+  presetOrder,
+  presentation: requestedPresentation = "default",
+  onApplyPreset,
+  onEdit,
+}: {
+  number: NonNullable<WorkspaceNumbers>;
+  queues: NamedOption[];
+  scripts: NamedOption[];
+  mediaNames: MediaOption[];
+  verifiedCallerIds: NonNullable<WorkspaceNumbers>[];
+  isBusy: boolean;
+  presetOrder?: readonly InboundRoutingPresetId[];
+  presentation?: "default" | "onboarding";
+  onApplyPreset: NumberSummaryListProps["onApplyPreset"];
+  onEdit: () => void;
+}) {
+  const inference = inferInboundRoutingPreset(number);
+  // The compact email editor can only edit an existing voicemail route.
+  // Other routes keep their current selection and explicit routing controls.
+  const presentation =
+    requestedPresentation === "onboarding" && inference.presetId === "voicemail"
+      ? "onboarding"
+      : "default";
+  const effective = summarizeEffectiveInboundRouting(number, { queues, scripts });
+  const rankedPresets = orderedPresets(presetOrder);
+  const initialPreset =
+    inference.presetId === "custom"
+      ? (rankedPresets[0]?.id as Exclude<InboundRoutingPresetId, "custom">) ??
+        "agent"
+      : inference.presetId;
+  const [presetId, setPresetId] =
+    useState<Exclude<InboundRoutingPresetId, "custom">>(initialPreset);
+
+  if (number.type === "caller_id") {
+    return <CallerIdSummary number={number} onEdit={onEdit} />;
   }
 
   return (
-    <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <CardTitle className="break-words">{number.phone_number}</CardTitle>
-          <CardDescription>{number.friendly_name}</CardDescription>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{verificationStatus(number)}</Badge>
-          <Badge variant={inference.presetId === "custom" ? "warning" : "secondary"}>
-            {INBOUND_ROUTING_PRESETS.find((preset) => preset.id === inference.presetId)
-              ?.label ?? "Custom routing"}
-          </Badge>
-        </div>
-      </CardHeader>
+    <Card
+      className={
+        presentation === "onboarding"
+          ? "mx-auto w-full max-w-xl gap-3 py-3"
+          : undefined
+      }
+    >
+      <NumberSummaryHeader
+        number={number}
+        presentation={presentation}
+        inference={inference}
+      />
       <CardContent className="space-y-4">
-        <div>
-          <p className="text-sm font-medium">{effective.label}</p>
-          {effective.detail ? (
-            <p className="break-words text-sm text-muted-foreground">{effective.detail}</p>
-          ) : null}
-          {inference.presetId === "custom" ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-700 dark:text-amber-300">
-              {inference.reasons.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        {presentation !== "onboarding" ? (
+          <div>
+            <p className="text-sm font-medium">{effective.label}</p>
+            {effective.detail ? (
+              <p className="break-words text-sm text-muted-foreground">{effective.detail}</p>
+            ) : null}
+            {inference.presetId === "custom" ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-700 dark:text-amber-300">
+                {inference.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <form
           className="@container space-y-3"
           onSubmit={(event) => {
@@ -341,67 +439,98 @@ function NumberSummaryRow({
           }}
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <FormField
-              htmlFor={`preset-${number.id}`}
-              label="Routing preset"
-              className="min-w-0 flex-1"
-            >
-              <FormFieldControl>
-                <select
-                  id={`preset-${number.id}`}
-                  value={presetId}
-                  onChange={(event) =>
-                    setPresetId(
-                      event.target.value as Exclude<
-                        InboundRoutingPresetId,
-                        "custom"
-                      >,
-                    )
-                  }
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  aria-label="Routing preset"
-                >
-                  {rankedPresets.map((preset) => (
-                    <option
-                      key={preset.id}
-                      value={preset.id}
-                      disabled={
-                        preset.id === "forward" && verifiedCallerIds.length === 0
-                      }
-                    >
-                      {preset.id === "forward" && verifiedCallerIds.length === 0
-                        ? "Forward call — verify caller ID first"
-                        : preset.label}
-                    </option>
-                  ))}
-                </select>
-              </FormFieldControl>
-            </FormField>
-            <Button
-              type="submit"
-              disabled={isBusy}
-              aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
-            >
-              Apply
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onEdit}
-              aria-label={`Advanced routing for ${number.phone_number ?? "phone number"}`}
-            >
-              Advanced
-            </Button>
+            {presentation === "onboarding" ? null : (
+              <FormField
+                htmlFor={`preset-${number.id}`}
+                label="Routing preset"
+                className="min-w-0 flex-1"
+              >
+                <FormFieldControl>
+                  <select
+                    id={`preset-${number.id}`}
+                    value={presetId}
+                    onChange={(event) =>
+                      setPresetId(
+                        event.target.value as Exclude<
+                          InboundRoutingPresetId,
+                          "custom"
+                        >,
+                      )
+                    }
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    aria-label="Routing preset"
+                  >
+                    {rankedPresets.map((preset) => (
+                      <option
+                        key={preset.id}
+                        value={preset.id}
+                        disabled={
+                          preset.id === "forward" && verifiedCallerIds.length === 0
+                        }
+                      >
+                        {preset.id === "forward" && verifiedCallerIds.length === 0
+                          ? "Forward call — verify caller ID first"
+                          : preset.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormFieldControl>
+              </FormField>
+            )}
+            {presentation !== "onboarding" ? (
+              <Button
+                type="submit"
+                disabled={isBusy}
+                aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
+              >
+                Apply
+              </Button>
+            ) : null}
+            {presentation !== "onboarding" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onEdit}
+                aria-label={`Advanced routing for ${number.phone_number ?? "phone number"}`}
+              >
+                Advanced
+              </Button>
+            ) : null}
           </div>
-          <PresetFields
-            key={presetId}
-            number={number}
-            presetId={presetId}
-            queues={queues}
-            scripts={scripts}
-            mediaNames={mediaNames}
-            verifiedCallerIds={verifiedCallerIds}
-          />
+          {presentation === "onboarding" ? (
+            <div className="flex items-end gap-3">
+              <div className="min-w-0 flex-1">
+                <PresetFields
+                  key={presetId}
+                  number={number}
+                  presetId={presetId}
+                  queues={queues}
+                  scripts={scripts}
+                  mediaNames={mediaNames}
+                  verifiedCallerIds={verifiedCallerIds}
+                  onboarding
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={isBusy}
+                aria-label={`Apply routing preset for ${number.phone_number ?? "phone number"}`}
+              >
+                Apply
+              </Button>
+            </div>
+          ) : (
+            <PresetFields
+              key={presetId}
+              number={number}
+              presetId={presetId}
+              queues={queues}
+              scripts={scripts}
+              mediaNames={mediaNames}
+              verifiedCallerIds={verifiedCallerIds}
+              onboarding={false}
+            />
+          )}
         </form>
       </CardContent>
     </Card>
@@ -417,6 +546,7 @@ export function NumberSummaryList({
   verifiedCallerIds: suppliedCallerIds,
   isBusy,
   presetOrder,
+  presentation = "default",
   onApplyPreset,
   ...tableCallbacks
 }: NumberSummaryListProps) {
@@ -453,6 +583,7 @@ export function NumberSummaryList({
               verifiedCallerIds={verifiedCallerIds}
               isBusy={isBusy}
               presetOrder={presetOrder}
+              presentation={presentation}
               onApplyPreset={onApplyPreset}
               onEdit={() => setAdvancedNumberId(number.id)}
             />

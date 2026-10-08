@@ -15,9 +15,9 @@ import { OnboardingBusinessProgramStep } from "./OnboardingBusinessProgramStep";
 import { OnboardingChecklistLinkStep } from "./OnboardingChecklistLinkStep";
 import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
-import { OnboardingGoalStep } from "./OnboardingGoalStep";
+import { OnboardingGoalForm, isGoalSelectionValid as validateGoalSelection, readGoalSelection } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
-import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
+import { OnboardingLaunchStep, buildOnboardingLaunchItems } from "./OnboardingLaunchStep";
 import { readWizardStep } from "./wizard-step-resolution";
 import type { OnboardingPendingActions } from "./types";
 
@@ -38,6 +38,138 @@ function checklistCreateHref(
     `/workspaces/${workspaceId}/onboarding?step=${step}`,
   );
   return `/workspaces/${workspaceId}/${resourcePath}?returnTo=${returnTo}`;
+}
+
+function BusinessContinueButton({ form, isSaving }: {
+  form: string;
+  isSaving: boolean;
+}) {
+  return (
+    <Button type="submit" form={form} disabled={isSaving} aria-busy={isSaving}>
+      {isSaving ? "Saving…" : "Save & continue"}
+    </Button>
+  );
+}
+
+function ResourceContinueForm({ targetStep, resourceCount, isSubmitting }: {
+  targetStep: string;
+  resourceCount: number;
+  isSubmitting: boolean;
+}) {
+  return (
+    <Form method="post">
+      <input type="hidden" name="_action" value="advance_step" />
+      <input type="hidden" name="targetStep" value={targetStep} />
+      <Button
+        type="submit"
+        variant={resourceCount > 0 ? "default" : "outline"}
+        disabled={isSubmitting}
+      >
+        {resourceCount > 0 ? "Continue" : "Continue for now"}
+      </Button>
+    </Form>
+  );
+}
+
+function FooterContinue({
+  activeStep, isReadOnly, pending, isGoalSelectionValid, hasFirstNumber,
+  continueTarget, isFormSubmitting, audienceCount, hasLaunchNextItem,
+  workspaceId, campaignCount,
+}: {
+  activeStep: ReturnType<typeof readWizardStep> | null;
+  isReadOnly: boolean;
+  pending: OnboardingPendingActions;
+  isGoalSelectionValid: boolean;
+  hasFirstNumber: boolean;
+  continueTarget: string | null;
+  isFormSubmitting: boolean;
+  audienceCount: number;
+  hasLaunchNextItem: boolean;
+  workspaceId: string;
+  campaignCount: number;
+}) {
+    if (!activeStep || isReadOnly) {
+      return null;
+    }
+    switch (activeStep) {
+      case "business_identity":
+        return (
+          <BusinessContinueButton
+            form="onboarding-business-identity-form"
+            isSaving={pending.isSavingBusinessProfile}
+          />
+        );
+      case "business_program":
+        return (
+          <BusinessContinueButton
+            form="onboarding-business-program-form"
+            isSaving={pending.isSavingBusinessProfile}
+          />
+        );
+      case "path_selection":
+        return (
+          <Button
+            type="submit"
+            form="onboarding-channels-form"
+            disabled={pending.isSavingChannels || !isGoalSelectionValid}
+            aria-busy={pending.isSavingChannels}
+          >
+            {pending.isSavingChannels ? "Saving…" : "Save & continue"}
+          </Button>
+        );
+      case "first_number":
+        if (hasFirstNumber && continueTarget) {
+          return (
+            <Form method="post">
+              <input type="hidden" name="_action" value="advance_step" />
+              <input type="hidden" name="targetStep" value={continueTarget} />
+              <Button type="submit" disabled={isFormSubmitting}>
+                Continue
+              </Button>
+            </Form>
+          );
+        }
+        return null;
+      case "audience":
+        return continueTarget ? (
+          <ResourceContinueForm
+            targetStep={continueTarget}
+            resourceCount={audienceCount}
+            isSubmitting={isFormSubmitting}
+          />
+        ) : null;
+      case "launch_checks":
+        return hasLaunchNextItem ? (
+          <Button variant="outline" asChild>
+            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
+          </Button>
+        ) : null;
+      case "script":
+        return null;
+      case "campaign_info":
+        return continueTarget ? (
+          <ResourceContinueForm
+            targetStep={continueTarget}
+            resourceCount={campaignCount}
+            isSubmitting={isFormSubmitting}
+          />
+        ) : null;
+      case "credits":
+        return (
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value="launch_checks" />
+            <Button type="submit" variant="outline" disabled={isFormSubmitting}>
+              Continue for now
+            </Button>
+          </Form>
+        );
+      default: {
+        const _exhaustive: never = activeStep;
+        return _exhaustive;
+      }
+    }
+
 }
 
 export function OnboardingWizard({
@@ -71,6 +203,13 @@ export function OnboardingWizard({
   const [introSession, setIntroSession] = useState<
     "auto" | "force_show" | "force_hide"
   >("auto");
+  const [goalSelection, setGoalSelection] = useState(() => readGoalSelection(onboarding));
+  const isGoalSelectionValid = validateGoalSelection(goalSelection.goal, onboarding.operatingCountry, goalSelection.numberPath);
+  const launchItems = buildOnboardingLaunchItems({
+    onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+    scriptCount: scripts.length, creditsBalance,
+  });
+  const hasLaunchNextItem = launchItems.some((item) => !item.complete);
   const showIntro =
     introSession === "force_hide"
       ? false
@@ -114,78 +253,46 @@ export function OnboardingWizard({
     navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
   };
 
-  const footerContinue = (() => {
-    if (!activeStep || isReadOnly) {
-      return null;
-    }
-    switch (activeStep) {
-      case "business_identity":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-business-identity-form"
-            disabled={pending.isSavingBusinessProfile}
-            aria-busy={pending.isSavingBusinessProfile}
-          >
-            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "business_program":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-business-program-form"
-            disabled={pending.isSavingBusinessProfile}
-            aria-busy={pending.isSavingBusinessProfile}
-          >
-            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "path_selection":
-        return (
-          <Button
-            type="submit"
-            form="onboarding-channels-form"
-            disabled={pending.isSavingChannels}
-            aria-busy={pending.isSavingChannels}
-          >
-            {pending.isSavingChannels ? "Saving…" : "Save & continue"}
-          </Button>
-        );
-      case "first_number":
-        if (hasFirstNumber && continueTarget) {
-          return (
-            <Form method="post">
-              <input type="hidden" name="_action" value="advance_step" />
-              <input type="hidden" name="targetStep" value={continueTarget} />
-              <Button type="submit" disabled={isFormSubmitting}>
-                Continue
-              </Button>
-            </Form>
-          );
-        }
-        return null;
-      case "launch_checks":
-        return null;
-      case "audience":
-      case "script":
-      case "campaign_info":
-      case "credits":
-        return null;
-      default: {
-        const _exhaustive: never = activeStep;
-        return _exhaustive;
-      }
-    }
-  })();
+  const footerContinue = (
+    <FooterContinue
+      activeStep={activeStep}
+      isReadOnly={isReadOnly}
+      pending={pending}
+      isGoalSelectionValid={isGoalSelectionValid}
+      hasFirstNumber={hasFirstNumber}
+      continueTarget={continueTarget}
+      isFormSubmitting={isFormSubmitting}
+      audienceCount={audienceCount}
+      hasLaunchNextItem={hasLaunchNextItem}
+      workspaceId={workspaceId}
+      campaignCount={campaignCount}
+    />
+  );
 
   // Onboarding content reads better narrow (#1318). The first-number step is
   // the exception: it embeds the number-search table and routing presets and
   // keeps the full shell width until #1110 reworks that page.
-  const widthCap = activeStep === "first_number" ? "" : "mx-auto w-full max-w-4xl";
+  const widthCap =
+    activeStep === "first_number"
+      ? hasFirstNumber
+        ? "mx-auto w-full max-w-xl"
+        : "mx-auto w-full max-w-4xl"
+      : activeStep === "path_selection"
+        ? "mx-auto w-full max-w-2xl"
+        : activeStep === "business_identity"
+          ? "mx-auto w-full max-w-xl"
+          : activeStep === "audience" || activeStep === "campaign_info"
+            ? "mx-auto w-full max-w-2xl"
+          : activeStep === "credits"
+            ? "mx-auto w-full max-w-md"
+            : activeStep === "launch_checks"
+              ? "mx-auto w-full max-w-2xl"
+              : "mx-auto w-full max-w-4xl";
 
   return (
-    <div className={`space-y-6 ${widthCap}`}>
+    <div
+      className={`space-y-6 [&>section]:border-b-0 [&>section]:pb-0 ${widthCap}`}
+    >
       {/*
         Compliance state is computed by the loader and was previously dropped on
         the floor here, so a workspace stuck in "Action needed by CallCaster
@@ -255,12 +362,14 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep === "path_selection" ? (
-        <OnboardingGoalStep
-          formId="onboarding-channels-form"
-          onboarding={onboarding}
-          isReadOnly={isReadOnly}
-          pending={pending}
-        />
+          <OnboardingGoalForm
+            formId="onboarding-channels-form"
+            onboarding={onboarding}
+            isReadOnly={isReadOnly}
+            pending={pending}
+            selection={goalSelection}
+            onSelectionChange={setGoalSelection}
+          />
       ) : null}
 
       {!showIntro && activeStep === "audience" && continueTarget ? (
@@ -273,10 +382,11 @@ export function OnboardingWizard({
           actionHref={checklistCreateHref(workspaceId, "audiences/new", "audience")}
           actionLabel={audienceCount > 0 ? "Add another call list" : "Upload call list"}
           secondaryHref={`/workspaces/${workspaceId}/audiences`}
-          secondaryLabel="View call lists"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
-        />
+           secondaryLabel="View call lists"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+           continueInFooter
+         />
       ) : null}
 
       {!showIntro && activeStep === "first_number" ? (
@@ -308,26 +418,26 @@ export function OnboardingWizard({
           incompleteLabel="Create a script, then return here to continue."
           actionHref={checklistCreateHref(workspaceId, "scripts/new", "script")}
           actionLabel={scripts.length > 0 ? "Manage scripts" : "Create script"}
-          secondaryHref={`/workspaces/${workspaceId}/scripts`}
-          secondaryLabel="View scripts"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
-        />
+           secondaryHref={`/workspaces/${workspaceId}/scripts`}
+           secondaryLabel="View scripts"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+         />
       ) : null}
 
       {!showIntro && activeStep === "campaign_info" && continueTarget ? (
         <OnboardingChecklistLinkStep
           title="Campaign info"
-          description="Create a campaign that connects your audience, phone number, and script to your goal."
+          description="Create a campaign with a name that connects your audience, phone number, and script to your goal."
           complete={campaignCount > 0}
           completeLabel={`You have ${campaignCount} campaign${campaignCount === 1 ? "" : "s"} ready.`}
-          incompleteLabel="Create a campaign with a name and the assets you just set up."
           actionHref={checklistCreateHref(workspaceId, "campaigns/new", "campaign_info")}
-          actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
-          secondaryHref={`/workspaces/${workspaceId}/campaigns`}
-          secondaryLabel="View campaigns"
-          nextStep={continueTarget}
-          isReadOnly={isReadOnly}
+           actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
+           secondaryHref={`/workspaces/${workspaceId}/campaigns`}
+           secondaryLabel="View campaigns"
+           nextStep={continueTarget}
+           isReadOnly={isReadOnly}
+           continueInFooter
         />
       ) : null}
 
@@ -340,7 +450,8 @@ export function OnboardingWizard({
       ) : null}
 
       {!showIntro && activeStep === "launch_checks" ? (
-        <OnboardingLaunchStep
+          <OnboardingLaunchStep
+          items={launchItems}
           onboarding={onboarding}
           readiness={readiness}
           workspaceId={workspaceId}
@@ -348,8 +459,8 @@ export function OnboardingWizard({
           audienceCount={audienceCount}
           campaignCount={campaignCount}
           scriptCount={scripts.length}
-          creditsBalance={creditsBalance}
-        />
+            creditsBalance={creditsBalance}
+          />
       ) : null}
 
       {!showIntro && activeStep ? (

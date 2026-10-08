@@ -37,7 +37,6 @@ export function OnboardingProgressStrip({
   const visibleSteps = wizardStepsForGoal(onboarding.selectedGoal);
   const activeStep = readWizardStep(urlStep, onboarding.currentStep, visibleSteps);
   const stepIndex = visibleSteps.indexOf(activeStep);
-  const activeMeta = WIZARD_STEP_META.find((step) => step.id === activeStep);
   const progressValue =
     stepIndex >= 0 ? ((stepIndex + 1) / visibleSteps.length) * 100 : 0;
 
@@ -50,24 +49,9 @@ export function OnboardingProgressStrip({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">Setup: {workspaceName}</p>
           <p className="text-xs text-muted-foreground">
-            Step {stepIndex + 1} of {visibleSteps.length} —{" "}
-            {activeMeta?.label ?? "Onboarding"}
+            Step {stepIndex + 1} of {visibleSteps.length}
           </p>
         </div>
-        {/*
-          Offered only once intake is complete. Before that the workspace root
-          still redirects back here, so an exit link would be a dead end that
-          looks like a bug. The remaining steps are all resumable from the
-          workspace, so this is a genuine "finish later".
-        */}
-        {canLeaveSetup ? (
-          <Link
-            to={`/workspaces/${workspaceId}`}
-            className="order-last ml-auto text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:order-none"
-          >
-            I&rsquo;ll finish later
-          </Link>
-        ) : null}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {visibleSteps.map((stepId, index) => {
             const meta = WIZARD_STEP_META.find((step) => step.id === stepId);
@@ -97,6 +81,15 @@ export function OnboardingProgressStrip({
             );
           })}
         </div>
+        {/* The remaining steps are resumable from the workspace. */}
+        {canLeaveSetup ? (
+          <Link
+            to={`/workspaces/${workspaceId}`}
+            className="ml-auto text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            I&rsquo;ll finish later
+          </Link>
+        ) : null}
       </div>
       <Progress value={progressValue} className="mt-2 h-1.5" />
     </div>

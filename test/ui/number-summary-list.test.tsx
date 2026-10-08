@@ -32,6 +32,7 @@ function renderList(
     phoneNumbers?: WorkspaceNumbers[];
     presetOrder?: readonly InboundRoutingPresetId[];
     verifiedCallerIds?: WorkspaceNumbers[];
+    presentation?: "default" | "onboarding";
   } = {},
 ) {
   render(
@@ -40,6 +41,7 @@ function renderList(
         phoneNumbers={options.phoneNumbers ?? [number]}
         presetOrder={options.presetOrder}
         verifiedCallerIds={options.verifiedCallerIds}
+        presentation={options.presentation}
         users={[]}
         mediaNames={[]}
         queues={[{ id: 7, name: "Support" }]}
@@ -69,6 +71,60 @@ describe("NumberSummaryList", () => {
     expect(
       screen.getByRole("combobox", { name: "Routing preset" }),
     ).toBeInTheDocument();
+  });
+
+  test("keeps an existing onboarding voicemail route fixed and exposes only email editing", () => {
+    renderList(
+      makeNumber({
+        friendly_name: "Test / +14165550100",
+        inbound_queue_id: null,
+        inbound_action: "sai@example.test",
+      }),
+      vi.fn(),
+      { presentation: "onboarding" },
+    );
+
+    expect(screen.queryByText("Test / +14165550100")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Routing preset" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Advanced routing/ })).toBeNull();
+    expect(screen.getByLabelText("Voicemail notification email")).toHaveValue(
+      "sai@example.test",
+    );
+    expect(screen.queryByRole("combobox", { name: "Voicemail greeting" })).toBeNull();
+  });
+
+  test.each([
+    { route: "queue", fields: { inbound_queue_id: 7 }, expected: { queueId: "7" } },
+    { route: "automated_menu", fields: { inbound_queue_id: null, inbound_script_id: 9 }, expected: { scriptId: "9" } },
+    { route: "forward", fields: { inbound_queue_id: null, inbound_action: "+14165550111" }, expected: { phoneNumber: "+14165550111" } },
+  ])("retains the existing $route route in onboarding", ({ route, fields, expected }) => {
+    const apply = renderList(makeNumber(fields), vi.fn(), {
+      presentation: "onboarding",
+      verifiedCallerIds: [makeNumber({ id: 2, type: "caller_id", phone_number: "+14165550111" })],
+    });
+    expect(screen.getByRole("combobox", { name: "Routing preset" })).toHaveValue(route);
+    expect(screen.queryByLabelText("Voicemail notification email")).toBeNull();
+    const form = screen.getByRole("button", { name: /Apply routing preset/ }).closest("form");
+    if (!form) throw new Error("Routing form is missing");
+    fireEvent.submit(form);
+    expect(apply).toHaveBeenCalledWith(expect.objectContaining({ presetId: route, ...expected }));
+  });
+
+  test("changing only the onboarding voicemail email retains its greeting", () => {
+    const apply = renderList(makeNumber({
+      inbound_queue_id: null,
+      inbound_action: "old@example.test",
+      inbound_audio: "existing-greeting.mp3",
+    }), vi.fn(), { presentation: "onboarding" });
+    fireEvent.change(screen.getByLabelText("Voicemail notification email"), {
+      target: { value: "new@example.test" },
+    });
+    const form = screen.getByRole("button", { name: /Apply routing preset/ }).closest("form");
+    if (!form) throw new Error("Routing form is missing");
+    fireEvent.submit(form);
+    expect(apply).toHaveBeenCalledWith(expect.objectContaining({
+      presetId: "voicemail", notificationEmail: "new@example.test", audioName: "existing-greeting.mp3",
+    }));
   });
 
   test("explains conflicting legacy routing", () => {

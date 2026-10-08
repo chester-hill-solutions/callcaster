@@ -65,7 +65,7 @@ export const NumberPurchase = ({
         const purchased = data?.newNumber;
         const phone =
           purchased?.phone_number ?? purchased?.friendly_name ?? "new number";
-        return `Your number is live — try calling ${phone}. Recordings land in Voicemails.`;
+        return `Number rented successfully: ${phone} is now live.`;
       },
       getError: (data) => data?.error,
       onSuccess: () => {

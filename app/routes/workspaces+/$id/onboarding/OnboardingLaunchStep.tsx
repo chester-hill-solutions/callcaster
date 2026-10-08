@@ -2,12 +2,16 @@ import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
-import { buildWorkspaceLaunchChecklist } from "@/lib/workspace-launch-checklist";
+import { buildWorkspaceLaunchChecklist, type LaunchChecklistItem } from "@/lib/workspace-launch-checklist";
 import {
   BUSINESS_IDENTITY_REQUIRED_FIELDS,
   findMissingBusinessProfileFields,
 } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingStepProps } from "./types";
+
+type OnboardingLaunchItem = Omit<LaunchChecklistItem, "id" | "due"> & {
+  id: LaunchChecklistItem["id"] | "business_identity";
+};
 
 type OnboardingLaunchStepProps = Pick<
   OnboardingStepProps,
@@ -17,18 +21,13 @@ type OnboardingLaunchStepProps = Pick<
   campaignCount: number;
   scriptCount: number;
   creditsBalance: number;
+  items?: OnboardingLaunchItem[];
 };
 
-export function OnboardingLaunchStep({
-  onboarding,
-  readiness,
-  workspaceId,
-  phoneNumbers,
-  audienceCount,
-  campaignCount,
-  scriptCount,
-  creditsBalance,
-}: OnboardingLaunchStepProps) {
+export function buildOnboardingLaunchItems({
+  onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+  scriptCount, creditsBalance,
+}: Omit<OnboardingLaunchStepProps, "readiness" | "items">): OnboardingLaunchItem[] {
   const checklist = buildWorkspaceLaunchChecklist({
     workspaceId,
     onboarding,
@@ -41,7 +40,7 @@ export function OnboardingLaunchStep({
     onboarding.selectedGoal !== "rent_number" ||
     item.id === "goal" || item.id === "phone_number" || item.id === "credits"
   ));
-  const items = [
+  const items: OnboardingLaunchItem[] = [
     ...checklist.filter((item) => item.id === "goal"),
     {
       id: "business_identity",
@@ -54,33 +53,42 @@ export function OnboardingLaunchStep({
     },
     ...checklist.filter((item) => item.id !== "goal"),
   ];
+  return items;
+}
+
+export function OnboardingLaunchStep({
+  onboarding,
+  readiness,
+  workspaceId,
+  phoneNumbers,
+  audienceCount,
+  campaignCount,
+  scriptCount,
+  creditsBalance,
+  items: suppliedItems,
+}: OnboardingLaunchStepProps) {
+  const items = suppliedItems ?? buildOnboardingLaunchItems({
+    onboarding, workspaceId, phoneNumbers, audienceCount, campaignCount,
+    scriptCount, creditsBalance,
+  });
   const nextItem = items.find((item) => !item.complete);
-  const completeCount = items.filter((item) => item.complete).length;
 
   return (
     <Section variant="flat">
       <SectionHeader
         compact
         title="Review your setup"
-        description="See what is complete and choose your next step. You can return to setup from your workspace."
+          actions={
+          <div className="flex flex-col items-end">
+            <Button asChild>
+              <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
+                {nextItem ? "Continue setup" : "Go to workspace"}
+              </Link>
+            </Button>
+          </div>
+        }
       />
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-medium">{completeCount} of {items.length} setup items complete</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {nextItem
-                ? `Next: ${nextItem.label}.`
-                : "Your setup checklist is complete. Check any notices below before you start."}
-            </p>
-          </div>
-          <Button asChild>
-            <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
-              {nextItem ? "Continue setup" : "Go to workspace"}
-            </Link>
-          </Button>
-        </div>
-
         {readiness.warnings.length > 0 ? (
           <section aria-labelledby="setup-notices" className="space-y-2 rounded-md bg-muted/40 p-4">
             <h3 id="setup-notices" className="text-sm font-medium">Before you start</h3>
@@ -111,15 +119,10 @@ export function OnboardingLaunchStep({
             </li>
           ))}
         </ul>
-        <p className="text-sm text-muted-foreground">
-          {onboarding.selectedGoal === "rent_number"
-            ? "You can create a campaign later if you need one."
-            : "Before launching, open your campaign and check its contacts, content, and sending settings."}
-        </p>
-        {nextItem ? (
-          <Button variant="ghost" asChild>
-            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
-          </Button>
+        {onboarding.selectedGoal === "rent_number" ? (
+          <p className="text-sm text-muted-foreground">
+            You can create a campaign later if you need one.
+          </p>
         ) : null}
       </div>
     </Section>

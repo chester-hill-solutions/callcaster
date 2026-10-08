@@ -1,4 +1,4 @@
-import { Form, Link } from "react-router";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { NUMBER_RENTAL_MONTHLY_CREDITS } from "@/lib/number-rental";
@@ -29,7 +29,7 @@ export function OnboardingCreditsStep({
               {creditsBalance.toLocaleString()} credits
             </div>
           </div>
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" asChild>
             <Link to={`/workspaces/${workspaceId}/billing`}>Add credits</Link>
           </Button>
         </div>
@@ -37,13 +37,6 @@ export function OnboardingCreditsStep({
           Number rental is about {NUMBER_RENTAL_MONTHLY_CREDITS.toLocaleString()} credits /
           30 days. You can add credits before launch.
         </p>
-        {!isReadOnly ? (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value="launch_checks" />
-            <Button type="submit">Continue to review</Button>
-          </Form>
-        ) : null}
       </div>
     </Section>
   );

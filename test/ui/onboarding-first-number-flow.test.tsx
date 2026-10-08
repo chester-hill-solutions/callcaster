@@ -136,7 +136,7 @@ describe("guided phone setup (#1205, #1763, #1764)", () => {
     expect(screen.queryByLabelText(/Street address/)).toBeNull();
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
     await act(() => router.navigate(`${basePath}?step=first_number&numberStep=rent`));
-    expect(screen.getByText(/You have 1 rented number/)).toBeVisible();
+    expect(screen.getByRole("link", { name: "Phone Numbers" })).toBeVisible();
   });
 
   test("resumes pending caller ID verification and completes without rented-number routing", async () => {
@@ -146,7 +146,9 @@ describe("guided phone setup (#1205, #1763, #1764)", () => {
     expect(await screen.findByText("Awaiting verification")).toBeVisible();
     props.phoneNumbers = [number({ type: "caller_id", capabilities: { verification_status: "success" } })];
     await act(() => router.revalidate());
-    await waitFor(() => expect(screen.getByText(/1 verified caller ID ready/)).toBeVisible());
+    await waitFor(() =>
+      expect(screen.getByText(/Your caller ID is verified/)).toBeVisible(),
+    );
     expect(screen.queryByRole("heading", { name: "When someone calls your number" })).toBeNull();
     expect(screen.queryByLabelText("Your phone number")).toBeNull();
   });

@@ -9,29 +9,47 @@ import {
 import type {
   WorkspaceOnboardingChannel,
   WorkspaceOnboardingGoal,
+  WorkspaceMessagingOnboardingState,
+  WorkspaceOperatingCountry,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GOAL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
 type SmsNumberPath = "local" | "toll_free";
+export type GoalSelection = { goal: WorkspaceOnboardingGoal | null; numberPath: SmsNumberPath | null };
 
-export function OnboardingGoalStep({
-  formId = "onboarding-channels-form",
-  onboarding,
-  isReadOnly,
-}: Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & {
-  formId?: string;
+export function readSmsNumberPath(onboarding: Pick<WorkspaceMessagingOnboardingState, "selectedGoal" | "selectedChannels">): SmsNumberPath | null {
+  if (onboarding.selectedGoal !== "sms_blast") return null;
+  if (onboarding.selectedChannels.includes("toll_free_bulk_sms")) return "toll_free";
+  if (onboarding.selectedChannels.includes("local_number")) return "local";
+  return null;
+}
+
+export function isGoalSelectionValid(goal: WorkspaceOnboardingGoal | null, country: WorkspaceOperatingCountry, path: SmsNumberPath | null): boolean {
+  return goal !== "sms_blast" ||
+    !channelsForOnboardingGoal(goal, country).includes("toll_free_bulk_sms") ||
+    path !== null;
+}
+
+export function readGoalSelection(onboarding: Pick<WorkspaceMessagingOnboardingState, "selectedGoal" | "selectedChannels">): GoalSelection {
+  return { goal: onboarding.selectedGoal, numberPath: readSmsNumberPath(onboarding) };
+}
+
+type GoalStepProps = Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & { formId?: string };
+
+export function OnboardingGoalStep(props: GoalStepProps) {
+  const [selection, setSelection] = useState(() => readGoalSelection(props.onboarding));
+  return <OnboardingGoalForm {...props} selection={selection} onSelectionChange={setSelection} />;
+}
+
+export function OnboardingGoalForm({
+  formId = "onboarding-channels-form", onboarding, isReadOnly, selection, onSelectionChange,
+}: GoalStepProps & {
+  selection: GoalSelection;
+  onSelectionChange: (selection: GoalSelection) => void;
 }) {
-  const [selectedGoal, setSelectedGoal] = useState<WorkspaceOnboardingGoal | null>(
-    () => onboarding.selectedGoal,
-  );
-  const [smsNumberPath, setSmsNumberPath] = useState<SmsNumberPath | null>(() => {
-    if (onboarding.selectedGoal !== "sms_blast") return null;
-    if (onboarding.selectedChannels.includes("toll_free_bulk_sms")) return "toll_free";
-    if (onboarding.selectedChannels.includes("local_number")) return "local";
-    return null;
-  });
+  const { goal: selectedGoal, numberPath: smsNumberPath } = selection;
 
   const derivedChannels = useMemo<WorkspaceOnboardingChannel[]>(() => {
     if (!selectedGoal) return [];
@@ -49,12 +67,15 @@ export function OnboardingGoalStep({
     );
   }, [derivedChannels, offersTollFree, smsNumberPath]);
 
+  const selectNumberPath = (path: SmsNumberPath) => {
+    onSelectionChange({ goal: selectedGoal, numberPath: path });
+  };
+
   return (
     <Section variant="flat">
       <SectionHeader
         compact
         title="What are you setting up?"
-        description="Pick the outcome you want first. Setup steps adapt to that goal so you can launch sooner."
       />
       <Form id={formId} method="post" className="space-y-4">
         <input type="hidden" name="_action" value="save_channels" />
@@ -86,8 +107,7 @@ export function OnboardingGoalStep({
                   value={option.id}
                   checked={checked}
                   onChange={() => {
-                    setSelectedGoal(option.id);
-                    setSmsNumberPath(null);
+                    onSelectionChange({ goal: option.id, numberPath: null });
                   }}
                   disabled={isReadOnly}
                   className="mt-1"
@@ -121,7 +141,7 @@ export function OnboardingGoalStep({
                   size="sm"
                   variant="outline"
                   aria-pressed={smsNumberPath === "toll_free"}
-                  onClick={() => setSmsNumberPath("toll_free")}
+                  onClick={() => selectNumberPath("toll_free")}
                   disabled={isReadOnly}
                 >
                   Set Up Toll Free (BN required)
@@ -131,7 +151,7 @@ export function OnboardingGoalStep({
                   size="sm"
                   variant="outline"
                   aria-pressed={smsNumberPath === "local"}
-                  onClick={() => setSmsNumberPath("local")}
+                  onClick={() => selectNumberPath("local")}
                   disabled={isReadOnly}
                 >
                   Continue with Local Number
