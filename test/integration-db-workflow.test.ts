@@ -13,6 +13,8 @@ const workflowSchema = z.object({
       steps: z.array(
         z.object({
           run: z.string().optional(),
+          uses: z.string().optional(),
+          with: z.record(z.string(), z.string()).optional(),
           if: z.unknown().optional(),
           "continue-on-error": z.boolean().optional(),
           env: z.record(z.string(), z.string()).optional(),
@@ -77,4 +79,19 @@ test("a failed bootstrap or integration assertion remains a failed job", () => {
   expect(commands).toHaveLength(2);
   for (const step of commands) expect(step["continue-on-error"]).not.toBe(true);
   expect(commands[1].run).toBe("npm run test:integration-db");
+});
+
+test("the database tier installs the pinned Bun worker runtime before execution", () => {
+  const steps = workflow().jobs.guards.steps;
+  const runtime = steps.findIndex(
+    (step) => step.uses === "oven-sh/setup-bun@v2",
+  );
+  const tier = steps.findIndex(
+    (step) => step.run === "npm run test:integration-db",
+  );
+  expect(runtime).toBeGreaterThanOrEqual(0);
+  expect(tier).toBeGreaterThan(runtime);
+  expect(steps[runtime].with?.["bun-version-file"]).toBe(".bun-version");
+  expect(steps[runtime].if).toBeUndefined();
+  expect(steps[runtime]["continue-on-error"]).not.toBe(true);
 });

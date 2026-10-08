@@ -304,6 +304,11 @@ The shared Vitest config restores spies before each case. Install observation
 spies in `beforeEach`; a spy created in `beforeAll` can be removed before the
 first case. Require executed cases and a passing result before using the proof.
 
+For integration tests that start a worker process, install its actual runtime
+in every runner of that tier. Use the project's pinned runtime version, including
+the database-only workflow. Local PATH availability does not prove CI setup;
+keep worker kill and restart cases enabled.
+
 Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
 `INTEGRATION_DB_URL` as an optional override. Verify the suite with
 `DATABASE_URL` alone; skipped cases do not prove the remote database gate.
