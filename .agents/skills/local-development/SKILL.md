@@ -226,6 +226,11 @@ Use a block body for setup hooks that call a mock method. Returning a mock
 function from `beforeEach` registers it as cleanup; Vitest then calls it after
 the test, which can create a false failure or an unintended second effect.
 
+For a production hydration error, record the exact rejected DOM node before
+assuming the theme is at fault. Check server and browser stylesheet URLs.
+Use the React Router route CSS manifest for root styles; test the frozen Bun
+build and an actual deployed page, since a Node developer build can pass.
+
 ## UI fixture contracts
 
 For a focused temporary Vitest config, replace `test.include` explicitly after

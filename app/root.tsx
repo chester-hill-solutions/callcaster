@@ -17,7 +17,7 @@ import Navbar from "@/components/layout/Navbar";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { toResponseMessage } from "@/lib/user-message";
-import stylesheet from "@/tailwind.css?url";
+import "@/tailwind.css";
 
 import type { RootLoaderData } from "./root.loader.server";
 
@@ -33,7 +33,6 @@ export const meta: MetaFunction = () => [
 ];
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: stylesheet },
   { rel: "icon", href: "/favicon.ico" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
