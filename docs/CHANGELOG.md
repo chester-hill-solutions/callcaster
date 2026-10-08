@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-## 2026-10-08 — voice setup patch (release PR pending)
+## 2026-10-08 — release #2500
 
 - Fixed: Workspace setup notices keep a direct link to voice setup while a complete service address awaits validation or voice remains incomplete ([PR #2499](https://github.com/chester-hill-solutions/callcaster/pull/2499), [#2498](https://github.com/chester-hill-solutions/callcaster/issues/2498)).
 

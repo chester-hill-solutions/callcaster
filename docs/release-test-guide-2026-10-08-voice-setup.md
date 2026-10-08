@@ -1,4 +1,4 @@
-# Voice setup patch — 2026-10-08 (release PR pending)
+# Voice setup patch — 2026-10-08 (release [#2500](https://github.com/chester-hill-solutions/callcaster/pull/2500))
 
 This patch promotes [PR #2499](https://github.com/chester-hill-solutions/callcaster/pull/2499) for [#2498](https://github.com/chester-hill-solutions/callcaster/issues/2498), on tested dev `38fd063b4bfa1cbb52a80b2afb5f107c647a2981`. It changes the setup notice link. It adds no provider requests or data migration.
 
