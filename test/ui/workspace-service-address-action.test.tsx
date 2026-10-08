@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import Workspace from "@/routes/workspaces+/$id";
 import { ServiceAddressGate } from "@/components/phone-numbers/ServiceAddressGate";
 import { onboardingFixture } from "../fixtures/onboarding";
+import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 
 vi.mock("@/routes/workspaces+/$id.loader.server", () => ({ loader: vi.fn() }));
 vi.mock("@/routes/workspaces+/$id.middleware.server", () => ({ middleware: [] }));
@@ -16,13 +17,23 @@ const warning = "Add the emergency service address before renting a voice number
 const workspaceId = "00000000-0000-4000-8000-000000000001";
 const path = `/workspaces/${workspaceId}`;
 
-function renderWorkspace({ role = "owner", showWarning = true, addressComplete = false, showCompliance = true } = {}) {
+function renderWorkspace({
+  role = "owner", showWarning = true, addressComplete = false,
+  showCompliance = true, voiceReady = false, addressStatus = "validated",
+}: {
+  role?: string;
+  showWarning?: boolean;
+  addressComplete?: boolean;
+  showCompliance?: boolean;
+  voiceReady?: boolean;
+  addressStatus?: WorkspaceMessagingOnboardingState["emergencyVoice"]["address"]["status"];
+} = {}) {
   const onboarding = onboardingFixture();
   if (addressComplete) {
     onboarding.emergencyVoice.address = {
       ...onboarding.emergencyVoice.address,
       street: "123 Main St", city: "Toronto", region: "ON",
-      postalCode: "M5V 2T6", countryCode: "CA", status: "validated",
+      postalCode: "M5V 2T6", countryCode: "CA", status: addressStatus,
     };
   }
   const router = createMemoryRouter([
@@ -34,7 +45,15 @@ function renderWorkspace({ role = "owner", showWarning = true, addressComplete =
           workspace: { id: workspaceId, name: "Workspace", credits: 100 },
           audiences: [], campaigns: [], phoneNumbers: [],
         },
-        onboardingReadiness: { shouldShowOnboardingBanner: showWarning, warnings: [warning] },
+        onboardingReadiness: {
+          shouldShowOnboardingBanner: showWarning,
+          voiceReady,
+          warnings: [addressComplete
+            ? voiceReady
+              ? "Messaging Service has not been provisioned yet."
+              : "Emergency voice readiness is incomplete."
+            : warning],
+        },
         serviceAddressRequired: !addressComplete,
         ...(showCompliance ? { complianceOnboarding: onboarding } : {}),
         campaignQueueProgress: {},
@@ -82,8 +101,31 @@ describe("workspace service-address remedy", () => {
   });
 
   test("does not direct another setup warning to an already validated address", async () => {
-    renderWorkspace({ addressComplete: true });
+    renderWorkspace({ addressComplete: true, voiceReady: true });
     expect(await screen.findByText("Continue workspace setup")).toBeVisible();
+    expect(screen.getByText("Messaging Service has not been provisioned yet.")).toBeVisible();
     expect(screen.queryByRole("link", { name: /Continue workspace setup: add service address/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Continue workspace setup: review voice setup/ })).toBeNull();
+  });
+
+  test.each(["owner", "admin"])("%s can review a complete pending-validation address from the notice", async (role) => {
+    const router = renderWorkspace({ role, addressComplete: true, addressStatus: "pending_validation" });
+    const action = await screen.findByRole("link", { name: "Continue workspace setup: review voice setup" });
+    expect(action).toHaveAttribute("href", `${path}/phone-numbers#service-address`);
+    fireEvent.click(action);
+    expect(await screen.findByText("pending validation")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Validate address" })).toBeEnabled();
+    expect(router.state.location.hash).toBe("#service-address");
+  });
+
+  test.each(["not_started", "invalid", "validated"] as const)("a complete %s address keeps the review action until voice is ready", async (addressStatus) => {
+    renderWorkspace({ addressComplete: true, addressStatus });
+    expect(await screen.findByRole("link", { name: "Continue workspace setup: review voice setup" })).toHaveAttribute("href", `${path}/phone-numbers#service-address`);
+  });
+
+  test.each(["member", "caller", ""])("%s does not get the owner/admin pending-validation remedy", async (role) => {
+    renderWorkspace({ role, addressComplete: true, addressStatus: "pending_validation" });
+    expect(await screen.findByText("Continue workspace setup")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Continue workspace setup:/ })).toBeNull();
   });
 });

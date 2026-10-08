@@ -144,6 +144,11 @@ bootstrap does not prove runtime session state or per-file recovery.
 
 ## Route authentication tests
 
+For readiness notices, check missing fields, complete pending or invalid
+validation, validated input with an unavailable capability, and full readiness.
+Keep owner/admin and restricted-role controls. Complete input does not prove
+that the capability is ready; use the server's readiness result for its remedy.
+
 React Router 8 action and loader fixtures must include `url: new URL(request.url)`
 with `request`. Missing `url` can trigger the error handler before login runs.
 
