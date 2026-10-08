@@ -157,6 +157,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Patch the Twilio JWT dependency path in both install methods while preserving voice token identity, grants and expiry ([#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341), [PR #2345](https://github.com/chester-hill-solutions/callcaster/pull/2345)).
 
 - Patched the Scalar documentation SDK response readers in both runtime install paths ([#2335](https://github.com/chester-hill-solutions/callcaster/issues/2335), [PR #2339](https://github.com/chester-hill-solutions/callcaster/pull/2339)).
+- Security: API documentation dependencies use the patched Vue renderer to reject unsafe HTML attribute names ([PR #2483](https://github.com/chester-hill-solutions/callcaster/pull/2483), [#2474](https://github.com/chester-hill-solutions/callcaster/issues/2474)).
 
 - Patched the CSV parser while preserving audience import and contact consent mapping ([#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334), [PR #2338](https://github.com/chester-hill-solutions/callcaster/pull/2338)).
 

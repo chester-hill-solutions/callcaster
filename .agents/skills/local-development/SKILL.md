@@ -89,6 +89,17 @@ Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.
 
+An audit command can export dependency names and versions to its registry.
+If automatic approval review rejects that export, keep it held and request
+approval for the exact inventory and destination. Do not run it through another
+executor. For authorized install work while the audit is held, use npm's
+`--no-audit` option so installation does not submit that inventory. Public
+advisory reads and local version comparisons do not replace a full audit.
+
+When publication is held, do not predict a PR number in the changelog. Keep
+the issue link during local preparation, add the verified PR link before final
+publication, then repeat full gates and source reviews for those exact bytes.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
