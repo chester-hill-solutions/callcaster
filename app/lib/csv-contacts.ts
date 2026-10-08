@@ -137,11 +137,20 @@ const OPT_IN_VALUES = new Set([
  *
  * Total by construction: it never throws, for any string.
  */
-export const parseOptOut = (value: string | null): boolean => {
-  const normalised = normaliseConsentValue(value);
-  if (!normalised) return false;
-  return !OPT_IN_VALUES.has(normalised);
-};
+const OPT_OUT_VALUES = new Set([
+  "yes", "y", "true", "1", "opt out", "opted out", "unsubscribe",
+  "unsubscribed", "do not contact", "do not call", "stop",
+]);
+
+export function parseOptOutCell(value: string | null) {
+  const normalized = normaliseConsentValue(value);
+  return {
+    optOut: Boolean(normalized) && !OPT_IN_VALUES.has(normalized),
+    needsReview: Boolean(normalized) && !OPT_IN_VALUES.has(normalized) && !OPT_OUT_VALUES.has(normalized),
+  };
+}
+
+export const parseOptOut = (value: string | null): boolean => parseOptOutCell(value).optOut;
 
 type ParsedCsvContact = Pick<
   Contact,

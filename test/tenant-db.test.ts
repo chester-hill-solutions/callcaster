@@ -13,7 +13,7 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // vi.hoisted (which cannot import other modules). A test below cross-checks
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
-  "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
+  "campaign", "campaign_queue", "contact", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
   "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
@@ -46,7 +46,7 @@ const hoisted = vi.hoisted(() => {
     txExecute: [],
   };
   const TABLES = [
-    "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
+    "campaign", "campaign_queue", "contact", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
     "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",

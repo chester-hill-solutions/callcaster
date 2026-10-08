@@ -1,4 +1,4 @@
-import { processAudienceUpload } from "@/lib/audience-upload-process.server";
+import { processAudienceUpload, normalizeVoterListSource } from "@/lib/audience-upload-process.server";
 import {
   processCallCampaignExport,
   processMessageCampaignExport,
@@ -31,7 +31,6 @@ import { DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS } from "@/lib/throughput-con
 import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import type { VoterListSource } from "@/lib/audience-upload-process.server";
 import type { CampaignDeferralCause } from "@/lib/campaign-batch-outcome";
 
 // Re-exported for backwards compatibility: moved to job-types.server.ts in
@@ -61,21 +60,14 @@ export async function audienceUploadHandler(
     throw new Error("audience_upload: missing workspaceId or userId");
   }
 
-  await processAudienceUpload(
-    params.uploadId,
-    params.audienceId,
-    workspaceId,
-    userId,
-    params.fileContent,
-    params.headerMapping,
-    params.splitNameColumn,
-    undefined,
-    // Same blind cast the old narrowing did — voterListSource was never
-    // validated against the enum at this layer (see legacyNullableStringParam
-    // in job-registry.server.ts for why that stays true post-migration).
-    params.voterListSource as VoterListSource | null,
-  );
-  return { ok: true, uploadId: params.uploadId, audienceId: params.audienceId };
+  if (!job.claimed_by) throw new Error("audience_upload: worker claim owner missing");
+
+  return processAudienceUpload({
+    uploadId: params.uploadId, audienceId: params.audienceId, workspaceId, userId,
+    fileContent: params.fileContent, headerMapping: params.headerMapping,
+    splitNameColumn: params.splitNameColumn, voterListSource: normalizeVoterListSource(params.voterListSource),
+    claim: { jobId: job.id, attemptCount: job.attempt_count, claimedBy: job.claimed_by },
+  });
 }
 
 export type WorkspaceTwilioComplianceParams = {

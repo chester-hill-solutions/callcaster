@@ -1,6 +1,4 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 
 /**
  * Regression coverage for the P0 audit finding: `audience.status` is backed by
@@ -14,7 +12,8 @@ import { resolve } from "node:path";
  * This captures the exact `status` each function writes and asserts it is a
  * valid enum member. It mocks the tenant DB rather than hitting real Postgres:
  * CI's `test:node` job has no live database, so a real-Postgres test fails there
- * even though it passes locally (that is what this file previously did wrong).
+ * even though it passes locally. CSV finalization is tested against the real
+ * enum in integration-db/audience-import-recovery.test.ts.
  */
 
 const ALLOWED_AUDIENCE_STATUSES = ["pending", "processing", "completed", "error"];
@@ -70,19 +69,4 @@ describe("audience_status enum drift (audit fix, AUDIENCES)", () => {
     expect(written).toBe("processing");
   });
 
-  test("CSV finalize writes a valid audience_status enum literal in source", async () => {
-    const source = await readFile(
-      resolve(process.cwd(), "app/lib/audience-upload-process.server.ts"),
-      "utf8",
-    );
-    // The success-path "Update audience status" finalize block — not the
-    // catch-block "error" literal a few lines below. Fails the instant someone
-    // reverts the finalize status back to "active".
-    const m = source.match(
-      /\/\/ Update audience status[\s\S]{0,400}?status:\s*"([a-zA-Z]+)"/,
-    );
-    expect(m).not.toBeNull();
-    expect(ALLOWED_AUDIENCE_STATUSES, `finalize wrote "${m?.[1]}"`).toContain(m![1]);
-    expect(m![1]).toBe("completed");
-  });
 });

@@ -14,6 +14,8 @@ export type ClaimedJobRow = {
   user_id: string | null;
   attempt_count: number;
   max_attempts: number;
+  /** Captured at claim time; attempt counts can reset on dead-letter revival. */
+  claimed_by?: string;
 };
 
 export type JobHandler = (job: ClaimedJobRow) => Promise<unknown>;
@@ -190,7 +192,7 @@ export async function claimNextJob(
       WHERE id = ${job.id}
     `);
 
-    return { ...job, attempt_count: job.attempt_count + 1 };
+    return { ...job, attempt_count: job.attempt_count + 1, claimed_by: workerId };
   });
 }
 

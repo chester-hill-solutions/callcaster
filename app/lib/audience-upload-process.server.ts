@@ -1,46 +1,27 @@
-import { parseCSV } from "@/lib/csv";
-import { parseOptOut } from "@/lib/csv-contacts";
 import { logger } from "@/lib/logger.server";
 import { uploadObject } from "@/lib/object-storage.server";
 import {
   isProcessingStale,
   PROCESSING_INTERRUPTED_MESSAGE,
 } from "@/lib/processing-watchdog.server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
-  audience as audienceTable,
   audience_upload as audienceUploadTable,
-  contact_audience as contactAudienceTable,
-  households as householdsTable,
 } from "@/db/schema";
-import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
-import { listAudiencePhones } from "@/lib/audience-upload-db.server";
 import { householdKeyFor } from "@/lib/household-key";
 import { parsePhoneNumber } from "@/lib/phone";
 import type { AudienceUploadSidecar } from "@/components/audience/audience-upload-phase";
 import {
-  AUDIENCE_UPLOAD_CHUNK_SIZE,
   audienceUploadChunkDelayMs,
   audienceUploadShouldWriteStatus,
 } from "../../shared/audience-upload";
-import {
-  splitContactFullName,
-  validateContactImportMapping,
-} from "../../shared/contact-import-headers";
+import { prepareAudienceImport } from "@/lib/audience-import-map.server";
+import { startAudienceImport, advanceAudienceImport, finishAudienceImport, recordAudienceImportFailure,
+  type AudienceImportContext, type AudienceImportRun } from "@/server/audience-import-recovery.server";
 
 interface CSVContact {
   [key: string]: string;
-}
-
-interface MappedContact {
-  id?: number;
-  workspace: string;
-  created_by: string;
-  firstname?: string;
-  surname?: string;
-  other_data?: Array<Record<string, unknown>>;
-  [key: string]: unknown;
 }
 
 export type VoterListSource =
@@ -201,10 +182,8 @@ async function writeAudienceUploadStatus(
 
 /**
  * Staleness watchdog for the polling status loader: `processAudienceUpload`
- * runs as a fire-and-forget promise inside a request process (see
- * app/routes/api+/audience-upload.action.server.ts). If that process
- * restarts mid-run, the `audience_upload` row is stranded at
- * status: "processing" forever and the client polls indefinitely.
+ * runs in the durable worker. Legacy uploads can still have no job row.
+ * The watchdog must not fail an upload with a queued or live worker claim.
  *
  * Call this from the status loader (write-through on read): if the DB row
  * is "processing" and the object-storage status blob hasn't been updated
@@ -235,13 +214,15 @@ export async function markAudienceUploadInterruptedIfStale(args: {
   }
 
   const tdb = createTenantDb(workspaceId);
-  await tdb.audience_upload.update({
-    set: {
-      status: "error",
-      error_message: PROCESSING_INTERRUPTED_MESSAGE,
-    },
-    where: eq(audienceUploadTable.id, uploadId),
+  const changed = await tdb.audience_upload.update({
+    set: { status: "error", error_message: PROCESSING_INTERRUPTED_MESSAGE },
+    where: and(eq(audienceUploadTable.id, uploadId), eq(audienceUploadTable.status, "processing"),
+      sql`not exists (select 1 from job where type = 'audience_upload'
+        and workspace_id = ${workspaceId}::uuid and params->>'uploadId' = ${String(uploadId)}
+        and ((status = 'queued' and attempt_count < max_attempts)
+          or (status = 'running' and claimed_until > clock_timestamp())))`),
   });
+  if (!changed.length) return { interrupted: false, statusFileData };
 
   const nextStatusFileData: AudienceUploadSidecar = {
     ...statusFileData,
@@ -262,352 +243,56 @@ export async function markAudienceUploadInterruptedIfStale(args: {
   };
 }
 
-// Process audience upload in background
-export const processAudienceUpload = async (
-  uploadId: number,
-  audienceId: number,
-  workspaceId: string,
-  userId: string,
-  fileContent: string,
-  headerMapping: Record<string, string>,
-  splitNameColumn: string | null,
-  deps: { parseCSV: typeof parseCSV } = { parseCSV },
-  voterListSource?: VoterListSource | null,
-) => {
-  // Initialize status data at the top level so it's available in catch block
-  const statusData = {
-    status: "processing",
-    progress: 0,
-    uploadId,
-    audienceId,
-    workspaceId,
-    stage: "Starting upload",
-    created_at: new Date().toISOString()
-  };
-
-  const tdb = createTenantDb(workspaceId);
-
+export const processAudienceUpload = async (args: AudienceImportContext & {
+  fileContent: string;
+  headerMapping: Record<string, string>;
+  splitNameColumn: string | null;
+  voterListSource?: VoterListSource | null;
+}) => {
+  const { uploadId, audienceId, workspaceId, userId, fileContent, headerMapping, splitNameColumn, voterListSource, claim } = args;
+  if (!claim) throw new Error("Audience import requires a worker claim");
+  const ctx = { uploadId, audienceId, workspaceId, userId, claim };
+  const statusData = { uploadId, audienceId, workspaceId, created_at: new Date().toISOString() };
   try {
-    await writeAudienceUploadStatus(workspaceId, uploadId, statusData);
-
-    // Parse the CSV content
-    const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
-    const { contacts: parsedContacts, headers } = deps.parseCSV(decodedContent);
-
-    // Create case-insensitive header lookup
-    const headerLookup = new Map(
-      headers.map(header => [header.toLowerCase(), header])
-    );
-
-    // Validate that all mapped headers exist in the CSV (case-insensitive)
-    const missingHeaders = Object.keys(headerMapping).filter(
-      header => !headerLookup.has(header.toLowerCase())
-    );
-    if (missingHeaders.length > 0) {
-      throw new Error(`Missing headers in CSV: ${missingHeaders.join(', ')}`);
-    }
-    const duplicateIssue = validateContactImportMapping(headerMapping).find(
-      (issue) => issue.blocking && issue.code === "duplicate-target",
-    );
-    if (duplicateIssue) {
-      throw new Error(duplicateIssue.message);
-    }
-    const hasPhoneMapping = Object.values(headerMapping).includes("phone");
-
-    // Resolve the actual CSV header (correct case) mapped to "phone".
-    const phoneMappingHeader =
-      Object.entries(headerMapping).find(([, target]) => target === "phone")?.[0] ??
-      null;
-    const phoneHeader = phoneMappingHeader
-      ? headerLookup.get(phoneMappingHeader.toLowerCase()) ?? null
-      : null;
-
-    // Phones already in this audience, for cross-upload dedupe. Only fetched
-    // when the upload maps a phone column (dedupe is phone-based).
-    const existingPhones: ReadonlySet<string> = phoneHeader
-      ? await listAudiencePhones(workspaceId, audienceId)
-      : new Set<string>();
-
-    // Drop within-file and already-in-audience duplicate phones up front.
-    const { rows: dedupedContacts, skippedDuplicateCount } =
-      dedupeParsedContacts(parsedContacts, phoneHeader, existingPhones);
-
-    // Update total contacts count. Duplicates are excluded from the
-    // denominator so progress percentages reflect rows actually processed.
-    await tdb.audience_upload.update({
-      set: { total_contacts: dedupedContacts.length },
-      where: eq(audienceUploadTable.id, uploadId),
-    });
-
-    // Process contacts in chunks
-    const CHUNK_SIZE = AUDIENCE_UPLOAD_CHUNK_SIZE;
+    const prepared = prepareAudienceImport(Buffer.from(fileContent, "base64"), headerMapping,
+      splitNameColumn, voterListSource ?? null);
+    let run = await startAudienceImport(ctx, prepared);
+    await writeAudienceUploadStatus(workspaceId, uploadId, importSidecar(run, statusData));
     let lastProgressAt = 0;
-    let processedCount = 0;
-    let importedCount = 0;
-    let skippedInvalidCount = 0;
-    const importedAt = new Date().toISOString();
-    const voterListStamp =
-      voterListSource != null
-        ? {
-            voter_list_source: voterListSource,
-            voter_list_imported_at: importedAt,
-          }
-        : null;
-
-    for (let i = 0; i < dedupedContacts.length; i += CHUNK_SIZE) {
-      const chunk = dedupedContacts.slice(i, i + CHUNK_SIZE);
-
-      // Map the contacts according to the header mapping
-      const mappedContacts = chunk.flatMap((contact: CSVContact) => {
-        logger.debug('Processing contact:', contact);
-
-        const mappedContact: MappedContact = {
-          workspace: workspaceId,
-          created_by: userId,
-          other_data: []
-        };
-
-        // Handle name splitting if specified
-        if (splitNameColumn) {
-          const actualHeader = headerLookup.get(splitNameColumn.toLowerCase());
-          if (actualHeader) {
-            const splitName = splitContactFullName(contact[actualHeader]);
-            mappedContact.firstname = splitName.firstname;
-            mappedContact.surname = splitName.surname;
-          }
-        }
-
-        // Map other fields
-        Object.entries(headerMapping).forEach(([csvHeader, dbField]) => {
-          // Get the actual header with correct case from CSV
-          const actualHeader = headerLookup.get(csvHeader.toLowerCase());
-          if (!actualHeader) {
-            logger.warn(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
-            return;
-          }
-
-          const value = contact[actualHeader];
-          if (dbField === "name" || dbField === "ignore" || value === undefined) {
-            return;
-          }
-
-          if (dbField === "other_data") {
-            mappedContact.other_data?.push({ [actualHeader]: value });
-          } else if (dbField === "phone") {
-            const normalizedPhone = parsePhoneNumber(value);
-            if (normalizedPhone) mappedContact.phone = normalizedPhone;
-          } else if (dbField === "opt_out") {
-            mappedContact.opt_out = parseOptOut(value);
-          } else {
-            mappedContact[dbField] = value;
-          }
-        });
-
-        // Remove other_data if empty
-        if (!mappedContact.other_data?.length) {
-          delete mappedContact.other_data;
-        }
-
-        // ADR-0023: stamp voter-list provenance on every imported contact.
-        if (voterListStamp) {
-          mappedContact.voter_list_source = voterListStamp.voter_list_source;
-          mappedContact.voter_list_imported_at = voterListStamp.voter_list_imported_at;
-        }
-
-        if (hasPhoneMapping && !mappedContact.phone) {
-          skippedInvalidCount += 1;
-          return [];
-        }
-
-        logger.debug('Final mapped contact:', mappedContact);
-        return [mappedContact];
-      });
-
-      // Log the first contact's transformation
-      if (i === 0) {
-        logger.debug('First chunk transformation:', {
-          rawCsvRow: chunk[0],
-          availableHeaders: headers,
-          headerMapping,
-          mappedResult: mappedContacts[0]
-        });
-      }
-
-      // Insert contacts
-      if (mappedContacts.length > 0) {
-        // Household stamping: find-or-create households for the chunk's
-        // distinct address|postal keys (max 2 queries per chunk, never
-        // per-row), then stamp household_id onto each mapped contact.
-        const { entries: householdEntries, keys: householdKeys } =
-          chunkHouseholdPlan(mappedContacts);
-        if (householdEntries.length > 0) {
-          const householdNowIso = new Date().toISOString();
-          await db
-            .insert(householdsTable)
-            .values(
-              householdEntries.map((entry) => ({
-                // id: uuid DEFAULT gen_random_uuid() — generated by the DB.
-                household_key: entry.household_key,
-                workspace_id: workspaceId,
-                address: entry.address,
-                city: entry.city,
-                province: entry.province,
-                postal: entry.postal,
-                do_not_knock: false,
-                created_at: householdNowIso,
-                updated_at: householdNowIso,
-              })),
-            )
-            .onConflictDoNothing({
-              target: [householdsTable.workspace_id, householdsTable.household_key],
-            });
-
-          const householdRows = await db
-            .select({
-              id: householdsTable.id,
-              household_key: householdsTable.household_key,
-            })
-            .from(householdsTable)
-            .where(
-              and(
-                eq(householdsTable.workspace_id, workspaceId),
-                inArray(
-                  householdsTable.household_key,
-                  householdEntries.map((entry) => entry.household_key),
-                ),
-              ),
-            );
-          const householdIdByKey = new Map(
-            householdRows.map((row) => [row.household_key, row.id]),
-          );
-          mappedContacts.forEach((mapped, index) => {
-            const key = householdKeys[index];
-            if (!key) return;
-            const householdId = householdIdByKey.get(key);
-            if (householdId) mapped.household_id = householdId;
-          });
-        }
-
-        const insertedContacts = await tdb.contact.insertMany(
-          mappedContacts.map((contact) => ({
-            ...contact,
-            other_data: contact.other_data ?? [],
-            created_at: new Date().toISOString(),
-          })) as Record<string, unknown>[],
-        );
-
-        if (insertedContacts.length === 0) {
-          throw new Error("Error inserting contacts: no rows returned");
-        }
-
-        importedCount += insertedContacts.length;
-        logger.debug('Inserted contacts sample:', insertedContacts[0]);
-
-        // Link contacts to audience
-        await db.insert(contactAudienceTable).values(
-          insertedContacts.map((contact) => ({
-            contact_id: contact.id,
-            audience_id: audienceId,
-            created_at: new Date().toISOString(),
-          })),
-        );
-      }
-
-      // Update progress — durable row every chunk; sidecar throttled.
-      processedCount += chunk.length;
-
-      await tdb.audience_upload.update({
-        set: {
-          processed_contacts: processedCount,
-          status: "processing",
-        },
-        where: eq(audienceUploadTable.id, uploadId),
-      });
-
-      const isLastChunk = i + CHUNK_SIZE >= dedupedContacts.length;
+    while (run.next_index < run.source_rows) {
+      run = await advanceAudienceImport(ctx, run.id, prepared);
       const now = Date.now();
-      if (
-        audienceUploadShouldWriteStatus({
-          total: dedupedContacts.length,
-          chunkSize: CHUNK_SIZE,
-          isLastChunk,
-          lastProgressAt,
-          now,
-        })
-      ) {
-        const progress = Math.round((processedCount / dedupedContacts.length) * 100);
-
-        await writeAudienceUploadStatus(workspaceId, uploadId, {
-          ...statusData,
-          progress,
-          stage: `Processing contacts (${processedCount}/${dedupedContacts.length}; ${skippedInvalidCount} skipped)`,
-          skipped_invalid_contacts: skippedInvalidCount,
-          skipped_duplicate_contacts: skippedDuplicateCount,
-        });
-
+      if (audienceUploadShouldWriteStatus({ total: run.source_rows, isLastChunk: run.next_index === run.source_rows,
+        lastProgressAt, now })) {
+        await writeAudienceUploadStatus(workspaceId, uploadId, importSidecar(run, statusData));
         lastProgressAt = now;
       }
-
-      const chunkDelayMs = audienceUploadChunkDelayMs(dedupedContacts.length);
-      if (chunkDelayMs > 0) {
-        await new Promise((resolve) => setTimeout(resolve, chunkDelayMs));
-      }
+      const delay = audienceUploadChunkDelayMs(run.source_rows);
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
     }
-
-    // Update audience status. audience_status enum is
-    // pending|processing|completed|error — there is no "active" value (see
-    // drizzle/0000_baseline.sql:86). A finalized, successfully-imported
-    // audience maps to "completed".
-    await tdb.audience.update({
-      set: {
-        status: "completed",
-        total_contacts: importedCount,
-      },
-      where: eq(audienceTable.id, audienceId),
-    });
-
-    await tdb.audience_upload.update({
-      set: {
-        status: "completed",
-        processed_contacts: processedCount,
-        processed_at: new Date().toISOString(),
-      },
-      where: eq(audienceUploadTable.id, uploadId),
-    });
-
-    await writeAudienceUploadStatus(workspaceId, uploadId, {
-      ...statusData,
-      status: "completed",
-      progress: 100,
-      stage: `Upload completed (${importedCount} imported; ${skippedInvalidCount} invalid skipped; ${skippedDuplicateCount} duplicates skipped)`,
-      skipped_invalid_contacts: skippedInvalidCount,
-      skipped_duplicate_contacts: skippedDuplicateCount,
-    });
-
+    run = await finishAudienceImport(ctx, run.id);
+    await writeAudienceUploadStatus(workspaceId, uploadId, importSidecar(run, statusData));
+    return { ok: true, uploadId, audienceId, runId: run.id, imported: run.imported,
+      skippedInvalid: run.invalid, skippedDuplicates: run.duplicates };
   } catch (error) {
     logger.error("Upload processing error:", error);
-    
-    // Update audience status to error
-    await tdb.audience.update({
-      set: {
-        status: "error",
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      },
-      where: eq(audienceTable.id, audienceId),
-    });
-
-    await tdb.audience_upload.update({
-      set: {
-        status: "error",
-        error_message: error instanceof Error ? error.message : "Unknown error",
-      },
-      where: eq(audienceUploadTable.id, uploadId),
-    });
-
-    await writeAudienceUploadStatus(workspaceId, uploadId, {
-      ...statusData,
-      status: "error",
-      error_message: error instanceof Error ? error.message : "Unknown error",
-    });
+    const message = error instanceof Error ? error.message : "Unknown import error";
+    try {
+      if (await recordAudienceImportFailure(ctx, message)) {
+        await writeAudienceUploadStatus(workspaceId, uploadId, { ...statusData, status: "error", error_message: message });
+      }
+    } catch (reportError) {
+      logger.error("Audience import failure report could not be saved", reportError);
+    }
+    throw error;
   }
 };
+
+function importSidecar(run: AudienceImportRun, status: AudienceUploadSidecar): AudienceUploadSidecar {
+  return { ...status, status: run.state, import_run_id: run.id,
+    progress: run.source_rows === 0 ? (run.state === "completed" ? 100 : 0) : Math.round(run.next_index / run.source_rows * 100),
+    stage: run.state === "completed"
+      ? `Upload completed (${run.imported} imported; ${run.invalid} invalid skipped; ${run.duplicates} duplicates skipped)`
+      : `Processing contacts (${run.next_index - run.duplicates}/${run.source_rows - run.duplicates}; ${run.invalid} skipped)`,
+    skipped_invalid_contacts: run.invalid, skipped_duplicate_contacts: run.duplicates };
+}

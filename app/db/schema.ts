@@ -17,6 +17,7 @@ import {
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+export { audience_import_run, audience_import_row } from "./schema-audience-import";
 export { workspace_number_release } from "./schema-number-release";
 export { predictive_machine_operation } from "./schema-predictive-machine";
 export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
@@ -362,6 +363,7 @@ export const audience = pgTable("audience", {
 });
 
 export const audience_upload = pgTable("audience_upload", {
+  import_run_id: uuid(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   audience_id: bigint({ mode: "number" }).notNull(),
   workspace: uuid().notNull(),

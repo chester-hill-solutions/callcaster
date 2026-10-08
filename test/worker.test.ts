@@ -306,6 +306,7 @@ describe("worker poll-jobs lifecycle", () => {
     expect(job).not.toBeNull();
     expect(job?.id).toBe(42);
     expect(job?.attempt_count).toBe(1);
+    expect(job?.claimed_by).toBe("worker-1");
     const stored = mockState.state.jobs.find((j) => j.id === 42);
     expect(stored?.status).toBe("running");
     expect(stored?.claimed_by).toBe("worker-1");

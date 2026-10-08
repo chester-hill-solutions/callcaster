@@ -323,6 +323,11 @@ The shared Vitest config restores spies before each case. Install observation
 spies in `beforeEach`; a spy created in `beforeAll` can be removed before the
 first case. Require executed cases and a passing result before using the proof.
 
+For integration tests that start a worker process, install its actual runtime
+in every runner of that tier. Use the project's pinned runtime version, including
+the database-only workflow. Local PATH availability does not prove CI setup;
+keep worker kill and restart cases enabled.
+
 Real PostgreSQL suites must accept the compose runner's `DATABASE_URL`, with
 `INTEGRATION_DB_URL` as an optional override. Verify the suite with
 `DATABASE_URL` alone; skipped cases do not prove the remote database gate.
@@ -484,6 +489,10 @@ untouched classes and expand old test formatting. Restore only those unrelated
 hunks from the pinned base; format edited blocks or new files, then inspect the
 actual diff before source freeze.
 
+Database fault controls can leave deliberately broken rows. Clean only the owned
+fixture rows after each case, before the next control runs. A passing control
+must not inherit orphan rows or missing receipts from the preceding mutation.
+
 Run source faults only when no other test reads that worktree. Restore each
 fault before starting the next reader, then rerun the fixed source. A passing
 report from overlapping runs does not identify which source it tested.
@@ -567,3 +576,14 @@ drift without its matching reviewed source change.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.
 - Load the `github-cli` and `github-issues` skills for `gh` specifics.
+
+Route modules must export only route-facing handlers and components. Import
+server helpers directly in their tests. A helper re-export from a route can
+retain its server dependency graph in the browser build, even with a `.server`
+filename. Confirm the production build and client bundle guard after changing
+server imports.
+
+For exact-file import identity and coordinates, test the real multipart upload
+boundary through its queued worker bytes. A decoder/encoder round trip can strip
+a UTF-8 BOM or replace invalid bytes while direct parser tests stay green. Keep
+worker and stored-original bytes equal, and reject invalid UTF-8 before writes.
