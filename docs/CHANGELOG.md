@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
+- Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([PR #2481](https://github.com/chester-hill-solutions/callcaster/pull/2481), [#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
 
 - Fixed: Onboarding keeps existing inbound routes and voicemail greetings when number settings are saved ([PR #2476](https://github.com/chester-hill-solutions/callcaster/pull/2476)).
 
