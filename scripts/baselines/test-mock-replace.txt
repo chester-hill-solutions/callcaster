@@ -131,7 +131,6 @@ test/billing-reconcile-workspace.server.test.ts::@/lib/database/workspace.server
 test/billing-reconcile-workspace.server.test.ts::@/lib/twilio-client.server#1
 test/boot-checks.server.test.ts::@/lib/env.server#1
 test/boot-checks.server.test.ts::@/lib/object-storage.server#1
-test/bootstrap-migrations.server.test.ts::@/lib/logger.server#1
 test/call-coaching-ack.server.test.ts::@/lib/workspace-membership.server#1
 test/call-recording-storage.server.test.ts::@/lib/logger.server#1
 test/call-recording-storage.server.test.ts::@/lib/object-storage.server#1
