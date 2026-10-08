@@ -95,7 +95,7 @@ export function useAudienceUploadProgress({
   const applyServerSnapshot = (snapshot: AudienceUploadServerSnapshot, attempt: UploadAttempt | null) => {
     setProgress((prev) => {
       if (!isCurrentAttempt(prev, attempt) ||
-        (snapshot.id != null && snapshot.id !== prev.uploadId) ||
+        (snapshot.id != null && String(snapshot.id) !== String(prev.uploadId)) ||
         (snapshot.uploadId != null && snapshot.uploadId !== prev.uploadId)) {
         return prev;
       }

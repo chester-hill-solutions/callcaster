@@ -501,6 +501,9 @@ For upload progress, bind both successful snapshots and delayed warnings to the
 current attempt and tenant. Reusing an upload ID must not reuse an attempt token.
 Test delayed old success/failure responses and realtime row IDs before enabling
 a saved-report action; API snapshots and database events can name IDs differently.
+Keep legacy caller fixtures on the actual accepted upload ID, and retain a
+foreign-ID rejection control. Key the uploader state to its workspace so tenant
+navigation cannot reuse another workspace’s file draft or enabled report action.
 
 For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a

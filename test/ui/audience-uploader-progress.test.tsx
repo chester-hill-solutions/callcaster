@@ -158,6 +158,7 @@ async function startUpload(
 describe("AudienceUploader progress polling", () => {
   beforeEach(() => {
     vi.resetModules();
+    mocks.params.id = "w1";
     mocks.navigate.mockReset();
     mocks.realtimeOpts = null;
     mocks.interval.cb = null;
@@ -166,6 +167,22 @@ describe("AudienceUploader progress polling", () => {
     mocks.onUploadComplete.mockReset();
     vi.useRealTimers();
     (globalThis as any).fetch = undefined;
+  });
+
+
+  test("changing workspace clears an enabled report and the previous file draft", async () => {
+    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { container, rerender } = render(<AudienceUploader audienceName="A1" />);
+    await startUpload(container, "Phone\n4165551234");
+    const oldFileInput = container.querySelector('input[type="file"]#contacts');
+    await act(async () => { mocks.realtimeOpts.onChange({ eventType: "UPDATE", new: { id: "9", status: "processing", import_run_id: "owned-run" } }); });
+    expect(screen.getByRole("link", { name: "Download row report" })).toHaveAttribute("href", "/workspaces/w1/audience-imports/9/report");
+    mocks.params.id = "w2";
+    rerender(<AudienceUploader audienceName="A1" />);
+    expect(screen.queryByRole("link", { name: "Download row report" })).toBeNull();
+    expect(screen.queryByText("Processing...")).toBeNull();
+    expect(container.querySelector('input[type="file"]#contacts')).not.toBe(oldFileInput);
+    expect(container.querySelector('input[type="file"]#contacts')).toHaveProperty("files", expect.objectContaining({ length: 0 }));
   });
 
   test("polling throws -> shows warning and logs error", async () => {

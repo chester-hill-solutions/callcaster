@@ -37,16 +37,20 @@ type AudienceUploaderProps = {
   onStageChange?: (stage: "file" | "map" | "upload") => void;
 };
 
-export default function AudienceUploader({
+export default function AudienceUploader(props: AudienceUploaderProps) {
+  const { id: workspaceId } = useParams();
+  return <WorkspaceAudienceUploader key={workspaceId} workspaceId={workspaceId} {...props} />;
+}
+
+function WorkspaceAudienceUploader({
+  workspaceId,
   audienceName = "",
   existingAudienceId,
   campaignId,
   returnTo,
   onUploadComplete,
   onStageChange,
-}: AudienceUploaderProps) {
-  const params = useParams();
-  const workspaceId = params["id"];
+}: AudienceUploaderProps & { workspaceId: string | undefined }) {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRedirect = useTimeoutFn();
