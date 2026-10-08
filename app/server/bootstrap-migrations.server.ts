@@ -28,7 +28,7 @@ import { logger } from "@/lib/logger.server";
  *      we abort without running anything.
  *   3. Per-file isolation. Each file runs on its own; a failure is logged and
  *      skipped (with ROLLBACK so an aborted BEGIN from that file does not
- *      poison the shared connection), never left half-applied across files,
+ *      poison the shared connection), not recorded until it succeeds. Later boots retry unfinished files,
  *      and the downstream `assertRequiredDbFunctions` guard remains the hard
  *      gate on readiness.
  */
@@ -76,7 +76,7 @@ export type BootstrapResult =
       ran: true;
       applied: string[];
       skipped: string[];
-      /** Drizzle baseline files applied because the app schema was missing. */
+      /** Drizzle baseline files applied on a fresh or tracked partial schema. */
       baselineApplied: string[];
       /** Whether the E2E fixtures were seeded (false/true) or skipped (null). */
       seedApplied: boolean | null;
@@ -142,8 +142,8 @@ type SeedOutcome = {
 };
 
 /**
- * Replay the drizzle baseline (app schema) when `workspace` is missing. Managed
- * environments already have the schema and skip this. psql-only meta-command
+ * Replay the drizzle baseline on a fresh or tracked partial schema. Existing
+ * schemas without our baseline ledger remain managed outside this bootstrap. psql-only meta-command
  * lines (e.g. pg_dump's `\restrict` header) are stripped — they are not valid
  * SQL over the wire protocol.
  */
@@ -151,10 +151,11 @@ async function applyDrizzleBaseline(
   sql: BootstrapSql,
   rootDir: string,
 ): Promise<string[]> {
-  const schemaCells = await sql<{ t: string | null }[]>`
-    select to_regclass('public.workspace') as t
+  const schemaCells = await sql<{ t: string | null; tracking: string | null }[]>`
+    select to_regclass('public.workspace') as t,
+      to_regclass('public.drizzle_baseline_bootstrap') as tracking
   `;
-  if (schemaCells[0]?.t) return [];
+  if (schemaCells[0]?.t && !schemaCells[0]?.tracking) return [];
 
   const baselineDir = path.join(rootDir, BASELINE_DIRNAME);
   const baselineFiles = readdirSync(baselineDir)
@@ -181,6 +182,8 @@ async function applyDrizzleBaseline(
       .filter((line) => !/^\s*\\/.test(line))
       .join("\n");
     try {
+      // pg_dump can clear session state; each file needs its own schema path.
+      await sql`select set_config('search_path', '"$user", public', false)`;
       await sql.unsafe(content).simple();
       await sql`
         insert into public.drizzle_baseline_bootstrap (filename)
@@ -232,6 +235,7 @@ async function applyClientMigrations(
     }
     const content = readFileSync(path.join(dir, file), "utf8");
     try {
+      await sql`select set_config('search_path', '"$user", public', false)`;
       // Simple-protocol so multi-statement files with their own BEGIN/COMMIT
       // and dollar-quoted function bodies execute as written.
       await sql.unsafe(content).simple();
@@ -361,7 +365,7 @@ export async function applyClientMigrationsOnBoot(options: {
     }
 
     // Baseline (app schema) first — the client migrations ALTER baseline
-    // tables, so order matters. No-op where the schema already exists.
+    // tables, so order matters. Tracked partial schemas retry pending files.
     const baselineApplied = await applyDrizzleBaseline(sql, options.rootDir);
 
     const { applied, skipped } = await applyClientMigrations(sql, files, dir);

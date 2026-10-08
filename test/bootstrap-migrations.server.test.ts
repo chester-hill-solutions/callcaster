@@ -93,7 +93,8 @@ vi.mock("postgres", () => {
   };
 });
 
-vi.mock("@/lib/logger.server", () => ({
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
