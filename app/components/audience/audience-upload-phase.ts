@@ -14,6 +14,7 @@ export type AudienceUploadWizardKind = "file" | "map" | "review";
 
 /** Server snapshot shared by poll + realtime. */
 export type AudienceUploadServerSnapshot = {
+  id?: number;
   status?: string | null;
   total_contacts?: number | null;
   processed_contacts?: number | null;
