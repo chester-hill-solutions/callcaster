@@ -14,6 +14,7 @@ export type AudienceUploadWizardKind = "file" | "map" | "review";
 
 /** Server snapshot shared by poll + realtime. */
 export type AudienceUploadServerSnapshot = {
+  id?: number | string;
   status?: string | null;
   total_contacts?: number | null;
   processed_contacts?: number | null;
@@ -25,6 +26,8 @@ export type AudienceUploadServerSnapshot = {
   /** Rows dropped as duplicates (within the file or already in the audience). */
   skipped_duplicate_contacts?: number | null;
   uploadId?: number | null;
+  import_run_id?: string | null;
+  report_available?: boolean;
   file_name?: string | null;
   file_size?: number | null;
 };
@@ -74,6 +77,7 @@ export type AudienceUploadProgressStatus =
 
 /** Contact counters shared by every in-flight/terminal upload variant. */
 type UploadCounters = {
+  reportAvailable?: boolean;
   totalContacts: number;
   processedContacts: number;
   progress: number;
@@ -90,14 +94,15 @@ type ProcessingFields = UploadCounters & {
   warning: string | null;
 };
 
-type CompletedFields = UploadCounters & { audienceId: string };
+type CompletedFields = UploadCounters & { audienceId: string; uploadId: number | null };
+type FailedFields = UploadCounters & { message: string; uploadId: number | null; audienceId: string | null };
 
 export type AudienceUploadProgressState =
   | { kind: "idle" }
   | ({ kind: "submitting" } & SubmittingFields)
   | ({ kind: "processing" } & ProcessingFields)
   | ({ kind: "completed" } & CompletedFields)
-  | { kind: "error"; message: string };
+  | ({ kind: "error" } & FailedFields);
 
 /**
  * Single UI phase derived from wizard step + upload progress.
@@ -110,7 +115,7 @@ export type AudienceUploadPhase =
   | ({ kind: "submitting"; draft: AudienceUploadDraft } & SubmittingFields)
   | ({ kind: "processing"; draft: AudienceUploadDraft } & ProcessingFields)
   | ({ kind: "completed" } & CompletedFields)
-  | { kind: "error"; draft: AudienceUploadDraft; message: string };
+  | ({ kind: "error"; draft: AudienceUploadDraft } & FailedFields);
 
 export function resolveAudienceUploadPhase(args: {
   wizard: AudienceUploadWizardKind;
@@ -136,6 +141,7 @@ export function resolveAudienceUploadPhase(args: {
         kind: "processing",
         draft,
         uploadId: progress.uploadId,
+        reportAvailable: progress.reportAvailable,
         audienceId: progress.audienceId,
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
@@ -147,6 +153,8 @@ export function resolveAudienceUploadPhase(args: {
     case "completed":
       return {
         kind: "completed",
+        uploadId: progress.uploadId,
+        reportAvailable: progress.reportAvailable,
         audienceId: progress.audienceId,
         totalContacts: progress.totalContacts,
         processedContacts: progress.processedContacts,
@@ -156,7 +164,7 @@ export function resolveAudienceUploadPhase(args: {
       };
     case "error":
       if (!draft) return { kind: "file" };
-      return { kind: "error", draft, message: progress.message };
+      return { ...progress, draft };
     case "idle":
       break;
     default: {

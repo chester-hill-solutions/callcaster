@@ -37,16 +37,20 @@ type AudienceUploaderProps = {
   onStageChange?: (stage: "file" | "map" | "upload") => void;
 };
 
-export default function AudienceUploader({
+export default function AudienceUploader(props: AudienceUploaderProps) {
+  const { id: workspaceId } = useParams();
+  return <WorkspaceAudienceUploader key={workspaceId} workspaceId={workspaceId} {...props} />;
+}
+
+function WorkspaceAudienceUploader({
+  workspaceId,
   audienceName = "",
   existingAudienceId,
   campaignId,
   returnTo,
   onUploadComplete,
   onStageChange,
-}: AudienceUploaderProps) {
-  const params = useParams();
-  const workspaceId = params["id"];
+}: AudienceUploaderProps & { workspaceId: string | undefined }) {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scheduleRedirect = useTimeoutFn();
@@ -332,6 +336,9 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="processing"
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -346,6 +353,9 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="completed"
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
                 progress={phase.progress}
                 processedContacts={phase.processedContacts}
                 totalContacts={phase.totalContacts}
@@ -359,9 +369,14 @@ export default function AudienceUploader({
             return (
               <AudienceUploadProgressPanel
                 status="error"
-                progress={0}
-                processedContacts={0}
-                totalContacts={phase.draft.rowCount}
+                workspaceId={workspaceId}
+                uploadId={phase.uploadId}
+                reportAvailable={phase.reportAvailable}
+                progress={phase.progress}
+                processedContacts={phase.processedContacts}
+                totalContacts={phase.totalContacts}
+                skippedInvalidContacts={phase.skippedInvalidContacts}
+                skippedDuplicateContacts={phase.skippedDuplicateContacts}
                 errorMessage={phase.message}
                 showCompletionChrome
                 onTryAgain={() => {

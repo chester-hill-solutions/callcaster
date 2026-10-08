@@ -38,6 +38,12 @@ temporary worktrees whose readers have stopped; keep source, proof artifacts
 and user files. A disk-space failure is not a green gate: rerun the full gate
 after recovery.
 
+Scope an isolated integration-test DATABASE_URL to the bootstrap and database test
+commands. The reset compose fixture deliberately has no deployment ledger. Do not
+carry that test URL into ci:local and then claim its ledger failure is code drift.
+Keep the full normal-environment CI result and the real database proof separate;
+never mark missing migrations as applied merely to pass the ledger guard.
+
 Full `ci:local` must run where the vendor guard can restore its generated
 files through Git and Bun can write its temporary files. A permission failure
 is not lockfile drift: retain the dependency files, restore only the owned
@@ -118,6 +124,10 @@ before retrying with the needed permissions. Keep the existing lockfiles.
 Install locked dependencies before committing in a new worktree. The effects
 pre-commit guard imports TypeScript even for a Markdown-only change.
 
+For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.ts`
+with the file paths. `npm run test:node -- <file>` appends that path to the final
+Bun command and still runs the entire Node suite.
+
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
 checkout has no dependencies. Use the prepared worktree instead of fetching a
@@ -169,6 +179,10 @@ before trusting a guard's floor result.
 
 `asRouteResponse` normalizes thrown Responses. To verify that an auth redirect
 stays thrown, call the raw loader or action and inspect its rejected Response.
+Normalize a middleware result only once, outside its `next` callback. A nested
+response wrapper can become a JSON 200 and hide a real status or download. Keep
+a streaming Response raw until the intended concurrent write has occurred; the
+normalizer consumes its body and would hide a broken capture boundary.
 
 API services should call the domain service, then map its result or exception to
 JSON. A React Router form helper returns a data wrapper; checking a top-level
@@ -488,6 +502,14 @@ Confirm the dialog or selected value before claiming an interactive check.
 Finish full CI and codegen writers before live Vite browser acceptance.
 Generated file rewrites can reload an active request fixture. Require a completed
 stable browser run after those writers stop.
+
+For upload progress, bind both successful snapshots and delayed warnings to the
+current attempt and tenant. Reusing an upload ID must not reuse an attempt token.
+Test delayed old success/failure responses and realtime row IDs before enabling
+a saved-report action; API snapshots and database events can name IDs differently.
+Keep legacy caller fixtures on the actual accepted upload ID, and retain a
+foreign-ID rejection control. Key the uploader state to its workspace so tenant
+navigation cannot reuse another workspace’s file draft or enabled report action.
 
 For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a

@@ -543,7 +543,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
         new: {
-          id: "1",
+          id: "9",
           status: "processing",
           total_contacts: 10,
           processed_contacts: 3,
@@ -556,7 +556,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "error", error_message: "x" },
+        new: { id: "9", status: "error", error_message: "x" },
       });
     });
     expect(screen.getByText("x")).toBeInTheDocument();
@@ -572,7 +572,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", total_contacts: 0, processed_contacts: 0 },
+        new: { id: "9", total_contacts: 0, processed_contacts: 0 },
       });
     });
 
@@ -589,7 +589,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "error" },
+        new: { id: "9", status: "error" },
       });
     });
 
@@ -609,7 +609,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
         new: {
-          id: "1",
+          id: "9",
           status: "processing",
           total_contacts: -1,
           processed_contacts: 0,
@@ -631,7 +631,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "processing", total_contacts: 10 },
+        new: { id: "9", status: "processing", total_contacts: 10 },
       });
     });
 
@@ -656,7 +656,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
         new: {
-          id: 123,
+          id: 9,
           audience_id: 123,
           status: "completed",
           total_contacts: 1,
