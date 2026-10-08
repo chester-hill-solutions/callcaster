@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { onboardingFixture } from "./fixtures/onboarding";
 import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 import { asRouteResponse } from "./helpers/route-result";
+import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({ onboarding: vi.fn() }));
 vi.mock("@/lib/messaging-onboarding/persistence.server", async (importOriginal) => ({
@@ -40,8 +41,12 @@ const completeAddress = {
   street: "123 Main St", city: "Toronto", region: "ON", postalCode: "M5V 2T6", countryCode: "CA",
 };
 
-async function load(address: typeof completeAddress) {
+async function load(
+  address: typeof completeAddress,
+  emergencyVoice: Partial<WorkspaceMessagingOnboardingState["emergencyVoice"]> = {},
+) {
   const onboarding = onboardingFixture();
+  onboarding.emergencyVoice = { ...onboarding.emergencyVoice, ...emergencyVoice };
   onboarding.emergencyVoice.address = { ...onboarding.emergencyVoice.address, ...address };
   mocks.onboarding.mockResolvedValue(onboarding);
   const context = await withWorkspaceRouteArgs({
@@ -68,4 +73,37 @@ test("a complete draft address does not offer a missing-address remedy", async (
   expect(body.serviceAddressRequired).toBe(false);
   expect(body.complianceOnboarding).toBeUndefined();
   expect(body.onboardingReadiness.warnings).not.toContain("Add the emergency service address before renting a voice number.");
+});
+
+test.each(["not_started", "pending_validation", "invalid"] as const)(
+  "a complete %s address still requires voice setup",
+  async (status) => {
+    const address = { ...onboardingFixture().emergencyVoice.address, ...completeAddress, status };
+    const body = await load(completeAddress, {
+      enabled: true, emergencyEligiblePhoneNumbers: ["+14165550123"], address,
+    });
+    expect(body.serviceAddressRequired).toBe(false);
+    expect(body.onboardingReadiness.voiceReady).toBe(false);
+    expect(body.onboardingReadiness.warnings).toContain("Emergency voice readiness is incomplete.");
+  },
+);
+
+test("a validated address without an eligible number still requires voice setup", async () => {
+  const body = await load(completeAddress, {
+    enabled: true,
+    address: { ...onboardingFixture().emergencyVoice.address, ...completeAddress, status: "validated" },
+  });
+  expect(body.serviceAddressRequired).toBe(false);
+  expect(body.onboardingReadiness.voiceReady).toBe(false);
+  expect(body.onboardingReadiness.warnings).toContain("Emergency voice readiness is incomplete.");
+});
+
+test("validated enabled voice with an eligible number clears the voice warning", async () => {
+  const body = await load(completeAddress, {
+    enabled: true, emergencyEligiblePhoneNumbers: ["+14165550123"],
+    address: { ...onboardingFixture().emergencyVoice.address, ...completeAddress, status: "validated" },
+  });
+  expect(body.serviceAddressRequired).toBe(false);
+  expect(body.onboardingReadiness.voiceReady).toBe(true);
+  expect(body.onboardingReadiness.warnings).not.toContain("Emergency voice readiness is incomplete.");
 });

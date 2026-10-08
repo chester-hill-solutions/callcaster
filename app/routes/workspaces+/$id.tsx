@@ -218,10 +218,16 @@ function WorkspaceResolvedView({
               {onboardingReadiness.shouldShowOnboardingBanner ? (
                 <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
                   <div className="font-medium">
-                    {canManageWorkspace && serviceAddressRequired ? (
+                    {canManageWorkspace &&
+                    (serviceAddressRequired ||
+                      onboardingReadiness.voiceReady === false) ? (
                       <Link
                         to={`/workspaces/${workspace.id}/phone-numbers#service-address`}
-                        aria-label="Continue workspace setup: add service address"
+                        aria-label={
+                          serviceAddressRequired
+                            ? "Continue workspace setup: add service address"
+                            : "Continue workspace setup: review voice setup"
+                        }
                         className="underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                       >
                         Continue workspace setup
