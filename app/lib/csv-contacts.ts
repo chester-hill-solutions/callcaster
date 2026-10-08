@@ -19,7 +19,12 @@ const headerMappings = {
   ],
   city: [/^(contact[-_\s]?)?(city|town|municipality)$/i],
   opt_out: [
-    /^(contact[-_\s]?)?(opt[-_]?out|unsubscribe|do[-_\s]?not[-_\s]?contact|consent|permission)$/i,
+    // `\s` alongside `-` and `_`: `shared/contact-import-headers.ts:69`
+    // advertises `opt out` as a recognised opt-out column name, and this
+    // runtime matcher rejected it. The two modules disagreed, so a file using
+    // `opt out` had the whole column dropped into `other_data` and every
+    // contact imported as contactable.
+    /^(contact[-_\s]?)?(opt[-_\s]?out|unsubscribe|do[-_\s]?not[-_\s]?contact|consent|permission)$/i,
   ],
   external_id: [
     /^(contact[-_\s]?)?(external[-_\s]?id|vanid|van[-_\s]?id|id|record[-_\s]?id|unique[-_\s]?identifier)$/i,
@@ -67,13 +72,85 @@ const parseName = (name: string | null) => {
   return { firstname: parts[0] ?? "", surname: parts.slice(1).join(" ") || null };
 };
 
-const parseOptOut = (value: string | null) => {
-  if (typeof value === "string") {
-    value = value.toLowerCase().trim();
-    return ["yes", "true", "1", "opt-out", "unsubscribe"].includes(value);
-  }
-  return Boolean(value);
-};
+/**
+ * Folds a consent cell to one comparable phrase.
+ *
+ * CSVs are hand-edited, so the same word arrives as `Opt-Out`, `opted_out`,
+ * `OPT OUT` and `do   not<TAB>contact`. Separators and runs of whitespace become
+ * a single space, so the accepted spellings below can be written as plain
+ * phrases instead of a pile of regex alternations.
+ */
+const normaliseConsentValue = (value: string | null | undefined): string =>
+  String(value ?? "")
+    .toLowerCase()
+    .replace(/[-_\s]+/g, " ")
+    .trim();
+
+/**
+ * The only values that leave a contact contactable.
+ *
+ * This is an allow-list on purpose, and it is short on purpose.
+ *
+ * `contact.opt_out` gates dispatch: `campaign-ivr-dispatch.server.ts` dequeues a
+ * member only when `opt_out` is truthy, and `chat-sms-guards.server.ts` blocks a
+ * send on the same flag. So `opt_out === false` means **contactable**.
+ *
+ * The previous code enumerated the values that meant *opted out*
+ * (`yes | true | 1 | opt-out | unsubscribe`) and treated everything else as
+ * contactable. That inverts the safe direction for a compliance column: a
+ * spelling nobody thought of produced a dispatchable contact. `opted out` and
+ * `opted-out` were in that trap, and `shared/contact-import-headers.ts` line 69
+ * advertises exactly those as recognised opt-out column names — so the customer's
+ * own file, using a spelling the product invited, produced a call list.
+ *
+ * Enumerating the deny-list cannot fix that. Any opt-out spelling added later
+ * fails open again unless somebody remembers to update this function. So there is
+ * no deny-list: a value is contactable only if it is *explicitly* permission.
+ * A new opt-out spelling needs no change here at all.
+ *
+ * `pending` is here because a compliance pipeline can write it, and the contact
+ * has not refused. It is a judgement call — the safe reading of "pending" is
+ * "not yet permission" — and it is recorded because it is the one entry a reader
+ * would not predict.
+ */
+const OPT_IN_VALUES = new Set([
+  "no",
+  "n",
+  "false",
+  "0",
+  "opted in",
+  "subscribed",
+  "active",
+  "pending",
+]);
+
+/**
+ * Parses the opt-out cell.
+ *
+ * **Fails safe**: only an explicitly permitted value yields `false`.
+ *
+ * Absent (`null`) and blank yield `false`, because an empty cell means the file
+ * said nothing — not that the file said no. That is the one case where silence
+ * is read as consent, and it is the pre-existing behaviour for a contact with no
+ * opt-out column at all; changing it would suppress every contact in every
+ * ordinary import.
+ *
+ * Total by construction: it never throws, for any string.
+ */
+const OPT_OUT_VALUES = new Set([
+  "yes", "y", "true", "1", "opt out", "opted out", "unsubscribe",
+  "unsubscribed", "do not contact", "do not call", "stop",
+]);
+
+export function parseOptOutCell(value: string | null) {
+  const normalized = normaliseConsentValue(value);
+  return {
+    optOut: Boolean(normalized) && !OPT_IN_VALUES.has(normalized),
+    needsReview: Boolean(normalized) && !OPT_IN_VALUES.has(normalized) && !OPT_OUT_VALUES.has(normalized),
+  };
+}
+
+export const parseOptOut = (value: string | null): boolean => parseOptOutCell(value).optOut;
 
 type ParsedCsvContact = Pick<
   Contact,
@@ -161,7 +238,9 @@ const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
 export const parseCSV = (csvString: string) => {
   try {
     const records = parse(csvString);
-    const headers = parseCSVHeaders(records[0]);
+    const firstRow = records[0];
+    if (!firstRow) throw new Error("CSV file is empty");
+    const headers = parseCSVHeaders(firstRow);
     const contacts = parseCSVData(records, headers);
 
     return { headers, contacts };

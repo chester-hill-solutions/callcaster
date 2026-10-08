@@ -84,6 +84,38 @@ function shouldSkipFile(rel) {
   return SKIP_FILE_PATTERNS.some((pattern) => pattern.test(rel));
 }
 
+/**
+ * #2101 — fractional credit rates must fail CI, not production.
+ *
+ * Credits are `integer` end to end: `workspace.credits`,
+ * `transaction_history.amount`, and the ledger RPC's `p_amount`. So a fractional
+ * rate handed to the debit helpers reaches Postgres as `-0.1` and dies with
+ * `invalid input syntax for type integer`. `COACHING_CUE_CREDITS` was passed raw
+ * and every LLM coaching cue went unbilled; the caller swallowed the error, so
+ * nothing surfaced. The unit test that "covered" the rate asserted
+ * `COACHING_CUE_CREDITS === 0.1` and never exercised the write.
+ *
+ * This rule rejects a non-integer *literal* passed to either debit helper. Only
+ * literals: a computed value is the caller's business, and rejecting every
+ * non-literal would either ban legitimate arithmetic or need a type system.
+ *
+ * The rate card and the helpers themselves are exempt — they are where the
+ * invariant is defined and enforced, not where it is consumed.
+ */
+const FRACTIONAL_DEBIT_FN = /\b(?:debitAmountFromCredits|wholeCreditDebit)\s*\(\s*(-?\d*\.?\d+)\s*\)/g;
+const RATE_CARD_FILES = new Set(["shared/billing-rates.ts", "shared/pricing.ts"]);
+
+function fractionalDebitsIn(source) {
+  const found = [];
+  for (const match of source.matchAll(FRACTIONAL_DEBIT_FN)) {
+    const literal = match[1];
+    if (!literal.includes(".")) continue; // an integer literal is exactly what we want
+    if (Number.isInteger(Number(literal))) continue;
+    found.push(literal);
+  }
+  return found;
+}
+
 function walk(dir, files = []) {
   if (!fs.existsSync(dir)) return files;
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -112,6 +144,18 @@ for (const dir of SCAN_DIRS) {
       if (rule.pattern.test(source)) {
         violations.push({ rel, label: rule.label });
         break;
+      }
+    }
+
+    if (!RATE_CARD_FILES.has(rel)) {
+      for (const literal of fractionalDebitsIn(source)) {
+        violations.push({
+          rel,
+          label:
+            `fractional credit rate ${literal} passed to a debit helper — credits are ` +
+            `integer (workspace.credits, transaction_history.amount, RPC p_amount). ` +
+            `Use wholeCreditDebit(), or make the ledger numeric first. (#2101)`,
+        });
       }
     }
   }

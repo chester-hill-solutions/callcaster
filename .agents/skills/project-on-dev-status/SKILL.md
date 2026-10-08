@@ -127,8 +127,14 @@ gh api graphql -f query='query { repository(owner: "chester-hill-solutions", nam
 
 ## Related
 
-- Next states: `tested-on-dev` (`eaff2ab1`) when QA confirms on the review env, then
-  GitHub closes the issue on master promotion (see `github-issues` Closed Reasons).
+- Next states: `tested-on-dev` (`eaff2ab1`) when QA confirms on the review env. When the
+  fix is promoted to master the release PR's `Closes #N` closes the issue, and the
+  project's **"Item closed" automation** moves the item to `on-qa` (`98236657`) by itself.
+  Do NOT move closed items manually — only a closed issue whose state reason is
+  `not_planned` or `duplicate` goes to `archive` (`2441cbb1`) by hand.
 - `ON_DEV_PROJECT_NUMBER=9`, `PROJECT_TOKEN`, and `ON_DEV_STATUS_VALUE=on-dev` are set,
   so the workflow moves the Status automatically. Keep this skill for backfilling merges
   the automation missed (or while the token is unset).
+- Options on the live project (2026-09-22): `Backlog f75ad846`, `In progress 47fc9ee4`,
+  `on-dev 9fd67429`, `tested-on-dev eaff2ab1`, `on-qa 98236657`, `on-prod 2f691958`,
+  `archive 2441cbb1` — mirrored in `.github/projects.yaml`.

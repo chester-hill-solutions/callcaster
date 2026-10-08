@@ -6,7 +6,7 @@ import { makeContact, DataSmokeRouter, SmokeRouter } from "./_helpers/component-
 vi.mock("@/hooks/chats/useChatThread", () => ({
   useChatThread: () => ({
     contact_number: "+1555",
-    messages: [{ sid: "1", body: "Hi", date_created: new Date().toISOString(), direction: "inbound" }],
+    messages: [{ sid: "1", body: "Hi", date_created: new Date(), direction: "inbound" }],
     messagesEndRef: createRef(),
     scrollContainerRef: createRef(),
     loadMoreSentinelRef: vi.fn(),
@@ -15,6 +15,22 @@ vi.mock("@/hooks/chats/useChatThread", () => ({
     optedOut: true,
   }),
 }));
+
+// Hoisted so the double hands out ONE stable reference per test, matching the
+// real hooks: `useSearchParams` memoises its URLSearchParams and returns a
+// stable setter, and `useFetcher` returns a stable object. Rebuilding either
+// per call would put a new identity in any consumer effect dep (#2054).
+const STABLE_SEARCH_PARAMS = new URLSearchParams();
+const STABLE_SET_SEARCH_PARAMS = vi.fn();
+const STABLE_FETCHER_FORM = ({ children, ...p }: any) => (
+  <form {...p}>{children}</form>
+);
+const STABLE_FETCHER = {
+  submit: vi.fn(),
+  state: "idle" as const,
+  data: null,
+  Form: STABLE_FETCHER_FORM,
+};
 
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
@@ -33,8 +49,8 @@ vi.mock("react-router", async () => {
         totalPages: 1,
       },
     }),
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
-    useFetcher: () => ({ submit: vi.fn(), state: "idle", data: null, Form: ({ children, ...p }: any) => <form {...p}>{children}</form> }),
+    useSearchParams: () => [STABLE_SEARCH_PARAMS, STABLE_SET_SEARCH_PARAMS],
+    useFetcher: () => STABLE_FETCHER,
     useNavigate: () => vi.fn(),
   };
 });
@@ -57,7 +73,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
   test("renders a distinct failed/undelivered state with error_message", async () => {
     const ChatMessages = (await import("@/components/sms-ui/ChatMessages"))
       .default;
-    render(
+    const { container } = render(
       <ChatMessages
         messages={[
           {
@@ -65,7 +81,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "failed",
             direction: "outbound",
             body: "hello",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
             error_message: "Landline or unreachable carrier",
           },
           {
@@ -73,7 +89,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "delivered",
             direction: "outbound",
             body: "world",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
           },
         ]}
         messagesEndRef={createRef()}
@@ -93,6 +109,11 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
     const okItem = screen.getByText("world").closest("[data-message-status]");
     expect(okItem).toHaveAttribute("data-message-status", "delivered");
     expect(screen.queryByText(/Landline/)).not.toBeNull();
+    expect(container.firstElementChild).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+    );
   });
 
   test("keeps data-message-status intact for both failed and normal messages", async () => {
@@ -106,7 +127,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "failed",
             direction: "inbound",
             body: "failed one",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
           },
         ]}
         messagesEndRef={createRef()}

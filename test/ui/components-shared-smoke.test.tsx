@@ -106,6 +106,7 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
       title: "Saved",
       description: "Your changes were saved",
       className: "banner-saved",
+      variant: "success" as const,
     },
   };
 
@@ -124,6 +125,7 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
     );
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.getByText("Your changes were saved")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveClass("border-success/40");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText("Saved")).not.toBeInTheDocument();
   });
@@ -233,7 +235,7 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
     ).toBeInTheDocument();
   });
 
-  test("shows status and statusText for a route error response", async () => {
+  test("keeps status and reload for a server error without exposing its body", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { RouteErrorBoundary } = await import(
       "@/components/shared/RouteErrorBoundary"
@@ -243,9 +245,9 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
         {
           path: "/",
           loader: () => {
-            throw new Response("denied", {
-              status: 403,
-              statusText: "Forbidden",
+            throw new Response("Internal database detail", {
+              status: 500,
+              statusText: "Internal Server Error",
             });
           },
           element: <div>never shown</div>,
@@ -255,7 +257,9 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
       { initialEntries: ["/"] },
     );
     render(<RouterProvider router={router} />);
-    expect(await screen.findByText("403 Forbidden")).toBeInTheDocument();
+    expect(await screen.findByText("500 Internal Server Error")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reload Page" })).toBeInTheDocument();
+    expect(screen.queryByText("Internal database detail")).not.toBeInTheDocument();
   });
 });
 
@@ -278,20 +282,6 @@ describe("app/components/shared/SaveBar.tsx", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
-  });
-
-  // Asserts the token classes rather than computed colors: jsdom does not load
-  // Tailwind, so the class list is the only observable signal that the bar is
-  // themed via tokens (and therefore dark-mode safe) instead of raw literals.
-  test("uses design tokens rather than hardcoded colors", async () => {
-    const { SaveBar } = await import("@/components/shared/SaveBar");
-    const { container } = render(<SaveBar isChanged onSave={vi.fn()} />);
-    const bar = container.firstElementChild as HTMLElement;
-    expect(bar).toHaveClass("bg-background");
-    expect(bar.className).not.toMatch(/bg-white/);
-
-    const save = screen.getByRole("button", { name: "Save changes" });
-    expect(save.className).not.toMatch(/bg-red-|text-white/);
   });
 
   test("saves via keyboard shortcut and hides when unchanged", async () => {

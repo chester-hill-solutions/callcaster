@@ -6,11 +6,10 @@
  * one place.
  */
 
-export type IvrOption = {
-  value?: string | number | null;
-  label?: string | null;
-  content?: string | null;
-};
+import { ivrOptionValue, type IvrOptionLike } from "@/lib/ivr-option-value";
+
+/** The stored option shape. Aliased from the shared reader so the two cannot drift. */
+export type IvrOption = IvrOptionLike;
 
 export type IvrGatherAttributes = {
   input: Array<"dtmf" | "speech">;
@@ -53,7 +52,10 @@ function humanizeHint(raw: string): string {
 export function ivrStepGathersSpeech(
   options: ReadonlyArray<IvrOption>,
 ): boolean {
-  return options.some((option) => String(option.value).trim() === "vx-any");
+  // Through the shared reader: `vx-any` is stored as an option's `value`, but
+  // a documented-format option has only `content`, and reading `value` alone
+  // made a spoken catch-all invisible (#2146).
+  return options.some((option) => ivrOptionValue(option) === "vx-any");
 }
 
 /**
@@ -93,7 +95,7 @@ export function ivrSingleKeyDigits(
 ): number | undefined {
   if (options.length === 0) return undefined;
   const everyOptionIsOneKey = options.every((option) => {
-    const value = String(option.value ?? "").trim();
+    const value = ivrOptionValue(option);
     return value.length === 1 && /^[0-9*#]$/.test(value);
   });
   return everyOptionIsOneKey ? 1 : undefined;

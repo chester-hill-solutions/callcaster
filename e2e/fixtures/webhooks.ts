@@ -15,7 +15,7 @@ export type WebhookSigning = "valid" | "missing" | "wrong-token" | "tampered";
 
 /**
  * Signature the app expects for a webhook to `path`. The server validates
- * against `BASE_URL + pathname` (`resolveCanonicalTwilioWebhookUrl`), which the
+ * against `BASE_URL + pathname + search` (`resolveCanonicalTwilioWebhookUrl`), which the
  * harness sets to the same origin this fixture posts to.
  */
 export function twilioWebhookSignature(

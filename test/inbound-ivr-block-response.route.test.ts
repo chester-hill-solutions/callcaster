@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { RouterContextProvider } from "react-router";
+import { asRouteResponse } from "./helpers/route-result";
+import {
+  bumpInboundNoInputReplay,
+  resetInboundNoInputReplays,
+} from "@/lib/inbound-no-input-replay.server";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  createSignedObjectUrl: vi.fn(),
+  listObjects: vi.fn(),
+  objectExists: vi.fn(),
   requireTwilioSignatureForIvrResponse: vi.fn(),
   env: {
     BASE_URL: () => "https://base.example",
@@ -9,6 +18,11 @@ const mocks = vi.hoisted(() => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   findCallBySid: vi.fn(),
   loadInboundIvrBlockContext: vi.fn(),
+}));
+
+vi.mock("@/server/inbound-voicemail-store.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/inbound-voicemail-store.server")>()),
+  bindInboundVoicemailRecipient: vi.fn(async (_binding, recipient) => recipient),
 }));
 
 vi.mock("@client/client-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
@@ -25,6 +39,13 @@ vi.mock("@/lib/inbound-ivr-db.server", () => ({
   loadInboundIvrBlockContext: (...a: unknown[]) => mocks.loadInboundIvrBlockContext(...a),
 }));
 
+vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
+  createSignedObjectUrl: (...args: unknown[]) => mocks.createSignedObjectUrl(...args),
+  listObjects: (...args: unknown[]) => mocks.listObjects(...args),
+  objectExists: (...args: unknown[]) => mocks.objectExists(...args),
+}));
+
 function makeReq(form: Record<string, string>) {
   const params = new URLSearchParams(form);
   return new Request("https://base.example/api/inbound-ivr/1/page_1/b1/", {
@@ -35,6 +56,10 @@ function makeReq(form: Record<string, string>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.createSignedObjectUrl.mockReset().mockImplementation(async (_bucket: string, key: string) => `https://audio.example/${key}`);
+  mocks.listObjects.mockReset().mockResolvedValue([]);
+  mocks.objectExists.mockReset().mockResolvedValue(true);
+  resetInboundNoInputReplays();
   mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
     async () => ({ callSid: "CA1", userInput: "1" }),
   );
@@ -53,6 +78,18 @@ beforeEach(() => {
 });
 
 describe("inbound IVR block response", () => {
+  test("a declared page target does not need a generated page_ prefix", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: { pages: { page_1: { blocks: ["b1"] }, goodbye: { blocks: ["b2"] } },
+        blocks: { b1: { id: "b1", options: [{ value: "1", next: "goodbye" }] }, b2: { id: "b2", options: [] } } },
+    });
+    const { action } = await import("../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server");
+    const response = await asRouteResponse(action({ request: makeReq({ CallSid: "CA1", Digits: "1" }),
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" }, context: new RouterContextProvider() }));
+    expect(await response.text()).toContain("<Redirect>https://base.example/api/inbound-ivr/1/goodbye/</Redirect>");
+  });
+
   test("internal error text is not spoken to the caller", async () => {
     // Simulate an internal error from findCallBySid
     mocks.findCallBySid.mockRejectedValue(new Error("ECONNREFUSED postgres:5432"));
@@ -159,4 +196,197 @@ describe("inbound IVR block response", () => {
     const text = await res.text();
     expect(text).toMatch(/hangup/i);
   });
+
+  test("next:'end' is terminal and hangs up (#1884)", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: { b1: { id: "b1", options: [{ value: "1", next: "end" }] } },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+
+    const text = await res.text();
+    expect(text).toMatch(/hangup/i);
+    expect(text).not.toContain("Sorry, we ran into a problem.");
+  });
+
+  test("dangling page:block target hangs up instead of playing an error (#1884)", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: {
+          b1: { id: "b1", options: [{ value: "1", next: "page_missing:block_missing" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+
+    const text = await res.text();
+    expect(text).toMatch(/hangup/i);
+    expect(text).not.toContain("Sorry, we ran into a problem.");
+  });
+
+  test("no input with noInput:hangup hangs up (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: "hangup" }, options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await res.text()).toMatch(/hangup/i);
+  });
+
+  test("no input with noInput:replay redirects back until the cap, then continues (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1", "b2"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: "replay", maxReplays: 2 }, options: [{ value: "1", next: "hangup" }] },
+          b2: { id: "b2", options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const first = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await first.text()).toMatch(/Redirect/i);
+
+    bumpInboundNoInputReplay("CA1", "b1");
+    bumpInboundNoInputReplay("CA1", "b1");
+    const overCap = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    // Past the cap: fall through to the next step (redirect to b2).
+    const text = await overCap.text();
+    expect(text).toContain("page_1/b2/");
+  });
+
+  test("no input with noInput:route redirects to the target step (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] }, page_2: { blocks: ["b2"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: { pageId: "page_2", blockId: "b2" } }, options: [] },
+          b2: { id: "b2", options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await res.text()).toContain("page_2/b2/");
+  });
+  describe("voicemail playback settings (#2088)", () => {
+    async function voicemailResponse(inboundAudio: string | null) {
+      mocks.loadInboundIvrBlockContext.mockResolvedValue({
+        number: {
+          id: 42,
+          phoneNumber: "+15551234567",
+          workspaceId: "w1",
+          inbound_audio: inboundAudio,
+        },
+        script: {
+          pages: { page_1: { blocks: ["b1"] } },
+          blocks: { b1: { id: "b1", options: [{ value: "1", next: "voicemail:mail@example.org" }] } },
+        },
+      });
+      const { action } = await import(
+        "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+      );
+      const request = makeReq({ CallSid: "CA1", Digits: "1" });
+      return asRouteResponse(action({
+        params: { numberId: "42", pageId: "page_1", blockId: "b1" },
+        request,
+        context: new RouterContextProvider(),
+        url: new URL(request.url),
+      }));
+    }
+
+    function expectCapture(text: string) {
+      expect(text).toContain('<Pause length="1"');
+      expect(text).toContain("<Record");
+      expect(text).toContain('transcribe="true"');
+      expect(text).toContain('timeout="10"');
+      expect(text).toContain('playBeep="true"');
+      expect(text).toContain('recordingStatusCallback="https://base.example/api/email-vm"');
+    }
+
+    test("plays the number's selected greeting from its workspace before recording", async () => {
+      const text = await (await voicemailResponse("greeting.mp3")).text();
+      expect(text).toContain("<Play>https://audio.example/w1/greeting.mp3</Play>");
+      expect(text).not.toContain("Thank you for calling");
+      expectCapture(text);
+    });
+
+    test("speaks the actual called phone without a configured greeting", async () => {
+      const text = await (await voicemailResponse(null)).text();
+      expect(text).toContain("Thank you for calling +15551234567");
+      expect(text).not.toContain("Thank you for calling 42");
+      expect(text).not.toContain("<Play>");
+      expect(mocks.createSignedObjectUrl).not.toHaveBeenCalled();
+      expectCapture(text);
+    });
+
+    test("keeps phone-based speech and capture when the configured audio is unavailable", async () => {
+      mocks.objectExists.mockResolvedValueOnce(false);
+      mocks.listObjects.mockResolvedValueOnce([]);
+      const text = await (await voicemailResponse("missing.mp3")).text();
+      expect(text).toContain("Thank you for calling +15551234567");
+      expect(text).not.toContain("Thank you for calling 42");
+      expect(text).not.toContain("<Play>");
+      expect(mocks.createSignedObjectUrl).not.toHaveBeenCalled();
+      expectCapture(text);
+    });
+  });
+
 });

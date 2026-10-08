@@ -112,6 +112,14 @@ jobs:
       # requireWorkspaceAccess cannot check them. One route was declared
       # session-only and authed dual, leaving key callers entirely unguarded.
       - run: npm run check:dual-auth
+      # A route that consumes an unauthenticated credential must declare an
+      # `auth:` rate-limited scope. The HTML signup and reset-password forms
+      # shipped without one while their JSON twins had one, and nothing
+      # enforced the choice — so the next auth action copied from a neighbour
+      # would ship unthrottled too. Surfaces are derived from call sites, not
+      # a filename list, so a brand-new auth route is covered the moment it
+      # exists (#2220).
+      - run: npm run check:auth-rate-limits
       # Security gates. These previously ran ONLY in `ci:local`, so a regression
       # in workspace write authorization, or a loader leaking twilio_data /
       # stripe_id to the client, could merge unnoticed.
@@ -131,6 +139,8 @@ jobs:
       # the URL tree silently reroute it — the "successful upload → 404"
       # flow in #1396. Ratchet the current allowlist so no new one lands.
       - run: npm run check:relative-redirects
+      - run: npm run check:redirect-targets
+      - run: npm run check:sheet-bodies
       # Drizzle nests the Postgres SQLSTATE on error.cause; inline
       # `.code === "23505"` checks miss it, which is how duplicate campaign
       # names shipped a generic "Unexpected Server Error" behind green CI.

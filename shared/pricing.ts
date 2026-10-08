@@ -141,6 +141,36 @@ export function debitAmountFromCredits(credits: number): number {
   return -Math.abs(credits);
 }
 
+/**
+ * Negative ledger amount for a credit debit, quantised to whole credits.
+ *
+ * Credits are whole units: `workspace.credits` and `transaction_history.amount`
+ * are `integer`, and the ledger RPC's `p_amount` is `integer` too (the
+ * 2026-07-11 migration converted them). A fractional rate passed straight to
+ * {@link debitAmountFromCredits} therefore reaches Postgres as `-0.1` and dies
+ * with `invalid input syntax for type integer` — which is exactly what
+ * `COACHING_CUE_CREDITS` did, leaving every LLM coaching cue unbilled (#2101).
+ *
+ * `Math.max(1, …)` is load-bearing, not defensive: `Math.round(0.1)` is `0`, and
+ * a zero debit writes a row that moves no credits — the defect would come back
+ * in a form no test could see, because the write would succeed.
+ *
+ * **The cost of quantising is stated plainly:** a cue whose true cost is 0.1
+ * credits is billed as 1. That is a 10x overcharge on the cheapest unit in the
+ * rate card, and it is a deliberate pricing decision — see the note on
+ * `COACHING_CUE_CREDITS`. Every other rate in the rate card is already whole
+ * credits by construction, so they are unaffected. If sub-credit pricing is
+ * ever wanted, the columns and the RPC have to become `numeric`; that is a
+ * migration on the money path, not a change to this function.
+ *
+ * `scripts/check-credit-write-paths.mjs` rejects a non-integer literal handed to
+ * either function outside the rate card, so the next fractional rate fails CI
+ * rather than production.
+ */
+export function wholeCreditDebit(credits: number): number {
+  return debitAmountFromCredits(Math.max(1, Math.round(Math.abs(credits))));
+}
+
 export function formatCadFromCredits(credits: number): string {
   return new Intl.NumberFormat("en-CA", {
     style: "currency",

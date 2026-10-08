@@ -3,7 +3,6 @@
 :blockId
 :callSid/disconnect
 :campaignId
-:campaignId/:pageId
 :campaignId/dialer/start
 :campaign_id/audiences/new
 :campaign_id/call
@@ -15,6 +14,7 @@
 :id
 :number
 :numberId
+:pageId
 :scriptId
 :selected_id
 :surveyId
@@ -114,6 +114,7 @@ api/verify-pin-input
 api/workspace-api-keys
 api/workspaces
 archive
+audience-imports/:uploadId/report
 audience-uploads/:uploadId
 audiences
 audios
@@ -150,6 +151,7 @@ new
 numbers
 onboarding
 other-services
+phone-numbers
 pricing
 purchase
 queue

@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/tailwind.css?url", () => ({ default: "/tailwind.css" }));
+vi.mock("@/tailwind.css", () => ({}));
 
 vi.mock("@/components/layout/Navbar", () => ({
   default: (props: any) => {
@@ -92,15 +92,6 @@ describe("root.tsx", () => {
       workspace_invite: [{ id: "invite-1" }],
     });
     mocks.workspaceMembersDb.listUserWorkspaceSummaries.mockResolvedValue([{ id: "w1", name: "W", role: "admin", credits: 5 }] as any[]);
-  });
-
-  test("links includes stylesheet", async () => {
-    const mod = await import("../../app/root");
-    expect(mod.links()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ rel: "stylesheet", href: expect.stringContaining("tailwind") }),
-      ]),
-    );
   });
 
   test("loader redirects when q decodes to contactId:surveyId", async () => {

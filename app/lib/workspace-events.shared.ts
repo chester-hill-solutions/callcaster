@@ -1,6 +1,13 @@
 /** Client-safe workspace event types for SSE consumers. */
 import { z } from "zod";
 
+export type PredictiveBroadcastPayload = {
+  contact_id: number | null;
+  status: string;
+  conference_id?: string;
+  conference_ended?: boolean;
+};
+
 export type PostgresChangePayload = {
   eventType: "INSERT" | "UPDATE" | "DELETE" | string;
   table: string;

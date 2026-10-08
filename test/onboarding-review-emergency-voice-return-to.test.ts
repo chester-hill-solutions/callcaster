@@ -182,10 +182,10 @@ describe("review_emergency_voice returnTo", () => {
     });
   });
 
-  test("redirects back to Numbers settings when returnTo is present", async () => {
+  test("redirects back to Phone Numbers when returnTo is present", async () => {
     const formData = new FormData();
     formData.set("_action", "review_emergency_voice");
-    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings/numbers`);
+    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/phone-numbers`);
 
     const outcome = await runOnboardingAction(
       USER_ID,
@@ -200,7 +200,7 @@ describe("review_emergency_voice returnTo", () => {
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
     expect(mapped).toEqual({
       kind: "ui_redirect_path",
-      path: `/workspaces/${WORKSPACE_ID}/settings/numbers`,
+       path: `/workspaces/${WORKSPACE_ID}/phone-numbers`,
       searchParams: { saved: "emergency_voice" },
     });
   });
@@ -232,7 +232,7 @@ describe("review_emergency_voice returnTo", () => {
 
     const formData = new FormData();
     formData.set("_action", "review_emergency_voice");
-    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings/numbers`);
+    formData.set("returnTo", `/workspaces/${WORKSPACE_ID}/phone-numbers`);
 
     const outcome = await runOnboardingAction(
       USER_ID,
@@ -247,7 +247,7 @@ describe("review_emergency_voice returnTo", () => {
     const mapped = mapOnboardingHandlerResult(outcome.result, outcome.detail, "ui");
     expect(mapped).toEqual({
       kind: "ui_redirect_path",
-      path: `/workspaces/${WORKSPACE_ID}/settings/numbers`,
+       path: `/workspaces/${WORKSPACE_ID}/phone-numbers`,
       searchParams: {
         warning:
           "Save a complete emergency service address before running voice review.",

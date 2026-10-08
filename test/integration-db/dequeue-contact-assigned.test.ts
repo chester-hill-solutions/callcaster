@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+import { PgDialect } from "drizzle-orm/pg-core";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -45,7 +46,8 @@ import type {
 // The realtime side channel is covered by test/queue-events*.test.ts and is
 // explicitly non-fatal in production; stubbing it keeps this suite to one
 // subject (the RPC + its TS wrapper's row selection).
-vi.mock("@/lib/workspace-events.server", () => ({
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-events.server")>()),
   emitQueueEvent: vi.fn(async () => undefined),
   emitPostgresChangeEvent: vi.fn(async () => undefined),
 }));
@@ -100,12 +102,13 @@ describeDb("dequeue_contact against real Postgres", () => {
   let explainDequeueNoOp: typeof ExplainFn;
   let workspaceId: string;
   let campaignId: string;
+  let otherCampaignId: string;
   let householdId: string;
   let primaryContactId: string;
   let siblingContactId: string;
   let loneContactId: string;
 
-  async function queueRow(contactId: string): Promise<QueueRow> {
+  async function queueRow(contactId: string, targetCampaign = campaignId): Promise<QueueRow> {
     const rows = await client<QueueRow[]>`
       select
         id::text as id,
@@ -117,7 +120,7 @@ describeDb("dequeue_contact against real Postgres", () => {
         dequeued_reason,
         provider_status
       from public.campaign_queue
-      where campaign_id = ${campaignId}::bigint
+      where campaign_id = ${targetCampaign}::bigint
         and contact_id = ${contactId}::bigint
     `;
     return rows[0];
@@ -131,6 +134,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       assigned_to_user_id?: string | null;
       provider_status?: string | null;
     },
+    targetCampaign = campaignId,
   ) {
     await client`
       update public.campaign_queue
@@ -141,7 +145,7 @@ describeDb("dequeue_contact against real Postgres", () => {
           dequeued_at = null,
           dequeued_by = null,
           dequeued_reason = null
-      where campaign_id = ${campaignId}::bigint
+      where campaign_id = ${targetCampaign}::bigint
         and contact_id = ${contactId}::bigint
     `;
   }
@@ -183,6 +187,12 @@ describeDb("dequeue_contact against real Postgres", () => {
       returning id::text as id
     `;
     campaignId = campaigns[0].id;
+    const otherCampaigns = await client<{ id: string }[]>`
+      insert into public.campaign (title, workspace, group_household_queue, dial_type)
+      values ('Integration DB Other Campaign', ${workspaceId}::uuid, true, 'call')
+      returning id::text as id
+    `;
+    otherCampaignId = otherCampaigns[0].id;
 
     const households = await client<{ id: string }[]>`
       insert into public.households (household_key, workspace_id, address)
@@ -206,7 +216,10 @@ describeDb("dequeue_contact against real Postgres", () => {
       values
         (${primaryContactId}::bigint, ${campaignId}::bigint, ${workspaceId}::uuid, 'queued', 1),
         (${siblingContactId}::bigint, ${campaignId}::bigint, ${workspaceId}::uuid, 'queued', 2),
-        (${loneContactId}::bigint, ${campaignId}::bigint, ${workspaceId}::uuid, 'queued', 3)
+        (${loneContactId}::bigint, ${campaignId}::bigint, ${workspaceId}::uuid, 'queued', 3),
+        (${primaryContactId}::bigint, ${otherCampaignId}::bigint, ${workspaceId}::uuid, 'queued', 1),
+        (${siblingContactId}::bigint, ${otherCampaignId}::bigint, ${workspaceId}::uuid, 'queued', 2),
+        (${loneContactId}::bigint, ${otherCampaignId}::bigint, ${workspaceId}::uuid, 'queued', 3)
     `;
   });
 
@@ -218,12 +231,21 @@ describeDb("dequeue_contact against real Postgres", () => {
     }
     await client`delete from public."user" where id in (${AGENT_A}::uuid, ${AGENT_B}::uuid)`;
     await client.end({ timeout: 5 });
+    const { pool, directPool } = await import("@/server/db");
+    await Promise.all([pool.end(), directPool.end()]);
   });
 
   beforeEach(async () => {
     await setState(primaryContactId, { queue_state: "queued" });
     await setState(siblingContactId, { queue_state: "queued" });
     await setState(loneContactId, { queue_state: "queued" });
+    for (const contactId of [primaryContactId, siblingContactId, loneContactId]) {
+      await setState(contactId, { queue_state: "queued" }, otherCampaignId);
+    }
+    await client`update public.campaign set status = 'running'
+      where id in (${campaignId}::bigint, ${otherCampaignId}::bigint)`;
+    const { emitQueueEvent } = await import("@/lib/workspace-events.server");
+    vi.mocked(emitQueueEvent).mockClear();
   });
 
   test("the fixture starts with three queued rows", async () => {
@@ -231,6 +253,172 @@ describeDb("dequeue_contact against real Postgres", () => {
       const row = await queueRow(contactId);
       expect(row.queue_state).toBe("queued");
       expect(row.dequeued_at).toBeNull();
+    }
+  });
+
+  test.each([false, true])("guarded dequeue confines household=%s to its campaign", async (household) => {
+    const result = await dequeueQueueEntry({
+      by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
+      workspaceId, household, userId: AGENT_A, reason: "Call completed", exec,
+    });
+    expect(result).toEqual({ dequeuedPrimary: true });
+    expect((await queueRow(primaryContactId)).queue_state).toBe("dequeued");
+    expect((await queueRow(siblingContactId)).queue_state).toBe(household ? "dequeued" : "queued");
+    for (const contactId of [primaryContactId, siblingContactId, loneContactId]) {
+      expect(await queueRow(contactId, otherCampaignId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+    }
+    const { emitQueueEvent } = await import("@/lib/workspace-events.server");
+    const events = vi.mocked(emitQueueEvent).mock.calls;
+    expect(events).toHaveLength(household ? 2 : 1);
+    for (const [, operation, row, old] of events) {
+      expect(operation).toBe("UPDATE");
+      expect(row).toMatchObject({ campaign_id: Number(campaignId), queue_state: "dequeued" });
+      expect(old).toMatchObject({ campaign_id: Number(campaignId), queue_state: "queued", dequeued_at: null });
+    }
+  });
+
+  test("a campaign without this contact is a no-op and emits no update", async () => {
+    const result = await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId), campaignId: Number.MAX_SAFE_INTEGER },
+      workspaceId, household: false, userId: AGENT_A, reason: "Wrong campaign", exec,
+    });
+    expect(result).toEqual({ dequeuedPrimary: false });
+    for (const target of [campaignId, otherCampaignId]) {
+      expect(await queueRow(loneContactId, target)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+    }
+    await expect(explainDequeueNoOp({
+      contactId: Number(loneContactId), campaignId: Number.MAX_SAFE_INTEGER, workspaceId, userId: AGENT_A,
+    })).resolves.toBe("not_found");
+    const { emitQueueEvent } = await import("@/lib/workspace-events.server");
+    expect(emitQueueEvent).not.toHaveBeenCalled();
+  });
+
+  test("a missing primary row makes household dequeue a no-op", async () => {
+    await client`delete from public.campaign_queue
+      where campaign_id = ${campaignId}::bigint and contact_id = ${primaryContactId}::bigint`;
+    try {
+      const result = await dequeueQueueEntry({
+        by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
+        workspaceId, household: true, userId: AGENT_A, reason: "Wrong campaign", exec,
+      });
+      expect(result).toEqual({ dequeuedPrimary: false });
+      expect(await queueRow(siblingContactId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+      for (const contactId of [primaryContactId, siblingContactId]) {
+        expect(await queueRow(contactId, otherCampaignId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+      }
+      const { emitQueueEvent } = await import("@/lib/workspace-events.server");
+      expect(emitQueueEvent).not.toHaveBeenCalled();
+      let first = true;
+      const concurrentExec: RpcExecutor = {
+        execute: async (query) => {
+          if (first) {
+            first = false;
+            await client`update public.campaign_queue
+              set queue_state = 'dequeued', dequeued_at = now()
+              where campaign_id = ${campaignId}::bigint and contact_id = ${siblingContactId}::bigint`;
+          }
+          return exec.execute(query);
+        },
+      };
+      expect(await dequeueQueueEntry({
+        by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
+        workspaceId, household: true, userId: AGENT_A, reason: "Wrong campaign", exec: concurrentExec,
+      })).toEqual({ dequeuedPrimary: false });
+      expect((await queueRow(siblingContactId)).queue_state).toBe("dequeued");
+      expect(emitQueueEvent).not.toHaveBeenCalled();
+    } finally {
+      await client`insert into public.campaign_queue (contact_id, campaign_id, workspace, queue_state, queue_order)
+        values (${primaryContactId}::bigint, ${campaignId}::bigint, ${workspaceId}::uuid, 'queued', 1)`;
+    }
+  });
+
+  test("another campaign's concurrent dequeue is not emitted by this operation", async () => {
+    let first = true;
+    const concurrentExec: RpcExecutor = {
+      execute: async (query) => {
+        if (first) {
+          first = false;
+          // Another operation commits after this wrapper's old-row snapshot.
+          await client`update public.campaign_queue
+            set queue_state = 'dequeued', dequeued_at = now()
+            where campaign_id = ${otherCampaignId}::bigint and contact_id = ${loneContactId}::bigint`;
+        }
+        return exec.execute(query);
+      },
+    };
+    await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
+      workspaceId, household: false, userId: AGENT_A, reason: "Call completed", exec: concurrentExec,
+    });
+    const { emitQueueEvent } = await import("@/lib/workspace-events.server");
+    expect(emitQueueEvent).toHaveBeenCalledTimes(1);
+    expect(emitQueueEvent).toHaveBeenCalledWith(workspaceId, "UPDATE",
+      expect.objectContaining({ campaign_id: Number(campaignId) }),
+      expect.objectContaining({ campaign_id: Number(campaignId) }));
+    expect((await queueRow(loneContactId, otherCampaignId)).queue_state).toBe("dequeued");
+  });
+
+  test("no-op explanation ignores another campaign's agent claim", async () => {
+    await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
+      workspaceId, household: false, userId: AGENT_A, reason: "Call completed", exec,
+    });
+    await setState(loneContactId, { queue_state: "assigned", assigned_to_user_id: AGENT_B }, otherCampaignId);
+    await expect(explainDequeueNoOp({
+      contactId: Number(loneContactId), campaignId: Number(campaignId), workspaceId, userId: AGENT_A,
+    })).resolves.toBe("already_dequeued");
+  });
+
+  test("plain contact dequeue also leaves other campaigns queued", async () => {
+    expect(await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
+      workspaceId, userId: AGENT_A, reason: "Single campaign",
+    })).toEqual({ dequeuedPrimary: true });
+    expect((await queueRow(loneContactId)).queue_state).toBe("dequeued");
+    expect(await queueRow(loneContactId, otherCampaignId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+  });
+
+  test("completion is requested only for the campaign that was drained", async () => {
+    for (const contactId of [primaryContactId, siblingContactId]) {
+      await setState(contactId, { queue_state: "dequeued" });
+    }
+    const executed = vi.spyOn(exec, "execute");
+    try {
+      await dequeueQueueEntry({
+        by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
+        workspaceId, household: false, userId: AGENT_A, reason: "Last contact", exec,
+      });
+      const dialect = new PgDialect();
+      const completions = executed.mock.calls.map(([query]) => dialect.sqlToQuery(query))
+        .filter((query) => query.sql.includes("try_complete_campaign_if_drained"));
+      expect(completions.map((query) => query.params)).toEqual([[Number(campaignId)]]);
+      const rows = await client<{ id: string; status: string }[]>`
+        select id::text as id, status::text as status from public.campaign
+        where id in (${campaignId}::bigint, ${otherCampaignId}::bigint)`;
+      expect(rows.find((row) => row.id === campaignId)?.status).toBe("complete");
+      expect(rows.find((row) => row.id === otherCampaignId)?.status).toBe("running");
+      expect(await queueRow(loneContactId, otherCampaignId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+    } finally {
+      executed.mockRestore();
+    }
+  });
+
+  test.each([
+    { userId: null, reason: "Contact opted out via SMS" },
+    { userId: AGENT_A, reason: "Do not call requested" },
+  ])("explicit all-campaigns dequeue preserves $reason", async ({ userId, reason }) => {
+    await setState(loneContactId, { queue_state: "assigned", assigned_to_user_id: AGENT_B }, otherCampaignId);
+    const result = await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId), allCampaigns: true },
+      workspaceId, userId, reason,
+    });
+    expect(result).toEqual({ dequeuedPrimary: true });
+    for (const target of [campaignId, otherCampaignId]) {
+      expect(await queueRow(loneContactId, target)).toMatchObject({
+        queue_state: "dequeued", assigned_to_user_id: null, dequeued_reason: reason, dequeued_by: userId,
+      });
+      expect((await queueRow(loneContactId, target)).dequeued_at).not.toBeNull();
+      expect((await queueRow(primaryContactId, target)).queue_state).toBe("queued");
     }
   });
 
@@ -246,7 +434,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       // The park path: guarded RPC, no household fan-out.
       household: false,
@@ -277,7 +465,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(primaryContactId) },
+      by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: true,
       userId: AGENT_A,
@@ -298,7 +486,7 @@ describeDb("dequeue_contact against real Postgres", () => {
 
   test("a queued row still dequeues (the pre-existing path is unchanged)", async () => {
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: AGENT_A,
@@ -317,7 +505,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     await setState(loneContactId, { queue_state: null });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: AGENT_A,
@@ -343,7 +531,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: AGENT_A,
@@ -374,7 +562,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(primaryContactId) },
+      by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: true,
       userId: AGENT_A,
@@ -404,7 +592,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: null,
@@ -432,7 +620,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const result = await dequeueQueueEntry({
-      by: { contactId: Number(primaryContactId) },
+      by: { contactId: Number(primaryContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: true,
       userId: AGENT_A,
@@ -453,6 +641,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     await expect(
       explainDequeueNoOp({
         contactId: Number(primaryContactId),
+        campaignId: Number(campaignId),
         workspaceId,
         userId: AGENT_A,
       }),
@@ -464,7 +653,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     // already dequeued the same row. Zero rows affected, but nothing is wrong
     // — calling it a conflict would toast on every completed call.
     await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: AGENT_A,
@@ -473,7 +662,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     });
 
     const second = await dequeueQueueEntry({
-      by: { contactId: Number(loneContactId) },
+      by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
       workspaceId,
       household: false,
       userId: AGENT_A,
@@ -485,6 +674,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     await expect(
       explainDequeueNoOp({
         contactId: Number(loneContactId),
+        campaignId: Number(campaignId),
         workspaceId,
         userId: AGENT_A,
       }),
@@ -493,7 +683,7 @@ describeDb("dequeue_contact against real Postgres", () => {
 
   test("explainDequeueNoOp reports not_found for a contact with no queue row", async () => {
     await expect(
-      explainDequeueNoOp({ contactId: -1, workspaceId, userId: AGENT_A }),
+      explainDequeueNoOp({ contactId: -1, campaignId: Number(campaignId), workspaceId, userId: AGENT_A }),
     ).resolves.toBe("not_found");
   });
 
@@ -513,7 +703,7 @@ describeDb("dequeue_contact against real Postgres", () => {
 
     expect(overloads).toHaveLength(1);
     expect(overloads[0].args).toBe(
-      "passed_contact_id bigint, group_on_household boolean, p_workspace uuid, " +
+      "passed_contact_id bigint, p_campaign_id bigint, group_on_household boolean, p_workspace uuid, " +
         "dequeued_by_id uuid, dequeued_reason_text text",
     );
     expect(overloads[0].result).toBe("integer");
@@ -536,7 +726,7 @@ describeDb("dequeue_contact against real Postgres", () => {
 
     try {
       const result = await dequeueQueueEntry({
-        by: { contactId: Number(loneContactId) },
+        by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
         workspaceId: otherWorkspaceId,
         household: false,
         userId: AGENT_A,

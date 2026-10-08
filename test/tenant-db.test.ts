@@ -13,8 +13,8 @@ import { WORKSPACE_SCOPED_TABLES, type WorkspaceScopedTableName } from "@/db/wor
 // vi.hoisted (which cannot import other modules). A test below cross-checks
 // this list against the real registry.
 const SCOPED_TABLE_NAMES = [
-  "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
-  "outreach_attempt", "script", "survey", "webhook", "workspace_number",
+  "campaign", "campaign_queue", "contact", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
+  "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
   "workspace_invite", "transaction_history",
   "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
@@ -46,8 +46,8 @@ const hoisted = vi.hoisted(() => {
     txExecute: [],
   };
   const TABLES = [
-    "campaign", "campaign_queue", "contact", "audience", "audience_upload", "call", "message",
-    "outreach_attempt", "script", "survey", "webhook", "workspace_number",
+    "campaign", "campaign_queue", "contact", "audience", "audience_upload", "audience_import_run", "audience_import_row", "call", "message",
+    "outreach_attempt", "predictive_machine_operation", "inbound_voicemail_recipient", "inbound_voicemail_delivery", "script", "survey", "webhook", "workspace_number", "workspace_number_purchase", "workspace_number_release",
     "workspace_invite", "transaction_history",
     "households", "inbound_queue", "inbound_queue_member", "inbound_queue_entry",
     "agent_status", "agent_status_event", "handset_session", "workspace_users",
@@ -196,6 +196,25 @@ describe("createTenantDb — registry completeness", () => {
     const registryNames = Object.keys(WORKSPACE_SCOPED_TABLES).sort();
     const inlineNames = [...SCOPED_TABLE_NAMES].sort();
     expect(registryNames).toEqual(inlineNames);
+  });
+
+  /**
+   * `workspaceColumnName` exists only so `ColumnNameFor` can produce a type
+   * *literal* — Drizzle types a column's `name` as `string`, and reading it
+   * widened the omit key until `ScopedInsert`/`ScopedUpdate` accepted any object
+   * (#2242). A duplicate that drifts from its column would silently reopen that
+   * hole, so it is checked against the column it names.
+   */
+  test("every declared tenancy column name matches the column it names", () => {
+    for (const [tableName, entry] of Object.entries(WORKSPACE_SCOPED_TABLES)) {
+      const { workspaceColumn, workspaceColumnName } = entry as unknown as {
+        workspaceColumn: { name: string };
+        workspaceColumnName: string;
+      };
+      expect(`${tableName}: ${workspaceColumnName}`).toBe(
+        `${tableName}: ${workspaceColumn.name}`,
+      );
+    }
   });
 
   /**

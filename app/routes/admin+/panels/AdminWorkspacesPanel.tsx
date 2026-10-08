@@ -48,8 +48,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
         sortKey: "created_at",
         sortDirection: "desc",
     });
-    const filterKey = JSON.stringify(filter);
-    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
+    const filterKey = JSON.stringify({ filter, itemsPerPage });
 
     const filteredRows = useMemo(
         () =>
@@ -67,7 +66,8 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
         [filteredRows, filter.sortDirection, filter.sortKey],
     );
 
-    const totalPages = Math.ceil(sortedRows.length / itemsPerPage);
+    const totalPages = Math.max(1, Math.ceil(sortedRows.length / itemsPerPage));
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey, 1, totalPages);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedRows = sortedRows.slice(startIndex, startIndex + itemsPerPage);
 
@@ -100,7 +100,6 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                     Sync Twilio
                                 </Button>
                             </Form>
-                            <Button size="sm">Add Workspace</Button>
                         </div>
                     </div>
                 </CardHeader>

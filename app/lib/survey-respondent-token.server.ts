@@ -40,10 +40,16 @@ async function sign(message: string): Promise<ArrayBuffer> {
 export async function createRespondentToken(
   surveyId: number,
   workspace: string,
+  options: { resultId?: string } = {},
 ): Promise<{ token: string; resultId: string }> {
-  const resultId = randomUUID();
+  // The legacy database uses bigint IDs, which postgres.js returns as strings.
+  const numericSurveyId = Number(surveyId);
+  if (!Number.isSafeInteger(numericSurveyId) || numericSurveyId <= 0) {
+    throw new Error("Invalid survey identity");
+  }
+  const resultId = options.resultId ?? randomUUID();
   const payload: RespondentTokenPayload = {
-    survey_id: surveyId,
+    survey_id: numericSurveyId,
     workspace,
     result_id: resultId,
     exp: Math.floor((Date.now() + TOKEN_TTL_MS) / 1000),
@@ -73,7 +79,12 @@ export async function verifyRespondentToken(
       return null;
     }
     const payload = JSON.parse(base64urlDecode(payloadB64)) as RespondentTokenPayload;
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    if (
+      !Number.isSafeInteger(payload.survey_id) || payload.survey_id <= 0 ||
+      typeof payload.workspace !== "string" || !payload.workspace ||
+      typeof payload.result_id !== "string" || !payload.result_id ||
+      !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)
+    ) {
       return null;
     }
     const signed = `${headerB64}.${payloadB64}`;
@@ -87,7 +98,7 @@ export async function verifyRespondentToken(
     if (!valid) {
       return null;
     }
-    if (expectedSurveyId !== undefined && payload.survey_id !== expectedSurveyId) {
+    if (expectedSurveyId !== undefined && payload.survey_id !== Number(expectedSurveyId)) {
       return null;
     }
     return payload;

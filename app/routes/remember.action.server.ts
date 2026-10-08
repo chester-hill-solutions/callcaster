@@ -21,7 +21,7 @@ export const action = defineAction({
         // Pinned to the configured base URL, not the request's own origin: a
         // forwarded-host header would otherwise put the reset link — and the
         // token in it — on a host the caller chose.
-        body: { email, redirectTo: `${env.BASE_URL()}/api/auth/callback` },
+        body: { email, redirectTo: `${env.BASE_URL()}/reset-password` },
         headers: request.headers,
       });
       return routeData({ data: { success: true }, error: null });

@@ -16,6 +16,16 @@ export {
   type BillingEventSource,
 } from "@/lib/transaction-history-display";
 
+/** Ledger projection shared by balance views (platform billing, admin Credits tab). */
+export const LEDGER_ACTIVITY_COLUMNS = {
+  id: true,
+  created_at: true,
+  type: true,
+  amount: true,
+  note: true,
+  idempotency_key: true,
+} as const;
+
 type LedgerRpcRow = {
   id: number;
   inserted: boolean;
@@ -34,6 +44,8 @@ type InsertArgs = {
   campaignId?: number | null;
   callSid?: string | null;
   messageSid?: string | null;
+  /** A transaction caller publishes its inserted row only after COMMIT. */
+  emitEvent?: boolean;
 };
 
 async function applyLedgerEntryViaDrizzle(
@@ -95,7 +107,7 @@ export async function insertTransactionHistoryIdempotent(
 
     // Post-write, non-fatal: ledger integrity outranks UI freshness. Emission
     // failure must not convert a committed billing write into a reported error.
-    if (row.inserted) {
+    if (row.inserted && args.emitEvent !== false) {
       try {
         await emitTransactionHistoryInsertEvent(args.workspaceId, {
           id: row.id,

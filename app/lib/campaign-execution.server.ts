@@ -4,6 +4,10 @@ import { findLiveJobId, rescheduleQueuedJob } from "@/lib/worker/enqueue-job.ser
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
+import { validateScriptSteps } from "@/lib/call-script-service";
+import { createTenantDb } from "@/server/tenant-db";
+import { script as scriptTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
 import {
   ivrCallingPolicy,
@@ -17,19 +21,7 @@ type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | und
 
 export { CAMPAIGN_DISPATCH_JOB_TYPE };
 
-/**
- * Evaluate whether a campaign is expired (end_date < now).
- * Pure function, no side effects.
- */
-export function isCampaignExpired(
-  endDateStr: string | null | undefined,
-  now: Date = new Date(),
-): boolean {
-  if (!endDateStr) return false;
-  const endDate = new Date(endDateStr);
-  if (Number.isNaN(endDate.getTime())) return false;
-  return endDate < now;
-}
+export { isCampaignExpired } from "@/lib/campaign-readiness";
 
 export type LaunchCampaignResult =
   | { ok: true; status: "running" | "scheduled"; job?: EnqueueJobResult }
@@ -55,12 +47,48 @@ export function isMachineDispatchedVoiceCampaignType(
 }
 
 /**
+ * Returns a `script_routing_invalid` readiness issue when a machine-dispatched
+ * voice campaign's script has a dangling option target or a routing cycle.
+ * Null when the campaign is not a voice campaign, has no script, or validates.
+ */
+export async function scriptRoutingIssue(
+  workspaceId: string,
+  campaign: Campaign,
+  campaignDetails: CampaignDetails,
+): Promise<CampaignReadinessIssue | null> {
+  if (
+    campaign.type == null ||
+    !isMachineDispatchedVoiceCampaignType(campaign.type) ||
+    campaignDetails == null ||
+    !("script_id" in campaignDetails) ||
+    campaignDetails.script_id == null
+  ) {
+    return null;
+  }
+  const tdb = createTenantDb(workspaceId);
+  const scriptRow = await tdb.script.findFirst({
+    where: eq(scriptTable.id, campaignDetails.script_id),
+    columns: { steps: true },
+  });
+  if (scriptRow?.steps == null) {
+    return null;
+  }
+  const validation = validateScriptSteps(scriptRow.steps);
+  if (validation.ok) {
+    return null;
+  }
+  return {
+    code: "script_routing_invalid",
+    message: `Script routing is invalid: ${validation.errors.join("; ")}`,
+  };
+}
+
+/**
  * Launch a campaign (message or machine-dialled voice).
  *
  * 1. Validates configuration readiness.
- * 2. Checks expired dates.
- * 3. Changes campaign status.
- * 4. Enqueues a dispatch job — SMS batches for message campaigns, IVR call
+ * 2. Changes campaign status.
+ * 3. Enqueues a dispatch job — SMS batches for message campaigns, IVR call
  *    batches for robocall/simple_ivr/complex_ivr.
  *
  * `live_call` campaigns just get the status change (the dialler owns them).
@@ -86,7 +114,7 @@ export async function launchCampaign(args: {
   const readiness = getCampaignReadiness(
     campaign,
     campaignDetails,
-    { queueCount: queueCount ?? 0 },
+    { queueCount: queueCount ?? 0, now: args.now },
   );
   const readinessError =
     mode === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
@@ -94,12 +122,12 @@ export async function launchCampaign(args: {
     return { ok: false, error: readinessError, issue: readiness.issues[0] };
   }
 
-  // Check expired dates.
-  if (isCampaignExpired(campaign.end_date, args.now)) {
-    return {
-      ok: false,
-      error: "This campaign's end date has passed. Update the dates or create a new campaign.",
-    };
+  // Routing stopgap (#1884): a machine-dispatched voice campaign with a script
+  // whose option routing dangles or cycles must not dial. validateScriptSteps
+  // folds the routing check into the structural one.
+  const routingError = await scriptRoutingIssue(workspaceId, campaign, campaignDetails);
+  if (routingError) {
+    return { ok: false, error: routingError.message, issue: routingError };
   }
 
   // Change status.

@@ -1,4 +1,5 @@
 import { request as httpRequest } from "node:http";
+import type { ClientRequest, IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { resolve } from "node:dns/promises";
 import { isIP } from "node:net";
@@ -28,6 +29,10 @@ const BLOCKED_HOSTNAMES = new Set([
 /** Upper bound on DNS resolution so a hostile/slow authoritative nameserver
  * can't hold the request handler open past the outbound timeout. */
 const DNS_RESOLVE_TIMEOUT_MS = 5_000;
+
+// Webhook responses are small. Bound retained bytes before appending each chunk
+// so a customer-controlled destination cannot exhaust the shared worker's heap.
+const MAX_RESPONSE_BYTES = 1_048_576;
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -202,6 +207,9 @@ export interface SafeOutboundFetchInit {
  * Redirects are treated as errors — matching the previous `fetch(redirect: "error")`
  * contract — so a 3xx cannot bounce the request onto a rebind target.
  *
+ * Response bodies are limited to one MiB. Oversized or interrupted responses
+ * reject and close the active request and response.
+ *
  * Returns a standard {@link Response} so existing callers can keep using `.status`,
  * `.statusText`, `.headers` and `.json()`/`.text()` unchanged.
  */
@@ -239,7 +247,19 @@ export async function safeOutboundFetch(
   const requestImpl = isHttps ? httpsRequest : httpRequest;
 
   return await new Promise<Response>((resolvePromise, rejectPromise) => {
-    const req = requestImpl(
+    let req: ClientRequest | null = null;
+    let response: IncomingMessage | undefined;
+    let settled = false;
+    const chunks: Buffer[] = [];
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      chunks.length = 0;
+      response?.destroy();
+      req?.destroy();
+      rejectPromise(error);
+    };
+    req = requestImpl(
       url,
       {
         method: init.method ?? "GET",
@@ -250,46 +270,66 @@ export async function safeOutboundFetch(
         signal: init.signal,
       },
       (res) => {
+        response = res;
+        if (settled) {
+          res.destroy();
+          return;
+        }
+        res.on("error", fail);
+        res.on("aborted", () =>
+          fail(new Error("Destination response aborted")),
+        );
         // Belt-and-suspenders: confirm the socket actually connected to a validated address.
         const remote = res.socket?.remoteAddress;
         if (remote && isPrivateOrMetadataIp(remote)) {
-          res.destroy();
-          rejectPromise(new Error("Destination connected to a disallowed address"));
+          fail(new Error("Destination connected to a disallowed address"));
           return;
         }
 
         const status = res.statusCode ?? 0;
         if (status >= 300 && status < 400) {
-          res.destroy();
-          rejectPromise(new Error("Destination URL responded with a redirect"));
+          fail(new Error("Destination URL responded with a redirect"));
           return;
         }
 
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          const headers = new Headers();
-          for (const [key, value] of Object.entries(res.headers)) {
-            if (Array.isArray(value)) {
-              for (const v of value) headers.append(key, v);
-            } else if (value != null) {
-              headers.set(key, value);
-            }
+        let responseBytes = 0;
+        res.on("data", (chunk: Buffer) => {
+          if (settled) return;
+          responseBytes += chunk.byteLength;
+          if (responseBytes > MAX_RESPONSE_BYTES) {
+            fail(new Error("Destination response too large"));
+            return;
           }
-          const body = Buffer.concat(chunks);
-          resolvePromise(
-            new Response(body.length > 0 ? body : null, {
+          chunks.push(chunk);
+        });
+        res.on("end", () => {
+          if (settled) return;
+          try {
+            const headers = new Headers();
+            for (const [key, value] of Object.entries(res.headers)) {
+              if (Array.isArray(value)) {
+                for (const v of value) headers.append(key, v);
+              } else if (value != null) {
+                headers.set(key, value);
+              }
+            }
+            const body = Buffer.concat(chunks);
+            const result = new Response(body.length > 0 ? body : null, {
               status: status || 200,
               statusText: res.statusMessage ?? "",
               headers,
-            }),
-          );
+            });
+            settled = true;
+            chunks.length = 0;
+            resolvePromise(result);
+          } catch (error) {
+            fail(error instanceof Error ? error : new Error(String(error)));
+          }
         });
-        res.on("error", rejectPromise);
       },
     );
 
-    req.on("error", rejectPromise);
+    req.on("error", fail);
     if (init.body !== undefined) {
       req.write(init.body);
     }

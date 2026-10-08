@@ -21,6 +21,14 @@ npm test            # vitest node + UI suites, plus bun server-runtime tests
 make e2e            # full Playwright run against compose Postgres + MinIO
 ```
 
+## Redirect target checks
+
+`npm run check:redirect-targets` compares literal local redirects with the actual registered JSON route tree. It composes parent, pathless, index, parameter and wildcard routes through React Router's matcher. Query strings and hashes do not change the target page. All registered modules are scanned, including the root. Static imports and re-exports are followed within `app/routes/` and for direct `app/` siblings such as the root loader; directory index modules are resolved too. Imported assets are excluded from script discovery. Named `redirect`/`redirectDocument` imports, aliases, namespace imports, multiline calls and literal templates are supported. Lexical bindings keep shadowed names, comments and string examples out of the check.
+
+The gate does not validate runtime-computed arguments, interpolated templates, dynamic imports or helpers outside those source boundaries. External URLs and other non-absolute references remain unchecked. An auth wildcard proves route registration, not whether Better Auth accepts that endpoint. Keep runtime and end-to-end checks for those cases. The existing relative-redirect gate remains separate. Both gates run in full local CI and the quality workflow; absent literal targets fail without a suppression baseline.
+
+The CLI's `--routes-json <file>` option supplies a registered tree for isolated fixtures. Normal CI always reads the current tree from `react-router routes --json` and fails on empty output or a missing registered source file.
+
 ## Service control
 
 The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
@@ -40,7 +48,6 @@ Tail an app process by running it in its own terminal; the compose services are 
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
-- `psql` (Postgres client, used by the schema bootstrap script)
 - Localtunnel (only for live Twilio calling)
 - A Twilio account with:
   - an account SID and auth token
@@ -94,10 +101,11 @@ docker compose -f docker-compose.dev.yml up -d
 node scripts/e2e/bootstrap-compose-db.mjs
 ```
 
-4. Create the MinIO bucket:
+4. Create the object-storage bucket (stow runs as a local binary, not a container):
 
 ```bash
-node scripts/e2e/ensure-minio-bucket.mjs
+node scripts/e2e/start-stow.mjs --start
+node scripts/e2e/ensure-bucket.mjs
 ```
 
 5. Start the media-stream Bun service (optional; needed for the dashboard audio stream):
@@ -144,6 +152,10 @@ lt --port 3000
 3. Copy the HTTPS forwarding URL from Localtunnel.
 
 4. Set `BASE_URL` in `.env` to that HTTPS URL.
+
+   If `.env.local` exists, update or remove its `BASE_URL` too. Bun loads
+   `.env.local` as an override, so its localhost value takes precedence over
+   the tunnel URL in `.env`.
 
 Example:
 
@@ -242,7 +254,7 @@ Node 24+.
 - `npm run build` runs `react-router build` (client + server bundles under `build/`).
 - `npm run typecheck` runs `react-router typegen` then `tsc`.
 - `npm start` runs the Bun production server (`server/bun.ts`) against `build/server/index.js`.
-- `npm run worker` runs the background job worker (`worker/index.ts`).
+- `npm run worker` runs the background job worker (`worker/index.ts`). In long-running mode, general jobs and customer webhook delivery use separate claim loops. One delivery can run at a time; a slow destination does not take the general loop. Drain mode still processes one job.
 - Railway-style probes: `GET /healthz` (liveness), `GET /readyz` (readiness; 503 until the RR build is loaded, when the database is unreachable, or during graceful shutdown).
 - Optional: `PROCESS_FATAL_ON_REJECTION=1` exits the process on unhandled promise rejections (default logs only).
 - HTTPS for the optional dev websocket server (`scripts/dev/websocket-server.js`) uses self-signed certs in `scripts/dev/certs/` (gitignored). Regenerate with:

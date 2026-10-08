@@ -77,10 +77,24 @@ export function useChatsPage() {
     }) => void;
     markOptimisticMessageFailed?: (sid: string) => void;
   } | null>(null);
-  const pendingOptimisticMessageRef = useRef<{ sid: string; body: string } | null>(
-    null,
-  );
+  const pendingOptimisticMessageRef = useRef<{
+    sid: string;
+    body: string;
+    composerKey: string;
+    to: string;
+    observedSubmission: boolean;
+    previousData: unknown;
+    draftRevision: number;
+  } | null>(null);
   const requestedPageRef = useRef(pagination.page);
+  /**
+   * The filter this accumulation belongs to. A page number cannot identify a
+   * response — after "load more" the fetcher holds a later page than the loader,
+   * permanently, and comparing the two discards every revalidation. The filter
+   * can: a different filter means a different list, and the same filter means
+   * the response should be folded in.
+   */
+  const accumulatedFilterKeyRef = useRef<string | null>(null);
   const registerChatActions = useCallback(
     (actions: typeof chatActionsRef.current) => {
       chatActionsRef.current = actions;
@@ -94,6 +108,22 @@ export function useChatsPage() {
   const params = useParams();
   const navigate = useNavigate();
   const contact_number = params["contact_number"] ?? "";
+  const composerKey = `${workspace.id}:${contact_number || "new"}`;
+  const [draft, setDraft] = useState({ key: composerKey, body: "", revision: 0 });
+  // Reset before rendering a different conversation, as the keyed composer did.
+  if (draft.key !== composerKey) {
+    setDraft({ key: composerKey, body: "", revision: draft.revision + 1 });
+  }
+  const bodyValue = draft.key === composerKey ? draft.body : "";
+  const onBodyChange = useCallback(
+    (body: string) =>
+      setDraft((current) => ({
+        key: composerKey,
+        body,
+        revision: current.revision + 1,
+      })),
+    [composerKey],
+  );
   const formatDate = formatMessageTimestamp;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const [loadedChats, setLoadedChats] = useState(chats);
@@ -145,8 +175,8 @@ export function useChatsPage() {
   }, []);
 
   /**
-   * @effect CANDIDATE-REMOVE: mirror the loader's chats/pagination into local loadedChats/paginationState whenever the loader revalidates (e.g. filter/search/sort change, realtime-triggered revalidation), skipping the sync if the pagination fetcher already loaded a further-ahead page.
-   * @effect-deps chats, pagination (loader data to mirror), paginationFetcher.data, paginationFetcher.state (guards against clobbering an in-flight/completed "load more" page with stale loader data)
+   * @effect CANDIDATE-REMOVE: fold a fresh loader response into the accumulated chat list — merging it onto the pages already loaded, so a revalidation updates counts and ordering without discarding them.
+   * @effect-deps chats, pagination (loader data to fold in), paginationFetcher.data, paginationFetcher.state (skip while a "load more" is in flight), paginationFilterKey (the discriminator for a reset)
    * @effect-side-effects none (setState + ref write only)
    * @effect-why-not-loader chats/pagination are already loader data (via useLoaderData); this copies them into local state, the "sync state to a prop" pattern the effects guide flags. It's kept as an effect because loadedChats also accumulates fetcher-loaded pages over time (see the effect below) and must be reconciled against a fresh loader response without discarding those extra pages — a case not implemented today via a pure derivation.
    */
@@ -154,14 +184,38 @@ export function useChatsPage() {
     if (paginationFetcher.state !== "idle") {
       return;
     }
-    const fetchedPage = paginationFetcher.data?.pagination.page;
-    if (fetchedPage != null && fetchedPage > pagination.page) {
+
+    // A different filter means a different list, so the accumulated pages
+    // belong to a result the agent is no longer looking at. The fetcher key
+    // already carries the filter, so this is the one reset signal that stays
+    // correct when page numbers are in play.
+    if (accumulatedFilterKeyRef.current !== paginationFilterKey) {
+      accumulatedFilterKeyRef.current = paginationFilterKey;
+      setLoadedChats(chats);
+      setPaginationState(pagination);
+      requestedPageRef.current = pagination.page;
       return;
     }
-    setLoadedChats(chats);
-    setPaginationState(pagination);
-    requestedPageRef.current = pagination.page;
-  }, [chats, pagination, paginationFetcher.data, paginationFetcher.state]);
+
+    // Same filter, already paginating. This used to compare page numbers and
+    // drop the response whenever the fetcher held a later page, which after the
+    // first "load more" discarded every page-1 revalidation for the life of the
+    // page: a realtime event on a page-1 conversation never updated its unread
+    // count again. Page numbers are not an identity — merge instead.
+    setLoadedChats((currentChats) => mergeConversationPages(currentChats, chats));
+    // The cursor only moves forward. Rewinding it to the loader's page 1 would
+    // make the next "load more" re-request a page already held.
+    setPaginationState((current) =>
+      pagination.page > current.page ? pagination : current,
+    );
+    requestedPageRef.current = Math.max(requestedPageRef.current, pagination.page);
+  }, [
+    chats,
+    pagination,
+    paginationFetcher.data,
+    paginationFetcher.state,
+    paginationFilterKey,
+  ]);
 
   /**
    * @effect Merge a newly-loaded "load more" page of conversations (from the pagination fetcher) into the accumulated local chat list, and advance the pagination cursor.
@@ -329,7 +383,13 @@ export function useChatsPage() {
       e.preventDefault();
       const target = e.currentTarget;
       const toNumber = contact_number || phoneNumber;
-      if (!toNumber || messageFetcher.state !== "idle") return;
+      if (
+        !toNumber ||
+        messageFetcher.state !== "idle" ||
+        pendingOptimisticMessageRef.current
+      ) {
+        return;
+      }
 
       const formData = new FormData(target);
       // ChatInput only renders a hidden `contact_number` field for the
@@ -354,7 +414,15 @@ export function useChatsPage() {
           : selection.fromNumber || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
       const pendingSid = `pending-${Date.now()}`;
-      pendingOptimisticMessageRef.current = { sid: pendingSid, body };
+      pendingOptimisticMessageRef.current = {
+        sid: pendingSid,
+        body,
+        composerKey,
+        to: toNumber,
+        observedSubmission: false,
+        previousData: messageFetcher.data,
+        draftRevision: draft.revision,
+      };
       chatActionsRef.current?.addOptimisticMessage?.({
         body,
         from,
@@ -365,13 +433,12 @@ export function useChatsPage() {
 
       messageFetcher.submit(formData, { method: "POST" });
 
-      const messageBody =
-        target.querySelector<HTMLInputElement>("#body") ||
-        target.querySelector<HTMLTextAreaElement>("#body");
-      if (messageBody) messageBody.value = "";
+      setDraft((current) => ({ ...current, body: "" }));
       setSelectedImages([]);
     },
     [
+      composerKey,
+      draft.revision,
       contact_number,
       phoneNumber,
       messageFetcher,
@@ -384,16 +451,28 @@ export function useChatsPage() {
 
   /**
    * @effect When the message-send fetcher settles with an error, reconcile the optimistic UI: mark the pending optimistic message as failed and restore its text into the composer.
-   * @effect-deps messageFetcher.state, messageFetcher.data (react to the send fetcher settling)
-   * @effect-side-effects dom (reads/writes the #body input's value); no fetch itself (reacts to the existing send fetcher)
+   * @effect-deps messageFetcher.state, messageFetcher.data, composerKey, contact_number, phoneNumber (send lifecycle and current recipient)
+   * @effect-side-effects toast, optimistic message status, draft state; no DOM access or fetch
    * @effect-why-not-loader This reconciles optimistic client state against a fetcher action's result; it's inherently a "react after the fetcher settles" side effect, not something a loader or derived value can express.
    */
   useEffect(() => {
-    if (messageFetcher.state !== "idle") return;
     const pending = pendingOptimisticMessageRef.current;
     if (!pending) return;
+    if (messageFetcher.state !== "idle") {
+      pending.observedSubmission = true;
+      return;
+    }
+    // A fast result can skip the busy render; retained data still belongs to the old request.
+    const hasFreshResult = messageFetcher.data !== pending.previousData;
+    if (
+      !pending.observedSubmission &&
+      !hasFreshResult &&
+      pending.composerKey === composerKey
+    ) {
+      return;
+    }
 
-    const data = messageFetcher.data as
+    const data = (hasFreshResult ? messageFetcher.data : undefined) as
       | { error?: string; billing?: { nextSendBlocked?: boolean } }
       | undefined;
     if (!data || !data.error) {
@@ -407,16 +486,27 @@ export function useChatsPage() {
     }
 
     toast.error(data.error);
-    chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
-    const bodyField = document.getElementById("body") as
-      | HTMLTextAreaElement
-      | HTMLInputElement
-      | null;
-    if (bodyField && !bodyField.value) {
-      bodyField.value = pending.body;
+    if (
+      pending.composerKey === composerKey &&
+      pending.to === (contact_number || phoneNumber)
+    ) {
+      chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
+      setDraft((current) =>
+        current.key === pending.composerKey &&
+        current.revision === pending.draftRevision &&
+        !current.body
+          ? { ...current, body: pending.body }
+          : current,
+      );
     }
     pendingOptimisticMessageRef.current = null;
-  }, [messageFetcher.state, messageFetcher.data]);
+  }, [
+    messageFetcher.state,
+    messageFetcher.data,
+    composerKey,
+    contact_number,
+    phoneNumber,
+  ]);
 
   const markConversationReadForContact = useCallback(
     (number: string) => {
@@ -573,6 +663,8 @@ export function useChatsPage() {
     chatInputWorkspaceNumbers,
     initialFrom,
     establishedFromNumber,
+    bodyValue,
+    onBodyChange,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,

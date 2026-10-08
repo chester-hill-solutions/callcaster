@@ -14,6 +14,10 @@ curl -X POST "$BASE_URL/api/auth/register" \
 
 ### Token (login)
 
+Registration ignores `Idempotency-Key` and does not replay session responses.
+If the registration response is lost, sign in through this token endpoint. A
+repeated registration request uses normal account-creation validation.
+
 ```bash
 curl -X POST "$BASE_URL/api/auth/token" \
   -H "Content-Type: application/json" \
@@ -50,6 +54,10 @@ curl -X POST "$BASE_URL/api/workspaces" \
 
 Export `WORKSPACE_ID` from the response.
 
+Workspace creation accepts an optional `Idempotency-Key`. The key belongs to the
+authenticated user. Reuse the same key to replay that user's original creation
+result. Another user can use the same key and create their own workspace.
+
 ## Onboarding & telephony
 
 See [Telephony provisioning](./api-telephony-provisioning.md) for the full compliance sequence:
@@ -62,9 +70,11 @@ See [Telephony provisioning](./api-telephony-provisioning.md) for the full compl
 
 ## Billing
 
-`GET /api/workspaces/:workspaceId/billing` requires the workspace `admin` role or
-above; members and callers receive 403. Like the rest of this section it is
-session-only — `$TOKEN` must be a user bearer token, not a workspace API key.
+Balance, checkout creation and checkout-session polling require the workspace
+`admin` role or above. Members and callers receive 403 before checkout replay,
+Stripe calls or credit changes. Non-members receive 404. These routes are
+session-only — `$TOKEN` must be a user bearer token, not a workspace API key;
+a workspace key without a user session receives 401.
 
 ```bash
 # Balance

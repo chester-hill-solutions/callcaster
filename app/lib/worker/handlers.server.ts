@@ -1,7 +1,12 @@
+import { runPredictiveMachineContinuation, reconcilePredictiveMachineOperation } from "@/lib/predictive-machine.server";
+import { runNumberReleaseRecovery } from "@/lib/number-release-recovery.server";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+  PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
+  RECORDING_REPAIR_SWEEP_JOB_TYPE,
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
@@ -13,6 +18,8 @@ import type { JobHandlers } from "@/lib/worker/poll-jobs.server";
 import { defineJob, type RegisteredJob } from "@/lib/worker/job-registry.server";
 import {
   audienceUploadParams,
+  predictiveMachineParams,
+  predictiveMachineReconcileParams,
   billingReconcileParams,
   callStatusSideEffectsParams,
   campaignDispatchParams,
@@ -20,6 +27,7 @@ import {
   elevenlabsBatchTranscribeParams,
   noParams,
   numberRentalBillingParams,
+  recordingRepairSweepParams,
   recordingSideEffectsParams,
   smsStatusSideEffectsParams,
   twilioOpenSyncParams,
@@ -27,6 +35,9 @@ import {
   webhookDeliveryParams,
   workspaceTwilioComplianceParams,
 } from "@/lib/worker/job-params.server";
+import { runRecordingRepairSweep } from "@/lib/call-recording-repair.server";
+import { runNumberPurchaseRecovery } from "@/lib/number-purchase-recovery.server";
+import { withReschedule } from "@/lib/worker/handlers/shared.server";
 import {
   billingReconcileHandler,
   campaignScheduleSyncHandler,
@@ -49,6 +60,12 @@ import {
   workspaceTwilioComplianceHandler,
 } from "./handlers/campaign.server";
 import { elevenlabsBatchTranscribeHandler } from "./handlers/elevenlabs-batch-transcribe.server";
+
+/**
+ * Daily, matching the other once-a-day crons (`billing_reconcile`,
+ * `number_rental_billing`, `low_credit_notify` in `handlers/cron.server.ts`).
+ */
+const RECORDING_REPAIR_SWEEP_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 
 export { enqueueWorkspaceComplianceJob };
 
@@ -127,6 +144,49 @@ const registrations = [
     handler: (job, params) => numberRentalBillingHandler(job, params),
   }),
   defineJob({
+    type: "number_purchase_recovery",
+    params: noParams,
+    schedule: true,
+    handler: (job) => withReschedule({
+      type: "number_purchase_recovery", delayMs: 60_000, params: {}, completedJobId: job.id,
+    }, runNumberPurchaseRecovery),
+  }),
+  defineJob({
+    type: "number_release_recovery",
+    params: noParams,
+    schedule: true,
+    handler: (job) =>
+      withReschedule(
+        {
+          type: "number_release_recovery",
+          delayMs: 60_000,
+          params: {},
+          completedJobId: job.id,
+        },
+        runNumberReleaseRecovery,
+      ),
+  }),
+  defineJob({
+    type: PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+    params: predictiveMachineParams,
+    pages: true,
+    handler: (job, params) => {
+      if (job.workspace_id !== params.workspaceId)
+        throw new Error("Predictive job workspace does not match");
+      return runPredictiveMachineContinuation(params, job.id);
+    },
+  }),
+  defineJob({
+    type: PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
+    params: predictiveMachineReconcileParams,
+    pages: true,
+    handler: (job, params) => {
+      if (job.workspace_id !== params.workspaceId)
+        throw new Error("Predictive job workspace does not match");
+      return reconcilePredictiveMachineOperation(params, job.id);
+    },
+  }),
+  defineJob({
     type: "audience_upload",
     params: audienceUploadParams,
     handler: (job, params) => audienceUploadHandler(job, params),
@@ -142,6 +202,25 @@ const registrations = [
     params: twilioWebhookAuditParams,
     schedule: true,
     handler: (job, params) => twilioWebhookAuditHandler(job, params),
+  }),
+  defineJob({
+    type: RECORDING_REPAIR_SWEEP_JOB_TYPE,
+    params: recordingRepairSweepParams,
+    schedule: true,
+    // Self-scheduling chains are their own scheduler — there is no pg_cron.
+    // Without `withReschedule` the chain dies after one run and the 10-minute
+    // watchdog re-seeds it, so the sweep would run every 10 minutes instead of
+    // daily. Every other cron here wraps its handler the same way.
+    handler: (job) =>
+      withReschedule(
+        {
+          type: RECORDING_REPAIR_SWEEP_JOB_TYPE,
+          delayMs: RECORDING_REPAIR_SWEEP_RESCHEDULE_MS,
+          params: recordingRepairSweepParams.parse({}),
+          completedJobId: job.id,
+        },
+        () => runRecordingRepairSweep(),
+      ),
   }),
   defineJob({
     type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,

@@ -14,6 +14,15 @@ Spec: [`/api/docs/openapi`](/api/docs/openapi) · Auth: [auth matrix](./api-auth
 
 Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
 
+### Ownership transfer
+
+`POST /api/workspaces/:workspaceId/transfer-ownership` requires an owner session
+and a JSON body with `new_owner_user_id`. Choose a different existing workspace
+member who has enrolled in MFA. Self transfer returns 400 with a clear error
+before any ownership change. A failed transfer also returns an error; it cannot
+return success or record a successful transfer audit event. A successful transfer
+promotes the chosen member to owner and changes the previous owner to admin.
+
 ## API keys
 
 | Method | Path | Purpose |
@@ -45,6 +54,17 @@ update path — so revoke and re-mint to change them.
 
 Auth: workspace member manager session. Privileged role changes require MFA (SEC-08).
 
+To cancel an invitation, send `DELETE` with `target: "invite"` and `invite_id`.
+Only a pending invitation in the URL's workspace can be canceled. Foreign,
+missing and finalized invitations all return 404 and remain unchanged. The
+workspace settings form uses the same cancellation rule.
+
+Invitation resend on `/accept-invite` requires a session email that matches the
+pending invitation. Foreign, missing and finalized invitations return the same
+404 without token rotation or email delivery. A permitted resend rotates the
+token, stores only its hash and renews the existing seven-day expiry. The
+registration rate limit also applies to resend.
+
 ## Customer webhooks
 
 | Method | Path | Purpose |
@@ -54,6 +74,13 @@ Auth: workspace member manager session. Privileged role changes require MFA (SEC
 | POST | `/api/workspaces/:workspaceId/webhook` | Send test payload |
 
 Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pass SSRF validation.
+
+Both webhook test URLs require a signed-in workspace member, admin or owner.
+Callers receive 403. Non-members receive 404. Each user has one budget of ten
+tests per minute across both URLs and all workspaces. A 429 response includes
+`Retry-After`; a rate-limit storage failure prevents delivery. Tests can use an
+unsaved destination or headers. The public-URL, redirect, response-size and
+timeout controls still apply.
 
 ## Phone numbers
 
@@ -75,11 +102,17 @@ Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pa
 | --- | --- | --- |
 | POST | `/api/test-webhook` | Send test payload to workspace webhook URL |
 
+The flat endpoint requires `workspace_id` at the top level of the JSON body,
+along with `destination_url`, JSON-stringified `event` and JSON-stringified
+`custom_headers`. A workspace ID inside the event does not grant access.
+The workspace URL takes the workspace from the route and uses object-valued
+`event` and object or tuple-array `custom_headers`.
+
 ## Auth callback
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/auth/callback` | Supabase email OTP exchange (public redirect flow) |
+| GET | `/api/auth/callback` | Better Auth email verification (public redirect flow) |
 
 ## Public integrator APIs (different guide)
 
@@ -93,3 +126,11 @@ Workspace API keys authenticate the [public integrator endpoints](./api-overview
 
 - [Complete inventory](./api-surface-inventory.md)
 - [Stripe billing webhook setup](./stripe-webhook.md) (provider route, not session admin)
+
+### Password recovery UI
+
+`/remember` accepts a reset request with generic feedback for known and unknown email addresses. Reset links use the configured application base URL and the final page `/reset-password`; Better Auth checks the issued token before sending the user there. The form retains the token in its URL for the password change. Expired or reused tokens cannot change a password. Failed email verification at `/api/auth/callback` or `/auth/confirm` returns to `/signin`.
+
+### Admin workspace response fields
+
+Global admin dashboard, detail and user-workspace responses use the same positive workspace field set as product clients: `id`, `name`, `created_at`, `credits`, `disabled`, `feature_flags` and `coaching_config`. Dashboard and detail data can add campaign rows. Membership and invitation workspaces use that field set too; invitation display rows exclude the token hash. Provider account responses contain only `sid`, `friendlyName`, `status`, `type` and `dateCreated`. Server services retain credential reads for Twilio operations and health calculations. The projection gate checks static reader imports and client types; complete serialized response tests check nested data.

@@ -39,9 +39,95 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 4. When `gh pr create` / `gh pr merge` hit `graphql_rate_limit`, fall back to REST: `POST /repos/{owner}/{repo}/pulls` (create; ensure the head branch has commits ahead of base first — "No commits between base and head" is the failure when it does not), `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `-f merge_method=squash`, and `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}`.
 5. Verify REST fallbacks the same as any mutation: query the remote state and report it.
 
+## Dependabot Alert Pagination
+
+The alert list uses `before`/`after` cursors from the Link header; it rejects
+the `page` parameter. Use `gh api --paginate` or follow those cursors. A malformed
+request can also print a scope hint: correct the endpoint parameters and retry
+before asking for broader access. See the [official alert API](https://docs.github.com/en/rest/dependabot/alerts#list-dependabot-alerts-for-a-repository).
+
+## Advisory Version Ranges
+
+Before comparing an advisory with installed versions, normalize provider
+comma-separated bounds to the package comparator's syntax. Require a valid
+parsed range and version; parse failure is unknown, not unaffected. Keep the
+original advisory range, install path and development/runtime metadata in the
+proof. Version applicability does not prove exploit reachability.
+
+## CI Test-Count Evidence
+
+Job logs can contain ANSI escapes as actual ESC bytes or literal `\u001b` text.
+Normalize both forms before matching a test file and collected count. A failed
+raw-string match does not prove that the suite was skipped. Require the expected
+executed cases and a completed successful job.
+
+## Aggregating REST Pages
+
+`gh api --paginate --jq` filters each page separately. For one total across
+pages, pipe `gh api --paginate` to `jq -s` and aggregate the collected pages.
+Older gh versions reject combining `--slurp` with `--jq`. Check the installed
+help and require one numeric output before writing a count to GITHUB_OUTPUT.
+Use `pipefail` so a failed or incomplete API read cannot become a successful
+zero or partial count. In GitHub Actions, declare `shell: bash` for this pipeline.
+
+## Concurrent PR Check Events
+
+Do not use a check-run or job ID to infer workflow event order. Concurrent
+opened and labeled events can allocate their jobs in the opposite order.
+Resolve each check's Actions run, group by workflow and check name, and compare
+the workflow run number and attempt at the exact tested head. Keep checks from
+different workflows visible even when their job names match.
+
+Inspect an earlier failure before treating it as superseded. The issue-reference
+workflow reads labels from its event payload: rerunning an opened event does not
+add a later `no-issue` label to that payload. Verify the current PR label, the
+successful later event, all applicable required checks and deployment contexts,
+and the PR's current merge state before merging.
+
+## Empty REST Responses
+
+A successful REST deletion can return HTTP 204 with no response body. Check the
+command result, then read the target again to verify deletion. Parse JSON only
+when the response body is non-empty; an empty success response is not a failure.
+
+## REST Version And Commit Evidence
+
+Choose a verified API version for each endpoint contract. Do not copy a version
+header to every request without checking its breaking changes and response fields.
+GitHub's [version guide](https://docs.github.com/en/rest/about-the-rest-api/api-versions)
+and [breaking changes](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes)
+are the source of truth. Version `2026-03-10` removes `merge_commit_sha` from pull
+request payloads. For cleanup that reads that field, explicitly use the supported
+`2022-11-28` contract for the pull read, or migrate the merge-evidence read to a
+verified contract. Do not depend on the unversioned default staying the same.
+A missing field does not prove that a PR is unmerged. Before cleanup, verify the
+merged state, base, tested head, merge SHA and source equivalence; stop if required
+evidence is absent. Keep issue-dependency version headers scoped to those calls.
+
+After a push, the remote ref can show the new commit before the pull endpoint's
+head updates. Compare both with the tested commit. Re-read with bounded retries;
+if the pull head stays stale, stop the mutation. Do not merge or delete refs using
+a stale pull snapshot, or create another PR to force its head to update.
+
 ## Authentication And Scopes
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.
+
+## Organization Effort Field
+
+- In CallCaster, `Effort` is an organization-level GitHub Issue field. Every organization issue has it; it is not an issue label or a GitHub Project field.
+- `gh issue view --json` does not expose organization Issue fields. Use GraphQL `issueFieldValues`; do not use `gh issue list --label "effort:<value>"` or Project item data.
+- Resolve the current field and option IDs before filtering. On 2026-09-22, `Effort` is `IFSS_kgDOAZggGQ` and `nothing-burger` is `IFSSO_kgDOBLhcrg`:
+
+```bash
+gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueFields(first: 100) { nodes { ... on IssueFieldSingleSelect { id name options { id name } } } } } }'
+```
+
+- List open CallCaster issues for an Effort option with the verified repository filter. Replace the IDs only with values returned by the preceding query:
+
+```bash
+gh api graphql -f query='query { repository(owner: "chester-hill-solutions", name: "callcaster") { issues(first: 100, filterBy: { states: OPEN, issueFieldValues: [{ fieldId: "IFSS_kgDOAZggGQ", singleSelectOptionId: "IFSSO_kgDOBLhcrg" }] }) { nodes { number title url } } } }'
+```
 
 ## Issue Development Branches
 

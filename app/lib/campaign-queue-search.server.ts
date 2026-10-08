@@ -178,6 +178,8 @@ export function buildCampaignQueueSearchWhere(
             .where(
               and(
                 eq(outreachAttemptTable.contact_id, campaignQueueTable.contact_id),
+                eq(outreachAttemptTable.campaign_id, campaignQueueTable.campaign_id),
+                eq(outreachAttemptTable.workspace, campaignQueueTable.workspace),
                 isNull(outreachAttemptTable.disposition),
               ),
             ),
@@ -192,6 +194,8 @@ export function buildCampaignQueueSearchWhere(
             .where(
               and(
                 eq(outreachAttemptTable.contact_id, campaignQueueTable.contact_id),
+                eq(outreachAttemptTable.campaign_id, campaignQueueTable.campaign_id),
+                eq(outreachAttemptTable.workspace, campaignQueueTable.workspace),
                 eq(outreachAttemptTable.disposition, filters.disposition),
               ),
             ),

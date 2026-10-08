@@ -1,6 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6153b084` · 160 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 332 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -13,91 +15,1657 @@ Reviewed at `dev@6153b084` · 160 open issues in `chester-hill-solutions/callcas
 Lane assignments, root causes, resolution paths, and test gaps come from the audit in
 `scripts/issue-board-enrichment/` — update those files when evidence changes.
 
+## CHS backlog Status flow (project 9)
+
+`gh project item-edit` does NOT close issues and must NOT move closed items:
+
+- A fix merged to **dev** moves the issue's Status to **on-dev** (the `issue-on-dev`
+  workflow does this; the project-on-dev-status skill backfills it). The issue stays OPEN.
+- A manual verification pass moves it to **tested-on-dev**. Still open.
+- When the fix is promoted to **master** the issue is CLOSED by the release PR, and the
+  project's "Item closed" automation moves the item to **on-qa** automatically.
+- **Never move a CLOSED issue by hand.** Closed items go to **on-qa** on their own;
+  moving them (e.g. to `archive`) loses that signal.
+- A CLOSED issue whose state reason is `not_planned`/`duplicate` is the ONE manual move:
+  its Status goes to **archive**. Everything closed as completed stays in **on-qa**.
+
 ---
 
-## Fix now — 18
+## Fix now — 9
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-### [#1885](https://github.com/chester-hill-solutions/callcaster/issues/1885) Rewrite Supabase-auth RPCs, then drop the legacy auth schema
-- Verdict: **Fix now** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth**
-- Not a Supabase dependency: the only auth survivors are our own shim. auth.uid() is defined by drizzle/0001_auth_uid_shim.sql; auth.jwt() has no shim, so get_outreach_attempts is dead. The only live RPCs using auth.uid() are select_and_update_campaign_contacts and update_user_workspace_last_access_time, both called inside withAppCurrentUser. No code has shipped.
-- Current behavior: Public RPCs still reference auth.uid()/auth.jwt(); schema auth cannot be dropped. get_outreach_attempts is dead.
-- Root cause: Legacy Supabase-era definitions survive in the Drizzle baseline and the auth.uid() shim was never rewritten onto the v2 app.current_user_id identity.
-- Resolution: Chunk 1: migration dropping public.get_outreach_attempts, remove its KEEP entry, wire into both bootstrap step lists. Chunk 2: rewrite the two RPCs to nullif(current_setting('app.current_user_id', true), '')::uuid. Chunk 3: fail-closed guard raising while any non-auth function or public policy still matches auth., then DROP SCHEMA IF EXISTS auth CASCADE. Retire or guard drizzle/0001_auth_uid_shim.sql.
-- Look in: `app/lib/db-rpc.server.ts`, `drizzle/0001_auth_uid_shim.sql`, `drizzle/0000_baseline.sql`, `client/migrations/20260807130000_manual_dial_claim_attempt_count.sql`, `client/migrations/20260715140000_drop_legacy_rls.sql`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`
-- Existing tests: test/queue-rpc-contract.test.ts; test/db-rpc-claim-queue-entry.test.ts; test/db-rpc-outreach-attempt.test.ts; test/atomic-manual-dial-claims.integration.test.ts
-- Missing tests: test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt(); test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor; test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration
-- Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
-- Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
+### [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170) Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
+- A 2026-09-28 run found 18 rejected workspace credentials. Current code still selects API-key auth without rejection-time fallback, and number release uses the same client. Current credential liveness was not measured in this audit.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The 18 stale-credential failures are historical incident evidence. Current client selection has no fallback after an API-key rejection; release still uses that client.
+- Root cause: Stored credentials were rejected in the incident; the rotation cause is not proved. Client construction prefers a key, but does not automatically retry a rejected key with the Auth Token.
+- Resolution: Detect and report provider credential rejection. Select a reviewed recovery path using the existing re-auth capability or platform-owned release path. Coordinate release ordering with #2085; verify current credential liveness separately.
+- Look in: `app/lib/database/workspace.server.ts:461`, `app/lib/database/workspace.server.ts:497`, `app/lib/database/workspace-twilio-subaccount.server.ts (createSubaccount/createKeys; the place credentials are minted and would be rotated)`, `app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber — authenticates with the workspace credential)`, `master.api.v2010.accounts(subAccountSid) — the working path for platform-operated calls`
+- Existing tests: none that exercise a stale or rejected subaccount credential
+- Missing tests: Inject provider auth rejection and prove recovery or a named degraded state; verify current liveness separately.
+- Done when: Rejected workspace credentials produce a named degraded state or a tested recovery path.; A customer can release their own platform-owned number under the selected credential-recovery contract.; Valid credentials retain supported operations without unnecessary re-authentication.; The current live credential state is measured separately; the historical 18 failures are not reported as a fresh result.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) IVR audio takes ~7s to start after answer (synchronous AMD suspected)
-- Verdict: **Fix now** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **IVR first audio: remove the flow-entry redirect and serve WAV prompts**
-- Re-scoped from synchronous AMD to the gather/first-audio path. Remaining on dev: the flow entry returns only a Redirect, so the block route re-runs findCallBySid + fetchCampaignWithScript before any prompt, and every IVR prompt is mono MP3. No PR yet; measurement is required.
-- Current behavior: Time-to-first-audio about 7s: first audio waits on two server round-trips and an MP3 prompt Twilio transcodes.
-- Root cause: The flow entry returns a Redirect before rendering any prompt, and the prompt library only stores MP3.
-- Resolution: PR1: extract the shared block renderer into app/lib/ivr-block-runtime.server.ts and render the first block inline from the outbound and inbound page routes. PR2: add a WAV transcode in app/lib/audio.server.ts, an ivr-wav/ object path + signed URL, backfill existing prompts, then point playback at WAV. Instrument answer->flowEntry and flowEntry->firstBlock timestamps; target under 2s.
-- Look in: `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts`, `app/lib/audio.server.ts`, `app/lib/audio-upload.ts`, `app/lib/object-storage.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`
-- Existing tests: test/ivr-page.route.test.ts; test/ivr-block.route.test.ts; test/audio.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
-- Missing tests: page route returns inline first-block TwiML with no Redirect; signed prompt path is ivr-wav/*.wav; WAV transcode args; a WAV failure does not fail the MP3 write; machine branches unchanged
-- Done when: Time-to-first-audio measured before/after with numbers recorded; Under 2s on the human path; No redirect hop; the first block is rendered from the flow entry; IVR prompts served as WAV without breaking legacy objects; Machine-detection behaviour unchanged
-- Tracker: Fix now, split into PR1 (redirect removal) and PR2 (WAV + backfill). If measurement shows AMD dominates, open a separate IVR AMD-conditioning ticket (cf. #1845).
+### [#2215](https://github.com/chester-hill-solutions/callcaster/issues/2215) Add the five workspace foreign keys missing from the active bootstrap lineage
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Five tenant tables lack a workspace FK in the active fresh-bootstrap SQL: outreach_attempt, workspace_events, workspace_member, workspace_audit_event and workspace_audio. Six originally listed tables are already constrained in drizzle/0006_app_schema_tail.sql.
+- Current behavior: Source verified at dev@51d7ac3de73c32c6e96beca9117a59b9c0d45bbf and read-only actual development PostgreSQL 18 on 7 October 2026 UTC: five registered tenant tables still lack workspace foreign keys. outreach_attempt and workspace_events use UUID tenancy; workspace_member, workspace_audit_event and workspace_audio use text; workspace.id is UUID. Development counts are 3,341/2/46/0/0 rows respectively, with zero orphan references and zero invalid UUID values. The 633 orphan workspace_events rows in the separate owned local diagnostic database are synthetic test residue, not a deployed count.
+- Root cause: Original audit checked only 0000_baseline.sql and missed 0006_app_schema_tail.sql plus the campaign_queue tenancy migration. Five constraint gaps remain. Three have text tenancy columns requiring a database conversion, not only a Drizzle model edit.
+- Resolution: Validate the supported upgrade and fresh-bootstrap lineages, then add the two missing UUID constraints. Convert and constrain each text tenancy column in separately validated work or explicit blocking tasks. Recheck data inside the migration; a zero-orphan read does not reserve integrity against later writes. Prove registered-table constraints, cascade behavior and model/catalog type agreement through real Postgres.
+- Look in: `scripts/e2e/bootstrap-compose-db.mjs:29`, `drizzle/0006_app_schema_tail.sql:84`, `drizzle/0006_app_schema_tail.sql:133`, `drizzle/0006_app_schema_tail.sql:283`, `drizzle/0002_workspace_events.sql:4`, `app/db/schema.ts:162`, `client/migrations/20260705000200_add_campaign_queue_workspace.sql:38`, `drizzle/0000_baseline.sql:5320 (workspace.id is uuid in the database)`, `app/db/schema.ts:130 (workspace.id is text() in the model — the drift)`, `app/db/schema.ts:162,503,522 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)`, `app/db/schema-campaign.ts:145 (campaign_queue.workspace is uuid)`, `app/db/workspace-scoped-tables.ts (32 registered tenant tables at dev@f1fc3ef5)`, `client/migrations/20260713180000_chs_workspace_membership.sql:99-106 (workspace_member, role_id FK but no workspace_id FK)`, `client/migrations/20260713120000_workspace_audit_event.sql:4 (workspace_audit_event.workspace_id is text)`, `client/migrations/20260715120000_workspace_audio_metadata.sql:17 (workspace_audio.workspace_id is text)`, `client/migrations/20260731140000_create_workspace_events.sql:24 (workspace_events.workspace_id is uuid — unconstrained)`
+- Missing tests: Need real-Postgres coverage proving registered FK presence and deletes, plus referential-integrity measurement before constraining deployed data.
+- Done when: Inspect the supported database lineages and record the actual missing workspace constraints.; Add workspace(id) foreign keys with ON DELETE CASCADE for outreach_attempt and workspace_events after checking orphan rows.; Convert and constrain workspace_member.workspace_id, workspace_audit_event.workspace_id and workspace_audio.workspace_id in separate validated changes, or track explicit blocking tasks.; A real-Postgres test checks every registered tenancy table for the intended workspace FK and proves cascade behavior.; A model/database type check covers workspace.id and tenancy columns.
+- Tracker: Native scope and all original acceptance criteria remain open. Current development catalog measurements are recorded in the issue; no rows or schema were changed. Production and staging integrity, migration validation and source implementation remain.
 
-### [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873) record every call and IVR
-- Verdict: **Fix now** · Size: L · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **feat(recording): record live and IVR calls under a workspace policy**
-- The recording + transcript pipeline already exists for agent calls (record:'record-from-answer' + /api/recording -> Railway Bucket -> ElevenLabs Scribe per ADR-0029). IVR dispatch and test-call never set record; predictive dialing does not either. Consent model recorded in the issue comment.
-- Current behavior: campaign-ivr-dispatch.server.ts:241 and campaign-test-call.server.ts:105 create calls with no record/recordingStatusCallback; auto-dial.server.ts createTwilioCall also omits record. Manual live paths record.
-- Root cause: Recording is wired per call-creation site, and the IVR/predictive creators were never wired; there is no workspace policy to gate or disclose recording.
-- Resolution: Add workspace recording policy (allowed + disclosure text) and a campaign opt-in; set record:'record-from-answer' with recordingStatusCallback/Event on the IVR dispatch, test-call, and predictive paths; play the disclosure before the menu when set; reuse /api/recording and the ADR-0029 pipeline.
-- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/recording.action.server.ts`, `app/lib/call-recording-storage.server.ts`, `app/db/schema.ts`, `docs/adr/0029-post-call-golden-transcript-cohere-batch-worker.md`
-- Existing tests: test/recording.route.test.ts; test/call-recording-storage.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
-- Missing tests: IVR and test-call calls.create include record + callback; disclosure plays before the first menu when configured; policy off means no record; policy on + campaign opt-in records and enqueues transcription
-- Done when: Every live and IVR call records when the workspace policy allows and the campaign opts in; The disclosure message plays before the menu when set; No recording when the policy disallows it; Recording flows into the existing bucket + transcript pipeline
-- Tracker: Fix now, but likely split: (1) workspace recording policy + campaign opt-in, (2) IVR/predictive record wiring + disclosure. Confirm jurisdiction gating and policy storage before coding.
+### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
+- Number purchase still has explicit deferred-Q43 code and no regulatory addressSid. Its service-address precheck and validated emergencyAddressSid do not resolve local/foreign regulatory requirements.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Purchase requires a service address and may pass validated emergencyAddressSid. It still explicitly defers regulatory addressRequirements/addressSid, and provider create rejection maps to 500.
+- Resolution: Look up inventory requirement, select compliant validated regulatory address, explain absence before purchase and pass addressSid.
+- Look in: `app/lib/platform-workspace-numbers.server.ts:171`, `app/lib/platform-workspace-numbers.server.ts:187`, `app/lib/platform-workspace-numbers.server.ts:152`, `app/lib/platform-workspace-numbers.server.ts:344`, `app/lib/platform-workspace-numbers.server.ts:175-192,339-346`, `app/lib/number-address-requirements.ts (`resolveAddressForRequirement`, `addressRequirementUserMessage`)`, `app/lib/numbers-search.server.ts`, `app/lib/numbers-search.types.ts`, `app/components/phone-numbers/ (the search row and purchase fetcher)`, `isNanpTollFreeNumber`
+- Missing tests: Purchase-boundary missing/compliant/foreign address tests and search badge. Twilio rejection and live address data were not reproduced.
+- Done when: A number with `addressRequirements: "local"` and no validated address returns 400 with the address-specific message, and no Twilio number is created (kill-check: remove the resolve call and confirm the test goes red).; With a compliant address, the purchase succeeds and passes `addressSid`.; A `foreign` requirement is satisfied by a foreign address.; The badge is visible on the search row.; No purchase path returns 500 for an address requirement.
+- Tracker: Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter.
 
-### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
-- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **IVR: guarantee a terminal hangup (handle next:"end", validate dangling targets and cycles)**
-- 'Hang up' is already an editor routing target. The real remaining ask is the terminal-hangup guarantee: handleNextStep treats only 'hangup' as terminal; next:"end" redirects, a dangling target falls back to pageIds[0], and validateDocument only checks startPageId and missing blocks.
-- Current behavior: A script can route to "end" or a dangling target and be redirected instead of hanging up; routing cycles are undetected; the editor shows no validation warning.
-- Root cause: The runtime parses next as an opaque string with no terminal/validation contract.
-- Resolution: Treat 'hangup' and 'end' as terminal in handleNextStep and the inbound renderer; hang up instead of redirecting when the page/block does not exist; add app/lib/ivr-script-validation.ts (edge graph + DFS) surfaced in ScriptEditorShell.tsx and wired into validateScriptSteps; add a script_routing_invalid readiness code that blocks launch.
-- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.routing.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/call-script-service.ts`, `vendor/scriptkit/scriptkit-call-script-core/src/parse.ts`, `docs/script-json-format.md`
-- Existing tests: test/ivr-block-response.route.test.ts; test/ivr-block.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/ui/script-block-editor-ivr.test.tsx; vendor/scriptkit test/script-editor.test.ts
-- Missing tests: ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok; route tests: next:"end" renders <Hangup/>, dangling renders <Hangup/>, last-block fallthrough renders <Hangup/>; editor shell test shows the validation error for a cyclic script
-- Done when: An author can choose Hang up as an option's next step (already true); A published script always has a terminal hangup; next:"end" and "hangup" are both terminal at runtime; Dangling targets and reachable cycles fail validation and block launch
-- Tracker: Fix now; confirm the already-present 'expose Hang up' half with the reporter, then split runtime safety from editor/launch validation if the PR grows.
+### [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459) The Access form shows two success notices for one recovery click
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- One click was measured as one POST, one membership update and two notices. A local existing-panel repair is tested; final browser approval remains pending.
+- Current behavior: Local 784265970c6d40f09667938c80a4909e22ff073c on older dev@8672297b1b3a97dcf2744b31e80f421b860a1da0 uses TabsContent around the admin Outlet. Six real parent/Access Router cases, full local CI, 1,001 actual PostgreSQL cases and both source reviews pass. There is no PR or candidate browser acceptance.
+- Root cause: The routed Access child was rendered in both the React Aria Tabs collection builder and visible tree because it lacked a TabPanel boundary. The measured original full-app case has one request and one write, so it is a presentation defect.
+- Resolution: Complete the explicitly approved isolated browser role tests, require one notice per result and zero page-landmark movement at phone/desktop widths, then refresh onto current dev and repeat full gates/reviews before one atomic PR. Preserve repeat messages, pending controls, owner safety and the single root host.
+- Look in: `app/routes/admin+/workspaces/$workspaceId.route.tsx`, `app/components/ui/tabs.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`
+- Missing tests: Candidate full-app notice/request/write counts, repeat Owner action, sole-owner refusal and phone/desktop landmarks await role-test approval. Local test/ui/admin-access-result-notices.test.tsx has six passing Router cases but is not on dev.
+- Done when: One recovery click produces one result notice after loader revalidation. Measure request/write counts before claiming a duplicate mutation or repairing that boundary.; A later valid action still produces its own result, including the same message. Error and warning results remain visible and are not suppressed by a previous success.; Navigation, revalidation and ordinary renders do not replay a handled result. Preserve pending controls, owner safety, target enrollment and saved data.; Success/error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths. Keep the shared component library and single root host.; Add an executed failing regression with valid controls, then prove restored behavior. Pass full local CI, independent source reviews, applicable exact-head remote gates and deployments before an atomic merge. Keep deployed release acceptance separate.
+- Tracker: Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain.
 
-### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
-- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
-- The runtime half shipped on dev in PR #1937 (e79644b9): per-step gather timeout plus hangup/replay/route with a 2-replay cap. The PR deferred the script-editor panel and the inbound IVR mirror, so the feature is not authorable and not applied inbound.
-- Current behavior: IvrBlock carries gatherTimeoutSeconds and noInput; appendBlockResponse honours the timeout and the outbound response route branches on resolveNoInputTarget. Nothing writes those fields (no editor control) and the inbound response route has no noInput/timeout handling.
-- Root cause: PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.
-- Resolution: Add the script-editor no-input panel (wait length + action select + conditional target) writing the block fields, mirror the branching into the inbound response route with its own replay store and cap, add editor/inbound route tests. Fold #1843 into this issue or close it as duplicate.
-- Look in: `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/ivr-script-editor.ts`
-- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-gather.test.ts
-- Missing tests: Editor emits wait/no-input controls; Inbound response route no-input branches and replay cap
-- Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults are unchanged for steps that do not configure it
-- Tracker: Fix now. Runtime + outbound are dev-only in PR #1937; finish the editor panel and inbound mirror (or fold #1843 in).
+### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
+- Current behavior: Source audit dev@efb3bb54, 2026-10-05. The same actionData.error goes to the shared root feedback hook and the invite Email FormField. Permission, role, member, webhook and API key errors can become email field errors. Responses lack an explicit field discriminator. An addUser form name alone does not prove email validation. The current FormField error paragraph is in document flow. Actual-page UI reproduction ran four cases: the unrelated-field and duplicate-result desired assertions failed; the email-description and no-replay controls passed. Server action responses were isolated; no authorization or browser geometry proof is claimed.
+- Root cause: The route assigns failures from unrelated settings actions to the Email field.
+- Resolution: Identify actual email validation from explicit server field feedback, not action names or message text. Preserve the shared FormField accessible association and use its adopted anchored/reserved-area contract. Render other operation failures once through the root toast, preserve retry values and permission checks, and retain once-only action feedback during revalidation. Keep the member-name concern separate.
+- Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `app/routes/workspaces+/$id/settings.action.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/hooks/utils/useActionFeedback.ts`, `app/components/ui/form-field.tsx`, `docs/design-system.md`
+- Existing tests: Actual WorkspaceSettings page, shared FormField, useActionFeedback and root Toaster with a real memory router: four isolated-response cases ran, two desired defect assertions failed and two controls passed. Four presentation source blobs matched the audited dev commit. The temporary fixture was removed; product source stayed clean.
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
 
-### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
-- scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.
-- Current behavior: Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.
-- Root cause: The checker was added as a tool but never connected to a DB-backed per-environment gate.
-- Resolution: Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.
-- Look in: `scripts/db/check-schema-drift.mjs`, `scripts/db/check-migration-ledger.mjs`, `.github/workflows/ledger-drift-check.yml`, `scripts/lib/app-db-objects.mjs`, `test/schema-drift-enums.test.ts`
-- Existing tests: test/schema-drift-enums.test.ts
-- Missing tests: Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL
-- Done when: A deployed environment missing a required object fails the workflow.; A missing DATABASE_URL fails the workflow rather than no-op passing.; Push path filters include the schema files and the checker.
-- Tracker: Fix now per the accepted grilling decision (existence gate first, type parity deferred).
+### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
+- Reviewed source and PR #2466 are green; live cleanup approval remains pending before merge.
+- Current behavior: PR #2466 at 4a940591db5116c156c3d270529d471ab1970f23 removes four obsolete-key entries and adds Railway plan guidance. All local/remote gates and exact-head preview deployments pass. Each of three read-only plans deletes only the obsolete app key. The dev push workflow refuses that destructive drift if the live old key remains.
+- Root cause: Preservation lists and staging sync retained STRIPE_API_KEY although the verified deployed app and worker sources use STRIPE_SECRET_KEY.
+- Resolution: After explicit approval, commit only the three old app-key deletions through the verified explicit patch with skipDeploys. Preserve all other variables, resources and staged changes; verify no redeploy and fresh plan convergence before merging. Do not apply a broad environment plan or bypass the destructive-drift guard.
+- Look in: `.railway/environments/dev.ts:22`, `.railway/environments/staging.ts:35`, `.railway/environments/production.ts:28`, `scripts/railway/sync-staging-vars.sh:33`
+- Missing tests: Live deletion approval, exact read-back preservation and fresh converged plans remain. No live mutation has been executed.
+- Done when: STRIPE_API_KEY is absent from active Railway IaC variable lists and sync scripts.; STRIPE_SECRET_KEY remains configured for the app and worker where required.; Repository checks pass.; Confirm no external runtime consumer depends on STRIPE_API_KEY.
+- Tracker: Keep source and live configuration acceptance distinct. PR #2466 remains draft until the live cleanup decision is resolved; it is not merged or release-ready.
 
-### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR was marked as complete before the recipient actually received their dial
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Recommended title: **IVR: don't mark a campaign complete while calls are still in flight**
+### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All observed alerts become severity-free alert-banner events; workspace-scoped successes can become warning logs. The /workspaces invite banner only logs locally, without a stack or network beacon.
+- Root cause: The telemetry keys on the ARIA role rather than on the severity the component is actually communicating. `role="alert"` is an accessibility announcement mechanism, not a severity signal, and a neutral `Alert` uses it too.
+- Resolution: Make severity explicit through primitive, client payload and sink schema. Do not infer severity from role alone.
+- Look in: `app/lib/flash-telemetry.client.ts:125`, `app/lib/flash-telemetry.client.ts:58`, `app/routes/api+/workspaces+/$workspaceId/client-flash.action.server.ts:29`, `app/lib/flash-telemetry.client.ts`, `app/components/shared/QueryParamBanner.tsx (the Alert inside it)`, `app/routes/api+/workspaces+/$workspaceId/client-flash`
+- Existing tests: test/ui/flash-telemetry.test.tsx (error-toast and alert-banner capture; no semantic severity mapping)
+- Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
+- Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
+- Option B is recorded: make the default Alert neutral and require explicit semantic tones. CallCaster has not adopted that contract.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. The app vendor default still uses border-brand-tertiary and bg-brand-wash. The issue now records a neutral default contract, without changing global brand tokens. Shared workbench ownership is confirmed; app adoption and rendered acceptance remain.
+- Root cause: The app still consumes the older brand-styled default Alert; the selected neutral contract has not been adopted.
+- Resolution: Adopt the reviewed canonical ui-kit Alert snapshot as a separate consumer change. Keep existing geometry and theme. Classify unvarianted and style-only warning sites, give conditions explicit tones, and verify light/dark contrast and no page movement. Do not change global brand-wash or brand-tertiary.
+- Look in: `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23`, `app/components/ui/alert.tsx:1`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx`, `app/components/ui/alert.tsx`
+- Missing tests: Actual light/dark rendered tone and contrast, including default/explicit warning sites; browser geometry for any migrated dynamic notices.
+- Done when: Record the token change, explicit tone, or combined decision.; Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.; List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.; If shared tokens change, check their other consumers in light and dark themes.; Test the selected Alert tone contract and verify the rendered result.
+- Tracker: Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished.
+
+### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Finish the raw-button cursor migration and prevention guard
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
+- Partial fix: PR #1963 added the shared Button cursor. The raw-button migration and prevention guard in the issue inventory are still absent. The board wrongly says the shared fix is unmerged.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Shared Button cursor handling is present on dev. Raw buttons still bypass that wrapper, including shared pagination. No raw-button structural guard was found.
+- Root cause: The shared Button cursor fix is present in dev. Remaining raw buttons bypass that wrapper and its cursor rules; no raw-button prevention guard was found.
+- Resolution: Do not reopen the landed shared fix. Verify it, then track the raw-control inventory and prevention guard as focused work.
+- Look in: `app/components/ui/button.tsx:55`, `app/components/shared/TablePagination.tsx:120`, `test/ui/button.smoke.test.tsx:11`, `app/components/ui/button.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `test/ui/button.smoke.test.tsx`
+- Existing tests: test/ui/button.smoke.test.tsx
+- Missing tests: Classes alone do not prove computed cursor behavior. Disabled and aria-disabled cursor browser checks and the raw-button prevention guard are missing.
+- Done when: Interactive shared buttons show the pointer cursor by default; Disabled buttons show the default cursor; The reported onboarding save/continue instance is fixed; A guard prevents recurrence
+- Tracker: Partial fix in PR #1963. Keep remaining inventory/guard work visible; the old unmerged-branch claim is stale. Related PR evidence: #1963. A PR reference alone does not prove deployed behavior.
+
+---
+
+## Verify and close — 213
+
+Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2067](https://github.com/chester-hill-solutions/callcaster/issues/2067) check:effects never verifies @effect-deps against the real dependency array
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2465 merged at cd9a3e22d16f3114c00e8069556cfab70c155eb8. The effects guard compares complete @effect-deps tags with actual arrays, checks qualified calls and stale entries, and supports a documented escape. Four omitted ContactSearchDialog dependency annotations were corrected.
+- Root cause: The guard checked annotation presence but not dependency agreement; wrapped tags require complete parsing before debt is recorded.
+- Resolution: Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed. Do not close from dev source evidence alone.
+- Look in: `app/components/queue/ContactSearchDialog.tsx`, `docs/effects-inventory.md`, `docs/effects-strictness.md`, `scripts/check-effects.mjs`, `scripts/effects-deps-baseline.json`, `scripts/lib/effects-lib.mjs`
+- Existing tests: test/effect-dependencies.test.ts; test/ui/contact-search-dialog.test.tsx
+- Missing tests: Run the guard on the final candidate and retain existing recorded debt. The dependency baseline contains 21 existing mismatches; this repair is not a claim that all effect debt is removed.
+- Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2465 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123) The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2464 merged at 171f6fca4c7ec5be368d62a521c8063037af5d59. Root and nested error boundaries now extract recognized safe response messages through the shared sanitizer. Internal database/query data falls back to safe text; 404 handling remains.
+- Root cause: The nested boundary discarded response messages, while the root accepted only strings and unsafe response data needed filtering.
+- Resolution: Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim. Do not close from dev source evidence alone.
+- Look in: `app/components/shared/RouteErrorBoundary.tsx`, `app/lib/user-message.ts`, `app/root.tsx`
+- Existing tests: test/user-message.test.ts; test/ui/route-error-messages.test.tsx
+- Missing tests: Validate released route messages and layouts. Source markup and classes were preserved; this change has no fresh full-browser geometry claim.
+- Done when: A 403 thrown as "You do not have access to this workspace" renders that sentence in the nested boundary (kill-check: revert to the status-only text and confirm the test goes red).; A 404 still renders its not-found treatment (the existing correct behaviour must stay green).; A non-`Response` error still goes through `toUserMessage` and never leaks a driver message.; Safe string response data and recognized structured error payloads both produce the intended message.; Response data containing a driver/internal message produces a safe fallback.; Missing or unrecognized response data uses the status fallback.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2464 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2124](https://github.com/chester-hill-solutions/callcaster/issues/2124) Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2463 merged at c26088ad5f34c68d7cd32883405dffb11a0bb5c4. The redirect scanner reads whole-file syntax and both ratchets reject stale baseline entries. Replacing mocks are counted per occurrence; 24 stale keys were removed without new exceptions.
+- Root cause: Line-based redirect scanning and set-based mock keys missed multiline calls and repeated occurrences, while stale entries were tolerated.
+- Resolution: Validate the guards on the final release candidate and promote through the default branch. Do not close from dev source evidence alone.
+- Look in: `scripts/baselines/test-mock-replace.txt`, `scripts/check-relative-redirects.mjs`, `scripts/check-test-mock-coverage.mjs`
+- Existing tests: test/check-guard-ratchets.test.ts
+- Missing tests: Validate the guards on the final release candidate and promote through the default branch.
+- Done when: A multiline relative redirect fails. An absolute /foo redirect remains outside the relative-redirect guard.; Both guards reject stale baselines.; The mock baseline records per-occurrence counts.; Fixture tests prove fail and pass cases.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2463 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151) Cache interactive SMS readiness checks and measure Twilio read cost
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2462 merged at b2e8c712d9baab0b8f8f75a08b0b31be8df7d3a3. Interactive chat uses a 30-second sender-pool cache with version-fenced invalidation. Campaign ticks retain a fresh gate. Measured ten-message chat bursts use one sender read; three-message campaign ticks use one.
+- Root cause: Chat readiness listed the live sender pool on each send without a bounded cache; campaign gating was already present.
+- Resolution: Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance. Do not close from dev source evidence alone.
+- Look in: `app/lib/chat-sms.server.ts`, `app/lib/merge-workspace-twilio-data.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/twilio-sender-pool.server.ts`
+- Existing tests: test/integration-db/interactive-sender-cache.test.ts; test/interactive-sender-pool-cache.test.ts; test/twilio-sender-pool.server.test.ts
+- Missing tests: Verify candidate worker/provider traffic and invalidation behavior. The measurements use real SDK calls with simulated transport; they are not live-provider acceptance.
+- Done when: A dispatch tick of N messages performs **one** readiness evaluation, not N (kill-check: revert to the per-message call and confirm the test goes red).; A chat burst re-lists the sender pool at most once per TTL window.; A non-ready campaign dispatch defers before row selection and does not spend queue attempts; this behavior is already implemented by PR #2228.; The before/after Twilio request count for a representative tick is recorded in the issue.; The chat readiness cache expires and invalidates after relevant sender/configuration changes.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2462 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2127](https://github.com/chester-hill-solutions/callcaster/issues/2127) The contact page's "Call lists" checkboxes and the whole "Other Data" editor are discarded, yet Save reports success
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2460 merged at 8672297b1b3a97dcf2744b31e80f421b860a1da0. The contact editor sends list membership and Other Data drafts through Save and persists them atomically with tenant validation. Reset, reload, create and refused edits are covered.
+- Root cause: The draft and action transport omitted call-list membership and Other Data values.
+- Resolution: Validate the released contact editor with candidate data and complete default-branch promotion. Do not close from dev source evidence alone.
+- Look in: `app/components/contact/ContactDetails.tsx`, `app/components/contact/ContactDetailsOtherFields.tsx`, `app/lib/contact-editor.ts`, `app/routes/workspaces+/$id/contacts/$contactId.action.server.ts`, `app/routes/workspaces+/$id/contacts/$contactId.route.tsx`, `app/server/contact-editor.server.ts`
+- Existing tests: test/contact-detail-action.route.test.ts; test/integration-db/contact-editor-save.test.ts; test/ui/_helpers/contact-editor.ts; test/ui/contact-editor-drafts.test.tsx; test/ui/contact-editor-route.test.tsx
+- Missing tests: Validate the released contact editor with candidate data and complete default-branch promotion.
+- Done when: Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).; Editing an "Other Data" field persists and survives a reload (kill-check).; If the controls are removed instead, they are absent rather than inert.; The unfinished-wiring comment is gone.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2460 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2138](https://github.com/chester-hill-solutions/callcaster/issues/2138) Non-member sudo users cannot use the Access tab, while separate sudo membership writers omit safety guards
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2458 merged at 9e5bbdb38d77c7b6480aa650e4afc097bcf1e75d. Verified non-member sudo access and protected admin membership writes are implemented. Shared services lock membership changes and enforce sole-owner and target enrollment rules.
+- Root cause: The Access route mixed platform and workspace roles, while separate admin writers omitted membership safety rules.
+- Resolution: Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459. Do not close from dev source evidence alone.
+- Look in: `app/components/workspace/TeamMember.tsx`, `app/lib/platform-admin.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/admin+/users/$userId/workspaces.action.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.route.tsx`, `app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts`
+- Existing tests: test/integration-db/platform-membership-safety.test.ts; test/ui/platform-member-controls.test.tsx; test/workspace-members-rbac.test.ts; test/workspace-ownership-transfer.test.ts
+- Missing tests: Validate the released sudo/member paths and actual MFA enrollment. The separate duplicate presentation defect remains under #2459.
+- Done when: A verified sudo user can open the Access tab without workspace membership.; A user without sudo access cannot open the admin route, regardless of workspace role.; Access-tab and sudo API mutations refuse sole-owner removal or demotion.; Access-tab and sudo API mutations refuse owner/admin grants to a target without required two-factor enrollment.; Permitted sudo mutations and existing member-path protections continue to work.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2458 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2455](https://github.com/chester-hill-solutions/callcaster/issues/2455) Bind inbound IVR page and block requests to the signed call workspace
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2457 merged at 31230d93b5a47396cf1b040860339ab5c89ec1f0. Inbound page and block actions bind the signed persisted call to the verified number workspace before routing, rendering or signing audio.
+- Root cause: Page and block actions checked phone matching but omitted the signed call-to-number workspace comparison; the response action already had it.
+- Resolution: Live signed-call and storage acceptance, release QA and default-branch promotion remain. Do not close from dev source evidence alone.
+- Look in: `app/lib/inbound-ivr-db.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/integration-db/inbound-ivr-workspace.test.ts
+- Missing tests: Live signed-call and storage acceptance, release QA and default-branch promotion remain.
+- Done when: A valid B-workspace signed call cannot render, redirect to or sign audio for an A-workspace number, even when the called phone matches.; Missing call workspace and missing/foreign number or script fail closed before audio signing.; Correct workspace calls retain documented speech, MP3/WAV playback, Gather nesting and routing.; Invalid signatures and changed called phones remain denied.; Real signed HTTP/database tests cover page, block and response boundaries. Remove each workspace guard separately and require an executed failure with valid controls.; One atomic PR; full local CI before every push and exact-head remote database/E2E/deployment gates before merge. Deployed acceptance and default-branch promotion remain required for closure.
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2457 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2148](https://github.com/chester-hill-solutions/callcaster/issues/2148) The inbound IVR renderer has no speech-text fallback and no WAV sidecar lookup, so a documented-format block emits an empty Say
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair merged into dev; candidate acceptance and default-branch promotion remain.
+- Current behavior: Current source: dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8, 2026-10-07 UTC. PR #2456 merged at 4d9bbde26016fa3cea3753d5b4ce4919b66c3914. The inbound IVR action uses the canonical audio renderer with its workspace context. Content-only speech, recordings and WAV sidecars are covered.
+- Root cause: The inbound action had a separate renderer that read audioFile for synthesized speech and omitted shared sidecar lookup.
+- Resolution: Provider playback, storage behavior and release-candidate routing still require acceptance. Do not close from dev source evidence alone.
+- Look in: `app/lib/ivr-block-render.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/inbound-ivr-block.route.test.ts; test/integration-db/inbound-ivr-prompt.test.ts
+- Missing tests: Provider playback, storage behavior and release-candidate routing still require acceptance.
+- Done when: A documented-format block on the **inbound** path emits the spoken text (kill-check: keep the local `handleAudio` and confirm the test goes red).; A block with an `audioFile` still plays the recording.; A block with a WAV sidecar still uses the sidecar.; There is one block renderer in the codebase (a grep assertion, so a second cannot be added without noticing).
+- Tracker: Verify and close after candidate acceptance and default-branch promotion. PR #2456 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified.
+
+### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Upload history loads with the authorized audience page. Retry, live updates and navigation retain the current call-list identity.
+- Current behavior: PR #2453 merged into dev at f1fc3ef5df1316c8f57b12d3c82afa7f4f001ba9. The existing scoped query feeds route data after audience access checks. Failed reads retain prior rows; retries use revalidation; prior workspace/audience callbacks and delayed responses cannot replace current rows. Persistent shared root feedback retains its action through notice updates and reopen. Both exact-source reviews, full local gates, all 875 local and remote database cases with zero skips, E2E and actual exact-head preview deployments passed. Six phone/desktop/wide light/dark geometry checks have zero background movement. Deployed acceptance and release promotion remain.
+- Root cause: Initial server history is owned by a client effect instead of the existing audience route data contract.
+- Resolution: Verify deployed upload history, retry and realtime navigation in the release candidate before default-branch promotion and closure. Source implementation is complete; retain all original acceptance criteria.
+- Look in: `app/components/audience/AudienceUploadHistory.tsx`, `app/hooks/audience/useAudienceUploads.ts`, `app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts`, `app/routes/workspaces+/$id/audiences/$audience_id.route.tsx`
+- Existing tests: test/ui/audience-upload-history.test.tsx; test/integration-db/audience-upload-history.test.ts
+- Missing tests: Release-candidate deployed browser/upload acceptance and default-branch promotion remain.
+- Done when: Initial history is route data; the mount fetch effect is removed.; Workspace/audience changes cannot leak old history or accept late results for another audience.; Loading, empty, error retry and success behavior remain available.; Current-audience event updates and route tenant authorization are retained.; Tests fail if the required loader, isolation, retry or event behavior is removed.; Remove candidate inventory debt and pass full local/remote gates before merge.; Initial audience upload history is route data; the mount effect and raw fetch path are removed from the hook.; Workspace/audience navigation cannot show a prior audience's uploads or let a late result overwrite the current audience.; Loading, empty, failed-read retry and successful history display remain supported.; Existing upload progress updates still handle INSERT, UPDATE and DELETE for the current audience.; Route authorization and tenant filtering are retained; foreign audience/workspace rows are not returned.; Meaningful route/UI tests fail if initial loading, audience isolation, retry or event updates are broken. Use stable fetcher/session doubles.; Remove this effect's CANDIDATE-REMOVE inventory entry after the runtime fix. Full local CI and all remote gates pass before merge.
+- Tracker: Native issue is OPEN; exact-head issue-on-dev workflow moved one item. Source evidence is complete and separate from deployed acceptance and release QA.
+
+### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
+- Verdict: **Verify and close** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Call History shows unavailable stored playback; voicemail retries retain one deterministic recording key and metadata retention is recorded.
+- Current behavior: PR #2451 merged into dev at c08f8b0f256f758ca445219af897660e9142c5b1. Call History shows unavailable stored playback; voicemail retries retain one deterministic recording key and metadata retention is recorded. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Root cause: The original design treated the copy as best-effort and swallowed the failure, which made an unrecoverable data loss look like success. A second, independent problem: recording_sid was written AFTER the copy, so a failed copy left no searchable row — the failure was unrepresentable in the database. #2169 fixed the ordering, which is what made the repair sweep's find query possible.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `app/components/calls/CallLogTable.tsx`, `docs/CHANGELOG.md`, `docs/adr/0015-domain-ids-as-pk.md`, `test/integration-db/inbound-voicemail-recipient.test.ts`, `test/ui/call-log-table.test.tsx`
+- Existing tests: test/integration-db/inbound-voicemail-recipient.test.ts; test/ui/call-log-table.test.tsx
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
+- Tracker: PR #2451 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282) Prepare a valid A2P Messaging Profile before brand registration
+- Verdict: **Verify and close** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-07
+- A2P product preparation validates explicit inputs, recovers verified resources and requires compliant submission before brand creation.
+- Current behavior: PR #2450 merged into dev at d1f5664e02e013d49c9512cb413489bb21ca14ba. A2P product preparation validates explicit inputs, recovers verified resources and requires compliant submission before brand creation. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `app/lib/a2p-messaging-profile.server.ts`, `app/lib/a2p-messaging-profile.ts`, `app/lib/messaging-onboarding/business-profile.server.ts`, `app/lib/messaging-onboarding/merge.server.ts`, `app/lib/messaging-onboarding/normalize-sections.server.ts`, `app/lib/messaging-onboarding/normalize.server.ts`, `app/lib/messaging-onboarding/persistence.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/onboarding-actions.server.ts`, `app/lib/platform-onboarding-handlers.server.ts`, `app/lib/platform-onboarding.server.ts`, `app/lib/twilio-a2p-messaging-profile.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/twilio-a2p-status-sync.server.ts`, `app/lib/twilio-client.server.ts`, `app/lib/twilio-compliance-job.server.ts`, `app/lib/twilio-compliance-webhook.server.ts`, `app/lib/types.ts`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`, `docs/CHANGELOG.md`, `docs/api-telephony-provisioning.md`, `test/a2p-messaging-profile.test.ts`, `test/fixtures/a2p-profile-provider.ts`, `test/fixtures/onboarding.ts`, `test/integration-db/a2p-messaging-profile.test.ts`, `test/onboarding-business-profile-validation.test.ts`, `test/twilio-a2p-provision.server.test.ts`, `test/twilio-a2p-status-sync.test.ts`, `test/ui/onboarding-business-identity-website-required.test.tsx`
+- Existing tests: test/a2p-messaging-profile.test.ts; test/fixtures/a2p-profile-provider.ts; test/fixtures/onboarding.ts; test/integration-db/a2p-messaging-profile.test.ts; test/onboarding-business-profile-validation.test.ts; test/twilio-a2p-provision.server.test.ts; test/twilio-a2p-status-sync.test.ts; test/ui/onboarding-business-identity-website-required.test.tsx
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.; Required messaging-profile business inputs are represented and validated. Public-company attributes and contact verification requirements follow the current provider contract; no invented attestations.; Create/reuse the messaging-profile EndUser and assign it to the Trust Product with the Secondary Customer Profile.; Evaluate and submit only after required entities exist. Submission or evaluation errors are visible and block brand registration.; Retry repairs and resubmits an existing incomplete product without duplicate EndUsers, assignments or brands.; Installed SDK transport tests cover preparation order, failures and missing inputs. Real persistence/readiness checks prove that incomplete prerequisites cannot become approval.; Complete private and public business controls pass. Deployed provider verification precedes promotion and issue closure.
+- Tracker: PR #2450 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2145](https://github.com/chester-hill-solutions/callcaster/issues/2145) The regulatory optInType submitted to Twilio is derived by substring-matching free-text prose
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-07
+- Toll-free provisioning uses an explicit exact consent enum; missing or invalid selections stop new registration.
+- Current behavior: PR #2447 merged into dev at f3e62bfc95ab907582d4a691cb81dd42c755e915. Toll-free provisioning uses an explicit exact consent enum; missing or invalid selections stop new registration. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `.agents/skills/local-development/SKILL.md`, `app/lib/messaging-onboarding/business-profile.server.ts`, `app/lib/messaging-onboarding/normalize-sections.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/onboarding-actions.server.ts`, `app/lib/platform-onboarding-handlers.server.ts`, `app/lib/platform-onboarding.server.ts`, `app/lib/toll-free-opt-in.ts`, `app/lib/twilio-toll-free-provision.server.ts`, `app/lib/types.ts`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`, `docs/CHANGELOG.md`, `docs/twilio-toll-free-verification-plan.md`, `test/fixtures/onboarding.ts`, `test/integration-db/toll-free-opt-in.test.ts`, `test/onboarding-business-profile-validation.test.ts`, `test/twilio-toll-free-provision.server.test.ts`, `test/ui/onboarding-business-identity-website-required.test.tsx`
+- Existing tests: test/fixtures/onboarding.ts; test/integration-db/toll-free-opt-in.test.ts; test/onboarding-business-profile-validation.test.ts; test/twilio-toll-free-provision.server.test.ts; test/ui/onboarding-business-identity-website-required.test.tsx
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: Free-text workflow descriptions never determine optInType.; Each supported explicit enum value passes through exactly; invalid explicit values are refused.; Missing selections follow an explicit recorded product policy and cannot silently produce an unsupported consent statement.; Any allowed legacy fallback logs the workspace and reason.; Tests cover negated verbal prose, explicit enum values, invalid values and missing selections.; The provisioning sweep result is recorded; any live registration audit is tracked separately.
+- Tracker: PR #2447 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2429](https://github.com/chester-hill-solutions/callcaster/issues/2429) Rental sweep database tests depend on the real database clock
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
+- Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.
+- Current behavior: PR #2430 merged explicit timestamps for owned rental sweep fixture rows. All 700 local PostgreSQL 17.6 and 700 remote PostgreSQL 18 tests passed without skips. Removing fixture clock control restores the two intended failures; the future-debit control protects the unchanged production cutoff. The separate patched Vite repair is also merged through PR #2428; the earlier pending-PR assessment is obsolete. Candidate/default-branch acceptance remains. Merge: 6b851b300c047352a78b90b3c7a031ae2cc6c181. Recovery/source equivalence and topic cleanup are verified.
+- Resolution: Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.
+- Look in: `test/integration-db/billing-rental-reconciliation.test.ts`
+- Existing tests: test/integration-db/billing-rental-reconciliation.test.ts
+- Missing tests: Deployed release-candidate acceptance through the original criteria; default-branch promotion.
+- Done when: The two actual-sweep cases pass independent of the real database clock, with explicit owned ledger timestamps.; A debit stored after the captured timestamp remains excluded in a real-database control.; A source fault that removes fixture timestamp control restores the executed failures; valid controls still pass.; The full integration suite and final remote Postgres 18 gate pass without skips. Keep local database-version evidence explicit.; Run full ci:local before each push, final specification and structural reviews, applicable exact-head checks and both deployments before merge into dev.; Update the smallest local-development guide with the rule that JavaScript fake timers do not change database defaults. Preserve dev preview, environment and user files.
+- Tracker: Merged source is available on clean dev. Verify candidate acceptance and promote before closure.
+
+### [#2268](https://github.com/chester-hill-solutions/callcaster/issues/2268) Deliver inbound IVR voicemail to the script recipient
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- Voicemail delivery retains the script-selected recipient and first-send payload through retries and receipt recovery.
+- Current behavior: PR #2446 merged into dev at 63c8014263f67d304d806f6833e04bbc48505438. Voicemail delivery retains the script-selected recipient and first-send payload through retries and receipt recovery. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Root cause: No trusted recipient metadata is carried from the selected IVR target into recording delivery.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `.agents/skills/local-development/SKILL.md`, `app/db/schema-inbound-voicemail.ts`, `app/db/schema.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/inbound-call-db.server.ts`, `app/lib/inbound-voicemail-email.server.ts`, `app/lib/voicemail-email-provider.server.ts`, `app/routes/api+/email-vm.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/server/inbound-voicemail-store.server.ts`, `client/migrations/20261006000003_inbound_voicemail_delivery.sql`, `docs/CHANGELOG.md`, `docs/contact-center-platform-plan.md`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `test/email-vm.route.test.ts`, `test/inbound-ivr-block-response.route.test.ts`, `test/integration-db/inbound-voicemail-recipient.test.ts`, `test/tenant-db.test.ts`, `test/voicemail-email-provider.test.ts`
+- Existing tests: test/email-vm.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/integration-db/inbound-voicemail-recipient.test.ts; test/tenant-db.test.ts; test/voicemail-email-provider.test.ts
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.; An IVR target email receives the voicemail even when the number's default address differs.; Legacy number and queue voicemail retain their existing recipient behavior.; Callback requests cannot replace another call's or workspace's bound recipient.; Retry handling does not send a duplicate email or silently fall back to the wrong inbox.; Runtime, public target documentation and tests agree on `voicemail:{email}`.; Real failing-source regressions, valid controls and full local CI pass before publishing. Verify recording delivery on deployed dev before promotion and closure.
+- Tracker: PR #2446 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- Inbound script attachment and attached-script saves share tenant and routing validation; invalid changes retain the last valid configuration.
+- Current behavior: PR #2445 merged into dev at 424f506b1344d007df58d318c11c97a979b1d752. Inbound script attachment and attached-script saves share tenant and routing validation; invalid changes retain the last valid configuration. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Root cause: Inbound activation and attached-script editing have no shared ownership/routing validation boundary.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `.agents/skills/local-development/SKILL.md`, `app/components/campaign/settings/script/CampaignSettings.Script.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.routing.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/components/campaign/settings/script/ScriptValidationDetails.tsx`, `app/lib/call-script-service.ts`, `app/lib/database/campaign.server.ts`, `app/lib/inbound-script-validation.ts`, `app/lib/ivr-no-input.ts`, `app/lib/ivr-script-validation.ts`, `app/lib/openapi-platform-components.ts`, `app/lib/openapi-platform.ts`, `app/lib/parse-utils.server.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/routing-preset-write.server.ts`, `app/lib/schemas/api/platform-workspace-admin.ts`, `app/lib/script-persistence.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/routes/workspaces+/$id/scripts/$scriptId.route.tsx`, `app/server/inbound-script-write.server.ts`, `docs/CHANGELOG.md`, `docs/contact-center-platform-plan.md`, `openapi/public-api.json`, `shared/inbound-routing-presets.ts`, `test/inbound-ivr-block-response.route.test.ts`, `test/inbound-ivr-validation.test.ts`, `test/integration-db/inbound-script-attachment.test.ts`, `test/routing-preset-write.server.test.ts`, `test/script-persistence.server.test.ts`, `test/ui/inbound-script-validation.test.tsx`, `test/ui/script-block-editor-ivr.test.tsx`, `test/ui/script-editor-route.test.tsx`
+- Existing tests: test/inbound-ivr-block-response.route.test.ts; test/inbound-ivr-validation.test.ts; test/integration-db/inbound-script-attachment.test.ts; test/routing-preset-write.server.test.ts; test/script-persistence.server.test.ts; test/ui/inbound-script-validation.test.tsx; test/ui/script-block-editor-ivr.test.tsx; test/ui/script-editor-route.test.tsx
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.; Valid targets and clearing remain usable.; API, editor and target docs agree; real write-boundary regressions and deployed checks pass.; Draft/configuration are preserved and canonical shared validation feedback does not move the page.; Foreign, missing or unsuitable scripts cannot be attached through the platform API, workspace form or automated-menu preset.; Dangling page/block targets, malformed voicemail emails and invalid forward/queue targets are rejected before attachment.; Workspace and campaign saves reject an invalid update to an attached script without replacing its valid version.; Valid scripts and each supported terminal target remain usable; clearing the attachment remains allowed.; API contract, editor errors and target documentation agree. Regression tests reach each real write boundary with valid controls.; Validation preserves the draft and returns usable feedback through the canonical shared components. Error appearance, update and clearing do not move the page layout.; Full local CI passes before publishing. Verify attachment and editing behavior on deployed dev before promotion and closure.
+- Tracker: PR #2445 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2114](https://github.com/chester-hill-solutions/callcaster/issues/2114) Message campaign credit estimates assume one segment per contact while billing charges per segment
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Campaign estimates use rendered recipient SMS segments and MMS rates with dispatch exclusions.
+- Current behavior: PR #2444 merged into dev at ed73bd67dfd85d629fe87a8814b7384f8af7c52a. Campaign estimates use rendered recipient SMS segments and MMS rates with dispatch exclusions. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `app/components/campaign/settings/CampaignCostPanel.tsx`, `app/components/campaign/settings/CampaignLaunch.tsx`, `app/lib/campaign-billing.server.ts`, `app/lib/campaign-message-estimate.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`, `app/lib/message-db.server.ts`, `app/lib/message-templates.ts`, `docs/CHANGELOG.md`, `shared/campaign-billing.ts`, `test/campaign-billing.test.ts`, `test/integration-db/campaign-message-estimate.test.ts`, `test/ui/campaign-cost-panel.test.tsx`, `test/ui/campaign-launch-review.test.tsx`
+- Existing tests: test/campaign-billing.test.ts; test/integration-db/campaign-message-estimate.test.ts; test/ui/campaign-cost-panel.test.tsx; test/ui/campaign-launch-review.test.tsx
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: For a campaign whose template produces 2 segments per message, the estimate equals the ledger debit (kill-check: revert to per-contact and confirm the test goes red).; The panel's `rateDescription` states the assumption it actually makes.; MMS is either estimated or explicitly excluded in the copy.; A `loadCampaignBillingSummary`-level test asserts estimate == debit for a representative campaign.
+- Tracker: PR #2444 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278) Validate literal redirect targets against the route tree
+- Verdict: **Verify and close** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-06
+- Local and quality CI validate literal redirect targets against the actual registered route tree.
+- Current behavior: PR #2443 merged into dev at dcff5ed2e89d768665bb27cb13a63dbec08e8202. Local and quality CI validate literal redirect targets against the actual registered route tree. Source reviews, full local gates, actual database regressions, applicable remote checks and exact-head preview deployments passed. These receipts do not complete remaining deployed acceptance or default-branch promotion.
+- Root cause: The existing guard has no route-tree matching for absolute redirect literals.
+- Resolution: Source fix is merged into dev. Complete the remaining deployed acceptance and release verification stated in the current native issue before default-branch promotion and closure.
+- Look in: `.agents/skills/local-development/SKILL.md`, `.github/workflows/ci.yml`, `docs/CHANGELOG.md`, `docs/local-development.md`, `package.json`, `scripts/check-redirect-targets.mjs`, `scripts/lib/redirect-targets.mjs`, `test/check-redirect-targets.test.ts`
+- Existing tests: test/check-redirect-targets.test.ts
+- Missing tests: Deployed acceptance and release QA remain; current native issue separates those from passing source, local and remote tests.
+- Done when: Literal absolute redirect pathnames match registered routes, including multiline calls.; Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.; Existing violations are corrected or tracked before enabling the gate.; Local and quality CI run the gate; the relative redirect check remains.; Parse literal absolute redirect targets, including multiline calls, in registered route server modules and compare pathnames against the generated route tree.; Handle query strings, hashes, dynamic route segments and the auth wildcard explicitly; document what cannot be checked statically.; Reject a fixture with an absent target and accept fixtures with real static, parameterized and wildcard routes.; Correct or separately track existing violations before enabling the gate. Do not suppress them through an unexplained baseline.; Wire the check into full local CI and the matching quality workflow. Keep the relative-redirect gate intact.
+- Tracker: PR #2443 is merged into dev; native issue remains OPEN/on-dev. Keep provider/candidate verification and release promotion visible; do not repeat completed implementation.
+
+### [#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111) Admin Add User and Add Workspace buttons have no action
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source removal repair is merged into dev. Deployed admin acceptance and default-branch promotion remain.
+- Current behavior: The two inert admin creation controls were removed through [PR #2440](https://github.com/chester-hill-solutions/callcaster/pull/2440), at 2991159ce9c9be62b383327739990972899bd7bc. This follows the native removal option because the creation routes do not exist. Search, Clear Filters, pagination and Sync Twilio remain. Both full local gates, final reviews, all applicable exact-head remote checks, E2E, 700 PostgreSQL18 cases and both actual deployments passed. Recovery/source equivalence and topic/preview cleanup are verified. Original scope and acceptance remain; no live admin geometry or candidate acceptance is claimed.
+- Root cause: Before the repair, the admin panels rendered creation buttons without routes or handlers.
+- Resolution: Verify the original admin acceptance on the release candidate and promote the verified change. Keep the native issue open until then.
+- Look in: `app/routes/admin+/panels/AdminUsersPanel.tsx`, `app/routes/admin+/panels/AdminWorkspacesPanel.tsx`, `test/ui/admin-pagination.test.tsx`
+- Existing tests: test/ui/admin-pagination.test.tsx; test/ui/admin-public-remediation.test.tsx
+- Missing tests: Deployed admin acceptance through the original criteria, release-candidate QA and default-branch promotion.
+- Done when: Each of the two buttons either navigates to a real route or is removed (kill-check: remove the `to` and confirm the test goes red).; A guard test asserts that creation controls in app/routes/admin+/panels/ have a reachable action, or are absent.; If the routes do not exist yet, the button is absent rather than inert.
+- Tracker: Merged on dev; verify the candidate before default-branch promotion and closure.
+
+### [#1989](https://github.com/chester-hill-solutions/callcaster/issues/1989) Dead Twilio recording callbacks on dial/:number and connect-campaign-conference
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-06
+- The manual callback repair and unsupported conference recording removal are merged. Provider/storage acceptance and promotion remain.
+- Current behavior: PR #2439 merged into dev at bc74dd45bf7a5dca637988487aa1901227d75067. Manual Dial keeps record-from-answer and sends completed recording events to the canonical signed /api/recording endpoint. The campaign Conference path removes recording under the permitted removal option. Its ConferenceSid payload cannot be passed to the existing CallSid endpoint. Authentication, ordinary call-status callbacks and conference join settings remain. All 37 focused tests, three isolated faults with controls, both full local gates, both reviews, all applicable remote checks, 700 PostgreSQL 18 tests and both actual deployments passed. Recovery/source equivalence and topic/preview cleanup are verified.
+- Resolution: Verify actual manual-call recording download and persisted audio on the release candidate. Confirm that campaign conferences no longer request unsupported capture. Keep recording policy/lifecycle separate under #1873 and keep this issue open until deployed acceptance and default-branch promotion.
+- Look in: `app/routes/api+/dial/$number.action.server.ts`, `app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.loader.server.ts`, `app/routes/api+/recording.action.server.ts`
+- Existing tests: test/dial-number.route.test.ts; test/connect-campaign-conference.route.test.ts; test/recording.route.test.ts; test/webhook-side-effects.test.ts
+- Missing tests: Actual provider recording download and call audio_url persistence on the release candidate. Passing synthetic boundaries and deployments do not prove provider acceptance.
+- Done when: No dial path records without a persisted callback; Conference recordings persist (or record is removed)
+- Tracker: Wire-or-remove source contract is merged and clean. General conference recording policy remains separate; candidate recording/storage acceptance and promotion remain.
+
+### [#2063](https://github.com/chester-hill-solutions/callcaster/issues/2063) Harden useChatRealtime against a fresh array with unchanged contents
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Candidate refresh acceptance and default-branch promotion remain.
+- Current behavior: PR #2438 merged into dev at 618fd4bc355413b35e3e2b803712f097ba527e2c. The existing deepEqual helper compares merged message values before changing state. Fresh objects with equal payloads retain the current array; real body, status, error, media and nested date changes update it. Existing SID matching, optimistic sends, retained history, order and conversation ownership remain. Both source reviews, full local CI before both pushes, all applicable remote gates, 700 Postgres 18 cases and both deployments passed. Recovery and branch, worktree and preview cleanup are verified.
+- Root cause: The dependency is array identity rather than the conversation identity the effect actually cares about. Nothing in the type system or a guard distinguishes the two.
+- Resolution: Verify unchanged refreshes and real message updates on the release candidate through the original criteria. Keep the native issue open until candidate QA and default-branch promotion.
+- Look in: `app/hooks/realtime/useChatRealtime.ts`, `test/ui/chat-content-identity.test.tsx`, `test/ui/chat-thread-history.test.tsx`, `test/ui/hooks-chats.test.tsx`
+- Existing tests: test/ui/chat-content-identity.test.tsx; test/ui/chat-thread-history.test.tsx; test/ui/hooks-chats.test.tsx
+- Missing tests: Deployed refresh and payload-change acceptance on the release candidate; default-branch promotion.
+- Done when: A contents-equal but freshly built `initial` does not re-seed the thread; The effect converges under StrictMode double-rendering; The live pagination-wipe symptom has its own tracked fix; A changed conversation resets the thread, while loader updates for the same conversation retain valid accumulated history.
+- Tracker: Source correction is merged and clean. Candidate acceptance and promotion remain.
+
+### [#2110](https://github.com/chester-hill-solutions/callcaster/issues/2110) Chat composer segment counter and credit estimate desync from the message text after a failed send
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.
+- Current behavior: The chat composer repair merged into dev in [PR #2437](https://github.com/chester-hill-solutions/callcaster/pull/2437), at `c73ee65fc132b0318cc588f358d4fd2eb59a05e0`. One controlled draft now supplies text and send estimates. Failed sends restore the unchanged draft only for the same composer and recipient. Later typing and intentional clears remain intact. Immediate results and first-send redirects release the pending request; retained older results cannot replay. Accepted sends clear text; refused submissions preserve it.
+- Resolution: Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.
+- Look in: `app/components/sms-ui/ChatInput.tsx`, `app/hooks/chats/useChatsPage.ts`, `app/routes/workspaces+/$id/chats.route.tsx`, `test/ui/chat-composer-recovery.test.tsx`, `test/ui/chat-composer-router-lifecycle.test.tsx`, `test/ui/hooks-chats-optimistic-failure.test.tsx`
+- Existing tests: test/ui/chat-composer-recovery.test.tsx; test/ui/chat-composer-router-lifecycle.test.tsx; test/ui/hooks-chats-optimistic-failure.test.tsx
+- Missing tests: Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance.
+- Done when: After a failed send of a 340-character message, the counter shows the real length, the real segment count and the real credit estimate (kill-check: keep the DOM write and confirm the test goes red).; The restored text is the user's, unchanged, and the cursor is at a sensible position.; A successful send still clears the composer.; The 160-character boundary warning still fires on the restored text.
+- Tracker: Source repair merged into dev; verify candidate acceptance and promote before closure.
+
+### [#2155](https://github.com/chester-hill-solutions/callcaster/issues/2155) Double-clicking Record leaks a microphone stream and corrupts the take
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.
+- Current behavior: The recorder lifetime repair merged into dev in [PR #2436](https://github.com/chester-hill-solutions/callcaster/pull/2436), at `0c7adc518e5036245079782f6080ae712038a8e4`. Record takes synchronous ownership before permission; cancelled and unmounted attempts release late streams. Each take owns its chunks; stale stop/error callbacks and late rejections cannot alter a newer take. Starting controls lock and phase changes are announced. Safe errors use the existing root Toaster.
+- Resolution: Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.
+- Look in: `app/components/file-assets/AudioRecorder.tsx`, `test/ui/audio-recorder.test.tsx`
+- Existing tests: test/ui/audio-recorder.test.tsx
+- Missing tests: Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance.
+- Done when: A double-click on Record starts exactly one recording (kill-check: remove the latch and confirm the test goes red).; Only one `getUserMedia` stream is open at any time, and it is released on stop.; The recorded take contains one recording, not two.; The Record button is disabled while starting.; The phase is announced to assistive technology on start, pause, resume and stop.
+- Tracker: Source repair merged into dev; verify candidate acceptance and promote before closure.
+
+### [#2434](https://github.com/chester-hill-solutions/callcaster/issues/2434) Patch proxy-addr across locked development consumers
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- Source repair merged through PR #2435; release-candidate acceptance and promotion remain.
+- Current behavior: Merged dev source c18f80a983b04fae4c2fa7f7c9a1ebbad9f9506a is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.
+- Resolution: Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-proxy-addr.test.ts`, `docs/CHANGELOG.md`
+- Existing tests: test/runtime-proxy-addr.test.ts
+- Missing tests: Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance.
+- Done when: Every actual Express consumer in independent immutable npm and Bun installs resolves proxy-addr 2.0.8, with valid installed dependency trees.; Finite real package tests reject unrelated IPv4 clients for short mapped/zero-leading IPv6 trust subnets; valid plain IPv4, correctly mapped IPv6, ordinary IPv6 and forwarded-hop controls remain correct.; Exercise both actual Express versions' request IP behavior through their resolved proxy-addr paths. The official old 2.0.7 control must fail at least one rejection case while valid controls pass.; Both dependency locks remain in sync. Fresh audits no longer report this package range; other #1803 families remain open.; Full local CI before each push, exact source specification/structural reviews, applicable remote checks and both deployments pass before merge.; Required candidate acceptance and default-branch promotion remain open until proved. No product exploit claim is required to verify this development package patch.
+- Tracker: Merged on dev; verify candidate acceptance and promote before closure.
+
+### [#2426](https://github.com/chester-hill-solutions/callcaster/issues/2426) Reconciliation cost total adds overlapping provider categories
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Source repair merged through PR #2433; release-candidate acceptance and promotion remain.
+- Current behavior: Merged dev source 6d0bcdaefc10ee8190752f0b8953d2979b01167f is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.
+- Resolution: Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.
+- Look in: `.agents/skills/local-development/SKILL.md`, `app/lib/billing-reconcile-workspace.server.ts`, `app/lib/platform-admin-twilio.server.ts`, `app/lib/twilio-billing-usage.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx`, `docs/CHANGELOG.md`, `shared/billing-reconciliation.ts`, `test/admin-response-projection.test.ts`, `test/admin-workspace-twilio.route.test.ts`, `test/billing-cost-adapters.test.ts`, `test/billing-cost-reconciliation.test.ts`, `test/billing-reconcile-workspace.server.test.ts`, `test/helpers/twilio-usage-page.ts`, `test/integration-db/admin-billing-period.test.ts`, `test/integration-db/billing-message-reconciliation.test.ts`, `test/integration-db/billing-rental-reconciliation.test.ts`, `test/twilio-billing-usage.server.test.ts`, `test/ui/billing-cost-reconciliation.test.tsx`
+- Existing tests: test/admin-response-projection.test.ts; test/admin-workspace-twilio.route.test.ts; test/billing-cost-adapters.test.ts; test/billing-cost-reconciliation.test.ts; test/billing-reconcile-workspace.server.test.ts; test/helpers/twilio-usage-page.ts; test/integration-db/admin-billing-period.test.ts; test/integration-db/billing-message-reconciliation.test.ts; test/integration-db/billing-rental-reconciliation.test.ts; test/twilio-billing-usage.server.test.ts; test/ui/billing-cost-reconciliation.test.tsx
+- Missing tests: Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance.
+- Done when: With a valid provider total of 4.20 USD for the requested period, overlapping rental aggregate and subtype rows still produce 4.20 USD. The rental subset alone is insufficient to prove a full-account total and must remain unknown.; A provider total record cannot be ignored in favor of overlapping categories.; Valid zero totals remain zero; missing, malformed or unsupported coverage remains explicit.; An isolated source fault that restores the overlapping sum makes the regression test fail while valid controls pass.; The admin display and structured alert details retain the correct period and cost state; credit mutations and material-variance thresholds do not change.; Full local CI before each push, specification/structural review, applicable exact-head remote checks and candidate acceptance pass before closure.
+- Tracker: Merged on dev; verify candidate acceptance and promote before closure.
+
+### [#2431](https://github.com/chester-hill-solutions/callcaster/issues/2431) Use patched Vitest 4 for all installed test consumers
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- Source repair merged through PR #2432; release-candidate acceptance and promotion remain.
+- Current behavior: Merged dev source 263a549e8431b14bc13e892b21f87a729a148c46 is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.
+- Resolution: Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.
+- Look in: `.agents/skills/local-development/SKILL.md`, `bun.lock`, `docs/CHANGELOG.md`, `package-lock.json`, `package.json`, `test/runtime-postcss.test.ts`, `test/runtime-vite.test.ts`, `test/runtime-vitest.test.ts`, `vendor/scriptkit/scriptkit-call-script-react/package.json`
+- Existing tests: test/runtime-postcss.test.ts; test/runtime-vite.test.ts; test/runtime-vitest.test.ts
+- Missing tests: Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance.
+- Done when: No installed npm or Bun Vitest/mocker copy remains in either cited affected range, including nested local-package copies.; An actual installed standalone interceptor fixture retains valid mocks and excludes owned outside and denied in-root marker files. Show the old installed failure with the same valid controls. Record Windows-specific cases as unexecuted unless tested on Windows.; Check API defaults and authenticated browser registration according to the installed tool contract. Keep proof separate from claims about product runtime reachability.; Both coverage providers resolve compatible versions and produce real coverage output. ScriptKit editor tests still execute through the app UI gate.; Generate both lockfiles with their installers. Finish with npm ci before Node gates. Run full npm run ci:local before each push.; Review one atomic diff; pass exact-head remote checks, all real database cases, and both deployment checks before merge. Continue from clean dev after #2428 lands.; Keep #1803 open for remaining families, deployed acceptance, promotion, and default-branch alert verification.
+- Tracker: Merged on dev; verify candidate acceptance and promote before closure.
+
+### [#2427](https://github.com/chester-hill-solutions/callcaster/issues/2427) Use patched Vite 7 in the Bun install path
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- Source repair merged through PR #2428; release-candidate acceptance and promotion remain.
+- Current behavior: Merged dev source e25bc8b08c20617697ca090bcd0897274c412652 is equivalent to the tested topic head. The native issue records completed source, CI, real database and deployment evidence. It remains open pending candidate acceptance and default-branch promotion.
+- Resolution: Verify the deployed candidate through the original acceptance criteria and promote the verified source in the release PR. Keep the issue open until the required verification and promotion complete.
+- Look in: `.agents/skills/local-development/SKILL.md`, `bun.lock`, `docs/CHANGELOG.md`, `package-lock.json`, `package.json`, `test/runtime-vite.test.ts`
+- Existing tests: test/runtime-vite.test.ts
+- Missing tests: Release-candidate acceptance through the original criteria and default-branch promotion remain. Source and successful deployments alone do not establish live acceptance.
+- Done when: Both npm and Bun resolve the affected Vite copies outside all current applicable advisory ranges. Keep the supported Vite 7 line; do not apply a major-version audit fix.; The actual installed Vite rejects the outside marker over HTTP and WebSocket, including `file:` raw-module access. A valid in-root module and HMR transport remain usable. The old 7.3.1 fixture must fail the denial assertion so the test cannot pass on mocks or a disconnected socket.; Add valid and denied query/source-map controls for the repaired file boundary. Keep platform-specific limitations explicit. Do not replace full dependency evidence with one fixture.; Check independently installed npm and frozen Bun paths, their resolved versions and fresh audits. Run both `npm install` and `bun install` if dependencies change, then `npm ci` for the Node gates. Review lock diffs for unrelated updates.; Full `npm run ci:local` passes before every push. Final specification and structural reviews, applicable remote checks and both deployments pass before merge into dev.; Preserve the signed-in preview, user files and environment. Candidate build/development acceptance and default-branch alert verification remain separate from dev-source proof.
+- Tracker: Merged on dev; verify candidate acceptance and promote before closure.
+
+### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.
+- Current behavior: The rental reconciliation repair is merged through [PR #2425](https://github.com/chester-hill-solutions/callcaster/pull/2425) at dev commit `4f00975aaf61ef60295ed699bd7deff866737a0b`. It compares the previous complete UTC month with non-overlapping rental subtypes in verified provider units. Initial purchases remain separate. Catch-up debits use their recorded billing cycle. Known rollout exemptions and released-number history are included. Missing or conflicting coverage remains explicit.
+- Resolution: Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.
+- Look in: `shared/billing-reconciliation.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/number-rental-reconciliation.server.ts`, `test/integration-db/billing-rental-reconciliation.test.ts`, `test/billing-reconciliation.test.ts`, `test/billing-reconciliation-alert.test.ts`
+- Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
+- Missing tests: Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance.
+- Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
+- Tracker: Source repair merged into dev; verify candidate acceptance and promote before closure.
+
+### [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396) Make predictive machine playback and continuation retry-safe
+- Verdict: **Verify and close** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.
+- Current behavior: The predictive machine operation repair is merged through [PR #2424](https://github.com/chester-hill-solutions/callcaster/pull/2424) at dev commit `db0e1686c72e65c8c8c5540f3ce4861954117289`. A durable operation binds playback, disposition and continuation to the workspace, call, outreach attempt, campaign, actor and conference. Signed replay cannot issue playback twice, and continuation waits for the playback acknowledgement. Issued or uncertain outcomes retain a recorded recovery policy.
+- Root cause: Before the repair, a terminal outcome claim was used as operation completion. Playback was outside its winning branch and continuation ran before provider acknowledgement.
+- Resolution: Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.
+- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/outreach-disposition.ts`, `app/lib/twilio-twiml.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/enqueue-job.server.ts`, `app/lib/worker/poll-jobs.server.ts`
+- Existing tests: test/auto-dial-room.route.test.ts
+- Missing tests: Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance.
+- Done when: Enabled-drop concurrent and sequential replays cannot request playback twice or start a second next turn.; Continuation does not run while playback acknowledgement is pending.; Rejected or uncertain provider acknowledgement has recorded, tested recovery and cannot appear as successful playback or lose continuation.; Drop-off/no-audio advances once; human/device flows, tenant isolation, signatures and billing ownership remain correct.; Real route/TwiML and durable claim tests, full local CI, exact-head remote checks and deployed acceptance are required.
+- Tracker: Source repair merged into dev; verify candidate acceptance and promote before closure.
+
+### [#2119](https://github.com/chester-hill-solutions/callcaster/issues/2119) runCampaignScheduleSync skips every voice campaign that lacks a start_date/end_date pair, so such a campaign never reports waiting
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged into dev. Deployed acceptance, release-candidate QA and default-branch promotion remain.
+- Current behavior: The optional-date schedule repair is merged through [PR #2423](https://github.com/chester-hill-solutions/callcaster/pull/2423) at dev commit `059cc376d11e564e6db72ca2efa027bedb9a2a4e`. Machine-voice campaigns with absent or one-sided date bounds now use the canonical dispatch policy to report waiting outside calling hours and running when permitted. Future starts do not dial early. Invalid supplied bounds retain their skip, and expired active campaigns remain the dispatch worker's completion responsibility. The tenant-scoped conditional writer preserves concurrent pause or completion.
+- Resolution: Verify the merged behavior on the release candidate through the original acceptance criteria. Promote the verified repair through the release PR; keep the native issue open until then.
+- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/worker/handlers/cron.server.ts`, `test/campaign-schedule-sync.server.test.ts`, `test/integration-db/campaign-schedule-sync-status-race.test.ts`
+- Existing tests: test/campaign-schedule-sync.server.test.ts; test/integration-db/campaign-schedule-sync-status-race.test.ts
+- Missing tests: Deployed acceptance through the original criteria, release-candidate QA and default-branch promotion remain. Passing merge gates do not establish provider or user acceptance.
+- Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
+- Tracker: Source repair merged into dev; verify candidate acceptance and promote before closure.
+
+### [#2142](https://github.com/chester-hill-solutions/callcaster/issues/2142) rental_warned_cycle is never cleared, so a second non-payment episode gets no warning and the ladder suspends a customer who was never warned
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Fully paid rentals can warn again after a later lapse; the repair is merged into dev.
+- Current behavior: PR #2421 merged as 4b0322c490ba0c3da676ca5a2051a52b71f34ccb after both full local CI gates, clear final reviews, all applicable exact-head remote checks, all567 Postgres18 cases without skips and both deployments. The warning marker resets only at zero unpaid cycles; partial payment and technical failures retain it. Candidate QA remains pending.
+- Resolution: Run required release-candidate acceptance and promote through the release PR. Keep the issue OPEN until required QA and default-branch promotion.
+- Look in: `app/lib/number-rental-billing.server.ts`, `app/lib/number-rental-lifecycle.ts`
+- Existing tests: test/integration-db/number-rental-warning-reset.test.ts; test/number-rental-billing.server.test.ts; test/number-rental-lifecycle.test.ts; test/jobs-number-rental-billing.route.test.ts
+- Missing tests: Release-candidate QA for later-lapse warnings, partial payment, retained-marker recovery and safe retry.
+- Done when: The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).; Warn → pay without suspension → lapse also produces a second warning.; The first lapse still warns exactly once.; A workspace that never lapses is never warned.; The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour.
+- Tracker: Source fixed on dev; verify candidate acceptance before default-branch closure.
+
+### [#2418](https://github.com/chester-hill-solutions/callcaster/issues/2418) Allow blank optional-only public surveys to complete
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Blank optional public surveys can complete; the repair is merged into dev.
+- Current behavior: PR #2420 merged as bc8c10bbe00f6c5fff5c4068b11ca200840f979f after full local CI before both pushes, clear final reviews, all applicable exact-head remote checks, all555 Postgres18 cases without skips and both deployments. Actual browser and HTTP retries passed. Candidate QA remains pending.
+- Root cause: The signed public loader created an identity but no response row; blank optional forms sent completion without first saving an answer. The repair creates or resolves the response through the canonical signed completion path.
+- Resolution: Run required release-candidate acceptance and promote through the release PR. Keep the issue open until required QA and default-branch promotion.
+- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/lib/survey-db.server.ts`, `app/routes/api+/survey-complete.action.server.ts`
+- Existing tests: test/integration-db/survey-optional-completion.test.ts; test/integration-db/survey-respondent-identity.test.ts; test/survey-complete.route.test.ts; test/ui/survey-save-order.test.tsx
+- Missing tests: Release-candidate QA for anonymous/contact-specific blank optional completion, retries, rejected identities and feedback layout.
+- Done when: An anonymous valid optional-only blank response completes through the actual browser and HTTP action; exactly one response row exists with a completion time and zero answers.; Repeating completion preserves the same row and original completion time.; A contact-specific valid response retains the correct scoped contact identity.; Missing, invalid, expired, or foreign tokens cannot create or complete a response; inactive surveys remain rejected.; A required survey with no answers remains incomplete.; Optional questions beside valid required answers remain skippable.; Rejection and retry use the shared feedback surfaces without page layout or scroll movement.; Verify real persisted rows, full local CI, exact-head remote checks, both deployments and release QA before default-branch closure.
+- Tracker: Source fixed on dev; verify candidate acceptance before default-branch closure.
+
+### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2419 merged into dev as a691d7a7910153f4529902ebfb7e04e5159cbd81. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/components/ui/form-field.tsx`, `app/hooks/surveys/useSurveySubmission.ts`, `app/lib/survey-answer-state.ts`, `app/lib/survey-db.server.ts`, `app/lib/survey-required-answer.ts`, `app/routes/survey+/$surveyId.tsx`, `app/server/survey-completion.ts`, `app/routes/api+/survey-complete.action.server.ts`
+- Existing tests: test/integration-db/survey-required-answers.test.ts; test/ui/form-field.test.tsx; test/ui/survey-required-answers.test.tsx; test/ui/survey-save-order.test.tsx
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
+- Tracker: Verify and close after required acceptance and promotion. PR #2419 is merged to dev; deployment success alone is not product QA.
+
+### [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211) Run the independent real-Postgres CI tier for application changes covered by its tests
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2417 merged into dev as c194cdb5767b8a5c050035130c1ebdd84e88cab0. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Root cause: The independent workflow runs the full integration-db tier, but its path filters omit application modules and most integration test files; ci:local also omits the tier.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `.github/workflows/schema-default-drift.yml`, `scripts/e2e/run-compose-e2e.mjs`, `docs/schema-default-drift.md`, `package.json`, `vitest.integration-db.config.ts`
+- Existing tests: test/integration-db-workflow.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: An application-only change covered by integration-db starts the independent Postgres job, and an integration assertion failure makes that job fail. Keep the existing E2E invocation explicitly documented.; The tier is runnable locally by a documented command, matching what CI runs.; The e2e log names the tier it is running before any test output.; The measured e2e failure rate is recorded somewhere durable.
+- Tracker: Verify and close after required acceptance and promotion. PR #2417 is merged to dev; deployment success alone is not product QA.
+
+### [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085) Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2416 merged into dev as 860372a7faff9af67fdd6b3bbbf7c01033cb6e2b. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/db/schema-number-release.ts`, `app/db/schema.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/database/workspace.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/number-release-recovery.server.ts`, `app/lib/number-release.server.ts`, `app/lib/number-rental-billing.server.ts`, `app/lib/openapi-platform.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/worker/handlers.server.ts`, `app/lib/worker/job-params.server.ts`, `app/routes/workspaces+/$id/phone-numbers.action.server.ts`, `app/server/number-release-intent.server.ts`, `client/migrations/20261006000001_number_release_recovery.sql`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/twilio-sender-pool.server.ts`, `app/lib/twilio-readiness.server.ts`
+- Existing tests: test/db-workspace.server.test.ts; test/helpers/number-release-final-write.ts; test/integration-db/number-release-recovery.test.ts; test/job-registry.test.ts; test/messaging-sender-pool-readiness.test.ts; test/number-release-worker.test.ts; test/number-rental-billing.server.test.ts; test/tenant-db.test.ts; test/twilio-sender-pool.server.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
+- Tracker: Verify and close after required acceptance and promotion. PR #2416 is merged to dev; deployment success alone is not product QA.
+
+### [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084) Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2415 merged into dev as 4c5220df788701ef51bd6b6024d3e4a1a1e6416f. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/db/schema.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/merge-workspace-twilio-data.server.ts`, `app/lib/messaging-onboarding/persistence.server.ts`, `app/lib/number-purchase-recovery.server.ts`, `app/lib/number-purchase.server.ts`, `app/lib/openapi-platform.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/transaction-history.server.ts`, `app/lib/worker/handlers.server.ts`, `app/lib/worker/job-params.server.ts`, `app/routes/api+/numbers.action.server.ts`, `app/server/number-purchase-reservation.server.ts`, `app/server/tenant-db.ts`, `client/migrations/20261006000000_number_purchase_recovery.sql`, `scripts/baselines/unscoped-db-imports.txt`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/number-rental-billing.server.ts`, `client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql`, `app/lib/workspace-credits.server.ts`, `scripts/check-credit-write-paths.mjs`
+- Existing tests: test/integration-db/number-purchase-credits.test.ts; test/job-registry.test.ts; test/number-purchase-worker.test.ts; test/tenant-db.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.; A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.; Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.; The balance can never go negative through this path (an assertion or check, not a comment).; `check:credit-writes` stays green.
+- Tracker: Verify and close after required acceptance and promotion. PR #2415 is merged to dev; deployment success alone is not product QA.
+
+### [#2153](https://github.com/chester-hill-solutions/callcaster/issues/2153) DELETE /api/queues reset wipes dequeued_at and dequeued_reason for every row, destroying the dequeue audit trail
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2414 merged into dev as 7defe663d6d3847500ad74070e72758f92ad7301. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/lib/campaign-queue-updates.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/lib/queue-status.ts`, `app/lib/campaign-queue-db.server.ts`, `app/components/call/CallScreen.Layout.tsx`, `scripts/check-queue-rpc-contract.mjs`
+- Existing tests: test/integration-db/campaign-queue-reset.test.ts; test/queues.route.test.ts; test/queue-status.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: A reset does not clear `dequeued_at` or `dequeued_reason` on a row that was already dequeued (kill-check: clear all rows and confirm the test goes red).; Un-attempted rows return to `queued` (positive control).; An opted-out contact is never re-armed by a reset.; If deliberate full requeue is retained or added, it is a separate explicit operation with audit history. Ordinary reset does not require a new full-requeue feature.
+- Tracker: Verify and close after required acceptance and promotion. PR #2414 is merged to dev; deployment success alone is not product QA.
+
+### [#2412](https://github.com/chester-hill-solutions/callcaster/issues/2412) Use the same billing period in admin reconciliation
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-06
+- Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.
+- Current behavior: PR #2413 merged one captured reference date and bounded provider/ledger period into the admin loader and both manual actions. Tests reach the actual admin boundaries, real scoped ledger report and stored snapshot with synthetic provider responses. Tenant, auth, error and existing notification behavior remain. Candidate provider/admin acceptance remains. Merge: 5cf7db6256cd585cfe28f4451418b89f814042e4. Recovery/source equivalence and topic cleanup are verified.
+- Resolution: Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.
+- Look in: `app/lib/platform-admin-twilio.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts`, `test/admin-workspace-twilio.route.test.ts`, `test/integration-db/admin-billing-period.test.ts`
+- Existing tests: test/admin-workspace-twilio.route.test.ts; test/integration-db/admin-billing-period.test.ts
+- Missing tests: Deployed release-candidate acceptance through the original criteria; default-branch promotion.
+- Done when: The admin loader and both manual actions request bounded provider dates.; Each provider request and ledger report use the same captured reference date, including a midnight-boundary case.; Old provider activity outside the ledger period cannot create admin drift.; Both manual actions persist the correct admin snapshot. The loader retains its existing read behavior.; Existing auth, tenant scope, failures and notification behavior stay correct.; Tests execute the actual admin boundaries with synthetic provider responses and the real report/persistence path where practical. State the evidence limits.; Full local CI, applicable exact-head remote checks and both deployments pass before merge. Keep the issue open for release acceptance and default-branch promotion.
+- Tracker: Merged source is available on clean dev. Verify candidate acceptance and promote before closure.
+
+### [#2112](https://github.com/chester-hill-solutions/callcaster/issues/2112) The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source repair is merged to dev; release-candidate acceptance remains.
+- Current behavior: PR #2411 merged into dev as f811e7dd6f6671db7e4997d7b639551971e09184. Native issue evidence records the scoped source repair and completed local/remote gates. Current dev contains the merge. Candidate QA remains pending; preserve the original criteria.
+- Root cause: The ledger loader has no message-kind fact, all SMS-key credits are divided by the SMS rate, and the provider matcher sums an outbound aggregate with its included subtypes.
+- Resolution: Run the required release-candidate acceptance, then promote through the release PR. Keep the issue OPEN until required acceptance and default-branch promotion. Do not implement the landed source repair again.
+- Look in: `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/billing-reconciliation-snapshot.server.ts`, `app/lib/billing-reconciliation.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx`, `shared/billing-reconciliation-alert.ts`, `shared/billing-reconciliation.ts`, `app/lib/billing-reconcile-workspace.server.ts`, `shared/pricing.ts`
+- Existing tests: test/billing-message-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts; test/billing-reconciliation.test.ts; test/integration-db/billing-message-reconciliation.test.ts; test/ui/billing-message-reconciliation.test.tsx; test/billing-reconcile-workspace.server.test.ts
+- Missing tests: Required candidate acceptance from the current native issue; do not treat merged source or deployment success as release QA.
+- Done when: A pure SMS case reconciles with zero variance; disabling SMS matching makes this test fail.; A workspace that sent only MMS reconciles with zero variance.; A workspace that sent a mix of SMS and MMS reconciles with zero variance.; Explicitly map the provider SMS/MMS usage categories that correspond to supported billed message kinds and test that mapping.
+- Tracker: Verify and close after required acceptance and promotion. PR #2411 is merged to dev; deployment success alone is not product QA.
+
+### [#2152](https://github.com/chester-hill-solutions/callcaster/issues/2152) POST /api/campaign_queue honours a client-supplied startOrder, skipping the atomic reservation
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Public queue appends now always use server-reserved ranges; the fix is merged to dev. Release-candidate ordering acceptance and promotion remain.
+- Current behavior: PR #2410 merged at dev@34fac6502fbc8dfee40cc127b837a511d1d2636c. Ten actual API/PostgreSQL cases pass; both independent faults fail six cases with four controls, and all three URL modes pass. Both reviews, 127 focused tests, nine actual CLI rejection cases, initial/final full local CI, applicable exact-head remote checks, E2E, bundle checks and both deployments passed. Clean topic refs/worktree were removed after source-equivalence and recovery-bundle verification.
+- Root cause: A client-controlled/default ordering option bypasses atomic order allocation. It does not itself remove the unique campaign/contact constraint or normalized-number dispatch dedupe.
+- Resolution: Verify ordering on the release candidate against the original criteria, then promote. Do not implement the landed repair again. Existing uniqueness is independent; #2153 queue-reset history remains a separate concern.
+- Look in: `app/routes/api+/campaign_queue.action.server.ts:40`, `app/routes/api+/campaign_queue.action.server.ts:69`, `app/lib/queue.server.ts:51`, `drizzle/0006_app_schema_tail.sql:95`, `client/migrations/20260716120000_fix_handle_campaign_queue_entry_queue_state.sql:49`, `app/routes/api+/campaign_queue.action.server.ts`, `app/lib/campaign-queue-db.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts:156-161`, `scripts/check-queue-rpc-contract.mjs`, `client/migrations/ (the reservation RPC)`
+- Existing tests: test/campaign-queue.route.test.ts; test/queue.server.test.ts; test/queue-rpc-contract.test.ts
+- Missing tests: Live release-candidate ordering and default-branch promotion remain. Historical order/counter data has not been audited or repaired by this change.
+- Done when: Omitted and supplied startOrder both use server-reserved order ranges; client ordering is rejected or ignored.; Two concurrent public enqueues reserve disjoint order ranges.; The existing UNIQUE(campaign_id,contact_id) invariant remains effective; do not attribute it to order reservation.; check-queue-rpc-contract rejects public route bypass of server order allocation, including forwarded startOrder options, with a failing fixture.; Record the API sweep for other client-writable queue lifecycle fields.
+- Tracker: Verify and close. PR #2410 is merged to dev. Keep the issue OPEN until required acceptance and promotion; source/deployment proof does not establish live or historical data acceptance.
+
+### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2409 at dev@ee28af666b6b0fd30f3c8bca0aa55ec996c8a429. Preparation commits the pending outreach link before provider invocation, leaves acceptance unresolved and queues recovered terminal side effects before settling local state. Thirteen real database cases and 153 caller cases passed. Full local CI, final-head remote checks and both deployments passed.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/lib/campaign-sms-send.server.ts`, `app/lib/sms-send.server.ts`, `app/lib/twilio-open-sync.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-queue-search.server.ts`
+- Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
+- Missing tests: Live provider/browser acceptance against the release candidate and default-branch promotion remain. Historical-row repair must be separately verified before claiming it is complete.
+- Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
+- Tracker: Verify and close. PR #2409 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
+
+### [#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049) Verify provider send-time capture and bounded backfill on the review environment
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Preserve provider send time across Date encoding and null updates**
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2406 at dev@d805e71fd9307f9e313e298cbe205575114ff808. Provider Date and null preservation passed five real database cases and fault controls. Full local CI, final-head remote checks and both deployments passed.
+- Root cause: The timestamp column encoder was not used for Date values in the coalesce expression; an explicit null used the normal update and could erase the saved date.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/lib/message-db.server.ts`, `app/lib/twilio-open-sync.server.ts`, `test/message-db.server.test.ts`, `test/twilio-open-sync.server.test.ts`
+- Existing tests: test/twilio-open-sync.server.test.ts; test/message-db.server.test.ts; test/sms-status-webhook.test.ts
+- Missing tests: Live release-candidate acceptance and default-branch promotion remain.
+- Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752.
+- Tracker: Verify and close. PR #2406 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
+
+### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The source fix is merged to dev; release acceptance and promotion remain.
+- Current behavior: Merged in PR #2407 at dev@b2831f728f273dddb269277ca6034af02a14413b. Signed callback and provider recovery paths persist provider quantity before billing. Eighteen real database cases passed with independent fault checks and all three database URL modes. Full local CI, final-head remote checks and both deployments passed.
+- Resolution: Verify the release candidate against the original criteria and promote only after required acceptance. Do not implement the landed repair again.
+- Look in: `app/routes/api+/sms/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/twilio-open-sync.server.ts`
+- Existing tests: test/sms-status-webhook.test.ts; test/webhook-side-effects.test.ts
+- Missing tests: Live release-candidate acceptance and default-branch promotion remain.
+- Done when: A recovered three-segment intent is charged for three segments using validated provider metadata. The test fails if segment persistence/provider fallback is removed.; A send-time-resolved intent is unaffected (positive control).; A row reaching a terminal status with `num_segments IS NULL` and a non-empty body is logged and surfaced in the reconciliation.; The reconciliation variance for a multi-segment blast is zero.
+- Tracker: Verify and close. PR #2407 is merged to dev. Keep the native issue OPEN for promotion and required acceptance; deployment success alone is not live provider proof.
+
+### [#2402](https://github.com/chester-hill-solutions/callcaster/issues/2402) Scope campaign queue disposition filters to the selected campaign
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Scope campaign queue disposition filters to the selected campaign and workspace**
+- Named and unknown disposition predicates now match the queue row campaign and workspace; PR #2405 is merged on dev.
+- Current behavior: Verified dev@c704cdf9 / PR #2405: all 14 real Postgres query cases passed. Four separate predicate-removal controls failed with passing cases. Final full local CI, exact-head remote checks and both deployments passed.
+- Root cause: Disposition EXISTS subqueries previously matched only contact_id, allowing results from another campaign or workspace.
+- Resolution: Verify both disposition branches on the release candidate, then retain OPEN until default promotion and deployed acceptance.
+- Look in: `app/lib/campaign-queue-search.server.ts`, `test/integration-db/campaign-queue-disposition.test.ts`
+- Existing tests: test/integration-db/campaign-queue-disposition.test.ts
+- Missing tests: Deployed release filter acceptance with one contact in multiple campaigns and isolated workspace data.
+- Done when: A named disposition from another campaign cannot match a queue row in the selected campaign.; A null disposition from another campaign cannot satisfy the selected campaign unknown filter.; An attempt from another workspace cannot satisfy either disposition branch.; Same-campaign, same-workspace named and unknown results remain visible; unfiltered results and other filters keep their behavior.; Actual Postgres cases pass and fail when each scope predicate is removed. Full local CI, exact-head remote checks and both deployments pass before merge.; Keep this issue open for default promotion and deployed filter acceptance.
+- Tracker: OPEN Verify and close. Source scope is fixed; delivery state ownership remains separate in #2149.
+
+### [#2122](https://github.com/chester-hill-solutions/callcaster/issues/2122) DateTimePicker's displayed month is initialised from value and never re-synced, so the grid can show a stale month
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- External date, cleared value and AM/PM mirrors are fixed on dev in PR #2404; release browser acceptance remains.
+- Current behavior: PR #2404 merged at 4e132d1ca1530026a3bcc0850a34815e475204f3. Twelve real UI cases, three independent fault controls and 32 caller cases passed. Final full local and exact-head remote checks and deployments passed.
+- Resolution: Verify saved-value changes, clearing and retained calendar navigation on the release candidate; keep OPEN through default promotion and acceptance.
+- Look in: `app/components/ui/datetime.tsx`, `test/ui/datetime-external-value.test.tsx`
+- Existing tests: test/ui/datetime-external-value.test.tsx; test/ui/components-ui-primitives.test.tsx
+- Missing tests: Release-candidate browser acceptance for external values, clearing, period display and intentional navigation.
+- Done when: A `value` change from April to May updates the displayed month (kill-check: remove the re-sync and confirm the test goes red).; Clearing `value` resets the month to the current month.; After an external value change, the displayed month follows that value; intentional calendar navigation remains possible.; `TimePicker`'s AM/PM re-syncs from `date` on the same kinds of change.; The rendered AM/PM Select follows external date changes and clearing; updating period state alone is insufficient while the Select uses defaultValue.
+- Tracker: OPEN Verify and close. Source is merged and tested; default promotion and live browser acceptance remain.
+
+### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Environment-specific ledger checkout and contract protection merged into dev in PR #2401. Default-branch promotion and deployed scheduled runs remain to verify.
+- Current behavior: Verified dev merge bf689a853aa1e99f80c198394e6f04cd87b036c0 includes PR #2401. All environment refs, independent missing/wrong-ref controls and real migration inventory controls passed; final full local and exact-head applicable remote gates passed.
+- Root cause: Scheduled runs use the default branch when checkout has no ref; the dev environment job therefore compares that branch's migration/schema files with the dev database. This workflow checks each environment against its matching code, not dev against master.
+- Resolution: Promote the corrected workflow to the default branch, then verify scheduled environment jobs against their matching deployed databases.
+- Look in: `.github/workflows/ledger-drift-check.yml`, `scripts/db/check-migration-ledger.mjs`, `scripts/db/check-schema-drift.mjs`, `test/ledger-drift-workflow.test.ts`
+- Existing tests: test/ledger-drift-workflow.test.ts
+- Missing tests: Default-branch workflow promotion and actual scheduled deployment/database checks.
+- Done when: Every job in the workflow checks out an explicit ref; The nightly dev job passes on a correct database that is ahead of master; The job name states which comparison it makes; A refless job fails the check
+- Tracker: OPEN for release verification. Do not repeat the merged workflow fix. All original acceptance criteria remain required.
+
+### [#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140) Settings member projection drops names from the manage-sheet heading
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2399 merged target member names and username fallback in workspace settings. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@f8f40ffc, 2026-10-05. The settings projection retains both names. The actual member sheet shows available target names with existing capitalization and falls back to the target username when both are absent. The shared display contract requires nullable names. Invitations provide null fields; the admin producer and its fallback rows already preserve the same fields. Sheet structure, roles and form identities retain their existing behavior; no actor-name defect was established.
+- Root cause: The settings projection discarded name fields while a partial consumer type hid the omission.
+- Resolution: Promote PR #2399 to the default branch and verify named and unnamed target members in workspace settings. Confirm the selected target and mutation form IDs on the deployed product. Keep OPEN for release acceptance.
+- Look in: `app/lib/workspace-members.ts`, `app/lib/workspace-settings-db.server.ts`, `app/components/workspace/TeamMember.tsx`, `app/routes/workspaces+/$id/settings.route.tsx`, `app/lib/platform-admin.server.ts`, `app/routes/admin+/workspaces/$workspaceId/invite.route.tsx`
+- Existing tests: test/workspace-settings-db.server.test.ts; test/ui/team-member-a11y.test.tsx; Three service cases and seven actual shared-sheet UI cases passed. Each projected-name deletion failed one executed case; removing the username fallback failed two executed cases. The compiler rejected the missing required first_name projection. Sources were restored. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product.
+- Done when: Member sheet heading shows target first/last name.; When both names are absent, heading falls back to username.; Producer/consumer types require the name fields, even when null.; Other member list producers are reviewed; admin invite projection already includes names.
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2399. Preserve original criteria and separate source proof from release acceptance.
+
+### [#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121) Dismissing a query-param banner pushes a history entry, so Back resurrects it
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2398 merged query-notice dismissal with history replacement. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@efb3bb54, 2026-10-05. QueryParamBanner dismissal replaces the history entry and preserves unrelated repeated parameters. Active URL-flash cleanup already replaces history. QueryParamBanner has no current product-route consumer; this fix preserves its rendering and does not adopt a new banner. Genuine filter and pagination navigation retain their existing history behavior.
+- Root cause: QueryParamBanner cleared its URL parameter with a push instead of a replacement.
+- Resolution: Promote PR #2398 to the default branch, then verify that an active flash does not replay after Back/Forward and that filter navigation retains its own entry. Keep OPEN for release acceptance.
+- Look in: `app/components/shared/QueryParamBanner.tsx`, `app/hooks/utils/useSearchParamFlash.ts`
+- Existing tests: test/ui/notice-query-history.test.tsx; test/ui/components-shared-smoke.test.tsx; Thirty focused UI cases passed, including six new actual shared-banner/flash-hook cases with a real memory router. Two independent replacement faults each failed one executed case. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product. No current product-route banner adoption is claimed.
+- Done when: Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).; Dismissing still clears the parameter from the URL.; Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue).
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2398. Preserve original criteria and separate source proof from release acceptance.
+
+### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2395 merged one persistent startup Alert in stable reserved space. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@e011e04b, 2026-10-05. Loading and failure startup views share one fixed-height region and Back to workspace action. A startup error appears once through the real shared Alert. Long messages scroll inside a keyboard-focusable region without moving page landmarks or page scroll. Connected status-error handling, device checks, pending guards and session ownership retain their existing behavior.
+- Root cause: Startup failure was passed to StatusBar and rendered again in an outer Alert.
+- Resolution: Promote PR #2395 to the default branch, then verify one token/runtime startup message, recovery navigation, pending controls and stable page geometry in the deployed product. Separate connected-status placement and runtime retry concerns are not resolved by this atomic startup presentation fix.
+- Look in: `app/components/agent/AgentDesktop.tsx`, `app/components/calls/SoftphonePanel.tsx`, `docs/design-system.md`
+- Existing tests: test/ui/agent-startup-feedback.test.tsx; test/ui/agent-desktop.test.tsx; Ten focused component cases passed. Four independent source faults each failed one executed case; removing the region height failed real-browser geometry. Desktop/narrow and light/dark cases each kept six transitions stable, including keyboard scrolling of long messages. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product. Browser tests used isolated router/device boundaries and did not send provider calls.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2395; preserve original criteria and separate release acceptance from source proof.
+
+### [#2131](https://github.com/chester-hill-solutions/callcaster/issues/2131) Predictive "Start Dialing" is a silent no-op when the campaign has no caller ID, and the error is discarded
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- PR #2394 merged predictive start prerequisites, pending protection and safe once-only root feedback into dev. Default promotion and deployed acceptance remain.
+- Current behavior: Source verified at dev@9f33f3e7, 2026-10-05. Missing caller ID/device disables the existing shared predictive start control with a reason. A synchronous pending lock prevents repeated requests before acknowledgement. Known route failures use safe recovery text; unknown/malformed/server replies use a stable retry message. Credit recovery is role-appropriate and adds no inline banner.
+- Root cause: The call-screen contract discarded start error/loading state, and the client adapter exposed raw response text.
+- Resolution: Promote PR #2394 to the default branch and verify missing prerequisites, server and credit failures, pending/double-click protection, retry and manual/connected controls on the deployed product. Keep OPEN until release acceptance.
+- Look in: `app/hooks/call/useStartConferenceAndDial.ts`, `app/hooks/call/useCallScreen.ts`, `app/components/call/CallScreen.Layout.tsx`, `app/components/call/CallScreen.CallArea.tsx`, `app/lib/services/hooks-api.ts`
+- Existing tests: test/startConferenceAndDial.test.ts; test/services-api.test.ts; test/ui/predictive-start-feedback.test.tsx; test/ui/hooks-call-screen.test.tsx; 45 focused Node cases and 50 UI cases passed. Ten independent source faults failed one executed case each. Browser geometry stayed fixed at desktop/narrow widths in both themes through 11 states each. Full local CI, exact-head remote checks, E2E and both deployments passed before merge.
+- Missing tests: Default promotion and acceptance on the deployed product. Local start responses were loopback fixtures; no live provider call was sent.
+- Done when: With `campaign.caller_id === null`, the Dial button is disabled and the reason is visible (kill-check: remove the `disabled` condition and confirm the test goes red).; With no device selected, same.; When the server rejects a start for any reason, the error reaches the user through a toast, not only the log (kill-check: drop the toast and confirm the test goes red).; The positive control: a configured caller ID and a device → the button is enabled and the start path runs.
+- Tracker: Keep OPEN in Verify and close. Development is linked to PR #2394; preserve original criteria and separate release acceptance from source proof.
+
+### [#2390](https://github.com/chester-hill-solutions/callcaster/issues/2390) Validate Twilio signatures against complete callback URLs
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-05
+- Recommended title: **Verify complete Twilio callback URL signatures after release**
+- PR #2391 merged complete encoded callback queries and GET/HEAD signature handling. Actual SDK, Bun, full local CI, remote E2E and both deployments are green; default promotion and genuine deployed provider callback acceptance remain.
+- Current behavior: Source audit: dev@eb7bc066, 2026-10-05. The trusted configured public URL includes pathname and unchanged encoded query. GET/HEAD query fields resolve workspace credentials without being appended as POST fields. Query changes and query-free signature reuse are refused; POST body validation, workspace-only tokens and SDK encoding compatibility remain. Failure diagnostics omit query values.
+- Root cause: The canonical verifier discarded the query and passed GET/HEAD query fields again as form parameters. Its old mocked unit test encoded query removal as expected behavior.
+- Resolution: Promote PR #2391 to the default branch. Verify genuine signed provider callbacks under the deployed public URL, including valid encoded queries, query tampering, no-query compatibility and relevant GET callbacks. Keep OPEN until release acceptance; fixture callbacks and green deployment contexts do not prove live call delivery.
+- Look in: `app/lib/twilio-webhook.server.ts`, `server/twilio-webhook.ts`, `e2e/fixtures/webhooks.ts`, `e2e/specs/twilio-webhook-auth.spec.ts`
+- Existing tests: test/twilio-webhook-query.test.ts; test/twilio-webhook.server.test.ts; test/twilio-webhook-production-guard.test.ts; test/twilio-webhook-prehandler.test.ts; test/fixtures/twilio-webhook-query.bun.ts; 53 focused Node and 7 Bun pre-handler cases passed; Bun child executed 12 real-SDK checks. Five independent source faults and the Bun query-removal fault failed their selected cases; sources restored. Complete local CI passed at 652c25e0; exact-head remote checks, 330 real-Postgres cases, 139 E2E cases and both deployments passed. New HTTP fixtures observed 200/403/403. Merge source equivalence and recoverable cleanup verified.
+- Missing tests: Default-branch promotion and genuine deployed provider callback acceptance. No live call or message was sent by the fixture checks.
+- Done when: Valid SDK POST signatures with encoded/repeated/blank queries pass; no-query callbacks stay compatible; Changed/added/removed queries and query-free signature replay fail with 403; Valid GET/HEAD signatures avoid duplicate query fields while retaining workspace credential lookup; Route and Bun ingress validation agree and retain a readable POST body; Workspace credentials, missing-credential refusal and production validation remain; new failure logs omit query values
+- Tracker: Keep OPEN in Verify and close until default promotion and deployed acceptance. Development is linked to PR #2391; the implementation prerequisite for #1878 is fulfilled.
+
+### [#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047) Warn when a message campaign has no end time on its send window
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Verify unrestricted SMS send-window warning after release**
+- PR #2387 merged unrestricted SMS warnings and raw interval save validation into dev. Launch remains allowed after deliberate consent. Release and deployed acceptance remain.
+- Current behavior: Source audit: dev@4fa72d69, 2026-10-05. Null and voice-only SMS windows show a persistent shared-root notice before launch and while running. Launch review adds deliberate consent; Cancel and Escape independently cancel without a send. Raw active intervals are validated before normalization, and the settings action rejects invalid SMS intervals before writes. Sender, content, expiry and queue blockers remain. Real browser fixtures keep page landmarks and scroll stable across desktop/narrow and both themes.
+- Root cause: Previously warning data did not exist separately from blockers. The readiness parser removed incomplete raw intervals, so valid siblings could hide them. Settings save checked the voice schedule instead of the raw SMS window. SMS dispatch never uses voice hours.
+- Resolution: Promote PR #2387 to the default branch. In deployed acceptance, verify null and voice-only SMS warnings before launch and while running, allowed deliberate unrestricted launch, independent Cancel/Escape and pending protection, invalid raw SMS save rejection, authorized editor navigation and notice cleanup. Keep the issue open until those checks pass.
+- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/campaign-send-window.ts`, `app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`, `app/components/campaign/CampaignSendWindowNotice.tsx`, `app/components/campaign/settings/CampaignLaunch.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`
+- Existing tests: test/campaign-readiness.test.ts; test/campaign-send-window.test.ts; test/campaign-send-window-warning.test.ts; test/campaign-settings.route.test.ts; test/ui/campaign-send-window-notice.test.tsx; test/ui/campaign-launch-review.test.tsx; 72 focused cases passed (57 Node, 15 UI). Seven independent source faults each failed one executed case, followed by source restoration. Initial and final full ci:local, required final-head remote checks and both deployments passed at 375ffaf32e68e14d88f5b44fa27ed61bf8b05c15; merge source equivalence verified. Browser fixtures cover stable background geometry and consent controls at 1280x720 and 390x844 in both themes.
+- Missing tests: Default-branch promotion and deployed acceptance for unrestricted warning lifetime, permitted confirmed launch, invalid SMS interval save rejection, editor permission and notice cleanup. Local fixtures and green deployment contexts do not prove deployed acceptance.
+- Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
+- Tracker: Keep OPEN in Verify and close until release promotion and deployed acceptance. Native body preserves all five criteria and both original and pre-fix audit history; Development links to PR #2387.
+
+### [#2115](https://github.com/chester-hill-solutions/callcaster/issues/2115) ensureStripeCustomer is read-then-create-then-write, so two concurrent first-time checkouts orphan a Stripe customer and can strand a saved payment method
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- Recommended title: **Verify canonical Stripe customer creation after release**
+- PR #2385 merged the canonical customer protocol into dev. Checkout and setup reuse one frozen provider request and an atomic persisted claim. Release and deployed Stripe acceptance remain.
+- Current behavior: Source audit: dev@02af083e, 2026-10-05. PR #2385 uses frozen customer parameters and a workspace provider key, atomic canonical claims, protected setup writes, old unknown-request recovery, and persisted conflict reconciliation. Unsafe or unfinished conflicts stop checkout and retry. Previously claimed customers are retained; unclaimed candidates require ownership, balance, saved-method and seven history checks before deletion. Provider I/O stays outside database locks.
+- Resolution: Promote PR #2385 to the default branch. Verify concurrent first checkout and setup in an owned deployed Stripe test-mode workspace, canonical storage, saved payment access and unchanged completed-ID checkout. Verify retry, old unknown-result recovery and protected-conflict behavior before closure. Preserve unsafe customers for operator reconciliation.
+- Look in: `app/lib/platform-billing.server.ts:38`, `app/lib/database/stripe.server.ts:136`, `app/lib/database/stripe-customer-reconciliation.server.ts:23`, `app/lib/database/workspace-provisioning.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts`, `client/migrations/20261005000000_persist_stripe_customer_creation.sql`, `scripts/db/bootstrap-fresh-db.mjs:129`, `scripts/e2e/bootstrap-compose-db.mjs:88`, `test/integration-db/stripe-customer-race.test.ts`
+- Existing tests: test/platform-billing-checkout.test.ts; test/db-stripe.server.test.ts; test/integration-db/stripe-customer-race.test.ts: 26 actual PostgreSQL and installed-Stripe-SDK cases; all 330 database cases passed on a fresh local bootstrap. The final 26-case suite and both final-head remote database jobs passed. Eleven independent source faults failed selected behavior cases; source was restored. Initial and final full ci:local, required remote checks and both deployment contexts passed at tested head d59fcf999498104c6dbb2e7958235bed6695d898; merge source equivalence verified.
+- Missing tests: Owned deployed Stripe test-mode acceptance: concurrent checkout/setup, saved methods, completed-ID control, retry/recovery and protected conflict handling. Local provider fixtures and green deployments do not prove this acceptance.
+- Done when: Concurrent first-time checkouts both use the same canonical Stripe customer, and workspace.stripe_id stores that same ID. Exactly one customer is created, or any losing customer is identified and reconciled.; If the protocol creates a losing customer, its ID is logged and reconciled; an idempotent single-customer path need not create an orphan.; A saved payment method is retrievable after the race.; The permitted path (a second checkout after `stripe_id` is set) is unchanged and does not call `createStripeContact`.
+- Tracker: Keep OPEN in Verify and close until default-branch promotion and deployed Stripe acceptance. Native body preserves four criteria and original history; Development links to PR #2385.
+
+### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
+- Independent feature-flag reads and safe workspace diagnostics merged through PR #2382. Deployed functional acceptance and release remain open.
+- Current behavior: Source fix dev@9f4bb125: requested flags use strict === true independently. Known-key diagnostics at the client projection, server workspace read and batch-worker flag read include only workspace ID and invalid key names. Stored values, defaults and batch policy stay unchanged. All 24 actual-reader PostgreSQL cases passed locally and in the final-head remote E2E job; all 68 focused Node cases passed. Six independent faults fail the relevant cases and exact restoration passes.
+- Resolution: Verify deployed client, server and batch-worker behavior with malformed known siblings and valid requested flags, confirm safe workspace diagnostics, then promote to the default branch before closure.
+- Look in: `app/lib/feature-flags.ts`, `app/lib/workspace-feature-flags.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts`, `test/feature-flags.test.ts`, `test/workspace-feature-flags.server.test.ts`, `test/integration-db/workspace-feature-flags.test.ts`
+- Existing tests: 68 focused Node cases cover flags, diagnostics, TwiML and live-media route controls.; 24 real PostgreSQL cases exercise the three actual readers, real TwiML/token signing, safe client projection, unchanged stored JSON and foreign-workspace isolation. Final-head remote E2E job 111588289870 ran all 24 successfully.; Six faults cover whole-object parsing, loose truthiness, removed diagnostics and each removed server call site; exact restoration passes 24 database and 36 focused Node cases.
+- Missing tests: Deployed client, server and batch-worker acceptance with malformed known siblings and safe diagnostics; default-branch promotion.
+- Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
+- Tracker: Keep #2118 open in Verify and close after PR #2382 merged into dev. on-dev workflow 37255076883 moved one issue; a deployment success is not deployed functional acceptance.
+
+### [#2355](https://github.com/chester-hill-solutions/callcaster/issues/2355) Reject invalid audio campaign targets before storage
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The audio campaign target precheck is merged through #2379. Invalid identifiers return 400 and missing or foreign campaigns return 404 before application file allocation or storage work.
+- Current behavior: dev@63fecfa0 validates the campaign ID and reads the target through findCampaignInWorkspace before file allocation, upload, signing or update. Valid attachment retains 201. A missing or failed final update cannot report success. Real campaign deletion during upload returns failure. Object lifecycle work remains under #2356.
+- Root cause: Resolved by #2379: the old action checked campaign existence only at the final update and used an unchecked Number conversion.
+- Resolution: Verify the deployed /api/media endpoint and promote #2379 to the default branch before closure. Keep #2356 separate: uncertain outcomes, durable object ownership and physical reclamation are not resolved by this precheck.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`, `test/integration-db/media-campaign-target.test.ts`, `docs/api-data-management.md`
+- Existing tests: All 25 actual-action PostgreSQL cases pass locally and in final-head remote job 111576750987 (run 37250419783). They use native multipart, real membership and scoped campaign reads/updates; session resolution and external storage are fixtures in this tier.; All 44 existing upload controls pass. Three independent faults remove the target precheck, identifier parser or empty-update guard; each fails relevant cases and exact restoration passes all 25.; All 25 production-build HTTP requests pass with genuine Better Auth sessions, real membership/campaign rows, native multipart and real URL signing. Valid MP3, WebM and OGA attach only to the owned campaign. Invalid, missing, foreign and sessionless targets have no application file allocation or S3 send. Real campaign deletion during upload returns failure. S3 SDK send is a provider fixture; no physical bucket acceptance or cleanup is claimed.; Full npm run ci:local and exact-head remote checks pass at a5e6d9123f7b1b8286b84ed09b51417db8ba1fc8; both deployments pass. Squash source equivalence is verified at 63fecfa07b7777cee052bffc1317c8e6de9d43cc.
+- Missing tests: Deployed functional acceptance with the real bucket remains open. Confirm invalid/missing/foreign target rejection, valid 201 attachment and truthful final-update failure.; Default-branch release remains open; retain the native issue until release and required verification complete.
+- Done when: Missing, non-numeric, non-finite, non-integer and invalid campaign IDs are rejected with 400 before media work.; A nonexistent or foreign-workspace campaign returns 404 before File.arrayBuffer, upload, signing or update. No global campaign accessor is used.; A valid campaign in the requested workspace retains its 201 response and updated audio URL.; A failed or empty final update cannot report success. Durable object reconciliation, safe deletion and uncertain outcomes are retained in #2356; this precheck does not claim to solve them.; The current workspace access guard, limits, source cancellation, safe keys and audio formats remain intact.; Real action tests cover invalid/foreign/missing targets, a valid target, failed attachment and zero unintended storage work before target validation. Break the precheck and confirm the relevant test fails.; Full local gates and exact-head remote checks pass; deployed functional acceptance and release promotion remain open.
+- Tracker: Keep #2355 open in Verify and close for deployed functional acceptance and default-branch release. Its source fix is verified in #2379. Keep physical object reconciliation and uncertain attachment outcomes under #2356.
+
+### [#2371](https://github.com/chester-hill-solutions/callcaster/issues/2371) Require Admin access for JSON billing checkout
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The JSON checkout role gap is fixed on dev by PR #2376. Both routes and both shared services enforce the existing Admin policy. Verify deployed acceptance and release rather than implementing the same fix again.
+- Current behavior: PR #2376 merged at cd0ac0d322fe9c01a14954af6c662a2b252902cb, with source paths equal to tested 6fc58491635dd188e7f357fe5dbf3759336af3fc. Caller and Member sessions receive 403 before replay, Stripe calls or ledger writes. Admin and Owner retain valid creation, polling and paid confirmation. Non-members remain 404 and valid API-key-only requests remain 401. Workspace/session matching and duplicate-credit protections remain. Local production HTTP used genuine Better Auth sessions and real PostgreSQL with a Stripe-provider fixture; it made no live charge.
+- Root cause: The original endpoints and services proved membership without the adopted billing role floor. PR #2376 applies the canonical session-only Admin strategy at the routes and Admin checks in both services.
+- Resolution: Verify the merged fix in deployed dev and promote through the default branch before closure. Keep checkout source work complete; #2115 Stripe customer concurrency and #2137 billing reads remain separate.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.loader.server.ts`, `app/lib/platform-billing.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/openapi-platform.ts`, `docs/api-agent-quickstart.md`, `test/integration-db/billing-checkout-access.test.ts`
+- Existing tests: test/integration-db/billing-checkout-access.test.ts — 34 real-Postgres route/service cases passed locally and in the remote E2E database tier at the tested head.; Four independent route/service role-floor faults failed denial cases; exact restored source passed all 34 cases.; 25 production HTTP cases passed with genuine Better Auth sessions, real PostgreSQL membership, persistent replay, paid confirmation, duplicate-credit and foreign-session controls. Only Stripe Checkout provider calls were fixtures; no live payment is claimed.; Full local ci:local, both review axes and strict structural review passed at the tested head. Final remote checks and both Railway deployments were green before merge. The successful on-dev workflow log identified only #2371 and recorded one project move.
+- Missing tests: Deployed dev functional acceptance and default-branch promotion remain open. Local fixtures and green deployments do not prove deployed functional acceptance.
+- Done when: Caller and member sessions receive 403 for checkout creation and session polling, before replay lookup, Stripe work or credit-ledger writes.; Administrator and owner sessions retain valid checkout creation, polling and confirmation behavior.; Non-members receive the existing uniform 404; API keys without a session receive 401.; Direct checkout service calls enforce Admin before provider or ledger work.; Existing workspace/session matching and duplicate credit protections remain in place.; Tests use actual auth and membership checks, plus permitted controls. Removing or weakening each gate makes a denial test fail.; Direct browser/session HTTP tests cover all four roles. API documentation states the existing Admin policy and generated contract verification passes.
+- Tracker: Source fix is merged and reviewed on dev. Verify deployed acceptance and release before closing; keep all seven original acceptance criteria. Do not add another checkout role gate.
+
+### [#2141](https://github.com/chester-hill-solutions/callcaster/issues/2141) addInboundQueueMember accepts any user_id, including non-members of the workspace
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify workspace-scoped inbound queue member assignments**
+- The shared service validates queue ownership, target membership and global-user existence before insertion. Both actual add routes return clear 400 validation errors.
+- Current behavior: PR #2373 merged to dev as 9fa9d582 on 2026-10-04. The service refuses foreign queues and foreign or missing users, including stale memberships. Both routes map validation to 400; valid assignments succeed and unexpected database failures retain 500. The tested source and squash merge match. Full local CI, both reviews, remote checks and both deployment checks passed. Deployed acceptance and default-branch release remain.
+- Root cause: The shared service inserted caller-selected queue and user IDs without checking queue ownership or target membership. The global-user FK could reject nonexistent users only after insertion was attempted, producing 500. Canonical membership can be stale, so the service now also checks global-user existence.
+- Resolution: Run deployed dev acceptance through both real add routes for foreign user, nonexistent user with and without stale membership, foreign queue, caller refusal and valid member assignment. Promote the verified fix to the default branch before closure. A read-only dev review database audit found 0 total queue-member rows and 0 invalid rows; no cleanup was required and no rows changed. This is not a production-data audit. A membership FK migration needs its own key-upgrade and member-removal policy.
+- Look in: `app/lib/inbound-queue-db.server.ts:107`, `app/routes/api+/inbound-queue.action.server.ts:97`, `app/routes/workspaces+/$id/settings/queues.action.server.ts:96`, `test/integration-db/inbound-queue-members.test.ts`, `app/db/schema-inbound-queue.ts`, `app/lib/workspace-members-db.server.ts`
+- Existing tests: 22 real PostgreSQL route/service cases passed: invalid target and queue controls, stale membership, valid same-workspace rows, caller refusal and unexpected database failure.; Six injected faults failed their regression tests; exact restored source passed all 22 cases.; 14 actual session/HTTP cases passed against the final production build for both add routes.; Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, production build, bundle check and codegen verification.
+- Missing tests: Repeat the actual add-route acceptance checks on deployed dev.; Default-branch promotion and release verification before closure.
+- Done when: Both real add-member routes reject an existing foreign-workspace user with 400 and no insert.; Both routes reject a nonexistent user with a clear 400 rather than the current database-error 500.; The shared service rejects a queue belonging to another workspace.; A valid member and queue in the same workspace succeed.; An authorized existing-row audit records its count and cleanup result; this source audit does not claim live data was inspected.
+- Tracker: Source fix is merged and reviewed on dev. Verify deployed acceptance and promote before closing; do not implement the membership validation again.
+
+### [#2003](https://github.com/chester-hill-solutions/callcaster/issues/2003) Agent role can reach the billing page by URL even though the sidebar link is hidden
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- The Agent display name maps to Caller. The direct billing-page read gap is fixed on dev by PR #2370 under canonical #2137; do not add another gate for this report.
+- Current behavior: The billing loader checks Admin before reading billing data. Caller and Member document requests receive 403; Admin and Owner retain 200. Document non-members follow the existing workspace-picker redirect; billing JSON and service non-members receive 404.
+- Root cause: The original route relied on sidebar visibility. PR #2370 added the route and service read floor; the earlier #2030 policy blocker no longer applies to this specific billing report.
+- Resolution: Follow #2137 for deployed dev acceptance and default-branch promotion. Verify direct billing requests for all four roles. Preserve the document/API distinction when applying the existing non-member acceptance criterion. Keep checkout creation and polling scope in #2371 separate.
+- Look in: `app/lib/workspace-role-display.ts`, `app/routes/workspaces+/$id/billing.loader.server.ts`, `app/lib/workspace-middleware.server.ts`, `e2e/specs/rbac.spec.ts`, `test/billing-read-access.test.ts`
+- Existing tests: e2e/specs/rbac.spec.ts:83 — direct caller/member 403 and admin/owner 200 for document and JSON billing; isolated production run passed all five setup/role cases without retry; test/billing-read-access.test.ts — actual loader/service access checks with mocked membership rows; denied reads stop before balance or ledger access; PR #2370 merged at 486de78e585cf648754f5437ff34bf009c39b5a3; source paths checked at that commit
+- Missing tests: Deployed dev acceptance and default-branch release remain under canonical #2137
+- Done when: An Agent requesting the billing path by URL is refused; The refusal matches the convention used by sibling routes (404 for non-members); The check is a permission check at the route, not a UI-visibility check
+- Tracker: Verify with canonical #2137, then close only after default-branch promotion. This source fix needs no additional #2030 policy decision; keep broader role-model work separate.
+
+### [#2137](https://github.com/chester-hill-solutions/callcaster/issues/2137) The billing/ledger loader has no role gate — any member, including caller, reads the full credit history
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify administrator-only workspace billing reads**
+- The billing page and activity service require Admin on dev. Direct document and JSON checks refuse caller/member roles and permit admin/owner roles.
+- Current behavior: PR #2370 merged to dev as 486de78e on 2026-10-04. The page throws 403 before billing reads for caller/member roles; the activity service also requires Admin. The existing JSON read stays session-only Admin, with non-member 404. Final full local CI and both reviews passed; the isolated production browser run passed 5/5. Remote CI, E2E and both deployment checks were green for the tested head. Deployed acceptance and default-branch promotion remain.
+- Root cause: The page loader and activity service proved membership without an Admin floor. The server now enforces the existing billing policy before reads. The new sibling role guard records 11 exact pre-existing permission gaps for separate work.
+- Resolution: Verify direct billing page and JSON requests on deployed dev for caller/member refusal and admin/owner access, then promote before closing. Existing baseline gaps remain separate audits; the JSON checkout role gap is tracked in #2371.
+- Look in: `app/routes/workspaces+/$id/billing.loader.server.ts:15`, `app/lib/billing-activity.server.ts:202`, `app/routes/api+/workspaces+/$workspaceId/billing.loader.server.ts:11`, `scripts/lib/route-read-role-floor.mjs`, `scripts/baselines/route-read-role-floor.json`, `test/billing-read-access.test.ts`, `test/route-read-role-floor.test.ts`, `e2e/specs/rbac.spec.ts:83`
+- Existing tests: Actual auth and membership controls: caller/member 403, admin/owner 200, non-member 404 and session-only JSON reads.; 64 focused cases passed. Nine faults made regressions fail; restored source passed again.; Full ci:local passed 4,625 Node, 33 Bun and 1,054 UI tests, all guards, build, bundle check and codegen verification.; Isolated production browser checks passed 5/5, including document and JSON status assertions for all four roles; no retry or skipped case.
+- Missing tests: Deployed dev browser acceptance for direct page and JSON requests with all four roles.; Default-branch promotion and release verification before closure.
+- Done when: A `caller` and a `member` receive 403 on the billing loader (kill-check: remove the gate and confirm the test goes red).; An `admin` and the `owner` receive 200.; The API path enforces the same floor.; The e2e RBAC spec asserts a loader status, not only nav visibility.
+- Tracker: Source fix merged and reviewed on dev. Run deployed acceptance and promote before closing; do not implement the billing read gate again.
+
+### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- Merged access states explain 401 and 403 and offer sign-in or workspace navigation. Source and local browser verification are complete; deployed acceptance and release remain pending.
+- Current behavior: Source audit: dev@eaac477e, 2026-10-04. PR #2368 is merged. The shared boundary preserves safe string and message/error response copy, replaces missing or technical copy, and removes the generic crash/reload UI for access failures. The existing 404 and server-error behavior is unchanged.
+- Root cause: Before PR #2368, the boundary treated all non-404 route responses as generic crashes, including deliberate access denials. The merged change gives 401 and 403 a dedicated access state in that canonical component.
+- Resolution: Verify 401/403 copy and recovery navigation on deployed dev. Keep the original acceptance criteria and the default-branch release pending; do not close the issue on source proof alone.
+- Look in: `app/components/shared/RouteErrorBoundary.tsx:38`, `app/components/shared/RouteErrorBoundary.tsx:10`, `test/ui/route-error-access.test.tsx:31`, `test/survey-create-access.route.test.ts:16`, `e2e/specs/rbac.spec.ts:63`, `test/ui/components-shared-smoke.test.tsx:238`
+- Existing tests: 15 access-state UI cases cover safe copy, fallback copy and real navigation; disabling the access-status branch fails all 15.; Existing shared smoke tests retain 404 and internal-error protections, including server status/reload without response-body leakage.; Four cases use the actual survey creation loader: caller 403 and member/admin/owner 200.; Final production-build browser run: authentication setup, actual caller denial/recovery and owner access all passed.; Full final-head ci:local, independent spec/standards/strict reviews, all remote checks and both PR deployments passed before merge. Remote browser suite: 132 cases passed.; Merged dev deployment contexts passed. The existing issue-on-dev workflow succeeded and moved #2004; deployed acceptance is still separate.
+- Missing tests: Deployed acceptance of 401/403 copy and recovery navigation; default-branch release remains pending.
+- Done when: A 403 tells the user they lack access, in the app's voice, with the server's message where one exists; No 403 renders the generic crash heading or a Reload Page action; The boundary offers a next step the user can actually take; 401 gets the same treatment; 404 and 5xx behaviour is unchanged; A test covers each status branch, including one on a real min-role-gated route
+- Tracker: Source fix is merged in PR #2368. Keep #2004 OPEN for deployed acceptance and default-branch release. Preserve all six original acceptance criteria; do not treat green deployment contexts as acceptance proof.
+
+### [#2042](https://github.com/chester-hill-solutions/callcaster/issues/2042) Side Sheet has no default padding, so any body between header and footer renders flush to the edge
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-04
+- The merged local SheetBody contract fixes all 12 consumers; measured normal, edge-to-edge and compact navigation layouts pass. Deployed acceptance and release remain pending.
+- Current behavior: Source audit: dev@1a5d463f, 2026-10-04. PR #2366 merged with source-equivalent cleanup. Normal body insets match the padded header/footer; mobile chats and workspace navigation keep explicit edge-to-edge bodies; the site menu keeps compact spacing.
+- Root cause: The original content slot did not declare body padding. The local body slot now owns padding, with deliberate edge-to-edge and navigation variants.
+- Resolution: Verify affected flows on deployed dev, including forms, normal and edge-to-edge layouts, then promote through the default-branch release. Keep the issue open until required acceptance is complete.
+- Look in: `app/components/ui/sheet.tsx`, `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx`, `app/components/workspace/WorkspaceNav.tsx`, `app/routes/workspaces+/$id/chats.route.tsx`, `app/components/layout/Navbar.MobileMenu.tsx`, `scripts/lib/sheet-body-contract.mjs`, `e2e/specs/sheet-insets.spec.ts`
+- Existing tests: test/sheet-body-contract.test.ts: 26 AST contract cases; missing/flush body, imports, forms and padding controls.; test/ui/split-campaign-override.test.tsx: eight confirmation and form behavior cases.; e2e/specs/sheet-insets.spec.ts: seven real built-app geometry cases at mobile/desktop widths and light/dark themes; page bounds, both edge-to-edge layouts and compact navigation.; Four browser geometry cases on the actual reported split component; removing its default horizontal inset failed all four.; Final full ci:local: 4,570 node, 1,039 UI and 33 Bun cases passed; remote browser gate: 131 cases passed.
+- Missing tests: Deployed acceptance for the affected normal, edge-to-edge and compact navigation sheets.; Default-branch release and required acceptance before issue closure.
+- Done when: Body content in a side Sheet has the same horizontal inset as its header and footer; The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge; Padding is defined in one place, and hand-compensating padding at call sites is removed; A test fails if a new SheetContent call site reintroduces flush body content; The vendored shad-cc package is unchanged
+- Tracker: PR #2366 merged to dev with clear independent reviews, final exact-head local/remote gates and both deployments green. Native issue retains all five original acceptance criteria and remains open; issue-on-dev workflow actually moved one item. Local browser proof does not replace deployed acceptance.
+
+### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-04
+- PR #2364 removes the newest-100 cap from the badge and Today total. The original browser list flow, deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@5be1f2c6, 2026-10-04. Badge and Today use the same complete workspace aggregate; ordinary list requests and per-conversation pills keep their existing behavior. Full local and final-head remote checks and both deployments passed.
+- Root cause: Fixed: both totals previously summed a newest-100 conversation page. They now share a SQL aggregate with the list’s workspace scope, message exclusions and participant identity. Failed badge refreshes retain the last known total.
+- Resolution: Verify deployed badge/Today parity beyond 100 conversations and repeat polling after an inbound reply. Retest the original screenshot list flow in the browser: the 105-row hook control retained every loaded row through repeated page-1 revalidation, but that does not settle the live report. Reproduce and file a separate concern, or record a scoped not-reproducible result with browser evidence. Release to the default branch before closure.
+- Look in: `app/lib/database/workspace-conversations.server.ts`, `app/hooks/chats/useUnreadConversationsCount.ts`, `app/lib/chats/messaging-client.ts`, `app/routes/api+/workspaces+/$workspaceId/conversations.loader.server.ts`, `app/routes/workspaces+/$id.loader.server.ts`, `app/hooks/chats/useChatsPage.ts`
+- Existing tests: test/integration-db/workspace-unread-count.test.ts (six real PostgreSQL cases: 105 conversations, full 107 total vs capped-page 100; parity, foreign scope, exclusions, number identity, legacy phone text and repeated reads); test/workspace-conversations-sql-parity.test.ts (six existing real SQL/JS list parity cases passed without skips); test/workspace-unread-count.route.test.ts (count mode, ordinary list, safe failure, capability and scope boundary); test/ui/workspace-unread-count.test.tsx (real client/parser, repeated polling, malformed responses, workspace switch and late response/event); test/ui/components-workspace-nav.test.tsx (zero, numeric, 99+ badge display and realtime changes through real client); test/ui/use-chats-page-pagination.test.tsx (105 loaded rows and page cursor retained through repeated page-1 revalidation); Eight genuine mutations rejected; source restored and verified. The remote e2e log confirms all six new real database cases ran.
+- Missing tests: The screenshot’s original live browser flow remains to reproduce or rule out with evidence. Deployed badge/Today acceptance and default-branch release remain pending.
+- Done when: The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations; For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.; A Postgres test proves the aggregate equals the per-conversation sum beyond the first page; Per-conversation unread pills are unchanged; The comments asserting the 100-conversation window is by design are corrected; The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence
+- Tracker: Verify and close after original browser-flow triage, deployed QA and default-branch release. PR #2364 is merged into dev; the native issue preserves all acceptance criteria and remains open.
+
+### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Both invitation paths now use a clean redirect and signed finite receipt for the existing root success toast in PR #2362. Deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04. PR #2362 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.
+- Root cause: Fixed: invitation success previously used shareable URL state. A signed five-minute allow-listed receipt now carries the success code and nonce, and the loader clears it on success, failure and auth redirects. Separate auth cookies are preserved.
+- Resolution: Verify normal redemption and signup plus acceptance on the deployed environment: session cookies, clean redirect, one readable root success toast, no list movement, refresh replay or error warning, and invalid/expired receipt clearing. Release to the default branch before closure. Concurrent-tab delivery remains the original permitted best-effort limitation.
+- Look in: `app/lib/invitation-flash.server.ts`, `app/lib/better-auth-headers.server.ts`, `app/routes/accept-invite.action.server.ts`, `app/routes/workspaces+/index.loader.server.ts`, `app/routes/workspaces+/index.tsx`
+- Existing tests: test/accept-invite.route.test.ts (both redirects, signed receipt and separate auth cookies); test/invitation-flash.test.ts (real signing, expiry, malformed/unknown/unsigned receipt rejection); test/workspaces-invitation-flash.loader.test.ts (success, failure and thrown auth redirects clear receipt); test/ui/workspaces-invitation-feedback.test.tsx (real root toast, revalidation nonce, no inline invitation row); Five mutations rejected: expiry, signing, cookie separation, clearing and nonce suppression.
+- Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
+- Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
+- Tracker: Verify and close after deployed QA and default-branch release. PR #2362 is merged into dev; keep the issue open until the remaining verification is complete.
+
+### [#2015](https://github.com/chester-hill-solutions/callcaster/issues/2015) auth pages: sign-in hides the real error behind "We couldn't sign you in, Try again shortly"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-10-04
+- Safe sign-in messages are merged in PR #2361. Known provider codes are mapped; unknown failures remain generic. Deployed QA and default-branch release remain open.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04. PR #2361 is merged. Full local CI, final-head remote checks and both deployments passed. Source proof does not complete deployed acceptance.
+- Root cause: Fixed: the shared login helper previously masked the real invalid-credentials exception as a temporary server failure. Its finite mapping now checks known codes and expected statuses; browser and JSON paths use it.
+- Resolution: Verify deployed wrong-password, rate-limit and provider-failure copy; confirm one root toast, retained form values, no layout movement, successful sign-in and two-factor routing. Release to the default branch before closure.
+- Look in: `app/lib/platform-auth.server.ts`, `app/routes/signin.action.server.ts`, `test/platform-auth.test.ts`, `test/ui/signin-feedback.test.tsx`
+- Existing tests: test/platform-auth.test.ts (real APIError codes and statuses, safe fallback and actual browser/token paths); test/ui/signin-feedback.test.tsx (real root toast, form retention and revalidation); Mutation checks rejected the old generic catch and raw provider-message disclosure.
+- Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
+- Done when: The UI distinguishes invalid credentials from a provider outage or rate limit; A wrong password no longer reads as a generic temporary failure; The raw provider payload is mapped, not passed through to the user; The error is surfaced through the toast pattern, not inline text
+- Tracker: Verify and close after deployed QA and default-branch release. PR #2361 is merged into dev; keep the issue open until the remaining verification is complete.
+
+### [#2358](https://github.com/chester-hill-solutions/callcaster/issues/2358) Sum all file pages in the structural review check
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify release of the fixed review-coverage pagination**
+- PR #2359 is merged in dev. The real 221-file Sai PR passed the corrected workflow with one total of 664695, then merged under #2301. Default-branch release remains.
+- Current behavior: dev@ec3d87f1, 2026-10-04: the reviewed workflow repair passed full local CI, applicable remote checks and both deployments. Sai PR #2301 passed corrected require-coverage at e79e0d48 with changed_lines=664695, plus quality, bundle, E2E and both deployments before merge. Job: https://github.com/chester-hill-solutions/callcaster/actions/runs/37213298927/job/111468640453
+- Root cause: gh --paginate --jq aggregated each page separately and wrote multiple totals to GITHUB_OUTPUT. A pipeline also needs pipefail to reject a partial API read.
+- Resolution: Retain the merged jq -s aggregate and explicit Bash shell. Keep default-branch release tracking open.
+- Look in: `.github/workflows/review-coverage.yml`, `.agents/skills/github-cli/SKILL.md`
+- Existing tests: Actual 221-file API response: page lengths 100/100/21, one sum 664695.; Bash controls: empty=0; single and multi=10; failed and partial producer exit 1 with no output.; Real Sai require-coverage job 111468640453 completed successfully at e79e0d48 with changed_lines=664695.
+- Done when: PRs with more than 100 files produce one additions total across every page.; Single-page and empty responses produce one integer, including 0 for empty.; API failures and partial reads stop the step; they cannot pass with 0 or an incomplete total.; GITHUB_OUTPUT receives valid step output.; The risk paths, 500-line threshold, marker rule and board exemption remain unchanged.; The real 221-file Sai response and corrected Sai job are verified before merge.; Full local and applicable remote checks are green.
+- Tracker: All source and real large-PR acceptance checks passed. Source fixes are on dev under #2359 and #2301. Keep the issue open until default-branch release.
+
+### [#2035](https://github.com/chester-hill-solutions/callcaster/issues/2035) The settings-sheet Leave Campaign button bypasses the new confirmation
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-04
+- The settings-sheet callback already uses the shared confirmation in current dev. Settings-path, keyboard, page geometry and deployed acceptance remain.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04. Top, settings and welcome Leave callbacks use requestLeaveCampaign. PR #2257 fixed the settings bypass. The modal keeps Cancel/confirm disabled while predictive cleanup waits for acknowledgement.
+- Root cause: Historical: the settings callback called cleanup directly. Current source fixes that callback; the remaining gap is acceptance proof.
+- Resolution: Exercise the real settings button and prove no cleanup before confirm, Cancel safety, single cleanup while pending, keyboard/focus behavior and stable page landmarks. Verify the deployed flow and release.
+- Look in: `app/components/call/CallScreen.Layout.tsx:271`, `app/components/call/CallScreen.Layout.tsx:348`, `app/components/call/CallScreen.Layout.tsx:378`, `app/components/call/CallScreen.Layout.tsx:552`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: test/ui/call-screen-leave.test.tsx covers actual layout behavior for predictive acknowledgement, failure/retry, Cancel, live cleanup and a welcome callback stub. It does not drive settings Leave or prove browser geometry.
+- Missing tests: Real settings-sheet Leave integration; keyboard focus/focus-visible Cancel/focus return; no page-landmark or scroll movement through open, Cancel, confirmation and pending states; deployed acceptance.
+- Done when: Leave Campaign is visible on the live call screen, not only inside the kebab menu; Leaving the campaign requires an explicit confirmation that states what it does; No hangup, device teardown or requeue happens before the confirmation is accepted; All leave entry points share one confirmation and one implementation; The confirmation is keyboard accessible and has a focus-visible cancel action
+- Tracker: Source bypass fixed under #2257. Native #2035 now records the current proof and retains all original acceptance criteria. Keep it open for remaining acceptance and release.
+
+### [#2354](https://github.com/chester-hill-solutions/callcaster/issues/2354) Preserve workspace denial status on audio media uploads
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Known workspace denials retain 404/403 under merged #2357. Deployed acceptance and release remain.
+- Current behavior: dev@8ae867ed includes #2357 at tested head 23950884. The route rethrows known AppError instances to its existing mapper, preserving safe 404/403 responses before file allocation or media work. Unknown failures remain 500.
+- Root cause: The route catch swallows the known AppError before defineAction can map it.
+- Resolution: Verify deployed denials, successful uploads, unknown failures and retry behavior, then promote through the release PR.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: Seven actual-route cases reproduce two denial failures and five passing controls. The fix passes 50 affected cases; removing passthrough fails both denials, restoring passes seven. Both source and final full local gates passed.; Exact final local gate passed at 23950884. Remote quality executed seven denial cases, 34 boundary cases and six stream cases; all applicable checks, e2e and both app/worker deployments passed before merge.
+- Missing tests: Deployed functional acceptance and release promotion remain. Green deployment contexts are not functional QA.
+- Done when: A non-member response is 404 with the safe workspace-not-found message and no file allocation, upload, URL signing or campaign update.; A known 403 role denial retains 403 and also does no media work.; A permitted session user still receives 201 for a valid upload. Unauthenticated and API-key-only callers remain refused.; Unknown storage/update failures remain failures. No exception details are added to user responses.; File and encoded body limits, source cancellation, safe keys and accepted formats remain covered.; Real action tests fail if the catch again maps known denials to 500. Full local gates and exact-head remote checks pass.; Verify the deployed response and failure/retry behavior before release promotion. Keep the issue open until then.
+- Tracker: Source complete under #2357. Preserve the open Bug until deployed acceptance and default-branch release.
+
+### [#2136](https://github.com/chester-hill-solutions/callcaster/issues/2136) POST /api/media lacks the file-size limit enforced by its sibling route
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- The shared file cap, bounded body reader and safe audio keys are merged in #2353. Deployed functional acceptance and release promotion remain.
+- Current behavior: dev@cea31c69 includes merged #2353. Both routes enforce the 10 MiB file policy before application allocation/storage. The encoded reader limits actual bytes to 10 MiB + 64 KiB and cancels overflow even without a truthful Content-Length. Random safe audio keys exclude campaign text. WebM audio remains supported by the native Bun parser; MMS still rejects it. No peak-memory or one-copy claim is made.
+- Resolution: Verify the deployed exact-cap, oversize, malformed, stream-cancellation and WebM paths, then promote through the release PR. Measure peak memory/concurrency before making memory capacity claims.
+- Look in: `app/lib/bounded-form-data.server.ts`, `app/lib/media-upload.server.ts`, `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `test/media-upload-boundary.test.ts`, `test/bounded-form-data.test.ts`, `test/media-upload.runtime.test.ts`
+- Existing tests: 101 focused Node cases and 11 native Bun media cases passed. Six Node faults and a Bun WebM fault failed the relevant contracts; restored controls passed.; Full ci:local passed at exact reviewed head a574eefc. Remote quality ran 34 route, six stream and 11 native Bun media cases; applicable checks, e2e and both deployment contexts were green before merge.
+- Missing tests: Deployed functional acceptance for valid/invalid and streamed uploads, failure/retry behavior and WebM compatibility remains. Process peak-memory and concurrent-request capacity have not been measured.
+- Done when: An oversized file is rejected before file.arrayBuffer or storage work runs.; A file at the shared cap succeeds on both routes.; The request/multipart reader has an explicit tested bound so rejection does not depend solely on already materialized formData.; campaignName cannot control the storage key's path structure.; Memory claims describe measured allocations; they do not require an unsupported one-copy guarantee.
+- Tracker: Source complete under #2353. Keep the native Bug open for deployed functional acceptance and default-branch promotion; deployment green is not QA.
+
+### [#2350](https://github.com/chester-hill-solutions/callcaster/issues/2350) Retain the original audience CSV before import starts
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- PR #2351 merged original audience CSV retention into dev at ee225fc3. Store exact private immutable bytes before campaign linking, existing-audience status changes and job enqueue. Storage failure persists the failed upload without those effects. Deployed acceptance and release remain.
+- Current behavior: Original BOM/UTF-8/CRLF/multiline bytes are stored at {workspaceId}/{uploadId}/original.csv, separate from status sidecars and job retention. Reuses existing storage, tenant failure update and typed enqueue APIs. No report UI or whole-run recovery is introduced.
+- Root cause: The route previously queued imports without a durable original file; completed job payloads are pruned after seven days.
+- Resolution: Verify applicable deployed private original storage, failed-upload behavior and release promotion. Keep #1771 per-row reporting and #2128 recovery open.
+- Look in: `app/routes/api+/audience-upload.action.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/lib/object-storage.server.ts`, `test/audience-upload-original.test.ts`
+- Existing tests: 11 actual-route/real-CSV artifact cases and 50 focused upload/route cases pass. Byte equality, immutable concrete path/options, held acknowledgement, failure ID/tenant predicate, campaign link and denied/foreign controls are covered.; Original source/removing storage and early enqueue each fail five cases; altered bytes/wrong failed-upload ID each fail one; early campaign link fails two. Restored source passes 11.; Both full local gates, both independent reviews, all applicable exact-head remote checks and both app/worker deployments passed. Successful remote quality ran all 11 cases; branch/worktree cleanup verified source equivalence and recovery bundle.
+- Missing tests: Applicable deployed storage/upload functional acceptance and default-branch release promotion.
+- Done when: Exact original bytes retained privately and immutably at server-created workspace/upload path before enqueue.; Storage failure truthfully persists failed upload; no campaign link, existing-audience status change or queued import.; Denied/foreign and invalid input perform no artifact or queued import; valid own-workspace control succeeds.; Original is separate from status sidecar and completed-job pruning; no public/unauthenticated retrieval.; Full local CI per pushed head, independent reviews, remote gates, both deploys, deployed acceptance and release verified.
+- Tracker: Verified native Task under #1771, source completed in PR #2351. Keep open for deployed acceptance and release; does not complete parent reporting or #2128 recovery.
+
+### [#2348](https://github.com/chester-hill-solutions/callcaster/issues/2348) Normalize opt-out values in the audience upload path
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- PR #2349 merged normalization into dev at 0b72f37d after both full local gates, both reviews, applicable remote checks and both deployments passed. Mapped opt-out cells reach insertion as booleans through the existing total parser. Deployed acceptance and release remain required.
+- Root cause: The real upload uses generic lib/csv and previously wrote mapped opt-out values as raw strings, bypassing the standalone parser fixed in #2250.
+- Resolution: Verify the applicable deployed import behavior and release promotion. Keep broader reporting and failure/re-upload acceptance under parent #2128 and existing #1771; do not close the parent from this normalization-only Task.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/csv-contacts.ts`, `test/audience-upload-opt-out.test.ts`, `test/csv-opt-out-parsing.test.ts`
+- Existing tests: 25 real server upload cases: explicit opt-out, permitted, blank, unknown and unmapped values; case-insensitive mapping, phone/custom data and successful completion controls.; 111 focused upload, standalone parser, route and phone dedupe cases pass.; Original source and removal of normalization each fail 24 cases with one unmapped control passing. A false unknown fallback fails 12 cases with 13 controls passing; restored source passes all 25.; Successful final-head remote quality job executed all 25 server upload cases; both full local gates, reviews, applicable remote checks and both deployments passed.
+- Missing tests: Applicable deployed upload acceptance and release/default-branch verification.
+- Done when: Mapped opt-out cells reach contact insertion as expected literal booleans through one canonical parser.; Existing value policy, unmapped default, other fields, custom data, phone normalization and completion remain correct.; Full local CI, both independent reviews, applicable remote gates and both deployments pass before merge.; Applicable deployed upload behavior and release promotion are verified.
+- Tracker: Native Task under #2128; source completed and merged in PR #2349. Keep this Task open for deployed acceptance and release. Parent reporting and durable recovery requirements remain open.
+
+### [#2342](https://github.com/chester-hill-solutions/callcaster/issues/2342) security(deps): patch PostCSS across locked consumer paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- PR #2346 merged PostCSS 8.5.25 across all locked consumers to dev at befe20fa. Both immutable install trees pass all 38 real cases and actual Scalar docs compatibility checks. Source work is complete; deployed docs/style acceptance and release promotion remain open.
+- Root cause: Bun retained four old compatible nested PostCSS copies. The merged matching direct spec and flat override retain one patched copy; npm changes only root spec metadata. Both source-map advisory ranges are excluded.
+- Resolution: Verify applicable deployed docs and style behavior, then release promotion and the default-branch dependency state. Preserve the existing theme and do not repeat the completed source patch.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/tailwind.css`, `app/routes/docs.tsx`
+- Existing tests: test/runtime-postcss.test.ts: seven owned-file guard/control cases through five actual consumers plus three real Vue style compilation cases, 38 per clean installer.; Official 8.5.16 fails 16 guards with 22 controls passing; 8.5.22 fails 10 missing-filename guards with 28 controls passing; restored patched source passes all 38.; Actual DocsPage/Scalar widget built and rendered in both trees: public/complete specs, auth alternatives, examples, fonts and light/dark styles.
+- Missing tests: Applicable deployed docs/style acceptance and release/default-branch verification remain unfinished.
+- Done when: All PostCSS copies are >=8.5.23 and compatible with their consumers.; Outside marker maps are not read; valid CSS and supported source maps still work.; Both installers, full local CI, real docs render and remote gates pass.; Required deployed acceptance and release promotion are complete.
+- Tracker: Native Task under #1802 remains open; development copies share this package task under #1803. Final head d28fecdf passed full local CI, all applicable remote gates and both deployments; remote quality executed all 38 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Compiler package presence does not prove a live untrusted-CSS service or app file-disclosure exploit.
+
+### [#2341](https://github.com/chester-hill-solutions/callcaster/issues/2341) security(deps): patch the Twilio jws dependency path
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- PR #2345 merged the compatible Twilio JWT patch to dev at 9c834837. Both locked install trees resolve patched jws, with both Twilio versions and unrelated packages preserved. Source work is complete; deployed token acceptance and release promotion remain open.
+- Root cause: Bun retained an older compatible jsonwebtoken patch and affected jws range. The merged flat jsonwebtoken 9.0.3 override repairs that path. The maintainer excludes jsonwebtoken users from the exploit conditions; no app token bypass is claimed.
+- Resolution: Verify applicable deployed browser and handset token behavior, then release promotion and the default-branch dependency state. Do not repeat the completed source patch.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/twilio-token.server.ts`, `app/lib/handset/handset-token.server.ts`
+- Existing tests: test/runtime-twilio-token.test.ts: 22 real cases per installer, including Node and Bun app token generators, signature and rejection controls.; Official old JWT/JWS path fails one package-only stream guard while 21 controls pass; a real app TTL mutation fails two cases with 20 controls passing.
+- Missing tests: Applicable deployed token acceptance and release/default-branch verification remain unfinished.
+- Done when: Every jws resolution excludes <=3.2.2 and 4.0.0.; App token contracts stay correct without provider calls or real credentials.; Both installers, full local CI, remote checks and both deployments pass.; Deployed token acceptance and release promotion are complete.
+- Tracker: Native Task under #1802 remains open. Final head 42bef2ee passed full local CI, all applicable remote gates and both deployments; remote quality executed all 22 cases. Verified worktree and local/remote topic refs are removed with a recovery bundle. Package exposure and app exploit reachability remain separate claims.
+
+### [#2340](https://github.com/chester-hill-solutions/callcaster/issues/2340) security(deps): patch ws in both locked install paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- ws source is merged to dev in PR #2343 (3228e89f). Both locks resolve only 8.21.0; npm package entries stay unchanged and Bun deduplicates the old jsdom copy. Ten real cases pass for each installed tree; old 8.18.0 fails four rejection cases while six valid controls pass. No app exploit is claimed.
+- Resolution: Verify applicable deployed WebSocket behavior and promote the source fix. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-ws.test.ts`
+- Existing tests: test/runtime-ws.test.ts
+- Tracker: PR #2343 passed full local CI on final head 95ea1c17, all applicable remote gates and both deployments. Remote quality executed all ten cases. The verified worktree and local/remote refs are removed with a recovery bundle. Task #2340 remains a child of #1802; applicable deployed acceptance and release promotion remain open.
+
+### [#2333](https://github.com/chester-hill-solutions/callcaster/issues/2333) security(deps): patch Axios in runtime install paths
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Axios source is merged to dev in PR #2336 (9edfb271). Both npm and Bun resolve 1.20.0 while their existing Twilio versions remain unchanged. Six real HTTP/SDK cases pass in each installed tree; the old Axios redirect fault fails with five passing controls. No production exploit path is claimed.
+- Resolution: Verify deployed Twilio request authentication, form serialization, errors and retry behavior, then promote the source fix to the release branch. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-axios.test.ts`
+- Existing tests: test/runtime-axios.test.ts; test/twilio-client.server.test.ts
+- Tracker: PR #2336 passed full ci:local on final head 68832c47 and all applicable remote gates plus both deployments. Remote quality executed all six HTTP cases. Task #2333 remains a child of runtime Epic #1802; deployed acceptance and release promotion remain open.
+
+### [#2334](https://github.com/chester-hill-solutions/callcaster/issues/2334) security(deps): upgrade csv-parse to a patched release
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- csv-parse source is merged to dev in PR #2338 (42aa7957). Both installed trees resolve 7.0.3 and pass 103 parser/mapping cases, including 13 runtime cases. Old 5.6.0 fails the advisory case while twelve controls pass. Package exposure was confirmed without an application exploit claim.
+- Resolution: Verify actual deployed audience/contact uploads, then promote the source fix. Keep this Task open until its full acceptance is met.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/lib/csv-contacts.ts`, `test/runtime-csv.test.ts`
+- Existing tests: test/runtime-csv.test.ts; test/csv.test.ts; test/audience-upload-csv.test.ts; test/csv-opt-out-parsing.test.ts
+- Tracker: PR #2338 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all 13 runtime cases. Task #2334 remains a child of #1802; deployed upload acceptance and release promotion remain open.
+
+### [#2335](https://github.com/chester-hill-solutions/callcaster/issues/2335) security(deps): patch the Scalar AI SDK dependency chain
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Scalar SDK source is merged to dev in PR #2339 (364d8d5b). Both install paths resolve provider-utils 4.0.33 without changing Scalar. Nine real response/stream cases pass; old 4.0.5 fails three handler guards while three valid controls pass. The actual JSON handler default remains 2 GiB.
+- Resolution: Verify actual deployed public/complete docs with the existing theme, auth controls and examples, then promote the source fix. Keep local browser proof separate from deployed acceptance.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`, `test/runtime-scalar-sdk.test.ts`, `app/routes/docs.tsx`
+- Existing tests: test/runtime-scalar-sdk.test.ts; test/ui/docs.route.test.tsx
+- Tracker: PR #2339 passed full local CI on its final head, all applicable remote checks and both deployments. Remote quality executed all nine runtime cases. The actual Scalar widget was built and checked independently for both local installed graphs, including spec selection, operation auth, examples and unmount/remount. Task #2335 remains a child of #1802; deployed docs acceptance and release promotion remain open.
+
+### [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329) Prune expired public rate-limit buckets
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Source repair is merged into dev. Candidate acceptance and default-branch promotion remain.
+- Current behavior: PR #2331 merged strict one-day, indexed rate-bucket retention in bounded batches. The delete-time predicate preserves reactivated rows. The actual daily handler logs counts including zero and preserves its successor after cleanup failure. Current source retains that repair. Trusted public client identity remains separate in #2330; scheduled deployed maintenance acceptance remains. Merge: f877b636d963cf1154fbab81ef45ef1244bc61ec. Recovery/source equivalence and topic cleanup are verified.
+- Resolution: Verify the original acceptance on the release candidate and promote through the release workflow. Keep the native issue open until verification and default-branch promotion.
+- Look in: `app/lib/platform-rate-limit-db.server.ts`, `app/lib/worker/handlers/cron.server.ts`, `test/integration-db/rate-limit-retention.test.ts`
+- Existing tests: test/integration-db/rate-limit-retention.test.ts
+- Missing tests: Deployed release-candidate acceptance through the original criteria; default-branch promotion.
+- Done when: The daily maintenance tick deletes only buckets with reset_at strictly older than the one-day retention window. The boundary and live buckets remain.; Use the existing reset_at index for the retention predicate; do not add a duplicate index or return all deleted keys into app memory.; The maintenance log records the number of buckets removed, including zero. Failures log an error and do not break notification processing or its reschedule chain.; Real PostgreSQL tests prove expired, boundary, recent-expired and live rows plus the retained-key control. Making the prune a no-op or reversing the predicate fails those tests.; Exercise the real maintenance handler's success and failure paths; a prune failure must still let its daily chain continue.; Full npm run ci:local and final remote gates pass. Verify the deployed maintenance log and retained-row boundary before release promotion.
+- Tracker: Merged source is available on clean dev. Verify candidate acceptance and promote before closure.
+
+### [#2109](https://github.com/chester-hill-solutions/callcaster/issues/2109) Changing "rows per page" in the admin portal blanks the table — the page number is never reset
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-04
+- Admin page-size changes reset to page 1; all three panels retain records and clamp pages after record counts fall. Source merged in PR #2326; deployed acceptance and promotion remain.
+- Current behavior: Source verified at dev@e3f3d49a (PR #2326, tested bce315ff). TablePagination resets page size changes; admin filters include size, and the shared hook clamps to available pages. Full local and remote gates plus both deployments passed on that head.
+- Resolution: Verify all three deployed admin panels for page 2 to size 50, normal paging, true empty filters and record-count reduction, then promote through the release workflow. Keep #2109 open until that acceptance is complete.
+- Look in: `app/components/shared/TablePagination.tsx`, `app/hooks/utils/useFilterPagination.ts`, `app/routes/admin+/panels/AdminUsersPanel.tsx`, `app/routes/admin+/panels/AdminWorkspacesPanel.tsx`, `app/routes/admin+/panels/AdminCampaignsPanel.tsx`, `test/ui/admin-pagination.test.tsx`, `test/ui/table-pagination-page-size.test.tsx`
+- Existing tests: 16 shared/admin UI cases pass; original source fails 7, removing the shared reset fails 1, and removing the clamp fails 3; restored source passes all 16.; Full npm run ci:local passed on final head bce315ff; final quality, bundle, E2E, metadata and both deployment contexts passed.
+- Missing tests: Deployed acceptance across users, workspaces and campaigns, plus release promotion; deployment success does not prove those UI interactions.
+- Done when: Changing the page size on page 2 shows the first page of the new size, not an empty table (kill-check: remove the `onPageChange(1)` call and confirm the test goes red).; The invariant `currentPage <= totalPages` holds after any page-size change, in all three admin panels.; An empty result shows a real empty state.; The permitted path (paging with an unchanged page size) is unchanged.
+- Tracker: Source fix merged in PR #2326. Retain the native issue open for deployed verification and promotion.
+
+### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Signup responses are not cached or replayed on dev; deployed verification remains.
+- Current behavior: PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.
+- Resolution: Verify registration success, validation, rate limits and absence of response replay on deployed dev. The remaining replay namespaces are user-scoped workspace creation and authorized workspace-scoped billing checkout. Promote the tested fix before closing.
+- Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
+- Existing tests: test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter); test/platform-api.test.ts (public auth API contract)
+- Missing tests: Confirm the registration behavior on the deployed dev environment before promotion.
+- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; The remaining replay call sites are scoped to the verified user for workspace creation and to the authorized workspace for billing checkout.
+- Tracker: The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix.
+
+### [#2117](https://github.com/chester-hill-solutions/callcaster/issues/2117) sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Durable SMS webhook retry and separate worker capacity merged into dev through PR #2324. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@d376fd88: SMS side effects enqueue customer delivery with normalized SID/status keys and preserve each callback status. General jobs and webhook delivery use separate filtered claim loops. Queue failures propagate; missing or disabled subscriptions remain no-ops. Full local CI passed on final head 2e2bfeaf; remote quality, bundle, browser checks and both deployment contexts passed. Real PostgreSQL retry, deduplication and saturated-delivery controls pass; removing the relevant runtime logic fails regression checks.
+- Root cause: The old SMS side-effect handler awaited the customer POST on the serial general worker loop and swallowed delivery failures.
+- Resolution: Verify retry attempts, duplicate callbacks, distinct accepted status updates and general-job progress under saturated slow delivery on the deployed review worker. Keep the issue open until deployed acceptance and release promotion are complete.
+- Look in: `app/lib/worker/webhook-side-effects.server.ts:281`, `app/lib/worker/run-worker.server.ts:8`, `app/lib/worker/poll-jobs.server.ts:153`, `app/lib/worker/handlers/campaign.server.ts:634`, `test/integration-db/webhook-delivery-lanes.test.ts`
+- Existing tests: test/webhook-side-effects.test.ts and test/worker.test.ts: 41 focused unit cases, including no-inline-send and distinct callback status controls.; test/integration-db/webhook-delivery-lanes.test.ts: six isolated real PostgreSQL controls for SQL claim filters, durable retry, event deduplication, saturated capacity and optional subscriptions.; Full real PostgreSQL tier: 187 passed, no skips or failures.
+- Missing tests: Deployed controlled retry, deduplication and saturated-delivery acceptance; release promotion.
+- Done when: An `outbound_sms` webhook that fails is retried by the `webhook_delivery` job, with the retry count visible in the job record (kill-check: revert to the inline call and confirm the test goes red).; A slow webhook destination does not delay other jobs in the real processing arrangement. Exercise the delivery worker/concurrency boundary rather than only asserting that SMS side effects enqueue a delivery. Saturating delivery capacity with slow destinations must still allow other job types to be claimed.; Duplicate enqueue attempts for one normalized SMS status event produce one durable delivery job. Distinct accepted status updates for the same message, such as sent then delivered, remain deliverable. Do not use a SID-only delivery key.; SMS side-effect processing performs no inline customer webhook POST. The delivery handler owns the POST in separate processing capacity or bounded delivery concurrency with reserved capacity for other job types; a grep check excludes this intended delivery boundary.
+- Tracker: PR #2324 merged to dev at d376fd88. Keep the native issue open until deployed review-worker acceptance and release promotion are verified.
+
+### [#2320](https://github.com/chester-hill-solutions/callcaster/issues/2320) Download the current survey CSV on the first export click
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The first-click and stale survey-download fix merged into dev through PR #2322. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@96229009: the shared shad-cc outline Button links to the protected CSV attachment route. Full local CI passed on final head f513f4e5; remote quality, bundle, browser checks and both deployments succeeded. The real local production browser passes first download, a changed answer on a later export, attachment headers and foreign-workspace 404. The original page fails the first download while its direct CSV control passes.
+- Root cause: The old async export handler read the captured render value of exportFetcher.data after load(), which did not replace that value.
+- Resolution: Verify first and repeated protected CSV downloads with changed saved data on the deployed review environment. Retain the shared Button position and styling, authorization, attachment filename, CSV protection and no-store policy. Promote through the release process after acceptance.
+- Look in: `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/responses/export.loader.server.ts`, `app/lib/csv.ts:csvResponse`, `app/components/campaign/home/CampaignHomeScreen/CampaignExportButton.tsx`
+- Existing tests: test/ui/survey-export-link.test.tsx: two actual-page link cases, original-action fault proof.; e2e/specs/survey-admin.spec.ts SURV-11: real first and repeated download, fresh saved answer, attachment/no-store headers, foreign-workspace 404; original first-download failure and restored pass.; test/integration-db/survey-response-columns.test.ts retains workspace-isolation and CSV protection controls.
+- Missing tests: Deployed review-browser protected-download acceptance for the first click and a later changed answer; release promotion.
+- Done when: The first click downloads current survey data; a later click requests current data again.; Keep the shared Button geometry and action position.; Keep workspace authorization, attachment filename, CSV formula protection and no-store policy.; Real browser proves two downloads and updated saved answers; deployed acceptance remains explicit.
+- Tracker: PR #2322 merged to dev at 96229009. Keep the native issue open until deployed browser acceptance and release promotion are verified. The separate response-column fix is #2317; historical response assessment remains #2292.
+
+### [#2317](https://github.com/chester-hill-solutions/callcaster/issues/2317) Keep survey response columns tied to saved questions
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The saved-question response-column fix merged into dev through PR #2319. Deployed acceptance and promotion remain pending.
+- Current behavior: Source fix at dev@5af3f675: response table and CSV columns match saved numeric question IDs. Header and cell keys use those IDs. Five actual-page and seven real-Postgres cases pass; original lookups fail four cases in each suite. Final-head full local CI, remote quality/bundle/deployments and E2E passed (181 database, 123 browser cases).
+- Root cause: Response columns use a page-local public label instead of the saved question identity.
+- Resolution: Verify distinct repeated-label columns and an unanswered column on the deployed response page and direct CSV attachment route. Preserve headers, order, checkbox formatting, formula protection and workspace isolation. Promote through the release process after acceptance.
+- Look in: `app/lib/survey-responses.server.ts:buildSurveyResponsesCsv`, `app/routes/workspaces+/$id/surveys/$surveyId/responses.route.tsx`, `app/lib/survey-format.ts`, `test/survey-responses.route.test.ts`
+- Existing tests: test/ui/survey-response-columns.test.tsx: five page cases and duplicate-key fault proof.; test/integration-db/survey-response-columns.test.ts: seven real-Postgres CSV cases, two selected-URL configurations, original-lookup fault proof.
+- Missing tests: Deployed response-page and CSV attachment acceptance for repeated labels and unanswered columns; release promotion.
+- Done when: Repeated-label columns show the answers for their distinct saved questions in both table and CSV.; An unanswered question retains its existing placeholder and CSV sanitizer escape; single-page/checkbox behavior and access controls remain.; Use unique internal question identities for header and cell keys.
+- Tracker: PR #2319 merged to dev at 5af3f675. Keep native issue open pending deployed acceptance and promotion. The separate export-click defect is #2320; historical response assessment remains #2292.
+
+### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- Public survey answer and write-in state use page/question identity. Source verification passed; deployed public-form acceptance and promotion remain.
+- Current behavior: PR #2316 merged at dev@ec6ff792: the reader, local answers, write-in drafts and save queue share one page/question key. Resume excludes foreign-survey question rows without changing stored data.
+- Root cause: The form and resume reader treat a page-scoped label as a survey-wide identity.
+- Resolution: Verify the deployed public form with repeated labels through Next/Previous and reload, including checkbox/write-in state; then promote the tested source. Historical stored-data assessment stays in #2292.
+- Look in: `app/lib/survey-answer-state.ts`, `app/lib/survey-responses.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/surveys/useSurveySubmission.ts`, `test/ui/survey-answer-page-scope.test.tsx`, `test/integration-db/survey-respondent-identity.test.ts`
+- Existing tests: Focused actual-page UI controls: 25 passed. Focused real-Postgres controls: 16 passed.; Full local CI: 4323 node tests passed with 11 existing skips, 22 Bun tests passed, 1008 UI tests passed. Full native Postgres tier: 174 passed, no skips.; Fault proof: original reader six failures/ten controls; survey ownership removed one/fifteen; page identity removed ten/fifteen UI controls. Restored source passes.
+- Missing tests: Deployed public-form repeated-label navigation/reload and write-in acceptance before promotion.
+- Done when: Each page retains its own displayed, resumed and write-in answer.; An unanswered question stays empty when another page has the same public label.; Single-page resume, checkbox hydration and signed identity remain valid.; A page-scope removal makes the new tests fail.; Resumed foreign-survey question references cannot replace owned answers; stored rows are unchanged.
+- Tracker: Source fix in PR #2316; keep open for deployed acceptance and promotion. Project Status remains unverified by the local token.
+
+### [#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129) The inbound-queue duplicate-offer guard is wired as "already in the baseline" but exists in no baseline, and both database lineages behave wrongly
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-04
+- The active-offer guard is repaired on dev. Repeated requests return no new offer; timeout and decline permit a new offer. Deployed caller behavior and promotion remain to verify.
+- Current behavior: PR #2314 merged at dev@eaaffaf4. Both bootstrap paths apply the later guard after the unguarded claim definition. The partial index and RPC use queued/offered/accepted; duplicate claims reserve no extra agent or dial.
+- Resolution: Verify the deployed final RPC, partial index, concurrent wait callbacks and release/retry behavior, then promote the tested source. Review existing duplicate active rows before an upgrade; the migration rejects them without ending calls.
+- Look in: `client/migrations/20261003231500_guard_active_inbound_offers.sql`, `app/db/schema-inbound-queue.ts`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`, `app/lib/acd/acd-router.server.ts`, `test/integration-db/inbound-offer-guard.test.ts`
+- Existing tests: test/integration-db/inbound-offer-guard.test.ts: thirteen real-Postgres cases on production fresh, compose fresh and legacy text-status/index upgrade fixtures.; Full real-database tier: 169 passed locally and in final PR E2E CI. Full local CI, remote quality/E2E/bundle/guards and both app/worker deployments passed at eb9019c4.; Fault proof: original runtime nine failures/four controls; caller serialization removed one/twelve; wrong terminal predicate three/ten; queue ownership removed one/twelve; restored thirteen pass. Dirty upgrade preserves rows, agent state, previous RPC and index state.
+- Missing tests: Deployed real-caller concurrent wait and timeout/decline retry verification before promotion.
+- Done when: Concurrent claims for the same queue and CallSid produce at most one active offer.; After timeout/release, a later claim can create a new offer; any different-agent preference is an explicit policy rather than assumed behavior.; The final claim definition and duplicate-offer constraint are applied on each supported database lineage.; A real-Postgres test fails when active-offer protection is removed.
+- Tracker: Source repair verified on dev in PR #2314. Issue remains open until promotion and required deployed verification. No change to retry-agent preference.
+
+### [#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304) Show reset-password action failure once
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- PR #2310 completes single readable reset-password action feedback on dev; deployment verification and promotion remain.
+- Current behavior: Merged at dev@cb88df8b, 2026-10-03. The root toast receives the actual error message once; the inline duplicate is removed and failed passwords remain for retry. Full local CI passed 5,325 Vitest and 22 Bun tests; four built-app narrow/desktop light/dark browser cases proved stable page/document/scroll geometry. Exact-head remote checks and both Railway checks passed before merge.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Verify the implemented reset failure/retry on the deployed review environment and promote through the release PR. Keep the issue open until its default-branch delivery and verification are complete.
+- Look in: `app/routes/reset-password.tsx`, `docs/feedback-inventory.md`
+- Existing tests: test/ui/reset-password-feedback.test.tsx; e2e/specs/password-reset-feedback.spec.ts; Original source fails both new error cases; restored source and validation/retry controls pass. Full PR #2310 CI and browser proof.
+- Missing tests: Deployed review verification and promotion; no further duplicate-removal implementation is needed.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Verify and close. Native Development link to PR #2310 and successful issue-on-dev workflow were verified; no deployed browser acceptance is claimed.
+
+### [#2058](https://github.com/chester-hill-solutions/callcaster/issues/2058) Rule and inventory: inline error text used where a toast belongs
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- PR #2302 completed the feedback rule and reviewed source inventory on dev; consumer conversions are separate work.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. docs/design-system.md defines no movement on appearance, update and dismissal. docs/feedback-inventory.md records 76 error candidates, 79 Alert sites, supplemental status owners and five duplicate groups. Both review axes and full local/remote checks passed. No runtime conversion or deployed browser acceptance is claimed.
+- Root cause: No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.
+- Resolution: Verify the documentation deliverable after promotion, then close. Implement consumer changes separately under #2300 and #2304–#2308.
+- Look in: `docs/design-system.md`, `docs/feedback-inventory.md`, `docs/design-system-audit.md`
+- Existing tests: Full local CI for PR #2302: 5,322 Vitest tests and 22 Bun tests; remote checks and both deployments passed.
+- Missing tests: Promotion of the documentation deliverable; runtime conversions are separate acceptance.
+- Done when: A written rule exists where a contributor will find it; Every inline error site is listed with a keep-or-change verdict and a reason; Pages rendering the same failure twice are identified; Changes, if any, land in reviewable batches after the inventory, not mixed into it; No form validation is removed in the name of consistency
+- Tracker: Verify and close. PR #2302 is merged into dev at 5ad088c4; keep separate consumer issues open.
+
+### [#2014](https://github.com/chester-hill-solutions/callcaster/issues/2014) auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-03
+- The sign-in route already sends action failures through the root feedback hook; the wider source inventory is complete in #2058.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. app/routes/signin.tsx uses useActionFeedback with getError(data.error) and renders no inline action failure. Source behavior is present; this audit does not claim a deployed sign-in test.
+- Root cause: The earlier board record described pre-conversion source and treated the inventory as a blocker for the page fix.
+- Resolution: Verify one sign-in failure toast, no revalidation replay, retained input/validation and stable page geometry in the deployed app. Promote before closure. The separate inventory is PR #2302; other consumer defects remain under #2300.
+- Look in: `app/routes/signin.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual sign-in failure, retry/revalidation and real-browser geometry; deployed verification and promotion.
+- Done when: A failed sign-in surfaces through a toast, not inline text; No inline error text remains on the sign-in page; The change is scoped to this page; the sweep ships separately as #2058
+- Tracker: Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix.
+
+### [#2295](https://github.com/chester-hill-solutions/callcaster/issues/2295) Confirm bulk-send warning overrides explicitly
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The bulk-volume override has an explicit confirmation with recipient count, delivery risk and a Send anyway choice.
+- Current behavior: Source change based on clean dev@a3d9fc40. The existing campaign-level local-number override is reused with Are you sure?, the actual queued contact count and delivery risk. Confirmation permits launch and does not dispatch immediately. Cancel, Escape and reopen require a fresh acknowledgement; pending confirmation locks the shared Checkbox and confirmation, with retry after failure. FormField uses matching visible label/control IDs. Existing admin/workspace guard, readiness rules, active notice, removal and splitting remain. Seven actual UI cases and 42 surrounding readiness/settings cases pass; original UI fails 5 with 2 controls; six faults fail and source is restored. Independent review is clear; full local/remote gates are required before merge.
+- Root cause: The existing override wording did not use the requested explicit confirmation, and cancelled acknowledgement could persist on reopening. The custom Checkbox was not explicitly locked during the request.
+- Resolution: Verify deployed bulk-volume warning count, explicit acknowledgement, Cancel/Escape/fresh reopen, pending double click, failure retry and active override removal. Keep other readiness and consent/opt-out enforcement. Promote before closure.
+- Look in: `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`, `app/lib/campaign-readiness.ts`
+- Existing tests: test/ui/split-campaign-override.test.tsx; test/campaign-readiness.test.ts; test/campaign-settings.route.test.ts
+- Missing tests: Deployed dev browser verification and promotion.
+- Done when: Show Are you sure?, real queued count, delivery risk, Cancel and Send anyway.; Require risk acknowledgement; Cancel/Escape sends nothing and reopening resets it.; Pending confirmation locks custom Checkbox and prevents a second request.; Failed confirmation is retryable without successful override state.; Keep existing workspace/admin authorization, readiness and recipient consent/opt-out boundaries.
+- Tracker: User-authorized source change in this atomic PR; keep open for deployed verification and promotion.
+
+### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.
+- Current behavior: Merged to dev in PR #2296 at a3d9fc40. Page/question revisions drain serially through the existing form client. Next and Submit await successful answer acknowledgements; Thank You awaits completion success. Failures retain retryable form values; a completed write does not remove a newer edit. Busy controls include explicit shared Checkbox disable. Respondent unmount cancels timers and requests; shared Sidebar debounce also cleans up. All 32 focused cases pass; original fails 16 with 16 controls; nine faults fail and source is restored. Full local CI passed 5,318 Vitest and 22 Bun; all remote and both Railway gates passed on 29115361. Source prerequisite #2125 is fulfilled. Verify deployed dev and promote before closure.
+- Root cause: One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers.
+- Resolution: Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.
+- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/utils/useDebounce.ts`
+- Existing tests: test/ui/survey-save-order.test.tsx; test/ui/debounce-owner-unmount.test.tsx; test/ui/survey-respondent-identity.test.tsx; test/ui/hooks-utils.test.tsx
+- Missing tests: Deployed dev browser verification and promotion.
+- Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
+- Tracker: Merged source fix; verify deployed dev and promote before closure. Required validation, displayed/resumed page identity and historical assessment stay separate.
+
+### [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125) Keep one signed respondent identity through the public survey
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The public loader signs one respondent ID, keeps it in a scoped browser cookie and passes its token to every answer and completion. Completion requires an actual saved row.
+- Current behavior: Merged to dev in PR #2293 at be7f2312. Signed respondent identity is authoritative, tokenless writes fail, and the scoped HttpOnly cookie resumes the exact saved response. Trusted bigint survey/contact IDs are normalized. Checkbox arrays resume correctly, respondent change resets state, and completion must affect a saved row. All 68 focused cases pass; original runtime fails 21 with 47 controls; ten faults fail. Full local CI passed 5,299 Vitest and 22 Bun tests; all remote and both Railway gates passed on 3700fdb2. Issue-on-dev moved one item. Required-answer policy, save ordering and historical assessment remain separate. Verify deployed dev and promote before closure.
+- Root cause: The page omitted the signed token, and tokenless writes minted a fresh ID for each request. Completion reported success without checking the affected row.
+- Resolution: Verify deployed public three-answer persistence, anonymous/contact reload, scoped token rejection and missing-row API failure. Required-answer enforcement is separate #2107; flush/save/completion acknowledgement and the premature Thank You screen are separate #2108. Historical fragments require read-only assessment #2292. Promote before closure.
+- Look in: `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/lib/survey-public-action.server.ts`, `app/lib/survey-respondent-token.server.ts`, `app/lib/survey-respondent-cookie.server.ts`, `app/lib/survey-db.server.ts`, `app/lib/survey-responses.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts; test/survey-public-loader.route.test.ts; test/survey-respondent-token-cookie.test.ts; test/ui/survey-respondent-identity.test.tsx; test/integration-db/survey-respondent-identity.test.ts; test/integration-db/survey-answer-question-scope.test.ts
+- Missing tests: Deployed dev survey/browser verification and promotion. Save-order/UI-success and required-field fixes remain in their own issues.
+- Done when: Three acknowledged answers and completion use one survey response with three answers.; Anonymous reload retains the signed identity and saved answers; a contact cookie keeps its exact response even when a newer attempt exists.; The real page passes the loader token with answer/completion requests and resets state when respondent identity changes.; Tampered, expired, wrong-survey/workspace or missing tokens cannot become chosen plain IDs.; Completion with no matching saved response returns a non-2xx API error with no success:true.; Preserve existing active-survey, honeypot, rate-limit, contact scope and trusted contact resume controls.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change. Keep #2107, #2108 and read-only historical assessment #2292 separate and visible.
+
+### [#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106) Keep loaded chat history when the current thread refreshes
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Same-conversation loader refreshes reconcile rows by SID and retain loaded history. Workspace/contact changes reset the keyed thread.
+- Current behavior: Merged to dev in PR #2291 at b2d717c3. Same-conversation loader rows reconcile by SID and retain older/live history. Saved-row identity/time limits protect pending replies from known, older and unknown-time repeated-body rows. Different workspace/contact resets keyed history and pagination. Empty older pages set exhaustion. All 32 focused cases pass; original runtime fails ten with four controls; eleven faults fail and source is restored. Full local CI passed 5,269 Vitest and 22 Bun tests; remote and both Railway gates passed on 23676f9f. Issue-on-dev moved one item. Verify deployed dev and promote before closure.
+- Root cause: Loader array reference changes were treated as a new conversation and replaced accumulated history. SID bookkeeping also excluded manually prepended rows; latest-page pagination state did not represent the retained thread.
+- Resolution: Verify loading older pages, replying and filter/sort revalidation on deployed dev retain history, update matching records and do not duplicate saved/live replies. Different workspace/contact must reset history/pagination. Promote before closure.
+- Look in: `app/hooks/realtime/useChatRealtime.ts`, `app/hooks/chats/useChatThread.ts`, `app/routes/workspaces+/$id/chats/$contact_number.route.tsx`, `app/hooks/chats/useChatsPage.ts`
+- Existing tests: test/ui/chat-thread-history.test.tsx; test/ui/hooks-chats.test.tsx; test/ui/hooks-realtime.test.tsx; test/ui/hooks-chats-optimistic-failure.test.tsx; test/ui/use-chats-page-pagination.test.tsx
+- Missing tests: Deployed dev scroll/reply/filter/identity verification before promotion.
+- Done when: At least two older pages survive reply and filter/sort loader refreshes.; Matching SID records update, unmatched live rows remain and messages retain chronological order.; Saved rows replace matching optimistic replies when loader data arrives before SSE.; Known/older/unknown-time saved rows cannot remove a new repeated pending reply or hide send failure; valid second-precision saved rows can replace it.; SSE/loader overlap and already-loaded older SIDs do not append duplicates.; Different contact/workspace resets history and pagination; equivalent normalized contact keeps history.; Empty older pages stop pagination; latest-page availability changes do not reset exhaustion.; Current-context event filtering is retained.; Original source and isolated regressions fail meaningful tests; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change. Thread history is separate from the sidebar accumulation already fixed under #2191; verify the deployed flow before promotion and closure.
+
+### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) Return feature-unavailable response when call-in verification is not configured
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.
+- Current behavior: Merged to dev in PR #2290 at c14e4a19. The single optional verification-number entry makes absent/empty real getter values undefined and the actual loader returns 503 without session writes. Configured requests retain number, caller, ten-minute expiry and session headers; invalid callers, auth denial and writer failure retain errors. Boot keys and other security settings are unchanged. All 27 focused cases pass; original runtime fails four with 23 controls, three mutations fail. Full local CI passed 5,255 Vitest and 22 Bun tests; all remote and both Railway gates passed on 0d44b4b7. Issue-on-dev moved one item. Verify disabled/enabled deployed behavior and promote before closure.
+- Root cause: The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch.
+- Resolution: Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.
+- Look in: `app/lib/env.server.ts`, `app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs`, `app/routes/api+/verify-call-in-session.loader.server.ts`
+- Existing tests: test/env.server.test.ts; test/verify-call-in-session.route.test.ts; test/verification-number-config.route.test.ts
+- Missing tests: Deployed dev disabled/enabled verification before production promotion.
+- Done when: Absent/empty verification number returns undefined from the real getter and does not prevent startup.; The real loader returns 503 with Call-in verification is not configured and writes no session.; Configured valid requests retain number, caller, ten-minute expiry and headers.; Invalid callers, unauthenticated requests and session write failures retain error responses.; Required boot keys and other production configuration/security contracts remain intact.; Meaningful original-source and mutation regressions fail; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.
+
+### [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104) Include namespace effect calls in the effects guard
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The effect guard collects actual direct and namespace calls and reads annotations before the complete callee. Both hidden effects are now inventoried.
+- Current behavior: Merged to dev in PR #2289 at 0a0acd17. The guard collects actual direct and namespace call expressions and reads annotations before the complete callee; declarations and comment/string lookalikes are ignored. Both hidden app effects are now inventoried: datetime timer documented, audience-history fetch CANDIDATE-REMOVE under #2288. Inventory lists 120 effects: 118 documented and the same two grandfathered effects. Runtime, dependencies and allowances are unchanged. All 29 focused cases pass; original scanner fails 14 of 18 with four controls, five mutations and two annotation removals fail. Full local CI passed 5,247 Vitest and 22 Bun tests; all remote and both Railway gates passed on cc58190e. Issue-on-dev moved one item. Verify merged/dev guard inventory and promote before closure.
+- Root cause: The definition-skip regex treated a preceding dot as proof of a declaration, including namespace calls and a dot in a preceding line comment. Annotation lookup at the hook name would also reject valid namespace annotations.
+- Resolution: Verify the real guard and generated inventory on the merged source; namespace calls must be enforced and documented, true declarations ignored and baseline allowances retained. Promote before closure. Audience-history behavior belongs to #2288; dependency-tag comparison remains #2067.
+- Look in: `scripts/check-effects.mjs`, `scripts/lib/effects-lib.mjs`, `app/components/ui/datetime.tsx`, `app/hooks/audience/useAudienceUploads.ts`, `docs/effects-inventory.md`, `scripts/effects-baseline.json`
+- Existing tests: test/effects-scanner.test.ts; test/effects-compliance.test.ts; test/ui/audience-upload-history.test.tsx
+- Missing tests: Verification on merged/deployed dev source before promotion.
+- Done when: Actual unannotated direct, namespace and layout-effect calls fail the CLI.; Annotated complete member calls appear in inventory, including multiline forms.; Actual declarations and hook-like comments/strings are ignored.; Namespace effects count in baseline mode and growth above allowance fails.; Datetime timer annotation and audience removal debt are listed; production behavior and baseline allowance are unchanged.; Original source, scanner mutations and annotation removals fail meaningful regressions.; Full local/remote gates pass before merge; verify merged dev source before promotion and closure.
+- Tracker: Source guard fix is in this change; verify inventory/enforcement and promote before closure.
+
+### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.
+- Current behavior: Merged to dev in PR #2287 at 24c4d810. Calling publishes canonical staffed 4/5 credits; IVR retains 2/3. Distinct calculator fields use canonical duration arithmetic and exclude zero/invalid durations. Five connected minutes cost 24 and 14 credits; additional started minutes round up. Shared FormField/Input controls retain accessible hints and canonical styles. The team quote and active pricing copy are explicit; actual billing tariffs/debit logic are unchanged. All 57 focused cases pass; original runtime fails 22 with 35 controls and nine mutations fail. Full local CI passed 5,229 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on da89d57e. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.
+- Root cause: The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team.
+- Resolution: Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.
+- Look in: `app/lib/public-pricing.ts`, `app/components/pricing/PricingCalculator.tsx`, `app/routes/workspaces+/$id/billing.route.tsx`, `shared/pricing.ts`, `app/lib/twilio-call-status.server.ts`
+- Existing tests: test/public-pricing.test.ts; test/ui/pricing-calculator.test.tsx; test/call-status-billing.test.ts; test/ui/billing-purchase-caller-gating.test.tsx
+- Missing tests: Deployed pricing cards/calculator and actual ledger smoke verification before promotion.
+- Done when: Calling publishes 4/5 and IVR 2/3 from their canonical constants.; Representative positive durations agree across published rates, calculator estimates and the real billing processor.; Zero, negative and invalid duration estimates contribute zero.; Actual UI fields remain distinct and show matching credit/CAD totals.; The CallCaster-team quote request remains explicit.; Original source and isolated rate, kind, duration, field-wiring and copy mutations fail meaningful regressions.; Full local/remote gates and deployed verification pass before promotion and closure.
+- Tracker: Source fix is in this change; verify deployed estimates and copy, then promote before closure.
+
+### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) Align the API session-cookie contract with Better Auth
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.
+- Current behavior: Merged to dev in PR #2286 at 715c6844. Shared session-cookie definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS as deployment alternatives. All served specs preserve session-only versus API-key/session policy; the SDK uses the exact issued name and signed value through its auth callback. Auth configuration/verifier are unchanged. All 112 focused cases pass; original runtime fails eight with ten controls, five source/SDK mutations and a separate signed-value challenge fail. Full local CI passed 5,202 Vitest and 22 Bun tests. All remote gates and both Railway checks passed on b13ad43d; issue-on-dev moved one item. Verify deployed behavior and promote before closure.
+- Root cause: The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism.
+- Resolution: Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.
+- Look in: `app/lib/openapi-integrator.ts`, `app/lib/openapi-build.ts`, `app/lib/openapi-platform.ts`, `app/lib/api-generated/sdk.gen.ts`, `app/server/auth-instance.ts`, `app/lib/auth.server.ts`, `docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md`, `test/session-cookie-contract.test.ts`
+- Existing tests: test/session-cookie-contract.test.ts (real app auth instance with isolated adapter, issued signed cookies, three generated SDK operations, HTTP/HTTPS, wrong-name/prefix/signature and API-key header controls); test/openapi.test.ts (session-only and API-key/session security policy); test/api-auth.test.ts; test/auth-instance.server.test.ts; test/api-surface.test.ts; test/openapi-complete.test.ts
+- Missing tests: Deployed cookie/SDK verification and production promotion before closure.
+- Done when: All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.; All session operations include both mechanisms without widening session-only routes to API-key access.; The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.; Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.; Browser-cookie and SDK API-key controls remain valid.; Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.; Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure.
+- Tracker: Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.
+
+### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) Require conversation read capability for message acknowledgments
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Conversation POST now uses the same existing campaigns.read capability strategy as GET before either received-message read acknowledgment writer.
+- Current behavior: Merged to dev in PR #2285 at a3051a42. Conversation acknowledgment POST enforces campaigns.read before either received-message writer, matching GET. Required-capability keys and permitted session roles retain both modes; scope, actor, membership and workspace rejections perform no writes. Generated and served contracts state the matching capability and API-key/session access. These writers only change received-message read state, not outbound provider delivery receipts. All 92 focused cases pass; original runtime fails 21 of 37 cases with 16 controls and four mutations fail. Full local CI passed 5,184 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on 0f9019b5. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.
+- Root cause: The action read middleware context but did not require a session actor or a capability. GET already required campaigns.read. An editorial auth declaration concealed the missing POST gate and the sessionOnly exposure contradicted key access.
+- Resolution: Verify empty/unrelated API-key scopes cause no read-state write on deployed dev, while campaigns.read keys and permitted session roles can acknowledge one received message or a conversation. Verify 401/403/404/405 errors and the documented served contract. Promote before closing.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/message-db.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/api-surface-generated.ts`, `docs/api-data-plane.md`
+- Existing tests: test/conversation-ack.route.test.ts (actual actions, actor/scope controls, both writers, decoding, methods, generated surface and both served specs); test/capability-actor.test.ts; test/capability-gated-routes.test.ts; test/capability-linkage.test.ts
+- Missing tests: Deployed route verification and production promotion before closure.
+- Done when: Empty/unrelated API-key scopes receive 403 and perform no message write in either acknowledgment mode.; Required-capability keys and permitted session roles succeed; missing actor is 401 and non-member/workspace mismatch is 404 with no write.; GET and POST enforce campaigns.read and generated/served API contracts state API-key/session access.; Preserve decoded phone forwarding, specific-SID and empty-body acknowledgment, POST-only behavior and write failures.; Original runtime and changed gate fail the actual route regressions while positive controls remain.; Verify deployed behavior before production promotion and closure.
+- Tracker: Source fix is in this change; verify deployed behavior and promote before closure.
+
+### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) Restrict webhook tests to permitted workspace members
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Both test URLs require workspace membership and the existing member-or-higher rule, then share one Postgres-backed per-user limit before DNS and outbound delivery.
+- Current behavior: Merged to dev in PR #2284 at 29668acd. Both webhook-test URLs require member-or-higher workspace access and share ten tests per minute per authenticated user. Rejection and storage failure prevent DNS/HTTP work. The editor carries the top-level workspace ID, retains unsaved URL/header testing and preserves response read-back. The route guard checks external effects and only used service/provider imports. All 100 focused Node cases and one UI case pass; original runtime fails 23 regressions with 23 controls and the original editor fails. Thirteen mutations fail. Full local CI passed 5,147 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on 470d1825. Issue-on-dev moved one item. Verify deployed behavior and cross-process shared rate limiting before promotion and closure.
+- Root cause: The flat action trusted a session without workspace authorization. The nested test service relied on membership middleware but had no role gate. Neither test path was throttled. The membership guard skipped routes without tenancy text and could count unused service/provider imports as proof.
+- Resolution: Verify both deployed URLs: permitted users can test unsaved destinations/headers; callers and non-members have no outbound effect; both URLs and workspaces share the same user budget and return actionable 429 responses. Check storage-error rejection and public-URL/response controls before production promotion and closure.
+- Look in: `app/routes/api+/test-webhook.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts`, `app/lib/platform-members.server.ts:testWorkspaceWebhook`, `app/lib/webhook-test-delivery.server.ts`, `app/components/workspace/WebhookEditor.tsx`, `app/lib/platform-rate-limit.server.ts`, `scripts/check-route-membership.mjs`, `docs/api-workspace-admin.md`
+- Existing tests: test/test-webhook.route.test.ts (actual actions, role/membership, real bucket, shared identities, failures, forwarding and expiry); test/check-route-membership.test.ts (external relay, unused imports, called services, auth/provider/cron controls); test/ui/webhook-editor.test.tsx (actual unsaved test submission and top-level workspace); test/openapi.test.ts; test/safe-outbound-url.test.ts; test/safe-outbound-response-limit.test.ts; test/platform-rate-limit.test.ts; test/workspace-setting-utils.test.ts
+- Missing tests: Deployed route/provider verification, shared rate-limit behavior across app processes and production promotion before closure.
+- Done when: Missing workspace or non-member cannot deliver a test. Caller is refused; member/admin/owner remains permitted.; Both URLs and all workspaces share ten tests per minute per authenticated user, independent of caller IP and destination.; Over-limit requests include Retry-After; storage failure, role rejection and membership rejection perform no DNS or HTTP work.; The editor sends top-level workspace_id while retaining unsaved URL/header testing and response read-back.; External-effect routes without workspace proof fail the guard; unused imports do not grant proof or a provider exemption. Explicit user auth/provider/cron controls remain valid.; Verify deployed behavior before promotion and closure.
+- Tracker: Source fix is in this change; verify both deployed routes and the shared database-backed rate limit before promotion and closure.
+
+### [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082) Route manual A2P setup through the canonical compliance job
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Source fix uses the existing compliance job for all manual actions, reports queue acceptance only and requires both provider resources for A2P approval.
+- Current behavior: Merged to dev in PR #2283 at e71435b3. Manual actions queue the canonical compliance job and report queue acceptance only. Required A2P resources, real SDK campaign statuses and stored worker errors gate 10DLC SMS. Required inputs precede A2P product/brand/campaign calls, while prior service/customer-profile setup can run. All 107 focused cases pass, old source fails 27 regressions with 22 controls, and 16 mutations fail. Full local CI passed 5,103 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on a4c8e9ba. Issue-on-dev moved one item. After brand approval, operators must retry the compliance job to create the campaign. Verify deployed behavior and promote before closure. Trust Product preparation remains separate in #2282.
+- Resolution: After deployment, inspect actual brand/campaign SIDs and errors. Wait for brand approval, then use Retry compliance job to resume campaign creation. Verify provider review, error/retry recovery and the real 10DLC send gate before promotion and closure. Separate Messaging Trust Product preparation remains #2282.
+- Look in: `app/lib/platform-onboarding-handlers.server.ts`, `app/lib/platform-admin-twilio.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/twilio-compliance-job.server.ts`, `app/lib/twilio-a2p-status-sync.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `docs/twilio-parent-ops-runbook.md`
+- Existing tests: test/a2p-manual-actions.test.ts (onboarding/admin API queue acceptance, failures and role controls); test/admin-workspace-twilio.route.test.ts (actual admin form success/error); test/twilio-a2p-provision.server.test.ts (installed SDK, actual writer/normalizer/send gate, creation/reuse/wait/errors/inputs and retry recovery); test/twilio-a2p-status-sync.test.ts (required resources, provider VERIFIED/IN_PROGRESS, review demotion and unknown reads); Existing onboarding, business-profile and readiness controls
+- Missing tests: Deployed provider and send-gate checks; manual retry after brand approval; production promotion before closure.
+- Done when: All manual actions queue the canonical compliance job and report queue acceptance only.; Queue failure never reports success.; Brand review waits without campaign creation; both required resources and approval evidence gate 10DLC SMS.; The installed SDK submits a service-scoped campaign with the required payload and persists created/reused SIDs.; Provider failure, missing campaign SID and thrown bootstrap error remain visible and remove stale approval; successful retry clears stale errors.; Missing business inputs stop A2P Trust Product, brand and campaign calls; prior service/profile setup is separate. Opt-in text is never fabricated.; Verify deployed provider states and retry continuation before promotion and closure.
+- Tracker: Source fix is in this change. Verify the complete deployed provider/send path and operator continuation before promotion and closure; #2282 remains separate.
+
+### [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083) Block bulk SMS when toll-free verification evidence is missing
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.
+- Current behavior: Merged to dev in PR #2281 at aacb17ac. The stored bulk SMS gate requires complete successful toll-free verification evidence. Only TWILIO_APPROVED permits approval; full SDK inventory/verification lists, failed or legacy evidence and visible sync errors are covered. Approved/no-toll-free inventories and refresh recovery remain permitted. All 101 focused cases pass, 27 old-source regressions fail with 12 controls, 14 mutations fail, and full local CI passed 5,083 Vitest and 22 Bun tests. All remote gates and both Railway checks passed at 29b76839; issue-on-dev moved one item. Refresh deployed snapshots, verify behavior and promote before closure.
+- Root cause: The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence.
+- Resolution: After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.
+- Look in: `app/lib/twilio-toll-free.server.ts`, `app/lib/database/workspace-twilio-sync.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/workspace-twilio-sync.ts`, `app/lib/types.ts`, `scripts/check-app-file-size.mjs`, `docs/twilio-toll-free-verification-plan.md`
+- Existing tests: test/toll-free-verification-evidence.test.ts (installed SDK transport, exact status controls, provider errors and later verification pages); test/workspace-twilio-sync.server.test.ts (real writer, normalization, stored readiness gate, later inventory page, unknown/legacy/malformed/failed evidence, approval/no-TF controls and refresh recovery); Existing portal, recommendations, shared onboarding/readiness, RCS and campaign send-gate controls
+- Missing tests: Deployed dev refresh and actual bulk SMS checks before promotion and closure.
+- Done when: Missing, unknown, misleading non-approved, pending and rejected verification blocks bulk SMS.; Provider and inventory errors remain visible and block the actual gate.; Phone inventory and matching verification beyond the former 200-result cap affect the decision.; A successful complete sync is required before old or missing evidence can permit sends.; Approved senders and successful no-toll-free inventory remain allowed; successful refresh recovers from failure.; The shared gate fails closed and adds no provider call per recipient.; Refresh deployed snapshots and verify behavior before promotion and closure.
+- Tracker: Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.
+
+### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Project admin workspace responses without credentials
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2280 at 6e46180b. Six admin UI/API surfaces use the canonical positive workspace contract, nested invitation hashes are excluded and both account loaders use one five-field projection with selected-account tests. Safe client types and the static import/type gate preserve server-only credential reads and health derivation. All 50 focused Node cases passed, 13 mutations failed, full local CI passed 5,048 Vitest and 22 Bun tests. All remote gates passed on 9ee5270b; issue-on-dev moved one item. Deployed functional verification and promotion remain.
+- Root cause: Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields.
+- Resolution: Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.
+- Look in: `app/lib/platform-admin.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/twilio-client-projection.server.ts`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/admin.types.ts`, `scripts/check-workspace-projection.mjs`
+- Existing tests: test/admin-response-projection.test.ts (six real service/route surfaces, complete root/workspace/provider/invitation key sets, nested secret absence, API auth, missing workspace, provider failure, selected workspace account SID and server-only portal control); test/check-workspace-projection.test.ts (raw reader/type refusal, positive/secret Pick controls and permitted server-only credentials); Existing product SQL projection, admin rows/actions/credits/portal and membership summary controls
+- Missing tests: Deployed admin payload, display/health and Twilio-operation verification before promotion.
+- Done when: Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.; Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.; Client types use the safe workspace contract and server-only credential reads remain permitted.; Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.; Missing workspace, provider failure and real API authorization remain controlled.; Deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.
+
+### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2279 at 9aa2025e. /remember uses configured BASE_URL with /reset-password, actual issued email links retain tokens through the password form and change the password; generic request feedback, expiry/replay rejection and limits remain. Both verification failures return to registered sign-in and password completion feedback is accurate. All 33 focused Node and four rendered UI cases passed, nine mutations failed, full local CI passed 5,022 Vitest and 22 Bun tests. All remote gates passed on 2303257c; issue-on-dev moved one item. Wider redirect guard remains separate in #2278. Deployed functional verification and promotion remain.
+- Root cause: The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled.
+- Resolution: Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.
+- Look in: `app/routes/remember.action.server.ts`, `app/routes/remember.tsx`, `app/routes/reset-password.tsx`, `app/routes/reset-password.loader.server.ts`, `app/routes/reset-password.action.server.ts`, `app/routes/api+/auth/callback.loader.server.ts`, `app/routes/auth/confirm.loader.server.ts`
+- Existing tests: test/password-recovery-journey.test.ts (installed Better Auth, actual email sender, auth loader, reset loader/action, sign-in, expiry, replay, configured host and throttling); test/verification-callbacks.test.ts (both missing/rejected callbacks and success cookie/return controls); test/ui/password-recovery-feedback.test.tsx (real rendered forms and action feedback); Existing remember, reset, email sender, auth-instance and callback tests
+- Missing tests: Deployed password recovery and callback verification before promotion.
+- Done when: Actual issued link reaches the password form with the original token and the action changes the password.; Known and unknown emails receive the same generic acceptance feedback.; Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.; Password completion feedback names the correct credential.; Existing expiry, replay rejection and request/reset limits remain.; Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.
+
+### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2277 at c261919e. Session email authorizes resend before rotation or delivery; the actual UPDATE filters mandatory workspace, authorized email, ID and pending state. Same 404 for foreign/missing/finalized invitations, unsigned 401, seven-day hash-only token and expired-pending resend remain. All 45 focused Node and six real Postgres cases passed, nine isolated mutations failed, full local CI passed 5,007 Vitest and 22 Bun tests. All remote gates passed on 7a1945e7; issue-on-dev moved one item. Deployed functional verification and promotion remain.
+- Root cause: The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization.
+- Resolution: Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.
+- Look in: `app/routes/accept-invite.action.server.ts`, `app/lib/workspace-invitations.server.ts`, `app/lib/platform-auth-rate-limit.server.ts`, `app/lib/platform-rate-limit.server.ts`
+- Existing tests: test/workspace-invitation-resend.test.ts (real route, identity precheck, unsigned/race/server errors, email delivery and existing register throttling); test/integration-db/workspace-invitation-resend.test.ts (actual scoped UPDATE, unchanged tokens/expiry/status, independent hash check and seven-day expired-pending control); Existing accept-invite signup/redemption, invitations, cancellation and auth rate-limit controls
+- Missing tests: Deployed invite resend refusal, delivery, token and rate-limit verification before promotion.
+- Done when: Session email matches the pending invitation before rotation or email delivery.; Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.; The writer requires workspace and authorized email and filters both with ID and pending status.; Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.; Existing register rate limiting refuses excess resends before rotation or delivery.; Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.
+
+### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.
+- Current behavior: Merged to dev in PR #2276 at 8e1f89d3. Mandatory workspace ID filters the actual cancellation UPDATE with ID and pending status; API and settings preserve uniform 404 and permitted-role behavior. Global admin cancellation derives the invitation workspace for the same writer. All 73 focused Node and ten real Postgres cases passed; eight isolated mutations failed and were restored. Full local CI passed 4,998 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 9886eae2. Deployed functional verification and promotion remain.
+- Root cause: API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status.
+- Resolution: Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.
+- Look in: `app/lib/workspace-invitations.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-invitation-cancel.test.ts (real adapters, mandatory workspace wiring, 404/500 mapping, member/admin/owner controls and global admin caller); test/integration-db/workspace-invitation-cancel.test.ts (actual UPDATE, unchanged foreign/finalized rows, real API/settings, role refusal and global admin control); Existing workspace settings, invitations, member authorization and OpenAPI controls
+- Missing tests: Deployed API, product and global admin cancellation verification before promotion.
+- Done when: The canonical mutation requires workspace ID and filters ID, workspace and pending status.; API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.; Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.; Every cancellation caller supplies the authorized or explicitly admin-selected workspace.; Resend and invitation acceptance stay separate.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.
+
+### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.
+- Current behavior: Merged to dev in PR #2275 at 89bd9fbb. One canonical rule rejects the current owner before MFA or transactions; real API and settings return a clear 400 with no writes or success audit. API failure mapping calls the domain service directly. All 65 focused Node and three real Postgres cases passed; seven isolated mutations failed and were restored. Full local CI passed 4,989 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 48ae34a0. Deployed functional verification and promotion remain.
+- Root cause: The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful.
+- Resolution: Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.
+- Look in: `app/lib/workspace-members-db.server.ts`, `app/lib/platform-workspace.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-ownership-transfer.test.ts (real API/form, shared service, error/audit, MFA and owner-role controls); test/integration-db/workspace-ownership-transfer.test.ts (real distinct rows, self rejection, workspace isolation and rollback); Existing workspace membership, settings RBAC, form-helper and OpenAPI controls
+- Missing tests: Deployed ownership-transfer verification before promotion.
+- Done when: The canonical service rejects equal owner IDs before MFA or a transaction.; API and product self transfers return a clear error and leave ownership unchanged.; Session identity, owner authorization and distinct-target MFA remain enforced.; A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.; A failed transfer cannot return API success or record a success audit.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.
+
+### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Caller entry and next-page flow use saved start and order; deployed outbound/manual/inbound flow checks remain.
+- Current behavior: Merged to dev in PR #2274 at 48a29230. Signed campaign entry and both dispatch paths use the saved start; inbound entry and shared prompt/response flow use saved start and order. Raw campaign launch rejects a missing declared start before migration can repair it. All 139 focused tests passed; seven isolated mutations failed and were restored. Full local CI passed 4,981 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on e7d35344. Deployed caller-flow verification and promotion remain; #2269 owns inbound attachment/save validation.
+- Root cause: Outbound dispatch hard-coded page_1, inbound entry used object key order, and three next-block helpers ignored saved order. Launch validation migrated first and silently repaired dangling saved entries.
+- Resolution: Verify saved entry and order in manual, machine and inbound calls, machine-answer controls and clear launch rejection on deployed dev; promote before closure. Inbound attachment/save validation remains separate in #2269.
+- Look in: `app/lib/ivr-page-order.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/campaign-ivr-page.server.ts`, `app/lib/call-script-service.ts`, `app/lib/twilio-ivr-runtime.server.ts`, `app/routes/api+/ivr/$campaignId.action.server.ts`, `app/routes/api+/inbound.action.server.ts`
+- Existing tests: test/page-order.test.ts and test/page-flow.route.test.ts (entry, ordering, real TwiML, legacy/explicit-page, auth and machine controls); test/ivr.route.test.ts and test/campaign-ivr-dispatch.test.ts (manual/machine dispatch with real URL resolver); test/campaign-readiness-expiry.test.ts (raw entry rejects before status/job writes for all three machine voice types); Existing page, block response, inbound response, script service and shared runtime controls
+- Missing tests: Deployed caller-flow and launch-error verification before promotion.
+- Done when: Both outbound dispatch paths and inbound entry use the declared start.; Prompt and response fall-through use saved page order; explicit navigation and legacy behavior remain intact.; Unknown/repeated order IDs are reconciled and omitted pages remain reachable.; A dangling raw start is rejected before campaign launch; entry cannot silently choose another page.; Signature and stored campaign checks, machine-answer policy, deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.
+
+### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Validated credentials are reused and agent-call setup failures release the exact offer; deployed configuration, release and retry checks remain.
+- Current behavior: Merged to dev in PR #2273 at dff1ac66. Validated credentials are reused, call URL setup runs before a claim, and SDK setup/create failures release the exact offer with actionable context. All 33 focused Node and three real Postgres cases passed; six isolated mutations failed and were restored. Full local CI passed 4,952 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 9960d86e. Deployed functional verification and promotion remain.
+- Root cause: Initial missing credentials were already rejected during signature validation, but the second credential read after claim could leave an undialled offer. SDK loading/construction and URL configuration also happened outside or before the call-start cleanup boundary.
+- Resolution: Verify missing configuration, failed agent-call setup, release state and bounded retries on deployed dev, then promote before closure. No new readiness subsystem or historical migration changes are required.
+- Look in: `app/lib/acd/acd-router.server.ts`, `app/lib/db-rpc.server.ts`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`
+- Existing tests: test/acd-offer-start.test.ts (credential reuse, initial rejection, configuration before claim, SDK/create failure, exact release, log context and retry/active controls); test/integration-db/acd-offer-cleanup.test.ts (real SDK setup error and actual release RPC: availability, accepted-entry and missing-entry controls); test/acd-router.test.ts, test/acd-router-route.test.ts and test/acd-router-subroutes.test.ts (existing ACD, signature and stale-sweep controls)
+- Missing tests: Deployed configuration, failed setup, release and retry behavior before promotion.
+- Done when: Missing credentials or required call URL configuration cannot create a new offer.; Validated credentials are reused; failed SDK setup or create releases the exact offered entry.; Actual release makes its agent available while accepted calls and other-workspace offers remain intact.; Logs identify the affected context without credentials; existing signatures, limits, active-entry and stale-sweep controls pass.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed ACD behavior after merge, then promote and close.
+
+### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Both inbound routes now emit valid Enqueue text and ACD callbacks after a workspace-scoped queue lookup; deployed direct and scripted queue verification remains.
+- Current behavior: Merged to dev in PR #2272 at dbb9f691. Direct number and IVR queues share real named Enqueue with encoded ACD wait/completion callbacks, stored IVR caller and a workspace-scoped queue check. All 59 focused Node and three real-Postgres cases passed; nine isolated mutations failed and were restored. Full local CI passed 4,941 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 254c3fed. Deployed functional verification and promotion remain.
+- Root cause: Both routes called a nonexistent Enqueue.queue method. The IVR queue branch also omitted the ACD wait and completion callbacks. Raw query interpolation could change callback parameters; repaired routing needs an owned queue before emitting TwiML.
+- Resolution: Verify a queue-configured number and a script queue target on deployed dev, including ACD wait, agent connection and completion, then promote before closure. Inbound attachment validation remains separate in #2269.
+- Look in: `app/lib/inbound-queue-twiml.server.ts`, `app/lib/inbound-queue-db.server.ts`, `app/routes/api+/inbound.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/acd/acd-router.server.ts`
+- Existing tests: test/inbound-queue-entry.route.test.ts (both real routes and TwiML: queue text, callback URL values, stored IVR caller, invalid/missing queues, lookup failure and signatures); test/integration-db/inbound-queue-lookup.test.ts (real query: same-workspace, foreign-workspace and missing IDs); Existing inbound, IVR and voicemail suites (surrounding controls)
+- Missing tests: Deployed direct and scripted queue entry, ACD wait, agent connection and completion before promotion.
+- Done when: Both routes emit valid named Enqueue with ACD wait and completion callbacks.; Callback values round-trip unchanged; invalid, missing or foreign queues cannot emit Enqueue.; Signature, call mismatch, voicemail and navigation controls remain valid.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed queue behavior after merge, then promote and close.
+
+### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The inbound IVR terminal renderer now uses the configured greeting and actual called phone. Recording capture remains intact; deployed playback verification remains.
+- Current behavior: Merged to dev in PR #2270 at 89bba361. The terminal renderer uses the configured greeting and verified called phone; direct and listed playback first check actual object existence. All 49 focused Node tests passed; four isolated mutations failed and were restored. Full local CI passed 4,931 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on a295b40c. Deployed functional verification and promotion remain.
+- Root cause: The route already loaded inbound_audio and phoneNumber but passed null for the greeting and the number row ID for fallback speech.
+- Resolution: Verify selected greeting playback, actual-phone fallback speech and voicemail recording capture on deployed dev, then promote before closing. Script recipient delivery and attachment validation remain open in #2268 and #2269; this playback fix does not resolve them.
+- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `app/lib/inbound-voicemail-twiml.server.ts`
+- Existing tests: test/inbound-voicemail-audio.test.ts (real storage adapter with S3 boundaries: availability, failures and retry controls); test/inbound-ivr-block-response.route.test.ts (actual greeting Play, real called phone in speech, unavailable-audio fallback, recording attributes, existing call mismatch and navigation controls); test/inbound-ivr-block.route.test.ts, test/inbound.route.test.ts, test/ivr-block-runtime.test.ts and test/email-vm.route.test.ts (surrounding IVR and recording controls)
+- Missing tests: Deployed greeting playback, actual-phone speech and recording capture before promotion.
+- Done when: Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.; Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.
+
+### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) Use the destination phone to verify the SMS recipient
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The API, chat form and campaign test sender now use one verified recipient. Mismatched IDs, ambiguous contacts and failed verification block sends; deployed verification remains.
+- Current behavior: Source fix from dev@2d25f309: a workspace-scoped SQL query selects every normalized-equal phone, including formatted duplicates; the shared guard verifies unique destination identity. A supplied ID must match it. The same contact supplies opt-out, cached line type, template data and attribution. API and form line lookups propagate actual cache and provider failures. Campaign tests retain their existing opt-out-only policy. All 146 focused cases passed (137 node and nine real-Postgres tests), including 53 recipient regressions and controls; the old source failed 42 with 11 controls retained. Ten isolated mutations failed the relevant checks and were restored.
+- Root cause: The guards trusted the supplied ID and allowed ambiguous matches or lookup failures. Later template and attribution code reused the unverified ID. The general search helper can omit formatted phones and hide ambiguity.
+- Resolution: Verify matching and mismatched IDs, ambiguous contacts, lookup failures, normalized phones, known opt-out and landline results, correct templates and attribution, and manual new-number behavior on deployed dev. Verify the campaign test sender. Promote verified behavior before closing. This change does not implement the unknown-sender consent ledger rollout under #2263 and #1268.
+- Look in: `app/lib/database/contact.server.ts`, `app/lib/chat-sms-guards.server.ts`, `app/routes/api+/chat_sms.action.server.ts`, `app/routes/workspaces+/$id/chats.action.server.ts`, `app/lib/campaign-test-send.server.ts`, `app/lib/twilio-lookup.server.ts`, `app/lib/openapi-integrator.ts`, `docs/api-send-sms.md`
+- Existing tests: test/integration-db/sms-recipient-identity.test.ts (actual SQL, normalized formats and hidden duplicates, workspace and prefix exclusion, new-number and international controls); test/sms-recipient-identity.test.ts (real resolver and line-type lookup through all three consumers, provider/cache failure, mismatch, ambiguity, phone equality, tags and attribution); test/chat-sms-action.route.test.ts and test/chats-action.route.test.ts (opt-out, landline and verification error responses); test/chats-action.server.test.ts (template and sender controls); test/campaign-test-send.test.ts (test-send policy, sample data and media); test/chat-sms.route.test.ts (actual chat sender and provider controls); test/twilio-lookup.server.test.ts (existing caller fail-open policy retained)
+- Missing tests: Deployed verification through API, chat form and campaign test sender before promotion.
+- Done when: Destination phone and unique workspace contact agree before sending; supplied IDs cannot bypass opt-out or landline protection.; Ambiguous and failed verification block sends with an error distinct from opt-out and landline.; Eligible normalized recipients use verified template data and attribution; legacy manual new-number and campaign test policies remain.; Public API contract and generated artifacts describe recipient verification.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close.
+
+### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Retain all required SMS opt-out keywords when workspace settings add custom keywords
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The shared parser and direct matcher now retain all eight standard keywords plus the OPT OUT alias. Custom settings add keywords; deployed SMS and queue verification remain.
+- Current behavior: Source fix from dev@fd86e10a: one shared merge retains mandatory keywords for both parsed configuration and direct callers. Whole-message matching normalizes case and whitespace. Returned arrays cannot mutate the defaults. Actual inbound-route tests prove every keyword updates matching contacts and removes both contacts from all workspace campaign queues. All 175 focused cases passed (162 node, 13 UI). The corrected old-source check failed 72 regressions while 43 controls passed; five isolated mutations failed the relevant checks, including both real dispatch adapter gates.
+- Root cause: The default keyword list had only STOP and UNSUBSCRIBE, and non-empty workspace or direct-call lists replaced it.
+- Resolution: Verify all standard keywords, the OPT OUT alias, custom phrases, STOP-only configuration, workspace queue removal and ordinary replies on deployed dev. Verify START still resubscribes without requeue. Promote verified behavior before closing. Unknown-sender app suppression and operator guidance remain separate decision issues #2263 and #2264.
+- Look in: `app/lib/chat-opt-out.ts`, `app/routes/api+/inbound-sms.action.server.ts`, `app/routes/workspaces+/$id/chats.loader.server.ts`, `app/hooks/chats/useChatsPage.ts`, `app/hooks/chats/useChatThread.ts`, `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: test/chat-opt-out.test.ts (mandatory set, custom union, direct matcher, whitespace, exact match and immutable defaults); test/inbound-sms.route.test.ts (every keyword across three configurations, every fallback keyword, both matching contacts and workspace queues, ordinary replies and START controls); test/campaign-sms-dispatch-contract.test.ts (real coordinator through HTTP and worker; opted-out and eligible contacts); test/chat-sms-action.route.test.ts and test/chat-sms.route.test.ts (existing outbound route controls); test/ui/hooks-chats.test.tsx, test/ui/hooks-chats-optimistic-failure.test.tsx and test/ui/components-chats-contact.test.tsx (existing chat consumers and opt-out banner controls)
+- Missing tests: Deployed SMS keyword and workspace queue verification before promotion.
+- Done when: All eight standard keywords plus OPT OUT remain mandatory for parser and direct matcher.; Custom keywords add to the required set, with case and whitespace normalization and whole-message matching.; Matching contacts are opted out and removed from all receiving-workspace campaign queues; eligible dispatch and ordinary reply controls remain.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close. #2263 and #2264 are independent decisions; do not treat them as completed by this parser fix.
+
+### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Expired campaigns now produce a readiness blocker before launch or joining. The correction selects the date pickers. Deployed launch and join verification remain.
+- Current behavior: The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.
+- Root cause: campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers.
+- Resolution: Verify expired, equal-time and future campaigns on deployed dev: expired campaigns show Complete before launch, disable Start and Schedule, and disable joining. The setup guide must select the date pickers. Check message, live and automated voice campaigns, then promote verified behavior before closing.
+- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/campaign-readiness-actions.ts`, `app/lib/campaign-setup-steps.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.loader.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id.loader.server.ts`, `app/components/campaign/settings/CampaignLaunch.tsx`
+- Existing tests: test/campaign-readiness-expiry.test.ts (expiry boundary, default/explicit clock, launch writes, every real producer and a new-union-code guard); test/campaign-settings.route.test.ts (activation and unavailable-script controls with a pinned clock); test/campaign-readiness.test.ts and test/campaign-readiness-actions.test.ts (existing readiness controls with a pinned clock); test/campaign-setup-steps.test.ts (expired guide correction and existing steps); test/campaign-selected-id.loader.test.ts (expired/equal running-campaign join behavior); test/ui/campaign-launch-review.test.tsx and test/ui/campaign-launch-actions.test.tsx (real expiry readiness into UI, disabled start/schedule controls)
+- Missing tests: Deployed expiry, date correction, launch and join verification before promotion.
+- Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
+- Tracker: The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- New MMS uploads use unique keys and reject object collisions. Earlier chat attachments and campaign keys remain intact. Deployed upload and campaign-send verification remain.
+- Current behavior: This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.
+- Root cause: The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError.
+- Resolution: Verify same-name chat and campaign uploads on deployed dev: both retain their own bytes and links, each campaign sends its own media, historical attachments still resolve and a storage conflict cannot report success or alter the original. Promote verified behavior before closing.
+- Look in: `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/sms-ui/ChatMessages.tsx`
+- Existing tests: test/message-media-storage-regression.test.ts (five real-adapter cases: chat/campaign bytes, historic keys, preflight conflict and conditional-write race); test/message-media.route.test.ts (validation, auth, upload failure, campaign update and historic deletion controls); test/campaign-sms-dispatch-contract.test.ts (both API and worker sign and send historic plus new media keys); test/object-storage-upsert.test.ts (no-overwrite provider behavior)
+- Missing tests: Deployed chat upload and campaign-send verification before promotion.
+- Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
+- Tracker: The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Ordinary contact dequeues require a campaign and leave other campaign queues intact. Explicit workspace-wide opt-out remains. Deployed migration and calling verification remain.
+- Current behavior: This source fix scopes primary and household SQL, RPC event snapshots, completion and no-op diagnostics to the selected campaign. A missing primary queue row cannot dequeue siblings or emit another operation’s sibling update. SMS opt-out and do-not-call use explicit allCampaigns targets. The assigned-agent guard and primary result remain. All 196 focused cases passed (161 node, 23 real Postgres, 12 UI); eight isolated mutations each failed the relevant regression. Both standards and issue-scope reviews passed after the missing-primary correction.
+- Root cause: The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues.
+- Resolution: Verify the new six-argument dequeue_contact migration and matching application on deployed dev. Call one contact from campaign A while B stays queued; check household, predictive, manual advance, hangup and terminal callbacks, another agent’s claim, no-op messages, event scope and completion. Confirm SMS STOP and do-not-call still remove the contact from all campaign queues. Old callers fail after the old RPC signature is removed, so deploy the matching application and migration together. Promote verified behavior before closure.
+- Look in: `client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql`, `app/lib/campaign-queue-db.server.ts`, `app/lib/db-rpc.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/routes/api+/hangup.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/callscreenActions.ts`
+- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts (23 real Postgres cases: campaign/household/event/completion/no-op scope, missing-primary and concurrent events, own-assignee guard, global opt-out controls and exact RPC signature); test/queues.route.test.ts (validation, campaign/contact workspace pair and existing no-op/conflict responses); test/auto-dial.server.test.ts, test/auto-dial-status.test.ts, test/hangup.route.test.ts, test/webhook-side-effects.test.ts (campaign wiring and no-campaign controls); test/inbound-sms.route.test.ts and test/questions.route.test.ts (explicit all-campaign opt-out targets); test/ui/callscreenActions.test.ts (selected campaign in manual request)
+- Missing tests: Deployed migration and calling verification before production promotion.
+- Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
+- Tracker: The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.
+- Current behavior: This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.
+- Root cause: The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference.
+- Resolution: Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.
+- Look in: `app/routes/api+/auto-dial/status.action.server.ts`, `app/hooks/call/useCallRoom.ts`, `app/hooks/call/usePredictiveCallSync.ts`, `app/lib/workspace-events.shared.ts`, `test/auto-dial-agent-leave.route.test.ts`, `test/ui/predictive-conference-ended.test.tsx`
+- Existing tests: test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection); test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events); test/auto-dial-status.test.ts (ordinary status and callee controls); test/auto-dial.server.test.ts (ended conference stops the next turn); test/ui/use-call-room.test.tsx; test/ui/use-predictive-call-sync.test.ts; test/ui/hooks-call-screen.test.tsx
+- Missing tests: Deployed browser and phone calling verification, callback retries and billing verification.
+- Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
+
+### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Voice campaign test calls no longer count as prior campaign dispatches. Deployed campaign verification remains.
+- Current behavior: This source fix adds IS NOT NULL on outreach_attempt_id to the real tenant-scoped duplicate query. All 45 focused cases passed, including three real Postgres query and dispatch cases. Removing the exclusion failed two cases while the real-call control passed; reversing it failed all three.
+- Resolution: Verify on deployed dev: test-call an audience number, then dispatch the campaign and confirm the first real call proceeds. A later real dispatch to that number must still be skipped as a duplicate. Promote the verified fix before closing.
+- Look in: `app/lib/telephony-db.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `test/integration-db/campaign-call-duplicate.test.ts`
+- Existing tests: test/integration-db/campaign-call-duplicate.test.ts (real Postgres counts and real dispatch gate; test and real history; workspace, campaign and phone controls); test/campaign-test-call.test.ts (all three voice types, with and without a matching contact); test/campaign-settings.route.test.ts (all three voice types use the shared test-call helper); test/campaign-ivr-dispatch.test.ts (existing queue and dispatch controls)
+- Missing tests: Deployed calling verification with a test recipient also in the audience, plus a real-call duplicate control.
+- Done when: A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.; Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).; The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.; Every test-call path is covered; a test enumerates them.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
+
+### [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095) "Leave Campaign" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Predictive Leave waits for a confirmed conference stop and preserves the queue; deployed calling verification remains.
+- Current behavior: PR #2257 implements #2095: Leave waits for the server stop, keeps the local device on failure and omits queue reset. The endpoint finds the current user's idle conferences and reports completion failures. All 57 focused UI and server cases passed; restoring the old Leave handler failed four regressions, and restoring the old endpoint failed twelve regressions with five controls passing.
+- Resolution: Verify predictive Leave on deployed dev with browser and phone devices, pending calls and an idle conference. Confirm that the next turn stops, failed stops permit retry, other users remain connected and live Leave keeps its behavior. Promote the tested fix before closing.
+- Look in: `app/components/call/CallScreen.Layout.tsx`, `app/lib/callscreenActions.ts`, `app/routes/api+/auto-dial/end.action.server.ts`, `app/lib/auto-dial.server.ts`, `test/ui/call-screen-leave.test.tsx`, `test/auto-dial-end.route.test.ts`
+- Existing tests: test/ui/call-screen-leave.test.tsx (seven cases using the real conference-end helper); test/ui/callscreenActions.test.ts (server confirmation before agent hangup/state clearing); test/auto-dial-end.route.test.ts (completion failures, idle discovery, explicit target, other-user rejection and SID/name deduplication); test/auto-dial.server.test.ts (no claim, outreach attempt or call after the conference ended)
+- Missing tests: Deployed browser/phone calling verification, including delayed and failed conference completion.
+- Done when: With `campaign.dial_type === "predictive"`, clicking "Leave Campaign" posts `/api/auto-dial/end` and completes the conference.; No `DELETE /api/queues` requeue is issued when the campaign is being left in predictive mode.; The dialer stops placing calls within one turn after leave.; A non-predictive (live) campaign's Leave behaviour is unchanged.; The control is confirmed before it fires (see the related UX issue).
+- Tracker: The source fix is in PR #2257. This board update travels with that fix; after merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
+
+### [#2103](https://github.com/chester-hill-solutions/callcaster/issues/2103) safeOutboundFetch buffers webhook responses without a byte limit
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Outbound responses are bounded to one MiB on dev; deployed verification remains.
+- Current behavior: PR #2255 merged to dev as 6aec5b03. The helper rejects before retaining an overflow chunk, clears retained chunks on failure and closes the active request and response. All 17 focused stream and DNS-pinning cases passed. Removing the byte cap failed both size regressions while six cleanup/control cases passed.
+- Resolution: Verify exact-limit and oversized response behavior on the deployed dev environment with a controlled webhook target. Confirm cleanup on abort/error and preserve the existing ten-second caller timeouts. Promote the tested fix before closing. Webhook scheduling remains separate work.
+- Look in: `app/lib/safe-outbound-url.server.ts:268`, `app/lib/safe-outbound-url.server.ts:262`, `app/lib/workspace-webhooks.server.ts:64`, `test/safe-outbound-url.test.ts:175`, `app/lib/safe-outbound-url.server.ts (all `rejectPromise` paths, the accumulation loop)`, `app/lib/worker/handlers/cron.server.ts (the inline webhook call)`, `app/lib/worker/handlers/campaign.server.ts:545-567 (`webhook_delivery` handler)`, `app/lib/workspace-webhooks.server.ts`
+- Existing tests: test/safe-outbound-response-limit.test.ts (eight real-stream boundary and cleanup cases); test/safe-outbound-url.test.ts (nine DNS validation, pinning and redirect cases)
+- Missing tests: Confirm rejection and cleanup on the deployed dev environment using a controlled webhook target.
+- Done when: A response above the configured cap rejects with a clear error and terminates its connection.; Buffered chunks never accumulate beyond the cap.; A response exactly at the cap succeeds.; Abort, stream-error and redirect paths release request/response resources.; Tests prove bounded buffering and cleanup. Webhook scheduling changes are separate work.
+- Tracker: The source fix is on dev in PR #2255. Verify on deployed dev; close after production promotion. Do not start a duplicate fix.
+
+### [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132) The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Workspace creation replay is scoped to the verified user on dev; deployed verification remains.
+- Current behavior: PR #2254 merged to dev as 41b2785e. Workspace creation now uses workspaces:create:${auth.user.id}. Legacy global records are unreachable through the route. Seven route tests pass, and restoring the global scope fails all three cross-user isolation regressions.
+- Resolution: Verify cross-user isolation, same-user retries, in-flight conflicts, authentication and input validation on the deployed dev environment. Promote the tested fix to production before closing.
+- Look in: `app/routes/api+/workspaces.action.server.ts`, `app/lib/platform-idempotency.server.ts`, `app/lib/openapi-platform.ts`, `test/api-workspace-create-idempotency.route.test.ts`
+- Existing tests: test/api-workspace-create-idempotency.route.test.ts (seven route cases with real replay storage and route auth); test/platform-api.test.ts (replay helper and public API contract)
+- Missing tests: Confirm workspace creation and retry behavior on the deployed dev environment.
+- Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
+- Tracker: The source fix is on dev in PR #2254. Verify it on the deployed dev environment; close after production promotion. Do not start a duplicate fix.
+
+### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) Verify the disabled-workspace billing split and continued number release
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
+- Implemented in PR #2165 on dev. Disabled workspaces receive no rental debit or sync/reconcile fanout. Number release keeps running.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The disabled-workspace billing split is complete on dev. Fanout skips disabled workspaces by default; rental billing still runs the release ladder and suppresses debits.
+- Resolution: Verify the disabled workspace case on the review environment, then promote the existing change.
+- Look in: `app/lib/cron-workspace-fanout.server.ts:92`, `app/lib/worker/handlers/cron.server.ts:193`, `app/lib/number-rental-billing.server.ts:435`, `test/cron-workspace-fanout.server.test.ts:1`, `app/lib/worker/handlers/cron.server.ts:64,121,167,190-225`, `app/lib/cron-workspace-fanout.server.ts`, `app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)`
+- Existing tests: test/cron-workspace-fanout.server.test.ts (new, 7 tests: skip + count, positive control, mixed sweep, includeDisabled opt-in, no credential read for a disabled workspace, undefined-disabled treated as enabled, skipped-not-failed); test/number-rental-billing.server.test.ts (new describe block, 6 tests: no charge when disabled with a healthy balance, enabled control still charges, no balance read, release still happens, no unsuspend without a charge, fail-open when the workspace lookup throws); test/worker-cron-handlers.server.test.ts (3 new tests asserting the coordinator passes includeDisabled: true for number_rental_billing and omits it for billing_reconcile and twilio_open_sync)
+- Missing tests: Runtime verification remains; source and tests implement the decided behavior.
+- Done when: DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.; DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.; DONE: an enabled workspace is unaffected (positive control asserted in all three test files).; DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.; DONE: the release half keeps running, so no number is stranded by the suspension itself.
+- Tracker: Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior.
+
+### [#2086](https://github.com/chester-hill-solutions/callcaster/issues/2086) The IVR no-input replay branch overwrites outreach_attempt.result, destroying every answer already recorded on that call
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-02
+- The replay path now merges answers and nested counters. CSV and result display strip the replay metadata. PR #2161 covers the reported loss.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The replay path now merges answers and nested counters. CSV and result display strip the replay metadata. PR #2161 covers the reported loss.
+- Root cause: PR #2161 fixed the read-modify-write omission by merging prior answers and counters, and removes replay metadata from Results and export views.
+- Resolution: The source fix and regression tests landed in #2161. Verify IVR answers, Results and CSV in the review environment; close after promotion under the issue policy.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts:226`, `app/lib/ivr-results.ts:113`, `test/ivr-block-response.route.test.ts:347`, `test/campaign-export-voice-credits.test.ts:230`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts:188-195,219-226,237+`, `app/lib/inbound-no-input-replay.server.ts`, `app/lib/campaign-export.server.ts:493`, `app/lib/outreach-typed-fields.server.ts`, `app/lib/ivr-results.ts`
+- Existing tests: test/ivr-block-response.route.test.ts:347 preserves answers across repeated replays.; test/campaign-export-voice-credits.test.ts:230 removes replay metadata from CSV.; test/ivr-results.test.ts covers result presentation.
+- Missing tests: Source tests exist; deployed IVR/result/CSV verification remains.
+- Done when: A call that answers two prompts, then hits a no-input replay, then answers again, retains **all three** answers in `outreach_attempt.result`.; A second replay does not lose the answers either.; The export CSV `full_result` cell contains no `__no_input_replays` key.; The Results screen shows every answer for that attempt.
+- Tracker: Source fix exists. Verify the review environment and required promotion before closing. Related PR evidence: #2161. A PR reference alone does not prove deployed behavior.
+
+### [#2060](https://github.com/chester-hill-solutions/callcaster/issues/2060) Verify welcome-credit classification through the display and reconciliation adapters
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
+- The claimed purchase-classification defect is not present in the public adapters. Welcome and manual grant prefix buckets intentionally return other; the display adapter converts other+CREDIT to purchase, and reconciliation classifies every CREDIT as purchase.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. shared/billing-keys.ts returns other for welcome/manual grant prefixes, as explicitly tested in test/billing-keys.test.ts:28. app/lib/transaction-history-display.ts:30 maps other+CREDIT to purchase. shared/billing-reconciliation.ts:126 also maps every CREDIT to purchase. The reconciliation prefix classifier is duplicated, but that does not cause the claimed welcome-credit defect.
+- Root cause: The issue mistakes the prefix-only bucket for the final event source. The adapters already use transaction type to identify credit purchases/grants. The shared key helper documentation overstates classifier reuse because reconciliation still has an inline classifier.
+- Resolution: Verify welcome CREDIT classification through getBillingEventSource and categorizeLedgerRow, then close the incorrect defect report. Any distinction between paid purchases and grants needs its own product decision and task; no welcome-prefix change is needed for the claimed behavior.
+- Look in: `app/lib/transaction-history-display.ts:30`, `shared/billing-reconciliation.ts:126`, `test/billing-keys.test.ts:28`, `shared/billing-keys.ts:71`, `shared/billing-keys.ts:116`, `shared/billing-reconciliation.ts:3`, `shared/billing-keys.ts:24,72,106-129`, `app/lib/getBillingEventSource`, `shared/billing-keys.ts (categorizeLedgerRow)`
+- Existing tests: test/billing-keys.test.ts:28 asserts welcome/manual grant prefix buckets are other.; test/transaction-history.server.test.ts; test/billing-reconciliation.test.ts
+- Missing tests: A focused adapter-level welcome CREDIT test would pin the already-correct displayed/reconciliation behavior.
+- Done when: A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.; The intentional prefix-only grant bucket remains other unless product semantics change.; Any change to distinguish paid purchases and grants has its own decision and task.
+- Tracker: Move to Verify and close. Public adapters already satisfy the claimed purchase classification; do not change intentional grant prefix buckets solely to satisfy the original incorrect premise.
+
+### [#2040](https://github.com/chester-hill-solutions/callcaster/issues/2040) Verify the SMS contact creation fix in the review environment
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-10-02
+- The reported SMS contact creation defects are addressed in current source: workspace_id is posted, blank audience is skipped, and the sheet waits for a successful response.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. PR #2070 fixes the posted workspace field, empty-audience conversion, and premature sheet close.
+- Root cause: The original form/endpoint tenancy mismatch, blank-audience conversion, and premature sheet close are fixed by PR #2070. Browser persistence and failure-retention checks remain.
+- Resolution: Verify both successful creation and error retention in the review environment.
+- Look in: `app/components/contact/ContactForm.tsx:107`, `app/routes/api+/contacts.action.server.ts:51`, `app/components/sms-ui/ChatAddContactDialog.tsx:74`, `app/components/contact/ContactForm.tsx:45-51 (Form action/method/navigate) and :107 (hidden input name)`, `app/components/sms-ui/ChatAddContactDialog.tsx:62-69 (submit, navigate:false, unconditional setDialog(false))`, `app/routes/api+/contacts.action.server.ts:35-40 (reads data.workspace_id, 400 on empty)`, `app/lib/request-utils.server.ts:10-20 (parseRequestData does no field-name mapping)`, `app/components/queue/ContactSearchDialog.tsx:65 (the correct workspace_id caller, and the working pattern to copy)`
+- Existing tests: test/contacts-action.server.test.ts (JSON tenancy checks; no Messages form round trip); test/ui/components-chats-contact.test.tsx (ContactForm rendering only)
+- Missing tests: Source fix is present, but test/contacts-action.server.test.ts covers JSON tenancy and the UI smoke test only renders ContactForm. No full dialog success/failure test was found.
+- Done when: Saving a contact from the Messages sheet creates exactly one contact row; The POST carries the tenancy field the endpoint reads, agreed in one place rather than two; A rejected save keeps the sheet open with the typed values and shows the reason; A successful save closes the sheet after the create response.; One click produces one request, verified by a test that counts requests
+- Tracker: Verify and close after browser persistence/error checks; the original root-cause description is stale. Related PR evidence: #2070. A PR reference alone does not prove deployed behavior.
+
+### [#2039](https://github.com/chester-hill-solutions/callcaster/issues/2039) Verify rented-number success tone and routing spacing
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
+- PR #2071 changed the rented-number notice to success and removed the extra routing top padding. Source matches the recorded implementation plan.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The success tone and spacing change are present in dev.
+- Root cause: The original default-tone and duplicate-padding defects are fixed by PR #2071. Dark/light visual checks remain.
+- Resolution: Verify the reported success state and spacing visually; no further source fix is established.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:388`, `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:485`, `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:387-400 (the Alert), :270 (space-y-6), :485 (border-t pt-6)`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash; success/destructive/warning/info exist)`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx (sibling steps to sweep for the same missing variant)`
+- Existing tests: test/ui/onboarding-first-number-flow.test.tsx; test/ui/onboarding-first-number-groups.test.tsx
+- Missing tests: Existing first-number UI tests cover number flows but do not prove tone and spacing in a real rendered theme. No browser check was performed.
+- Done when: The rented-number confirmation reads as a success, not an error, in both light and dark themes; The gap under the banner matches the rest of the step's rhythm; The Alert primitive's default variant is unchanged; The rented-number confirmation uses the success tone. The wider default-Alert contract is tracked separately in #2061.; A test fails if a success-state Alert renders with the default variant
+- Tracker: Move to Verify and close pending browser confirmation. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior.
+
+### [#2174](https://github.com/chester-hill-solutions/callcaster/issues/2174) test/integration-db never runs in CI — the real-Postgres tier built to catch schema-vs-database type mismatches is not wired to any workflow
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- Recommended title: **Wire test/integration-db into a CI workflow**
+- The premise is false: the tier already runs in CI. Its summary proved `grep -rln 'integration-db' .github/workflows/` returns nothing, which is a true observation and the wrong place to look — the workflow YAML never names the tier because the invocation lives in a script. `scripts/e2e/run-compose-e2e.mjs:108` runs `npm run test:integration-db`, and the e2e job runs that script, so the tier executes on every CI run. Implementing the requested remedy would duplicate an existing run rather than add coverage.
+- Current behavior: The real-Postgres tier runs on every CI run inside the e2e compose job. Confirmed from a real log, not only from the source: PR #2207's e2e output contains `Test Files 6 passed (6)` / `Tests 60 passed (60)`, which is this tier exactly on dev before #2209 added its sixth file.
+- Resolution: No code change. The tier is already gated. The issue's residual observation is narrower than claimed and is filed as #2211: the tier's only gate is the pipeline's least reliable job, so a genuine database regression and an unrelated compose flake arrive as the same red check, and the standing 'rerun a red e2e first' reflex would discard the real failure. Separately, `ci:local` omits the tier, so a green local gate says nothing about it.
+- Look in: `scripts/e2e/run-compose-e2e.mjs:107-108 (the invocation #2174's grep could not see)`, `#2211 (the real residual: signal mixing, not missing coverage)`
+- Existing tests: test/integration-db/ — runs in CI today via the e2e compose job
+- Done when: Met: the tier runs in CI, so the schema-vs-database class of bug has a gate.; Not applicable: the wiring this issue asked for already exists.
+- Tracker: Closing rather than implementing, because implementing would add a duplicate CI run and give the appearance of a fix. Worth carrying forward as a general check: when an issue says something 'runs nowhere', find where the invocation actually lives before concluding it is absent. A call inside a script is invisible to a grep of the workflow file, and verifying that takes two minutes.
+
+### [#2154](https://github.com/chester-hill-solutions/callcaster/issues/2154) splitMessageCampaign is non-atomic across clone, enqueue and dequeue, so a mid-run failure leaves a partially split campaign
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- `splitMessageCampaign` cloned the campaign, distributed the queued contacts across the clones and dequeued the source in three separate steps. A failure between them left contacts in two campaigns at once, and the source un-dequeued, so the next dispatch dialled them twice. Fixed: all three phases now run in one transaction.
+- Current behavior: All three phases commit together. A failure in any phase rolls the whole split back, leaving the source exactly as it was.
+- Resolution: DONE. Wrapped in `withAppCurrentUser` rather than `db.transaction` — the dequeue path calls SECURITY DEFINER plpgsql that reads `app.current_user_id`, so the setting must be transaction-local or it leaks between requests on the pooled connection. The SSE publish is **deferred to after the commit** rather than merely moved inside the transaction: an emit issued pre-commit tells a subscriber about rows a rollback erases, and never tells it the change was undone. Two other points from the original record dissolved or moved: *idempotency on retry* is now unnecessary, because with atomicity there is no partial state for a retry to double against; and the *clone roll-up* question is a product decision about how clones are presented, not a defect, and is not part of this fix. The in-flight-send question in point 3 became a separate issue (#2208) once it turned out the split has no in-flight marker to condition on.
+- Look in: `app/lib/database/campaign.server.ts (splitMessageCampaign, now in withAppCurrentUser)`, `app/lib/campaign-queue-db.server.ts (DeferredEmit / QueueWriteExecutor seam)`, `app/lib/campaign-queue-updates.server.ts (created by #2207, the prerequisite refactor)`, `test/integration-db/split-campaign-atomic.test.ts (six real-database tests, two kill-checks)`
+- Existing tests: test/integration-db/split-campaign-atomic.test.ts — six tests against a real Postgres. The unit tier mocks the db client wholesale, so nothing there would notice if the withAppCurrentUser call were deleted; that is why this is the integration tier.
+- Done when: Met: a failure in the dequeue phase leaves the campaign exactly as it was (kill-check executed — removing withAppCurrentUser turns exactly this test red).; Met: nothing is published to subscribers unless the split commits (kill-check executed — publishing inline turns exactly this test red).; Met: contacts are distributed across the clones with the requested segment count — no test asserted this before.; NOT DONE, and deliberately: the in-flight-send case. It is #2208, and it is severe.
+- Tracker: Two kill-checks, each failing exactly one test, re-confirmed after rebasing onto the #2207 refactor. One trap worth carrying: the first version of the failure test used `vi.spyOn` on `dequeueQueueEntry` and came back GREEN without ever failing, because splitMessageCampaign holds a direct ESM binding and a namespace spy does not intercept it. The failure is induced by a database trigger instead. A green test that never exercised its subject is worse than no test.
+
+### [#2133](https://github.com/chester-hill-solutions/callcaster/issues/2133) The workspace SSE event stream admits any workspace API key with no scope, though the surface and the public OpenAPI both declare it session-only
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- The workspace event stream wires only `dataPlaneMiddleware`, which admits any key bound to the workspace regardless of scope. The loader adds no capability gate. A key minted with **zero** scopes — or with only `campaigns.read` — can open the long-lived SSE stream and read every workspace event, which the route's own comment describes as including verbatim call transcripts. It is also an unbounded connection multiplier: each connection registers a `directPool.listen` subscription and is held open indefinitely. The published contract says this endpoint is **session-only**, so neither the operator nor the integrator knows the key works.
+- Current behavior: Two defects compound: an unscoped privileged stream, and a surface guard that failed to fire on a declared/implemented mismatch. The second is why the first is invisible.
+- Resolution: 1. Gate the loader on a capability: `dataPlaneCapabilityAuth("audit.read")` — the event log is the same class of privileged audit surface as `/audit-events`, which already requires it. 2. If a key must be allowed, require `requireDataPlaneWorkspaceUser` **and** declare `apiKeyOrSession` in the annotation, so the spec matches. 3. **Fix `scripts/lib/api-surface-derive.mjs:155-159`** and find out why `check:api:surface:check` accepted a declared `"session"` on a route whose context admits `apiKeyOrSession`. That guard gap is its own finding — a surface check that cannot detect an auth-class mismatch is not a check. 4. Bound concurrent SSE connections per workspace so a key cannot hold N open streams.
+- Look in: `app/routes/api+/workspaces+/$workspaceId.middleware.server.ts:4`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts:75,173`, `scripts/lib/api-surface-derive.mjs:155-159`, `scripts/check-api-surface-coverage.ts`, `app/lib/api-surface-annotations.ts:168`, `app/lib/data-plane-route.server.ts:6-18`
+- Missing tests: Zero-scope key refused (kill-check).; `campaigns.read`-only key refused.; Session with `audit.read` allowed (positive control).; A fixture where the declared auth class disagrees with the implemented one makes `check:api:surface:check` fail (kill-check).
+- Done when: A key with zero scopes is refused on the events stream (kill-check: remove the capability gate and confirm the test goes red).; A key with only `campaigns.read` is refused.; A session with `audit.read` is allowed (positive control).; The annotation and the published spec agree with the implemented auth class, and `check:api:surface:check` **fails** when they do not — with a fixture test proving the guard can fail.
+- Tracker: Fixed and merged as PR #2203 (c0e956239). The workspace SSE stream used getDataPlaneRouteContext, which only checks that the actor belongs to the workspace - so it admitted ANY workspace API key, including one minted with ZERO scopes, onto a long-lived connection carrying every workspace event, verbatim call transcripts among them. The published surface said 'session', so neither an operator auditing key scopes nor an integrator reading the spec had reason to look there. Now gated on audit.read, the same capability /audit-events already requires; the role-capability matrix grants it to OWNERS alone, so a member session is refused too - a control on the role axis, not only the scope axis. FIVE behavioural tests: zero-scope key refused, campaigns.read-only key refused, member session refused, and TWO POSITIVE CONTROLS (audit.read key allowed, owner session allowed) so the gate cannot pass by denying everything. IMPORTANT CORRECTION TO THE ISSUE'S DIAGNOSIS: it claims the surface guard 'accepted a declared session on a route whose context admits apiKeyOrSession'. It did not - the guard was CONSISTENT, the input it was consistent with was wrong. api-surface-derive.mjs listed allows:['session','workspaceAdmin'] for getDataPlaneRouteContext, on a comment claiming the preamble 'requires userId, so session-or-stronger'. It does NOT require userId - it only checks the workspace matches. So a declared authClass 'session' was validated against an allows list that itself asserted session was possible, and passed. A GUARD CANNOT DETECT A LIE ABOUT A HELPER IT BELIEVES. Corrected to permit apiKeyOrSession, and the misleading 'requires userId' claim removed from the comment - a comment asserting a guarantee the helper does not provide is worse than none, because it is what the next author trusts. authClass 'session' deleted from the annotation: dataPlaneCapabilityAuth derives the class authoritatively and the guard rejects a declaration alongside one, the same pattern as the audit-events sibling. Regenerated api-surface-generated.ts, both OpenAPI specs, and the inventory. Two test-harness traps worth keeping: the existing route test mocked @/lib/workspace-membership.server and defaulted every membership to 'member', but the gate resolves through @/lib/database/workspace.server - a DIFFERENT module - and audit.read is owner-only, so 'member' is refused before the stream opens; and the @/server/admin-db mock must be a LITERAL rather than an importOriginal spread, because the real module is built on `db` from @/server/db which that test mocks down to directPool alone, so spreading it evaluates the original and fails - while check:test-mocks then demands the spread anyway. Correct answer: literal for that module, spread for @/lib/database/workspace.server, which has no such dependency. Also caught a bug in my own tests: the two 200-path tests used asRouteResponse, which drains the body, and a 200 on this route is a LIVE STREAM THAT NEVER ENDS, so they hung for 5s and failed - they now assert status and content-type without reading the body. NOT done: the issue's step 4, bounding concurrent SSE connections per workspace, is a resource-limit change whose own failure mode (what happens to the n-th legitimate dashboard when the cap is hit) deserves its own PR. ci:local exit 0, node 444/444 files 3577 tests, ui 151/151 924 tests. The two non-null-assertion warnings in workspace-events.route.test.ts are pre-existing, verified against dev.
+
+### [#2143](https://github.com/chester-hill-solutions/callcaster/issues/2143) syncWorkspaceA2pStatus seeds both statuses from the same stored value and reverts to the old value, so a stale approved A2P state survives a brand re-review
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- The A2P status sync seeds the brand and campaign status from the **aggregate** stored status rather than from the provider. A workspace whose A2P was `approved` and whose brand re-enters review keeps reading `approved`, and the sync writes that back while bumping `lastSyncedAt` — so the record looks freshly verified and the SMS send gate stays open.
+- Current behavior: A per-resource status is never seeded from an aggregate status. The aggregate is a *derived* value; deriving from it inverts the direction of truth and makes the state monotonic — it can only move toward `approved`, never away.
+- Resolution: Never seed a per-resource status from the aggregate. Track which resources were actually fetched and compute the aggregate from the **authoritative** per-resource values, defaulting an unfetched resource to the most conservative value that keeps the gate closed: const brandStatus = brandSid ? await fetchBrand() : "pending"; const campaignStatus = campaignSid ? await fetchCampaign() : "pending"; const mergedStatus = brandStatus === "approved" && campaignStatus === "approved" ? "approved" : (brandStatus === "rejected" || campaignStatus === "rejected") ? "rejected" : "in_review"; and delete the `?? onboarding.a2p10dlc.status` fallback. Add a test per transition direction — `approved → in_review` and `approved → rejected` are the two that fail today.
+- Look in: `app/lib/twilio-a2p.server.ts (`syncWorkspaceA2pStatus`, `mapBrandStatus` at line 19, lines 71-80)`, `app/lib/messaging-onboarding/predicates.ts:380-390`, `app/routes/api+/twilio/trusthub/status.action.server.ts:62`, `app/lib/twilio-a2p-status-sync.server.ts`
+- Missing tests: `approved → in_review` (kill-check).; `approved → rejected`.; `in_review → approved` with both resources fetched (positive control).; An unfetched resource never yields `approved`.
+- Done when: `approved → in_review` demotes the stored status (kill-check: restore the seed and confirm the test goes red).; `approved → rejected` demotes.; `in_review → approved` promotes when **both** resources are fetched as approved.; An unfetched resource never contributes `approved`.; The send gate closes on a re-review.
+- Tracker: Fixed and merged as PR #2202. syncWorkspaceA2pStatus seeded BOTH per-resource statuses from the stored AGGREGATE, then merged back to the aggregate whenever the two disagreed. The aggregate is a derived value, so deriving from it inverts the direction of truth and makes the state MONOTONIC - it can only ever move toward approved. Verified against the real code before changing it: brand re-enters review with no campaignSid -> approved (want in_review); brand re-enters review with campaign still approved -> approved (want in_review); brand moving to provisioning (mapBrandStatus's default) -> approved (want in_review); brand rejected -> rejected (ALREADY CORRECT). Three of four wrong. Rejection already worked because it short-circuits on either side of the ||, which is why this survived review: the one direction that works is the one a test would naturally check. Fix: mergeA2pStatus extracted as a pure function over {fetched, exists} per resource, separating two states the old code conflated. DOES NOT EXIST is ignored - a brand-only workspace has no campaign to wait for, so it promotes on the brand alone. EXISTS BUT WAS NOT READ is an unknown, never an approval, and counts as in_review which keeps the gate shut. The second case is the consequential one and it is what the issue's own suggested fix got WRONG: defaulting every unfetched resource to a blocking value would permanently block brand-only workspaces, which would never be promoted. If NOTHING was read the sync returns early without writing, so a transient network error cannot close a live workspace's gate, and lastSyncedAt is not bumped so the record does not look freshly verified. 20 tests, six kill-checks each failing a specific one: restore the seed from the aggregate (the original defect) fails the all-fetches-failed test; an unread resource defaults to approved fails the blocks-a-promotion test; collapse absent into unread fails the contradiction test; guess when nothing authoritative was read fails the all-fetches-failed test; drop rejection precedence fails 3; no resources at all counts as approved fails the empty-resources test. WORTH RECORDING: one kill-check was a NO-OP and I only found out by enumerating the truth table - collapsing `exists ? fetched : null` into `fetched ?? (exists ? ... : null)` is not a semantic change at all, since the two differ only when exists is false AND fetched is non-null, which is unreachable because a caller cannot have fetched a resource that does not exist. My test 'passed' against it for that reason. The test that actually kills it asks a question I had not asked: what does a caller reporting a read for a resource it also reports ABSENT mean? The conservative answer is to drop the read, and that is the branch ordering the production code now has. Left alone deliberately: a2p_approved passing on approved OR live (predicates.ts:380-390) is a separate question from the sync's direction of truth and changing it would alter which workspaces can send at all. ci:local exit 0, node 444/444 files 3586 tests, ui 151/151 924 tests.
+
+### [#2146](https://github.com/chester-hill-solutions/callcaster/issues/2146) The IVR option matcher reads only option.value, so a documented-format script's declared next routes never match
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- PR #2199 is merged to dev. Option matching, labels and Gather configuration use the shared ivr-option-value helper, with content as a fallback when value is blank.
+- Current behavior: The documented content/next option shape is supported on the read path. Launch-time handling of unmatchable options still needs the product decision recorded in this issue.
+- Resolution: Verify documented-format routing and exported labels on dev. Decide whether launch validation should reject unmatchable options or normalize them before storage. Do not repeat the shared-reader fix.
+- Look in: `the IVR response route's option matcher (`findNextStep`) and `findNextBlock` at lines 86-89`, `app/lib/ivr-results.ts:114-118 (`resolveIvrAnswerLabel`)`, `app/lib/ivr-script-validation.ts (`resolveNext`, `script_routing_invalid`)`, `app/lib/create-with-script.server.ts`, `docs/script-json-format.md`
+- Existing tests: test/ivr-option-value.test.ts; test/ivr-gather.test.ts
+- Missing tests: Launch validation exercises the option matcher after the normalization or rejection decision.
+- Done when: A documented-format script with `content`/`next` options routes correctly on a key press (kill-check: remove the normalisation and confirm the test goes red).; The Results screen and the CSV export show the option label, not the raw digit.; A script whose options have no recognisable value is either normalised or rejected with a clear message — decided and tested.; The launch gate can detect a script whose options cannot be matched (a validation that exercises the matcher).
+- Tracker: Fixed and merged as PR #2199 (d3d6e1bfa). It was FOUR value-only readers, not one: findMatchedOption in both response routes (the linear-chain fall-through the issue named), resolveIvrAnswerLabel in ivr-results.ts (the raw DTMF digit), ivrStepGathersSpeech (a vx-any catch-all invisible, so no speech input gathered), and ivrSingleKeyDigits (reads empty, so never one-key). Only ivrSpeechHints was correct - it already read label AND content. All four now go through app/lib/ivr-option-value.ts, and BOTH private copies of the matcher are deleted: the two response routes had near-identical copies that had already drifted. IvrOptionShape in ivr-results.ts and IvrOption in ivr-gather.server.ts are now aliases of the shared IvrOptionLike rather than hand-copied declarations, which is how the two shapes came to diverge. Value and label are ordered differently ON PURPOSE: ivrOptionValue takes value first then content (the digit is what a caller pressed - falling back to text first would match 'Yes' when they pressed '1'), while ivrOptionLabel takes label first then content (a label is what the author wrote to be shown). A blank or whitespace-only value falls through to the text, because that is what a form submits for an unfilled field and treating it as authoritative would make the option unmatchable. 25 tests written against the DOCUMENTED shape - a test written against value would have passed before the fix and proved nothing. Four kill-checks: matcher reverts to value-only (the original defect) fails 7 tests, label order inverted fails 2, vx-any loses its length gate fails 1, gather speech gate reverts to value-only fails 1. Worth recording: one kill-check PASSED when it should have failed, twice - the first ivrSingleKeyDigits test used content 'Yes', which is three characters, so the answer is undefined under both readers and the test could not distinguish them. The real disagreement is a documented option whose text IS a single key, which is what an author writes when the option doubles as the digit; that case is now tested and the mutation fails it. NOT done: resolution step 4, a launch-gate validation that exercises the matcher. It changes what the API ACCEPTS, so it needs the decision the issue explicitly leaves open - normalise on the way in, or reject a script whose options cannot be matched - which is a product decision, not a read-path fix. Asked on the issue. ci:local exit 0, node 442/442 files 3560 tests, ui 151/151 924 tests. Note test/ivr.route.test.ts and one case in test/inbound-ivr-block.route.test.ts fail locally for want of DATABASE_URL - verified pre-existing on clean dev, not introduced here.
+
+### [#2187](https://github.com/chester-hill-solutions/callcaster/issues/2187) One contact's preparation failure aborts the whole campaign SMS batch
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-29
+- handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.
+- Tracker: Fixed and merged as PR #2198 (a3ab6cf0e). The send path had a per-row failure boundary (sendSingleCampaignSms rejects, and its .then(_,onError) releases the credit, counts the failure, records the attempt and returns a per-contact result); preparation had none, so a throw in any of its four database round trips propagated into await Promise.all in runPacedSendBatches and rejected the whole batch. Blast radius, and the third is the one that mattered: batch siblings' responses were discarded even though they had already sent and been counted; every remaining batch was abandoned; and rpcFailExhaustedCampaignQueueContacts was skipped, so the failed row never dead-lettered, stayed eligible, failed again on the next run, and the campaign could not drain. That is a permanent outage from one bad contact, and it is invisible in the logs, which show a successful dispatch. Fix is three parts: a row boundary in handleMember wrapping the whole body (the await on its last statement is load-bearing, because the phone-claim handler rethrows and returning its promise would put the rejection outside the try); the reservation released wherever a row fails after reserving (the release previously lived ONLY in the send's rejection handler, so a SYNCHRONOUS throw out of sendSingleCampaignSms - invisible to .then - kept the credits for the rest of the dispatch, so failRow now takes the cost to release and a new throw site cannot forget it); and Promise.allSettled so no future row path can abort a campaign. Six tests, four kill-checks each failing exactly one: remove the row boundary -> the dead-letter test; allSettled back to all -> the recorder-down test; drop the post-prepare release -> the credit-release test; failRow stops recording -> the dead-letter test. Note removing the row boundary fails ONLY the dead-letter test, because the loop backstop alone already keeps the batch alive - the boundary earns its place by RECORDING the attempt, which is what lets the campaign drain. Read that as the general shape: a per-row boundary usually earns its keep through a side effect (a recorded failure, a released resource), not through preventing the cascade, which something else prevents too. The recorder-down test caught a double-count in the fix itself: failRow counted before awaiting the record, so a failed record made the loop count the same row again (failed:2 for one contact); counting after the await makes the two mutually exclusive, and that test is also what makes the loop backstop reachable rather than dead code, since recording a failure is itself a database write against the same database that has just failed. The file-size guard forced an extraction rather than a baseline: the credit budget and start pacer are pure, dependency-free and imported by nothing else, so they moved to campaign-sms-dispatch-primitives.server.ts, taking the file 860 -> 784. NOT fixed, deliberately: when the record write itself fails the row stays queued and eligible, because nothing is recorded to dead-letter it on - retrying is honest but a persistently broken recorder keeps that row alive, and that deserves its own issue rather than a guess here. ci:local exit 0, node 442/442 files 3560 tests, ui 151/151 924 tests.
+
+### [#2156](https://github.com/chester-hill-solutions/callcaster/issues/2156) useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.
+- Current behavior: Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.
+- Resolution: 1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is "advance to the newly assigned contact", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.
+- Look in: `app/hooks/call/useQueue.ts:88-89,157`, `the predictive FSM bridge in the same area`, `app/hooks/call/useCallScreen.ts`
+- Missing tests: StrictMode double-render yields an identical state (kill-check).; The next recipient advances to the newly assigned contact.; The call duration resets on a contact change.
+- Done when: `updateQueue` contains no state update inside a state updater (kill-check: restore the nesting and confirm a StrictMode double-invoke test goes red).; A StrictMode double-render produces the same final state as a single render.; The newly assigned contact becomes the next recipient when that is the intent (the dead-guard fix).; A contact change resets the call duration.
+- Tracker: Fixed and merged as PR #2196 (24948429e). updateQueue now plans the next queue in a pure function and applies the state updates outside, so setQueue takes a value and never a function and the impure shape cannot return unnoticed. The issue's useReducer option was NOT viable: useCampaignQueueFlow types setQueue as Dispatch<SetStateAction<QueueItem[]>> and usePredictiveCallSync plus useCallScreen both hold setNextRecipient, so the hoisting option was used and both setter shapes are unchanged. The dead guard if (!nextRecipientRef.current) was DELETED, not fixed - it could essentially never fire, and where it could the queue[0] fallback already gave the same value, so removal is behaviour-preserving and a kill-check confirms it. The stated intent, advance to the newly assigned contact, never happened; implementing it would change which contact a live call screen points at mid-session, so it stays a product decision and is flagged in the code. queueRef needs both a synchronous write after planning (else two updates in one tick lose the first row's addition) and an effect re-syncing on commit (else an external setQueue from useCallScreen or useCampaignQueueFlow is ignored); each has a test that fails when removed. Verified: 10 tests, 4 kill-checks - nested update restored fails 4 tests, no synchronous write fails composition, no effect fails external setQueue, no advance fails the recipient test. Two traps recorded: the recipient-advance test PASSED against a mutation that deleted the advance, because nextRecipient=null falls back to queue[0] and the difference is only observable when the next uncontacted row is not first; and the pre-existing hooks-queue.test.tsx used id 'user-1', which is not a UUID, so every updateQueue call in it took the removal branch and the assignment path had no coverage at all. The predictive-FSM re-dispatch churn in usePredictiveCallSync is deliberately not touched - separate effect-dependency concern. ci:local exit 0, node 441/441, ui 151/151 with 924 tests up from 914, no new lint warnings.
+
+### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- When the agent has scrolled the conversation list and triggered "load more" (page 4 is in `paginationFetcher.data`), a realtime message on a page-1 conversation causes a loader revalidation that produces a **new** `chats` array with fresh `message_count` / `conversation_last_update` for a page-1 row. The sync effect returns early because `fetchedPage (4) > pagination.page (1)`, so the fresh data is dropped.
+- Current behavior: Page numbers are not an identity. Comparing them is a proxy for "have I already folded this response in?" that fails as soon as the agent paginates — and then fails **permanently**, not transiently.
+- Resolution: 1. Track which loader response has been folded in with a **monotonic token** — a ref holding the `pagination` object last applied, or a request sequence — rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity — that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the "accumulated pagination vs revalidation" class and should share one merge helper.
+- Look in: `app/hooks/chats/useChatsPage.ts (the loader-to-state sync effect)`, `app/hooks/chats/useChatRealtime.ts`, `app/hooks/chats/useChatThread.ts`, `app/components/chats/`
+- Missing tests: Page-1 update applies after pagination (kill-check).; Loaded pages survive.; No duplicate conversation rows.
+- Done when: With pages 1–4 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).; The loaded pages are not lost.; A conversation appearing on two pages is not duplicated.; A fresh page-1 response is applied even after pagination (the permanent-staleness case).
+- Tracker: Fixed and merged as PR #2191 (e3a10624). Page numbers are not an identity; the filter is. The sync effect now discriminates on accumulatedFilterKeyRef, so a different filter resets the list and the same filter merges the response in. Two changes were needed, not one: mergeConversationPages already deduped by conversation phone and applied the fresh row over the existing one, AND the cursor had to become monotonic — the old effect also reset paginationState and requestedPageRef to the loader's page 1, so deleting the guard alone would have made the next load-more re-request a page already held. Verified: 4 tests in test/ui/use-chats-page-pagination.test.tsx; 2 reproduce the defect and failed on current code with a fresh unread count of 9 and 7 arriving as 1; 2 guard behaviour a naive fix breaks. 4 kill-checks each fail exactly one test — page-number guard reinstated, replace-not-merge, cursor rewind, always-merge-never-reset — so neither 'always replace' nor 'always merge' passes. ci:local exit 0, node 441/441, ui 150/150. The max-lines-per-function warning is pre-existing at 450 lines, now 462; splitting the hook is a refactor and does not belong here. NOT done: the useChatRealtime re-seed defect this issue suggests fixing alongside — no revalidator call or page reset that wipes loaded pages could be found in app/hooks/realtime/useChatRealtime.ts. Left OPEN: merge to dev is not a release, and no CI tier covers accumulated-pagination behaviour against a live revalidation.
+
+### [#2185](https://github.com/chester-hill-solutions/callcaster/issues/2185) Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.
+- Tracker: Fixed and merged as PR #2188 (8f1952bfd). createSemaphore gates the preparation phase at ceil(QUERY_POOL_MAX / 2), leaving half the pool for interactive traffic. The permit is released BEFORE the pacing wait, so the pool is never gated on the rate limit — holding it across waitForTurn would be the #2172 defect in a different hat. Verified: measured peak in-flight prep dropped from 25 to the bound; 5 semaphore unit tests with 2 kill-checks (off-by-one on handoff -> 2 fail, one reporting inFlight -17; release removed -> 4 fail, 2 by timeout); 2 dispatch tests asserted from both sides so neither degenerate fix passes (gate removed -> 25 > 5; bound of 1 -> 1 > 1). An off-by-one in the first semaphore implementation was found and fixed during the work, and the test written for it initially passed against the bug because it never queued — it now uses more callers than permits. check:unscoped-db-imports correctly rejected importing @/server/db for the constant; fixed in code by moving QUERY_POOL_MAX to app/server/db-pool-size.ts, no baseline change. Left OPEN: merge to dev is not a release, and no CI tier runs against real Postgres (#2174).
+
+### [#2172](https://github.com/chester-hill-solutions/callcaster/issues/2172) Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
+- runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.
+- Current behavior: test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.
+- Root cause: The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.
+- Resolution: Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)`, `app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)`, `app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)`, `test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)`
+- Existing tests: campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it
+- Missing tests: a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code; a test proving pacing holds under simulated event-loop contention
+- Done when: A test that delays pre-RPC work and asserts the inter-RPC gap still holds; it fails against current code; Campaign SMS rate limiting holds under simulated event-loop contention; Existing dispatch contract tests stay green, with the 10ms floor unchanged; The dispatch-loop pacing and the send-point pacing are not both active (no double-wait)
+- Tracker: Fixed and merged as PR #2182 (d9eecf80), deployed to dev and serving HTTP 200. The pacing gate moved from the dispatch loop to immediately before the provider request, so the interval is now measured between the requests Twilio actually receives. createStartPacer serialises turns so two rows finishing preparation in the same tick cannot pass the gate together. The predicted mechanism was confirmed by instrumentation: dispatches paced perfectly at 0/20/40ms while requests landed 15ms apart where 20ms was required. Note the pacer also stopped serialising row preparation (peak concurrent lookups 1 -> 20, peak concurrent provider sends unchanged at 1), which is a real change in DB concurrency, not a pure refactor. Verified: two new tests fail before the fix at 5ms and 15ms against a 20ms floor, three kill-checks executed (including one that breaks a pre-existing test, proving the turn-chaining is load-bearing), ci:local exit 0, node suite 440/440 files and 3528 tests including the previously flaky 60 MPS test. Left OPEN because a merge to dev is not a release and no CI tier exercises this against real Postgres (test/integration-db is excluded, #2174).
+
+### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: retire the hand-rolled SaveBar token test
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-28
+- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
+- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
+- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
+- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
+- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
+- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
+- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
+- Tracker: Implemented on dev (PR #2027 bca2bc24): the hand-rolled SaveBar token test is gone and the ui-suite testTimeout is 20s to absorb route-hydration load. ESLint 9 + @shadcn/lint already shipped via #1907/#1908. Verify eslint runs clean and the save bar renders on the review env, then close.
+
+### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR: don't mark a campaign complete while calls are still in flight
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-28
 - Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.
 - Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.
 - Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.
@@ -106,74 +1674,417 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
 - Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
 - Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
-- Tracker: Product decided complete = all calls settled. Fix now via the completion gate.
+- Tracker: Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.
 
-### [#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844) Call History LIsten In feature sends you to twilio
-- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-21
-- Recommended title: **Play call recordings in-app instead of linking to the Twilio recording URL**
-- The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.
-- Current behavior: CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).
-- Root cause: Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.
-- Resolution: Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.
-- Look in: `app/lib/call-log.server.ts`, `app/components/calls/CallLogTable.tsx`, `app/lib/call-recording-storage.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/object-storage.server.ts`
-- Existing tests: test/call-log.test.ts
-- Missing tests: Loader returns a non-Twilio playback URL for a call with audio_url; CallLogTable renders the in-app player and no external Twilio link
-- Done when: Listen plays the recording without leaving CallCaster or opening Twilio; Works for a call whose recording was persisted to storage; A clear message when no recording copy exists; Tenant scoping is preserved
-- Tracker: Confirmed defect with a clear path; recordings are already persisted server-side.
+### [#2178](https://github.com/chester-hill-solutions/callcaster/issues/2178) call.date_created is declared text() but is timestamptz, so every date predicate needs a hand-written cast
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-09-28
+- PR #2241 corrected all four call timestamps and the message timestamps in dev. The recording-repair workaround cast is removed.
+- Resolution: Run the real-Postgres temporal guard and the recording-repair tests on dev. Verify the deployed schema before release. Track other tables under #2213.
+- Look in: `app/db/schema.ts`, `app/lib/call-recording-repair.server.ts`, `test/integration-db/schema-type-drift.test.ts`
+- Existing tests: test/integration-db/schema-type-drift.test.ts; test/call-recording-repair.server.test.ts
+- Tracker: Code reviewed at dev@5b673c81. The original call.date_created text declaration is absent. Do not create a second implementation for this issue.
 
-### [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845) Live campaign calls keep synchronous AMD latency when voicemail drop is off
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only**
-- Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).
-- Current behavior: machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection="Enable".
-- Root cause: AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.
-- Resolution: Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.
-- Look in: `app/routes/api+/call.action.server.ts`, `app/routes/api+/dial/$number.action.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/components/call/CallScreen.CallArea.tsx`
-- Existing tests: test/api-call.route.test.ts; test/dial-number.route.test.ts; test/dial-status.route.test.ts; test/auto-dial.server.test.ts
-- Missing tests: manual routes emit no machineDetection; auto-dial still emits machineDetection; Audio Drop still works on manual/power calls
-- Done when: A manual/power call reaches audio immediately with no AMD wait; Predictive dialing still drops or hangs up on a detected machine; A drop-enabled campaign still plays the voicemail when an agent drops it
-- Tracker: Fix now; decision recorded. IVR stays AMD-on per #1842/#1864; #1839 toggle is the Setup layer.
+### [#2097](https://github.com/chester-hill-solutions/callcaster/issues/2097) PATCH /api/campaigns/:campaignId/queue never checks that the referenced audience or contacts belong to the caller's workspace
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-09-28
+- `patchCampaignQueueApi` proves the **campaign** is the caller's, then resolves `add_audience` / `add_contact_ids` against **any** id in the platform. The trigger stamps the attacker's workspace onto the resulting queue rows, so `GET /api/campaigns/:id/queue` then returns another tenant's contacts in full.
+- Current behavior: `PATCH /api/campaigns/57/queue` with `{"add_audience": {"audience_id": "<ws-B audience>"}}` → the campaign is the attacker's → the audience is workspace B's → every B contact id is inserted into campaign 57's queue with `workspace = <attacker's workspace>` → `GET /api/campaigns/57/queue` returns B's contact records.
+- Resolution: 1. Resolve the target ids through the caller's tenant client before enqueuing. For `add_audience`: `createTenantDb(workspaceId).audience.findFirst({ where: eq(audienceTable.id, body.audience_id) })` → 404 when it is not in the workspace. 2. For `add_contact_ids`: filter the id list to `tdb.contact` rows, or reject with a 400 naming the foreign ids. Do not enqueue a partial set silently. 3. Return the same uniform 404 the rest of the data plane uses for another tenant's resource, so the endpoint is not an existence oracle. 4. Sweep the other `api+` write endpoints for the same shape: a request that references a tenant-scoped id must resolve it through the tenant client. `check:route-membership` cannot catch this class — it checks the route, not the referenced ids — so say so in the issue and consider a helper the write paths must use.
+- Look in: `app/routes/api+/campaigns/$campaignId/queue.action.server.ts:60-62`, `the `patchCampaignQueueApi` implementation (the `add_audience` / `add_contact_ids` branches)`, `app/lib/campaign-queue-search.server.ts:553-564`, `app/server/tenant-db.ts`, `app/db/workspace-scoped-tables.ts`
+- Missing tests: `add_audience` with a foreign audience → 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).; `add_contact_ids` with a foreign contact → rejected, no rows enqueued.; A permitted-path positive control.
+- Done when: `add_audience` with another workspace's `audience_id` returns 404 and enqueues nothing.; `add_contact_ids` with a foreign `contact_id` returns 404 (or a 400 naming it) and enqueues nothing.; A mixed list is handled explicitly: either all-or-nothing or a named rejection — documented and tested.; The permitted path (ids from the caller's own workspace) still enqueues, with a positive-control test.; Every `api+` write endpoint that accepts a tenant-scoped id has been swept and the sweep is recorded in the issue.
+- Tracker: Fixed on dev by PR #2175 (07bd43d1), merged 2026-09-28, plus PR #2177 (13e7c502) which unified the guard. Verified on dev rather than assumed: app/lib/contacts/tenant-scope.server.ts:44 defines resolveContactsOwnedByWorkspace, app/lib/platform-data.server.ts imports it at line 70 and calls it at line 506 from the add_contact_ids branch of patchCampaignQueueApi, and test/campaign-queue-tenant-scope.test.ts plus test/contact-tenant-scope-unified.test.ts cover it. One deliberate behaviour change: the workspaces+ route now answers 404 where it answered 403, because a 403 or 400 naming foreign ids would confirm a workspace's contents exist. The record went stale because it predates the fix and the generator only prunes CLOSED issues; #2097 is still open, correctly, since a merge to dev is not a release. Left OPEN: what remains is a verification pass on the review environment, not code.
 
-### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) Improve IVR speech capture: hints, valid speech model, confidence, intent matching
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **IVR: store speech answers as { value, raw, inputType } (slice B)**
-- Slice A shipped on dev in PR #1876 (642f4ee7, not in master). Slice B has not shipped: ivr-webhook-auth.server.ts returns only a bare userInput and never reads Confidence; ivr-results.ts normalizeAnswer returns a bare string. Confidence is deferred to #1880, so slice B is the { value, raw, inputType } shape only.
-- Current behavior: outreach_attempt.result stores a bare transcript string; readers unwrap only strings; Twilio Confidence is discarded.
-- Root cause: The response parser collapses Digits/SpeechResult into one string and drops Confidence.
-- Resolution: Add IvrStoredAnswer + isIvrStoredAnswer + ivrAnswerValue to app/lib/ivr-results.ts; parse Confidence in ivr-webhook-auth.server.ts; store answer in the outbound response route; unwrap to .value in outreach-typed-fields.server.ts and campaign-export.server.ts; keep readers accepting the legacy bare string.
-- Look in: `app/lib/ivr-results.ts`, `app/lib/ivr-webhook-auth.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/lib/outreach-typed-fields.server.ts`, `app/lib/campaign-export.server.ts`, `app/components/campaign/home/CampaignHomeScreen/ResultsScreen.IvrResponses.tsx`
-- Existing tests: test/ivr-gather.test.ts; test/ivr-block-response.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/ivr-results.test.ts
-- Missing tests: ivr-webhook-auth: digits yields DTMF with no confidence; speech yields the transcript; ivr-results aggregation over the object shape and mixed legacy/new merge; outreach-typed-fields unwraps the object shape; campaign export CSV cell is the value, not [object Object]
-- Done when: A vx-any step stores { value, raw, inputType }; Legacy bare strings and new objects both aggregate; Typed fields and CSV export resolve the value; Confidence capture is deferred to #1880
-- Tracker: Fix now as slice B in one PR. Keep confidence, intent matching and per-campaign language with #1880 and the #268 epic.
+### [#2147](https://github.com/chester-hill-solutions/callcaster/issues/2147) A timed-out Gather writes a literal null answer, and the voice campaign export renders it as the string "null"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
+- PR #2163 is merged to dev. The response route saves only accepted input. Timeout and unsupported menu keys follow the no-input route.
+- Current behavior: PR #2163 is merged to dev. The response route saves only accepted input. Timeout and unsupported menu keys follow the no-input route.
+- Resolution: Verify a silent Gather and an unsupported key on dev. Check that the exported answer is blank. Keep the issue open until release.
+- Look in: `app/lib/ivr-block-runtime.server.ts:120-131`, `the IVR response route (the `userInput === null` branch and the `result` write)`, `app/lib/ivr-results.ts:87-92`, `app/lib/campaign-export.server.ts:493`
+- Existing tests: test/ivr-block-response.route.test.ts
+- Done when: A caller who times out at a menu produces a CSV cell that is **empty**, not `null` (kill-check: keep recording the null and confirm the test goes red).; The Results screen is unchanged (empty, not `null`).; An unmatched key press re-prompts up to the replay cap and is not recorded as an answer (kill-check).; A terminal block is never answered by a digit the script did not offer.
+- Tracker: Code reviewed at dev@5b673c81. PR #2163 merge 6c8a48fa is in origin/dev. Runtime and export verification remain.
 
-### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface the caller audio selection on the /call welcome dialog (on join)
-- Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Surface and select the caller audio on the /call welcome dialog**
-- The welcome dialog receives voicemail_file as a boolean and only describes the drop in prose. Wants the dialog to show the actual caller audio (machine drop campaign.voicemail_file and agent voice drop campaign.voicedrop_audio) and let the agent change it. Grilling decision: session-only, no campaign write.
-- Current behavior: CallScreen.Dialogs.tsx renders prose keyed on a voicemail_file boolean; CallScreen.Layout.tsx:495 passes Boolean(campaign.voicemail_file). Audio Drop posts to /api/audiodrop, which loads campaign.voicedrop_audio server-side; no session override.
-- Root cause: The call-loader/Dialogs contract carries booleans and prose only; /api/audiodrop has no override parameter.
-- Resolution: Pass campaign voicemail_file and voicedrop_audio strings plus the workspace audio library into the call loader and Dialogs; render the caller audio with a picker; hold the choice in call-screen session state and send it with /api/audiodrop (validate against the workspace library); keep the Setup default.
-- Look in: `app/components/call/CallScreen.Dialogs.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallScreen.ts`, `app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts`, `app/routes/api+/audiodrop.action.server.ts`
-- Existing tests: test/ui/call-screen-dialogs.test.tsx; test/ui/call-screen-callarea.test.tsx; test/audiodrop.test.ts
-- Missing tests: dialog shows the configured caller audio name; changing it updates the session value; audiodrop POST carries the session override; default matches the campaign config and no campaign row is written
-- Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
-- Tracker: Fix now; session-only per the recorded decision. Relates to #1839 and #1708.
+### [#2041](https://github.com/chester-hill-solutions/callcaster/issues/2041) Admins can only grant credits by direct database write; add an audited manual credit load on the admin workspace page
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-27
+- PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.
+- Current behavior: PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.
+- Root cause: The billing ledger was designed around automated, provider-keyed writes. There is no human-initiated grant concept, no key namespace for one, and no UI for one — and the guard that would catch an unsafe write (check:credit-writes, scripts/check-credit-write-paths.mjs) treats any direct workspace.credits write as a violation, which is the correct default and the reason a supported path is needed rather than a bypass.
+- Resolution: Verify an admin credit load and a replay of the same form on dev. Check the balance, audit note and ledger row. Keep open until release.
+- Look in: `app/routes/admin+/workspaces/$workspaceId/credits.action.server.ts`, `app/routes/admin+/workspaces/$workspaceId/credits.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/credits.route.tsx`, `shared/billing-keys.ts`
+- Existing tests: test/admin-workspace-credits.route.test.ts; test/billing-keys.test.ts
+- Done when: A sudo admin can grant credits to any workspace from the admin page, and the balance updates on refresh; The grant is written through insertTransactionHistoryAndSyncCredits-equivalent RPC path only; no direct workspace.credits write and check:credit-writes stays green; A retried submit with the same nonce credits exactly once; Invalid amounts are rejected with a clear message and nothing is written; The ledger row shows type CREDIT, a positive amount, and a note naming the admin and the reason; The grant's bucket is decided deliberately and documented, and the welcome-credits prefix classification is corrected in the same change; npm run ci:local is green, including the codegen and surface checks
+- Tracker: Code reviewed at dev@5b673c81. PR #2044 merge 1a2d2313 is in origin/dev. No deployed credit mutation was made during this review.
 
-### [#1936](https://github.com/chester-hill-solutions/callcaster/issues/1936) Comment policy: comments must carry information (no-useless-comments rule)
-- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
-- Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.
-- Current behavior: eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.
-- Root cause: Comment hygiene is unenforced; a number or a punctuation banner passes lint.
-- Resolution: Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.
-- Look in: `eslint.config.mjs`, `package.json`, `app/`, `test/`
-- Missing tests: Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes
-- Done when: Issue/PR-number-only comments are lint errors; Punctuation-only comments are lint errors; Existing offenders are zero; Rule intent is documented
-- Tracker: Fix now as one atomic PR (rule + zero-offender sweep + rule tests).
+### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) IVR: store speech answers as { value, raw, inputType } (slice B)
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-27
+- PR #2160 is merged to dev. Outbound IVR answers include value, raw, inputType and optional confidence. Result readers still accept legacy strings.
+- Current behavior: PR #2160 is merged to dev. Outbound IVR answers include value, raw, inputType and optional confidence. Result readers still accept legacy strings.
+- Root cause: The response parser collapses Digits/SpeechResult into one string and drops the optional Confidence value.
+- Resolution: Verify one speech answer, one keypad answer and one legacy answer in Results and CSV on dev. Keep the issue open until release.
+- Look in: `app/lib/ivr-webhook-auth.server.ts`, `app/lib/ivr-results.ts`, `app/lib/outreach-typed-fields.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`
+- Existing tests: test/ivr-webhook-auth.server.test.ts; test/ivr-results.test.ts; test/outreach-typed-fields.server.test.ts; test/campaign-export-voice-credits.test.ts
+- Done when: A speech answer stores { value, raw, confidence, inputType }; confidence is null when Twilio omits or sends an invalid value; DTMF answers store inputType=dtmf and no confidence; route matching still receives the same userInput string; Legacy bare strings and new objects both aggregate and export as the answer value; Typed fields and CSV export resolve the value
+- Tracker: Slice B is present in dev@5b673c81 through PR #2160 merge 9dcab08b. The earlier claim that confidence is discarded is obsolete.
 
-### [#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847) Call list mapping should allow you to drop columns if you don't want the clutter instead of just custom fields
-- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-21
-- Recommended title: **Add a 'Do not import' mapping option so columns can be dropped**
+### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
+- DONE — the settled-message gate shipped on 2026-09-27 as PR #2050 (d032c0c9), a day before this record was written. Message campaigns no longer flip to complete on dequeue: try_complete_campaign_if_drained now refuses while any message is unsettled. Measured on the Eric Lombardi blast (2026-09-24) the old behaviour reported complete at 6:29pm EDT while Twilio still held 5,382 messages, releasing them between 11:59pm and 1:46am — a median lag of 7.3 hours.
+- Current behavior: Verified against the live dev database, not just the migration file: campaign_has_unsettled_messages, campaign_ids_with_unsettled_messages and try_complete_campaign_if_drained all exist in public, and the deployed body of try_complete_campaign_if_drained does call campaign_has_unsettled_messages. A completion re-check exists (app/lib/campaign-settle-recheck.server.ts) because the gate would otherwise strand every message campaign at running forever once the local queue empties.
+- Root cause: campaign_has_unsettled_calls had no message counterpart, and campaign_queue_has_pending_work treats a row as done at dequeue time — handed to Twilio, not delivered. The re-check module's own comment records that a TypeScript re-implementation of the settled rule shipped once and broke the recovery path in two ways no test caught, which is why both the filter and the gate now live only in SQL.
+- Resolution: No code work outstanding. The residual is the expired-campaign bypass at app/lib/worker/handlers/campaign.server.ts, which writes status=complete directly and never calls the gate — that is issue #2051, DECLINED by the maintainer on 2026-09-25 ('no 2051') and deliberately left with a code comment marking it a known gap. Do not reopen it here. What remains is a verification pass: confirm on a real campaign that a message sitting at Twilio keeps the campaign at running, and that the re-check promotes it once the provider settles. That pass belongs on a real database, which is the tier #2174 tracks.
+- Look in: `client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql`, `app/lib/twilio-open-sync.server.ts`, `app/lib/sms-status.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`
+- Existing tests: test/campaign-completion-rpc-contract.test.ts — extracts the live migration bodies and pins the settled list and the ::text casts (9 tests, runs in ci:local); test/campaign-settle-recheck.server.test.ts — the re-check sweep and its best-effort contract (7 tests, runs in ci:local); test/integration-db/campaign-completion-gate.test.ts — 14 tests against a real database; this tier is not wired to any workflow (#2174), so these do not run in CI today
+- Missing tests: an end-to-end real-Postgres pass: a message unsettled at the provider keeps the campaign at running, and the re-check promotes it once settled (#2174)
+- Done when: SMS campaign with queued/sending messages is not complete; Settled campaign completes normally; No-callback messages resolved by open-sync, don't block forever; IVR completion unchanged
+- Tracker: Verify and close — this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined.
+
+### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-09-27
+- PR #1796 (0188cea8) now wakes waiting voice work at the next calling-hours boundary. The four deployed boundary checks requested by this issue remain pending.
+- Current behavior: The waiting voice successor uses the next window opening; schedule-sweep ownership of waiting-to-running remains intact.
+- Resolution: Collect deployed evidence for future start, exact open, mid-run close, and no premature completion. Preserve #1351/#1352 until that evidence is assessed.
+- Look in: `app/lib/worker/handlers/campaign.server.ts`, `app/lib/campaign-schedule-sync.server.ts`
+- Existing tests: test/campaign-dispatch-worker.test.ts
+- Missing tests: DB rows plus screenshots or API results for all four deployed boundary cases.
+- Tracker: Verification work remains; do not repeat the next-window scheduling patch from PR #1796.
+
+### [#1794](https://github.com/chester-hill-solutions/callcaster/issues/1794) Campaign schedule sync can overwrite a concurrent pause or completion
+- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-09-27
+- PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. A new real-Postgres regression test covers pause and completion after candidate selection.
+- Current behavior: A concurrent status change causes the guarded update to return no transition; a real-Postgres test verifies paused and complete states are preserved and no transition event is emitted.
+- Resolution: Keep the issue open until this test is merged to dev and the guarded status transition is verified there.
+- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-ivr.server.ts`
+- Existing tests: test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper); test/integration-db/campaign-schedule-sync-status-race.test.ts (pause/completion interleaving against Postgres)
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1791](https://github.com/chester-hill-solutions/callcaster/issues/1791) SMS dispatch continues sending after the campaign window closes mid-batch
+- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
+- PR #1796 (0188cea8) added campaign-window checks before provider requests, including after asynchronous preparation.
+- Current behavior: When the campaign window closes mid-batch, new sends stop and unsent contacts remain queued.
+- Resolution: Verify the closing-boundary behavior on dev without sending outside the test window.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: test/campaign-sms-dispatch-window.test.ts
+- Missing tests: Deployed closing-boundary verification.
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#2005](https://github.com/chester-hill-solutions/callcaster/issues/2005) Quit This Workspace posts a self-leave that always 403s for the role it is shown to; remove the button and the self-leave path behind it
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-27
+- PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.
+- Current behavior: PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.
+- Root cause: deleteSelf was never a domain operation — it is a thin adapter over member removal — and member removal is a management-of-others operation. Because it exists as a named intent, the UI could offer it to a role the underlying service forbids, and the same intent is reachable through the public member-delete endpoint, where a same-rank actor can currently target their own user_id.
+- Resolution: Verify the workspace settings page has no self-leave control. Verify the member API refuses self-removal and still permits authorized removal of another member.
+- Look in: `app/components/workspace/TeamMember.tsx`, `app/routes/workspaces+/$id/settings.route.tsx`, `app/routes/workspaces+/$id/settings.action.server.ts`, `app/lib/platform-members.server.ts`
+- Existing tests: test/workspace-setting-utils.test.ts; test/workspace-settings-rbac.test.ts
+- Done when: No Quit This Workspace form renders anywhere; The deleteSelf intent is gone from all three actions and handleDeleteSelf no longer exists; Member removal refuses a self-target with a clear 403 for every role; Removing a different member, owner transfer, invite cancellation and platform-admin removal are unchanged; The OpenAPI description and the generated spec state that self-removal is unsupported; The e2e RBAC-03 assertion that the button is visible is removed, and the invite-authorization follow-up is filed as its own issue
+- Tracker: Code reviewed at dev@5b673c81. PR #2038 is merged. Its PR body says tests were not run, so a merge alone does not complete verification.
+
+### [#2054](https://github.com/chester-hill-solutions/callcaster/issues/2054) test:ui worker OOMs on test/ui/hooks-chats.test.tsx intermittently, on every branch including master
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-27
+- PR #2065 is merged to dev. The chats test mock returns one stable loader object. It no longer creates a new messages array on each render.
+- Current behavior: PR #2065 is merged to dev. The chats test mock returns one stable loader object. It no longer creates a new messages array on each render.
+- Root cause: The old loader mock created a new array on each render. The hook effect set state on each new array and caused a render loop.
+- Resolution: Run the UI suite in CI and confirm the chats file completes. Do not add a heap cap as a substitute for the mock fix.
+- Look in: `vitest.ui.config.ts (pool, maxWorkers, isolate)`, `test/ui/hooks-chats.test.tsx`, `test/setup.ui.ts`
+- Existing tests: test/ui/hooks-chats.test.tsx
+- Done when: test:ui completes 149/149 on a GitHub-hosted runner; hooks-chats no longer kills its worker under memory pressure; No rerun needed for a stable result on a clean dev checkout; Any new heap ceiling is documented in vitest.ui.config.ts beside the setting with its reason
+- Tracker: Code reviewed at dev@5b673c81. PR #2065 reports a measured render loop and a fix. The prior claim of runner memory pressure was incorrect.
+
+### [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052) Give the completion RPC one best-effort owner
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Five call sites invoke try_complete_campaign_if_drained and only two guard it. campaign-queue-completion.server.ts:51-68 and ivr/status.action.server.ts:130-153 catch and log; the #2048 campaign-settle-recheck.server.ts catches and logs under a third event name; campaign.server.ts continueOrCompleteDispatch and auto-dial.server.ts:437-444 do not catch at all, so an RPC failure propagates and fails the dispatch job or dial drain. An RPC failure only means 'not complete yet', which must never fail unrelated work.
+- Current behavior: Completion failures are reported three different ways depending on surface, and on two surfaces they fail the surrounding job instead of being absorbed.
+- Root cause: Each call site invented its own try/catch and log message. The #2048 wrapper was created for the same reason, so there are now two wrappers and three policies.
+- Resolution: One internal helper owns 'ask the gate, log, never throw', with a comment stating why. All five call sites use it and lose their own try/catch. Collapse campaign-settle-recheck.server.ts into the same owner rather than keeping two wrappers. Normalise the log event name and fields so a completion failure reads the same from every surface.
+- Look in: `app/lib/campaign-queue-completion.server.ts:51-68`, `app/routes/api+/ivr/status.action.server.ts:130-153`, `app/lib/campaign-settle-recheck.server.ts`, `app/lib/worker/handlers/campaign.server.ts (continueOrCompleteDispatch)`, `app/lib/auto-dial.server.ts:437-444`, `app/lib/db-rpc.server.ts:176-184`
+- Existing tests: test/webhook-side-effects.test.ts; test/campaign-settle-recheck.server.test.ts
+- Missing tests: completion RPC failure does not propagate out of a dispatch job; completion RPC failure does not propagate out of a dial drain; completion RPC failure does not fail a Twilio webhook; completion RPC failure does not fail an open-sync sweep; one log event name is used from every surface
+- Done when: Exactly one code path owns the best-effort completion call; All five call sites use it with no local try/catch; A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep; One log event name and field set from every surface; Failure path tested at each call site, not only at the owner
+- Tracker: Small cleanup, no live defect. Raised by the #2048 structural review and deliberately deferred there to keep that PR atomic. Lane is verify-close because the work is a de-duplication with no behavioural change to specify.
+
+### [#2019](https://github.com/chester-hill-solutions/callcaster/issues/2019) Corrected project-9 Status flow documented and the enrichment lanes repaired
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Shipped in PR #2026 (3d091ce5), which is an ancestor of the current dev HEAD, and every acceptance criterion in the issue body is satisfied in the working tree. .github/projects.yaml lists on-prod (2f691958) alongside the other six options. The board how-to in scripts/issue-board-lib.mjs:353-365 describes the corrected flow, including 'Never move a CLOSED issue by hand' and the not_planned/duplicate-is-the-one-manual-move rule. .agents/skills/project-on-dev-status/SKILL.md:114-140 carries the same rule and the option ids. The lane repair is done: verify-close.json holds #1883, #1884, #1846, #1980, #1981, #1982, #1830, #1844, #1845, #1886, #1936, and fix-now.json holds none of them. The validation error the issue quoted (#780 blockedBy unknown issue 1884) cannot occur now, because #1884 is present.
+- Current behavior: The Status flow is documented in the three places an agent will actually read, and the lanes match what has shipped.
+- Root cause: The 2026-09-21 release session bulk-archived 260+ closed items, which exposed that the documented flow described a hand-move process the automation had replaced, and that PR #1995 had dropped two enrichment records.
+- Resolution: No code. Confirm the fix reaches master and close. If the board is regenerated and any lane claim here turns out to be stale, correct the enrichment files rather than reopening this issue — the repair itself is done.
+- Look in: `.github/projects.yaml (on-prod option present)`, `scripts/issue-board-lib.mjs:353-365 (corrected Status-flow how-to)`, `.agents/skills/project-on-dev-status/SKILL.md:114-140 (Related section and option ids)`, `scripts/issue-board-enrichment/verify-close.json and fix-now.json (the lane moves)`
+- Existing tests: scripts/issue-board-lib.mjs validateEnrichmentFiles (fails on a duplicate issueNumber, an unknown blockedBy target, or a cycle — this is what caught the dropped #1883/#1884 records)
+- Missing tests: no test asserts that an on-prod option exists in .github/projects.yaml, so removing it again would not fail any check; no test asserts that no lane record claims a verdict its filename contradicts (the issue notes lanes come from the verdict field, which is a drift trap)
+- Done when: npm run tools:issues:board exits 0 with no blockedBy, duplicateOf or cycle error; The corrected Status flow is documented in the board how-to, the skill and AGENTS.md where an agent will find it; .github/projects.yaml lists on-prod; Every record moved between lanes carries the verdict matching its lane file
+- Tracker: Verify and close. The work is committed on dev and the acceptance criteria are individually checkable in the working tree. Close on promotion to master.
+
+### [#2013](https://github.com/chester-hill-solutions/callcaster/issues/2013) auth pages: one shared form container — same width, padding, centring
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-25
+- PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.
+- Current behavior: PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.
+- Root cause: No shared container component; each page sets its own geometry.
+- Resolution: Compare sign-in and sign-up at narrow and wide viewport sizes on dev. Check width, centering and padding. Keep open for any remaining visual defect.
+- Look in: `app/routes/signin.tsx`, `app/routes/signup.tsx`, `app/components/shared/AuthCard.tsx`
+- Existing tests: test/ui/signup.route.test.tsx
+- Done when: Identical form width on both pages; Identical padding on both pages; Centred vertically and horizontally on both pages; Geometry defined in one place, not per page; #2010 re-checked against this change
+- Tracker: Current source reviewed at dev@5b673c81. The PR description names older padding values; use current source for verification.
+
+### [#2012](https://github.com/chester-hill-solutions/callcaster/issues/2012) auth pages: remove the top "Sign Up" link and rename "Create an Account" to "Sign Up"
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-25
+- The sign-in page shows a "Sign Up" link at the top as well as a "Create an Account" button, so the same destination is offered twice under two different labels. Grouped under the auth-pages epic (#2057).
+- Current behavior: Two distinct labels both lead to sign-up.
+- Root cause: Copy was added over time without a single naming decision.
+- Resolution: Remove the top "Sign Up" link and change the button to read "Sign Up". Verify the result against the live routes before closing — this may already be fixed in which case it closes with a link to the current code.
+- Look in: `app/routes/account.sign-in.*`, `app/components/shared/AuthCard.tsx`
+- Done when: One label, one destination; No duplicate link to the same page from the same screen
+- Tracker: Smallest item in the cluster. Check the live route first — if it already reads this way, close it as already done rather than writing a change.
+
+### [#2006](https://github.com/chester-hill-solutions/callcaster/issues/2006) Bulk Status moves to archive on the shared CHS backlog: incident fixed, prevention documented, no repo automation involved
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-25
+- Diagnosed and remediated by wra-sol in the issue comments, and the repo-side half is done. The mover was never this repository: nothing under .github/workflows/ writes project Status at all (a grep for 'archive' across the workflows returns nothing), and the board scripts never touch GitHub Projects. It was agent tooling doing a bulk sweep on the shared board, which overreached and put 48 OPEN issues into the terminal lane; all 48 were restored to Backlog and verified. The durable prevention is now written into the two places an agent will read: scripts/issue-board-lib.mjs:353-365 (the board how-to states the corrected flow, that closed items go to on-qa by automation, and that archive is only the one manual move for not_planned/duplicate) and .agents/skills/project-on-dev-status/SKILL.md:114-140 (never set a terminal lane, with the option ids). The bulk-sweep warning that was added to session memory is now in the repo instead of in one person's memory.
+- Current behavior: No repo automation can move a project item. The rule that prevents a repeat is documented in the board generator and the skill.
+- Root cause: A terminal Status option named archive exists on a project shared by several CHS products, and a bulk 'archive the closed items' cleanup ran without checking item state. Open items in a terminal lane is a contradiction that nothing detected.
+- Resolution: No code. Verify on the shared board that no OPEN issue sits in a terminal lane (the check the fix claimed, re-run it), and that the corrected flow is still in the two documented places. Then close. If a repeat happens, the missing piece is an out-of-repo guard, not a repo change — a script that lists open items in a terminal lane would be worth its own issue if this recurs.
+- Look in: `.github/workflows/ (no project Status writes — the negative result is the evidence)`, `scripts/issue-board-lib.mjs:353-365 (the corrected Status-flow section, including the never-hand-move-a-closed-item rule)`, `.agents/skills/project-on-dev-status/SKILL.md:114-140 (the same rule plus the option ids)`, `.github/projects.yaml (the terminal option is literally named archive)`
+- Existing tests: scripts/issue-board-lib.mjs validateEnrichmentFiles (structural validation of the enrichment, not of the project board)
+- Missing tests: no check anywhere fails when an OPEN item is left in a terminal lane — the failure mode that produced this incident is still undetectable; no script lists project items in a terminal lane on demand, so the verification is manual
+- Done when: No open issue on the CHS backlog sits in archive or any other terminal lane; Nothing in this repository moves project Status to a terminal lane; The corrected Status flow is documented where an agent will read it, not only in session memory; The not_planned/duplicate exception is the only documented manual terminal move
+- Tracker: Verify and close. The incident was fixed and the prevention is in the repo, so there is no code work here. The one thing worth carrying forward is the gap named above: nothing detects an open item in a terminal lane, and that is what allowed a sweep to go unnoticed until a human looked.
+
+### [#2001](https://github.com/chester-hill-solutions/callcaster/issues/2001) Phone Numbers promoted to its own top-level page at /phone-numbers and removed from Settings
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-09-25
+- Shipped. PR #2018 (0ee4766a) merged to dev and the automation comment says this closes when it reaches master. Verified in the working tree: the route module exists (app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts, both dated 2026-09-24), the sidebar links to it (app/components/workspace/WorkspaceNav.tsx:140, path 'phone-numbers'), the URL is in the verified route-tree baseline (scripts/baselines/route-tree.txt:153), and the purchase sub-route is split out (app/routes/workspaces+/$id/phone-numbers/purchase.route.tsx).
+- Current behavior: Phone Numbers is its own sidebar page; the settings page no longer carries a Phone Numbers section.
+- Root cause: It was a section inside Settings rather than a top-level destination, which put a daily-use surface three clicks deep.
+- Resolution: No code. Verify on the review environment that /phone-numbers loads with numbers listed, that the Settings page has no Phone Numbers section, and that the e2e RBAC-04 assertion (e2e/specs/rbac.spec.ts:29-32, a caller is redirected away from /phone-numbers) still holds — that test is the only thing guarding the role gate on the new page. Then close when the fix is promoted to master.
+- Look in: `app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts`, `app/components/workspace/WorkspaceNav.tsx:140`, `scripts/baselines/route-tree.txt:153`, `e2e/specs/rbac.spec.ts:29-32 (the caller role gate on the new page)`
+- Existing tests: e2e/specs/rbac.spec.ts (RBAC-04 gates the caller role off /phone-numbers); npm run tools:routes:verify (route tree baseline includes the new path)
+- Missing tests: no test asserts the Settings page no longer renders a Phone Numbers section, so a re-add would pass silently; the sidebar link and the route path are asserted in the same place, so a rename cannot half-land
+- Done when: /phone-numbers loads and lists the workspace numbers; The Settings page has no Phone Numbers section; A caller role is still refused on /phone-numbers; No dead links point at the old settings anchor
+- Tracker: Verify and close. The work is merged to dev and the route tree baseline proves the path exists. The only open item is promotion to master.
+
+### [#1998](https://github.com/chester-hill-solutions/callcaster/issues/1998) Workspace audio library and caller/call audio split into separate key prefixes; migration tool shipped
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Shipped in PR #1999 (27601c58), which is in the dev history. The split is real: app/lib/platform-media.server.ts:79-80 documents that caller voicemails live under voicemail/<ws>/ and Twilio recordings under call-recordings/<ws>/, outside the library prefix, and the migration tool exists at scripts/migrate-media-namespaces.ts with the npm script tools:media-namespace-migrate (dry-run by default, --apply to move). Tests were added alongside: test/media-namespace-migrate.server.test.ts, test/voicemail-media.server.test.ts, and test/call-recording-storage.server.test.ts was extended.
+- Current behavior: Library audio, caller voicemails and call recordings live in three different key prefixes, so the filename-prefix heuristics the issue listed are gone.
+- Root cause: One bucket and one key prefix for three different kinds of media, which forced every consumer to guess from a filename and produced junk like voicemail-undefined.
+- Resolution: No code. The one remaining step is operational and is what makes this verifiable: run tools:media-namespace-migrate in dry-run on the review environment, check the counts, then --apply, then confirm the voicemails page and call-history playback still resolve their objects. Then repeat on prod. If the dry-run reports objects it cannot classify, that is a real gap — file it rather than forcing them across. Close when the review environment passes, since the code half is already merged.
+- Look in: `app/lib/platform-media.server.ts:75-85 (the prefix split and the comment replacing the heuristics)`, `scripts/migrate-media-namespaces.ts and package.json tools:media-namespace-migrate (dry-run default, --apply)`, `app/lib/object-storage.server.ts (bucket + key layout for workspaceAudio)`, `app/routes/api+/email-vm.action.server.ts (the voicemail writer, now writing voicemail/<ws>/)`
+- Existing tests: test/media-namespace-migrate.server.test.ts; test/voicemail-media.server.test.ts; test/call-recording-storage.server.test.ts
+- Missing tests: no test asserts that a voicemail object and a call recording are invisible to listWorkspaceAudiosApi, which is the whole point of the change; no test asserts the migrator is idempotent, so running it twice is unproven safe; no test covers an unclassifiable pre-split object, which is the case most likely to strand history
+- Done when: The review environment runs the migration dry-run, applies it, and the voicemails page and call-history playback still work; The audio library no longer lists voicemails or call recordings; No voicemail- or recording- filename heuristics remain in the code; The migration is idempotent and reports anything it cannot classify; The prod run happens after the review run and is recorded
+- Tracker: Verify and close, after the migration dry-run on the review environment. The code and the tests are merged; the only thing outstanding is running the tool, and that run is the verification rather than new work. Risk is medium only because the tool moves objects — which is why the dry-run default exists and why it should be run on review first.
+
+### [#1982](https://github.com/chester-hill-solutions/callcaster/issues/1982) Receipts: support email should be contact@callcaster.ca
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Receipts currently carry a wrong/absent support contact; use contact@callcaster.ca.
+- Current behavior: Receipt builder contact line differs from the canonical support address.
+- Resolution: Swap the contact line to contact@callcaster.ca on the receipt.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`
+- Missing tests: receipt test asserts contact@callcaster.ca
+- Done when: Receipts say contact@callcaster.ca
+
+### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts: state how many credits were bought
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Receipt (billing/receipt.route.tsx) should say how many credits the purchase covered, not just the amount.
+- Current behavior: Receipt builder shows amount/line items; no credit quantity line.
+- Resolution: Add a credit-quantity line to the receipt render (from the ledger row / stripe session metadata). Contact #1982/#1983 for the same receipts surface.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`
+- Missing tests: receipt test asserts credit-quantity line
+- Done when: Receipt states how many credits were bought
+
+### [#1980](https://github.com/chester-hill-solutions/callcaster/issues/1980) Trim IVR add-a-recording help copy: drop 'From the workspace audio library'
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-25
+- Design nit: the add-a-recording step's recording select shows helper text 'From the workspace audio library.' (ScriptBlockEditor.IvrStep.tsx:304). Remove it (the picker already frames the library context) and any now-redundant spacing.
+- Current behavior: ScriptBlockEditor.IvrStep.tsx:304 renders 'From the workspace audio library.' under the recording control.
+- Resolution: Remove the helper text line; verify the RecordingStepFields block still reads clean with the Select only.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx:304`
+- Missing tests: UI smoke renders recording step without the label
+- Done when: No 'From the workspace audio library' text in the IVR recording step
+
+### [#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976) IVR results/export show the option label (not raw DTMF)
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Shipped in #1977 via resolveIvrAnswerLabel (app/lib/ivr-results.ts): results screen and CSV export render the option label for known keys; unknown values fall back to the raw value. Verify on the review env and close.
+- Current behavior: Before fix: IvrOption labels ignored; raw DTMF was shown.
+- Resolution: Verify on dev: a script with keypad options displays the chosen label in Results + export; a key with no matching option still shows the raw value.
+- Look in: `app/lib/ivr-results.ts`
+- Existing tests: test/ivr-results* and route tests for label resolution
+- Done when: Results + export show the label the caller chose (or raw when unmatched)
+
+### [#1961](https://github.com/chester-hill-solutions/callcaster/issues/1961) issue-on-dev abort when PR bodies reference non-issue numbers
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Fixed by #1964: issue-on-dev.yml now parses closing keywords and 'Issues:' lines with PR-number robustness, and the parser ignores bare PR-number references. Verify a merge with a body containing issue numbers doesn't abort the loop, then close.
+- Current behavior: Before: 'gh issue view' on a PR number returned MERGED and the GraphQL move loop aborted.
+- Resolution: Verify with a reference PR whose body names issues + a PR number; confirm Status moves complete. #1961 is docs/automation only.
+- Look in: `.github/workflows/issue-on-dev.yml`
+- Done when: The move loop completes when a PR body references issue numbers
+
+### [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919) verify-close: single-consumer hooks dropped from the global barrel (#1920)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- app/hooks/index.ts no longer exports useSurveyForm or useCampaignExport; the hooks stay reachable through their sub-barrels. Shipped to dev in PR #1920 (95f084c9); ancestor of origin/dev, NOT of origin/master.
+- Root cause: The #1892 DRY pass widened the global barrel with hooks that have one consumer each.
+- Resolution: Verify on dev: rg the two hook names in app/hooks/index.ts finds no export, and the survey/export tests stay green. No new code expected.
+- Look in: `app/hooks/index.ts`, `app/hooks/surveys/index.ts`, `app/hooks/campaign/index.ts`
+- Existing tests: test/ui/use-survey-form.test.tsx; test/ui/campaign-export-button.test.tsx
+- Done when: The global-barrel exports are dropped; the sub-barrels keep the hooks.; No import breaks.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918) verify-close: loadQueueItemRelations returns grouped contact maps (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- loadQueueItemRelations in app/lib/campaign-queue-search.server.ts now returns { contactById, attemptsByContactId, audiencesByContactId } and both fetchers consume the same maps. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The helper returned raw arrays, so the page fetcher grouped them while the item fetcher re-filtered them.
+- Resolution: Verify on dev: queue route suites green and both fetchers use the maps. No new code expected.
+- Look in: `app/lib/campaign-queue-search.server.ts`
+- Existing tests: test/campaign-queue.route.test.ts; test/campaign-queue-db.claim.test.ts; test/campaign-settings-queue.route.test.ts
+- Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.
+- Resolution: Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.
+- Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
+- Existing tests: test/ui/campaign-export-button.test.tsx
+- Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) verify-close: type the public survey guard's extra required fields (#1920)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The shared guard encoded one route's requirement as an untyped string list.
+- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
+- Look in: `app/lib/survey-public-action.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
+- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) verify-close: admin pagination consolidated onto TablePagination (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- TablePagination gained optional pageSizeOptions + onPageSizeChange; AdminPagination is deleted and the three admin panels use TablePagination. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The DRY pass extracted a near-duplicate AdminPagination instead of extending the canonical component.
+- Resolution: Verify on dev: rg AdminPagination finds no imports; test/ui/table-pagination-page-size.test.tsx green. Eyeball the three admin panels' pagination. No new code expected.
+- Look in: `app/components/shared/TablePagination.tsx`, `app/components/admin/`, `app/components/queue/QueueTablePagination.tsx`
+- Existing tests: test/ui/table-pagination-page-size.test.tsx
+- Done when: TablePagination gains the page-size select.; AdminPagination is deleted; the three admin panels use TablePagination.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914) verify-close: survey routes share the fetcher redirect and error extraction (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- app/lib/survey-submit.ts owns SurveySubmitResult, surveySubmitError, and surveySuccessPath; both survey routes import it and render <Navigate>. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The two routes carried ~40 duplicated lines.
+- Resolution: Verify on dev: test/ui/survey-create-edit-redirect.test.tsx green and both routes import from @/lib/survey-submit. No new code expected.
+- Look in: `app/lib/survey-submit.ts`, `app/routes/workspaces+/$id/surveys/new.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/edit.route.tsx`
+- Existing tests: test/ui/survey-create-edit-redirect.test.tsx
+- Done when: A shared helper owns the redirect and error extraction.; Both routes use it.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913) verify-close: SurveyForm decomposed into page and question subcomponents (#1920)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- SurveyForm.tsx defines SurveyQuestionCard and SurveyPageSection; the top-level SurveyForm function is under the 200-line threshold. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The file held a 265-line function with everything inline.
+- Resolution: Verify on dev: lint reports no max-lines-per-function warning and survey tests stay green. No new code expected.
+- Look in: `app/components/surveys/SurveyForm.tsx`
+- Existing tests: test/ui/survey-create-edit-redirect.test.tsx; test/ui/use-survey-form.test.tsx
+- Done when: SurveyPageSection and SurveyQuestionCard are extracted.; The top-level function drops under the threshold.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912) verify-close: survey ids derive from the highest suffix, unique after removal (#1920)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- useSurveyForm derives new page/question ids from nextSuffix() (highest existing suffix + 1) and a regression test asserts ids stay unique after a middle removal. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Ids were derived from array.length + 1, which collides after a middle removal.
+- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx includes the uniqueness regression. No new code expected.
+- Look in: `app/hooks/surveys/useSurveyForm.ts`, `test/ui/use-survey-form.test.tsx`
+- Existing tests: test/ui/use-survey-form.test.tsx
+- Done when: New ids derive from the max existing numeric suffix.; A test adds three, removes the middle, adds another, asserts unique ids.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) verify-close: git hooks + PR issue-reference gate (shipped to dev in #1921/#1926)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Both halves shipped to dev: a checked-in pre-commit hook wired via core.hooksPath, and a PR-into-dev issue-reference gate. Merged in PR #1921 (23700b0f) and PR #1926 (f416f037). Both are ancestors of origin/dev but NOT of origin/master.
+- Root cause: The repo had no git hooks and no requirement that a PR body reference an issue.
+- Resolution: Verify on dev only: stage a lint error and confirm the pre-commit hook blocks the human commit; open a dev PR without an issue reference and confirm the check is red, then add no-issue and confirm it clears. No new code expected.
+- Look in: `.githooks/pre-commit`, `scripts/setup-githooks.sh`, `package.json`, `.github/workflows/pr-issue-reference.yml`, `.github/workflows/issue-on-dev.yml`
+- Done when: A commit with a lint error is blocked by the pre-commit hook.; A PR into dev with no issue reference fails a check unless labelled no-issue.
+- Tracker: Verify and close after dev verification; promote #1921/#1926 to master first.
+
+### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Verify: the test suite is pinned to UTC
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Fixed on dev in PR #1898 (4079b7ae, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, vitest.shared.config.ts:16 sets test env { TZ: "UTC" } for both projects.
+- Root cause: Neither vitest.shared.config.ts nor the setup files set TZ.
+- Resolution: No new code. Verify on the review environment and a non-UTC machine, then close when promoted to master.
+- Look in: `vitest.shared.config.ts`, `test/ui/campaign-launch-eta.test.tsx`, `test/setup.node.ts`, `test/setup.ui.ts`
+- Existing tests: test/ui/campaign-launch-eta.test.tsx
+- Missing tests: optional guard that process.env.TZ === "UTC" inside a test
+- Done when: process.env.TZ === "UTC" in node and ui tests without any per-file pin; The suite passes unchanged on a non-UTC machine
+- Tracker: Verify on the review env; close when promoted to master (dev-only today). Update the AGENTS.md per-file TZ pitfall once confirmed.
+
+### [#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891) Verify: mobile nav sheet stacks its links vertically
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Fixed on dev in PR #1893 (c83ad822, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, navLinkClass in Navbar.MobileMenu.tsx:37 includes block.
+- Root cause: navLinkClass lacked block, so <NavLink> stayed inline.
+- Resolution: No new code. Verify on the review environment at a narrow viewport, then close when promoted to master.
+- Look in: `app/components/layout/Navbar.MobileMenu.tsx`
+- Existing tests: e2e/specs/marketing-mobile-nav.spec.ts
+- Done when: On a narrow viewport, Home, Docs, Sign In and Sign Up stack one per row; Signed-in account links and the Log Out button stack the same way
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889) Verify: predictive auto-dial honours the voicemail-drop switch
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-25
+- Fixed on dev in PR #1901 (16a7abdd, merged 2026-09-19, base dev). NOT in master (origin/master 807cea82), so dev-only until the next release.
+- Current behavior: On dev, the predictive AMD branch reads voicemail_drop_enabled and calls machineAnswerDisposition.
+- Root cause: The AMD branch read campaign.voicemail_file but never campaign.voicemail_drop_enabled.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/ivr-machine.server.ts`
+- Existing tests: test/auto-dial-room.route.test.ts; test/integration-db/call-status-guard.test.ts; test/telephony-db-call-status-guard.test.ts
+- Done when: Predictive + machine + drop off yields No Answer with no audio; Predictive + machine + drop on yields Voicemail with the drop played
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888) Verify: IVR machine answer with the drop off records No Answer
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Fixed on dev in PR #1890 (d07e26b1, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, machineAnswerDisposition(campaign) returns voicemail only when voicemail_drop_enabled && voicemail_file, otherwise no-answer.
+- Root cause: recordVoicemailAnswer wrote disposition voicemail for every machine answer before deciding whether the drop would play.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/lib/ivr-machine.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`
+- Existing tests: test/ivr-page.route.test.ts; test/ivr-status.route.test.ts
+- Done when: Drop on + audio records disposition voicemail; Drop off or no audio records disposition no-answer; Results, metrics and exports show No Answer in the second case
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor routing validation + terminal-hangup guarantee
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- IMPLEMENTED on dev (#1991 merged 2026-09-22). Runtime half largely shipped (#1975): ou...
+- Current behavior: Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs — no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.
+- Root cause: The runtime parses next as an opaque string with no terminal/validation contract.
+- Resolution: Add app/lib/ivr-script-validation.ts: build an edge graph (page/block -> option.next targets) and run a DFS for (a) dangling targets (next refers to a nonexistent page/block), (b) reachable cycles (A->B->A), (c) terminal guarantee (every reachable path ends at hangup/end). Surface errors in ScriptEditorShell.tsx alongside editor.validation. Wire into validateScriptSteps (call-script-service.ts) and add a script_routing_invalid CampaignReadinessCode + readiness-action entry (campaign-readiness.ts:14-35 + campaign-readiness-actions.ts:35-144) so launch blocks (launchCampaign readiness gate campaign-execution.server.ts:86-95 surfaces it automatically). Inbound: make renderTerminalTarget treat 'end' explicitly and render <Hangup/> for dangling/terminal.
+- Look in: `app/lib/ivr-script-validation.ts (new)`, `app/lib/call-script-service.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/campaign-readiness.ts`, `app/lib/campaign-readiness-actions.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`
+- Existing tests: test/ivr-block-response.route.test.ts:226-247 (end terminal outbound)
+- Missing tests: ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok; inbound route: next:'end' renders <Hangup/>, dangling renders <Hangup/>; editor shell test shows the cyclic-script validation error
+- Done when: An author can choose Hang up as an option's next step (already true); A published script always has a terminal hangup; next:'end' and 'hangup' are both terminal at runtime (inbound too); Dangling targets and reachable cycles fail validation and block launch
+- Tracker: Implemented on dev (PR #1991, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.
+
+### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR no-input editor panel + inbound mirror
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- IMPLEMENTED on dev (#1992 merged 2026-09-22). Runtime+outbound half of #1937 shipped: ...
+- Current behavior: Editor: ScriptBlockEditor.IvrStep.tsx has mode/speech/recording/voice controls but no no-input panel; the response rows (IvrResponses.tsx) only set option.next/label. Inbound: inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:50-69 findNextStep ignores noInput; null userInput falls through to linear next/hangup; renderTerminalTarget (:71-123) has no noInput branch.
+- Root cause: PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.
+- Resolution: Editor: add per-step controls in ScriptBlockEditor.IvrStep.tsx writing block.noInput {action,pageId,blockId,maxReplays} + gatherTimeoutSeconds (defaults unchanged when unset). Inbound: mirror the outbound no-input branching into the inbound response route with a CALL-scoped replay store (no outreach attempt exists inbound; key by call/recurring session) and reuse resolveNoInputTarget + DEFAULT_NO_INPUT_MAX_REPLAYS. Fold #1843 or close it as duplicate.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`
+- Existing tests: test/ivr-block-runtime.test.ts (resolveNoInputTarget); test/ivr-gather.test.ts (timeout attrs); test/inbound-ivr-block-response.route.test.ts:144-161 (null-input falls through)
+- Missing tests: Editor emits wait/no-input controls; Inbound no-input branches (hangup/route/replay) + per-call replay cap
+- Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults unchanged for steps that do not configure it; Inbound mirrors outbound behavior with its own replay store
+- Tracker: Implemented on dev (PR #1992, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.
+
+### [#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869) Verify: test calls leave the campaign queue untouched
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-25
+- Fixed on dev in PR #1900 (2a2eb281, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, the dequeue block in webhook-side-effects.server.ts is gated on outreachAttemptId != null.
+- Root cause: The contact-keyed dequeue had no guard on the resolved outreach attempt, so any terminal callback with a contact_id could mutate the queue.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/routes/api+/call-status.action.server.ts`
+- Existing tests: test/webhook-side-effects.test.ts
+- Done when: A test call to a queued number leaves queue_state queued, queue_order unchanged, attempts unchanged and dequeued_at null
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847) Add a 'Do not import' mapping option so columns can be dropped
+- Verdict: **Verify and close** · Size: S-M · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-25
 - The CSV mapping forces every column to a target and defaults unknown columns to Custom field; users want to drop unwanted columns instead of importing them as custom fields.
 - Current behavior: Every CSV header maps to a ContactImportTarget (unknown headers default to other_data / Custom field). The Map CSV Headers select offers no ignore/drop option.
 - Root cause: CONTACT_IMPORT_TARGETS has no ignore/drop target, and the mapping, validation, and import paths assume every column is imported.
@@ -182,11 +2093,10 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/contact-import-headers.test.ts; test/ui/audience-uploader.test.tsx; test/audience-upload-parsing.test.ts
 - Missing tests: A column mapped to ignore passes validation and is absent from imported contacts; Ignore is not counted as a duplicate target
 - Done when: A mapping option drops a column; Dropped columns are not written to other_data; Dropped columns do not create duplicate-target errors; Phone and name validation behaviour is unchanged
-- Tracker: Well-scoped UX feature; add the ignore target end to end and test the import exclusion.
+- Tracker: Implemented on dev (PR #1973 41d45f6d): shared/contact-import-headers.ts includes a drop-column option with tests (test/contact-import-headers.test.ts) + CHANGELOG entry. Verify the mapping UI and close.
 
-### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Phone number verification pending doesn't switch to verified from onboarding steps
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-21
-- Recommended title: **Pass the live caller-ID verification status to the onboarding verification sheet**
+### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Pass the live caller-ID verification status to the onboarding verification sheet
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-25
 - From onboarding the verification sheet keeps showing 'Verification pending' after the number is verified; Settings shows 'Number verified' because it passes the live status.
 - Current behavior: OnboardingFirstNumberStep renders CallerIdVerificationDialog without a status prop, so the sheet defaults to pending. Settings passes status derived from capabilities.verification_status.
 - Root cause: The live-status wiring added for Settings (#1740) was never added to the onboarding render.
@@ -197,63 +2107,54 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Completing verification from onboarding flips the sheet to 'Number verified' with no reload; A failed verification still shows 'Verification failed'; Settings behaviour is unchanged
 - Tracker: Exact fix: pass the live status the way Settings already does.
 
-### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Primary button hover needs the hover mouse
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-21
-- Recommended title: **fix(ui): pointer cursor on shared Button + guard raw <button> usage**
-- Primary buttons show the arrow cursor because neither shad-cc's buttonVariants nor the local wrapper declares a cursor. The fix already exists on branch origin/bug/1833-primary-button-cursor (1a99dc44): default cursor-pointer with disabled/aria-disabled cursor-default plus test updates.
-- Current behavior: app/components/ui/button.tsx sets no cursor; the underlying shad-cc buttonVariants base class also has none. The reported onboarding 'Save & continue' uses the shared Button. A large raw-<button> inventory bypasses the shared component.
-- Root cause: Base button styles never declared a cursor; some controls bypass the shared Button.
-- Resolution: Land the existing branch/PR (cursor-pointer default + disabled/aria-disabled handling + button.smoke assertions). Then migrate the raw-<button> call sites from the issue inventory in focused groups and add a guard. Treat the inventory as follow-up tickets.
-- Look in: `app/components/ui/button.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `test/ui/button.smoke.test.tsx`
-- Existing tests: test/ui/button.smoke.test.tsx
-- Missing tests: default class includes cursor-pointer; disabled and aria-disabled use cursor-default; guard against new raw <button> usages
-- Done when: Interactive shared buttons show the pointer cursor by default; Disabled buttons show the default cursor; The reported onboarding save/continue instance is fixed; A guard prevents recurrence
-- Tracker: Branch origin/bug/1833-primary-button-cursor (1a99dc44) is ready but unmerged; open a PR. File the raw-button inventory migration as follow-up tickets.
+### [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845) fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).
+- Current behavior: machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection="Enable".
+- Root cause: AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.
+- Resolution: Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.
+- Look in: `app/routes/api+/call.action.server.ts`, `app/routes/api+/dial/$number.action.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/components/call/CallScreen.CallArea.tsx`
+- Existing tests: test/api-call.route.test.ts; test/dial-number.route.test.ts; test/dial-status.route.test.ts; test/auto-dial.server.test.ts
+- Missing tests: manual routes emit no machineDetection; auto-dial still emits machineDetection; Audio Drop still works on manual/power calls
+- Done when: A manual/power call reaches audio immediately with no AMD wait; Predictive dialing still drops or hangs up on a detected machine; A drop-enabled campaign still plays the voicemail when an agent drops it
+- Tracker: Implemented on dev (PR #1969 86794a3d): manual/power dials no longer send machineDetection (call.action.server.ts, dial/$number), auto-dial keeps it; tests assert both. Verify on the review env and close.
 
-### [#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859) Show campaign costs un-collapsed on the Launch page
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
-- The campaign cost panel is still wrapped in a collapsed <details> labelled 'Campaign cost' in CampaignLaunch.tsx. Remove the fold and render CampaignCostPanel directly.
-- Current behavior: CampaignLaunch.tsx (~449-462) renders <details><summary>Campaign cost</summary><CampaignCostPanel .../></details> when campaignBilling is present.
-- Root cause: The cost panel was placed inside a disclosure widget split out from the #1839 review.
-- Resolution: Render CampaignCostPanel directly (guarded by the existing campaignBilling ternary) and delete the <details>/<summary> wrapper and its inner mt-3 div. Keep the null/absent behaviour when campaignBilling is null.
-- Look in: `app/components/campaign/settings/CampaignLaunch.tsx`
-- Existing tests: test/ui/campaign-launch-review.test.tsx
-- Missing tests: Cost panel is visible on Launch without expanding any disclosure; No cost panel renders when campaignBilling is null
-- Done when: Campaign costs are visible on the Launch page without expanding anything; No 'Campaign cost' details/summary remains; Absent behaviour unchanged when campaignBilling is null
-- Tracker: Standalone UI change; one PR. Update campaign-launch-review.test.tsx to assert the panel is not behind a disclosure.
+### [#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844) Play call recordings in-app instead of linking to the Twilio recording URL
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.
+- Current behavior: CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).
+- Root cause: Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.
+- Resolution: Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.
+- Look in: `app/lib/call-log.server.ts`, `app/components/calls/CallLogTable.tsx`, `app/lib/call-recording-storage.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: test/call-log.test.ts
+- Missing tests: Loader returns a non-Twilio playback URL for a call with audio_url; CallLogTable renders the in-app player and no external Twilio link
+- Done when: Listen plays the recording without leaving CallCaster or opening Twilio; Works for a call whose recording was persisted to storage; A clear message when no recording copy exists; Tenant scoping is preserved
+- Tracker: Implemented on dev (PR #1972 d1c6049d): Call History plays the stored object-storage copy in-app via signed URL; raw Twilio link remains only as the no-copy fallback. Verify on the review env and close.
 
-### [#1830](https://github.com/chester-hill-solutions/callcaster/issues/1830) Tasks for other devs that are blocking movement on an issue should be new tickets, that are set to "blocking" the other issue and correctly assigned. GH agent skills should reflect
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-09-21
-- Recommended title: **Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills**
+### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) WAV sidecar backfill for existing prompts (gen-wav-sidecars)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- PR #1968 wires WAV sidecar creation only on NEW audio (upload: platform-media.server.ts:135-139; clip save: audio-clip.server.ts:87). The in-browser recording path (audios/record.action.server.ts:76) never writes a sidecar either. Backfill needed so EXISTING prompts (incl. recorded-*) stop being re-encoded by Twilio.
+- Current behavior: Sidecar logic lives in app/lib/ivr-wav.server.ts: ivrWavObjectKey (ivr-wav/<workspace>/<base>.wav), writeIvrWavSidecar (skips .wav, transcodeToWavBuffer, putMediaObject upsert), resolveIvrPromptObjectKey prefers the sidecar via objectExists. Transcode: app/lib/audio.server.ts transcodeToWavBuffer (mono 8kHz 16-bit PCM, WAV_ENCODE_ARGS:74-84) via raw ffmpeg spawn (runAudioTool:143-186); ffmpeg is a runtime dep (Dockerfile:33-38). Storage is S3 (MinIO local / Railway Bucket prod) with workspaceAudio/ prefix; workspace_audio is metadata-only. Prompt filter isWorkspaceAudioFile excludes voicemail-+/voicemail-undefined/recording- (platform-media.server.ts:30-35).
+- Root cause: Sidecar generation is opportunistic (only at write time); thousands of pre-existing MP3 prompts and recorded-* files never got one.
+- Resolution: Add scripts/gen-wav-sidecars.ts (bun-resolved @/ aliases; package.json tools:gen-wav-sidecars) modeled on scripts/db/reconcile-stuck-calls.ts (env placeholder bootstrap BEFORE app imports 28-50; dry-run default, --apply, per-workspace error isolation, non-zero exit on residual). Loop: select workspaces; listMediaObjects('workspaceAudio', ws) prefix ws/; filter to prompts (isWorkspaceAudioFile, skip existing .wav); dedupe gate objectExists(ivrWavObjectKey) unless --force; downloadObject -> transcodeToWavBuffer -> putMediaObject(upsert:true). Factor a pure core with injectable Deps (DI style of audio.server.ts:42-52) for unit tests mocking listObjects/objectExists/transcode/upload (ivr-wav.server.test.ts pattern). Include recorded-* library recordings (the record path never sidecared them); keep the voicemail- exclusion. Never pipe:0 input (seekable temp file required for mp4/m4a moov), skip empty transcode output.
+- Look in: `app/lib/ivr-wav.server.ts`, `app/lib/audio.server.ts`, `app/lib/object-storage.server.ts`, `scripts/db/reconcile-stuck-calls.ts`, `app/routes/workspaces+/$id/audios/record.action.server.ts`
+- Existing tests: test/ivr-wav.server.test.ts (key/sidecar/resolve); test/audio.server.test.ts (transcode)
+- Missing tests: Backfill core: lists prompts, skips existing sidecars + .wav, dedupes/--force, records per-workspace failures
+- Done when: All prompts incl. recorded-* have a sidecar after a apply run (idempotent re-runs); No new deps; reuses ivrWavObjectKey/transcodeToWavBuffer/putMediaObject
+- Tracker: Implemented on dev (PR #1994, merged). Run `npm run tools:gen-wav-sidecars -- --apply` against the review env first, then prod; verify sidecars appear (\`ivr-wav/<ws>/…\`) and IVR playback uses them, then close.
+
+### [#1830](https://github.com/chester-hill-solutions/callcaster/issues/1830) Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Request that work another developer must do to unblock an issue becomes a separate ticket, set to block that issue and assigned to the right person, and that the agent skills say so.
 - Current behavior: github-issues/SKILL.md covers issue types, parent/child decomposition, and the --blocked-by / --blocking flags, but does not require creating a separate assigned ticket when another dev's task blocks an issue.
 - Root cause: The skill documents the mechanics of blocking links but not the policy that blocking work is its own assigned ticket.
 - Resolution: Add a section to .agents/skills/github-issues/SKILL.md stating that blocking cross-developer work is created as a new Task, linked with --blocking <blocked issue> (or --blocked-by on the blocked issue), and assigned with --assignee; include a worked example.
 - Look in: `.agents/skills/github-issues/SKILL.md`, `.agents/skills/github-cli/SKILL.md`, `.agents/skills/github-pull-request/SKILL.md`
 - Done when: The skill states blocking work becomes a separate ticket; The skill shows the blocking link direction and assignment; The example uses --blocking and --assignee correctly
-- Tracker: Small documentation change. Note: the issue body is a copied #1822 PROJECT_TOKEN comment that does not match the title; confirm scope with the reporter before editing.
+- Tracker: Implemented on dev (PR #1965 ac6aaef6): github-issues SKILL.md documents cross-developer blockers as assigned, one-direction blocking tickets. Verify and close.
 
-### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: ESLint 9 + @shadcn/lint
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Design-system linting: retire the hand-rolled SaveBar token test**
-- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
-- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
-- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
-- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
-- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
-- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
-- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
-- Tracker: Fix now (delete the obsolete test), then close. The linter migration reaches master on the next release.
-
----
-
-## Verify and close — 63
-
-Likely already fixed or working as designed. Run the listed verification, then close without new code.
-
-### [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713) Needing a user to have an account before invite makes no sense.
-- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-21
-- Recommended title: **Workspace invites: email-first (invite by email without requiring an account)**
+### [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713) Workspace invites: email-first (invite by email without requiring an account)
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-25
 - IMPLEMENTED on dev (#1985, merged 2026-09-21): email-first invites (SEC-03) landed end-to-end — invite writers no longer require a pre-existing account, pending invites live on workspace_invitation by email, acceptance is token-gated through the emailed link, email sent via Resend, members API / settings / admin lists and cancel/resend moved to the new table. Verify the invitee flow on the review env (invite unknown email -> accept link -> signup -> workspace membership), then close.
 - Current behavior: Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).
 - Root cause: Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.
@@ -264,17 +2165,42 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account; Inviting a known email behaves as today (user-keyed invite, no duplicate pending); After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted; Raw invitation tokens are never stored; token_hash only; members.invite capability gate and role policy (owner never invitational) unchanged; Legacy workspace_invite rows migrated or abandoned before the table is dropped
 - Tracker: Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close.
 
-### [#1810](https://github.com/chester-hill-solutions/callcaster/issues/1810) docs(issues): refresh board after verified dev fixes
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
-- Tracking-only board refresh. Regenerates ISSUE_BOARD.md and prunes/moves enrichment records after verified dev fixes.
-- Resolution: This PR is the refresh. Review the generated board and enrichment diff, then close on master promotion.
-- Look in: `ISSUE_BOARD.md`, `scripts/issue-board-enrichment/`
-- Existing tests: test/issue-board-generator.test.ts; test/issue-board-atomic.test.ts
-- Done when: Verified merged work leaves Fix now; closed issues' records pruned; no issue closed early.
-- Tracker: Recurring tracking ticket; the active refresh PR owns it. Do not duplicate.
+### [#1338](https://github.com/chester-hill-solutions/callcaster/issues/1338) verify-close: call settings sheet laid out by device, no redundant labels
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-25
+- #1680 laid the sheet out by device (single label per field, buttons say what they do, flex gap), removing the redundant headings flagged in the issue. UI green; visual eyeball pending.
+- Current behavior: Microphone/Speaker/Output fields each carry one label with their controls beneath.
+- Root cause: Original layout clipped/misaligned; #1680 restructured.
+- Resolution: No new code; eyeball on dev.
+- Look in: `app/components/call/CallScreen.DeviceSettings.tsx`, `app/components/call/CallScreen.Layout.tsx`
+- Existing tests: test/ui/audio-device-lifecycle.test.tsx; test/ui/call-screen-header.test.tsx
+- Done when: no clipping left/right; no redundant labels
+- Tracker: Close after the eyeball.
+
+### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) test(chats): prove STOP and START text remains visible to operators
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-25
+- STOP/START bodies are stored unchanged and rendered verbatim in the transcript and conversation preview. The only remaining obfuscation is generic opt-out-banner copy ('replied with an opt-out keyword').
+- Current behavior: inbound-sms persists the raw body before opt-out processing; ChatMessages renders message.body; ConversationList preview shows it; STOP-only hiding is explicit.
+- Root cause: Already implemented; the ask likely refers to banner copy.
+- Resolution: Verify the transcript shows the exact text; if the banner is the concern, include the exact matched keyword in ChatOptOutBanner copy. Add tests pinning unchanged persistence.
+- Look in: `app/routes/api+/inbound-sms.action.server.ts`, `app/components/sms-ui/ChatMessages.tsx`, `app/components/chats/ChatOptOutBanner.tsx`, `app/lib/chat-opt-out.ts`
+- Existing tests: test/inbound-sms.route.test.ts (keyword state changes)
+- Missing tests: STOP/START bodies persisted unchanged; transcript/preview exact text
+- Done when: Opt-out text unchanged in history; Preview shows exact text; Hiding STOP-only stays explicit
+- Tracker: Close after verification; future #1268 consent work replaces the boolean authority.
+
+### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) verify-close: call screen shows Hang Up in-call, Dial (with confirm) after
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-25
+- Dial control (#1408) flips to Dial and requires a second click after a call ends; Hang Up has its own two-step confirm. CallControls state machine verified by code + call-screen UI tests.
+- Current behavior: in-call -> Hang Up (two-step); after end -> armed Dial ('Click again to call back') that disarms on first click.
+- Root cause: Errors not reproduced; #1408 implemented the guard.
+- Resolution: No new code; run the idle-state eyeball on dev.
+- Look in: `app/components/call/CallScreen.CallArea.tsx`
+- Existing tests: test/ui/call-screen-callarea.test.tsx
+- Done when: active call -> Hang Up; ended call -> Dial with confirm; no hang-up confirm loop
+- Tracker: Close after the eyeball.
 
 ### [#1957](https://github.com/chester-hill-solutions/callcaster/issues/1957) Exempt docs/data-only PRs from the review-coverage gate
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - The review-coverage gate now skips docs/data-only PRs, i.e. when every changed file is ISSUE_BOARD.md or under scripts/issue-board-enrichment/.
 - Resolution: Verify on dev that a board-only PR over ~500 lines passes without a Structural review marker, and a code PR does not. Close on master promotion.
 - Look in: `.github/workflows/review-coverage.yml`
@@ -282,21 +2208,91 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: Merged on dev in PR #1959; closes on master promotion.
 
 ### [#1956](https://github.com/chester-hill-solutions/callcaster/issues/1956) Release PRs must close the issues they promote (Closes #N)
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - release-close-issues.yml requires a closing keyword (Closes #N) in a dev to master release PR body, with a no-issue override; the local-development skill documents it.
 - Resolution: Verify on dev that a master PR without a closing reference fails the gate unless labelled no-issue. Close on master promotion.
 - Look in: `.github/workflows/release-close-issues.yml`, `.agents/skills/local-development/SKILL.md`
 - Done when: A release PR carrying Closes #N closes those issues on merge; A master PR with no closing reference fails unless labelled no-issue
 - Tracker: Merged on dev in PR #1960; closes on master promotion.
 
-### [#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701) IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: "What audio do you want to use"
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-20
-- In an IVR step on Play a recording, the Upload audio control now renders with the recording field (before the preview/empty-recording warning). On Speak text it stays visible with its switch hint.
-- Resolution: Verify on the review environment that the Upload audio button sits under the recording control in Play a recording mode and is still present in Speak text mode. Close on master promotion.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`
-- Existing tests: test/ui/script-block-editor-audio.test.tsx; test/ui/script-block-editor-ivr.test.tsx
-- Done when: Upload audio is adjacent to the recording Select on recorded steps; still visible on spoken steps (keeps #1325).
-- Tracker: Merged on dev in PR #1951 (fffeae9a); closes on master promotion.
+### [#1936](https://github.com/chester-hill-solutions/callcaster/issues/1936) Comment policy: comments must carry information (no-useless-comments rule)
+- Verdict: **Verify and close** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.
+- Current behavior: eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.
+- Root cause: Comment hygiene is unenforced; a number or a punctuation banner passes lint.
+- Resolution: Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.
+- Look in: `eslint.config.mjs`, `package.json`, `app/`, `test/`
+- Missing tests: Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes
+- Done when: Issue/PR-number-only comments are lint errors; Punctuation-only comments are lint errors; Existing offenders are zero; Rule intent is documented
+- Tracker: Implemented on dev (PR #1974 5fd10f49 + sweep/docs PR #1979 356e3efe): callcaster/no-useless-comments is error with unit tests (test/no-useless-comments-rule.test.ts), zero offenders, intent documented. Verify eslint passes and close.
+
+### [#1932](https://github.com/chester-hill-solutions/callcaster/issues/1932) Systemic structural review: PR risk template + coverage gate
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- PR #1935 (93def136) added .github/pull_request_template.md and the review-coverage workflow gate: high-risk paths or a ~500-line diff require a Structural review: marker. Shipped on dev only.
+- Current behavior: Every PR body declares Files touched / Risk class / Structural review; the review-coverage workflow fails a PR that touches app/lib/worker/, app/server/, app/db/ or client/migrations/, or crosses the line cap, without the marker.
+- Root cause: Structural review was an end-of-batch habit, so problems were caught after merge.
+- Resolution: No code work left in-repo. Verify the gate fails an unmarked high-risk PR on the review env, then close when dev is promoted to master.
+- Look in: `.github/pull_request_template.md`, `.github/workflows/review-coverage.yml`, `.github/workflows/pr-issue-reference.yml`
+- Existing tests: Workflow self-validates on its own PR
+- Done when: PR template declares risk surface; Gate fails high-risk PRs without a Structural review: marker; ci:local green
+- Tracker: Verify and close. Dev-only (93def136 not in master); confirm the marker is enforced, then close on promotion.
+
+### [#1931](https://github.com/chester-hill-solutions/callcaster/issues/1931) Ratchet the test echo-shape: expectations that reuse SUT exports
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- PR #1933 (3bfd5210) added scripts/check-test-echo.mjs plus an empty baseline, wired check:test-echo into ci:local, and converted the remaining echo candidates. Shipped on dev only.
+- Current behavior: check:test-echo scans test/ for toBe/toEqual/toContain whose expected argument is an identifier imported from app/ or shared/; scripts/test-echo-baseline.json is {}.
+- Root cause: Assertions could echo SUT exports, so any value the SUT chose would pass.
+- Resolution: No code work left. Re-run npm run check:test-echo on the review env, then close when dev is promoted to master.
+- Look in: `scripts/check-test-echo.mjs`, `scripts/test-echo-baseline.json`, `package.json`, `.github/workflows/ci.yml`
+- Existing tests: test/test-echo-checker.test.ts
+- Done when: check:test-echo reports echo-shaped expectations; Existing occurrences are zero; the count only ratchets down; Both suites stay green
+- Tracker: Verify and close. Dev-only (3bfd5210 not in master); baseline is empty.
+
+### [#1849](https://github.com/chester-hill-solutions/callcaster/issues/1849) what happens when multiple columns map to the same column in call list upload
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: question, business-logic · Assignee: @wra-sol · Updated: 2026-09-23
+- Working as designed. Duplicate mappings are a blocking validation: validateContactImportMapping flags duplicate-target, AudienceUploadMapStep shows a destructive 'Mapping needs attention' alert, Continue is blocked, and the upload action re-validates server-side. The guard shipped in PR #1063 (7824c824) and is on master.
+- Current behavior: Mapping both 'phone' and 'cell phone' to Phone number shows 'Phone number is assigned to more than one CSV column' and prevents continuing. The server rejects the same mapping independently.
+- Root cause: Not a defect. The issue is a question about intentional designed behaviour.
+- Resolution: Answer the question and confirm the blocking behaviour is intended, then close. If the desired behaviour is to merge two phone columns, that is a new feature.
+- Look in: `shared/contact-import-headers.ts`, `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/AudienceUploader.tsx`, `app/routes/api+/audience-upload.action.server.ts`, `app/lib/audience-upload-process.server.ts`
+- Existing tests: test/contact-import-headers.test.ts
+- Done when: Question answered with the current blocking behaviour; Blocking validation confirmed on master
+- Tracker: Answer and close as working-as-designed (validation from PR #1063 is on master). Open a separate feature ticket only if merging multiple phone columns is wanted.
+
+### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-23
+- The IVR completion estimate is now bounded by voiceConcurrentCallLimit / average in-flight call duration and labelled as completion time. Shipped on dev in PR #1934 (e833d955).
+- Current behavior: campaign-outbound-estimate.ts computes the effective IVR rate as min(configured dispatcher CPS, voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS) and footnote-annotates the concurrent-call bound.
+- Root cause: The projection treated CPS (dial-start rate) as a completion rate while IVR rows are dequeued only at call completion.
+- Resolution: No code work left. Verify a 5000-call IVR projection against the concurrency bound on the review env, then close when dev is promoted to master.
+- Look in: `app/lib/campaign-outbound-estimate.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/campaign-ivr-dispatch.server.ts`
+- Existing tests: test/campaign-outbound-estimate.test.ts
+- Done when: IVR projection accounts for the concurrent-call bound; Projection is labelled as completion time, not dial time
+- Tracker: Verify and close. Dev-only (e833d955 not in master); close when dev promotes to master.
+
+### [#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859) Show campaign costs un-collapsed on the Launch page
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
+- The campaign cost panel is still wrapped in a collapsed <details> labelled 'Campaign cost' in CampaignLaunch.tsx. Remove the fold and render CampaignCostPanel directly.
+- Current behavior: CampaignLaunch.tsx (~449-462) renders <details><summary>Campaign cost</summary><CampaignCostPanel .../></details> when campaignBilling is present.
+- Root cause: The cost panel was placed inside a disclosure widget split out from the #1839 review.
+- Resolution: Render CampaignCostPanel directly (guarded by the existing campaignBilling ternary) and delete the <details>/<summary> wrapper and its inner mt-3 div. Keep the null/absent behaviour when campaignBilling is null.
+- Look in: `app/components/campaign/settings/CampaignLaunch.tsx`
+- Existing tests: test/ui/campaign-launch-review.test.tsx
+- Missing tests: Cost panel is visible on Launch without expanding any disclosure; No cost panel renders when campaignBilling is null
+- Done when: Campaign costs are visible on the Launch page without expanding anything; No 'Campaign cost' details/summary remains; Absent behaviour unchanged when campaignBilling is null
+- Tracker: Implemented on dev (PR #1970 829e3b9e): CampaignLaunch renders CampaignCostPanel directly; the <details><summary>Campaign cost</summary> wrapper is gone; campaign-launch-review.test.tsx asserts no disclosure remains. Verify and close.
+
+### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
+- scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.
+- Current behavior: Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.
+- Root cause: The checker was added as a tool but never connected to a DB-backed per-environment gate.
+- Resolution: Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.
+- Look in: `scripts/db/check-schema-drift.mjs`, `scripts/db/check-migration-ledger.mjs`, `.github/workflows/ledger-drift-check.yml`, `scripts/lib/app-db-objects.mjs`, `test/schema-drift-enums.test.ts`
+- Existing tests: test/schema-drift-enums.test.ts
+- Missing tests: Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL
+- Done when: A deployed environment missing a required object fails the workflow.; A missing DATABASE_URL fails the workflow rather than no-op passing.; Push path filters include the schema files and the checker.
+- Tracker: Implemented on dev (PR #1958 d8d5639e): ledger-drift-check.yml runs db:schema:check --require-db per environment; resolver tests in test/schema-drift-enums.test.ts. Verify the workflow gates a missing object and close.
 
 ### [#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716) workspace drop down shouldn't move
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-20
@@ -306,24 +2302,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ui/navbar-credits.test.tsx; test/ui/components-shared-invite-layout.test.tsx
 - Done when: No navbar-credits testid and no 'Credits:' link in the nav shell; sidebar credits unchanged.
 - Tracker: Merged on dev in PR #1950 (2180c94d); closes on master promotion.
-
-### [#1822](https://github.com/chester-hill-solutions/callcaster/issues/1822) agents are labelling issues "on-dev" instead of setting the project status to on-dev
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-20
-- issue-on-dev.yml now moves the CHS backlog Status to the project's lowercase on-dev option on every dev merge (no label). The stale 'On dev' default that silently skipped the move is fixed; the vestigial on-dev label is deleted.
-- Resolution: Live-verified: merging PR #1949 logged moved=1 and moved #1715 to on-dev with no label applied. Close on master promotion.
-- Look in: `.github/workflows/issue-on-dev.yml`, `.agents/skills/project-on-dev-status/SKILL.md`
-- Done when: A dev-merge PR moves its referenced issues to the on-dev Status; no on-dev label exists or is applied.
-- Tracker: Merged on dev in PR #1952 (0beba212); closes on master promotion.
-
-### [#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696) Audio preview in IVR script shows 0:00 until you hit play
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-20
-- Recording metadata preload shipped to dev in PR #1806 (270680d8). A real Chrome check showed a one-second duration before Play, with the audio paused at time zero.
-- Current behavior: The IVR recording preview uses preload="metadata".
-- Resolution: Retest a selected recording on dev before playback. No further code is expected unless that check finds a gap.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`
-- Existing tests: test/ui/script-block-editor-ivr.test.tsx; PR #1806: real Chrome before/after component check
-- Done when: A selected recording shows its duration before Play.; Loading metadata does not start playback.
-- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
 
 ### [#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805) security(deps): patch nanoid 3.x lockfile resolutions
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-20
@@ -353,32 +2331,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: A simple_ivr/complex_ivr create request fails with a message directing the caller to robocall; OpenAPI and the public docs list only the supported types
 - Tracker: Verify and close. Dev-only: 078c797f is in origin/dev but not origin/master; close when dev promotes to master.
 
-### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-20
-- Recommended title: **verify-close: IVR Answer label help in a tooltip**
-- Merged to dev in PR #1946 (8e3c8668): the IVR response Answer label help shows in a hover/focus tooltip beside the label, via a new FormField labelTooltip prop, instead of a paragraph under the field.
-- Resolution: Verify on the review environment that the Answer label help appears on hover/focus and no paragraph renders under the field. Close on master promotion.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`, `app/components/ui/form-field.tsx`
-- Existing tests: test/ui/form-field.test.tsx; test/ui/script-block-editor-ivr.test.tsx
-- Done when: Answer label help is a tooltip, not a paragraph under the field
-- Tracker: PR #1946 merge 8e3c8668 is on dev, not yet master.
-
-### [#1942](https://github.com/chester-hill-solutions/callcaster/issues/1942) Task: ratchet the base db client in app/lib
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Merged to dev in PR #1944 (dda06a62): the guard also bans @/server/db in app/lib; baseline grew to 81 (50 base, 31 admin).
-- Resolution: Verify the guard fails on a new base-db import in app/lib and that ci:local is green. Close on master promotion.
-- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`
-- Done when: A new app/lib @/server/db import fails the guard
-- Tracker: PR #1944 merge dda06a62 is on dev, not yet master.
-
-### [#1939](https://github.com/chester-hill-solutions/callcaster/issues/1939) Task: ban the unscoped admin client in app/lib
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Merged to dev in PR #1943 (ec1d8075): scripts/check-unscoped-db-imports.mjs bans @/server/admin-db in app/lib with a ratchet baseline of 31 importers.
-- Resolution: Verify the guard fails on a new admin-db import in app/lib and on a stale baseline entry, and that ci:local runs check:unscoped-db-imports. Close on master promotion.
-- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `package.json`, `.github/workflows/ci.yml`
-- Done when: A new app/lib admin-db import fails the guard; A stale baseline entry fails the guard
-- Tracker: PR #1943 merge ec1d8075 is on dev, not yet master.
-
 ### [#1940](https://github.com/chester-hill-solutions/callcaster/issues/1940) Task: construct the workspace-scoped tenant client in middleware
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
 - Merged to dev in PR #1941 (58bea105): workspace and data-plane middleware build the scoped Drizzle client once and expose it as tdb on the context; 14 workspaces+/$id routes read it.
@@ -399,39 +2351,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: A guard probe that a new app/lib module importing @/server/admin-db fails the run
 - Done when: No route file under app/routes constructs createTenantDb for a plain request-scoped read or write; tdb is built once per workspace request, in middleware; A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist; npm run ci:local is green
 - Tracker: Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master.
-
-### [#1932](https://github.com/chester-hill-solutions/callcaster/issues/1932) Systemic structural review: PR risk template + coverage gate
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- PR #1935 (93def136) added .github/pull_request_template.md and the review-coverage workflow gate: high-risk paths or a ~500-line diff require a Structural review: marker. Shipped on dev only.
-- Current behavior: Every PR body declares Files touched / Risk class / Structural review; the review-coverage workflow fails a PR that touches app/lib/worker/, app/server/, app/db/ or client/migrations/, or crosses the line cap, without the marker.
-- Root cause: Structural review was an end-of-batch habit, so problems were caught after merge.
-- Resolution: No code work left in-repo. Verify the gate fails an unmarked high-risk PR on the review env, then close when dev is promoted to master.
-- Look in: `.github/pull_request_template.md`, `.github/workflows/review-coverage.yml`, `.github/workflows/pr-issue-reference.yml`
-- Existing tests: Workflow self-validates on its own PR
-- Done when: PR template declares risk surface; Gate fails high-risk PRs without a Structural review: marker; ci:local green
-- Tracker: Verify and close. Dev-only (93def136 not in master); confirm the marker is enforced, then close on promotion.
-
-### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-20
-- The IVR completion estimate is now bounded by voiceConcurrentCallLimit / average in-flight call duration and labelled as completion time. Shipped on dev in PR #1934 (e833d955).
-- Current behavior: campaign-outbound-estimate.ts computes the effective IVR rate as min(configured dispatcher CPS, voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS) and footnote-annotates the concurrent-call bound.
-- Root cause: The projection treated CPS (dial-start rate) as a completion rate while IVR rows are dequeued only at call completion.
-- Resolution: No code work left. Verify a 5000-call IVR projection against the concurrency bound on the review env, then close when dev is promoted to master.
-- Look in: `app/lib/campaign-outbound-estimate.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/campaign-ivr-dispatch.server.ts`
-- Existing tests: test/campaign-outbound-estimate.test.ts
-- Done when: IVR projection accounts for the concurrent-call bound; Projection is labelled as completion time, not dial time
-- Tracker: Verify and close. Dev-only (e833d955 not in master); close when dev promotes to master.
-
-### [#1931](https://github.com/chester-hill-solutions/callcaster/issues/1931) Ratchet the test echo-shape: expectations that reuse SUT exports
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- PR #1933 (3bfd5210) added scripts/check-test-echo.mjs plus an empty baseline, wired check:test-echo into ci:local, and converted the remaining echo candidates. Shipped on dev only.
-- Current behavior: check:test-echo scans test/ for toBe/toEqual/toContain whose expected argument is an identifier imported from app/ or shared/; scripts/test-echo-baseline.json is {}.
-- Root cause: Assertions could echo SUT exports, so any value the SUT chose would pass.
-- Resolution: No code work left. Re-run npm run check:test-echo on the review env, then close when dev is promoted to master.
-- Look in: `scripts/check-test-echo.mjs`, `scripts/test-echo-baseline.json`, `package.json`, `.github/workflows/ci.yml`
-- Existing tests: test/test-echo-checker.test.ts
-- Done when: check:test-echo reports echo-shaped expectations; Existing occurrences are zero; the count only ratchets down; Both suites stay green
-- Tracker: Verify and close. Dev-only (3bfd5210 not in master); baseline is empty.
 
 ### [#1925](https://github.com/chester-hill-solutions/callcaster/issues/1925) Prune tautological tests (echo tests) with kill-verification
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
@@ -466,177 +2385,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: tools:issues:board exits 0 and includes every open issue, unenriched ones in Needs triage; A malformed enriched record still fails the run; The board header reports the Needs-triage count
 - Tracker: Verify and close. Dev-only (87ecef16 not in master).
 
-### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) Guardrails: git hooks + PR issue-reference gate
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: git hooks + PR issue-reference gate (shipped to dev in #1921/#1926)**
-- Both halves shipped to dev: a checked-in pre-commit hook wired via core.hooksPath, and a PR-into-dev issue-reference gate. Merged in PR #1921 (23700b0f) and PR #1926 (f416f037). Both are ancestors of origin/dev but NOT of origin/master.
-- Root cause: The repo had no git hooks and no requirement that a PR body reference an issue.
-- Resolution: Verify on dev only: stage a lint error and confirm the pre-commit hook blocks the human commit; open a dev PR without an issue reference and confirm the check is red, then add no-issue and confirm it clears. No new code expected.
-- Look in: `.githooks/pre-commit`, `scripts/setup-githooks.sh`, `package.json`, `.github/workflows/pr-issue-reference.yml`, `.github/workflows/issue-on-dev.yml`
-- Done when: A commit with a lint error is blocked by the pre-commit hook.; A PR into dev with no issue reference fails a check unless labelled no-issue.
-- Tracker: Verify and close after dev verification; promote #1921/#1926 to master first.
-
-### [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919) Hooks: drop global-barrel exports for single-consumer hooks
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: single-consumer hooks dropped from the global barrel (#1920)**
-- app/hooks/index.ts no longer exports useSurveyForm or useCampaignExport; the hooks stay reachable through their sub-barrels. Shipped to dev in PR #1920 (95f084c9); ancestor of origin/dev, NOT of origin/master.
-- Root cause: The #1892 DRY pass widened the global barrel with hooks that have one consumer each.
-- Resolution: Verify on dev: rg the two hook names in app/hooks/index.ts finds no export, and the survey/export tests stay green. No new code expected.
-- Look in: `app/hooks/index.ts`, `app/hooks/surveys/index.ts`, `app/hooks/campaign/index.ts`
-- Existing tests: test/ui/use-survey-form.test.tsx; test/ui/campaign-export-button.test.tsx
-- Done when: The global-barrel exports are dropped; the sub-barrels keep the hooks.; No import breaks.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918) Queue item relations: return grouped contact maps
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: loadQueueItemRelations returns grouped contact maps (#1920)**
-- loadQueueItemRelations in app/lib/campaign-queue-search.server.ts now returns { contactById, attemptsByContactId, audiencesByContactId } and both fetchers consume the same maps. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The helper returned raw arrays, so the page fetcher grouped them while the item fetcher re-filtered them.
-- Resolution: Verify on dev: queue route suites green and both fetchers use the maps. No new code expected.
-- Look in: `app/lib/campaign-queue-search.server.ts`
-- Existing tests: test/campaign-queue.route.test.ts; test/campaign-queue-db.claim.test.ts; test/campaign-settings-queue.route.test.ts
-- Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) Public survey guard: type the extra required fields
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: type the public survey guard's extra required fields (#1920)**
-- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The shared guard encoded one route's requirement as an untyped string list.
-- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
-- Look in: `app/lib/survey-public-action.server.ts`
-- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
-- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) Campaign export hook: stop recreating the poll interval every tick
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)**
-- useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.
-- Resolution: Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.
-- Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
-- Existing tests: test/ui/campaign-export-button.test.tsx
-- Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) Admin pagination: consolidate onto the canonical TablePagination
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: admin pagination consolidated onto TablePagination (#1920)**
-- TablePagination gained optional pageSizeOptions + onPageSizeChange; AdminPagination is deleted and the three admin panels use TablePagination. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The DRY pass extracted a near-duplicate AdminPagination instead of extending the canonical component.
-- Resolution: Verify on dev: rg AdminPagination finds no imports; test/ui/table-pagination-page-size.test.tsx green. Eyeball the three admin panels' pagination. No new code expected.
-- Look in: `app/components/shared/TablePagination.tsx`, `app/components/admin/`, `app/components/queue/QueueTablePagination.tsx`
-- Existing tests: test/ui/table-pagination-page-size.test.tsx
-- Done when: TablePagination gains the page-size select.; AdminPagination is deleted; the three admin panels use TablePagination.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914) Survey routes: share the fetcher-redirect and error extraction
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: survey routes share the fetcher redirect and error extraction (#1920)**
-- app/lib/survey-submit.ts owns SurveySubmitResult, surveySubmitError, and surveySuccessPath; both survey routes import it and render <Navigate>. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The two routes carried ~40 duplicated lines.
-- Resolution: Verify on dev: test/ui/survey-create-edit-redirect.test.tsx green and both routes import from @/lib/survey-submit. No new code expected.
-- Look in: `app/lib/survey-submit.ts`, `app/routes/workspaces+/$id/surveys/new.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/edit.route.tsx`
-- Existing tests: test/ui/survey-create-edit-redirect.test.tsx
-- Done when: A shared helper owns the redirect and error extraction.; Both routes use it.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913) Decompose SurveyForm into page and question subcomponents
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: SurveyForm decomposed into page and question subcomponents (#1920)**
-- SurveyForm.tsx defines SurveyQuestionCard and SurveyPageSection; the top-level SurveyForm function is under the 200-line threshold. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: The file held a 265-line function with everything inline.
-- Resolution: Verify on dev: lint reports no max-lines-per-function warning and survey tests stay green. No new code expected.
-- Look in: `app/components/surveys/SurveyForm.tsx`
-- Existing tests: test/ui/survey-create-edit-redirect.test.tsx; test/ui/use-survey-form.test.tsx
-- Done when: SurveyPageSection and SurveyQuestionCard are extracted.; The top-level function drops under the threshold.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912) Survey form hook: duplicate page/question ids after a removal
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: survey ids derive from the highest suffix, unique after removal (#1920)**
-- useSurveyForm derives new page/question ids from nextSuffix() (highest existing suffix + 1) and a regression test asserts ids stay unique after a middle removal. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: Ids were derived from array.length + 1, which collides after a middle removal.
-- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx includes the uniqueness regression. No new code expected.
-- Look in: `app/hooks/surveys/useSurveyForm.ts`, `test/ui/use-survey-form.test.tsx`
-- Existing tests: test/ui/use-survey-form.test.tsx
-- Done when: New ids derive from the max existing numeric suffix.; A test adds three, removes the middle, adds another, asserts unique ids.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911) Survey form hook: collapse the deep-map mutators into index primitives
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: useSurveyForm mutators collapsed onto index primitives (#1920)**
-- useSurveyForm routes nested mutations through updatePages/withPage/withQuestions/withQuestion/withOptions/withOption, with generic field setters linking field and value types. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: Ten hand-written map-replace handlers duplicated index threading and immutability.
-- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx stays green and the primitives are the only traversal. No new code expected.
-- Look in: `app/hooks/surveys/useSurveyForm.ts`
-- Existing tests: test/ui/use-survey-form.test.tsx
-- Missing tests: Type-level assertion that the generic setters reject mismatched field/value pairs
-- Done when: Index primitives own traversal once.; All mutators are expressed through them.; Setters are generic.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
-### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Fixed on dev in PR #1906 (14d29f1c): the rent path shows Service address as its own breadcrumb step (address, then number search, then review). Changelog records the change.
-- Resolution: Verify on the review environment that the address substep gets its own crumb when renting. Close on master promotion.
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`
-- Existing tests: test/ui/onboarding-first-number-flow.test.tsx
-- Done when: Address substep has its own breadcrumb when renting
-- Tracker: PR #1906 merge 14d29f1c is on dev, not yet master.
-
-### [#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703) IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-19
-- Fixed on dev in PR #1905 (db176dc8): each IVR response row removes with an inline trash icon beside the fields. Changelog records the change.
-- Resolution: Verify on the review environment that the Remove response button is a trash icon in line with the row. Close on master promotion.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`
-- Existing tests: test/ui/script-block-editor-ivr.test.tsx
-- Done when: Response removal is an inline trash icon, not a full-width button
-- Tracker: PR #1905 merge db176dc8 is on dev, not yet master.
-
-### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
-- Verdict: **Verify and close** · Size: M · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **verify-close: SMS business identity fields on the Identity step**
-- Fixed on dev in PR #1903 (3103b835): toll-free and US registration business details are collected on the Identity step after the number path is chosen, not expanded on the Goal step. Changelog records the change.
-- Resolution: Verify on the review environment that the Goal step no longer shows the identity fields and that Identity collects them for the SMS paths, with saved data unchanged. Close on master promotion. Do not reimplement tooltip bounds (already shipped in #1608).
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`
-- Existing tests: test/ui/onboarding-goal-step.test.tsx
-- Done when: SMS compliance fields only on Identity; Goal has no duplicate guidance; Saved data unchanged
-- Tracker: PR #1903 merge 3103b835 is on dev, not yet master. Closes on master promotion.
-
-### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Fixed on dev in PR #1902 (f081cee8): the low-credit notification email names the workspace in its subject and body from the notify context. The open state does not prove the fix is absent.
-- Resolution: Verify on the review environment that the low-credit email subject and body name the workspace. Close on master promotion. Do not reimplement the template change.
-- Look in: `app/lib/low-credit-notify.server.ts`
-- Existing tests: test/low-credit-notify.server.test.ts
-- Done when: Low-credit email subject and body name the workspace
-- Tracker: PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion.
-
-### [#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889) Predictive auto-dial drops a voicemail even when the voicemail drop switch is off
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **Verify: predictive auto-dial honours the voicemail-drop switch**
-- Fixed on dev in PR #1901 (16a7abdd, merged 2026-09-19, base dev). NOT in master (origin/master 807cea82), so dev-only until the next release.
-- Current behavior: On dev, the predictive AMD branch reads voicemail_drop_enabled and calls machineAnswerDisposition.
-- Root cause: The AMD branch read campaign.voicemail_file but never campaign.voicemail_drop_enabled.
-- Resolution: No new code. Verify on the review environment, then close when promoted to master.
-- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/ivr-machine.server.ts`
-- Existing tests: test/auto-dial-room.route.test.ts; test/integration-db/call-status-guard.test.ts; test/telephony-db-call-status-guard.test.ts
-- Done when: Predictive + machine + drop off yields No Answer with no audio; Predictive + machine + drop on yields Voicemail with the drop played
-- Tracker: Verify on the review env; close when promoted to master (dev-only today).
-
-### [#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869) Test calls must not change the campaign queue
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **Verify: test calls leave the campaign queue untouched**
-- Fixed on dev in PR #1900 (2a2eb281, merged 2026-09-19, base dev). NOT in master, so dev-only.
-- Current behavior: On dev, the dequeue block in webhook-side-effects.server.ts is gated on outreachAttemptId != null.
-- Root cause: The contact-keyed dequeue had no guard on the resolved outreach attempt, so any terminal callback with a contact_id could mutate the queue.
-- Resolution: No new code. Verify on the review environment, then close when promoted to master.
-- Look in: `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/routes/api+/call-status.action.server.ts`
-- Existing tests: test/webhook-side-effects.test.ts
-- Done when: A test call to a queued number leaves queue_state queued, queue_order unchanged, attempts unchanged and dequeued_at null
-- Tracker: Verify on the review env; close when promoted to master (dev-only today).
-
 ### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
 - Fixed on dev in PR #1899 (9a82cbce): the campaigns list sorts by status group then newest first, via app/lib/campaign-list-order.ts. The open state does not prove the fix is absent.
@@ -645,55 +2393,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-list-order.test.ts
 - Done when: Campaign list orders running, waiting, draft, complete, newest first within each group
 - Tracker: PR #1899 merge 9a82cbce is on dev, not yet master. Closes on master promotion.
-
-### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Pin the test suite to UTC
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Verify: the test suite is pinned to UTC**
-- Fixed on dev in PR #1898 (4079b7ae, merged 2026-09-19, base dev). NOT in master, so dev-only.
-- Current behavior: On dev, vitest.shared.config.ts:16 sets test env { TZ: "UTC" } for both projects.
-- Root cause: Neither vitest.shared.config.ts nor the setup files set TZ.
-- Resolution: No new code. Verify on the review environment and a non-UTC machine, then close when promoted to master.
-- Look in: `vitest.shared.config.ts`, `test/ui/campaign-launch-eta.test.tsx`, `test/setup.node.ts`, `test/setup.ui.ts`
-- Existing tests: test/ui/campaign-launch-eta.test.tsx
-- Missing tests: optional guard that process.env.TZ === "UTC" inside a test
-- Done when: process.env.TZ === "UTC" in node and ui tests without any per-file pin; The suite passes unchanged on a non-UTC machine
-- Tracker: Verify on the review env; close when promoted to master (dev-only today). Update the AGENTS.md per-file TZ pitfall once confirmed.
-
-### [#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891) Mobile nav sheet lays its links out horizontally instead of stacking them
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Verify: mobile nav sheet stacks its links vertically**
-- Fixed on dev in PR #1893 (c83ad822, merged 2026-09-19, base dev). NOT in master, so dev-only.
-- Current behavior: On dev, navLinkClass in Navbar.MobileMenu.tsx:37 includes block.
-- Root cause: navLinkClass lacked block, so <NavLink> stayed inline.
-- Resolution: No new code. Verify on the review environment at a narrow viewport, then close when promoted to master.
-- Look in: `app/components/layout/Navbar.MobileMenu.tsx`
-- Existing tests: e2e/specs/marketing-mobile-nav.spec.ts
-- Done when: On a narrow viewport, Home, Docs, Sign In and Sign Up stack one per row; Signed-in account links and the Log Out button stack the same way
-- Tracker: Verify on the review env; close when promoted to master (dev-only today).
-
-### [#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888) IVR: a machine answer with the voicemail drop off should record No Answer, not Voicemail
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Verify: IVR machine answer with the drop off records No Answer**
-- Fixed on dev in PR #1890 (d07e26b1, merged 2026-09-19, base dev). NOT in master, so dev-only.
-- Current behavior: On dev, machineAnswerDisposition(campaign) returns voicemail only when voicemail_drop_enabled && voicemail_file, otherwise no-answer.
-- Root cause: recordVoicemailAnswer wrote disposition voicemail for every machine answer before deciding whether the drop would play.
-- Resolution: No new code. Verify on the review environment, then close when promoted to master.
-- Look in: `app/lib/ivr-machine.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`
-- Existing tests: test/ivr-page.route.test.ts; test/ivr-status.route.test.ts
-- Done when: Drop on + audio records disposition voicemail; Drop off or no audio records disposition no-answer; Results, metrics and exports show No Answer in the second case
-- Tracker: Verify on the review env; close when promoted to master (dev-only today).
-
-### [#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853) Dev: workspace invite insert fails (works on prod)
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
-- Root cause confirmed in comments: workspace_invite.user_id had two FKs, one to legacy auth.users (empty on dev), so every invite insert failed. PR #1887 (c80e59ec) drops both legacy constraints in migration 20260919120000_drop_legacy_auth_users_fks.sql, wired into both bootstrap scripts. Merged on dev only.
-- Current behavior: On dev the dropped constraints are gone; the public.user FK remains. Master still has the legacy auth.users FKs.
-- Root cause: Legacy Supabase auth.users FK on workspace_invite.user_id (and workspace_api_key.created_by).
-- Resolution: Invite a user on the review environment and confirm the insert succeeds; then close when the fix is promoted to master. No further code.
-- Look in: `client/migrations/20260919120000_drop_legacy_auth_users_fks.sql`, `app/lib/invite-user-by-email.server.ts`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`
-- Existing tests: test/accept-invite.route.test.ts; test/bootstrap-migrations.server.test.ts
-- Missing tests: schema assertion that no public FK targets auth.users; invite insert succeeds with no legacy FK
-- Done when: Inviting a user to a workspace succeeds on dev; Root schema difference identified and reconciled; No public FK to auth.users remains after migrations
-- Tracker: Verify on review env. Merged on dev in PR #1887 (c80e59ec); close on master promotion.
 
 ### [#1877](https://github.com/chester-hill-solutions/callcaster/issues/1877) De-duplicate the IVR runtime (machine policy, block runtime, option type, Setup sections)
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
@@ -772,43 +2471,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Pressing a key on an IVR test call navigates to the mapped branch; The generic error is never spoken for a test call with no outreach attempt
 - Tracker: PR #1850 merge 2df51d56 is on dev, not yet master. Closes on master promotion.
 
-### [#1849](https://github.com/chester-hill-solutions/callcaster/issues/1849) what happens when multiple columns map to the same column in call list upload
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: question, business-logic · Assignee: @wra-sol · Updated: 2026-09-18
-- Working as designed. Duplicate mappings are a blocking validation: validateContactImportMapping flags duplicate-target, AudienceUploadMapStep shows a destructive 'Mapping needs attention' alert, Continue is blocked, and the upload action re-validates server-side. The guard shipped in PR #1063 (7824c824) and is on master.
-- Current behavior: Mapping both 'phone' and 'cell phone' to Phone number shows 'Phone number is assigned to more than one CSV column' and prevents continuing. The server rejects the same mapping independently.
-- Root cause: Not a defect. The issue is a question about intentional designed behaviour.
-- Resolution: Answer the question and confirm the blocking behaviour is intended, then close. If the desired behaviour is to merge two phone columns, that is a new feature.
-- Look in: `shared/contact-import-headers.ts`, `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/AudienceUploader.tsx`, `app/routes/api+/audience-upload.action.server.ts`, `app/lib/audience-upload-process.server.ts`
-- Existing tests: test/contact-import-headers.test.ts
-- Done when: Question answered with the current blocking behaviour; Blocking validation confirmed on master
-- Tracker: Answer and close as working-as-designed (validation from PR #1063 is on master). Open a separate feature ticket only if merging multiple phone columns is wanted.
-
-### [#360](https://github.com/chester-hill-solutions/callcaster/issues/360) sign in and signup pages shouldn't be available to people who are already signed in
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-16
-- Recommended title: **Verify the signed-in redirect on /signin and /signup and the home CTA**
-- The sign-in and sign-up loaders already redirect a signed-in visitor to /workspaces, and the landing page shows 'Go to Workspaces' instead of Sign Up. Both are on master.
-- Current behavior: signin.loader.server.ts and signup.loader.server.ts redirect to /workspaces when getSession returns a user. _index renders 'Go to Workspaces' for a signed-in user.
-- Root cause: The original gap was closed by the loader redirects plus the signed-in home CTA (release 807cea82, #1838).
-- Resolution: Verify on the deployed master environment that a signed-in visit to /signin and /signup redirects to /workspaces and that the home CTAs read 'Go to Workspaces'. No new code expected.
-- Look in: `app/routes/signin.loader.server.ts`, `app/routes/signup.loader.server.ts`, `app/routes/_index/index.tsx`, `app/routes/_index/index.loader.server.ts`
-- Existing tests: test/ui/index.route.test.tsx; test/signup.route.test.ts; e2e/specs/auth.spec.ts; e2e/specs/signup-flow.spec.ts
-- Missing tests: Loader test that /signin and /signup redirect to /workspaces when a session exists
-- Done when: Signed-in /signin redirects to /workspaces; Signed-in /signup redirects to /workspaces; The home hero and CTA read 'Go to Workspaces' when signed in
-- Tracker: Released to master (807cea82, #1838). Verify, then close; do not reimplement the redirects.
-
-### [#1824](https://github.com/chester-hill-solutions/callcaster/issues/1824) workspace dropdown sends user to "Something went wrong" page
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-09-16
-- Recommended title: **Verify the workspace picker runtime-error fix**
-- PR #1825 kept the workspace actions inside the React Aria menu and rendered the pinned All workspaces footer as a plain button, removing the runtime error. The change is on master.
-- Current behavior: The workspace picker's All workspaces footer is a plain <button> with id all-workspaces outside the CommandList/menu.
-- Root cause: A React Aria CommandItem (All workspaces) was rendered outside its required menu context, causing the runtime error.
-- Resolution: Retest on the review environment: open the workspace dropdown, choose a workspace, and choose All workspaces; confirm no error page. Close on master. Do not reimplement.
-- Look in: `app/components/layout/Navbar.tsx`
-- Existing tests: test/ui/navbar-user-menu.test.tsx; test/ui/navbar-credits.test.tsx
-- Missing tests: Workspace-picker regression test (the mocked test was deleted in PR #1825)
-- Done when: Opening the workspace dropdown does not throw; Choosing a workspace navigates to it; All workspaces navigates to /workspaces
-- Tracker: PR #1825's change is present on master (release trunk 807cea82, #1838); verify and close.
-
 ### [#1788](https://github.com/chester-hill-solutions/callcaster/issues/1788) SMS export adds a false skipped row for each sent contact
 - Verdict: **Verify and close** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
 - PR #1798 (a80b3f9c) shipped the filter that removes synthetic SMS skipped rows for sent contacts.
@@ -816,16 +2478,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Resolution: Verify delivered and genuine skipped contact rows on a dev export.
 - Look in: `app/lib/campaign-export.server.ts`, `app/lib/campaign-queue-db.server.ts`
 - Existing tests: test/campaign-export-sms-dequeued.test.ts
-- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
-
-### [#1794](https://github.com/chester-hill-solutions/callcaster/issues/1794) Campaign schedule sync can overwrite a concurrent pause or completion
-- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-12
-- PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. The requested real database interleaving check is still missing.
-- Current behavior: A concurrent status change causes the guarded update to return no transition; events follow successful updates only.
-- Resolution: Verify pause/completion interleaving against a real database. The existing sweep test mocks the status helper, so it does not prove the SQL concurrency behavior.
-- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-ivr.server.ts`
-- Existing tests: test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)
-- Missing tests: Real database pause/completion after candidate selection; confirm state and emitted events.
 - Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
 
 ### [#1792](https://github.com/chester-hill-solutions/callcaster/issues/1792) SMS rate pacing is skipped between batches, including all waits at one MPS
@@ -838,26 +2490,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed pacing verification.
 - Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
 
-### [#1791](https://github.com/chester-hill-solutions/callcaster/issues/1791) SMS dispatch continues sending after the campaign window closes mid-batch
-- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-12
-- PR #1796 (0188cea8) added campaign-window checks before provider requests, including after asynchronous preparation.
-- Current behavior: When the campaign window closes mid-batch, new sends stop and unsent contacts remain queued.
-- Resolution: Verify the closing-boundary behavior on dev without sending outside the test window.
-- Look in: `app/lib/campaign-sms-dispatch.server.ts`
-- Existing tests: test/campaign-sms-dispatch-window.test.ts
-- Missing tests: Deployed closing-boundary verification.
-- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
-
-### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
-- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-09-12
-- PR #1796 (0188cea8) now wakes waiting voice work at the next calling-hours boundary. The four deployed boundary checks requested by this issue remain pending.
-- Current behavior: The waiting voice successor uses the next window opening; schedule-sweep ownership of waiting-to-running remains intact.
-- Resolution: Collect deployed evidence for future start, exact open, mid-run close, and no premature completion. Preserve #1351/#1352 until that evidence is assessed.
-- Look in: `app/lib/worker/handlers/campaign.server.ts`, `app/lib/campaign-schedule-sync.server.ts`
-- Existing tests: test/campaign-dispatch-worker.test.ts
-- Missing tests: DB rows plus screenshots or API results for all four deployed boundary cases.
-- Tracker: Verification work remains; do not repeat the next-window scheduling patch from PR #1796.
-
 ### [#1790](https://github.com/chester-hill-solutions/callcaster/issues/1790) Campaign exports reject simple_ivr and complex_ivr campaigns
 - Verdict: **Verify and close** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
 - PR #1798 (a80b3f9c) added supported machine-dispatched IVR types to the HTTP, workspace API, and durable export paths.
@@ -867,64 +2499,98 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-export-ivr-adapters.test.ts
 - Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
 
-### [#1338](https://github.com/chester-hill-solutions/callcaster/issues/1338) Call Settings buttons are all over the place needs better alignment and padding
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-11
-- Recommended title: **verify-close: call settings sheet laid out by device, no redundant labels**
-- #1680 laid the sheet out by device (single label per field, buttons say what they do, flex gap), removing the redundant headings flagged in the issue. UI green; visual eyeball pending.
-- Current behavior: Microphone/Speaker/Output fields each carry one label with their controls beneath.
-- Root cause: Original layout clipped/misaligned; #1680 restructured.
-- Resolution: No new code; eyeball on dev.
-- Look in: `app/components/call/CallScreen.DeviceSettings.tsx`, `app/components/call/CallScreen.Layout.tsx`
-- Existing tests: test/ui/audio-device-lifecycle.test.tsx; test/ui/call-screen-header.test.tsx
-- Done when: no clipping left/right; no redundant labels
-- Tracker: Close after the eyeball.
-
-### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) if the call recipient hangs up, I get call completed but still the option to hang up
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-11
-- Recommended title: **verify-close: call screen shows Hang Up in-call, Dial (with confirm) after**
-- Dial control (#1408) flips to Dial and requires a second click after a call ends; Hang Up has its own two-step confirm. CallControls state machine verified by code + call-screen UI tests.
-- Current behavior: in-call -> Hang Up (two-step); after end -> armed Dial ('Click again to call back') that disarms on first click.
-- Root cause: Errors not reproduced; #1408 implemented the guard.
-- Resolution: No new code; run the idle-state eyeball on dev.
-- Look in: `app/components/call/CallScreen.CallArea.tsx`
-- Existing tests: test/ui/call-screen-callarea.test.tsx
-- Done when: active call -> Hang Up; ended call -> Dial with confirm; no hang-up confirm loop
-- Tracker: Close after the eyeball.
-
 ### [#1664](https://github.com/chester-hill-solutions/callcaster/issues/1664) AI agents interacting with GH should properly mark items as duplicate or not planned
 - Verdict: **Verify and close** · Labels: devops/admin · Assignee: none · Updated: 2026-09-08
 - The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.
 - Resolution: Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.
 - Look in: `.agents/skills/github-issues/SKILL.md`
 
-### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) I don't think it's helpful to obfuscate the unsubscribe and resubscribe SMS message from the CC side
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-26
-- Recommended title: **test(chats): prove STOP and START text remains visible to operators**
-- STOP/START bodies are stored unchanged and rendered verbatim in the transcript and conversation preview. The only remaining obfuscation is generic opt-out-banner copy ('replied with an opt-out keyword').
-- Current behavior: inbound-sms persists the raw body before opt-out processing; ChatMessages renders message.body; ConversationList preview shows it; STOP-only hiding is explicit.
-- Root cause: Already implemented; the ask likely refers to banner copy.
-- Resolution: Verify the transcript shows the exact text; if the banner is the concern, include the exact matched keyword in ChatOptOutBanner copy. Add tests pinning unchanged persistence.
-- Look in: `app/routes/api+/inbound-sms.action.server.ts`, `app/components/sms-ui/ChatMessages.tsx`, `app/components/chats/ChatOptOutBanner.tsx`, `app/lib/chat-opt-out.ts`
-- Existing tests: test/inbound-sms.route.test.ts (keyword state changes)
-- Missing tests: STOP/START bodies persisted unchanged; transcript/preview exact text
-- Done when: Opt-out text unchanged in history; Preview shows exact text; Hiding STOP-only stays explicit
-- Tracker: Close after verification; future #1268 consent work replaces the boolean authority.
-
 ---
 
-## Needs reproduction — 14
+## Needs reproduction — 15
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
-### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @sai-sy · Updated: 2026-09-21
-- Focus loss on each keystroke in Answer label is reproduced but root cause unproven; candidates are the option row key with id regeneration on document round-trip (documentToScript) and block onFocusCapture wrappers. Issue explicitly demands a systemic component-level fix, so evidence-first.
+### [#2330](https://github.com/chester-hill-solutions/callcaster/issues/2330) Use verified client identity for public rate limits
+- Verdict: **Needs reproduction** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-06
+- The current rate key uses leftmost X-Forwarded-For. Actual ingress and spoof resistance must be verified before changing the trusted identity boundary.
+- Current behavior: clientRateLimitKey still reads the leftmost forwarded address and falls back to unknown. Official Railway employee guidance states its HTTP proxy sets and overwrites X-Real-IP and prevents direct access through that arrangement; stable peer CIDRs are not published. This is provider guidance, not proof of the actual CallCaster ingress. An additional proxy, direct/local request identity and forged-header controls remain unverified.
+- Root cause: The rate-limit helper receives a Request without a verified transport identity and trusts forwarded input without an established CallCaster proxy boundary.
+- Resolution: Inspect the real CallCaster public ingress and direct/local server arrangement. Prove overwrite or append behavior using actual forged-header and valid-client controls, then implement the verified transport rule. Preserve PostgreSQL windows and authenticated-user limits. Do not infer trust from X-Railway-Edge or an undocumented private CIDR.
+- Look in: `app/lib/platform-rate-limit.server.ts`, `app/lib/platform-auth-rate-limit.server.ts`, `server/bun.ts`, `.railway/`
+- Existing tests: test/platform-api.test.ts; test/auth-catch-all-rate-limit.route.test.ts
+- Missing tests: Actual transport/proxy arrangement with client-supplied X-Forwarded-For/X-Real-IP, valid clients, IPv4/IPv6, missing/malformed headers and stable local peer identity.
+- Done when: Derive public auth rate-limit identity from a verified transport/proxy boundary. A client cannot obtain a fresh bucket by varying the leftmost X-Forwarded-For or any other untrusted identity header.; Document the actual public ingress and trusted-hop rule, including direct/local requests and additional proxies where present.; Keep a real permitted-client control, IPv4/IPv6 controls and missing/malformed-header controls. Headerless local requests must not all share one unknown identity, and a fresh random key per request is not an acceptable fallback.; Test the actual production request arrangement, not only Request fixtures that set the supposed trusted header. Record what overwrites or appends each address field.; Preserve the existing distributed PostgreSQL window contract and authenticated user-based write limits.; Full npm run ci:local and final remote gates pass; deployed forged-header controls prove the rule before release promotion.
+- Tracker: Unassigned native child of #2099. Required CallCaster ingress proof remains; primary provider guidance was added to the issue without claiming acceptance.
+
+### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Verify toast spacing and move defaults into the shared component**
+- The app adapter adds gap-2 py-3 globally, but shad-cc does not own those defaults. Caller toastOptions can replace the adapter settings.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04: one root host uses the app adapter. Shared spacing ownership and actual audio-error spacing are not verified.
+- Root cause: App-level class duplication is not a shared component spacing contract. The reported computed spacing has not been reproduced on current code.
+- Resolution: Measure the audio-upload error toast in light/dark themes with long text and actions. Move confirmed global defaults into shad-cc with safe option merging. Prove alerts render outside page flow with no layout shift.
+- Look in: `app/components/ui/sonner.tsx:12`, `app/root.tsx:123`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/sonner.tsx:56`, `docs/design-system.md`
+- Missing tests: Computed toast spacing for audio-upload errors and option overrides.; Light/dark and long-content browser checks with stable page landmarks.
+- Done when: Error toasts have sensible global spacing defaults.; The shared component prevents the same spacing mistake across callers.; No alert causes page layout to shift when it renders.
+- Tracker: Native issue updated. Needs reproduction; app adapter classes are partial source evidence. Keep shared component ownership under #2300 visible.
+
+### [#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832) workspace setup sms goal continue with local number selected isn't visible on dark mode
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-04
+- Recommended title: **Reproduce dark-mode Continue visibility in SMS onboarding**
+- Current Continue uses the shared Button and renders only with hasFirstNumber and continueTarget. Source classes do not prove the reported dark-mode flow.
+- Current behavior: Source audit dev@8ae867ed, 2026-10-04: first-number footer uses shared default Button with primary/primary-foreground tokens. No browser visibility or computed-style proof has been collected.
+- Root cause: Not established for the current code. Separate absent, disabled and unreadable states before changing the component.
+- Resolution: Reproduce SMS goal with a selected local number and writable role. Inspect render conditions and dark-theme normal, hover, focus and pending states. Put any shared appearance repair in shad-cc and keep page layout stable.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx:155`, `app/components/ui/button.tsx`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/button.tsx:17`
+- Existing tests: test/ui/onboarding-first-number-flow.test.tsx
+- Missing tests: Real dark-mode visibility and computed contrast for the reported local-number flow.
+- Done when: Continue is visible and usable in the reported SMS/local-number dark-mode flow.; The fix uses the shared component contract and prevents the same defect on other controls.
+- Tracker: Native issue updated. Needs reproduction; do not close from shared token class names alone.
+
+### [#2292](https://github.com/chester-hill-solutions/callcaster/issues/2292) Assess fragmented public survey responses
+- Verdict: **Needs reproduction** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The historic impact of per-request respondent IDs has not been measured on deployed data.
+- Current behavior: The source defect is confirmed under #2125. No production survey-row query or repair has been performed in this audit.
+- Root cause: Tokenless writes could fragment one visit across response rows, but anonymous records may not permit reliable attribution.
+- Resolution: Identify deployment interval and intended database. Run read-only aggregate counts with controls for legitimate separate attempts and anonymous/contact-backed respondents. Record attribution limits and a concrete repair or no-repair recommendation. If justified, create an atomic repair task with exact selection and rollback; perform no repair in this assessment.
+- Look in: `app/lib/survey-db.server.ts`, `app/lib/survey-responses.server.ts`, `app/db/schema-survey.ts`
+- Existing tests: test/integration-db/survey-respondent-identity.test.ts
+- Missing tests: Read-only aggregate deployed-data assessment with reliable identity controls.
+- Done when: Identify affected revision/deployment interval and database.; Measure aggregate fragmented-response/answer/no-row-completion patterns without exporting respondent rows.; Separate anonymous/contact-backed groups and legitimate multiple attempts.; Record attribution limits and repair/no-repair recommendation.; Do not update, delete, merge or backfill stored rows in this task.
+- Tracker: Independent read-only historical assessment; it does not block the source fix.
+
+### [#2053](https://github.com/chester-hill-solutions/callcaster/issues/2053) Reproduce current E2E image-pull failures after the Stow migration
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
+- The original MinIO/Quay failure is obsolete after the Stow migration. Two anonymous Docker Hub pulls remain. Source alone cannot prove current image-pull failures or the claimed anonymous-quota root cause.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Stow replaced MinIO. Only postgres and inbucket Docker Hub images remain. No fresh hosted-runner image-pull failure was established in this code audit.
+- Root cause: The historical unauthorized Quay pull is not proof of rate limiting and no longer exists in the compose graph. Anonymous Docker Hub pulls remain a possible failure source.
+- Resolution: Read current master E2E runs. Separate image-pull failures from apt, database, and Playwright failures; choose mirror/auth policy only after confirming the remaining failure.
+- Look in: `docker-compose.dev.yml:15`, `.github/workflows/e2e.yml:130`, `.github/workflows/e2e.yml:40,55 (runs-on) and the test:e2e:compose step`, `docker-compose.dev.yml:12,36,49 (the three image sources — note line 36 is quay.io)`, `scripts/e2e/run-compose-e2e.mjs:20,57-58,84 (composeFile, up -d, ensure-minio-bucket)`, `scripts/e2e/ensure-minio-bucket.mjs:12-13,25-26 (endpoint and credentials)`
+- Missing tests: Need current hosted-runner logs, registry response evidence and the ten-run acceptance measurement.
+- Done when: npm run test:e2e:compose passes on master from a GitHub-hosted runner; No image in docker-compose.dev.yml is pulled anonymously from a rate-limited registry; No image-pull failure across ten consecutive PR runs; If the gate is not required, that is recorded deliberately
+- Tracker: Move to Needs reproduction for the current runner failure. Update obsolete MinIO and Quay claims first.
+
+### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @sai-sy · Updated: 2026-09-27
+- The specific 'credit warning after renting' could not be located in the onboarding source; screenshot unverifiable here. Needs the step + exact warning text to pin the component.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857) gap between pressing an IVR option and it moving on to the next block is very long ~4 seconds
-- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Instrument and attribute the ~4s IVR option-press to next-block gap**
+### [#2034](https://github.com/chester-hill-solutions/callcaster/issues/2034) Campaign results disagree with themselves: 0 of 1 contacts completed while the disposition breakdown reports 2 completed
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The inconsistency is real and the two numbers are computed from different tables, but I could not confirm which write produces the extra rows, so I am not specifying a fix. 'Contacts Completed' is queueRows, not attempts: ResultsScreen.tsx:53-57 passes queueCounts.completedCount, which is countDialableCompletedCampaignQueueRows (app/lib/campaign-queue-search.server.ts:338-342) counting campaign_queue rows where queue_state='dequeued' OR dequeued_at IS NOT NULL (the predicate is right, verified at :59-67). The disposition breakdown is attempts: it comes from the get_campaign_stats RPC (drizzle/0000_baseline.sql:2565, `COUNT(*) as count ... FROM outreach_attempt oa`) for non-message campaigns. So the screen compares a count of queue rows with a count of attempt rows, and they can only agree if there is exactly one attempt per contact. The report says the agent pressed hang up several times, and the breakdown says 2, so something produced two attempt rows — or one attempt plus a duplicate. I could not find it: the repeated-hangup guard in app/hooks/call/useCallHandling.ts:408-426 returns early without a server call when there is no active call, and the server-side /api/hangup is guarded (Twilio error 21220 is swallowed at app/routes/api+/hangup.action.server.ts:43-47, and the disposition update is scoped to the attempt and described as terminal-guarded at :67-80). Also unexplained: completedCount is 0, meaning the queue row was never dequeued, yet a disposition of completed exists. The remote-hangup button symptom is separately known and already guarded (the #1292 comment at useCallHandling.ts:409-412), so the visible half may already be fixed while the numbers half is not.
+- Current behavior: One contact, one call, the contact hangs up remotely, the agent presses hang up repeatedly: the headline reads 'Contacts Completed: 0 of 1' with a 100.0% completion rate, and the disposition bar reads 'Completed 2 (100.0%)'.
+- Root cause: Not established. Two candidate causes, and the repro distinguishes them. (a) A write-side duplication: something creates a second outreach_attempt row for the same contact in the same campaign, so the row count is 2 while the contact count is 1. (b) An aggregate-unit mismatch only: the queue row was never marked dequeued (so completedCount is 0) while one or more attempts carry a completed disposition, and the 2 comes from two attempts created by the dial, not by the hang-up presses. (b) is the more likely reading of completedCount=0, and it would mean the real defect is a dequeue that never happens, not a hang-up that happens twice.
+- Resolution: Reproduce first, then choose. Steps: (1) create a 1-contact call campaign, launch it, dial, let the contact answer, then hang up remotely from a second handset; (2) press hang up in the agent UI two or three times and note whether the button is still enabled and what the network tab shows for each press; (3) open the Results tab and record both numbers. Then, for that campaign id, query campaign_queue for the row (queue_state, dequeued_at), outreach_attempt for every row (id, contact_id, disposition, created_at) and call for every row (outreach_attempt_id, duration). The reading decides the fix: two attempt rows for one contact means a write-side duplication to find in the dial/hangup path and the aggregate is right; one attempt plus queue_state still 'queued' means the dequeue never ran, which points at dequeueQueueEntry in /api/hangup (app/routes/api+/hangup.action.server.ts:59-66) failing silently for this path — note it dequeues by contactId with a household-fanout branch, and an early return or a swallowed error there would produce exactly completedCount=0. If the numbers are right and only the units differ, the fix is in the presentation: state the unit ('contacts' versus 'attempts') or make the breakdown count distinct contacts. Do not change get_campaign_stats on the strength of a screenshot.
+- Look in: `app/components/campaign/home/CampaignHomeScreen/ResultsScreen.tsx:51-64 (the two numbers side by side)`, `app/lib/campaign-queue-search.server.ts:265-267 and :338-342 (completedCount = dequeued queue rows)`, `drizzle/0000_baseline.sql:2495-2571 (get_campaign_stats, COUNT(*) over outreach_attempt rows for non-message campaigns)`, `app/routes/api+/hangup.action.server.ts:49-81 (dequeueQueueEntry by contactId, then the attempt disposition update)`, `app/hooks/call/useCallHandling.ts:404-426 (the #1292 stale-hangup guard) and app/hooks/call/useCallScreen.ts:178`, `app/lib/dequeueQueueEntry in app/lib/campaign-queue-db.server.ts (the fanout branch that could fail silently)`
+- Existing tests: test/integration-db/campaign-completion-gate.test.ts; test/integration-db/dequeue-contact-assigned.test.ts; test/integration-db/call-status-guard.test.ts; test/ui/call-lifecycle-regression.test.tsx
+- Missing tests: no test asserts that a remote hangup followed by repeated agent hang-up presses leaves exactly one attempt row and one dequeued queue row; no test asserts that the results headline and the disposition breakdown agree for a 1-contact campaign — this is the assertion that would have caught the report; no test covers a /api/hangup for an already-ended call, which is the exact path the repro exercises; no test asserts that a failed dequeueQueueEntry surfaces rather than resolving quietly; no test pins the unit of the disposition breakdown (attempts versus contacts), so the two numbers can drift apart freely
+- Done when: The exact reproduction is recorded with the campaign_queue, outreach_attempt and call rows for the campaign; A 1-contact campaign whose contact hangs up remotely shows the same contact count in the headline and in the disposition breakdown; Repeated hang-up presses after a remote hangup do not create additional attempt or queue rows; The disposition breakdown's unit is stated in the UI or in code, and the headline and the breakdown cannot contradict each other; The fix lands with a test that fails against the current behaviour
+- Tracker: Needs reproduction, not fix now. The inconsistency is confirmed but the cause is not, and there are two candidate causes whose fixes are opposites: one is a duplicated write, the other is a write that never happens. Guessing here would change either a write path or an aggregate on the strength of a screenshot. The repro is three queries and about ten minutes. Also file the remote-hangup button symptom separately if the repro shows it still reproduces, since the existing #1292 guard suggests that half may already be fixed.
+
+### [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857) Instrument and attribute the ~4s IVR option-press to next-block gap
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-25
 - No issue body. The one comment attributes the gap to the flow-entry redirect hop or per-request media render in #1842, but this is the response->block hop after a key press, a path #1842 does not measure.
 - Current behavior: Pressing an option POSTs to response.action (outreach read/write, findNextStep), which redirects; Twilio then calls the block route, which re-fetches call and campaign in series and renders audio.
 - Root cause: Not confirmed. Candidates: the response->block double round-trip, serial findCallBySid + fetchCampaignWithScript, and MP3 transcoding.
@@ -935,81 +2601,8 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Done when: Measured option-press -> next-block first-audio, before and after; Chosen fix under 2s without regressing #1842/#1864; Root cause recorded, or folded into #1842 with evidence
 - Tracker: needs-repro: likely shares the per-request render root cause with #1842 but different hop. Measure before merging the tickets.
 
-### [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750) Fix the existing sign-in page hydration mismatch
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-16
-- Confirmed symptom (React #418 args=[HTML] on every /signin load per the 4-case protocol) but root cause unproven. Fastest check: the pre-hydration theme script mutating <html> vs React 19 singleton hydration (issue itself hints at the theme bootstrap).
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11
-- The specific 'credit warning after renting' could not be located in the onboarding source; screenshot unverifiable here. Needs the step + exact warning text to pin the component.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 — likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Fix #1375 (e49ce7a1, on master) made the launch-page queue ETA window-aware. Sai's 2026-09-09 counter-claim has not been re-verified, and #1816/#1820 (on master) now pulls a parked dispatch successor forward when the window is edited. The 15-min-cron hypothesis is refuted for SMS: the successor is scheduled at the exact nextOpenAt and the worker polls every 5s; SEND_WINDOW_RETRY_MS=15min applies only to voice 'waiting'.
-- Current behavior: With an in-window campaign the ETA is now+activeSeconds by design; outside the window it projects to the next open. Editing a window to include now wakes the parked successor. Actual first-send latency vs the ETA has not been measured.
-- Root cause: Unproven counter-claim with no timed repro. No 15-min dispatch floor exists on the SMS path.
-- Resolution: Reproduce on master/review env: (1) set a narrow future SMS window and note the ETA; (2) widen it to include now; (3) record the ETA and the actual first-send/completion timestamps. If dispatch still lags, instrument the successor's runAt vs actual execution and decide whether the ETA should add a dispatch-startup floor.
-- Look in: `app/lib/campaign-outbound-estimate.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/throughput-config.ts`, `app/lib/worker/poll-jobs.server.ts`
-- Existing tests: test/campaign-dispatch-policy.test.ts; test/campaign-outbound-estimate.test.ts
-- Missing tests: SMS ETA with a future window starts at/after the window boundary; rescheduleDispatchAfterWindowEdit pulls a parked successor to now when the window is widened; Timed integration: first-send latency within one poll interval of the ETA
-- Done when: A 3:05 window shows an ETA at/after 3:05; Widening the window to include now makes both the ETA and actual dispatch start within the poll interval; No unexplained wall-clock drift remains
-- Tracker: Needs reproduction. Fix #1375 and #1816/#1820 are on master; re-test the window-expansion scenario before scoping code. Keep paired with #1352.
-
-### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
-- Visual layout complaint that cannot be verified from code; sidebar already uses min-h-0 flex-1 overflow so a screenshot/steps on dev are required to identify the overflow.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1718](https://github.com/chester-hill-solutions/callcaster/issues/1718) contact has opted out messager should be dynamic
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Screenshot only, no repro or expected copy; generic opt-out banner is intentional per #1333 evidence. Needs the specific scenario before coding.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1671](https://github.com/chester-hill-solutions/callcaster/issues/1671) Campaign setup start and end set to 20:00:00 ? but also not adhered to at all
-- Verdict: **Needs reproduction** · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
-- A new report shows campaign date boundaries at 20:00 and says the boundaries are not enforced. This is separate from weekly calling-hours defaults, already shipped in #1590.
-- Resolution: Reproduce date-only serialization and display in the campaign timezone, then check dispatch against exact start/end instants before selecting a fix.
-- Look in: `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`, `app/lib/campaign-schedule-sync.server.ts`
-
-### [#1707](https://github.com/chester-hill-solutions/callcaster/issues/1707) Audo > Add Audio > Upload button doesn't have the on mouse hover
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- The Upload Audio submit is a standard primary Button that has hover:bg-primary/90, so the claimed missing hover cannot be confirmed from code; needs on-dev repro. May share the too-subtle-hover root cause with 1705, which the issue's investigation directive implies.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1670](https://github.com/chester-hill-solutions/callcaster/issues/1670) phone number search is too string
-- Verdict: **Needs reproduction** · Labels: ux · Assignee: none · Updated: 2026-09-08
-- Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.
-- Resolution: Compare the submitted locality with provider results and determine whether the provider supports partial matching before changing the search contract.
-- Look in: `app/components/phone-numbers/NumberPurchase.tsx`, `app/lib/number-locality.ts`
-
-### [#1666](https://github.com/chester-hill-solutions/callcaster/issues/1666) Audio uploaded shows error toast when it should be a success
-- Verdict: **Needs reproduction** · Labels: design · Assignee: none · Updated: 2026-09-08
-- A successful audio upload is reported as an error toast.
-- Resolution: Capture the action response and redirect flash, then verify the success/error discriminator. Keep independent from toast layout changes.
-- Look in: `app/routes/workspaces+/$id/audios/new.action.server.ts`, `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/lib/audio-upload.ts`
-
-### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
-- Verdict: **Needs reproduction** · Labels: none · Assignee: none · Updated: 2026-09-07
-- PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.
-- Resolution: Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.
-- Look in: `scripts/check-vendor-dist-drift.mjs`
-
-### [#1110](https://github.com/chester-hill-solutions/callcaster/issues/1110) Onboarding Rent A Number Issues
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: needs-repro · Assignee: none · Updated: 2026-08-26
-- Recommended title: **Reproduce and split the onboarding number-step defects**
+### [#1110](https://github.com/chester-hill-solutions/callcaster/issues/1110) Reproduce and split the onboarding number-step defects
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: needs-repro · Assignee: none · Updated: 2026-09-25
 - Parent for number-step issues; the body has no current defect details and children #1111/#1112/#1114 are closed.
 - Current behavior: OnboardingFirstNumberStep is a large combined flow (service address, rental, verification, routing); no component UI test exists.
 - Root cause: Cannot be determined from the open issue; needs reproduction.
@@ -1020,21 +2613,222 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Done when: Each defect recorded with steps; Unrelated defects split; Regression test per defect
 - Tracker: Reproduce and split; overlaps #1205/#1113/#1318.
 
----
+### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
+- Verdict: **Needs reproduction** · Labels: none · Assignee: none · Updated: 2026-09-25
+- PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.
+- Resolution: Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.
+- Look in: `scripts/check-vendor-dist-drift.mjs`
 
-## Needs decision — 33
-
-Product, security, or operations decision required before implementation can be scoped.
-
-### [#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725) should template tags allow for no closing bracket? the preview renderer and the parser seems to think so
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: @wra-sol · Updated: 2026-09-19
-- Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.
+### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-09-24
+- Visual layout complaint that cannot be verified from code; sidebar already uses min-h-0 flex-1 overflow so a screenshot/steps on dev are required to identify the overflow.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880) Roadmap: evaluate Jev (TypeSafe) as the IVR speech-intent service
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent**
+### [#1718](https://github.com/chester-hill-solutions/callcaster/issues/1718) contact has opted out messager should be dynamic
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-23
+- Screenshot only, no repro or expected copy; generic opt-out banner is intentional per #1333 evidence. Needs the specific scenario before coding.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1670](https://github.com/chester-hill-solutions/callcaster/issues/1670) phone number search is too strict
+- Verdict: **Needs reproduction** · Labels: ux · Assignee: none · Updated: 2026-09-23
+- Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.
+- Resolution: Compare the submitted locality with provider results and determine whether the provider supports partial matching before changing the search contract.
+- Look in: `app/components/phone-numbers/NumberPurchase.tsx`, `app/lib/number-locality.ts`
+
+### [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750) Fix the existing sign-in page hydration mismatch
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-16
+- Confirmed symptom (React #418 args=[HTML] on every /signin load per the 4-case protocol) but root cause unproven. Fastest check: the pre-hydration theme script mutating <html> vs React 19 singleton hydration (issue itself hints at the theme bootstrap).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1707](https://github.com/chester-hill-solutions/callcaster/issues/1707) Audo > Add Audio > Upload button doesn't have the on mouse hover
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
+- The Upload Audio submit is a standard primary Button that has hover:bg-primary/90, so the claimed missing hover cannot be confirmed from code; needs on-dev repro. May share the too-subtle-hover root cause with 1705, which the issue's investigation directive implies.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+---
+
+## Needs decision — 45
+
+Product, security, or operations decision required before implementation can be scoped.
+
+### [#2263](https://github.com/chester-hill-solutions/callcaster/issues/2263) Scope unknown-sender opt-out enforcement in the consent ledger rollout
+- Verdict: **Needs decision** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Unknown-sender opt-out messages are saved, but no contact flag or app phone-level suppression protects later imports and sends.
+- Current behavior: The inbound route saves the message, then updates and dequeues only matching contacts. Zero matching IDs leave no app suppression record. The original claim that the message was discarded was incorrect.
+- Root cause: ADR-0034 already adopts recipient consent and fail-closed automated sends. The unknown-sender path lacks that ledger; its rollout boundary and implementation slices need definition.
+- Resolution: Scope the unknown-sender path in the adopted consent ledger rollout under #1268. Define recipient key, normalization, future imports, every send entry point, atomic pending-send suppression, recipient START and the legacy migration boundary. An operator warning can expose the interim legacy gap but cannot replace ADR-0034 enforcement or satisfy completion.
+- Look in: `docs/adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md`, `docs/interactive-sms-delivery-plan.md`, `app/routes/api+/inbound-sms.action.server.ts`, `app/lib/inbound-sms-context.server.ts`, `app/lib/chat-sms-guards.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: Inbound tests cover known contacts; this decision has no implementation yet.
+- Missing tests: After the decision: unknown-sender opt-out followed by import and manual/campaign sends, another-workspace control and explicit opt-in.
+- Done when: Rollout boundary and slices follow ADR-0034 and the delivery plan.; Authoritative consent, enforcement points, atomic suppression and recipient START are defined.; Implementation and real prerequisites are split after scoping.
+- Tracker: Independent follow-up from #2090. Keep visible until the adopted ledger rollout is scoped; the keyword fix does not resolve it.
+
+### [#2264](https://github.com/chester-hill-solutions/callcaster/issues/2264) Define operator guidance for Advanced Opt-Out
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The saved Advanced Opt-Out request is not verified provider state. Decide how operators see the request, verification limits and Console action.
+- Current behavior: The saved flag defaults false. Console guidance appears only for requested true with a Messaging Service SID. Standard long-code provider opt-out exists by default, so a false local flag does not establish absent STOP protection.
+- Root cause: Operator guidance for requested state versus verified provider state is undefined.
+- Resolution: Choose the operator flow and any warning or justified setup blocker. Define true/false requested state, missing/present Messaging Service SID and unverified provider state. Do not label an unverified provider setting as disabled.
+- Look in: `app/lib/messaging-onboarding/normalize.server.ts`, `app/lib/database/workspace-twilio-recommendations.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.OperationalGuidancePanel.tsx`
+- Missing tests: After the decision: UI coverage for requested true/false, SID missing/present and unverified provider state.
+- Done when: Display-state meanings and operator flow are recorded.; Guidance does not imply the saved request verifies provider settings or that standard protection needs Advanced Opt-Out.; A small implementation issue with UI coverage follows the decision.
+- Tracker: Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance.
+
+### [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216) Email verification is half-wired: a verify-email route and a "verify your email" prompt both exist, but no verification email is ever sent
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
+- Email verification remains half-wired: auth has reset email callback but no verification callback/requirement; register fallback claims verification and a verify handler survives. The live issue explicitly leaves mandatory verification versus removal undecided.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Passwords are enabled and sessions issue without email verification; verification handler/message exist with no send callback. Registration can occupy an unverified email, while password reset goes to the mailbox owner.
+- Root cause: Auth configuration enables password signup and reset delivery but has no email-verification delivery or enforcement configuration. Verification handlers and a verification message remain without a configured issuance flow. Source does not establish that the feature was deliberately removed.
+- Resolution: Choose mandatory verification with delivery/resend/pending-session UX, or deliberately remove misleading verification surface. EmailVerified is a Better Auth schema field and should not be deleted blindly. Cover actual registration behavior.
+- Look in: `app/server/auth-instance.ts:21`, `app/lib/platform-auth.server.ts:195`, `app/lib/platform-auth.server.ts:347`, `app/routes/api+/auth/verify-email.action.server.ts:9`, `app/server/auth-instance.ts:22-31 (emailAndPassword: no sendVerificationEmail, no requireEmailVerification)`, `app/lib/platform-auth.server.ts:339-380 (the unreachable verify-email handler)`, `app/lib/platform-auth.server.ts:189-198 (the unreachable success branch)`, `app/routes/api+/auth/verify-email.action.server.ts:9 (a rate limit on a dead route)`, `app/db/auth-schema.ts:16 (emailVerified column, default false, never written)`
+- Missing tests: No test exercises real registration to assert verification issuance and session policy. Account-address occupancy is established; automatic account takeover by the first registrant is not, since reset goes to the actual mailbox owner.
+- Done when: A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return; No user-visible string references verification unless verification happens; The dead route and its rate limit are either live or removed; A test covers the chosen path end to end
+- Tracker: Needs decision. The issue explicitly requires Option A/B product policy and states funnel cost is unknown; do not select cheaper removal as a bug fix. Then implement/test the chosen policy. Related PR evidence: #2223, #2222. A PR reference alone does not prove deployed behavior.
+
+### [#2194](https://github.com/chester-hill-solutions/callcaster/issues/2194) Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)
+- Verdict: **Needs decision** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
+- The old survey identified 111 apparent candidates and 31 live dev owners. Dev, staging and production share the account; current ownership and deletion safety have not been established.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The 111 deletion candidates come from a dated shared-account survey. The inventory only reads Twilio resources; it does not prove that all candidates lack live dev, staging and production owners.
+- Resolution: Refresh the read-only inventory, reconcile each candidate with every environment and decide an explicit keep/delete list before Console cleanup.
+- Look in: `scripts/twilio-subaccount-inventory.mjs:24`, `scripts/twilio-subaccount-inventory.mjs:29`, `scripts/twilio-subaccount-inventory.mjs:65`
+- Missing tests: Every candidate must have an evidenced absence of live ownership; no current deletion count can be inferred from the old survey.
+- Tracker: Needs decision: a historical empty-resource count does not authorize shared-account deletion. Related PR evidence: #2193, #2195. A PR reference alone does not prove deployed behavior.
+
+### [#2046](https://github.com/chester-hill-solutions/callcaster/issues/2046) Attribute inbound SMS replies to a campaign
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
+- Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.
+- Root cause: The inbound write path knows only the contact (matched by From number); the outbound path knows its queue/campaign at dispatch. No conversation/thread link is written on the inbound row.
+- Resolution: Choose and document attribution precedence, correlation window, sender matching and ambiguity behavior. Then implement one model with STOP behavior preserved.
+- Look in: `app/routes/api+/inbound-sms.action.server.ts:178`, `app/lib/campaign-export-db.server.ts:73`, `app/routes/api+/inbound-sms.action.server.ts`, `app/lib/campaign-export.server.ts`, `app/lib/campaign-export-db.server.ts`, `app/db/schema.ts (message table)`
+- Existing tests: test/inbound-sms.route.test.ts
+- Missing tests: No source test proves single-blast attribution or deterministic ambiguous attribution.
+- Done when: Single-blast reply attributed to exactly that campaign; Export lists replies with deterministic reply_to_campaign_ids + documented precedence; STOP/opt-out dequeue unaffected; Attribution covered by a test
+- Tracker: Move to Needs decision. Choose reply attribution semantics before adding a historical heuristic as fact.
+
+### [#2029](https://github.com/chester-hill-solutions/callcaster/issues/2029) Decide the release list and the retention policy for unused dev-environment Twilio numbers
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-02
+- An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check — a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.
+- Current behavior: 76 numbers are held in the dev Twilio account; an unspecified subset is unused, and nobody can say which.
+- Root cause: Dev numbers accumulate because renting is cheap and there is no reaper. The list of what is safe to release is held in people's heads and in Slack, not in the repo or the database.
+- Resolution: Answer two questions and it becomes a 30-minute console task. (1) The release list: get Arfin's workspaces, then release every number not on the combined keep-list. (2) The safety rule, and this is the part worth writing down: what counts as 'in use'. The concrete options are (a) query the app for references — any workspace_number row not in a released state, any campaign using it as sender or caller ID, any messaging service with it attached, any caller-ID verification pending — and refuse to release a number with a live reference; (b) a time-based rule, release anything not rented in the last N days, accepting that a dormant campaign sender breaks; (c) purely manual, the operator eyeballs the console, which is what happens today and is how 76 accumulated. (a) is the only one that cannot break a workspace, and it is cheap because the reference check is a handful of queries over tables that already exist. Also decide whether dev numbers get a periodic reaper on the same rule, or whether this stays a one-off clean-up. Note the numbers in the keep-list are per-workspace, so record the mapping (number -> workspace) before releasing, otherwise the next clean-up starts from zero knowledge again.
+- Look in: `app/lib/number-rental-billing.server.ts:170-200 (existing suspend/release lifecycle and its workspace notification)`, `app/lib/platform-workspace-numbers.server.ts (the workspace_number accessor to build the reference check on)`, `app/db/workspace-scoped-tables.ts (workspace_number, campaign, workspace_audio — the tables a reference check must cover)`, `app/routes/admin+/workspaces/$workspaceId/twilio/ (the admin Twilio panels; no release action exists there today)`
+- Missing tests: no check reports which numbers in an account are referenced by a live workspace record, which is the check that would make this repeatable; no test covers a release that is refused because a reference exists; no test asserts that a released number cannot still be selected as a campaign sender
+- Done when: Arfin's keep-list is recorded in the issue, with the workspace each kept number belongs to; Every number released is confirmed to have no live workspace reference, checked by query and not by eye; The kept numbers are confirmed still working after the release run; The rule for 'in use' is written down, with the chosen option; A decision is recorded on whether the clean-up repeats on a schedule or stays a one-off
+- Tracker: Needs decision, and it is a short one. The engineering is a console exercise; what is genuinely unresolved is the safety rule, and getting that wrong breaks a dev workspace in a way nobody notices until later. If the answer is 'a reference check first', that is worth filing as its own small issue, because it makes every future clean-up safe and is more valuable than this particular release.
+
+### [#2218](https://github.com/chester-hill-solutions/callcaster/issues/2218) No recurring revenue exists: there is no plan, subscription or invoice table, and the only pay path is a one-time credit top-up
+- Verdict: **Needs decision** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- There is no plan, subscription or invoice table anywhere in the schema or in any migration. The only pay path is a one-time credit purchase with a $10 minimum (shared/pricing.ts:9) at $0.02 per credit (shared/pricing.ts:8). Half the plumbing already exists: createNewWorkspace creates a Stripe customer at provisioning (app/lib/database/workspace-provisioning.server.ts:138-145), workspace.stripe_id is stored (app/db/schema.ts:106), and a webhook is handled (app/routes/api+/stripe-webhook.action.server.ts). What is missing is the product: what a customer subscribes to, and what a lapse does.
+- Current behavior: Revenue stops when a customer's credits run out and someone tops up manually. For the revealed buyer this is a structural problem rather than a pricing one: the contact schema is political campaign outreach (voter_list_source holds elections_canada and elections_ontario at app/db/schema.ts:89; contact carries voter_id and support_level at app/db/schema.ts:285-290), and a campaign runs a season then stops. A platform funded only by usage therefore earns less the better a customer does, and no customer can budget against it.
+- Root cause: The credit ledger was built first and well — one idempotent plpgsql RPC for ledger insert plus balance update, a single shared rate card, shared idempotency-key builders per billing kind, and a reconciliation path using the same terminal-status set as the debit gate (shared/pricing.ts:84-99). That is a metered-billing foundation, and it was mistaken for a finished billing product. What is absent is the layer above it: a plan, a period, and a lapse behaviour. Note that a recurring charge already exists in everything but name — number rental bills on a cycle (app/lib/number-rental-billing.server.ts) with a suspension lifecycle (workspace_number.suspended_at, rental_warned_cycle; client/migrations/20260731160000_workspace_number_rental_lifecycle.sql). The gap is a plan that bundles that with metered usage, not the absence of recurring machinery.
+- Resolution: This is a product decision before it is an engineering task. Answer these five before writing code, because each changes the schema rather than just the checkout: (1) WHAT IS SOLD — a plan with included minutes and credits, metered overage, or a hybrid. Number rental is the natural anchor because it already recurs. (2) PERIOD — monthly, and whether annual exists. (3) LAPSE BEHAVIOUR — suspend sending at zero credits as today, or something softer; the rental lifecycle above is a working precedent for the whole workspace. (4) CREDIT SEMANTICS — whether credits become a grant that refreshes each period or remain a prepaid balance drawn down by a subscription. This is the core modelling question and it changes the ledger, not just checkout. (5) CURRENCY — CAD or USD or both; CREDIT_PRICE_CAD and formatCadFromCredits are CAD-only today (shared/pricing.ts:8,144-149). Once 1-5 are answered the schema work is a subscription table with a Stripe id, status and period, plus a plan table if plans are configurable. Everything else reuses the existing ledger, which is the asset here.
+- Look in: `shared/pricing.ts:8-10 (price per credit and minimum purchase — the whole current pay model)`, `shared/pricing.ts:84-99 (terminal billable status sets, shared by debit and reconciliation)`, `app/db/schema.ts:106 (workspace.stripe_id, currently the only billing identity on the tenant)`, `app/lib/database/workspace-provisioning.server.ts:138-145 (Stripe customer created at provisioning)`, `app/lib/number-rental-billing.server.ts (a recurring charge that already exists)`, `client/migrations/20260731160000_workspace_number_rental_lifecycle.sql (the suspension precedent for a lapse)`, `client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql (the idempotent ledger RPC the subscription would reuse)`
+- Blocked by: [#1521](https://github.com/chester-hill-solutions/callcaster/issues/1521)
+- Missing tests: The subscription write path is idempotent, consistent with how transaction_history is written today; A lapsed subscription produces a defined and tested workspace state; A refresh-period grant does not double-credit on replay (kill-check: replay the grant webhook and confirm the balance is unchanged)
+- Done when: The five questions above are answered in writing, in the repo; A subscription table exists with an idempotent write path; A lapsed subscription produces a defined, tested workspace state; Refunds and disputes are handled — #1521 is the open decision and it blocks this
+- Tracker: Needs decision, and the five questions are the deliverable, not a preamble to them. The single most consequential answer is credit semantics: if a subscription grants credits that refresh, the existing ledger's meaning changes and the reconciliation logic that shares the debit gate has to be reworked rather than extended. Do not start implementation before that is settled. This issue is blocked by #1521 (whether refunds and disputes reverse credits), which is a narrower decision about the same ledger. Sequence it AFTER the open credit-ledger defects are fixed rather than before — a subscription layered onto a ledger that drops out-of-order rows or mis-bills MMS makes those bugs more expensive and harder to attribute, and it is worth saying plainly that the ledger is currently correct by design and only its callers and schema are not.
+
+### [#2217](https://github.com/chester-hill-solutions/callcaster/issues/2217) No product analytics exists anywhere, so every product decision is an untested guess
+- Verdict: **Needs decision** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- No product analytics in the codebase. A scan of app/, shared/, services/, worker/ and server/ for PostHog, Segment, Mixpanel, Amplitude, Google Analytics, gtag and Plausible returns nothing. Sentry is wired for errors only, at 8 call sites (app/entry.server.tsx:133, app/lib/errors.server.ts:118, app/lib/ops-alert.server.ts:141, app/lib/worker/poll-jobs.server.ts:365,390, server/bun.ts:449,471,536,543,622, worker/index.ts:28). The two tables that look like usage data are not: workspace_events (app/db/schema.ts:443) is an SSE feed whose rows are deleted past a retention window by app/lib/worker/job-retention.server.ts:67-90, and workspace_audit_event (app/db/schema.ts:451) is a security log gated behind the owner-only audit.read capability.
+- Current behavior: Nothing about product usage is measurable. There is no funnel across the five steps a new workspace must pass (signup, workspace creation, first rented number, first campaign, first accepted send), no cohort or retention measure, and no acquisition attribution. The build is far wider than the revealed product — 53 tables, 542 route modules, and 90 days of commits at 355 fix against 134 feat — and nothing in the code indicates which parts anyone walks. NEW_WORKSPACE_WELCOME_CREDITS = 100 (app/lib/database/workspace-provisioning.server.ts:33) is an untested guess at whether $2 of free usage is enough to convert.
+- Root cause: Analytics was never treated as a product surface. The codebase has an unusually deliberate answer for most other concerns — tenancy is enforced by a scoped client, billing by one idempotent RPC, compliance by one shared predicate table — and each of those was a decision. Instrumentation was left to default, and the default was none. There is also no team-time argument that resolves it: adding a vendor is a privacy and data-sharing decision on a product that holds Canadian political contact data, and that decision has not been made rather than been deferred.
+- Resolution: Answer the sink question first, deliberately. Do not start by adding a vendor. A first-party event table behind the existing tenant client is more consistent with how everything else in this codebase works, costs no third-party data-sharing decision on a product holding voter and contact data, and inherits the tenancy enforcement that already exists. A vendor is faster to stand up and is the right answer if the team wants cohorts and funnels without building them. Either is defensible; picking by default is not. THEN, in order: (1) define the activation event and measure that alone — a workspace that has completed a first accepted send is the closest thing to a north-star metric this product has; (2) instrument the five-step funnel; (3) keep the data tenant-scoped and role-gated from day one, copying the audit.log model (workspace_audit_event plus the owner-only audit.read capability in app/lib/capabilities.ts:47-78), because looser access than that would be a regression in a codebase that deliberately went the other way; (4) keep the analytics client out of the session route's hot path and off check:client-bundle's denylist, sampling if volume requires it.
+- Look in: `app/db/schema.ts:443 (workspace_events — an SSE feed, not usage analytics)`, `app/db/schema.ts:451 (workspace_audit_event — a security log, the access model to copy)`, `app/lib/workspace-events.server.ts:26 (the insert path a first-party event table would mirror)`, `app/lib/capabilities.ts:47-78 (audit.read is owner-only — the model to copy)`, `app/lib/worker/job-retention.server.ts:67-90 (workspace_events rows are pruned, so it is a feed and not a record)`, `app/lib/database/workspace-provisioning.server.ts:33 (the untested welcome-credit guess)`
+- Missing tests: Each of the five funnel steps emits exactly one event, asserted per step (kill-check: break one emission and confirm the test goes red); A cohort query by activation state is reproducible from the database; Analytics routes are covered by check:route-authz and gated at least as tightly as the audit log
+- Done when: A written decision exists in the repo on the sink, stating why — vendor or first-party; The activation event is defined in writing and is queryable; The five funnel steps emit one event each, each asserted; Analytics data sits behind the same or tighter role gate than the audit log
+- Tracker: Needs decision, not fix-now, because the first task is a product and privacy choice rather than code: whether a product holding Canadian voter and contact data may send events to a third party. That choice changes the implementation substantially, so implementing before it is made risks doing the work twice. This is the largest gap between what the code does and what the business needs, and it is the reason the other open decisions in this batch are hard to answer — several of them (welcome-credit sizing, which features to keep, whether the product is one vertical or two) are product questions that measurement would settle and that currently rest on intuition. Not a duplicate of #1185, which was a narrower credit-variance cross-reference and is closed completed.
+
+### [#2164](https://github.com/chester-hill-solutions/callcaster/issues/2164) workspace.disabled does not block sign-in or API access, so the platform suspension lever does not suspend
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-28
+- Disabling a workspace stops money moving out (rental DEBITs, billing_reconcile, twilio_open_sync) but does not stop anyone using the product. `disabled` is read in only three places and no auth path reads it, so a suspended workspace's members still sign in and still use the API.
+- Current behavior: A disabled workspace can still be signed into and can still call the API with valid credentials. Number RELEASE deliberately keeps running, because freezing it would strand every unpaid number in a suspended workspace.
+- Root cause: `disabled` was specified and implemented as a billing lever only. It was never given an auth meaning, so the name implies a kill switch it does not provide. Not a missing check — a missing decision.
+- Resolution: Decide the semantics before scoping, because the two plausible answers have very different blast radius. (a) `disabled` blocks sign-in and API access, becoming a true kill switch; the warn->suspend->release ladder still runs server-side, so numbers are still released. (b) `disabled` stays billing-only and a separate field carries access suspension. Recommendation: (a), because one field with one meaning is what operators assume, and the release ladder already runs in background jobs that do not need user access. Do NOT implement by adding a single auth-path check — that would leave `disabled` still reading as billing-only everywhere else.
+- Look in: `app/lib/workspace-middleware.server.ts (workspaceContext — no disabled check)`, `app/lib/data-plane-middleware.server.ts (dataPlaneAuthContext — no disabled check)`, `app/lib/admin-middleware.server.ts (adminContext)`, `app/db/schema.ts (workspace.disabled)`
+- Existing tests: none covering disabled-workspace sign-in or API access
+- Missing tests: a disabled workspace's member cannot sign in; a disabled workspace's API token is rejected; number release still runs for a disabled workspace
+- Done when: The disabled semantics are chosen and recorded, not assumed; If (a): sign-in and API access are blocked for a disabled workspace; The warn->suspend->release ladder still releases numbers for disabled workspaces; Existing disabled-workspace billing tests stay green
+- Tracker: Needs a decision, not an implementation. Blocked only on the product call. Related to #2116, whose original single-guard proposal was already rejected in favour of splitting the billing lever from number release.
+
+### [#1699](https://github.com/chester-hill-solutions/callcaster/issues/1699) IVR script refers to the recipient as the "caller" in "caller response"
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: @sai-sy · Updated: 2026-09-27
+- Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#2139](https://github.com/chester-hill-solutions/callcaster/issues/2139) Member-level role management is server-permitted but UI-invisible, so the Member floor on updateUser/deleteUser is dead code
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text "You do not have permission to edit this user" — for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.
+- Current behavior: One side of the permission model is implemented and the other is not, and the user-visible message is on the wrong side. A test that asserts the server permits it and a UI that asserts the user cannot do it are both green, which is why this survived.
+- Resolution: Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` → `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === "owner"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th
+- Look in: `app/components/workspace/TeamMember.tsx:78,139-141`, `app/routes/workspaces+/$id/settings.action.server.ts:44-53`, `app/lib/platform-members.server.ts:53-75`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts (`assertNoRoleEscalation`, `requireActorOutranksTarget`)`, `e2e/specs/rbac.spec.ts`
+- Missing tests: The UI visibility matches the chosen policy (kill-check).; A `member` is not offered `admin`.; The e2e assertion.
+- Done when: The UI and the server agree: a `member` either sees a working manage form, or is told the truth and the server agrees (kill-check: flip one side and confirm a test goes red).; A `member` is never offered a role they cannot grant.; The sole owner still cannot be removed or demoted.; An e2e assertion covers the visibility, matching the chosen policy.
+- Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
+
+### [#2051](https://github.com/chester-hill-solutions/callcaster/issues/2051) Decide what happens to unsettled messages when a campaign expires
+- Verdict: **Needs decision** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
+- The #2048 settled-message gate is bypassed on the expired-campaign path: app/lib/worker/handlers/campaign.server.ts writes status=complete directly via updateCampaignStatusInWorkspace and never calls try_complete_campaign_if_drained. An expired message campaign can therefore read complete while Twilio still holds unsettled messages. Worse, runSmsStatusSideEffects only calls cancelQueuedMessagesForCampaign AFTER the end date has passed, so the bypass fires before the cancellation is even attempted.
+- Current behavior: Expired campaign terminalizes to 'complete' regardless of unsettled provider messages; the #2048 gate does not apply.
+- Root cause: Genuine rule conflict, not an oversight. The RPC also requires an empty queue, and this path exists so a campaign that expires mid-drain does not stay stuck 'running' (#1512). Routing it through the gate would re-break that.
+- Resolution: Decide between: (1) complete anyway and accept abandoned messages, specifying credit treatment and operator warning; (2) cancel everything still unsettled at the provider, wait, then let the normal gate complete it; (3) terminalize to a distinct status such as expired/cancelled so 'complete' always means settled, which keeps the #2048 promise intact but needs a campaign_status enum value plus UI handling. Option 3 is the one that preserves the new invariant.
+- Look in: `app/lib/worker/handlers/campaign.server.ts (expired-campaign branch of campaignDispatchHandler)`, `app/lib/worker/webhook-side-effects.server.ts (cancelQueuedMessagesForCampaign, only after end_date)`, `client/migrations/20260925120000_gate_campaign_completion_on_settled_messages.sql`
+- Missing tests: expired campaign with unsettled messages does not read complete (under the chosen rule); expired campaign with an undrained queue still terminalizes (#1512 preserved)
+- Done when: Decision recorded in the issue and in the relevant doc; Expired campaign with unsettled messages does not read complete under option 2 or 3; #1512 anti-stuck behaviour preserved; Option 1 also specifies credit treatment and an operator warning for abandoned messages; Real-Postgres test pins whichever rule is chosen
+- Tracker: DECLINED by the maintainer on 2026-09-25 ('no 2051'). Do not pick this up and do not re-raise it. The gap is real and still worth knowing about: an expired message campaign writes status=complete directly, bypassing the #2048 settled-message gate, so a campaign whose end_date passed while Twilio still held messages can read complete. It is deliberately left as-is rather than fixed, and the code carries a comment marking it a known gap so nobody mistakes it for covered. The genuine rule conflict stands: routing it through the gate would re-break #1512, because the RPC also requires an empty queue and this path exists so a campaign that expires mid-drain does not stay stuck running.
+
+### [#2043](https://github.com/chester-hill-solutions/callcaster/issues/2043) Decide how far to expand the campaign-split feature: promote it, widen its trigger, or automate the copy variation it asks for by hand
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: @sai-sy · Updated: 2026-09-25
+- This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works — SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.
+- Current behavior: A working but single-purpose warning-path tool: one entry point, one trigger condition, manual copy variation.
+- Root cause: The feature was scoped as a safeguard inside the bulk-send warning rather than as a campaign operation, so its reach and its automation were never designed.
+- Resolution: Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment — a per-segment message variant, or a merge field carrying the segment index — instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.
+- Look in: `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx (the whole feature: the alert, the sheet, the checklist, the split submit)`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:211-226 (the only render site)`, `app/lib/throughput-config.ts:102-108 (isBulkSmsSenderMisaligned: ca_local and >= 500)`, `test/ui/split-campaign-override.test.tsx (existing coverage of the override path)`, `app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment — locate it before scoping any change)`
+- Existing tests: test/ui/split-campaign-override.test.tsx (the bulk-on-local override and its acknowledgement)
+- Missing tests: the split itself is not covered end to end: no test asserts the contacts are distributed across the clones or that the clones are created with the requested segment count; no test asserts the clones are reachable and correctly scoped to the workspace; if copy variation is automated, no test asserts the variants differ per segment; no test covers a split taken while a send is in flight
+- Done when: The reporter has stated which expansion is wanted; The chosen scope is written into the issue before work starts; If the split is promoted, it is reachable outside the bulk-send warning and its trigger is documented; If copy variation is automated, the clones differ in the copy that reaches the carrier; The behaviour of a split during an in-flight send is documented
+- Tracker: Needs decision. The issue as filed is a note to a person plus a screenshot, and the three plausible readings are unrelated in size and risk. Cheapest next step is a one-line question to the reporter. If the answer is copy automation, that is a real feature worth doing and should be specced properly; if the answer is reach, it is a small change on top of existing tests.
+
+### [#2036](https://github.com/chester-hill-solutions/callcaster/issues/2036) Decide the scope of flattening the call screen: the call screen only, or the shared workspace panel every page uses
+- Verdict: **Needs decision** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-25
+- The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen — it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.
+- Current behavior: The live calling screen stacks three card treatments — the workspace panel, the sticky top bar, and inner section cards — and the invisible ones still cost padding.
+- Root cause: The workspace panel treatment is a single shared className with no per-surface override, and the top bar re-states rounded/border/shadow locally. Two owners for the same visual concept, so the call screen cannot opt out.
+- Resolution: Decide the scope, then it is a small edit either way. Option A (call screen only): add an isCallScreen branch next to the existing isChatsScreen branch at app/routes/workspaces+/$id.tsx:204-207 that drops rounded-2xl, border and shadow-sm and reduces p-6 for the call route, and flatten the sticky header at CallScreen.Header.tsx:239. Nothing else on the product changes; the risk is that the call screen now looks different from every page beside it. Option B (whole product): flatten the shared panel for all workspace routes, so the page is a flat canvas and cards mean something when they appear. Bigger visual diff, needs a pass over every workspace page to check what depended on the panel's padding, but it is the version that actually establishes 'a card is a deliberate container'. Option C (middle): keep the panel as-is and change the top bar only, which fixes the half the reporter named twice but leaves the outer card. Whichever is chosen, express it as a variant on the panel rather than a route-conditional className string, so the next surface can opt out without editing a ternary. Also decide the padding: the reporter asks to 'punch back' the padding the invisible cards were creating, which means auditing the space-* classes between the panel and the first inner card as part of the change, not just deleting rounded and shadow.
+- Look in: `app/components/call/CallScreen.Header.tsx:239 (the sticky top bar: rounded-xl, border, shadow-sm, backdrop-blur)`, `app/routes/workspaces+/$id.tsx:202-208 (the shared workspace panel, with the isChatsScreen branch as the pattern for a call-screen branch)`, `app/components/call/CallScreen.Layout.tsx:191 (the call screen's own space-y-6, the padding the invisible cards create)`, `app/components/call/CallScreen.Coaching.tsx:53,73 and CallScreen.DTMFPhone.tsx:22 (inner cards, which the issue says to keep)`
+- Existing tests: test/ui/call-screen-header.test.tsx (CampaignHeader only); test/ui/call-screen-callarea.test.tsx, call-screen-queuelist.test.tsx (inner cards)
+- Missing tests: no test asserts the call screen's panel treatment, so a regression to the nested-card look passes silently; no visual or class-level test would catch a re-introduced rounded/shadow on the top bar
+- Done when: The chosen scope is written down, and the panel treatment is a named variant rather than a route-conditional className string; The named surfaces (outer card, top bar) have no curved edges or drop shadow; The padding the removed cards were creating is punched back, verified by measuring the gap at the top of the call screen; Inner section cards keep their treatment — they are the containers that should still read as cards; No other workspace page changed unintentionally, or changed deliberately and listed
+- Tracker: Needs decision, briefly, then fix. The implementation is an hour either way; what is unresolved is whether this is a call-screen change or a product-wide one, and picking wrong means either an inconsistent product or an unreviewable visual diff across every page. The reporter's phrasing ('the call screen has the page, an outer card, and inner cards') reads as a call-screen complaint, which points to Option A, but the outer card is shared and the reporter may not know that. Answer that one question and this becomes a fix-now.
+
+### [#1996](https://github.com/chester-hill-solutions/callcaster/issues/1996) Decide whether a daily full PII snapshot ships, into which bucket, with what retention and who can restore it
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Canonical for the daily backup work; #1773 was folded in here as a duplicate. The code half is fully mapped and none of it is built, so the engineering risk is low and the open questions are product and data-protection ones. Every integration point the issue names exists: the job type constant file (app/lib/worker/job-types.server.ts), the params and registry (app/lib/worker/job-params.server.ts, app/lib/worker/handlers.server.ts), the cron handler pattern (app/lib/worker/handlers/cron.server.ts) with withReschedule from handlers/shared.server.ts, the per-workspace error isolation fanout (app/lib/cron-workspace-fanout.server.ts), the CSV serializer (app/lib/rpc-csv.server.ts rowsToCsv, app/lib/csv.ts escapeCsvCell), and the object-storage bucket union (app/lib/object-storage.server.ts ObjectStorageBucket, which today has no 'backups' member). ONE FACTUAL DRIFT to correct in the issue: it says 27 tenant tables and AGENTS.md says 26; WORKSPACE_SCOPED_TABLES in app/db/workspace-scoped-tables.ts currently has 28. Enumerate the table list from the constant rather than from either number, so the snapshot cannot silently miss a table. The unresolved decisions are below.
+- Current behavior: No scheduled backup exists. A workspace's data exists only in the live database.
+- Root cause: The backup system was never ported; the gocanvass blueprint it copies is described in the issue and nothing in CallCaster implements it.
+- Resolution: Answer the four questions, then implement. (1) What is in the snapshot: the issue proposes every tenant table, which includes contact PII (names, phones, emails, street addresses) and the full billing ledger. Options: everything (maximum recoverability, maximum exposure), or contacts and the ledger excluded (a schema-and-reference backup that cannot restore customer records), or a middle option that includes contact identifiers without free-text fields. This is the decision that has to be made by someone accountable for the data, not by the implementer. (2) Where it lands: a dedicated backups bucket with its own retention, or the existing S3_BUCKET under a backups/ prefix. A dedicated bucket is the better answer on isolation grounds and the issue already designs for it; the prefix is cheaper and needs no new env var. Pick one and say why, because the object-storage bucket union has to grow either way. (3) Retention and deletion: BACKUP_RETENTION_DAYS defaults to 30 and pruning deletes objects. Confirm the default and confirm the retention is long enough to be useful for the incident it is insurance against. (4) Who can restore: the issue explicitly puts restore tooling out of scope, which means the snapshots are written and never read. Decide whether that is acceptable as phase one, or whether a restore runbook is part of the deliverable — an unread backup is a liability, since it is a full copy of customer data with no access control beyond the bucket. Once those are answered the implementation is the issue's own step list: job type and registry entry, daily dedupe via an idempotency key of backups:<YYYY-MM-DD> (or a self-scheduling chain seeded by ensure-scheduled-jobs), per-workspace fanout so one failure does not error the job, one CSV per table from createTenantDb over the 28 tables, a manifest.json, and a prune pass over the date segments.
+- Look in: `app/db/workspace-scoped-tables.ts:41-95 (WORKSPACE_SCOPED_TABLES — 28 tables today, the single source of truth for the snapshot list)`, `app/lib/object-storage.server.ts:8-13 (ObjectStorageBucket, no backups member) and :57-62 (BUCKET_ENV_VARS)`, `app/lib/worker/job-types.server.ts, app/lib/worker/job-params.server.ts:206-222, app/lib/worker/handlers.server.ts:89-178 (job type, params, registry)`, `app/lib/worker/handlers/cron.server.ts:176-230 (handler pattern) and app/lib/worker/handlers/shared.server.ts:19-42 (withReschedule)`, `app/lib/cron-workspace-fanout.server.ts:42-89 (per-workspace error isolation)`, `app/lib/rpc-csv.server.ts and app/lib/csv.ts:55-75 (rowsToCsv, escapeCsvCell)`, `~/Documents/gocanvass/app/server/backup-schedule.server.ts and workspace-csv-backup.server.ts (the blueprint being ported)`
+- Existing tests: test/job-registry.test.ts (guards registry drift — a new job type must be registered here); test/worker-cron-handlers.server.test.ts (the pattern for handler tests); test/call-recording-storage.server.test.ts and test/object-storage-upsert.test.ts (the pattern for storage-adapter tests)
+- Missing tests: no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES — a new tenant table would silently not be backed up; no test asserts the daily dedupe key prevents a second run on the same UTC day; no test asserts that one workspace failing does not error the whole job; no test asserts the manifest is written and lists the files it claims to; no test asserts pruning removes date keys older than the retention and leaves newer ones, including a partial run's directory; no test asserts a resumed or retried run is idempotent; no test asserts retention configuration is validated (a zero or negative BACKUP_RETENTION_DAYS must fail closed, not delete everything)
+- Done when: The four decisions above are answered and recorded in the issue; A workspace gets a dated snapshot in object storage at most once per UTC day; The snapshot list is generated from WORKSPACE_SCOPED_TABLES, and a test fails when a tenant table is added without being handled; Per-workspace failures are isolated and reported, and any failure errors the job; A manifest lists what was written, and pruning removes only date keys older than the configured retention; An invalid retention configuration fails closed; The access and deletion story for the snapshot bucket is documented alongside whatever restore path is decided
+- Tracker: Needs decision before implementation, then it is well-specified work. The engineering is a known pattern in this repo, but shipping a daily full copy of customer PII with a 30-day retention, no access story and no restore path is a decision with an owner, not an implementation detail. Ask the four questions in one go; do not start by writing the job handler, because the answers change which tables the handler walks and where it writes.
+
+### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts and charges should include tax
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.
+- Current behavior: Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.
+- Resolution: Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`, `shared/pricing.ts`
+- Done when: No implementation until the tax decision is recorded
+
+### [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880) Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Roadmap investigation to replace the vx-any catch-all with structured intent routing via Jev's Choice primitive. Open questions: round-trip latency, per-call/step cost, service boundary, transcript-only vs audio input, EN/FR calibration, failure mode, confidence threshold. Its answer decides #1862 and the deferred confidence slice of #1875.
 - Current behavior: vx-any matches any speech longer than 2 characters; no intent classification and no confidence. #1875 slice B stores { value, raw, inputType } only; language defaults en-US.
 - Root cause: No intent-classification layer exists; the choice is between a calibrated service and a local normalizer/matcher.
@@ -1044,25 +2838,8 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Latency, cost, bilingual calibration, and failure-mode answers recorded; A decision: adopt Jev or hand-roll, with a named service boundary; #1862 and the #1875 confidence slice unblocked or closed accordingly
 - Tracker: needs-decision/roadmap spike. Keep vx-any as-is until answered; its outcome decides #1862.
 
-### [#1705](https://github.com/chester-hill-solutions/callcaster/issues/1705) Primary button hover darkening isn't strong enough. should be a bit darker
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-18
-- Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1814](https://github.com/chester-hill-solutions/callcaster/issues/1814) agent is referencing M4A bug on an issue that isn't talking about it and was already marked "tested-on-dev"
-- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-09-18
-- Recommended title: **Decide agent verbosity when quoting resolved sibling issues**
-- Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity — referencing a resolved fix on a non-matching context reads as noise.
-- Current behavior: Issue comments may restate resolved fixes from sibling issues; #1325's record (verify-close) already points at #1731 and #1730.
-- Root cause: None in code — comment placement/copy discipline for agents.
-- Resolution: Decide the agent guideline: do not re-post resolution snippets from another issue's thread; prefer a one-line pointer and check whether the issue is already marked tested/on-dev before commenting.
-- Done when: Issue comments avoid restating resolved sibling fixes; Agent checks issue state/labels before commenting
-- Tracker: Process decision; overlaps #1813 (on-dev marking) and the agent-skills guidance.
-
-### [#1858](https://github.com/chester-hill-solutions/callcaster/issues/1858) IVR Script Builder Options
-- Verdict: **Needs decision** · Size: XL · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
-- Recommended title: **Unify IVR and live script blocks and define prompt, multi-select, input, and end-call semantics**
+### [#1858](https://github.com/chester-hill-solutions/callcaster/issues/1858) Unify IVR and live script blocks and define prompt, multi-select, input, and end-call semantics
+- Verdict: **Needs decision** · Size: XL · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - Umbrella request to align the IVR script model with the live-call script model and add block kinds: prompt-only, multi-select with an explicit 'do nothing' default, free input with a stop key, end-call options, and a per-block default go-to.
 - Current behavior: IVR scripts use IvrBlock; live scripts use a separate instruction/multi-select model. There is no prompt-only block, no stop-key input block, no end-call block, and no general per-block default destination beyond noInput.
 - Root cause: Two parallel script models and undefined block semantics.
@@ -1073,21 +2850,8 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Product decision recorded for the unified block model and defaults; Blocks split into ticket-sized units before implementation; Prompt, multi-select, input, and end-call semantics specified with a default do-nothing path
 - Tracker: Decision first, then split. Related: #1862, #1741. #1856 and #1841 are already fixed on dev and should not be re-done.
 
-### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) IVR simple vs complex should be a script-side concern, not a campaign type choice
-- Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-18
-- Recommended title: **change(ivr): make simple/complex a script property, not a campaign type**
-- Campaign setup offers Simple IVR vs Complex IVR, but the runtime treats both identically; complexity belongs to the script (one page vs menus).
-- Current behavior: CampaignBasicInfo.SelectType exposes simple_ivr/complex_ivr; dispatch/execution treat them the same.
-- Root cause: Design decision.
-- Resolution: Decide: single IVR option at campaign setup; campaign_type simple_ivr/complex_ivr kept for existing rows and possibly derived from the script.
-- Look in: `app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx`, `app/lib/campaign-execution.server.ts`, `app/db/schema.ts`
-- Existing tests: test/ui/campaign-* type selection
-- Done when: campaign setup asks IVR once; no behavioural difference to lose
-- Tracker: Product decision first; storage/UI change after.
-
-### [#1852](https://github.com/chester-hill-solutions/callcaster/issues/1852) cleanup .env
-- Verdict: **Needs decision** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-18
-- Recommended title: **cleanup .env: document Twilio env vars and define config-as-code vs layered secrets**
+### [#1852](https://github.com/chester-hill-solutions/callcaster/issues/1852) cleanup .env: document Twilio env vars and define config-as-code vs layered secrets
+- Verdict: **Needs decision** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Audit and rationalize environment variables. Both TWILIO_APP_SID and TWILIO_AUTH_TOKEN in .env.example are used, but there is no documented policy for config-as-code vs secrets and no layered secret resolution.
 - Current behavior: TWILIO_APP_SID is the TwiML App SID for Voice SDK outbound and is auto-assigned per non-protected environment; TWILIO_AUTH_TOKEN is used for REST calls. Some paths use TWILIO_API_KEY/TWILIO_API_SECRET. No ENVIRONMENT singleton and no .secrets/env.<environment> layering.
 - Root cause: No documented owner/purpose per variable and no agreed boundary between config and secrets.
@@ -1098,9 +2862,8 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Every env var has a documented purpose and secret/config classification; Unused or duplicated variables removed; Secret precedence defined and easy to swap to a secrets manager; Non-sensitive config handled as config, not env values
 - Tracker: Decision (secrets/config policy) before edits. Coordinate with #1329. Do not touch the user's live .env.
 
-### [#1848](https://github.com/chester-hill-solutions/callcaster/issues/1848) call list mapping
-- Verdict: **Needs decision** · Size: S · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-18
-- Recommended title: **Decide the default mapping when a full-name and a last-name column both exist**
+### [#1848](https://github.com/chester-hill-solutions/callcaster/issues/1848) Decide the default mapping when a full-name and a last-name column both exist
+- Verdict: **Needs decision** · Size: S · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-25
 - Suggestion to auto-map a full-name column to firstname instead of name when a separate populated surname column exists, so the pair is not blocked by the ambiguous-name rule. The reporter is unsure the heuristic is worth the overhead.
 - Current behavior: suggestContactImportMapping maps a 'Name' header to 'name' and a 'Last name' header to 'surname'; validateContactImportMapping then raises a blocking ambiguous-name issue.
 - Root cause: Auto-mapping has no cross-column heuristic; a full-name column and component-name columns cannot coexist because ambiguous-name is blocking.
@@ -1111,9 +2874,8 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Decision recorded on whether to add the heuristic; If added, a Name column plus a Last name column with data maps to First name + Last name and is not blocking; Name-only files keep name splitting
 - Tracker: needs-decision: the reporter questions the overhead; confirm the heuristic is wanted before implementing.
 
-### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) MFA is turned off?
-- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **Decide TWO_FACTOR_ENABLED kill-switch state per environment**
+### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) Decide TWO_FACTOR_ENABLED kill-switch state per environment
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-25
 - Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.
 - Current behavior: Better Auth twoFactor plugin is not registered; no code prompt at sign-in for enrolled users. Enrollment rows are kept (two-factor.server.ts:59) so setting the flag turns it all back on.
 - Root cause: None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.
@@ -1123,16 +2885,144 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
 - Tracker: Keeps blocking #1316 until the state is decided.
 
-### [#1813](https://github.com/chester-hill-solutions/callcaster/issues/1813) issues should be marked on-dev when commits are merged into dev.
-- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **Finish the on-dev Status config: mint PROJECT_TOKEN**
-- Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.
-- Current behavior: issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.
-- Root cause: None — automation now exists and is Status-first; the token secret is the sole unconfigured input.
-- Resolution: Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.
-- Look in: `.github/workflows/issue-on-dev.yml`
-- Done when: A dev-merge PR auto-moves its referenced issues to the 'On dev' Status; No on-dev label is applied anywhere (Status is the only signal)
-- Tracker: Ops/config: only PROJECT_TOKEN remains; overlaps #1697/#1686.
+### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) feature(ivr): preview Speak (TTS) steps in the script editor
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
+- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
+- Root cause: Feature gap.
+- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
+- Missing tests: preview plays selected voice text; membership enforced
+- Done when: Speak step previews audibly; voice matches the block; workspace-gated
+- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
+
+### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) feature(audience): client-side preview + column-mapping step (gocanvass parity)
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
+- Current behavior: AudienceUploader is fire-and-forget: server parses + validates, job starts.
+- Root cause: UX gap vs gocanvass's import wizard.
+- Resolution: Wizard: file -> preview/map -> start; browser-safe CSV parser; reuse shared/contact-import-headers types.
+- Look in: `app/components/audience/AudienceUploader.tsx`, `app/lib/csv.ts`, `shared/contact-import-headers.ts`, `app/routes/api+/audience-upload.action.server.ts`
+- Existing tests: test/ui/audience-uploader.test.tsx
+- Missing tests: preview renders parsed headers/rows; mapping submitted with upload
+- Done when: parsed preview before start; columns mappable; server validation still gates
+- Tracker: Scope with #1771 (can ship together or split).
+
+### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) change(ivr): make simple/complex a script property, not a campaign type
+- Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Campaign setup offers Simple IVR vs Complex IVR, but the runtime treats both identically; complexity belongs to the script (one page vs menus).
+- Current behavior: CampaignBasicInfo.SelectType exposes simple_ivr/complex_ivr; dispatch/execution treat them the same.
+- Root cause: Design decision.
+- Resolution: Decide: single IVR option at campaign setup; campaign_type simple_ivr/complex_ivr kept for existing rows and possibly derived from the script.
+- Look in: `app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx`, `app/lib/campaign-execution.server.ts`, `app/db/schema.ts`
+- Existing tests: test/ui/campaign-* type selection
+- Done when: campaign setup asks IVR once; no behavioural difference to lose
+- Tracker: Product decision first; storage/UI change after.
+
+### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) Robocall vs IVR vs Automated Phone Menu — terminology consistency
+- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-25
+- Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.
+- Current behavior: Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.
+- Resolution: Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.
+- Look in: `app/components/campaign/settings/CampaignLaunch.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx`, `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`
+- Done when: One customer-facing term; API values unaffected
+
+### [#1345](https://github.com/chester-hill-solutions/callcaster/issues/1345) Decide and add a CHS-managed toll-free SMS verification path
+- Verdict: **Needs decision** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
+- Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.
+- Current behavior: Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.
+- Root cause: No managed-sponsorship model; CHS BN must not be stored as customer identity.
+- Resolution: Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/twilio-toll-free-provision.server.ts`
+- Existing tests: test/ui/onboarding-goal-step.test.tsx
+- Missing tests: managed-service request path (once approved)
+- Done when: Compliance approves/rejects sponsorship; Users without BN can request support; CHS BN not stored as customer identity
+- Tracker: Blocked on product/compliance decision; issue title says 'calls' but scope is SMS.
+
+### [#1320](https://github.com/chester-hill-solutions/callcaster/issues/1320) ops(twilio): migrate one CHS number with callback and database reconciliation
+- Verdict: **Needs decision** · Size: S-M · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-25
+- Transfer a Twilio number from the old CHS workspace to the new one. This is an operational migration (Twilio-side), not a product feature; no number-transfer action exists.
+- Current behavior: Settings support routing/release/purchase/caller-id only; no transfer workflow.
+- Root cause: Not a product gap; one-off infra task.
+- Resolution: Run a one-off runbook: confirm ownership, transfer in Twilio, insert/update destination workspace row, repoint callbacks/messaging service, verify inbound/outbound, remove old row, record rollback + evidence.
+- Look in: `app/routes/workspaces+/$id/settings/numbers.action.server.ts`, `app/lib/platform-workspace-numbers.server.ts`
+- Blocked by: [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329)
+- Existing tests: n/a — operational
+- Missing tests: before/after evidence, rollback steps
+- Done when: Ownership confirmed before transfer; Voice/SMS/callbacks work in new workspace; Single owner after migration
+- Tracker: Ops task with rollback plan; may depend on #1329 account ownership.
+
+### [#1129](https://github.com/chester-hill-solutions/callcaster/issues/1129) Define campaign draft/publish semantics and block dirty setup navigation
+- Verdict: **Needs decision** · Size: L · Risk: high · Labels: ux, needs-repro · Assignee: none · Updated: 2026-09-25
+- Campaign edits offer Reset/Save and the launch rail blocks dirty navigation, but there is no save-as-draft vs publish split and no disabled Next while dirty.
+- Current behavior: SaveBar Reset + Save Changes writes the row; footer Next always active; no persisted draft-vs-published revision model.
+- Root cause: Draft/published semantics undefined; needs-repro against current UI per maintainer.
+- Resolution: Decide semantics first (what 'Save as draft' vs 'Save and publish' change), then implement discard/draft/publish and disable footer Next while dirty. Surface existing drafts when a published version exists.
+- Look in: `app/components/campaign/settings/CampaignSettings.tsx`, `app/components/shared/SaveBar.tsx`, `app/components/campaign/home/CampaignShellDirty.tsx`, `app/components/campaign/settings/useCampaignSettingsController.ts`
+- Existing tests: SaveBar generic tests
+- Missing tests: footer navigation while dirty; published/draft version semantics
+- Done when: Product rules define draft/publish; Discard restores persisted version; Next blocked while dirty
+- Tracker: Decision + needs-repro confirmation before scoping.
+
+### [#1657](https://github.com/chester-hill-solutions/callcaster/issues/1657) Admin Twilio portal page is overwhelming — group into sections/tabs
+- Verdict: **Needs decision** · Labels: none · Assignee: none · Updated: 2026-09-25
+- The admin Twilio page needs grouping. The issue explicitly requests confirmation of panel priorities before implementation.
+- Resolution: Confirm the default tab and grouping, then ship a presentation-only PR.
+- Look in: `app/routes/admin+/workspaces/$workspaceId/twilio`
+
+### [#1659](https://github.com/chester-hill-solutions/callcaster/issues/1659) Admin: Twilio cost breakdown per workspace/account
+- Verdict: **Needs decision** · Labels: none · Assignee: none · Updated: 2026-09-25
+- Twilio cost breakdown could mean workspace ranking, more detail within one workspace, or both.
+- Resolution: Confirm the intended view before implementation. Reuse existing usage projection.
+- Look in: `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.UsagePanel.tsx`
+
+### [#1521](https://github.com/chester-hill-solutions/callcaster/issues/1521) decision(billing): should Stripe refunds/disputes reverse credits?
+- Verdict: **Needs decision** · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- Refunds and disputes do not reverse credits under the current documented billing scope.
+- Resolution: Choose automatic reversal or an explicit manual policy before changing ledger behavior.
+- Look in: `app/routes/api+/stripe-webhook.action.server.ts`, `docs/billing-source-of-truth.md`
+
+### [#1722](https://github.com/chester-hill-solutions/callcaster/issues/1722) What does "kick off" on campaign launch pane do
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- 'Kick off' button (running/paused) has no explanation and Sai 2026-09-09 confirms confusion; product decides label/tooltip/placement.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355) Rename the Railway staging environment to "qa" (still tracking master)
+- **IN PROGRESS** · Verdict: **Needs decision** · Labels: devops/admin · Assignee: @sai-sy, @wra-sol · Updated: 2026-09-25
+- The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.
+- Resolution: Verify a safe in-place rename before changing IaC. Do not recreate the environment.
+- Look in: `.railway/environments/staging.ts`
+
+### [#1763](https://github.com/chester-hill-solutions/callcaster/issues/1763) "Number" onboarding sub breadcrumbs don't work
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: @sai-sy · Updated: 2026-09-24
+- Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1705](https://github.com/chester-hill-solutions/callcaster/issues/1705) Primary button hover darkening isn't strong enough. should be a bit darker
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: @sai-sy · Updated: 2026-09-24
+- Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725) should template tags allow for no closing bracket? the preview renderer and the parser seems to think so
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: @wra-sol · Updated: 2026-09-23
+- Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1717](https://github.com/chester-hill-solutions/callcaster/issues/1717) Page not found should take you to workspace not home
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-23
+- 404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1700](https://github.com/chester-hill-solutions/callcaster/issues/1700) Why have a distinction between recording step and spoken step if you can also change "Speak text" to "play a recording"
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-23
+- Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789) Voice campaign exports calculate credits with the retired one-credit-per-minute rate
 - Verdict: **Needs decision** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
@@ -1146,61 +3036,6 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Define actual ledger debits versus estimated credits.; Label an estimate clearly, or source actual debits from the ledger.
 - Tracker: Keep this contract decision open. Do not repeat the rate calculation fix from PR #1798.
 
-### [#1773](https://github.com/chester-hill-solutions/callcaster/issues/1773) Daily lossless data backup per workspace (CSV snapshots + manifest + retention)
-- Verdict: **Needs decision** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
-- Recommended title: **feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention**
-- No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.
-- Current behavior: No daily data backup exists; worker only does job-row retention.
-- Root cause: Gap — no snapshot job.
-- Resolution: Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.
-- Look in: `app/lib/worker/handlers.server.ts`, `app/lib/object-storage.server.ts`, `app/db/workspace-scoped-tables.ts`, `app/lib/env.server.ts`
-- Missing tests: daily snapshot + manifest appear; retention pruned; one failing workspace does not stop others
-- Done when: per-workspace snapshot + manifest daily; older-than-retention pruned; failure isolation + errored job; restore documented
-- Tracker: Phase-1: core tables; document coverage in the manifest format.
-
-### [#1771](https://github.com/chester-hill-solutions/callcaster/issues/1771) Audience import: per-row error report + retain the original CSV artifact
-- Verdict: **Needs decision** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
-- Recommended title: **feature(audience): per-row import error report + original CSV artifact**
-- Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.
-- Current behavior: Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.
-- Root cause: No per-row capture or artifact retention, unlike gocanvass.
-- Resolution: Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.
-- Look in: `app/lib/audience-upload-process.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/object-storage.server.ts`
-- Missing tests: per-row errors persisted + listed; original retained under workspace prefix
-- Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
-- Tracker: Co-ordinate with #1770.
-
-### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) Audience CSV import: client-side preview + column-mapping step (gocanvass parity)
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
-- Recommended title: **feature(audience): client-side preview + column-mapping step (gocanvass parity)**
-- Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
-- Current behavior: AudienceUploader is fire-and-forget: server parses + validates, job starts.
-- Root cause: UX gap vs gocanvass's import wizard.
-- Resolution: Wizard: file -> preview/map -> start; browser-safe CSV parser; reuse shared/contact-import-headers types.
-- Look in: `app/components/audience/AudienceUploader.tsx`, `app/lib/csv.ts`, `shared/contact-import-headers.ts`, `app/routes/api+/audience-upload.action.server.ts`
-- Existing tests: test/ui/audience-uploader.test.tsx
-- Missing tests: preview renders parsed headers/rows; mapping submitted with upload
-- Done when: parsed preview before start; columns mappable; server validation still gates
-- Tracker: Scope with #1771 (can ship together or split).
-
-### [#1763](https://github.com/chester-hill-solutions/callcaster/issues/1763) "Number" onboarding sub breadcrumbs don't work
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-11
-- Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) IVR script editor: preview Speak (TTS) steps
-- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
-- Recommended title: **feature(ivr): preview Speak (TTS) steps in the script editor**
-- Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.
-- Current behavior: No TTS preview endpoint; text+voice only materialise when Twilio runs the call.
-- Root cause: Feature gap.
-- Resolution: Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/tts-voices.ts`, `app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts`
-- Missing tests: preview plays selected voice text; membership enforced
-- Done when: Speak step previews audibly; voice matches the block; workspace-gated
-- Tracker: Confirm provider (Polly vs ElevenLabs) then implement.
-
 ### [#1729](https://github.com/chester-hill-solutions/callcaster/issues/1729) Auto selected disposition
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
 - Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).
@@ -1210,12 +3045,6 @@ Product, security, or operations decision required before implementation can be 
 ### [#1732](https://github.com/chester-hill-solutions/callcaster/issues/1732) Campaign queue statuses
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
 - Umbrella queue status-model redesign (completion vs outreach status; missing opted-out/dialing/failed states). Big product decision; 1720 is a subset.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1722](https://github.com/chester-hill-solutions/callcaster/issues/1722) What does "kick off" on campaign launch pane do
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- 'Kick off' button (running/paused) has no explanation and Sai 2026-09-09 confirms confusion; product decides label/tooltip/placement.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
@@ -1231,12 +3060,6 @@ Product, security, or operations decision required before implementation can be 
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1717](https://github.com/chester-hill-solutions/callcaster/issues/1717) Page not found should take you to workspace not home
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- 404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
 ### [#1710](https://github.com/chester-hill-solutions/callcaster/issues/1710) Should surveys be separate from scripts instead of integrated?
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
 - Architecture question whether surveys should merge into scripts. Surveys exist as a separate module with public & workspace routes; consolidation scope needs a decision.
@@ -1249,129 +3072,201 @@ Product, security, or operations decision required before implementation can be 
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1700](https://github.com/chester-hill-solutions/callcaster/issues/1700) Why have a distinction between recording step and spoken step if you can also change "Speak text" to "play a recording"
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1699](https://github.com/chester-hill-solutions/callcaster/issues/1699) IVR script refers to the recipient as the "caller" in "caller response"
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1659](https://github.com/chester-hill-solutions/callcaster/issues/1659) Admin: Twilio cost breakdown per workspace/account
-- Verdict: **Needs decision** · Labels: none · Assignee: none · Updated: 2026-09-08
-- Twilio cost breakdown could mean workspace ranking, more detail within one workspace, or both.
-- Resolution: Confirm the intended view before implementation. Reuse existing usage projection.
-- Look in: `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.UsagePanel.tsx`
-
-### [#1657](https://github.com/chester-hill-solutions/callcaster/issues/1657) Admin Twilio portal page is overwhelming — group into sections/tabs
-- Verdict: **Needs decision** · Labels: none · Assignee: none · Updated: 2026-09-08
-- The admin Twilio page needs grouping. The issue explicitly requests confirmation of panel priorities before implementation.
-- Resolution: Confirm the default tab and grouping, then ship a presentation-only PR.
-- Look in: `app/routes/admin+/workspaces/$workspaceId/twilio`
-
-### [#1521](https://github.com/chester-hill-solutions/callcaster/issues/1521) decision(billing): should Stripe refunds/disputes reverse credits?
-- Verdict: **Needs decision** · Labels: business-logic · Assignee: none · Updated: 2026-09-03
-- Refunds and disputes do not reverse credits under the current documented billing scope.
-- Resolution: Choose automatic reversal or an explicit manual policy before changing ledger behavior.
-- Look in: `app/routes/api+/stripe-webhook.action.server.ts`, `docs/billing-source-of-truth.md`
-
-### [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355) Rename the Railway staging environment to "qa" (still tracking master)
-- Verdict: **Needs decision** · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-08-31
-- The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.
-- Resolution: Verify a safe in-place rename before changing IaC. Do not recreate the environment.
-- Look in: `.railway/environments/staging.ts`
-
-### [#1345](https://github.com/chester-hill-solutions/callcaster/issues/1345) Use CHS BN for Toll-Free calls?
-- Verdict: **Needs decision** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-26
-- Recommended title: **Decide and add a CHS-managed toll-free SMS verification path**
-- Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.
-- Current behavior: Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.
-- Root cause: No managed-sponsorship model; CHS BN must not be stored as customer identity.
-- Resolution: Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/twilio-toll-free-provision.server.ts`
-- Existing tests: test/ui/onboarding-goal-step.test.tsx
-- Missing tests: managed-service request path (once approved)
-- Done when: Compliance approves/rejects sponsorship; Users without BN can request support; CHS BN not stored as customer identity
-- Tracker: Blocked on product/compliance decision; issue title says 'calls' but scope is SMS.
-
-### [#1129](https://github.com/chester-hill-solutions/callcaster/issues/1129) Options for campaign changes should be discard, save as draft, save as publish, with the next button unavailable if changes to be actioned
-- Verdict: **Needs decision** · Size: L · Risk: high · Labels: ux, needs-repro · Assignee: none · Updated: 2026-08-26
-- Recommended title: **Define campaign draft/publish semantics and block dirty setup navigation**
-- Campaign edits offer Reset/Save and the launch rail blocks dirty navigation, but there is no save-as-draft vs publish split and no disabled Next while dirty.
-- Current behavior: SaveBar Reset + Save Changes writes the row; footer Next always active; no persisted draft-vs-published revision model.
-- Root cause: Draft/published semantics undefined; needs-repro against current UI per maintainer.
-- Resolution: Decide semantics first (what 'Save as draft' vs 'Save and publish' change), then implement discard/draft/publish and disable footer Next while dirty. Surface existing drafts when a published version exists.
-- Look in: `app/components/campaign/settings/CampaignSettings.tsx`, `app/components/shared/SaveBar.tsx`, `app/components/campaign/home/CampaignShellDirty.tsx`, `app/components/campaign/settings/useCampaignSettingsController.ts`
-- Existing tests: SaveBar generic tests
-- Missing tests: footer navigation while dirty; published/draft version semantics
-- Done when: Product rules define draft/publish; Discard restores persisted version; Next blocked while dirty
-- Tracker: Decision + needs-repro confirmation before scoping.
-
-### [#1320](https://github.com/chester-hill-solutions/callcaster/issues/1320) Transfer phone number from old CHS workspace to new CHS workspace if possible
-- Verdict: **Needs decision** · Size: S-M · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-08-25
-- Recommended title: **ops(twilio): migrate one CHS number with callback and database reconciliation**
-- Transfer a Twilio number from the old CHS workspace to the new one. This is an operational migration (Twilio-side), not a product feature; no number-transfer action exists.
-- Current behavior: Settings support routing/release/purchase/caller-id only; no transfer workflow.
-- Root cause: Not a product gap; one-off infra task.
-- Resolution: Run a one-off runbook: confirm ownership, transfer in Twilio, insert/update destination workspace row, repoint callbacks/messaging service, verify inbound/outbound, remove old row, record rollback + evidence.
-- Look in: `app/routes/workspaces+/$id/settings/numbers.action.server.ts`, `app/lib/platform-workspace-numbers.server.ts`
-- Blocked by: [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329)
-- Existing tests: n/a — operational
-- Missing tests: before/after evidence, rollback steps
-- Done when: Ownership confirmed before transfer; Voice/SMS/callbacks work in new workspace; Single owner after migration
-- Tracker: Ops task with rollback plan; may depend on #1329 account ownership.
-
 ---
 
-## Blocked / split first — 23
+## Blocked / split first — 44
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
-### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
-- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
-- Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).
-- Current behavior: scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).
-- Root cause: Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.
-- Resolution: Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.
-- Look in: `scripts/dry-baseline.json`, `scripts/check-dry.mjs`
-- Blocked by: [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911), [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912), [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913), [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914), [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915), [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916), [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917), [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918), [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919)
-- Existing tests: check:dry gate is the acceptance signal
-- Done when: clones/duplicatedLines drop and the baseline is lowered to lock it; One implementation per clone; call sites behave the same
-- Tracker: Umbrella/tracker; do not pick directly. Work the open children #1911-#1919.
+### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-07
+- Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.
+- Resolution: Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments.
 
-### [#268](https://github.com/chester-hill-solutions/callcaster/issues/268) i18n: add proper localization with fr-CA as the first locale
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-19
-- Recommended title: **i18n epic: fr-CA as the first locale (6 slices, one PR each)**
-- Multi-PR epic reviving #268. Decisions recorded (React Aria I18nProvider + @react-aria/i18n; react-i18next + remix-i18next JSON catalogs; per-user locale with workspace default en-CA; per-campaign campaign.language; explicit /fr/* marketing routes; sign-in as slice 1). Nothing is implemented.
-- Current behavior: English-only app with locale-naive formatting and no locale column on user, workspace or campaign.
-- Root cause: No i18n framework or locale resolution was ever added.
-- Resolution: Run the six published slices as separate PRs, starting with foundation + sign-in. Split them into child issues so each lands independently.
-- Look in: `app/root.tsx`, `app/lib/types.ts`, `app/lib/tts-voices.ts`, `app/routes.ts`, `package.json`, `app/lib/low-credit-notify.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/send-reset-password-email.server.ts`
-- Missing tests: catalog parity - every key present in every locale; locale resolution - user pref, then workspace default, then en-CA; /fr/* routes and hreflang; ICU plural handling for French
-- Done when: A signed-in operator can switch to French and UI, dates and numbers render in fr-CA; Outbound voice, SMS and email can be French per campaign; A missing-translation check fails CI
-- Tracker: Split first: open six child issues (one per slice) linked to this epic; slice 1 (foundation + sign-in) can start immediately. Do not attempt in one PR.
+### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-05
+- The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.
+- Current behavior: Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. Native #2396 now blocks #1878.
+- Root cause: The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.
+- Resolution: Resolve #2396 as a separate callback operation first, with durable duplicate/acknowledgement recovery. Then extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.
+- Look in: `app/components/call/CallScreen.Dialogs.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallScreen.ts`, `app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts`, `app/lib/platform-media.server.ts`, `app/routes/api+/audiodrop.action.server.ts`, `app/lib/auto-dial-start.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/openapi-platform-components.ts`, `app/lib/services/hooks-api.ts`
+- Blocked by: [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396)
+- Existing tests: test/ui/call-screen-dialogs.test.tsx; test/ui/call-screen-callarea.test.tsx; test/audiodrop.test.ts; test/auto-dial-start.server.test.ts; test/auto-dial.server.test.ts; test/auto-dial-room.route.test.ts; test/auto-dial-status.test.ts
+- Missing tests: Session file identity/None through every continuation; loader revalidation and separate agents; no shared configuration writes; tenant/object/actor/session refusal before provider updates; provider delay/rejection and retry without ending the call; API schema parity; real shared Dialog/Select/Toaster and stable geometry. Existing AMD replay/acknowledgement findings must be tested explicitly before claiming robust playback.
+- Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
+- Tracker: Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged.
 
-### [#1862](https://github.com/chester-hill-solutions/callcaster/issues/1862) IVR: fuzzy-match spoken / DTMF input to the script's declared options
-- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-19
-- Recommended title: **IVR: match spoken/DTMF input to the script's declared options (normalize + fuzzy)**
-- Wants caller input matched to a block's declared options in three tiers: exact value, normalized (digit words, yes/no, case/punctuation), then fuzzy against value+label. The issue comment defers intent matching to #1880 and says to keep this as the concrete spec only if #1880 chooses to hand-roll.
-- Current behavior: findNextStep compares raw strings exactly: optionValue === input || (input.length > 2 && optionValue === 'vx-any'). A caller who says 'one' against '1' misses; no normalization or similarity layer exists.
-- Root cause: The runtime only string-compares Twilio Digits/SpeechResult to option.value.
-- Resolution: Wait for #1880's decision. If a service, this is superseded; if hand-rolled, add a pure matcher module (normalize, then fuzzy against value+label, accept one candidate above threshold, re-prompt on ties). Keep the exact fast path and vx-any.
-- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/ivr-gather.server.ts`, `app/lib/ivr-block-runtime.server.ts`
-- Blocked by: [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880)
-- Existing tests: test/ivr-block-response.route.test.ts
-- Missing tests: one -> 1; press one -> 1; yeah -> yes; ambiguous utterance re-prompts; keypad-only step ignores speech
-- Done when: On a keypad-only step, a spoken digit word maps to the matching option; Ambiguous input re-prompts and never invents an option; Speech / vx-any behaviour unchanged; Exact matches add no latency; Recorded raw userInput stays as-is
-- Tracker: Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands.
+### [#2356](https://github.com/chester-hill-solutions/callcaster/issues/2356) Reconcile audio objects left unattached after campaign update failure
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Audio upload ownership and attachment reconciliation need a durable protocol before a safe cleanup implementation can ship.
+- Current behavior: The audio action has no cleanup after an empty or failed campaign update. A thrown database error can leave commit status uncertain; immediate deletion can remove an attached object. Current source/test evidence does not establish physical orphan counts or crash recovery.
+- Root cause: Object upload and campaign attachment have separate acknowledgement/failure boundaries and no durable lifecycle record or reference/deletion coordination.
+- Resolution: Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/lib/handler.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: Actual-route audit proves storage-call ordering before an empty scoped update; provider/database I/O is stubbed.
+- Missing tests: Durable state-transition, uncertain commit, duplicate retry, restart, reference-read failure and reference/deletion race controls with suitable DB/storage integration.
+- Done when: Define durable upload ownership and attachment state using existing media/storage and job patterns where they fit. Do not add a route-local garbage collector.; An upload that is known to be unattached can be reclaimed. A confirmed attachment is retained. An uncertain write result is retained until authoritative reconciliation resolves it.; The durable retry/reconciliation record survives a crash after upload or an uncertain database acknowledgement. Unresolved cases remain visible to operators and are retried.; Reconciliation cannot delete an existing or shared object. It verifies owned object identity and current attachment references; coordinate reference checks with supported attachment writes so a new attachment cannot race deletion.; Cleanup failures cannot replace the original user error or falsely report success. They retain actionable operator evidence and durable retry state.; Cover successful attachment, known rejection, uncertain commit, failed reference read, duplicate retries, process restart and a reference/deletion race with real state transitions and appropriate database/storage integration controls.; Verify deployed behavior and release promotion before closing the task. Do not claim physical orphan cleanup from mocked storage calls.
+- Tracker: Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.
 
-### [#780](https://github.com/chester-hill-solutions/callcaster/issues/780) Hang up controls/block in IVR script
-- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **Hang up controls/block in IVR script (parent of #1883 + #1884)**
+### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
+- Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Recommended title: **Complete audience upload recovery after opt-out normalization**
+- Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.
+- Current behavior: Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.
+- Root cause: Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed.
+- Resolution: Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/lib/audience-upload-db.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`, `shared/contact-import-headers.ts`, `app/lib/csv-contacts.ts`, `app/lib/chat-opt-out.ts`
+- Existing tests: #2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.; Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.; Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.; Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.; Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.; #2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green.
+- Missing tests: Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.; Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.; Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification.
+- Done when: `unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).; An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.; A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).; Re-uploading the same file does not duplicate the rows that already landed.; An opt-out value is never dropped on the floor: the contact is excluded from dispatch.
+- Tracker: Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.
+
+### [#1771](https://github.com/chester-hill-solutions/callcaster/issues/1771) feature(audience): per-row import error report + original CSV artifact
+- Verdict: **Blocked / split first** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-04
+- Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.
+- Current behavior: The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.
+- Root cause: Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.
+- Resolution: Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/object-storage.server.ts`
+- Existing tests: #2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.; Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance.
+- Missing tests: Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.; Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.; Applicable deployed original-file/reporting acceptance and release verification.
+- Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
+- Tracker: Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.
+
+### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-10-04
+- Runtime security is a native Epic with separate package Tasks. Six source fixes are merged: Axios #2336, csv-parse #2338, Scalar SDK #2339, ws #2343, Twilio JWS #2345 and PostCSS #2346. Deployed acceptance and release promotion remain open. At dev@befe20fa, npm production audit is clear and the independently resolved Bun runtime graph has zero affected nodes.
+- Resolution: Complete each child’s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open.
+
+### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Harden public request rate limits
+- Verdict: **Blocked / split first** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-04
+- Retention source is merged. Trusted public client identity and deployed verification remain separate child tasks.
+- Current behavior: PR #2331 merged the indexed one-day retention repair at f877b636d963cf1154fbab81ef45ef1244bc61ec. The actual daily handler prunes bounded batches, protects reactivated rows, logs counts and preserves rescheduling after cleanup failure. #2329 remains open for deployed tick/retention acceptance. #2330 still owns client identity; current source reads leftmost X-Forwarded-For and falls back to unknown. The actual CallCaster ingress and header trust rule remain unverified.
+- Resolution: Complete and verify #2329 deployed retention and #2330 trusted client identity. Test the actual ingress and forged-header controls before selecting a new trusted source; do not reimplement the merged retention repair. Keep the parent open until both child outcomes are verified and promoted.
+- Look in: `app/lib/platform-rate-limit.server.ts`, `app/lib/platform-rate-limit-db.server.ts`, `app/lib/worker/handlers/cron.server.ts`, `test/integration-db/rate-limit-retention.test.ts`
+- Blocked by: [#2329](https://github.com/chester-hill-solutions/callcaster/issues/2329), [#2330](https://github.com/chester-hill-solutions/callcaster/issues/2330)
+- Existing tests: test/integration-db/rate-limit-retention.test.ts; test/platform-api.test.ts; test/auth-catch-all-rate-limit.route.test.ts
+- Missing tests: Actual deployed maintenance count/error and retained-row boundary; actual CallCaster ingress, direct/local peer identity, IPv4/IPv6 and forged-header controls in #2330.
+- Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
+- Tracker: The parent tracks two independent child outcomes. Retention source completion does not complete trusted identity or release acceptance.
+
+### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Onboarding hides the name form before save acceptance and duplicates returned action failure. Preserve the entered name, retry and genuine field validation.
+- Current behavior: Source audit at dev@cb88df8b. The intro submits onContinue; the wizard force-hides it and starts step navigation before server acceptance. Actual route/wizard/hook/root-host tests fail retained pending form, retained name/retry after rejection and single returned result; native required validation, read-only access and the accepted path_selection redirect pass. Generic operation errors also mark the valid name invalid; blank/overlong server validation has no field discriminator.
+- Root cause: Premature client intro-session advance races the server result. Generic actionError is rendered again and assigned to the name invalid state without a field contract.
+- Resolution: After shared field-error adoption #2311, keep operation failures in one root toast, associate genuine name validation with its field, and let the existing server redirect advance on acceptance. Preserve server onboarding statuses, step targets, provider writes and native/server validation.
+- Look in: `app/routes/workspaces+/$id/onboarding.route.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx`, `app/lib/platform-onboarding-handlers.server.ts`, `app/components/ui/form-field.tsx`
+- Blocked by: [#2311](https://github.com/chester-hill-solutions/callcaster/issues/2311)
+- Existing tests: test/ui/onboarding-intro-step.test.tsx; test/onboarding-save-workspace-name.test.ts; Actual route source-audit reproduction: three regression failures and three passing native validation/permission/accepted-redirect controls.
+- Missing tests: Retained input/disabled pending action, failed acknowledgement/retry, field-specific server validation versus operation failures, no replay, actual-browser appearance/update/clear geometry.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Blocked by #2311 (native edge and audited issue body verified on 2026-10-03). Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine.
+
+### [#2311](https://github.com/chester-hill-solutions/callcaster/issues/2311) Keep validation errors from moving form controls
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Adopt the canonical field-error presentation while preserving correct accessible field association.
+- Current behavior: FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared #125 now has reviewed local source at a4a07e5: owning IDs/ARIA, SSR description, retained drafts, keyboard remedies and modal access. Full workbench/CLI checks and four actual CallCaster shad-cc browser cases pass; original flow fails geometry. Shared merge and consumer implementation/browser acceptance remain pending.
+- Root cause: Conditional error rows add layout height; some validation is not associated with the invalid control.
+- Resolution: Implement the canonical shared contract in https://github.com/chester-hill-solutions/chester-hill-solutions/issues/125 first. Adopt its reviewed source through the existing vendor and thin FormField adapter; preserve labels, help, stable IDs, values, compound controls, hard validation and remedies. Do not make a second placement engine.
+- Look in: `app/components/ui/form-field.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/design-system.md`
+- Existing tests: Existing FormField accessibility tests; canonical source audit at shared main@412bb1d.; Reviewed shared local source: 218 workbench tests, five CLI tests, nine focused cases with original/five faults failing and restored source passing. Four narrow/desktop light/dark actual shad-cc cases preserve 18 page/17 dialog landmarks.
+- Missing tests: Fresh full shared CI and merge, then actual consumer FormField/AddAudioSheet adoption with input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies.
+- Done when: Canonical library owns generic placement and accessibility.; Appearance, update and clearing do not move page landmarks or scroll.; Retain domain validation, hard guards, field/control identity and required remedies.
+- Tracker: Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300.
+
+### [#2305](https://github.com/chester-hill-solutions/callcaster/issues/2305) Show audio-upload failure once
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Audio upload duplicates the server failure; removing its inline copy is held until the root toast stays accessible inside the open sheet.
+- Current behavior: Source audit at dev@cb88df8b. A held local duplicate-removal patch has two actual UI failures because React Aria hides the root toaster ancestor while the sheet stays open; six component/validation/retry controls pass. No green PR or completed fix is claimed.
+- Root cause: The same action failure reaches localError and the root toast. The root host is also outside the modal accessibility top layer.
+- Resolution: Adopt the reviewed canonical modal-safe root host through #2312, then finish this atomic action-result repair with retained upload data, pending/retry and browser geometry. Local name/file validation is separate #2311 work; do not replace it with generic toasts.
+- Look in: `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/feedback-inventory.md`
+- Blocked by: [#2312](https://github.com/chester-hill-solutions/callcaster/issues/2312)
+- Existing tests: test/ui/audio-upload-feedback.test.tsx in held local commit 8c32e890: two modal accessibility regression failures and six passing controls.
+- Missing tests: Consumer modal-safe host adoption in #2312, restored accessible single-result proof, actual-browser geometry and full local/remote green gates.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Blocked by #2312 (native edge verified). Keep the held source and tests; do not push a patch whose only remaining failure result is inaccessible.
+
+### [#2312](https://github.com/chester-hill-solutions/callcaster/issues/2312) Keep modal action feedback accessible through the root toaster
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Adopt the canonical modal-safe root toast before removing upload failure duplication.
+- Current behavior: Actual AddAudioSheet/router/themed-root-toast tests fail two accessibility checks while six controls pass. Shared #126 has a reviewed local canonical fix with 12 generic built-catalog browser cases; it is not merged or adopted. Fresh shared CI remains blocked by shared #122 and #123.
+- Root cause: The root toast host is hidden by React Aria modal isolation; removing its inline copy would remove accessible failure feedback.
+- Resolution: Implement and merge https://github.com/chester-hill-solutions/chester-hill-solutions/issues/126 after its native CI prerequisites. Adopt its reviewed source with provenance and rebuilt vendor output, one root host, retained theme and actual modal accessibility/isolation/focus/geometry proof.
+- Look in: `app/components/ui/sonner.tsx`, `app/components/ui/sheet.tsx`, `app/root.tsx`, `vendor/chester-hill-solutions/shad-cc/`, `docs/design-system.md`
+- Existing tests: Held app integration reproduction: two failures and six controls. Canonical shared #126 source proof: six focused/203 workbench tests and 12 browser cases; local prerequisites are not fresh CI acceptance.
+- Missing tests: Canonical green merge; consumer source/generated-output adoption; actual app Dialog/Sheet keyboard and narrow/desktop light/dark geometry with modal isolation, retained fields and retry.
+- Done when: Canonical library owns generic placement and accessibility.; Appearance, update and clearing do not move page landmarks or scroll.; Retain domain validation, hard guards, field/control identity and required remedies.
+- Tracker: Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300.
+
+### [#2300](https://github.com/chester-hill-solutions/callcaster/issues/2300) Consistent feedback without page movement
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.
+- Current behavior: Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is reviewed local shared source at a4a07e5: 218 workbench tests, five CLI tests and four actual CallCaster shad-cc browser cases pass. Original flow adds 120px at narrow width. Shared source remains unmerged and not adopted. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.
+- Root cause: Message tone, placement and lifecycle were selected independently at each call site.
+- Resolution: Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.
+- Look in: `docs/design-system.md`, `docs/feedback-inventory.md`, `app/components/ui/`, `app/root.tsx`
+- Existing tests: PR #2302 full local/remote gates; PR #2310 full local/remote gates and four built-app geometry cases.; Canonical shared source proof is distinct from app adoption and fresh shared CI acceptance.
+- Missing tests: Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group.
+- Done when: Canonical component library owns generic feedback presentation.; No dynamic alert moves page content or scroll.; Consumer groups retain domain actions and hard guards.
+- Tracker: Split work through the native child issues; preserve the existing #2032 parent under #2000.
+
+### [#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213) Correct the remaining temporal column types listed in the schema drift baseline
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
+- The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. 64 committed temporal mismatch lines remain; guard and first table slices are on dev. Tenant write type boundary was tightened in PR #2244, so the earlier untyped-write prerequisite is resolved.
+- Root cause: The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.
+- Resolution: Split remaining tables into atomic tasks and start one table slice. Validate invalid/empty values, wire contracts and Date sorting at each boundary.
+- Look in: `scripts/baselines/schema-type-drift.txt:1`, `test/integration-db/schema-type-drift.test.ts:141`, `app/server/tenant-db.ts:121`, `scripts/baselines/schema-type-drift.txt`, `test/integration-db/schema-type-drift.test.ts`, `test/helpers/schema-drift.ts`, `app/db/schema.ts`, `app/db/schema-campaign.ts`
+- Existing tests: test/integration-db/schema-type-drift.test.ts
+- Missing tests: Guard exists. Each slice needs behavior tests at Date/write/wire boundaries plus real-Postgres verification; no fresh database count performed here.
+- Done when: The temporal drift baseline reaches zero in small table-specific changes.; The existing guard rejects both new drift and stale baseline entries.
+- Tracker: Move to Blocked / split first as a multi-table parent. Create table-specific tasks; do not re-implement the guard or completed slices. Related PR evidence: #2231, #2233, #2241, #2244. A PR reference alone does not prove deployed behavior.
+
+### [#2168](https://github.com/chester-hill-solutions/callcaster/issues/2168) Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo
+- Verdict: **Blocked / split first** · Size: S-M · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-02
+- The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.
+- Root cause: No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.
+- Resolution: Report tool and the historical number cull are complete. Split durable keep-list configuration, name backfill and repeat policy into separate work. Workspace-row deletion was deferred in the issue discussion. Recheck current ownership before any new live cleanup.
+- Look in: `scripts/cull-report.mjs:1`, `app/lib/twilio-resource-name.ts:1`, `scripts/cull-report.mjs (read-only cull tool, merged #2171)`, `app/lib/twilio-resource-name.ts (naming helper, merged #2167)`, `app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)`
+- Blocked by: [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170)
+- Existing tests: cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings
+- Missing tests: Keep-list lookup must protect an explicitly kept phone-named workspace; name backfill must be idempotent.
+- Done when: Subaccount display names are backfilled to the #2167 format; The keep-list lives in the repository, not a shell argument; 2608141501 survives, since it is on both the keep-list and the phone-number-named rule; The cull report remains read-only with no delete path
+- Tracker: Blocked / split first: keep-list/repeat policy and external name writes are separate concerns. Related PR evidence: #2171, #2167. A PR reference alone does not prove deployed behavior.
+
+### [#1885](https://github.com/chester-hill-solutions/callcaster/issues/1885) Retire the remaining auth schema after dependency verification
+- Verdict: **Blocked / split first** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
+- Partial fix only. Dead RPC removal and both actor rewrites are on dev; legacy auth shim remains and the fail-closed schema drop is absent. Issue discussion requires production dependency verification before the drop.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The two live RPCs now use app.current_user_id and get_outreach_attempts is dropped; auth.uid() is still created and schema auth remains to be retired.
+- Root cause: The live RPC actor rewrites and dead RPC removal shipped. The baseline shim still creates auth.uid(), and the final dependency guard and schema retirement remain unshipped.
+- Resolution: Remaining work only: ship a dependency guard, verify all production dependencies/data, then release the schema drop separately and retire the bootstrap shim.
+- Look in: `client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23`, `client/migrations/20260920120200_rewrite_last_access_actor.sql:18`, `drizzle/0001_auth_uid_shim.sql:2`, `scripts/db/bootstrap-fresh-db.mjs:120`, `app/lib/db-rpc.server.ts`, `drizzle/0001_auth_uid_shim.sql`, `drizzle/0000_baseline.sql`, `client/migrations/20260807130000_manual_dial_claim_attempt_count.sql`, `client/migrations/20260715140000_drop_legacy_rls.sql`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`
+- Existing tests: test/queue-rpc-contract.test.ts; test/db-rpc-claim-queue-entry.test.ts; test/db-rpc-outreach-attempt.test.ts; test/atomic-manual-dial-claims.integration.test.ts
+- Missing tests: No legacy-auth SQL guard is present on dev. Existing queue contract tests need latest-definition and actor/no-actor coverage. Database state was not queried in this read-only code audit.
+- Done when: A dependency guard fails before any destructive operation when non-auth functions, policies, views or other schema objects still depend on auth.; Production dependencies and data-retention requirements are verified before the schema drop.; Guard and schema drop follow the separate release steps recorded in the issue.; The two rewritten RPC flows retain actor and missing-actor behavior.; A fresh bootstrap does not recreate auth.uid() after retirement.
+- Tracker: Blocked / split first. Chunks 1–2 shipped in #1966. The 2026-09-28 issue comment explicitly requires production checks and separate guard/drop release work; do not merge the old chunk-3 branch as-is. Related PR evidence: #1966, #1887. A PR reference alone does not prove deployed behavior.
+
+### [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873) Call recording: workspace recording policy + campaign opt-in, wired into IVR/predictive/test dials
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-02
+- The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.
+- Root cause: Recording was built for specific agent call paths. The workspace/campaign policy model and other dial families are not yet wired; the issue combines several release units.
+- Resolution: Split policy/schema, dial-path recording and disclosure into separate changes. The optional disclosure model is stated in the issue; the jurisdiction gate and transcription scope still need exact requirements. #1989 is a separate, confirmed callback defect.
+- Look in: `app/lib/campaign-test-call.server.ts:105`, `app/lib/twilio-ivr-runtime.server.ts:20`, `app/db/schema-campaign.ts:1`, `app/routes/api+/call.action.server.ts`, `app/routes/api+/recording.action.server.ts`, `app/lib/call-recording-storage.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/auto-dial.server.ts`, `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/db/schema-campaign.ts`, `app/lib/coaching-schemas.ts`
+- Existing tests: test/recording.route.test.ts; test/webhook-side-effects.test.ts:445-560; test/call-recording-storage.server.test.ts; test/batch-transcription-gating.test.ts; test/api-call.route.test.ts:106 (dial record attrs)
+- Missing tests: Check policy disabled, campaign opt-out, each supported dial path, callback persistence and disclosure before enabling recording.
+- Done when: Workspace recording policy and campaign opt-in gate every supported recording path.; Enabled IVR, predictive and test calls persist audio through the recording callback.; #1989 callback work is verified separately.; Optional disclosure behavior and jurisdiction gating requirements are recorded before rollout.
+- Tracker: Blocked / split first: multiple dial families and policy requirements; keep #1989 available as a separate fix.
+
+### [#780](https://github.com/chester-hill-solutions/callcaster/issues/780) Hang up controls/block in IVR script (parent of #1883 + #1884)
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-28
 - Bundles four asks. Split into #1883 (per-step configurable no-input wait + action; dev, PR #1937) and #1884 (explicit Hang up routing target + guaranteed terminal hangup; open). The runtime already understands next:'hangup' and ends the script with a hangup, so #1884 is editor exposure plus validation.
 - Current behavior: No-input handling exists on dev (#1883). 'Hang up' is selectable in the editor via scriptkit and maps to <Hangup/>; gaps are next:'end' unhandled, dangling targets unvalidated, no guaranteed terminal/cycle check (#1884).
 - Root cause: Parent tracking ticket; the only remaining work is the explicit/validated terminal owned by #1884.
@@ -1383,21 +3278,116 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Hang up is selectable as an option's next step; A published script always ends in a terminal hangup; Configurable no-input wait and reroute (delivered by #1883)
 - Tracker: Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands.
 
-### [#1861](https://github.com/chester-hill-solutions/callcaster/issues/1861) Spike: replace Twilio AMD with a local, faster voicemail classifier
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-18
-- Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.
-- Current behavior: Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.
-- Root cause: Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.
-- Resolution: After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.
-- Look in: `app/lib/auto-dial.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/db/schema.ts`, `docs/adr/0030-media-stream-bun-service-third-railway-process.md`, `docs/live-transcription-coaching-plan.md`
-- Blocked by: [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842), [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)
-- Missing tests: Measured time-to-first-audio for sync vs async AMD and a local classifier; Classifier accuracy on human/machine/screening/beep/silence/fax; Media-stream fork/concurrency budget at target volume
-- Done when: Written report with measured latency and accuracy for Twilio async AMD and one local option on the same call set; Recommendation with an accuracy-latency threshold and reconciliation/fallback policy; If replacing: an ADR and a phased plan starting in shadow mode
-- Tracker: Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation.
+### [#2010](https://github.com/chester-hill-solutions/callcaster/issues/2010) auth pages: scrollbar appears even though the page fits the viewport
+- Verdict: **Blocked / split first** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-27
+- The sign-in and sign-up pages show a scrollbar even though the content fits within the viewport height. Grouped under the auth-pages epic (#2057).
+- Current behavior: A vertical scrollbar renders on pages whose content should fit.
+- Root cause: Most likely an over-sized form container rather than genuinely long content.
+- Resolution: Blocked by #2013. Fix the shared container geometry first, then re-check. If the scrollbar is gone, close this as resolved-by rather than carrying a separate fix for a symptom that no longer exists. If it persists, reopen with the specific remaining cause rather than assuming it is the same issue.
+- Look in: `app/routes/account.sign-in.*`, `app/routes/account.sign-up.*`, `app/components/shared/AuthCard.tsx`
+- Blocked by: [#2013](https://github.com/chester-hill-solutions/callcaster/issues/2013)
+- Missing tests: no scrollbar at 1x viewport height; regression guard once the container is fixed
+- Done when: No scrollbar at the supported viewport range; Either closed as resolved by #2013, or reopened with the specific remaining cause
+- Tracker: Suspect this closes for free with #2013. Do not fix it first — a scrollbar fix that is really a layout fix will be undone by the next alignment change.
 
-### [#1828](https://github.com/chester-hill-solutions/callcaster/issues/1828) PR open qa tests
-- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- Recommended title: **QA-environment PR acceptance suite against the smart test audience**
+### [#2031](https://github.com/chester-hill-solutions/callcaster/issues/2031) Sweep: authorization checks a permission, not a broad role
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.
+- Current behavior: Checks are inconsistent, comparing roles in some places and something narrower in others.
+- Root cause: Each check was written locally against whatever was convenient at the time.
+- Resolution: Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.
+- Look in: `app/lib/**-middleware.server.ts`, `scripts/checks/check-route-authz.mjs`, `eslint.config.mjs`
+- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030), [#2008](https://github.com/chester-hill-solutions/callcaster/issues/2008)
+- Existing tests: check:route-authz structural gate
+- Missing tests: a gate that fails when a new route compares a role string directly
+- Done when: No route or loader compares a broad role string where a permission check is meant; check:route-authz fails when a new role comparison is introduced; The sweep lands after the model, not before
+- Tracker: Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice.
+
+### [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030) Spike: weigh permission models against what the auth system already provides
+- Verdict: **Blocked / split first** · Size: M · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.
+- Current behavior: Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.
+- Root cause: Roles were adopted as the model without first checking whether a permission primitive was available.
+- Resolution: Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.
+- Look in: `package.json (better-auth version and plugins in use)`, `app/lib/admin-middleware.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/server/tenant-db.ts`, `app/lib/data-plane-middleware.server.ts`
+- Done when: A written recommendation exists, reviewed before any implementation begins; better-auth permission capabilities are established from the installed version, not from documentation memory; Existing in-repo authorization is inventoried so it is extended rather than duplicated; Ruled-out options are recorded with reasons
+- Tracker: Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL.
+
+### [#2011](https://github.com/chester-hill-solutions/callcaster/issues/2011) auth pages: sign-up is missing the background mural that sign-in has
+- **IN PROGRESS** · Verdict: **Blocked / split first** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-25
+- The sign-up page lacks the background mural treatment the sign-in page already uses. Grouped under the auth-pages epic (#2057).
+- Current behavior: Sign-in has a background mural; sign-up does not.
+- Root cause: The treatment was applied to one route only.
+- Resolution: Blocked by #2013 so the final visual pass sees the finished layout. Apply the same treatment to sign-up, ideally by extracting it so the two pages cannot drift apart again.
+- Look in: `app/routes/account.sign-in.*`, `app/routes/account.sign-up.*`
+- Blocked by: [#2013](https://github.com/chester-hill-solutions/callcaster/issues/2013)
+- Missing tests: both routes render the mural treatment
+- Done when: Sign-up renders the same mural treatment as sign-in; The treatment is shared, not duplicated per route
+- Tracker: Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards.
+
+### [#2009](https://github.com/chester-hill-solutions/callcaster/issues/2009) Agent ABAC: adding an Agent to a campaign unlocks that campaign type for them
+- Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
+- The attribute-based half of the cluster. Adding an Agent to a specific campaign should also unlock their broader ability to see and act on that campaign type: added to a live-call campaign, it appears on their list and is callable if open; added to an SMS campaign, its numbers become visible on the chats page.
+- Current behavior: Campaign membership is a relation, but it does not appear to confer the broader capability, and the broader capability does not appear to be scoped back down to the campaigns they are actually on.
+- Root cause: Two separate concerns — which campaign types you may touch, and which campaigns within a type — are not expressed in the same model, so membership cannot imply the first.
+- Resolution: Blocked by #2008, which defines the type-level capability set this refines. Two distinct grants are needed and they must not be conflated: a type-level capability from the role defaults, and a campaign-level grant from membership. The test that matters is negative — an Agent with access to one SMS campaign must not see another campaign's numbers.
+- Look in: `app/db/schema.ts (campaign membership relation)`, `app/lib/workspace-middleware.server.ts`, `app/routes/workspaces+/$id/**/chats`, `app/components/**/CampaignList`
+- Blocked by: [#2008](https://github.com/chester-hill-solutions/callcaster/issues/2008)
+- Missing tests: membership grants visibility of exactly that campaign; an Agent on one SMS campaign cannot see another campaign numbers
+- Done when: Campaign membership confers a campaign-level grant; An Agent sees only the campaigns they are on, within the types they may touch; The negative case is tested: one campaign membership does not leak another campaign; Type-level and campaign-level grants are separate and both readable in the code
+- Tracker: Blocked by #2008 on purpose — the two are easy to conflate and building this first would bake in the wrong model. The negative test is the one that proves it; without it a permissive implementation looks correct.
+
+### [#2008](https://github.com/chester-hill-solutions/callcaster/issues/2008) Agent role: define the permission surface for calling, messages and handset
+- Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.
+- Current behavior: Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.
+- Root cause: Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.
+- Resolution: Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.
+- Look in: `app/components/layout/WorkspaceSidebar.tsx`, `app/lib/workspace-middleware.server.ts`, `app/routes/workspaces+/$id/**`, `app/db/workspace-scoped-tables.ts`
+- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
+- Missing tests: each capability has a route-level enforcement test; sidebar visibility and route enforcement agree
+- Done when: The Agent capability set is written down as data, not scattered conditionals; Every denied surface returns 403 on a direct URL attempt, not only when hidden; The 403-versus-404 boundary is decided and documented rather than incidental; Sidebar visibility and route enforcement read from the same source
+- Tracker: This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes.
+
+### [#2002](https://github.com/chester-hill-solutions/callcaster/issues/2002) epic(authz): permission-based authorization instead of role checks
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-25
+- Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.
+- Current behavior: Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.
+- Root cause: Authorization was modelled as a role comparison from the start and every check since has followed that shape.
+- Resolution: Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.
+- Look in: `app/lib/admin-middleware.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/lib/auth-layout.server.ts`, `eslint.config.mjs (no-restricted-imports, tenant boundary)`
+- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
+- Missing tests: permission model exists; each permission has a test at the route that enforces it
+- Done when: A permission model exists that roles map onto as default groupings; Authorization checks a permission rather than comparing a role string; Existing roles continue to work as groupings without a migration per user; No route is left checking a broad role where a specific permission is meant
+- Tracker: Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports.
+
+### [#1862](https://github.com/chester-hill-solutions/callcaster/issues/1862) IVR: match spoken/DTMF input to the script's declared options (normalize + fuzzy)
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- Wants caller input matched to a block's declared options in three tiers: exact value, normalized (digit words, yes/no, case/punctuation), then fuzzy against value+label. The issue comment defers intent matching to #1880 and says to keep this as the concrete spec only if #1880 chooses to hand-roll.
+- Current behavior: findNextStep compares raw strings exactly: optionValue === input || (input.length > 2 && optionValue === 'vx-any'). A caller who says 'one' against '1' misses; no normalization or similarity layer exists.
+- Root cause: The runtime only string-compares Twilio Digits/SpeechResult to option.value.
+- Resolution: Wait for #1880's decision. If a service, this is superseded; if hand-rolled, add a pure matcher module (normalize, then fuzzy against value+label, accept one candidate above threshold, re-prompt on ties). Keep the exact fast path and vx-any.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/ivr-gather.server.ts`, `app/lib/ivr-block-runtime.server.ts`
+- Blocked by: [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880)
+- Existing tests: test/ivr-block-response.route.test.ts
+- Missing tests: one -> 1; press one -> 1; yeah -> yes; ambiguous utterance re-prompts; keypad-only step ignores speech
+- Done when: On a keypad-only step, a spoken digit word maps to the matching option; Ambiguous input re-prompts and never invents an option; Speech / vx-any behaviour unchanged; Exact matches add no latency; Recorded raw userInput stays as-is
+- Tracker: Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands.
+
+### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
+- Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.
+- Current behavior: QA has no dedicated Twilio account; #1357 is open and is the prerequisite.
+- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).
+- Resolution: Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.
+- Look in: `.railway/environments/`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`, `.github/workflows/railway-iac.yml`
+- Blocked by: [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357)
+- Missing tests: n/a (operations task)
+- Done when: CallCaster-qa Twilio account exists and is documented; qa.callcaster.ca uses the QA account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
+- Tracker: blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828.
+
+### [#1828](https://github.com/chester-hill-solutions/callcaster/issues/1828) QA-environment PR acceptance suite against the smart test audience
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.
 - Current behavior: PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.
 - Root cause: There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet.
@@ -1409,9 +3399,19 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: PRs run sign-up through the 3 campaign types against the smart test audience; Twilio unit tests use CallCaster-qa credentials; Failures are attributable to the PR
 - Tracker: blocked-epic: #1829 (CallCaster-qa Twilio account) and #1157 (smart test audiences) must land first; #1357 gates #1829.
 
-### [#1826](https://github.com/chester-hill-solutions/callcaster/issues/1826) PR open dev tests
-- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- Recommended title: **Dev-environment PR acceptance suite**
+### [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827) Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
+- Create a dedicated Twilio account for the dev environment (ideally via IaC) and update dev.callcaster.ca to use it.
+- Current behavior: There is no dedicated CallCaster-dev Twilio account; dev falls back to shared or main-account credentials. #1356 is open.
+- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1356.
+- Resolution: Create the CallCaster-dev Twilio account, store the credentials as dev environment secrets/vars, and update the dev.callcaster.ca config. Then unblock #1826.
+- Look in: `.railway/environments/dev.ts`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`
+- Missing tests: n/a (operations task)
+- Done when: CallCaster-dev Twilio account exists and is documented; dev.callcaster.ca uses the dev account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
+- Tracker: blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826.
+
+### [#1826](https://github.com/chester-hill-solutions/callcaster/issues/1826) Dev-environment PR acceptance suite
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Per-PR dev tests: sign-up, create workspace, MFA, rent a number, upload an audience and audio, create a second workspace; plus Twilio-tier unit tests with CallCaster-dev credentials.
 - Current behavior: E2E runs in the local compose harness; nothing runs against a dev.callcaster.ca environment backed by a dedicated CallCaster-dev Twilio account.
 - Root cause: There is no dedicated CallCaster-dev Twilio account; #1356 and #1827 are both open.
@@ -1423,69 +3423,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: PRs run the dev checklist against CallCaster-dev; MFA is enabled on the dev test environment; Twilio unit tests use CallCaster-dev credentials
 - Tracker: blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827.
 
-### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Create Twilio CallCaster-qa account (ideally with IaC) and update qa.callcaster.ca to use that account
-- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- Recommended title: **Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it**
-- Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.
-- Current behavior: QA has no dedicated Twilio account; #1357 is open and is the prerequisite.
-- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).
-- Resolution: Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.
-- Look in: `.railway/environments/`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`, `.github/workflows/railway-iac.yml`
-- Blocked by: [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357)
-- Missing tests: n/a (operations task)
-- Done when: CallCaster-qa Twilio account exists and is documented; qa.callcaster.ca uses the QA account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
-- Tracker: blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828.
-
-### [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827) Create Twilio CallCaster-dev account (ideally with IaC) and update dev.callcaster.ca to use that account
-- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- Recommended title: **Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it**
-- Create a dedicated Twilio account for the dev environment (ideally via IaC) and update dev.callcaster.ca to use it.
-- Current behavior: There is no dedicated CallCaster-dev Twilio account; dev falls back to shared or main-account credentials. #1356 is open.
-- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1356.
-- Resolution: Create the CallCaster-dev Twilio account, store the credentials as dev environment secrets/vars, and update the dev.callcaster.ca config. Then unblock #1826.
-- Look in: `.railway/environments/dev.ts`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`
-- Blocked by: [#1356](https://github.com/chester-hill-solutions/callcaster/issues/1356)
-- Missing tests: n/a (operations task)
-- Done when: CallCaster-dev Twilio account exists and is documented; dev.callcaster.ca uses the dev account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
-- Tracker: blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826.
-
-### [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) Create test audiences for voice, SMS, and AI scenarios
-- Verdict: **Blocked / split first** · Size: L-XL · Risk: high · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- Recommended title: **epic(testing): controlled synthetic campaign audiences**
-- Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.
-- Current behavior: Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.
-- Root cause: Dependent on the synthetic provider (#1328).
-- Resolution: Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.
-- Look in: `e2e/fixtures/seed.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`
-- Blocked by: [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328)
-- Existing tests: seed fixture only
-- Missing tests: scenario safety and telemetry
-- Done when: Test audiences reference server-owned scenario ids; Simulator rejects real recipient numbers; Runs report timing metrics; No billable traffic
-- Tracker: Parent epic; blocked by #1328.
-
-### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
-- The development-scope dependency findings span multiple package families and need separate remediation slices.
-- Resolution: Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope.
-
-### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
-- Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.
-- Resolution: Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.
-- Look in: `package.json`, `package-lock.json`, `bun.lock`
-- Tracker: Do not duplicate Nano ID #1805 or the active qs #1809 work.
-
-### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
-- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-10
-- Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329) Twilio environment program - consolidated roadmap (IaC controller, accounts, cost, testing)
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: enhancement, devops/admin · Assignee: none · Updated: 2026-09-09
-- Recommended title: **feat(twilio-iac): add ownership manifest and read-only environment plan**
+### [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329) feat(twilio-iac): add ownership manifest and read-only environment plan
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Roadmap for the Twilio environment program (IaC controller, accounts, cost, testing). Railway IaC is separate and done; no Twilio controller exists. Sub-issues were folded into this issue and are not implemented.
 - Current behavior: Twilio operations are imperative workspace actions; workspace provisioning owns dynamic resources; no ownership manifest, plan artifact, or drift workflow.
 - Root cause: Roadmap not started; too large for one agent.
@@ -1496,33 +3435,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Every managed resource has one env/owner/cleanup rule; Read-only plan compares declared vs actual; Plan cannot create/delete/rent; Secrets outside source and output
 - Tracker: Split; first slice is M/medium. #1195 overlaps its testing section.
 
-### [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645) Campaigns: first-class "send a test to this number" for every campaign type
-- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-07
-- Message tests shipped in #1648 and voice/IVR tests in #1654. The remaining slice is live-call rehearsal.
-- Resolution: Scope a separate live-call issue with isolation from queue, results and normal campaign metrics. Do not rebuild the shipped test-send paths.
-
-### [#1498](https://github.com/chester-hill-solutions/callcaster/issues/1498) [Feature]: Add campaign export report with toplines and reply conversations
-- Verdict: **Blocked / split first** · Labels: feature request, business-logic · Assignee: none · Updated: 2026-09-02
-- The export report needs toplines, inbound replies, contact grouping, attribution and tenant-safe filtering. This is a feature program, not a release cleanup.
-- Resolution: Split metrics and conversation projection from artifact presentation; establish scope and fixtures before implementation.
-- Look in: `app/lib/campaign-export.server.ts`
-
-### [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357) Point qa.callcaster.ca at the staging/qa environment (DNS + IaC)
-- Verdict: **Blocked / split first** · Labels: devops/admin · Assignee: none · Updated: 2026-08-31
-- The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.
-- Resolution: Resolve the naming decision, attach the domain through IaC, set DNS, and verify readyz externally.
-- Look in: `.railway/environments/staging.ts`
-- Blocked by: [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355)
-
-### [#1356](https://github.com/chester-hill-solutions/callcaster/issues/1356) Point dev.callcaster.ca at the dev environment (DNS + IaC)
-- Verdict: **Blocked / split first** · Labels: devops/admin · Assignee: none · Updated: 2026-08-31
-- The dev custom domain was attached in Railway; DNS and IaC ownership were still missing at the last verified report.
-- Resolution: Inspect current DNS and the Railway target. DNS changes need access to the domain zone, then codify the live mapping.
-- Look in: `.railway/environments/dev.ts`
-
-### [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328) Simulated telephony: gateway + synthetic provider for local dev and tests
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: enhancement, devops/admin · Assignee: none · Updated: 2026-08-26
-- Recommended title: **feat(telephony): add provider factory and synthetic SMS transport (split further)**
+### [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328) feat(telephony): add provider factory and synthetic SMS transport (split further)
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
 - Build a gateway seam between CallCaster call/SMS paths and the provider, with a synthetic provider for local dev/tests (no Twilio credentials). Consolidates #1156/#1194/#1161.
 - Current behavior: Workspace Twilio client hard-wired; IVR/number-rental call Twilio directly; SMS has a client-like seam; E2E mocks intercept browser HTTP only; Compose uses placeholder creds + disabled webhook validation.
 - Root cause: No server-side provider abstraction.
@@ -1533,9 +3447,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Provider selection explicit and fail-closed; Synthetic sends create deterministic events without creds; Tests prove no Twilio network call; Real Twilio unchanged
 - Tracker: Split: factory+SMS, voice, rental. Dependencies #1157/#1192/#1193.
 
-### [#1272](https://github.com/chester-hill-solutions/callcaster/issues/1272) B1: Vertical slice — publish, launch, run, exact-classify SMS/MMS interaction
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-15
-- Recommended title: **feat(interactive-sms): deliver a flagged exact-match opener-to-follow-up run slice**
+### [#1272](https://github.com/chester-hill-solutions/callcaster/issues/1272) feat(interactive-sms): deliver a flagged exact-match opener-to-follow-up run slice
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - B1 vertical slice: publish immutable Revision, create immutable Run, Run-owned queue, claim + Interaction, dispatch coordinator, inbound reply correlation, exact classification, follow-up within windows, typed outcome.
 - Current behavior: No script_revision/campaign_run/interaction/interaction_event/interaction_effect schema exists; message has no interaction references.
 - Root cause: Not implemented; hard-blocked by A1/A2/A3.
@@ -1547,9 +3460,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Flagged workspace publishes + launches one run; One queue entry -> one interaction + idempotent opener; Exact reply advances reducer + one follow-up
 - Tracker: Keep blocked until all Phase A gates pass.
 
-### [#1271](https://github.com/chester-hill-solutions/callcaster/issues/1271) A3: Message domain-id + credit reservation primitive for SMS/MMS
-- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-15
-- Recommended title: **feat(billing): add local message identity and atomic SMS credit reservations**
+### [#1271](https://github.com/chester-hill-solutions/callcaster/issues/1271) feat(billing): add local message identity and atomic SMS credit reservations
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - Give message a local domain-id PK with nullable indexed twilio_sid (rows before provider dispatch) and an atomic PL/pgSQL credit-reservation RPC with settle/reconcile.
 - Current behavior: message.sid is the required PK; campaign messages created at Twilio before local persistence; no reservation schema/RPC; billing supports idempotent writes but not holds.
 - Root cause: Not implemented.
@@ -1560,9 +3472,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Message row exists before SID; SID nullable + unique when present; Concurrent reservations cannot overspend; Settle/release/reconcile idempotent
 - Tracker: Blocks #1272; independent of the v2 editor.
 
-### [#1269](https://github.com/chester-hill-solutions/callcaster/issues/1269) A1: scriptkit-interaction-core v2 contracts + v1→v2 explicit conversion
-- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-15
-- Recommended title: **feat(scriptkit): add provider-neutral interaction document v2 and deterministic reducer**
+### [#1269](https://github.com/chester-hill-solutions/callcaster/issues/1269) feat(scriptkit): add provider-neutral interaction document v2 and deterministic reducer
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - Create vendored @chester-hill-solutions/scriptkit-interaction-core: ScriptDocument v2 schemas (send/collect/action/wait/handoff/complete), typed transitions, strict publish validator, deterministic reducer/effects, exact classifier, explicit convertV1ToV2. Provider/framework neutral.
 - Current behavior: Only v1 call-script packages exist under vendor/scriptkit; v2 exists only in ADR-0032.
 - Root cause: Not implemented.
@@ -1573,9 +3484,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: All six ops + transitions exported; convertV1ToV2 explicit with stable warnings; Stable error codes; Deterministic reducer for fixtures
 - Tracker: Blocks #1272; independent of #1271; can start.
 
-### [#1268](https://github.com/chester-hill-solutions/callcaster/issues/1268) Interactive SMS/MMS campaigns — release one
-- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-15
-- Recommended title: **epic(interactive-sms): ship release-one audited SMS/MMS interactions**
+### [#1268](https://github.com/chester-hill-solutions/callcaster/issues/1268) epic(interactive-sms): ship release-one audited SMS/MMS interactions
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - Parent epic for interactive SMS/MMS. Milestone A (domain id, single dispatch coordinator, credit reservation, policy) and B (vertical slice). Sub-issues #1269-1272.
 - Current behavior: A2 consolidation mostly landed; A1, A3, B1 absent; consent/disclosure tables, flags, and observability have no dedicated child issue; tracking docs stale.
 - Root cause: Epic; not single-agent work.
@@ -1586,16 +3496,111 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: Every milestone has owned child issue + dependency; A1-A3 exit gates pass before B1; One flagged workspace completes the slice without duplicate effects/billing
 - Tracker: Keep as epic; split before assignment.
 
+### [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) epic(testing): controlled synthetic campaign audiences
+- Verdict: **Blocked / split first** · Size: L-XL · Risk: high · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
+- Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.
+- Current behavior: Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.
+- Root cause: Dependent on the synthetic provider (#1328).
+- Resolution: Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.
+- Look in: `e2e/fixtures/seed.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`
+- Blocked by: [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328)
+- Existing tests: seed fixture only
+- Missing tests: scenario safety and telemetry
+- Done when: Test audiences reference server-owned scenario ids; Simulator rejects real recipient numbers; Runs report timing metrics; No billable traffic
+- Tracker: Parent epic; blocked by #1328.
+
+### [#268](https://github.com/chester-hill-solutions/callcaster/issues/268) i18n epic: fr-CA as the first locale (6 slices, one PR each)
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
+- Multi-PR epic reviving #268. Decisions recorded (React Aria I18nProvider + @react-aria/i18n; react-i18next + remix-i18next JSON catalogs; per-user locale with workspace default en-CA; per-campaign campaign.language; explicit /fr/* marketing routes; sign-in as slice 1). Nothing is implemented.
+- Current behavior: English-only app with locale-naive formatting and no locale column on user, workspace or campaign.
+- Root cause: No i18n framework or locale resolution was ever added.
+- Resolution: Run the six published slices as separate PRs, starting with foundation + sign-in. Split them into child issues so each lands independently.
+- Look in: `app/root.tsx`, `app/lib/types.ts`, `app/lib/tts-voices.ts`, `app/routes.ts`, `package.json`, `app/lib/low-credit-notify.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/send-reset-password-email.server.ts`
+- Missing tests: catalog parity - every key present in every locale; locale resolution - user pref, then workspace default, then en-CA; /fr/* routes and hreflang; ICU plural handling for French
+- Done when: A signed-in operator can switch to French and UI, dates and numbers render in fr-CA; Outbound voice, SMS and email can be French per campaign; A missing-translation check fails CI
+- Tracker: Split first: open six child issues (one per slice) linked to this epic; slice 1 (foundation + sign-in) can start immediately. Do not attempt in one PR.
+
+### [#1861](https://github.com/chester-hill-solutions/callcaster/issues/1861) Spike: replace Twilio AMD with a local, faster voicemail classifier
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.
+- Current behavior: Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.
+- Root cause: Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.
+- Resolution: After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.
+- Look in: `app/lib/auto-dial.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/db/schema.ts`, `docs/adr/0030-media-stream-bun-service-third-railway-process.md`, `docs/live-transcription-coaching-plan.md`
+- Blocked by: [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842), [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)
+- Missing tests: Measured time-to-first-audio for sync vs async AMD and a local classifier; Classifier accuracy on human/machine/screening/beep/silence/fax; Media-stream fork/concurrency budget at target volume
+- Done when: Written report with measured latency and accuracy for Twilio async AMD and one local option on the same call set; Recommendation with an accuracy-latency threshold and reconciliation/fallback policy; If replacing: an ADR and a phased plan starting in shadow mode
+- Tracker: Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation.
+
+### [#1498](https://github.com/chester-hill-solutions/callcaster/issues/1498) [Feature]: Add campaign export report with toplines and reply conversations
+- Verdict: **Blocked / split first** · Labels: business-logic · Assignee: none · Updated: 2026-09-25
+- The export report needs toplines, inbound replies, contact grouping, attribution and tenant-safe filtering. This is a feature program, not a release cleanup.
+- Resolution: Split metrics and conversation projection from artifact presentation; establish scope and fixtures before implementation.
+- Look in: `app/lib/campaign-export.server.ts`
+
+### [#2057](https://github.com/chester-hill-solutions/callcaster/issues/2057) epic(auth-pages): sign-in and sign-up share one layout, copy and error treatment
+- Verdict: **Blocked / split first** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Six filed sign-in/sign-up issues (#2010, #2011, #2012, #2013, #2014, #2015) are one piece of work on one pair of pages. Filed as loose tickets they guarantee a churn loop: fix alignment (#2013), the scrollbar returns (#2010), add the mural (#2011), and the box is off-centre again. Created 2026-09-25 during board triage, when all six sat unenriched in Needs triage.
+- Current behavior: The two pages drift independently: different centring, different form width, different padding, one has a mural and the other does not, and two different copy treatments.
+- Root cause: No shared form container between the pages, so every layout change is made twice and any one change can undo the other.
+- Resolution: Land #2013 first as the shared baseline. Then treat #2010 as a probable symptom rather than a separate defect — a mis-sized container is the usual cause of a scrollbar on a page that should fit — and close it if it resolves instead of carrying a fix for a symptom that is gone. #2011 and #2012 land after #2013 so the final visual pass sees final copy. #2014 keeps the sign-in page fix; its codebase-wide half is #2058. #2015 is business logic, independent of all of it, and is the one with real diagnostic value.
+- Look in: `app/routes/account.sign-in.*`, `app/routes/account.sign-up.*`, `app/components/shared/AuthCard.tsx`, `app/routes.ts`
+- Missing tests: both pages share one form container; no scrollbar at 1x viewport height
+- Done when: Both pages share one form container with identical width, padding and centring; Sign-up carries the same mural treatment as sign-in; Copy is consistent across the two pages; The sign-in page surfaces the real error through a toast; The inline-error sweep ships as its own issue with a rule and an inventory, not a blanket change; #2010 is closed as resolved by #2013, or reopened with the specific remaining cause
+- Tracker: Parent epic. Sequencing lives here, not in the children. #2015 can proceed in parallel with the whole thing.
+
+### [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645) Campaigns: first-class "send a test to this number" for every campaign type
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-25
+- Message tests shipped in #1648 and voice/IVR tests in #1654. The remaining slice is live-call rehearsal.
+- Resolution: Scope a separate live-call issue with isolation from queue, results and normal campaign metrics. Do not rebuild the shipped test-send paths.
+
+### [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357) Point qa.callcaster.ca at the staging/qa environment (DNS + IaC)
+- Verdict: **Blocked / split first** · Labels: devops/admin · Assignee: none · Updated: 2026-09-25
+- The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.
+- Resolution: Resolve the naming decision, attach the domain through IaC, set DNS, and verify readyz externally.
+- Look in: `.railway/environments/staging.ts`
+- Blocked by: [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355)
+
+### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
+- Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).
+- Current behavior: scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).
+- Root cause: Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.
+- Resolution: Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.
+- Look in: `scripts/dry-baseline.json`, `scripts/check-dry.mjs`
+- Blocked by: [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912), [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913), [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914), [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915), [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916), [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917), [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918), [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919)
+- Existing tests: check:dry gate is the acceptance signal
+- Done when: clones/duplicatedLines drop and the baseline is lowered to lock it; One implementation per clone; call sites behave the same
+- Tracker: Umbrella/tracker; do not pick directly. Work the open children #1912-#1919.
+
 ---
 
-## Duplicates — 2
+## Duplicates — 3
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
-### [#1843](https://github.com/chester-hill-solutions/callcaster/issues/1843) All steps in a script should have a next or "goto" option even outside of a selected choice and how long it waits
-- Verdict: **Duplicates** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
+### [#2000](https://github.com/chester-hill-solutions/callcaster/issues/2000) Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-04
+- Duplicate of: [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032)
+- Duplicate of #2032. PR #2362 removes the invitation banner and uses the existing root success toast. Tone, deployed geometry and telemetry acceptance remain to verify with the canonical report.
+- Current behavior: Source verified on dev@46ba4b7e, 2026-10-04: the invitation-only QueryParamBanner row is removed. The root toast consumes a signed finite receipt; deployed acceptance remains pending.
+- Root cause: The historical invitation confirmation used replayable URL state and an inline Alert. The source fix in #2032 replaces that transport and removes the invitation-specific Alert surface.
+- Resolution: Do not implement a separate colour patch. Verify the original tone, replay, layout and telemetry criteria with #2032. Retain the native parent relation and keep this report open for deployed QA and release.
+- Look in: `app/routes/workspaces+/index.tsx`, `app/lib/invitation-flash.server.ts`, `app/lib/flash-telemetry.client.ts`, `app/root.tsx`, `test/ui/workspaces-invitation-feedback.test.tsx`
+- Existing tests: test/accept-invite.route.test.ts (clean redirect and signed receipt); test/ui/workspaces-invitation-feedback.test.tsx (root toast, nonce suppression and no invitation banner row)
+- Missing tests: Deployed success tone and absence of an error-surface beacon remain to verify.
+- Done when: Invite acceptance shows a green one-time success toast; The message does not replay on refresh or revisit; The success surface is no longer beaconed to client-flash as an error; No colour-only change is shipped on its own
+- Tracker: Duplicate of #2032; its source fix is merged in PR #2362. Verify the original acceptance criteria together, preserve the native parent, and wait for QA and default-branch release before closure.
+
+### [#1843](https://github.com/chester-hill-solutions/callcaster/issues/1843) IVR step no-input wait + next/goto (folds into #1883 and #1884)
+- Verdict: **Duplicates** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-25
 - Duplicate of: [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883)
-- Recommended title: **IVR step no-input wait + next/goto (folds into #1883 and #1884)**
 - Body asks for a per-step no-input behavior: default 10s wait, default to next block, and an option to hang up. That is #1883 (configurable wait + no-input action) plus the explicit terminal routing in #1884.
 - Current behavior: After #1883 (dev, PR #1937), a step carries a configurable wait and a no-input action. #1884 still owns the explicit Hang up target and terminal validation.
 - Root cause: Same requirement as #1883/#1884, filed before the work was split from #780.
@@ -1613,34 +3618,18 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 7
+## Needs triage — 3
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) need to verify consistency for Robocall vs IVR vs Automated Phone Menu
-- Status: In progress · Labels: design · Assignee: none · Updated: 2026-09-21
+### [#2303](https://github.com/chester-hill-solutions/callcaster/issues/2303) Extract safe-outbound-url to a shared package — three repos now need it, and two have written their own half
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-03
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts should have tax (and the charges themselves should be taxed)
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
+### [#2239](https://github.com/chester-hill-solutions/callcaster/issues/2239) e2e toolchain step times out on a 62.8 MB ffmpeg apt download
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-01
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#1982](https://github.com/chester-hill-solutions/callcaster/issues/1982) Receipts should say contact@callcaster.ca
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts should say how many credits were bought
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1980](https://github.com/chester-hill-solutions/callcaster/issues/1980) Remove "From the workspace audio library" from IVR Script add a recording step
-- Status: Backlog · Labels: design · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976) IVR results and export show the raw DTMF code instead of the option label
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1961](https://github.com/chester-hill-solutions/callcaster/issues/1961) issue-on-dev aborts the Status move when a PR body references a non-issue number
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-21
+### [#2176](https://github.com/chester-hill-solutions/callcaster/issues/2176) The campaign-queue contact-id workspace guard exists in four places with three status codes, and two falsely reject a repeated id
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-09-28
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._

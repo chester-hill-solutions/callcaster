@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
@@ -189,6 +189,18 @@ export async function uploadObject(
   const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
   const payload = await toBuffer(body);
 
+  // `If-None-Match: "*"` alone does not honour `upsert: false`. The header is
+  // optional in the S3 spec and at least one implementation ignores it
+  // outright — answering 200 and overwriting — so the only guard would be
+  // silently absent on that backend. For audio that is a user-facing
+  // uniqueness guarantee ("a greeting with that name already exists"), not
+  // just a lost file, so check existence explicitly first and let the
+  // conditional write remain only as the race backstop for two writers that
+  // pass this check together.
+  if (options.upsert === false && (await objectExists(logicalBucket, objectPath))) {
+    throw new ObjectExistsError(objectPath);
+  }
+
   try {
     await getS3Client().send(
       new PutObjectCommand({
@@ -209,7 +221,7 @@ export async function uploadObject(
         // were overwriting anyway. For audio that is not just a lost file: a
         // filename is how campaigns and IVR steps point at a recording, so a
         // clobbered key changes what live callers hear. A conditional write
-        // makes the flag mean what it says.
+        // closes the race between the existence check above and this put.
         ...(options.upsert === false ? { IfNoneMatch: "*" } : {}),
       }),
     );
@@ -283,6 +295,38 @@ export async function downloadObject(
 
   const bytes = await response.Body.transformToByteArray();
   return Buffer.from(bytes);
+}
+
+/**
+ * Copy one object to a new key in the same logical bucket (server-side).
+ * Used by the media-namespace migration: same bucket, different prefix, so
+ * CopyObject avoids a download/upload round-trip and keeps object metadata.
+ * The source key must be URL-encoded per path segment for the `CopySource`
+ * header ("+" phone numbers break an unencoded copy).
+ */
+export async function copyObject(
+  logicalBucket: ObjectStorageBucket,
+  sourcePath: string,
+  targetPath: string,
+): Promise<void> {
+  const { bucketName, key: sourceKey } = resolveLocation(logicalBucket, sourcePath);
+  const { key: targetKey } = resolveLocation(logicalBucket, targetPath);
+  const copySource = `${bucketName}/${sourceKey
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+  try {
+    await getS3Client().send(
+      new CopyObjectCommand({
+        Bucket: bucketName,
+        Key: targetKey,
+        CopySource: copySource,
+      }),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Copy failed";
+    throw new Error(message);
+  }
 }
 
 export async function deleteObject(

@@ -5,6 +5,7 @@ import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/typography";
 import {
   Select,
   SelectContent,
@@ -233,15 +234,9 @@ export function CallLogTable({
           }
           if (row.original.recordingUrl) {
             return (
-              <a
-                href={row.original.recordingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-primary underline-offset-4 hover:underline"
-                onClick={(event) => event.stopPropagation()}
-              >
-                Listen
-              </a>
+              <Text as="span" variant="muted">
+                Recording unavailable
+              </Text>
             );
           }
           return (

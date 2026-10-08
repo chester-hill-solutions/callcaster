@@ -7,6 +7,7 @@ vi.hoisted(() => {
 import { asRouteResponse } from "./helpers/route-result";
 import { type TransactionRow } from "./helpers/transaction-history-stub";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { estimateMonthlyCredits } from "@/components/pricing/PricingCalculator";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -272,6 +273,50 @@ describe("processCallStatusWebhook single source of truth", () => {
     return Object.fromEntries(fd.entries()) as Record<string, string>;
   }
 
+  test.each([
+    { campaignType: "live_call", seconds: 1, expected: 4 },
+    { campaignType: "live_call", seconds: 60, expected: 4 },
+    { campaignType: "live_call", seconds: 61, expected: 9 },
+    { campaignType: "live_call", seconds: 300, expected: 24 },
+    { campaignType: "robocall", seconds: 1, expected: 2 },
+    { campaignType: "robocall", seconds: 60, expected: 2 },
+    { campaignType: "robocall", seconds: 61, expected: 5 },
+    { campaignType: "robocall", seconds: 300, expected: 14 },
+    { campaignType: "simple_ivr", seconds: 300, expected: 14 },
+    { campaignType: "complex_ivr", seconds: 300, expected: 14 },
+  ])("$campaignType estimate equals the real debit at $seconds seconds", async ({ campaignType, seconds, expected }) => {
+    const { processCallStatusWebhook, buildCallUpsertFromTwilioParams } = await import("../app/lib/twilio-call-status.server");
+    const agent = campaignType === "live_call";
+    const { total } = estimateMonthlyCredits({
+      smsSegments: 0, mmsMessages: 0, phoneNumbers: 0,
+      agentDials: agent ? 1 : 0, agentAverageMinutesPerDial: seconds / 60,
+      ivrDials: agent ? 0 : 1, ivrAverageMinutesPerDial: seconds / 60,
+    });
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", String(seconds), "CA_PRICE")),
+      { campaignType },
+    );
+    expect(total).toBe(expected);
+    expect(transactionRowsState.rows).toHaveLength(1);
+    expect(transactionRowsState.rows[0].amount).toBe(-expected);
+    expect(transactionRowsState.rows[0].amount).toBe(-total);
+  });
+
+  test.each(["live_call", "robocall", "simple_ivr", "complex_ivr"])("%s zero-duration estimate and actual debit are both zero", async (campaignType) => {
+    const { processCallStatusWebhook, buildCallUpsertFromTwilioParams } = await import("../app/lib/twilio-call-status.server");
+    const { total } = estimateMonthlyCredits({
+      smsSegments: 0, mmsMessages: 0, phoneNumbers: 0,
+      agentDials: 1, agentAverageMinutesPerDial: 0,
+      ivrDials: 1, ivrAverageMinutesPerDial: 0,
+    });
+    await processCallStatusWebhook(
+      buildCallUpsertFromTwilioParams(makeParams("completed", "0", "CA_ZERO_PRICE")),
+      { campaignType },
+    );
+    expect(total).toBe(0);
+    expect(transactionRowsState.rows).toHaveLength(0);
+  });
+
   test("same CallSid is billed exactly once across multiple terminal callbacks", async () => {
     const {
       processCallStatusWebhook,
@@ -337,4 +382,3 @@ describe("processCallStatusWebhook single source of truth", () => {
     expect(transactionRowsState.rows[0].idempotency_key).toBe("call:CA_KIND");
   });
 });
-

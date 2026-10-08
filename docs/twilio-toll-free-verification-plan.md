@@ -1,28 +1,54 @@
-# Toll-free verification plan (design only)
+# Toll-free verification for bulk SMS
 
-## Context
+Toll-free senders need approved verification before bulk SMS. The provider
+contract is the [Twilio Toll-free verification resource](https://www.twilio.com/docs/messaging/api/tollfree-verification-resource).
 
-CallCaster currently supports Canadian local number search and US/CA business profiles in onboarding. Toll-free senders require Twilio Toll-Free Verification before high-volume US messaging.
+## Current send gate
 
-## Scope decision
+Workspace Twilio sync reads the complete phone inventory and verification list.
+The SDK follows later pages without a total result cap. An exact approved status
+permits a toll-free sender. A missing record, unknown status, pending review or
+rejection blocks it. Provider and inventory errors remain visible in the sync
+snapshot and the send error.
 
-- **Phase 1 (document only):** Detect toll-free numbers in workspace inventory; surface readiness warnings in onboarding and admin health.
-- **Phase 2 (API):** Integrate Twilio Toll-Free Verification API when product adds US/CA toll-free purchase.
+A successful complete sync records `tollFreeVerificationCheckedAt`. A healthy
+snapshot must have that proof and an explicit non-blocked result before it can
+permit bulk SMS. Missing, malformed, failed and older snapshots remain blocked.
+A complete successful inventory with no toll-free sender is a permitted result.
+The send gate reads the stored evidence; it adds no provider call per recipient.
 
-## Required business data (Twilio)
+## Refresh after rollout
 
-- Business name, website, use case description
-- Opt-in workflow and sample messages
-- Contact email for verification updates
-- EIN or equivalent for US entities (when applicable)
+Older healthy snapshots are not proof: the previous list helper discarded
+provider errors and permitted missing records. After deploying this fix, use
+**Sync Twilio** on the admin workspace list to refresh all workspaces, or
+**Sync Twilio now** for one workspace. The workspace Twilio portal also has
+**Sync Now**.
 
-## UI steps (future)
+Check the resulting health and sync error. An approved toll-free sender or a
+confirmed inventory without toll-free senders can send again. A provider error
+keeps the gate blocked until credentials/access are repaired and a successful
+sync replaces it. This refresh also applies to workspaces without toll-free
+senders because older snapshots do not prove complete inventory.
 
-1. Channels step: optional “Toll-free SMS” when TF numbers present.
-2. Dedicated verification form mirroring A2P business profile fields.
-3. Status badge: pending / approved / rejected with rejection reason.
-4. Block campaign SMS sends when TF number selected and verification not approved.
+On deployed dev, verify approved, missing, provider-error and later-page cases.
+Verify the actual bulk SMS gate and refresh recovery before promotion and issue
+closure.
 
-## Canadian product note
+## Verification application data
 
-Current number search is CA-local only (`numbers.loader.server.ts`). Toll-free verification applies when TF numbers are added to inventory (manual Console or future purchase flow).
+New submissions require an explicit consent method in **Business identity**.
+The saved `tollFreeOptInType` uses an exact provider enum. Workflow descriptions,
+including negated consent statements, never select it. Missing or invalid stored
+values stay unselected and return an action-needed result before submission.
+There is no prose or `WEB_FORM` fallback. Other wizard steps preserve the saved
+selection; invalid posted selections are rejected before saving.
+
+Existing provider registrations remain readable without a new selection or
+resubmission. This field does not change the approved-sender send gate. Already
+submitted registrations require a separate authorized live audit; synthetic
+source tests do not establish that their previous attestations were correct.
+
+Provider registration uses business name, website, use case, opt-in workflow,
+message samples and contact email. Provider review remains separate from the
+source fix. This gate does not submit or approve a verification application.

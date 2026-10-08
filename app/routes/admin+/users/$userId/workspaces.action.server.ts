@@ -46,7 +46,7 @@ export const action = defineAction({
 
     const result = await addUserToWorkspaceAdmin(userId, workspaceId, role);
     if (!result.ok) {
-      return routeData({ error: result.error });
+      return routeData({ error: result.error }, { status: result.status });
     }
 
     return routeData({ success: "User added to workspace successfully" });
@@ -65,7 +65,7 @@ export const action = defineAction({
       role,
     );
     if (!result.ok) {
-      return routeData({ error: result.error });
+      return routeData({ error: result.error }, { status: result.status });
     }
 
     return routeData({ success: "User role updated successfully" });
@@ -80,7 +80,7 @@ export const action = defineAction({
 
     const result = await removeUserFromWorkspaceAdmin(userId, workspaceId);
     if (!result.ok) {
-      return routeData({ error: result.error });
+      return routeData({ error: result.error }, { status: result.status });
     }
 
     return routeData({ success: "User removed from workspace successfully" });

@@ -24,6 +24,10 @@ pnpm-debug.log*
 # Local generated files
 /public/exports/
 .repl/
+/graphify-out/cost.json
+/graphify-out/cache/
+/graphify-out/.graphify_python
+/graphify-out/.graphify_root
 
 # Playwright E2E
 /e2e/.auth/
@@ -36,13 +40,7 @@ pnpm-debug.log*
 .DS_Store
 *.swp
 
-# Local tooling
-.cursor/
-.agents/*
-!.agents/skills/
-.opencode/*
-!.opencode/tools/
-!.opencode/agents/
+# Local tooling folders are tracked.
 skills-lock.json
 
 # Secrets — never commit
@@ -50,4 +48,11 @@ app/transcribe.json
 *.serviceaccount.json
 scripts/dev/certs/
 /CLIPBOARD.md
-/.agent/
+# Object storage (stow) — downloaded release binary, pidfile and bucket data
+/.stow-bin/
+/.stow/
+
+# Isolated optional Graphify tool
+/.opencode/.graphify-venv/
+
+/graphify-out/.graphify_usage_unknown

@@ -92,7 +92,6 @@ export const action = defineAction({
     const credsForRest = inboundTwilioCreds;
 
     const now = new Date();
-    const nowIso = now.toISOString();
 
     // #1394 billing-attack guard. Run BEFORE media fetch, message insert,
     // opt-out/dequeue lookups, and webhook fanout — anything that costs us
@@ -177,8 +176,8 @@ export const action = defineAction({
       num_media: String(numMedia),
       num_segments: String(numSegments),
       direction: "inbound" as const,
-      date_created: nowIso,
-      date_sent: nowIso,
+      date_created: now,
+      date_sent: now,
       status: "received" as const,
       ...(messagingServiceSid ? { messaging_service_sid: messagingServiceSid } : {}),
       ...(media.length > 0 ? { inbound_media: media } : {}),
@@ -214,7 +213,7 @@ export const action = defineAction({
         try {
           for (const contactId of matchingContactIds) {
             await dequeueQueueEntry({
-              by: { contactId },
+              by: { contactId, allCampaigns: true },
               userId: null,
               reason: "Contact opted out via SMS",
               workspaceId: workspaceNumber.workspace,

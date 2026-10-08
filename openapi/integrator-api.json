@@ -41,6 +41,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -147,7 +150,7 @@
       "post": {
         "operationId": "sendChatSms",
         "summary": "Send a single SMS",
-        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
+        "description": "Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
@@ -156,6 +159,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -183,7 +189,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Validation error, SMS-incapable recipient (landline: true), or unverified recipient (recipientVerificationError: true)",
             "content": {
               "application/json": {
                 "schema": {
@@ -203,7 +209,7 @@
             }
           },
           "403": {
-            "description": "Forbidden (workspace mismatch)",
+            "description": "Forbidden (workspace mismatch or opted-out recipient: optedOut: true)",
             "content": {
               "application/json": {
                 "schema": {
@@ -248,6 +254,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -333,8 +342,14 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "sb-access-token",
-        "description": "Session cookie (browser). Use workspace API key for server/script access."
+        "name": "better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
+      },
+      "secureSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Secure-better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
       },
       "apiKey": {
         "type": "apiKey",
@@ -344,6 +359,26 @@
       }
     },
     "schemas": {
+      "ConversationSummaryMode": {
+        "type": "string",
+        "enum": [
+          "unread"
+        ],
+        "description": "Return the complete workspace unread message total instead of a conversation page."
+      },
+      "WorkspaceUnreadCountResponse": {
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "required": [
@@ -526,7 +561,7 @@
           },
           "contact_id": {
             "type": "string",
-            "description": "Optional contact ID for template tag substitution."
+            "description": "Optional contact ID. Must identify the unique workspace contact whose normalized phone equals to_number."
           },
           "media": {
             "type": "string",
@@ -639,7 +674,7 @@
               "type": "object",
               "additionalProperties": true
             },
-            "description": "Always empty on a deferral; present so clients can treat both variants alike."
+            "description": "Results for contacts processed before the send window closed. Contacts that remain queued are not included."
           }
         }
       },

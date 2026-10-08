@@ -1,8 +1,10 @@
+import { AuthzError } from "@chester-hill-solutions/auth";
 import {
   repointAllWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
 } from "@/lib/twilio-webhook-audit.server";
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
+import { projectWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { listRecentDeadLetteredJobs } from "@/lib/admin-jobs.server";
 import type { Database } from "@/lib/db-types";
 import {
@@ -10,6 +12,8 @@ import {
 } from "@/lib/workspace-invitations.server";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
+import { requireSoleOwnerProtection } from "@/lib/platform-members.server";
+import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
 import {
   deleteAdminWorkspaceMember,
   deleteWorkspaceInviteById,
@@ -34,6 +38,7 @@ import {
 } from "@/lib/workspace-members-db.server";
 
 type UserRow = Database["public"]["Tables"]["user"]["Row"];
+type AdminMembershipResult = { ok: true } | { ok: false; error: string; status: number };
 
 export async function repointAllWorkspacesTwilioWebhooks(): Promise<
   | { ok: true; results: import("@/lib/twilio-webhook-audit.server").TwilioWebhookRepointResult[] }
@@ -98,7 +103,10 @@ export async function getAdminDashboard() {
   });
 
   return {
-    workspaces: workspacesWithCampaigns,
+    workspaces: workspacesWithCampaigns.map((workspace) => ({
+      ...projectWorkspaceForClient(workspace),
+      campaign: workspace.campaign,
+    })),
     users,
     workspaceUsers,
     workspaceNumbers,
@@ -227,17 +235,28 @@ export async function getAdminUserWorkspaces(
     listPendingInvitesForUsername(userResult.user.username),
   ]);
 
-  const userWorkspaces = membershipRows;
+  const userWorkspaces = membershipRows.map((row) => ({
+    ...row,
+    workspace: row.workspace ? projectWorkspaceForClient(row.workspace) : null,
+  }));
   const pendingInvites = pendingInviteRows.map((row) => ({
-    ...row.invite,
+    id: row.invite.id,
+    workspace_id: row.invite.workspace_id,
+    email: row.invite.email,
+    role_id: row.invite.role_id,
     role: row.invite.role_id,
-    workspace: row.workspace,
+    status: row.invite.status,
+    created_at: row.invite.created_at,
+    updated_at: row.invite.updated_at,
+    expires_at: row.invite.expires_at,
+    invited_by_user_id: row.invite.invited_by_user_id,
+    workspace: projectWorkspaceForClient(row.workspace),
   }));
 
   return {
     ok: true as const,
     targetUser: userResult.user,
-    allWorkspaces,
+    allWorkspaces: allWorkspaces.map(projectWorkspaceForClient),
     userWorkspaces,
     pendingInvites,
   };
@@ -247,15 +266,18 @@ export async function addUserToWorkspaceAdmin(
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<AdminMembershipResult> {
   const existingMembership = await findAdminWorkspaceMembership({
     userId,
     workspaceId,
   });
 
   if (existingMembership) {
-    return { ok: false, error: "User is already a member of this workspace" };
+    return { ok: false, error: "User is already a member of this workspace", status: 400 };
   }
+
+  const mfaCheck = await requireTwoFactorForPrivilegedRoleAssignment(userId, role);
+  if (!mfaCheck.ok) return mfaCheck;
 
   try {
     await insertAdminWorkspaceMember({ userId, workspaceId, role });
@@ -264,6 +286,7 @@ export async function addUserToWorkspaceAdmin(
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Failed to add user",
+      status: 500,
     };
   }
 }
@@ -272,21 +295,31 @@ export async function updateUserWorkspaceRoleAdmin(
   userId: string,
   workspaceId: string,
   role: "owner" | "member" | "caller" | "admin",
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<AdminMembershipResult> {
   try {
+    const membership = await findAdminWorkspaceMembership({ userId, workspaceId });
+    if (!membership) return { ok: false, error: "Membership not found", status: 404 };
+    if (role !== "owner") {
+      const ownerCheck = await requireSoleOwnerProtection(workspaceId, userId);
+      if (!ownerCheck.ok) return ownerCheck;
+    }
+    const mfaCheck = await requireTwoFactorForPrivilegedRoleAssignment(userId, role);
+    if (!mfaCheck.ok) return mfaCheck;
+
     const updated = await updateAdminWorkspaceMemberRole({
       userId,
       workspaceId,
       role,
     });
     if (!updated) {
-      return { ok: false, error: "Membership not found" };
+      return { ok: false, error: "Membership not found", status: 404 };
     }
     return { ok: true };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Failed to update role",
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }
@@ -294,14 +327,20 @@ export async function updateUserWorkspaceRoleAdmin(
 export async function removeUserFromWorkspaceAdmin(
   userId: string,
   workspaceId: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<AdminMembershipResult> {
   try {
+    const membership = await findAdminWorkspaceMembership({ userId, workspaceId });
+    if (!membership) return { ok: false, error: "Membership not found", status: 404 };
+    const ownerCheck = await requireSoleOwnerProtection(workspaceId, userId);
+    if (!ownerCheck.ok) return ownerCheck;
+
     await deleteAdminWorkspaceMember({ userId, workspaceId });
     return { ok: true };
   } catch (error) {
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Failed to remove user",
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }
@@ -335,7 +374,10 @@ export async function getAdminWorkspaceDetail(
 
   return {
     ok: true as const,
-    workspace,
+    workspace: {
+      ...projectWorkspaceForClient(workspace),
+      campaign: workspace.campaign,
+    },
     workspaceUsers,
     phoneNumbers,
   };
@@ -372,7 +414,9 @@ export async function loadAdminWorkspaceInvitePage(
 
   const activeMembership = workspaceUsers.find((member) => member.user_id === activeUserId);
   const userRole = activeMembership?.role ?? null;
-  const hasAccess = userRole === "admin" || userRole === "owner";
+  // This page is reached only through the verified sudo admin route context.
+  // Workspace membership remains display data; it does not grant admin access.
+  const hasAccess = true;
 
   return {
     ok: true as const,

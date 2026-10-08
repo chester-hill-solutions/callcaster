@@ -18,6 +18,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { checkReadRoleFloors } from "./lib/route-read-role-floor.mjs";
 
 const ROOT = process.cwd();
 const DIR = path.join(ROOT, "app/routes/workspaces+");
@@ -70,3 +71,12 @@ if (offenders.length > 0) {
 console.log(
   `Route authz check passed: every workspace write action gates on role (${CALLER_OPEN.size} caller-open by design).`,
 );
+
+const reads = checkReadRoleFloors(ROOT);
+if (reads.offenders.length) {
+  console.error("Route authz check FAILED — sibling loader/action role mismatch:\n");
+  for (const offender of reads.offenders) console.error(`  ${offender}`);
+  console.error("Enforce the action's role floor before loader reads. Existing read/write asymmetries are a ratchet, not proof of safe access.");
+  process.exit(1);
+}
+console.log(`Read-role check passed (${reads.baselined} existing asymmetries remain recorded).`);

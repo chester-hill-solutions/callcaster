@@ -76,7 +76,9 @@ function renderStep({
       routingTargets={[
         { kind: "page", id: "page_2", label: "Thanks" },
         { kind: "special", id: "hangup", label: "Hang up" },
+        { kind: "block", id: "b2", label: "Thanks step", pageTitle: "Thanks" },
       ]}
+      pageByBlockId={{ b1: "page_1", b2: "page_2" }}
       onChange={onChange}
       onRemove={noop}
       onDuplicate={noop}
@@ -99,7 +101,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Callers hear nothing at this step yet/),
+      screen.getByText(/Recipients hear nothing at this step/),
     ).toBeInTheDocument();
   });
 
@@ -185,8 +187,8 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       }),
     });
 
-    expect(screen.getByText("Caller responses")).toBeInTheDocument();
-    expect(screen.getByLabelText("Caller answers with")).toBeInTheDocument();
+    expect(screen.getByText("Recipient responses")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient answers with")).toBeInTheDocument();
     expect(screen.getByLabelText("Then go to")).toBeInTheDocument();
     expect(screen.getByLabelText("Answer label")).toHaveValue("Yes");
 
@@ -237,5 +239,40 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
 
     expect(screen.queryByText("Spoken step")).not.toBeInTheDocument();
     expect(screen.getByText("Prompt")).toBeInTheDocument();
+  });
+
+  test("the IVR no-input panel writes gatherTimeoutSeconds and noInput on edits (#1883)", () => {
+    const { onChange } = renderStep({ block: spokenBlock() });
+
+    // The "If the recipient stays silent" panel is present with defaults.
+    expect(screen.getByText("If the recipient stays silent")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wait (seconds)")).toHaveValue(5);
+    expect(screen.getByLabelText("On no input")).toHaveTextContent("Continue to the next step");
+
+    // Choose "Replay these instructions" -> writes noInput with maxReplays.
+    fireEvent.click(screen.getByRole("combobox", { name: "On no input" }));
+    fireEvent.click(screen.getByText("Replay these instructions"));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ wireExtras: { noInput: { action: "replay", maxReplays: 2 } } }),
+    );
+
+    // Change the wait time -> writes gatherTimeoutSeconds.
+    fireEvent.change(screen.getByLabelText("Wait (seconds)"), { target: { value: "12" } });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ wireExtras: { gatherTimeoutSeconds: 12 } }),
+    );
+  });
+
+  test("a block with an existing noInput:route renders the route target (#1883)", () => {
+    renderStep({
+      block: spokenBlock({
+        wireExtras: { noInput: { action: { pageId: "page_2", blockId: "b2" }, maxReplays: 3 },
+          gatherTimeoutSeconds: 9 },
+      }),
+    });
+
+    expect(screen.getByLabelText("Wait (seconds)")).toHaveValue(9);
+    expect(screen.getByLabelText("On no input")).toHaveTextContent("Route to a step");
+    expect(screen.getByLabelText("Route to")).toHaveTextContent("Thanks step");
   });
 });

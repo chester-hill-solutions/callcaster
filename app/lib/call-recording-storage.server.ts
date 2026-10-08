@@ -23,12 +23,15 @@ function parseTwilioDataColumn(raw: unknown): unknown {
   return raw;
 }
 
+/** Twilio call-recording copies live under their own prefix, never the library. */
+const CALL_RECORDINGS_OBJECT_PREFIX = "call-recordings";
+
 /** Railway Buckets object path for a Twilio call recording copy. */
 export function callRecordingStoragePath(
   workspaceId: string,
   callSid: string,
 ): string {
-  return `${workspaceId}/recording-${callSid}.mp3`;
+  return `${CALL_RECORDINGS_OBJECT_PREFIX}/${workspaceId}/recording-${callSid}.mp3`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -143,15 +146,30 @@ type PersistCallRecordingDeps = FetchTwilioRecordingDeps & {
   loadCredentials?: typeof loadWorkspaceTwilioCredentials;
 };
 
+/**
+ * The success paths only. The failure paths throw — see
+ * {@link persistCallRecordingToStorage} for why.
+ */
 export type PersistCallRecordingResult =
   | { ok: true; audioUrl: string; skipped: false }
-  | { ok: true; audioUrl: string; skipped: true; reason: "already_persisted" }
-  | {
-      ok: false;
-      reason: "missing_credentials" | "download_failed" | "upload_failed";
-      error: string;
-    };
+  | { ok: true; audioUrl: string; skipped: true; reason: "already_persisted" };
 
+/**
+ * Copy one call recording out of Twilio into our own object storage.
+ *
+ * Throws on a missing-credentials, download, or upload failure so the caller's
+ * job FAILS and the worker's retry/dead-letter machinery takes over. This
+ * function previously returned `{ ok: false }` instead, and the single caller
+ * logged a warning and returned success — so a transient failure consumed the
+ * job's idempotency key, marked the job done, and left `call.audio_url` NULL
+ * with no mechanism left to ever fetch the audio again. Twilio is the transport;
+ * a copy that silently failed is a permanently lost recording (#2166).
+ *
+ * Missing credentials throws too, but for a different reason than a transport
+ * blip: retrying will not fix absent credentials, so the caller should treat
+ * that as permanent rather than something to re-drive. The error message says
+ * which it was.
+ */
 export async function persistCallRecordingToStorage(
   args: PersistCallRecordingArgs,
   deps: PersistCallRecordingDeps = {},
@@ -170,11 +188,9 @@ export async function persistCallRecordingToStorage(
   const loadCredentials = deps.loadCredentials ?? loadWorkspaceTwilioCredentials;
   const creds = await loadCredentials(args.workspaceId);
   if (!creds) {
-    return {
-      ok: false,
-      reason: "missing_credentials",
-      error: "Workspace Twilio credentials not found",
-    };
+    throw new Error(
+      `call_recording: permanent — workspace ${args.workspaceId} has no Twilio credentials on file, so the recording cannot be copied (call ${args.callSid})`,
+    );
   }
 
   let audioBuffer: Buffer;
@@ -186,8 +202,9 @@ export async function persistCallRecordingToStorage(
       deps,
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: "download_failed", error: message };
+    throw new Error(
+      `call_recording: download_failed — ${error instanceof Error ? error.message : String(error)} (call ${args.callSid}, recording ${args.recordingSid})`,
+    );
   }
 
   const upload = deps.uploadObject ?? uploadObject;
@@ -198,8 +215,9 @@ export async function persistCallRecordingToStorage(
       upsert: true,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { ok: false, reason: "upload_failed", error: message };
+    throw new Error(
+      `call_recording: upload_failed — ${error instanceof Error ? error.message : String(error)} (call ${args.callSid})`,
+    );
   }
 
   return { ok: true, audioUrl: objectPath, skipped: false };

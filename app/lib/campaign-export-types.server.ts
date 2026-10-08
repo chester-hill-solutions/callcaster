@@ -37,8 +37,8 @@ export interface ExportMessage {
   status?: string;
   error_code?: number | null;
   error_message?: string | null;
-  date_sent?: string;
-  date_created?: string;
+  date_sent?: Date;
+  date_created?: Date;
   workspace?: string;
 }
 
@@ -53,10 +53,10 @@ export interface ExportCall {
   duration?: string | null;
   status?: string | null;
   answered_by?: string | null;
-  start_time?: string | null;
-  end_time?: string | null;
-  date_created?: string | null;
-  date_updated?: string | null;
+  start_time?: Date | null;
+  end_time?: Date | null;
+  date_created?: Date | null;
+  date_updated?: Date | null;
   outreach_attempt_id?: string | number | null;
   parent_call_sid?: string | null;
 }

@@ -1,9 +1,10 @@
+import type { IvrPageLayout } from "@/lib/ivr-page-order";
 import { eq } from "drizzle-orm";
 import { script as scriptTable, workspace_number as workspaceNumberTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 
-export type InboundIvrScriptSteps = {
+export type InboundIvrScriptSteps = IvrPageLayout & {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, unknown>;
 };
@@ -61,6 +62,7 @@ async function loadScriptSteps(
 export async function loadInboundIvrPageContext(numberId: number): Promise<{
   inbound_script_id: number;
   phoneNumber: string | null;
+  workspaceId: string;
   steps: InboundIvrScriptSteps;
 } | null> {
   const number = await findWorkspaceNumberById(numberId);
@@ -73,7 +75,7 @@ export async function loadInboundIvrPageContext(numberId: number): Promise<{
     return null;
   }
 
-  return { inbound_script_id: number.inbound_script_id, phoneNumber: number.phoneNumber, steps };
+  return { inbound_script_id: number.inbound_script_id, phoneNumber: number.phoneNumber, workspaceId: number.workspaceId, steps };
 }
 
 export async function loadInboundIvrBlockContext(numberId: number): Promise<{

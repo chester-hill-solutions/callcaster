@@ -26,6 +26,14 @@ const creditsState = vi.hoisted(() => ({
 // The recipient calling window is wall-clock dependent; pin it open so these
 // tests are not time-of-day sensitive (window logic is covered in
 // test/recipient-calling-window.test.ts).
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    // Fixture: this workspace owns the sending number, so the send path reaches
+    // the behaviour under test instead of stopping at the ownership gate.
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+  }),
+}));
+
 vi.mock("@/lib/recipient-calling-window", () => ({
   recipientCallingWindowStatus: vi.fn(() => ({
     allowed: true,
@@ -143,6 +151,8 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   });
 
   test("success creates outreach, places call, inserts call, dequeues, returns JSON", async () => {
+    const create = vi.fn().mockResolvedValue({ sid: "CA1" });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: { create } });
     const mod = await import("../app/routes/api+/ivr");
     const res = await asRouteResponse(mod.action({
       request: makeRequest({
@@ -157,6 +167,10 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, callSid: "CA1" });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://base.example/api/ivr/1/",
+      statusCallback: "https://base.example/api/ivr/status",
+    }));
     expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledWith(
       expect.anything(),
       {
@@ -181,7 +195,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 3 },
       userId: "u1",
-      reason: "IVR call completed",
+      reason: "IVR dial dispatched",
     });
   });
 

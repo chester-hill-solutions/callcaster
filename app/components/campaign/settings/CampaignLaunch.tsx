@@ -39,6 +39,8 @@ import {
 import { productGoalForCampaignType } from "@/lib/campaign-goals";
 import type { CampaignType } from "@/lib/db-types";
 import { AlertCircle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { getCampaignSendWindowWarning } from "@/lib/campaign-readiness";
 
 function launchActionLabel(type: Campaign["type"] | null | undefined): string {
   if (!type) return "Start campaign";
@@ -210,6 +212,7 @@ export const CampaignLaunch = ({
         ).length
       : 0;
   const estimatedCredits = campaignBilling?.estimate.totalCredits ?? queueCount;
+  const sendWindowWarning = getCampaignSendWindowWarning(campaignData);
 
   const startReview = (
     <div className="space-y-4" data-testid="campaign-launch-review">
@@ -277,6 +280,13 @@ export const CampaignLaunch = ({
             ? "SMS usage is estimated by message segment."
             : "Voice usage is estimated from the configured campaign rate.")}
       </p>
+      {sendWindowWarning ? (
+        <Alert variant="warning">
+          <AlertCircle aria-hidden />
+          <AlertTitle>Are you sure you want unrestricted SMS sending?</AlertTitle>
+          <AlertDescription>{sendWindowWarning.message}</AlertDescription>
+        </Alert>
+      ) : null}
       {readinessIssues.length > 0 ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
           <p className="text-sm font-medium text-destructive-text">Complete before launch</p>
@@ -449,7 +459,6 @@ export const CampaignLaunch = ({
               {campaignBilling ? (
                 <CampaignCostPanel
                   billing={campaignBilling}
-                  queuedCount={queueCount}
                   completedCount={dequeuedCount}
                 />
               ) : null}

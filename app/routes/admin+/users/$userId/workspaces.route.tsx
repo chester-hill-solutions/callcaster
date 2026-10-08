@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type { Tables } from "@/lib/db-types";
+import type { WorkspaceClientData } from "@/lib/workspace-client-projection.server";
 
-type WorkspaceRow = Tables<"workspace">;
+type WorkspaceRow = WorkspaceClientData;
 type UserWorkspaceRow = Tables<"workspace_users"> & {
   workspace?: WorkspaceRow | null;
 };

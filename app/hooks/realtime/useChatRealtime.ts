@@ -3,7 +3,9 @@ import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/db-types";
 import {
   compareByRecentActivity,
+  getConversationPhoneKey,
   isInboundMessageDirection,
+  toConversationTimestamp,
 } from "@/lib/chat-conversation-sort";
 import {
   fetchConversationSummaries,
@@ -12,6 +14,7 @@ import {
 import { useWorkspaceEventSubscription } from "./useWorkspaceEventSubscription";
 import { type RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
+import { deepEqual } from "@/lib/deep-equal";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
 
@@ -40,6 +43,45 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
   const normalized2 = normalizePhoneForComparison(phone2);
   
   return normalized1 === normalized2;
+}
+
+function matchesPendingMessage(pending: Message, saved: Message): boolean {
+  return Boolean(
+    pending?.sid?.startsWith("pending-") && saved?.sid &&
+    !saved.sid.startsWith("pending-") && pending.body === saved.body &&
+    (!pending.from || phoneNumbersMatch(pending.from, saved.from)) &&
+    phoneNumbersMatch(pending.to, saved.to)
+  );
+}
+
+function reconcileLoaderMessages(current: Message[], initial: Message[]): Message[] {
+  const incoming = new Map(initial.flatMap(msg => msg?.sid ? [[msg.sid, msg] as const] : []));
+  const currentIds = new Set(current.map(msg => msg?.sid));
+  const newSavedRows = [...incoming.values()].filter(saved => !currentIds.has(saved.sid));
+  const retained = current.filter(pending => {
+    if (!pending?.sid.startsWith("pending-")) return true;
+    const pendingCreated = toConversationTimestamp(pending.date_created);
+    return !newSavedRows.some(saved => {
+      const savedCreated = toConversationTimestamp(saved.date_created);
+      // Allow second-precision saved timestamps to match optimistic milliseconds.
+      return matchesPendingMessage(pending, saved) && pendingCreated && savedCreated &&
+        savedCreated.slice(0, 19) >= pendingCreated.slice(0, 19);
+    });
+  });
+  const merged = retained.map(msg => incoming.get(msg?.sid ?? "") ?? msg);
+  const ids = new Set(merged.map(msg => msg?.sid));
+  for (const [sid, row] of incoming) {
+    if (!ids.has(sid)) {
+      merged.push(row);
+      ids.add(sid);
+    }
+  }
+  merged.sort((left, right) =>
+    (toConversationTimestamp(left?.date_created) ?? "").localeCompare(
+      toConversationTimestamp(right?.date_created) ?? "",
+    ),
+  );
+  return deepEqual(merged, current) ? current : merged;
 }
 
 /**
@@ -86,20 +128,27 @@ export const useChatRealTime = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>(initial);
   const initialRef = useRef(initial);
-  const messageIdsRef = useRef(new Set(initial.map(msg => msg?.sid)));
+  const conversationKey = `${workspace}:${getConversationPhoneKey(contact_number ?? null) ?? ""}`;
+  const conversationKeyRef = useRef(conversationKey);
   const contactNumberRef = useRef(contact_number);
 
   /**
-   * @effect Reset local message state and the SID-dedupe set whenever the caller supplies a new initial message list (e.g. switching conversations).
-   * @effect-deps initial (loader-provided message list; a new reference means the conversation/context changed)
-   * @effect-side-effects none — synchronizes initialRef/messageIdsRef and calls setMessages
-   * @effect-why-not-loader `initial` already comes from a loader; this effect only re-derives local realtime bookkeeping (the dedupe set) each time that loader data changes, which isn't itself a fetch.
+   * @effect Reconcile loader rows with retained history for the current workspace/contact; reset only when that conversation identity changes.
+   * @effect-deps initial (latest loader page); conversationKey (workspace and normalized contact identity)
+   * @effect-side-effects none — updates loader/conversation refs and local message state
+   * @effect-why-not-loader The loader supplies one page; accumulated pagination, live rows and optimistic replies exist in client state and must be reconciled with that page.
    */
   useEffect(() => {
+    if (conversationKeyRef.current !== conversationKey) {
+      conversationKeyRef.current = conversationKey;
+      initialRef.current = initial;
+      setMessages(initial);
+      return;
+    }
+    if (initialRef.current === initial) return;
     initialRef.current = initial;
-    messageIdsRef.current = new Set(initial.map(msg => msg?.sid));
-    setMessages(initial);
-  }, [initial]);
+    setMessages(current => reconcileLoaderMessages(current, initial));
+  }, [initial, conversationKey]);
 
   /**
    * @effect Keep a ref to the active contact_number filter so the realtime message handler always reads the current value.
@@ -125,21 +174,13 @@ export const useChatRealTime = ({
     if (typedPayload.eventType === "INSERT") {
       setMessages((curr) => {
         const newMessage = newRow as Message;
-        if (!newMessage?.sid || messageIdsRef.current.has(newMessage.sid)) {
+        if (!newMessage?.sid || curr.some(msg => msg?.sid === newMessage.sid)) {
           return curr;
         }
-        messageIdsRef.current.add(newMessage.sid);
         // Messaging Service optimistic messages have no fabricated From value,
         // so reconcile those by body/to while retaining From matching for
         // phone-number sends.
-        const withoutMatchingPending = curr.filter((m) => {
-          if (!m?.sid?.startsWith?.("pending-")) return true;
-          return !(
-            m.body === newMessage.body &&
-            (!m.from || phoneNumbersMatch(m.from, newMessage.from)) &&
-            phoneNumbersMatch(m.to, newMessage.to)
-          );
-        });
+        const withoutMatchingPending = curr.filter(m => !matchesPendingMessage(m, newMessage));
         return [...withoutMatchingPending, newMessage];
       });
     } else if (payload.eventType === "UPDATE" && newRow?.sid) {
@@ -354,6 +395,11 @@ export const useConversationSummaryRealTime = ({
             const contactPhone =
               (newRow.direction === 'inbound' ? newRow.from : newRow.to) ?? "";
 
+            // The realtime payload crossed JSON, so this arrives as the
+            // string it was sent as. ConversationSummary holds strings.
+            const rowTimestamp =
+              toConversationTimestamp(newRow.date_created) ?? new Date().toISOString();
+
             // Check if we already have a conversation for this contact
             const existingConversationIndex = prevConversations.findIndex(conv =>
               phoneNumbersMatch(conv.contact_phone, contactPhone)
@@ -369,7 +415,7 @@ export const useConversationSummaryRealTime = ({
               updatedConversations[existingConversationIndex] = {
                 ...existingConversation,
                 unread_count: existingConversation.unread_count + 1,
-                conversation_last_update: newRow.date_created || new Date().toISOString(),
+                conversation_last_update: rowTimestamp,
                 message_count: existingConversation.message_count + 1
               };
               return updatedConversations;
@@ -381,8 +427,8 @@ export const useConversationSummaryRealTime = ({
                   (newRow.direction === 'inbound'
                     ? newRow.to
                     : newRow.from) ?? "",
-                conversation_start: newRow.date_created || new Date().toISOString(),
-                conversation_last_update: newRow.date_created || new Date().toISOString(),
+                conversation_start: rowTimestamp,
+                conversation_last_update: rowTimestamp,
                 message_count: 1,
                 unread_count: 1,
                 contact_firstname: '',  // We don't have this info yet

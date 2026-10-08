@@ -545,7 +545,10 @@ export const platformOpenApiComponents = {
         inbound_audio: { type: "string" as const, nullable: true },
         inbound_ring_count: { type: "integer" as const, minimum: 1, maximum: 10 },
         inbound_queue_id: { type: "integer" as const, nullable: true },
-        inbound_script_id: { type: "integer" as const, nullable: true },
+        inbound_script_id: {
+          type: "integer" as const, minimum: 1, nullable: true,
+          description: "An inbound_ivr script in this workspace with valid document and routing targets. Referenced queues must belong to this workspace. Null clears the attachment. Invalid selection preserves the previous configuration.",
+        },
         handset_enabled: { type: "boolean" as const },
       },
     },

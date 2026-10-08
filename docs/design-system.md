@@ -6,14 +6,11 @@ For a full inventory of components, static assets, icons, route surfaces, and kn
 
 ## Package source
 
-| Layer | Location |
-|-------|----------|
-| Published package | `@chester-hill-solutions/shad-cc` (CHS monorepo `packages/shad-cc`) |
-| Vendored in-app | [`vendor/chester-hill-solutions/shad-cc`](../vendor/chester-hill-solutions/shad-cc) |
-| Theme tokens | `@chester-hill-solutions/shad-cc/theme.css` (imported from [`app/tailwind.css`](../app/tailwind.css)) |
-| Design workbench | `componentLiib/shad-cc` (catalog + axe tests) |
+The canonical shared component source is [the CHS ui-kit workbench](https://github.com/chester-hill-solutions/chester-hill-solutions/tree/main/apps/ui-kit-docs/packages/ui/src). Its components, catalog and tests are edited there, then synced into `packages/ui-kit/templates`. The [source contract](https://github.com/chester-hill-solutions/chester-hill-solutions/blob/main/packages/ui-kit/SOURCE.md) explicitly excludes external brand forks as package sources.
 
-Neutral CHS apps that own their own theme should use [`@chester-hill-solutions/ui-kit`](https://github.com/chester-hill-solutions/chester-hill-solutions/tree/main/packages/ui-kit) instead.
+CallCaster currently consumes the vendored `@chester-hill-solutions/shad-cc` compatibility package in [vendor/chester-hill-solutions/shad-cc](../vendor/chester-hill-solutions/shad-cc). It retains the app's theme and adapter API. Generic feedback changes start in the canonical workbench, then enter this compatibility layer through a reviewed source snapshot with provenance. Do not edit an external fork or generated bundle as the source of a new contract. Rebuild and verify any generated vendor output that changes.
+
+The app still imports `@chester-hill-solutions/shad-cc/theme.css` from [app/tailwind.css](../app/tailwind.css). Keep that theme, component geometry and existing page layout during targeted adoption. A wholesale library or palette migration is separate work.
 
 ## Primitives
 
@@ -21,6 +18,12 @@ Neutral CHS apps that own their own theme should use [`@chester-hill-solutions/u
 - **Compatibility:** Call sites may keep Radix-shaped props (`disabled`, `checked`, `value`/`onValueChange`, `asChild`). Adapters map these onto React Aria (`isDisabled`, `isSelected`, `selectedKey`, etc.).
 - **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired. Legacy classes `font-Zilla-Slab` / `font-Tabac-Slab` still resolve via `@theme` aliases to `font-heading` / `font-brand`.
 - **Loading:** Use `Skeleton` from [app/components/ui/skeleton.tsx](app/components/ui/skeleton.tsx) for table rows, cards, and form placeholders while data loads.
+
+### Sheet body spacing
+
+Use `SheetBody` from the local sheet adapter for content between `SheetHeader` and `SheetFooter`. It applies the same horizontal inset as the shared header/footer. Keep those slots outside the body, including inside a form, to prevent doubled padding.
+
+Use `inset="none"` only for deliberate edge-to-edge content, such as workspace navigation or the mobile chat list. `inset="navigation"` preserves the site menu's existing compact spacing. Use static layout and gap classes on the body; keep padding in the inset variants. Padding overrides, spread props and dynamic inset choices are rejected. `npm run check:sheet-bodies` rejects new undeclared bodies and nested padded slots.
 
 ## Form layout
 
@@ -60,6 +63,7 @@ For a nested control, or a compound component such as `Select`, wrap the focusab
 - Custom control components must forward ARIA attributes to their focusable input or trigger. The field does not search through arbitrary component trees or assign feedback to adjacent actions.
 - `required` on `FormField` displays the label marker. Set `required` on a native input or use the control's validation API to enforce a required value.
 - Keep plain-control CSS fallbacks in `@layer base`. Unlayered rules override Tailwind utilities, even with a zero-specificity `:where()` selector, and can hide invalid borders or replace component spacing.
+- For short field status and validation messages, pass `feedback` to reserve one row before feedback appears. An empty string reserves the row; `error` takes precedence and retains the control association. Keep action failures in the root Toaster. Verify the actual message lengths at the supported viewport widths.
 - Use the shared field contract for new forms. Do not rebuild the description and error association in each route. The app adapter owns this behavior; shad-cc owns the underlying control visuals and tokens.
 
 ## Page structure
@@ -75,10 +79,28 @@ For a nested control, or a compound component such as `Select`, wrap the focusab
 - **Tables:** Use [app/components/workspace/tables/DataTable.tsx](app/components/workspace/tables/DataTable.tsx) with TanStack Table for data grids. It supports optional toolbar, loading skeleton rows, custom empty state, and optional pagination.
 - **Pagination:** Use [app/components/shared/TablePagination.tsx](app/components/shared/TablePagination.tsx) as the single pagination composition. It renders the range summary and page controls, plus an optional page-size select (`pageSizeOptions` + `onPageSizeChange`) that the admin panels use. Queue and other list screens use it (e.g. via `QueueTablePagination`).
 
-## Toasts
+## Feedback surfaces
 
-- **One Toaster:** The app mounts a single `<Toaster />` (sonner) in [app/root.tsx](app/root.tsx). Do not mount `<Toaster />` in routes.
-- **Usage:** `import { toast } from "sonner"` and call `toast.success()`, `toast.error()`, etc. as needed.
+**A message must not move page content when it appears, updates or disappears.** Dynamic alerts render outside document flow, or inside an area that was already reserved. Do not insert a conditional banner above the page, its form or its actions. Retain existing page sections, spacing, widths and action positions.
+
+| Meaning | Shared surface | Lifetime and behavior |
+| --- | --- | --- |
+| A value in a specific field is invalid | `FormField` field feedback | Keep the accessible field association. Use an anchored message or an existing reserved area so the control stays put; do not convert validation into an unassociated toast. |
+| A brief action succeeded or failed | Single root Sonner Toaster | Deliver once for that action; preserve failed form values and retry. Do not repeat the same failure in a local row. |
+| A condition remains unresolved | Shared overlay notice | Keep it readable until resolved or explicitly dismissed. Retain required remedies and hard guards. Do not hide a required action behind transient feedback. |
+| An action needs deliberate consent | Shared controlled Dialog/AlertDialog | State the effect, offer Cancel, lock actions while pending, and dispatch only after consent. It is an overlay and does not move page landmarks. |
+| The page/region is unavailable | Shared route/region failure composition | Replace the unavailable region with useful recovery content. This is failure-page content, not a newly inserted notification beside usable content. |
+| An error/status belongs to a stored record | Existing record/table/status content | Keep it with the record. It is distinct from the result of a new action. |
+
+- **Shared ownership:** the component library owns placement, stacking, spacing, tone, dismissal controls and accessible behavior. CallCaster owns domain copy, permissions, recovery actions and route/cookie lifetime. Keep adapters thin; do not copy library class strings into routes.
+- **Tone:** use neutral, info, success, warning or error explicitly. ARIA `alert`/`status` controls announcements; it does not establish severity. Neutral content must not look like a failure. Do not express warning only through a local color override.
+- **One Toaster:** [app/root.tsx](../app/root.tsx) mounts the root Sonner host at `top-right`. Routes call `toast.success()`, `toast.error()`, etc. from `sonner`; they do not mount another host.
+- **Persistent notices:** their shared host must remain outside document flow, handle multiple notices and long content, and keep required actions usable. Do not replace important warnings with expiring toasts to achieve layout stability.
+- **Confirmation:** all entry points for one action use one controlled confirmation and one action implementation. Cancel/Escape do nothing; a pending confirmation cannot send twice. Native browser beforeunload prompts remain browser-owned.
+- **History and replay:** a presentation-only URL clear uses replacement, with unrelated parameters retained. One-time server events use validated server-owned flash state, not shareable success URLs.
+- **Proof:** test page landmark rectangles and scroll position before appearance, after appearance, after update and after dismissal in a real browser. Include narrow/desktop, light/dark, keyboard, long messages, multiple notices, failure retry and pending actions. DOM/class tests alone do not prove no layout movement.
+
+The [feedback inventory](feedback-inventory.md) lists all reviewed inline error candidates, Alert tones, duplicate groups and keep/change reasons at the stated source snapshot. Existing defects remain visible until atomic fixes land; this rule is not a claim that all current sites comply. #2058 owns the rule/inventory; #2300 owns the broader rollout.
 
 ## Icons
 

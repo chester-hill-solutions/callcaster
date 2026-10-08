@@ -12,14 +12,15 @@ import {
   pickRawTwilioSmsStatus,
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
-import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-settle-recheck.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
-import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
+import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
 import { campaign as campaignTable, campaign_queue as campaignQueueTable } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
-import { findMessageBySid } from "@/lib/message-db.server";
+import { findMessageBySid, updateMessageBySid, type MessageRow } from "@/lib/message-db.server";
+import { parseSmsProviderCount, smsProviderQuantityFields } from "@/lib/sms-provider-quantities";
 import {
   findCallBySid,
   findOutreachAttemptById,
@@ -37,7 +38,10 @@ import {
 import type { TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
+import {
+  ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+  WEBHOOK_DELIVERY_JOB_TYPE,
+} from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
@@ -114,7 +118,8 @@ export async function runCallStatusSideEffects(args: {
   if (
     outreachAttemptId != null &&
     CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
-    callRow.contact_id != null
+    callRow.contact_id != null &&
+    callRow.campaign_id != null
   ) {
     const dequeueWorkspace = workspaceId ?? callRow.workspace;
     if (!dequeueWorkspace) {
@@ -143,7 +148,7 @@ export async function runCallStatusSideEffects(args: {
         : Promise.resolve(null),
     ]);
     await dequeueQueueEntry({
-      by: { contactId: callRow.contact_id },
+      by: { contactId: callRow.contact_id, campaignId: callRow.campaign_id },
       workspaceId: dequeueWorkspace,
       household: campaign?.group_household_queue ?? false,
       userId: queueRow?.assigned_to_user_id ?? null,
@@ -153,6 +158,50 @@ export async function runCallStatusSideEffects(args: {
   }
 
   return { ok: true };
+}
+
+async function billTerminalSms(message: MessageRow, status: TwilioSmsStatus): Promise<void> {
+  const workspaceId = message.workspace;
+  if (!workspaceId || !isTerminalSmsStatus(status)) return;
+
+  let segments = parseSmsProviderCount(message.num_segments);
+  let media = parseSmsProviderCount(message.num_media);
+  if (media == null || (media === 0 && (segments == null || segments === 0))) {
+    const remote = await createWorkspaceTwilioInstance({ workspace_id: workspaceId })
+      .then((twilio) => twilio.messages(message.sid).fetch())
+      .catch((error: unknown) => {
+        logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+        throw new Error(`SMS billing metadata unavailable for ${message.sid}`, { cause: error });
+      });
+    if (remote.sid !== message.sid || (message.account_sid && remote.accountSid !== message.account_sid)) {
+      logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+      throw new Error(`Unexpected provider message identity for ${message.sid}`);
+    }
+    segments = parseSmsProviderCount(remote.numSegments);
+    media = parseSmsProviderCount(remote.numMedia);
+    const saved = await updateMessageBySid(workspaceId, message.sid, smsProviderQuantityFields(remote));
+    if (!saved) throw new Error(`Message ${message.sid} not found while saving billing metadata`);
+  }
+
+  if (media == null || (media === 0 && (segments == null || segments === 0))) {
+    logger.warn("billing.sms_metadata_unavailable", { workspaceId, sid: message.sid, status });
+    throw new Error(`SMS billing metadata unavailable for ${message.sid}`);
+  }
+
+  const isMms = media > 0;
+  const amount = isMms ? MMS_CREDITS : SMS_SEGMENT_CREDITS * (segments ?? 0);
+  const note = isMms
+    ? `MMS ${message.sid} ${status}`
+    : `SMS ${message.sid} ${status} (${segments} segment${segments === 1 ? "" : "s"})`;
+  await insertTransactionHistoryIdempotent(db, {
+    workspaceId,
+    type: "DEBIT",
+    amount: debitAmountFromCredits(amount),
+    note,
+    idempotencyKey: smsKey(message.sid),
+    messageSid: message.sid,
+    campaignId: message.campaign_id ?? null,
+  });
 }
 
 export async function runSmsStatusSideEffects(args: {
@@ -196,26 +245,13 @@ export async function runSmsStatusSideEffects(args: {
     });
   }
 
-  if (messageData.workspace && isTerminalSmsStatus(messageStatus)) {
-    const numSegments = Math.max(
-      1,
-      Number.parseInt(String(messageData.num_segments ?? "1"), 10) || 1,
-    );
-    const numMedia = Number.parseInt(String(messageData.num_media ?? "0"), 10) || 0;
-    const isMms = numMedia > 0;
-    const amount = isMms ? MMS_CREDITS : SMS_SEGMENT_CREDITS * numSegments;
-    const note = isMms
-      ? `MMS ${sid} ${messageStatus}`
-      : `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`;
-    await insertTransactionHistoryIdempotent(db, {
-      workspaceId: messageData.workspace,
-      type: "DEBIT",
-      amount: debitAmountFromCredits(amount),
-      note,
-      idempotencyKey: smsKey(sid),
-      messageSid: sid,
-      campaignId: messageData.campaign_id ?? null,
-    });
+  // Missing provider metadata defers billing, while delivery results still
+  // settle. Throw after the independent effects so the durable job retries.
+  let billingFailure: { error: unknown } | null = null;
+  try {
+    await billTerminalSms(messageData, messageStatus);
+  } catch (error) {
+    billingFailure = { error };
   }
 
   let outreachData:
@@ -274,27 +310,44 @@ export async function runSmsStatusSideEffects(args: {
     }
   }
 
-  const webhookResult = await sendWorkspaceWebhookNotification({
+  await enqueueRegisteredJob({
+    type: WEBHOOK_DELIVERY_JOB_TYPE,
     workspaceId: messageData.workspace,
-    eventCategory: "outbound_sms",
-    eventType: "UPDATE",
-    payload: {
-      type: "outbound_sms",
-      record: {
-        message_sid: messageData.sid,
-        from: messageData.from,
-        to: messageData.to,
-        body: messageData.body,
-        num_media: messageData.num_media,
-        status: messageData.status,
-        date_updated: messageData.date_updated,
+    dedupe: { kind: "idempotency", key: `outbound_sms:${sid}:${messageStatus}` },
+    params: {
+      workspaceId: messageData.workspace,
+      eventCategory: "outbound_sms",
+      eventType: "UPDATE",
+      optional: true,
+      payload: {
+        type: "outbound_sms",
+        record: {
+          message_sid: messageData.sid,
+          from: messageData.from,
+          to: messageData.to,
+          body: messageData.body,
+          num_media: messageData.num_media,
+          status: messageStatus,
+          date_updated: messageData.date_updated,
+        },
+        old_record: { message_sid: messageData.sid },
       },
-      old_record: { message_sid: messageData.sid },
     },
   });
-  if (!webhookResult.success) {
-    logger.error("SMS status webhook delivery failed", webhookResult.error);
-  }
+
+  // #2048: a message campaign is complete only when every message has settled.
+  // The dispatch chain stops when the local queue empties, so this callback is
+  // the moment the last message can actually open the gate. Re-check on EVERY
+  // status, not just terminal ones: a non-terminal callback still carries fresh
+  // message state, and asking is cheap because the RPC is the only work done.
+  // Inbound replies have campaign_id NULL, so they fall out here.
+  await recheckCampaignCompletion({
+    workspaceId: messageData.workspace,
+    campaignId: messageData.campaign_id,
+    reason: `sms_status:${messageStatus}`,
+  });
+
+  if (billingFailure) throw billingFailure.error;
 
   return { ok: true };
 }
@@ -324,7 +377,28 @@ export async function runRecordingSideEffects(args: {
     enrichment.recording_duration = recordingDuration;
   }
 
+  // Narrowed by the throw above; bound once so the closure below keeps it.
+  const workspaceId: string = callRow.workspace;
+
+  /**
+   * Writes a SNAPSHOT, not the live object. This is called twice — once before
+   * the copy so a failure is attributable, once after so `audio_url` lands —
+   * and `enrichment` keeps mutating between them. Passing the live reference
+   * would make both writes identical at read time.
+   */
+  async function writeEnrichment(): Promise<void> {
+    if (Object.keys(enrichment).length === 0) return;
+    await updateCallBySid(workspaceId, args.callSid, { ...enrichment });
+  }
+
   if (recordingSid && accountSid) {
+    // Persist the recording identity BEFORE attempting the copy, so a copy that
+    // fails still leaves a row the repair sweep can find and re-drive while
+    // Twilio still holds the source. Then attempt the copy, which throws on
+    // failure so this job FAILS and the worker retries (#2166) rather than
+    // reporting success while the audio is lost.
+    await writeEnrichment();
+
     const persistResult = await persistCallRecordingToStorage({
       workspaceId: callRow.workspace,
       callSid: args.callSid,
@@ -333,7 +407,7 @@ export async function runRecordingSideEffects(args: {
       existingAudioUrl: callRow.audio_url,
     });
 
-    if (persistResult.ok && !persistResult.skipped) {
+    if (!persistResult.skipped) {
       enrichment.audio_url = persistResult.audioUrl;
       // Batch transcription is default-off pending an undecided product policy
       // (see `batchTranscription` in @/lib/coaching-schemas). Suppress the
@@ -354,13 +428,6 @@ export async function runRecordingSideEffects(args: {
           });
         }
       }
-    } else if (!persistResult.ok) {
-      logger.warn("call_recording.persist_skipped", {
-        callSid: args.callSid,
-        workspaceId: callRow.workspace,
-        reason: persistResult.reason,
-        error: persistResult.error,
-      });
     }
   } else if (recordingSid && !accountSid) {
     logger.warn("call_recording.missing_account_sid", {
@@ -369,9 +436,7 @@ export async function runRecordingSideEffects(args: {
     });
   }
 
-  if (Object.keys(enrichment).length > 0) {
-    await updateCallBySid(callRow.workspace, args.callSid, enrichment);
-  }
+  await writeEnrichment();
 
   logger.debug("Recording side effects completed", {
     callSid: args.callSid,

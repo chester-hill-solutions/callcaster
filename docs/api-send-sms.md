@@ -10,7 +10,7 @@ CallCaster exposes two SMS endpoints for integrators. Both support **session coo
 
 ## Direct SMS — `POST /api/chat_sms`
 
-Send a single SMS to one phone number. Optional `contact_id` enables template tag substitution from the contact record.
+Send a single SMS to one phone number. The destination phone selects the recipient. A supplied `contact_id` must identify the single matching contact in the workspace. Template tags and message attribution use that verified contact. Ambiguous matches and failed recipient checks block the send. A successful lookup with no contact permits a manual send without `contact_id`.
 
 ### Request
 
@@ -22,7 +22,7 @@ Send a single SMS to one phone number. Optional `contact_id` enables template ta
 | `to_number` | string | Yes | Recipient phone (E.164 recommended). |
 | `caller_id` | string | Yes | Workspace outbound number. |
 | `body` | string | Yes | Message text (may be empty string). |
-| `contact_id` | string | No | Contact ID for `[tag]` substitution. |
+| `contact_id` | string | No | Must match the destination phone and its unique workspace contact. Enables template substitution. |
 | `media` | string | No | Media URL/path for MMS. |
 | `message_intent` | string | No | Twilio message intent. |
 | `messaging_service_sid` | string | No | Messaging Service SID override. |
@@ -48,9 +48,9 @@ curl -X POST "$BASE_URL/api/chat_sms" \
 | Status | Meaning |
 |--------|---------|
 | `201` | Message sent (`data`, `message` in body) |
-| `400` | Validation error |
+| `400` | Validation error, SMS-incapable recipient (`landline: true`), or recipient verification failure (`recipientVerificationError: true`) |
 | `401` | Missing/invalid auth |
-| `403` | `workspace_id` mismatch with API key |
+| `403` | `workspace_id` mismatch with API key or opted-out recipient (`optedOut: true`) |
 | `404` | Invalid phone number |
 | `500` | Twilio or server error |
 
@@ -101,6 +101,24 @@ curl -X POST "$BASE_URL/api/sms" \
 
 `402` with `{ "creditsError": true, "error": "Insufficient credits" }` when the workspace has no credits to start the batch at all. `400` when the campaign needs a `caller_id` and none was given.
 
+### Delivery results and recovery
+
+Provider acceptance removes the recipient from dispatch. The outreach result
+stays unresolved until the linked message has a provider result. Delivered,
+failed and undelivered messages appear under those campaign queue filters.
+Repeated callbacks and late nonterminal updates preserve the terminal result.
+
+Open-sync also checks sent messages whose send time is already saved. When the
+provider reports a terminal result, it queues the same status side effects used
+by callbacks. A provider response of sent leaves delivery unresolved; elapsed
+time alone does not prove delivery. Recovery follows the existing sweep budget.
+
+This behavior applies to messages with a saved outreach-attempt link. Older
+messages without that link, or attempts already marked completed at send time,
+need a separate repair with verified message-to-attempt identity. The send path
+does not rewrite those historical rows. The shared call terminal guard remains
+in force.
+
 ---
 
 ## Authentication
@@ -111,3 +129,23 @@ See [API overview — Authentication](./api-overview.md#authentication).
 
 - [Create campaign with script](./api-create-campaign-with-script.md)
 - [Script JSON format](./script-json-format.md)
+
+## SMS billing quantities
+
+SMS debits use the provider's validated segment count. MMS keeps its flat rate.
+A signed status callback saves segment and media counts when supplied. When
+those counts are missing or incomplete, the worker fetches the Message resource
+with the saved workspace credentials and checks its identity before saving
+metadata and applying the existing per-SID debit.
+
+If the provider count is still unavailable, the worker logs
+`billing.sms_metadata_unavailable`, leaves the debit pending and retries through
+the durable status job. Delivery results and campaign completion checks still
+run. A terminal message without its debit remains visible in the existing
+reconciliation message gap. An exhausted job uses the existing dead-letter
+recovery process. This change does not repair historical incorrect debits.
+
+Twilio status callbacks can contain different subsets of properties, and a
+Messaging Service create response can initially report zero segments. See the
+[Message resource](https://www.twilio.com/docs/messaging/api/message-resource)
+and [segment-count guidance](https://help.twilio.com/articles/360034857114).

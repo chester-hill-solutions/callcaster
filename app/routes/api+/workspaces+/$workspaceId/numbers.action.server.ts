@@ -9,7 +9,7 @@ import { defineAction } from "@/lib/handler.server";
 export const action = defineAction({
   // Buying a number debits workspace credits, so the role floor belongs at the
   // route, not three layers down in `requireNumbersManager`. Member (not admin):
-  // the purchase wizard at /workspaces/:id/settings/numbers/purchase is open to
+  // the purchase wizard at /workspaces/:id/phone-numbers/purchase is open to
   // members and `requireNumbersManager` has always allowed them — the declared
   // authClass was downgraded to match rather than tightening the live flow (D1).
   auth: dataPlaneSessionMinRoleAuth(MemberRole.Member),

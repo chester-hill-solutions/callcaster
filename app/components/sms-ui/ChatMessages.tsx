@@ -131,7 +131,7 @@ export default function ChatMessages({
       ref={
         scrollContainerRef as React.RefObject<HTMLDivElement> | undefined
       }
-      className="h-full overflow-y-auto p-3 sm:p-4"
+      className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
     >
       {hasMoreOlder ? (
         <div

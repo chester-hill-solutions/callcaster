@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
-import ChatInput from "@/components/sms-ui/ChatInput";
+import { useState } from "react";
+import ChatInputComponent from "@/components/sms-ui/ChatInput";
 import type { Contact } from "@/lib/types";
 
 vi.mock("@/components/ui/select", () => ({
@@ -23,6 +24,11 @@ vi.mock("@/components/ui/select", () => ({
   ),
 }));
 
+function ChatInput(props: React.ComponentProps<typeof ChatInputComponent>) {
+  const [bodyValue, onBodyChange] = useState("");
+  return <ChatInputComponent {...props} bodyValue={bodyValue} onBodyChange={onBodyChange} />;
+}
+
 function makeMessageFetcher(overrides: Partial<{ state: string }> = {}) {
   return {
     state: overrides.state ?? "idle",
@@ -40,6 +46,8 @@ function baseProps(overrides: Record<string, unknown> = {}) {
       messagingServiceReady: false,
     },
     initialFrom: "+15550000000",
+    bodyValue: "",
+    onBodyChange: vi.fn(),
     handleSubmit: vi.fn((e: React.FormEvent) => e.preventDefault()),
     handleImageSelect: vi.fn(),
     handleImageRemove: vi.fn(),

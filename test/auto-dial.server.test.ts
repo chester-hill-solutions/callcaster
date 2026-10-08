@@ -28,9 +28,14 @@ const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn());
 const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
+}));
+// Spreads the real module: only the keyed write is asserted here, and a frozen
+// factory breaks the day the module gains an export.
+vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-queue-updates.server")>()),
   requeueCampaignQueueById: (...args: unknown[]) =>
     requeueCampaignQueueByIdMock(...args),
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioMocks = vi.hoisted(() => ({
@@ -224,6 +229,27 @@ describe("auto-dial.server", () => {
     expect(update).toHaveBeenCalledTimes(2);
   });
 
+  test("an ended predictive conference cannot claim a queued contact or place another call", async () => {
+    twilioMocks.conferencesList.mockResolvedValueOnce([]);
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 11,
+      contact_id: 101,
+      contact_phone: "+15551234567",
+      caller_id: "+15550001111",
+    });
+    const result = await runAutoDialerTurn({
+      user_id: "agent-1",
+      workspace_id: "ws-1",
+      campaign_id: 5,
+      conference_id: "agent-1~campaign-5",
+      selected_device: "",
+    });
+    expect(result).toEqual({ success: true, message: "Conference ended, stopping auto-dial" });
+    expect(claimNextQueueContactMock).not.toHaveBeenCalled();
+    expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
+  });
+
   describe("runAutoDialerTurn recipient calling window", () => {
     const turnInput = {
       user_id: "user-1",
@@ -327,7 +353,7 @@ describe("auto-dial.server", () => {
       );
       expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: { contactId: 102 },
+          by: { contactId: 102, campaignId: 5 },
           household: true,
         }),
       );
@@ -401,7 +427,7 @@ describe("auto-dial.server", () => {
       expect(requeueCampaignQueueByIdMock).not.toHaveBeenCalled();
       expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: { contactId: 201 },
+          by: { contactId: 201, campaignId: 5 },
           household: false,
           reason: expect.stringContaining("Ambiguous dial failure"),
         }),

@@ -43,7 +43,7 @@ export function ChatThreadView({
   });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <ChatOptOutBanner contactPhone={contact_number} optedOut={optedOut} />
       <ChatMessages
         messages={

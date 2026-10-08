@@ -1,9 +1,11 @@
 import { Link, useFetcher, useRevalidator, useSearchParams } from "react-router";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { NumberSummaryList } from "@/components/phone-numbers/NumberSummaryList";
 import { useWorkspaceNumberSettingsMutations } from "@/hooks/phone";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
@@ -18,7 +20,6 @@ import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import {
   countRentedWorkspaceNumbers,
-  countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
   workspaceHasFirstNumber,
 } from "@/lib/messaging-onboarding/predicates";
@@ -109,6 +110,7 @@ export function OnboardingFirstNumberStep({
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
   const revalidator = useRevalidator();
   const {
+    fetcher: routingFetcher,
     isBusy: isRoutingBusy,
     onIncomingActivityChange,
     onIncomingVoiceMessageChange,
@@ -120,6 +122,25 @@ export function OnboardingFirstNumberStep({
     onNumberRemoval,
     onApplyPreset,
   } = useWorkspaceNumberSettingsMutations(workspaceId);
+  const pendingRoutingFormNameRef = useRef<string | null>(null);
+  if (routingFetcher.formData) {
+    pendingRoutingFormNameRef.current = String(
+      routingFetcher.formData.get("formName") ?? "",
+    );
+  }
+  useFetcherOnIdle(routingFetcher, (data) => {
+    const formName = pendingRoutingFormNameRef.current;
+    if (!formName) return;
+    pendingRoutingFormNameRef.current = null;
+    const error = (data as { error?: string } | undefined)?.error;
+    if (error) {
+      toast.error(error);
+    } else if (formName === "apply-routing-preset") {
+      toast.success("Number routing saved");
+    } else {
+      toast.success("Number settings saved");
+    }
+  });
   const [verificationDialogOpen, setVerificationDialogOpen] = useState(
     () => Boolean(validationRequest),
   );
@@ -142,7 +163,6 @@ export function OnboardingFirstNumberStep({
   const numbers = phoneNumbers ?? [];
   const rentedCount = countRentedWorkspaceNumbers(numbers);
   const rentedNumbers = numbers.filter((number) => number?.type === "rented");
-  const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
   const hasFirstNumber = workspaceHasFirstNumber(numbers);
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
   const isVerifying = pending.isVerifyingCallerId;
@@ -187,10 +207,18 @@ export function OnboardingFirstNumberStep({
       : requestedStep === "rent"
         ? hasServiceAddress ? "rent" : "address"
         : requestedStep === "address" ? "address" : "choose";
+  const firstNumberWidthClass =
+    numberStep === "rent"
+      ? undefined
+      : numberStep === "choose"
+        ? "mx-auto w-full max-w-3xl"
+        : "mx-auto w-full max-w-2xl";
   const isRentalPath =
     numberStep === "address" ||
     numberStep === "rent" ||
     (numberStep === "complete" && rentedCount > 0);
+  const numberStepPath = (step: "choose" | "address" | "rent" | "verify") =>
+    `${firstNumberReturnTo}&numberStep=${step}`;
   const rentReturnTo = `${firstNumberReturnTo}&numberStep=rent`;
 
   if (!messagingReady) {
@@ -203,7 +231,7 @@ export function OnboardingFirstNumberStep({
     const reasons = onboarding.reviewState.blockingIssues;
 
     return (
-      <Section variant="flat">
+      <Section variant="flat" className={firstNumberWidthClass}>
         <SectionHeader
           compact
           title="Phone number"
@@ -249,47 +277,93 @@ export function OnboardingFirstNumberStep({
         validationRequest={activeValidationRequest}
         status={verificationStatus}
       />
-      <Section variant="flat">
+      <Section variant="flat" className={firstNumberWidthClass}>
         <SectionHeader
           compact
           title="Phone number"
           description={hasFirstNumber
             ? rentedCount > 0
-              ? "Your number is added. Review how incoming calls are handled, then continue setup."
+              ? undefined
               : "Your caller ID is verified. Incoming calls stay with your current provider. Continue setup when you are ready."
             : "Get a new number, or verify a number your organization already owns."}
         />
         <div className="space-y-6">
           <nav aria-label="Phone number setup" className="flex flex-wrap items-center gap-2 text-sm">
-            {hasFirstNumber ? <span>1. Choose a method</span> : <Link
-              className="underline underline-offset-4"
-              to={`${firstNumberReturnTo}&numberStep=choose`}
+            <Link
+              className={
+                numberStep === "choose"
+                  ? "underline underline-offset-4"
+                  : undefined
+              }
+              to={numberStepPath("choose")}
               aria-current={numberStep === "choose" ? "step" : undefined}
             >
               1. Choose a method
-            </Link>}
+            </Link>
             <span aria-hidden="true">/</span>
             {isRentalPath ? (
               <>
-                <span aria-current={numberStep === "address" ? "step" : undefined}>
+                <Link
+                  className={
+                    numberStep === "address"
+                      ? "underline underline-offset-4"
+                      : numberStep === "rent" || numberStep === "complete"
+                        ? undefined
+                        : "text-muted-foreground"
+                  }
+                  to={numberStepPath("address")}
+                  aria-current={numberStep === "address" ? "step" : undefined}
+                >
                   2. Service address
-                </span>
+                </Link>
                 <span aria-hidden="true">/</span>
-                <span aria-current={numberStep === "rent" ? "step" : undefined}>
-                  3. Rent a number
-                </span>
+                {hasServiceAddress ? (
+                  <Link
+                      className={
+                        numberStep === "rent"
+                          ? "underline underline-offset-4"
+                          : numberStep === "address"
+                            ? "text-muted-foreground"
+                            : undefined
+                    }
+                    to={numberStepPath("rent")}
+                    aria-current={numberStep === "rent" ? "step" : undefined}
+                  >
+                    3. Rent a number
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">3. Rent a number</span>
+                )}
                 <span aria-hidden="true">/</span>
-                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                <span
+                  className={numberStep === "complete" ? undefined : "text-muted-foreground"}
+                  aria-current={numberStep === "complete" ? "step" : undefined}
+                >
                   4. Review your number
                 </span>
               </>
             ) : (
               <>
-                <span aria-current={numberStep === "verify" ? "step" : undefined}>
-                  2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
-                </span>
+                {numberStep === "choose" ? (
+                  <span className="text-muted-foreground">2. Add your number</span>
+                ) : (
+                  <Link
+                    className={
+                      numberStep === "verify"
+                        ? "underline underline-offset-4"
+                        : undefined
+                    }
+                    to={numberStepPath("verify")}
+                    aria-current={numberStep === "verify" ? "step" : undefined}
+                  >
+                    2. Verify your number
+                  </Link>
+                )}
                 <span aria-hidden="true">/</span>
-                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                <span
+                  className={numberStep === "complete" ? undefined : "text-muted-foreground"}
+                  aria-current={numberStep === "complete" ? "step" : undefined}
+                >
                   3. Review your number
                 </span>
               </>
@@ -330,21 +404,6 @@ export function OnboardingFirstNumberStep({
               ) : null}
             </div>
           ) : null}
-          {hasFirstNumber ? (
-            <Alert>
-              <AlertDescription>
-                {rentedCount > 0
-                  ? `You have ${rentedCount} rented number${rentedCount === 1 ? "" : "s"} on this workspace.`
-                  : null}
-                {rentedCount > 0 && verifiedCallerIdCount > 0 ? " " : null}
-                {verifiedCallerIdCount > 0
-                  ? `${verifiedCallerIdCount} verified caller ID${verifiedCallerIdCount === 1 ? "" : "s"} ready for outbound.`
-                  : null}{" "}
-                Continue when you are ready. You can add more numbers in Settings.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
           {numberStep === "rent" ? (
               <FirstNumberActionGroup title="Rent a Canadian number" flat>
                 <p className="text-sm text-muted-foreground">
@@ -428,15 +487,16 @@ export function OnboardingFirstNumberStep({
 
           {/* Routing only after a rented number exists. */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
-            <div className="space-y-2 border-t border-border/60 pt-6">
+            <div className="space-y-2 border-t border-border/60">
               <div>
                 <h3 className="font-medium">When someone calls your number</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose where incoming calls go for each rented number. You can change this later in Settings.
+                  Choose where incoming calls go for each rented number.
                 </p>
               </div>
               <NumberSummaryList
                 phoneNumbers={rentedNumbers}
+                presentation="onboarding"
                 users={workspaceUsers}
                 mediaNames={mediaNames}
                 queues={inboundQueues}
@@ -454,16 +514,16 @@ export function OnboardingFirstNumberStep({
                 presetOrder={presetOrderForGoal(onboarding.selectedGoal)}
                 isBusy={isRoutingBusy}
               />
+              <p className="text-sm text-muted-foreground">
+                You can add more numbers in{" "}
+                <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
+                  Phone Numbers
+                </Link>
+                .
+              </p>
             </div>
           ) : null}
 
-          <p className="text-sm text-muted-foreground">
-            Manage numbers later in{" "}
-            <Link className="underline" to={`/workspaces/${workspaceId}/settings/numbers`}>
-              Settings
-            </Link>
-            .
-          </p>
         </div>
       </Section>
     </>

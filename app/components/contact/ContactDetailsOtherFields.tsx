@@ -10,6 +10,7 @@ import { logger } from "@/lib/logger.client";
 export interface OtherDataFieldsProps {
   otherData?: Json[];
   editMode: boolean;
+  disabled?: boolean;
   setContact: (data: Record<string, unknown>) => void;
 }
 
@@ -19,7 +20,8 @@ export interface OtherDataItem {
 
 const OtherDataFields: React.FC<OtherDataFieldsProps> = ({ 
   otherData, 
-  editMode, 
+  editMode,
+  disabled = false,
   setContact 
 }) => {
   const [newKey, setNewKey] = useState<string>("");
@@ -35,7 +37,8 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
       if (!otherData) return;
       
       const newOtherData = [...otherData];
-      newOtherData[index] = { [key]: value };
+      const previous = newOtherData[index];
+      newOtherData[index] = { ...(previous && typeof previous === "object" && !Array.isArray(previous) ? previous : {}), [key]: value };
       setContact({ other_data: newOtherData });
     } catch (error) {
       logger.error('Error updating other data:', error);
@@ -62,14 +65,19 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
   }, [newKey, newValue, otherData, setContact]);
 
   // Enhanced remove function with validation
-  const removeOtherData = useCallback((index: number): void => {
+  const removeOtherData = useCallback((index: number, key: string): void => {
     try {
       if (!otherData || index < 0 || index >= otherData.length) {
         logger.warn('Invalid index for removal');
         return;
       }
 
-      const updatedOtherData = otherData.filter((_, i) => i !== index);
+      const item = otherData[index];
+      if (!item || typeof item !== "object" || Array.isArray(item)) return;
+      const { [key]: _removed, ...remaining } = item;
+      const updatedOtherData = Object.keys(remaining).length === 0
+        ? otherData.filter((_, i) => i !== index)
+        : otherData.map((row, i) => i === index ? remaining : row);
       setContact({ other_data: updatedOtherData });
     } catch (error) {
       logger.error('Error removing other data:', error);
@@ -119,12 +127,13 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
                 id={`other-data-${index}`}
                 value={value}
                 onChange={(e) => handleOtherDataChange(index, key, e.target.value)}
-                disabled={!editMode}
+                disabled={!editMode || disabled}
               />
             </FormField>
             {editMode && (
               <Button
-                onClick={() => removeOtherData(index)}
+                onClick={() => removeOtherData(index, key)}
+                disabled={disabled}
                 variant="destructive"
                 size="sm"
                 aria-label={`Remove ${key} field`}
@@ -144,6 +153,7 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
             <FormField htmlFor="new-other-data-key" label="Field Name">
               <Input
                 id="new-other-data-key"
+                disabled={disabled}
                 value={newKey}
                 onChange={(e) => setNewKey(e.target.value)}
                 placeholder="Enter field name"
@@ -152,6 +162,7 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
             <FormField htmlFor="new-other-data-value" label="Field Value">
               <Input
                 id="new-other-data-value"
+                disabled={disabled}
                 value={newValue}
                 onChange={(e) => setNewValue(e.target.value)}
                 placeholder="Enter field value"
@@ -161,7 +172,7 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
           <div className="mt-3">
             <Button
               onClick={addNewOtherData}
-              disabled={!newKey.trim() || !newValue.trim()}
+              disabled={disabled || !newKey.trim() || !newValue.trim()}
               className="bg-green-500 text-white hover:bg-green-600 disabled:opacity-50"
             >
               <FaPlus className="w-4 h-4 mr-2" />

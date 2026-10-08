@@ -7,9 +7,18 @@ description: "Use when creating or editing GitHub issues, especially issue types
 
 This skill extends `github-cli`; apply its authentication, repository-targeting, mutation, and general verification rules first. This skill owns only issue classification and relationships for `chester-hill-solutions/callcaster`.
 
+## User-limited issue queues
+
+For a user-limited issue queue, read live native assignees before selecting,
+editing or publishing work. Use the assignee field, not the author or cached
+board. Skip issues owned by someone the user excluded, including co-assigned
+issues; do not reassign an issue to make it eligible.
+
 ## Issue Types
 
 Use a GitHub issue type for primary work classification. Do not use a label such as `bug` as a substitute for the `Bug` type. Labels remain appropriate for orthogonal metadata, such as component, priority, status, or team ownership.
+
+`Effort` is an organization-level GitHub Issue field, not an issue label or a GitHub Project field. `gh issue view --json` does not expose it. Resolve its field and option IDs with the GraphQL query in `github-cli`, then use `repository.issues(filterBy: { issueFieldValues: [...] })` to select issues by effort.
 
 The following enabled organization types were verified for `chester-hill-solutions/callcaster` on **2026-08-08** using `gh 2.85.0` (closed-reason commands re-verified **2026-08-27** on `gh 2.96.0`):
 
@@ -30,6 +39,16 @@ gh api graphql -f query='query { organization(login: "chester-hill-solutions") {
 ```
 
 Use only names returned with `isEnabled: true`; record the new verification date and CLI version in this skill when the inventory changes.
+
+## Older CLI fallback
+
+The installed CLI can lack `--type` and relationship flags shown below. Check
+its help first. If those flags are absent, use REST with a JSON input file:
+create via `POST repos/OWNER/REPO/issues` with the enabled type name in `type`;
+link an existing child via `POST repos/OWNER/REPO/issues/PARENT/sub_issues` with
+`sub_issue_id` set to the child's numeric issue ID. Verify the returned type and
+`GET repos/OWNER/REPO/issues/CHILD/parent`. Do not replace issue types with labels
+or create duplicate issues to repair a missing relationship.
 
 ## Closed Reasons
 
@@ -66,6 +85,38 @@ gh api "repos/chester-hill-solutions/callcaster/issues/1155/timeline" \
 ```
 
 When closing an issue you intend as wontfix, pass `--reason "not planned"` explicitly — the default closure reason is `COMPLETED`, and the board treats those oppositely.
+
+## Issue Board Source Audits
+
+For an audit, update the existing enrichment records and regenerate `ISSUE_BOARD.md`.
+Before editing a record, read the strict schema in `scripts/issue-board-lib.mjs`
+and its existing fields. Merge only supported keys; preserve acceptance criteria
+and unrelated metadata. Unknown fields fail validation before board generation.
+Preserve the enrichment files' UTF-8 characters and existing rendering. Review
+the diff for unrelated serialization changes before staging.
+Trace the affected route or worker to its actual helper before moving an issue to
+Verify and close. A merged PR that changes another parser does not fix the upload
+path. For SQL, check bootstrap inclusion and later function definitions; a file
+that exists but is skipped or replaced is not the active fix.
+
+Read the applicable ADRs before putting work in Needs decision. A missing
+runtime feature does not mean its policy is undecided. Keep adopted constraints
+and scope the missing rollout decision. Interim warnings cannot replace a
+required enforcement rule.
+
+Separate source proof from deployed verification. Keep unfinished parts visible
+when a PR resolves only part of an issue. Check proposed query predicates against
+both the failing case and the control case before carrying them into the board.
+
+## Pinned Source Links
+
+Before publishing source evidence, discover uncertain paths with `rg --files`
+and verify each pinned link with `git cat-file -e COMMIT:path`. Read the cited
+lines from that exact commit. A guessed path can produce a valid-looking but
+broken GitHub URL; a successful issue write does not prove the source link works.
+After a correction, re-read the issue body and use the corrected snapshot for
+subsequent board updates. Keep historical findings separate from current scope
+so a completed task or recorded decision does not still read as unfinished.
 
 ## Atomic Task And Epic Creation
 

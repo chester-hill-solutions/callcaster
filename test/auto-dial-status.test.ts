@@ -32,13 +32,19 @@ vi.mock("@/lib/logger.server", () => ({
 }));
 const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
+}));
+// Spreads the real module, for the same reason: only the keyed write is
+// asserted on, and this file's graph is deep enough that a frozen factory hides
+// unrelated breakage behind a catch-all error.
+vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-queue-updates.server")>()),
   updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
     if (campaignQueueDbMocks.updateError) {
       throw campaignQueueDbMocks.updateError;
     }
     return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
   },
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioValidation = vi.hoisted(() => ({
@@ -72,6 +78,12 @@ vi.mock("@/lib/telephony-db.server", async () => {
 const runAutoDialerTurnMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auto-dial.server", () => ({
   runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
+}));
+
+const machineOperationMock = vi.hoisted(() => vi.fn());
+vi.mock("@/server/predictive-machine-operation.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/predictive-machine-operation.server")>()),
+  getPredictiveMachineOperation: machineOperationMock,
 }));
 
 const emitPredictiveBroadcastMock = vi.hoisted(() => vi.fn(async () => null));
@@ -201,6 +213,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
               data: {
                 disposition: args?.outreachDisposition ?? "in-progress",
                 contact_id: 1,
+                campaign_id: 1,
               },
               error: outreachFetchError,
             }),
@@ -348,6 +361,8 @@ describe("api.auto-dial.status", () => {
     loggerMocks.info.mockReset();
     dequeueQueueEntryMock.mockReset();
     dequeueQueueEntryMock.mockImplementation(async () => {});
+    machineOperationMock.mockReset();
+    machineOperationMock.mockResolvedValue(null);
     runAutoDialerTurnMock.mockReset();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
     emitPredictiveBroadcastMock.mockReset();
@@ -456,7 +471,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
     expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1 }, household: true }),
+      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
     );
   });
 
@@ -694,6 +709,22 @@ describe("api.auto-dial.status", () => {
     );
   });
 
+  test.each(["issued", "uncertain", "continued"])("%s machine operation keeps billing but suppresses a second next turn", async state => {
+    twilioClientMock.conferences.list.mockResolvedValueOnce([{sid:"CONF1"}]);
+    machineOperationMock.mockResolvedValueOnce({state});
+    const mod=await import("../app/routes/api+/auto-dial/status.route");
+    const fd=new FormData();
+    fd.set("CallSid","CA_MACHINE");fd.set("CallStatus","busy");
+    fd.set("Timestamp",new Date().toISOString());fd.set("Duration","61");fd.set("CallDuration","61");fd.set("ConferenceSid","conf1");
+    const response=await asRouteResponse(mod.action({request:new Request("http://localhost/api/auto-dial/status",{method:"POST",headers:{"x-twilio-signature":"good"},body:fd})} as Parameters<typeof mod.action>[0]));
+    expect(response.status).toBe(200);
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+    expect(machineOperationMock).toHaveBeenCalledWith(expect.objectContaining({workspaceId:"w1",callSid:"CA_MACHINE"}));
+    expect(postgresStub._ledgerCalls).toHaveLength(1);
+    expect(postgresStub._ledgerCalls[0].idempotencyKey).toBe("call:CA_MACHINE");
+    expect(dequeueQueueEntryMock).toHaveBeenCalledTimes(1);
+  });
+
   test("triggerAutoDialer error bubbles to 500 when the in-process dialer turn fails", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
     runAutoDialerTurnMock.mockResolvedValueOnce({ success: false, error: "no queue" });
@@ -799,12 +830,12 @@ describe("api.auto-dial.status", () => {
     } as any));
     expect(res.status).toBe(500);
     expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1 }, household: true }),
+      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
     );
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
-  test("participant-leave outreach fetch error returns 500", async () => {
+  test("participant-leave does not need a successful outreach lookup", async () => {
     postgresStub = await usePostgresStub({ outreachFetchError: new Error("out") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -824,7 +855,8 @@ describe("api.auto-dial.status", () => {
         body: fd,
       }),
     } as any));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(telephonyDbMocks.findOutreachAttemptById).not.toHaveBeenCalled();
   });
 
   test("participant-leave catch branch returns 500 when conferences.list throws", async () => {
@@ -1005,6 +1037,7 @@ describe("api.auto-dial.status", () => {
     expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
       contact_id: 1,
       status: "ringing",
+      conference_id: "conf1",
     });
   });
 
@@ -1028,6 +1061,7 @@ describe("api.auto-dial.status", () => {
     expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
       contact_id: 1,
       status: "completed",
+      conference_id: "conf1",
     });
   });
 
@@ -1215,4 +1249,3 @@ describe("api.auto-dial.status", () => {
     );
   });
 });
-

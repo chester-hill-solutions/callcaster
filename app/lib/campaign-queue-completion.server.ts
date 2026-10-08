@@ -7,8 +7,6 @@
  * empty queue. Kept out of campaign-queue-db.server.ts to stay under the
  * file-size guard.
  */
-import { and, eq } from "drizzle-orm";
-import { campaign_queue as campaignQueueTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { rpcTryCompleteCampaignIfDrained, type RpcExecutor } from "@/lib/db-rpc.server";
@@ -26,26 +24,20 @@ type DequeuedRow = { campaign_id: number | null; workspace?: string | null };
 export async function completeCampaignsDrainedByDequeue(
   rows: DequeuedRow[],
   workspaceId: string | null | undefined,
+  /**
+   * Run the completion checks inside a caller's transaction rather than on the
+   * module-level client. Without this, a caller that has wrapped its writes in
+   * a transaction would still see a campaign marked complete by a write that
+   * later rolls back (#2154).
+   */
+  execOverride?: RpcExecutor,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const exec = workspaceId ? createTenantDb(workspaceId) : db;
+  const exec = execOverride ?? (workspaceId ? createTenantDb(workspaceId) : db);
   await tryCompleteDrainedCampaigns(
     rows.map((row) => row.campaign_id).filter((id): id is number => id != null),
     exec,
   );
-}
-
-export async function campaignIdsForContact(contactId: number, workspaceId: string): Promise<number[]> {
-  const rows = await db
-    .select({ campaign_id: campaignQueueTable.campaign_id })
-    .from(campaignQueueTable)
-    .where(
-      and(
-        eq(campaignQueueTable.contact_id, contactId),
-        eq(campaignQueueTable.workspace, workspaceId),
-      ),
-    );
-  return rows.map((row) => row.campaign_id).filter((id): id is number => id != null);
 }
 
 export async function tryCompleteDrainedCampaigns(

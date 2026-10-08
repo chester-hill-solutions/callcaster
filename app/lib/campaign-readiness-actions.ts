@@ -113,6 +113,11 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Replace script",
   },
+  script_routing_invalid: {
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
+    label: "Fix script routing",
+  },
   audio_unavailable: {
     type: "route",
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
@@ -129,8 +134,8 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     label: "Add message content",
   },
   campaign_ended: {
-    type: "route",
-    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignQueue,
+    type: "scroll",
+    targetId: "campaign-setup-schedule",
     label: "Update campaign dates",
   },
   send_window_required: {

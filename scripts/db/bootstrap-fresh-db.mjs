@@ -31,6 +31,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -119,6 +120,22 @@ const steps = [
   "client/migrations/20260920120000_drop_get_outreach_attempts.sql",
   "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql",
   "client/migrations/20260920120200_rewrite_last_access_actor.sql",
+  "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
+  "client/migrations/20260925120000_gate_campaign_completion_on_settled_messages.sql",
+  "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
+  "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+  "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
+  "client/migrations/20261003231500_guard_active_inbound_offers.sql",
+  "client/migrations/20261005000000_persist_stripe_customer_creation.sql",
+  "client/migrations/20261006000000_number_purchase_recovery.sql",
+  "client/migrations/20261006000001_number_release_recovery.sql",
+  "client/migrations/20261006000002_predictive_machine_operation.sql",
+  "client/migrations/20261006000003_inbound_voicemail_delivery.sql",
+  "client/migrations/20261007000001_uuid_workspace_references.sql",
+  "client/migrations/20261007000002_workspace_audio_workspace_reference.sql",
+  "client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql",
+  "client/migrations/20261007000004_workspace_member_workspace_reference.sql",
+  "client/migrations/20261007000005_audience_import_recovery.sql",
 ];
 
 /**
@@ -135,7 +152,6 @@ const coveredByBaseline = new Set([
   "20260704000002_unique_workspace_api_key_prefix.sql",
   "20260704000003_extend_job_table.sql",
   "20260705000100_add_call_user_id.sql",
-  "20260705000200_acd_duplicate_offer_guard.sql",
   "20260705000200_add_campaign_queue_workspace.sql",
   "20260705000200_survey_response_unique_result_id.sql",
   "20260706120000_auth_two_factor.sql",
@@ -148,20 +164,24 @@ const allMigrationFiles = readdirSync(path.join(rootDir, "client/migrations"))
   .filter((file) => file.endsWith(".sql"))
   .sort();
 
-// Same drift guard as the compose bootstrap: a migration wired into neither
-// list is a mistake that would silently diverge this tool from the schema.
+// An unlisted migration with no explicit coverage would diverge fresh schemas.
+// The later guard replaces the legacy index and final claim function.
+const coveredByLaterMigration = new Set([
+  "20260705000200_acd_duplicate_offer_guard.sql",
+]);
+
 const listed = new Set(
   steps
     .filter((step) => step.startsWith("client/migrations/"))
     .map((step) => path.basename(step)),
 );
 const unwired = allMigrationFiles.filter(
-  (file) => !listed.has(file) && !coveredByBaseline.has(file),
+  (file) => !listed.has(file) && !coveredByBaseline.has(file) && !coveredByLaterMigration.has(file),
 );
 if (unwired.length > 0) {
   console.error(
-    "[bootstrap-fresh-db] migrations exist in client/migrations/ but are wired into neither\n" +
-      "`steps` nor `coveredByBaseline` in this file:\n" +
+    "[bootstrap-fresh-db] migrations exist in client/migrations/ but are wired into none of\n" +
+      "`steps`, `coveredByBaseline` or `coveredByLaterMigration` in this file:\n" +
       unwired.map((file) => `  ${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
       "the drizzle/ baseline already contains its effect. Update the compose\n" +
@@ -182,7 +202,7 @@ const drizzleWired = new Set(
 const unwiredDrizzle = allDrizzleFiles.filter((file) => !drizzleWired.has(file));
 if (unwiredDrizzle.length > 0) {
   console.error(
-    "[bootstrap-fresh-db] drizzle/*.sql files exist but are wired into neither\n" +
+    "[bootstrap-fresh-db] drizzle/*.sql files exist but are wired into none of\n" +
       "`steps` in this file:\n" +
       unwiredDrizzle.map((file) => `  drizzle/${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order). Update the compose\n" +
@@ -277,19 +297,12 @@ async function main() {
     await sql.end({ timeout: 5 });
   }
 
-  for (const step of steps) {
-    const file = path.join(rootDir, step);
-    console.log(`[bootstrap-fresh-db] applying ${step}`);
-    const result = spawnSync(
-      "psql",
-      [databaseUrl, "-v", "ON_ERROR_STOP=1", "-q", "-f", file],
-      { stdio: "inherit" },
-    );
-    if (result.status !== 0) {
-      console.error(`[bootstrap-fresh-db] failed on ${step}`);
-      process.exit(result.status ?? 1);
-    }
-  }
+  await applySqlSteps({
+    databaseUrl,
+    steps,
+    rootDir,
+    label: "bootstrap-fresh-db",
+  });
 
   const ledgerSql = postgres(databaseUrl, { prepare: false, max: 1 });
   try {

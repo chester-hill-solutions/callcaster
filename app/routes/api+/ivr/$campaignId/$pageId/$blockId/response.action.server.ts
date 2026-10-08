@@ -10,6 +10,8 @@ import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twil
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import {
+  findNextBlock,
+  type IvrScript,
   resolveNoInputTarget,
   type IvrNoInputConfig,
 } from "@/lib/ivr-block-runtime.server";
@@ -20,68 +22,34 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 
 import type { Json } from "@/lib/db-types";
+import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
   return row.result;
 };
 
-interface Script {
+interface Script extends IvrScript {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<
     string,
     {
       id: string;
       title?: string;
-      options?: Array<{ value: string; next?: string }>;
+      options?: IvrOptionLike[];
       noInput?: IvrNoInputConfig;
     }
   >;
 }
 
-const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
-  const currentPage = script.pages[currentPageId];
-  if (!currentPage) {
-    return null;
-  }
-  const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
-
-  if (currentBlockIndex < currentPage.blocks.length - 1) {
-    const nextBlockId = currentPage.blocks[currentBlockIndex + 1];
-    if (!nextBlockId) {
-      return null;
-    }
-    return {
-      pageId: currentPageId,
-      blockId: nextBlockId,
-    };
-  }
-
-  const pageIds = Object.keys(script.pages);
-  const currentPageIndex = pageIds.indexOf(currentPageId);
-  if (currentPageIndex < pageIds.length - 1) {
-    const nextPageId = pageIds[currentPageIndex + 1];
-    const nextPage = nextPageId ? script.pages[nextPageId] : undefined;
-    const nextBlockId = nextPage?.blocks[0];
-    if (!nextPageId || !nextBlockId) {
-      return null;
-    }
-    return { pageId: nextPageId, blockId: nextBlockId };
-  }
-
-  return null;
-};
-
-const findNextStep = (currentBlock: { id: string; options?: Array<{ value: string; next?: string }> }, userInput: string | null, script: Script, pageId: string): string => {
-  const hasUserInput = userInput != null && String(userInput).trim() !== "";
-  if (currentBlock.options && hasUserInput) {
-    const matchedOption = currentBlock.options.find((option) => {
-      const optionValue = String(option.value).trim();
-      const input = String(userInput).trim();
-      return optionValue === input || (input.length > 2 && optionValue === 'vx-any');
-    });
-    if (matchedOption && matchedOption.next) return matchedOption.next;
-  }
+const findNextStep = (
+  currentBlock: { id: string; options?: IvrOptionLike[] },
+  userInput: string | null,
+  script: Script,
+  pageId: string,
+): string => {
+  const matchedOption = findIvrMatchedOption(currentBlock.options, userInput);
+  if (matchedOption?.next) return matchedOption.next;
 
   const nextLocation = findNextBlock(script, pageId, currentBlock.id);
   return nextLocation 
@@ -130,12 +98,16 @@ export const action = defineAction({
   const baseUrl = env.BASE_URL();
 
   const twiml = createVoiceResponse();
+  const twimlResponse = () =>
+    new Response(twiml.toString(), {
+      headers: { "Content-Type": "application/xml" },
+    });
 
   const pageId = params.pageId as string;
   const blockId = params.blockId as string;
   const campaignId = params.campaignId as string;
 
-  const { callSid, userInput } = auth;
+  const { callSid, userInput, answer } = auth;
 
   try {
     const [call, campaignData] = await Promise.all([
@@ -173,6 +145,10 @@ export const action = defineAction({
 
     // Replay counts live in the call result so the cap survives the round-trip.
     const hadInput = userInput != null && String(userInput).trim() !== "";
+    const matchedOption = findIvrMatchedOption(currentBlock.options, userInput);
+    // A gathered key is an answer only when it matches a declared option.
+    // Treat an unknown key like no input so it cannot answer a later block.
+    const hasAcceptedInput = hadInput && (!currentBlock.options?.length || matchedOption != null);
     const persistResult = async (patch: Record<string, unknown>) => {
       if (call.outreach_attempt_id == null || !call.workspace) return;
       await updateOutreachAttemptForWorkspace(
@@ -199,11 +175,11 @@ export const action = defineAction({
       const perPage = nested?.[pageId] as Record<string, unknown> | undefined;
       noInputReplays = typeof perPage?.[blockId] === "number" ? (perPage[blockId] as number) : 0;
 
-      if (!hadInput) {
+      if (!hasAcceptedInput) {
         const target = resolveNoInputTarget(currentBlock.noInput, noInputReplays);
         if (target.kind === "hangup") {
           twiml.hangup();
-          return;
+          return twimlResponse();
         }
         if (target.kind === "route") {
           handleNextStep(
@@ -213,11 +189,12 @@ export const action = defineAction({
             pageId,
             baseUrl,
           );
-          return;
+          return twimlResponse();
         }
         if (target.kind === "replay" && call.outreach_attempt_id != null && call.workspace) {
           await persistResult({
             result: {
+              ...result,
               __no_input_replays: {
                 ...(nested ?? {}),
                 [pageId]: { ...(perPage ?? {}), [blockId]: noInputReplays + 1 },
@@ -225,7 +202,7 @@ export const action = defineAction({
             },
           });
           twiml.redirect(`${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`);
-          return;
+          return twimlResponse();
         }
         // replay without a store, or past the cap: fall through.
       }
@@ -234,7 +211,7 @@ export const action = defineAction({
     // Test calls have no outreach attempt by design: they walk the flow
     // but record nothing, so results, exports, and analytics never see them.
     // Guarding here keeps a test key press from speaking the generic error.
-    if (call.outreach_attempt_id) {
+    if (call.outreach_attempt_id && hasAcceptedInput) {
       const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id);
       const result =
         resultValue && typeof resultValue === "object"
@@ -252,7 +229,7 @@ export const action = defineAction({
           ...(result[pageId] && typeof result[pageId] === "object"
             ? (result[pageId] as Record<string, unknown>)
             : {}),
-          [blockTitle]: userInput,
+          [blockTitle]: answer,
         },
       };
 
@@ -283,8 +260,6 @@ export const action = defineAction({
     twiml.hangup();
   }
 
-  return new Response(twiml.toString(), {
-    headers: { "Content-Type": "application/xml" },
-  });
+  return twimlResponse();
   },
 });

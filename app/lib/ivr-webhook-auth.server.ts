@@ -10,6 +10,7 @@
  * is only parsed once.
  */
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import type { IvrRecordedAnswer } from "@/lib/ivr-results";
 
 async function readWebhookFormParams(request: Request): Promise<Record<string, string>> {
   const formData = await request.clone().formData();
@@ -55,11 +56,15 @@ export async function requireTwilioSignatureForIvrBlock(
   return forbidden ?? { callSid };
 }
 
-/** Response routes: block-route checks plus the Digits/SpeechResult input. */
+/** Response routes: block checks plus the Digits/SpeechResult input. */
 export async function requireTwilioSignatureForIvrResponse(
   request: Request,
   routeIds: Array<string | undefined>,
-): Promise<Response | { callSid: string; userInput: string | null }> {
+): Promise<Response | {
+  callSid: string;
+  userInput: string | null;
+  answer: IvrRecordedAnswer | null;
+}> {
   if (routeIds.some((id) => !id)) {
     return new Response("Missing required parameters", { status: 400 });
   }
@@ -76,11 +81,30 @@ export async function requireTwilioSignatureForIvrResponse(
         ? speechResultValue
         : null;
   const callSid = typeof callSidValue === "string" ? callSidValue : null;
+  const inputType: IvrRecordedAnswer["inputType"] =
+    typeof digitsValue === "string" ? "dtmf" : "speech";
+  const confidenceValue = formParams.Confidence?.trim();
+  const parsedConfidence = confidenceValue ? Number(confidenceValue) : Number.NaN;
+  const confidence =
+    inputType === "speech" &&
+    Number.isFinite(parsedConfidence) &&
+    parsedConfidence >= 0 &&
+    parsedConfidence <= 1
+      ? parsedConfidence
+      : null;
+  const answer = userInput === null || userInput.trim() === ""
+    ? null
+    : {
+        value: userInput.trim(),
+        raw: userInput,
+        confidence,
+        inputType,
+      };
 
   if (!callSid) {
     return new Response("Missing CallSid parameter", { status: 400 });
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid, userInput };
+  return forbidden ?? { callSid, userInput, answer };
 }

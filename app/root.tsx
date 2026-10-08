@@ -16,7 +16,8 @@ import { useCallback } from "react";
 import Navbar from "@/components/layout/Navbar";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
-import stylesheet from "@/tailwind.css?url";
+import { toResponseMessage } from "@/lib/user-message";
+import "@/tailwind.css";
 
 import type { RootLoaderData } from "./root.loader.server";
 
@@ -32,7 +33,6 @@ export const meta: MetaFunction = () => [
 ];
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: stylesheet },
   { rel: "icon", href: "/favicon.ico" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -102,7 +102,7 @@ export default function App() {
         />
         <Links />
       </head>
-      <body className="min-h-screen bg-background">
+      <body className="flex min-h-screen flex-col bg-background">
         <ThemeProvider
           defaultTheme="system"
           storageKey="callcaster-theme"
@@ -117,8 +117,15 @@ export default function App() {
             user={user ?? null}
             params={params}
           />
-          <Outlet context={{} satisfies Record<string, never>} />
-          <Toaster position="top-right" visibleToasts={3} />
+          <div className="flex min-h-0 w-full flex-1 flex-col">
+            <Outlet context={{} satisfies Record<string, never>} />
+          </div>
+          <Toaster
+            position="top-right"
+            visibleToasts={3}
+            offset={{ top: "5rem" }}
+            mobileOffset={{ top: "5rem" }}
+          />
           <ScrollRestoration />
           <Scripts />
         </ThemeProvider>
@@ -244,9 +251,10 @@ export function ErrorBoundary() {
         body={
           isNotFound
             ? "The page you're looking for doesn't exist or may have moved."
-            : typeof error.data === "string" && error.data
-              ? error.data
-              : "Something went wrong handling your request."
+            : toResponseMessage(
+                error.data,
+                "Something went wrong handling your request.",
+              )
         }
       />
     );

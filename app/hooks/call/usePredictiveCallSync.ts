@@ -1,19 +1,16 @@
 import { useEffect } from "react";
 import type { QueueItem } from "@/lib/types";
-
-type PredictiveState = {
-  contact_id: number | null;
-  status: string;
-};
+import type { PredictiveBroadcastPayload } from "@/lib/workspace-events.shared";
 
 type UsePredictiveCallSyncOptions = {
-  predictiveState: PredictiveState;
+  predictiveState: PredictiveBroadcastPayload;
   queue: QueueItem[];
   nextRecipient: QueueItem | null;
   send: (action: { type: string }) => void;
   setNextRecipient: (recipient: QueueItem | null) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
   conference: string | null;
+  setConference: (conference: string | null) => void;
 };
 
 /**
@@ -27,6 +24,7 @@ export function usePredictiveCallSync({
   setNextRecipient,
   setUpdate,
   conference,
+  setConference,
 }: UsePredictiveCallSyncOptions) {
   /**
    * @effect Bridge predictive-dialer room state (pushed via the workspace SSE
@@ -35,7 +33,7 @@ export function usePredictiveCallSync({
    * status, and clear the pending questionnaire update when the dialer starts
    * dialing a different (or no) contact.
    * @effect-deps predictiveState, queue, nextRecipient?.contact_id, send,
-   * setNextRecipient, setUpdate (reacts to every server-pushed predictive
+   * setNextRecipient, setUpdate, conference, setConference (reacts to every server-pushed predictive
    * status/contact change and needs the current queue to resolve the contact
    * and the current nextRecipient to detect a contact swap)
    * @effect-side-effects none (dispatches to state setters/reducer passed in;
@@ -46,6 +44,14 @@ export function usePredictiveCallSync({
    * it into local FSM/UI state is exactly what an effect is for.
    */
   useEffect(() => {
+    if (predictiveState.conference_id) {
+      if (predictiveState.conference_id !== conference) return;
+      if (predictiveState.conference_ended === true && predictiveState.status === "completed") {
+        send({ type: "HANG_UP" });
+        setConference(null);
+        return;
+      }
+    }
     if (predictiveState.contact_id && predictiveState.status) {
       const contact = queue.find(
         (c) => c.contact_id === predictiveState.contact_id,
@@ -85,5 +91,6 @@ export function usePredictiveCallSync({
     nextRecipient?.contact_id,
     setUpdate,
     conference,
+    setConference,
   ]);
 }

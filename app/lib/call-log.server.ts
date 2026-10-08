@@ -26,7 +26,7 @@ type CallLogQueryRow = {
   from: string | null;
   to: string | null;
   direction: string | null;
-  date_created: string;
+  date_created: Date;
   recording_url: string | null;
   /** Object-storage path of our copy of the recording (preferred for playback). */
   audio_url: string | null;
@@ -153,7 +153,9 @@ function mapCallLogRow(
 
   return {
     sid: row.sid,
-    dateCreated: row.date_created,
+    // `CallLogRow` is rendered client-side, so this crosses JSON: a Date would
+  // arrive as a string and the declared `string` would be a lie.
+  dateCreated: row.date_created.toISOString(),
     callcasterNumber: parties.callcasterNumber,
     otherNumber: parties.otherNumber,
     direction: parties.flow,

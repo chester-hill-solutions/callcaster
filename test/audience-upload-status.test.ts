@@ -49,6 +49,12 @@ const findAudienceUploadById = vi.hoisted(() =>
   }),
 );
 
+const durableProgressMock = vi.hoisted(() => vi.fn(async () => null));
+vi.mock("@/lib/audience-import-report.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/audience-import-report.server")>(),
+  getAudienceImportProgress: durableProgressMock,
+}));
+
 vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceUploadById: (...args: unknown[]) => findAudienceUploadById(...args),
 }));
@@ -101,6 +107,7 @@ vi.mock("@/lib/logger.server", () => {
 
 describe("api.audience-upload-status loader", () => {
   beforeEach(() => {
+    durableProgressMock.mockReset().mockResolvedValue(null);
     user = { id: "u1" };
     downloadMode = { kind: "ok", statusJson: { state: "processing" } };
     uploadMode = {
@@ -187,6 +194,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         audience_id: 2,
         status: "pending",
         file_name: "f.csv",
@@ -199,6 +207,18 @@ describe("api.audience-upload-status loader", () => {
         skipped_duplicate_contacts: null,
       },
     });
+  });
+
+  test("durable run counts and completed SQL override stale storage errors and counters", async () => {
+    uploadMode = { kind: "ok", row: { id: 1, audience_id: 2, import_run_id: "run", status: "completed",
+      file_name: "a.csv", file_size: 10, total_contacts: 4, processed_contacts: 4, error_message: null } };
+    durableProgressMock.mockResolvedValue({ invalid: 1, duplicates: 2 });
+    downloadMode = { kind: "ok", statusJson: { stage: "Upload failed", error_message: "old error", skipped_invalid_contacts: 99, skipped_duplicate_contacts: 98 } };
+    setDualAuthSession({ user: { id: "u1" } });
+    const mod = await import("../app/routes/api+/audience-upload-status");
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request: new Request("http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1") } as any)));
+    expect(await res.json()).toMatchObject({ ok: true, snapshot: { status: "completed", report_available: true, total_contacts: 4, processed_contacts: 4,
+      error_message: null, stage: "Upload completed", skipped_invalid_contacts: 1, skipped_duplicate_contacts: 2 } });
   });
 
   test("returns 500 when upload record query errors", async () => {
@@ -251,6 +271,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 2,
+        report_available: false,
         audience_id: 2,
         status: "pending",
         file_name: "a.csv",
@@ -307,6 +328,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 3,
+        report_available: false,
         audience_id: 2,
         status: "error",
         file_name: "a.csv",
@@ -338,6 +360,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         file_name: "f.csv",
         processed_contacts: 1,
       },
@@ -361,6 +384,7 @@ describe("api.audience-upload-status loader", () => {
       ok: true,
       snapshot: {
         uploadId: 1,
+        report_available: false,
         file_name: "f.csv",
         processed_contacts: 1,
       },

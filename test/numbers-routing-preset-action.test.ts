@@ -102,7 +102,7 @@ describe("numbers routing preset action", () => {
     body.set("presetId", "queue");
     body.set("queueId", "99");
     const { action } = await import(
-      "../app/routes/workspaces+/$id/settings/numbers.action.server"
+       "../app/routes/workspaces+/$id/phone-numbers.action.server"
     );
 
     const result = await normalizeRouteResult(
@@ -110,7 +110,7 @@ describe("numbers routing preset action", () => {
         await withWorkspaceRouteArgs(
           {
             request: new Request(
-              "http://localhost/workspaces/w1/settings/numbers",
+               "http://localhost/workspaces/w1/phone-numbers",
               { method: "POST", body },
             ),
             params: { id: "w1" },

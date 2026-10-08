@@ -350,6 +350,20 @@ Reviewed at \`${reviewedAt}\` · ${issues.length} open issues in \`${repo}\` · 
 Lane assignments, root causes, resolution paths, and test gaps come from the audit in
 \`scripts/issue-board-enrichment/\` — update those files when evidence changes.
 
+## CHS backlog Status flow (project 9)
+
+\`gh project item-edit\` does NOT close issues and must NOT move closed items:
+
+- A fix merged to **dev** moves the issue's Status to **on-dev** (the \`issue-on-dev\`
+  workflow does this; the project-on-dev-status skill backfills it). The issue stays OPEN.
+- A manual verification pass moves it to **tested-on-dev**. Still open.
+- When the fix is promoted to **master** the issue is CLOSED by the release PR, and the
+  project's "Item closed" automation moves the item to **on-qa** automatically.
+- **Never move a CLOSED issue by hand.** Closed items go to **on-qa** on their own;
+  moving them (e.g. to \`archive\`) loses that signal.
+- A CLOSED issue whose state reason is \`not_planned\`/\`duplicate\` is the ONE manual move:
+  its Status goes to **archive**. Everything closed as completed stays in **on-qa**.
+
 ---
 
 ${sections.join("\n\n---\n\n")}

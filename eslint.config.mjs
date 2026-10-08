@@ -51,6 +51,8 @@ export default [
       "dist/**",
       "build/**",
       "coverage/**",
+      // Imported graph data and its generated viewer are not application source.
+      "graphify-out/**",
       "e2e/playwright-report/**",
       "test-results/**",
       ".opencode/**",

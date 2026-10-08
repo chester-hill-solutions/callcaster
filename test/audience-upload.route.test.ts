@@ -77,7 +77,8 @@ vi.mock("@/server/db", () => ({
     insert: () => ({ values: processDbMocks.insertValues }),
   },
 }));
-vi.mock("@/lib/audience-upload-db.server", () => ({
+vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/audience-upload-db.server")>()),
   // processAudienceUpload dedupes against phones already in the audience.
   listAudiencePhones: vi.fn(async () => new Set<string>()),
   findAudienceInWorkspace: (...args: unknown[]) => dbMocks.findAudienceInWorkspace(...args),
@@ -132,8 +133,8 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
   const makeReq = (fd: FormData, method = "POST") =>
     new Request("http://localhost/api/audience-upload", { method, body: fd });
 
-  test("exports: isOtherDataArray + generateUniqueId", async () => {
-    const mod = await import("../app/routes/api+/audience-upload");
+  test("server helpers: isOtherDataArray + generateUniqueId", async () => {
+    const mod = await import("@/lib/audience-upload-process.server");
     expect(mod.isOtherDataArray([{ key: "a", value: 1 }])).toBe(true);
     expect(mod.isOtherDataArray([{ key: "a" } as any])).toBe(false);
     expect(mod.isOtherDataArray("no" as any)).toBe(false);
@@ -386,210 +387,46 @@ describe("app/routes/api+/audience-upload/route.tsx", () => {
     expect(await res.json()).toEqual({ error: "Unknown error" });
   }, 30000);
 
-  test("processAudienceUpload: happy path maps contacts, writes progress, and completes", async () => {
-    vi.useFakeTimers();
+  test("real multipart upload preserves original BOM bytes through worker hashing and source coordinates", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
-
-    const uploads = objectStorageMocks.uploads;
-
-    const parseCSVMock = vi.fn(() => ({
-      headers: ["Name", "Email"],
-      contacts: [{ Name: "Ada Lovelace", Email: "a@b.co" }],
-    }));
-
-    const uploadPromise = mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Name: "name", Email: "email" },
-      "Name",
-      { parseCSV: parseCSVMock as any },
-    );
-    await vi.runAllTimersAsync();
-    await uploadPromise;
-    vi.useRealTimers();
-
-    expect(parseCSVMock).toHaveBeenCalled();
-    expect(uploads.length).toBeGreaterThan(0);
-    expect(processTdbMocks.contact.insertMany.mock.calls[0][0][0]).toMatchObject({
-      workspace: "w1",
-      created_by: "u1",
-      firstname: "Ada",
-      surname: "Lovelace",
-      email: "a@b.co",
+    const { prepareAudienceImport } = await import("@/lib/audience-import-map.server");
+    const raw = Buffer.from("\uFEFFPhone\r\n4165551234");
+    let workerFile: string | undefined;
+    const enqueueJob = vi.fn(async (job: { params: { fileContent: string } }) => {
+      workerFile = job.params.fileContent;
+      return { enqueued: true, jobId: 1 };
     });
-    expect(logger.error).not.toHaveBeenCalled();
-  }, 30000);
+    const fd = new FormData(); fd.set("workspace_id", "w1"); fd.set("audience_id", "1");
+    fd.set("contacts", new File([raw], "bom.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone: "phone" }));
+    const result = await asRouteResponse(mod.action({ request:makeReq(fd), deps:{
+      verifyAuth:async () => ({ headers:new Headers(), user:{id:"u1"} }), enqueueJob,
+    } } as any));
+    expect(result.status).toBe(200);
+    const original = objectStorageMocks.uploads.find(upload => upload.path.endsWith("/original.csv"));
+    expect(original?.body).toEqual(new Uint8Array(raw));
+    if (!workerFile) throw new Error("Upload did not enqueue source bytes");
+    const prepared = prepareAudienceImport(Buffer.from(workerFile, "base64"), { Phone:"phone" }, null, null);
+    expect(prepared.fileSha256).toBe("ac154b1275fb94a369c31ca0468817a37112bcb4784115e95920cc1f5383d46d");
+    expect(prepared.contacts[0].source).toEqual({recordNumber:2,startLine:2,endLine:2,byteStart:10,byteEnd:20});
+    expect(prepared.identity).not.toBe(prepareAudienceImport(Buffer.from("Phone\r\n4165551234"), { Phone:"phone" }, null, null).identity);
+  });
 
-  test("processAudienceUpload normalizes phones and skips invalid rows", async () => {
-    vi.useFakeTimers();
+  test("invalid UTF-8 is rejected at the multipart boundary before any audience or upload writes", async () => {
     const mod = await import("../app/routes/api+/audience-upload");
-    const uploadPromise = mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Phone: "phone" },
-      null,
-      {
-        parseCSV: vi.fn(() => ({
-          headers: ["Phone"],
-          contacts: [{ Phone: "(416) 555-1234" }, { Phone: "123" }],
-        })) as any,
-      },
-    );
-    await vi.runAllTimersAsync();
-    await uploadPromise;
-    vi.useRealTimers();
+    const fd = new FormData(); fd.set("workspace_id", "w1"); fd.set("audience_name", "New audience");
+    fd.set("contacts", new File([new Uint8Array([80,104,111,110,101,10,255])], "invalid.csv"));
+    fd.set("header_mapping", JSON.stringify({ Phone:"phone" }));
+    const enqueueJob = vi.fn(async () => ({ enqueued:true, jobId:1 }));
+    const result = await asRouteResponse(mod.action({ request:makeReq(fd), deps:{
+      verifyAuth:async () => ({ headers:new Headers(), user:{id:"u1"} }), enqueueJob,
+    } } as any));
+    expect(result.status).toBe(400);
+    expect(await result.json()).toEqual({error:"CSV must be valid UTF-8"});
+    expect(dbMocks.createAudienceForUpload).not.toHaveBeenCalled();
+    expect(dbMocks.createAudienceUploadRecord).not.toHaveBeenCalled();
+    expect(objectStorageMocks.uploadObject).not.toHaveBeenCalled();
+    expect(enqueueJob).not.toHaveBeenCalled();
+  });
 
-    expect(processTdbMocks.contact.insertMany).toHaveBeenCalledWith([
-      expect.objectContaining({ phone: "+14165551234" }),
-    ]);
-    expect(processTdbMocks.audience.update).toHaveBeenCalledWith(
-      expect.objectContaining({ set: expect.objectContaining({ total_contacts: 1 }) }),
-    );
-    expect(objectStorageMocks.uploads.at(-1)?.body).toContain(
-      '"skipped_invalid_contacts":1',
-    );
-  }, 30000);
-
-  test("processAudienceUpload: header mismatch and insert errors go through catch and write error status", async () => {
-    const mod = await import("../app/routes/api+/audience-upload");
-
-    const uploads = objectStorageMocks.uploads;
-
-    // Missing headers -> error
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Missing: "email" },
-      null,
-      { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [] })) as any },
-    );
-    expect(uploads.some((u) => u.body.includes('"status":"error"'))).toBe(true);
-
-    // Insert error -> error path
-    processTdbMocks.contact.insertMany.mockResolvedValueOnce([]);
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Email: "email" },
-      null,
-      { parseCSV: vi.fn(() => ({ headers: ["Email"], contacts: [{ Email: "a@b.co" }] })) as any },
-    );
-    expect(uploads.some((u) => u.body.includes("Error inserting contacts"))).toBe(true);
-  }, 30000);
-
-  test("processAudienceUpload covers status/link errors and default deps branch", async () => {
-    const mod = await import("../app/routes/api+/audience-upload");
-
-    // statusError on initial write
-    objectStorageMocks.uploadObject.mockRejectedValueOnce(new Error("s"));
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      {},
-      { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
-    );
-
-    // mapping warn branch via empty-string header + link insert failure
-    processDbMocks.insertValues.mockRejectedValueOnce(new Error("link"));
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { "": "email", Custom: "other_data" },
-      "Name",
-      {
-        parseCSV: vi.fn(() => ({
-          headers: ["", "Name", "Custom"],
-          contacts: [{ "": "x", Name: undefined, Custom: "v" }],
-        })) as any,
-      },
-    );
-
-    // other_data mapping branch with defined value + splitNameColumn actualHeader present (and empty name => '' fallbacks)
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Name: "name", Custom: "other_data" },
-      "Name",
-      {
-        parseCSV: vi.fn(() => ({
-          headers: ["Name", "Custom"],
-          contacts: [{ Name: "", Custom: "v" }],
-        })) as any,
-      },
-    );
-
-    // Cover "Unknown error" branches in catch (non-Error throw)
-    objectStorageMocks.uploadObject.mockRejectedValueOnce("boom");
-    await mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      {},
-      { parseCSV: vi.fn(() => ({ headers: [], contacts: [] })) as any },
-    );
-
-    // default deps branch (no deps arg)
-    vi.useFakeTimers();
-    const csv = "Email\nx@y.co\n";
-    const defaultDepsPromise = mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from(csv, "utf-8").toString("base64"),
-      { Email: "email" },
-    );
-    await vi.runAllTimersAsync();
-    await defaultDepsPromise;
-    vi.useRealTimers();
-  }, 30000);
-
-  test("processAudienceUpload covers remaining else-branches (splitNameColumn missing header, undefined values, and i!==0)", async () => {
-    vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/audience-upload");
-
-    const contacts = Array.from({ length: 101 }, (_v, i) => {
-      if (i === 0) return { Name: "Ada Lovelace", Email: "a@b.co" };
-      if (i === 1) return { Name: "No Email", Email: undefined, Custom: "x" };
-      return { Name: "N", Email: "x@y.co", Custom: undefined };
-    });
-
-    const uploadPromise = mod.processAudienceUpload(
-      1,
-      2,
-      "w1",
-      "u1",
-      Buffer.from("csv", "utf-8").toString("base64"),
-      { Name: "name", Email: "email", Custom: "other_data" },
-      "Nope", // splitNameColumn not present in headers
-      { parseCSV: vi.fn(() => ({ headers: ["Name", "Email", "Custom"], contacts })) as any },
-    );
-    await vi.runAllTimersAsync();
-    await uploadPromise;
-    vi.useRealTimers();
-  }, 30000);
 });
-

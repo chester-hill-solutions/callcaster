@@ -30,12 +30,13 @@ jobs:
     steps:
       - name: Assess the risk surface
         id: risk
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           num=${{ github.event.pull_request.number }}
           files=$(gh api "repos/${{ github.repository }}/pulls/$num/files" --paginate --jq '.[].filename')
-          added=$(gh api "repos/${{ github.repository }}/pulls/$num/files" --paginate --jq '[.[].additions] | add // 0')
+          added=$(gh api "repos/${{ github.repository }}/pulls/$num/files" --paginate | jq -s '[.[][] | .additions] | add // 0')
           high_risk=false
           if printf '%s\n' "$files" | grep -qE '^(app/lib/worker/|app/server/|app/db/|client/migrations/)'; then
             high_risk=true

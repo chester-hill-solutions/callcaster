@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
@@ -7,6 +7,12 @@ vi.hoisted(() => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
 });
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 
 const mocks = vi.hoisted(() => {
   return {
@@ -318,6 +324,29 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
   });
 
+  test.each([
+    { interval: { start: "18:00" } },
+    { interval: { start: "18:00", end: "26:00" } },
+  ])("save rejects incomplete SMS intervals beside a valid sibling: $interval", async ({ interval }) => {
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "save",
+      campaignData: JSON.stringify({
+        type: "message", schedule: null,
+        sms_send_window: { monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }, interval] } },
+      }),
+      campaignDetails: "{}",
+    });
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ actionType: "save", error: expect.stringMatching(/SMS.*start and end/) });
+    expect(mocks.updateCampaign).not.toHaveBeenCalled();
+    expect(mocks.rescheduleDispatchAfterWindowEdit).not.toHaveBeenCalled();
+  });
+
   test("save on a live message campaign pulls a parked dispatch successor forward (#1816)", async () => {
     mocks.updateCampaign.mockResolvedValue({
       campaign: {
@@ -546,8 +575,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       );
     });
 
-    test("places a test call for voice campaigns", async () => {
-      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type: "robocall" } });
+    test.each(["robocall", "simple_ivr", "complex_ivr"])("places a %s test call through campaign settings", async (type) => {
+      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type } });
       mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
       testSendMocks.sendCampaignTestCall.mockResolvedValue({
         ok: true,
@@ -572,6 +601,9 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
         to: "+16135550199",
       });
       expect(testSendMocks.sendCampaignTestSms).not.toHaveBeenCalled();
+      expect(testSendMocks.sendCampaignTestCall).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: "w1", campaignId: "99", userId: "user-1", to: "6135550199" }),
+      );
     });
 
     test("rejects live-call campaigns without sending", async () => {

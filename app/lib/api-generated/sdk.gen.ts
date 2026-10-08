@@ -27,7 +27,12 @@ export const createCampaignWithScript = <ThrowOnError extends boolean = false>(o
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {
@@ -46,14 +51,19 @@ export const createCampaignWithScript = <ThrowOnError extends boolean = false>(o
 
 /**
  * Send a single SMS
- * Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.
+ * Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.
  */
 export const sendChatSms = <ThrowOnError extends boolean = false>(options: Options<SendChatSmsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<SendChatSmsResponse, SendChatSmsError, ThrowOnError>({
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {
@@ -79,7 +89,12 @@ export const dispatchCampaignSms = <ThrowOnError extends boolean = false>(option
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {

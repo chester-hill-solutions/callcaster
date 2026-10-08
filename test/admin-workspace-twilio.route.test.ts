@@ -1,3 +1,4 @@
+import { usageRecordPage } from "./helpers/twilio-usage-page";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
@@ -10,7 +11,6 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceTwilioPortalSnapshot: vi.fn(),
   syncWorkspaceTwilioSnapshot: vi.fn(),
   ensureWorkspaceTwilioBootstrap: vi.fn(),
-  provisionWorkspaceA2P: vi.fn(),
   updateWorkspaceRcsOnboarding: vi.fn(),
   triggerTwilioOpenSync: vi.fn(),
   auditWorkspaceTwilioWebhooks: vi.fn(),
@@ -44,10 +44,6 @@ vi.mock("@/lib/logger.server", () => ({
 
 vi.mock("../app/lib/twilio-bootstrap.server", () => ({
   ensureWorkspaceTwilioBootstrap: (...args: any[]) => mocks.ensureWorkspaceTwilioBootstrap(...args),
-}));
-
-vi.mock("../app/lib/twilio-a2p.server", () => ({
-  provisionWorkspaceA2P: (...args: any[]) => mocks.provisionWorkspaceA2P(...args),
 }));
 
 vi.mock("../app/lib/twilio-open-sync.server", () => ({
@@ -267,7 +263,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     mocks.getWorkspaceTwilioPortalSnapshot.mockReset();
     mocks.syncWorkspaceTwilioSnapshot.mockReset();
     mocks.ensureWorkspaceTwilioBootstrap.mockReset();
-    mocks.provisionWorkspaceA2P.mockReset();
+    mocks.enqueueWorkspaceComplianceJob.mockReset();
     mocks.updateWorkspaceRcsOnboarding.mockReset();
     mocks.logger.error.mockReset();
   });
@@ -419,12 +415,23 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     });
   });
 
+  test("A2P queue failure returns an error from the actual admin form", async () => {
+    mocks.enqueueWorkspaceComplianceJob.mockRejectedValueOnce(new Error("Compliance queue unavailable"));
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
+    const form = new FormData(); form.set("_action", "provision_workspace_a2p");
+    const response = await asRouteResponse(mod.action(await withAdminRouteArgs({
+      request: new Request("http://x", { method: "POST", body: form }), params: { workspaceId: "w1" },
+    }, { userId: "u1", userData: { id: "u1", username: currentUsername, access_level: currentAccessLevel } as any })));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Compliance queue unavailable" });
+  });
+
   test("action provisions workspace A2P and updates RCS state", async () => {
     const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
-    mocks.provisionWorkspaceA2P.mockResolvedValueOnce({});
+    mocks.enqueueWorkspaceComplianceJob.mockResolvedValueOnce(undefined);
 
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const provisionData = new FormData();
@@ -441,10 +448,8 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       } as any,
     })));
     expect(provisionRes.status).toBe(200);
-    expect(mocks.provisionWorkspaceA2P).toHaveBeenCalledWith({
-      workspaceId: "w1",
-      actorUserId: "u1",
-    });
+    expect(await provisionRes.json()).toEqual({ success: "A2P compliance setup is queued. Status will update after the worker runs." });
+    expect(mocks.enqueueWorkspaceComplianceJob).toHaveBeenCalledWith("w1", "admin_provision_a2p");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
@@ -507,17 +512,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-06T12:00:00.000Z"));
 
-    const usageList = vi.fn().mockResolvedValue([
+    const usageList = vi.fn().mockResolvedValue(usageRecordPage([
       {
         category: "sms-outbound",
         description: "SMS Outbound",
         usage: "10",
-        usageUnit: "messages",
+        usage_unit: "messages",
         price: 1.25,
-        startDate: new Date("2026-02-05T00:00:00.000Z"),
-        endDate: new Date("2026-03-06T00:00:00.000Z"),
+        start_date: "2026-02-05",
+        end_date: "2026-03-06",
       },
-    ]);
+    ]));
 
     const dbClient = makeDbClient("sudo", "AC123");
     mocks.getWorkspaceTwilioPortalSnapshot.mockResolvedValueOnce(makePortalSnapshot());
@@ -540,7 +545,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       },
       usage: {
         records: {
-          list: usageList,
+          page: usageList,
         },
       },
     });
@@ -553,13 +558,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     // Bounded: an unbounded list() makes the Twilio helper auto-page the whole
     // usage history, which is what pushed this admin loader past the SSR
     // stream timeout.
-    expect(usageList).toHaveBeenCalledWith({ limit: 200 });
+    expect(usageList).toHaveBeenCalledWith({
+      pageSize: 200,
+      startDate: new Date("2026-02-04T00:00:00.000Z"),
+      endDate: new Date("2026-03-06T00:00:00.000Z"),
+    });
     expect(data.twilioUsage).toEqual([
       expect.objectContaining({
         category: "sms-outbound",
         price: "1.25",
-        startDate: "2026-02-05T00:00:00.000Z",
-        endDate: "2026-03-06T00:00:00.000Z",
+        startDate: "2026-02-05",
+        endDate: "2026-03-06",
       }),
     ]);
   });

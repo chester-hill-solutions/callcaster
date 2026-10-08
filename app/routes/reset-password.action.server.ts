@@ -1,11 +1,25 @@
 import { data as routeData } from "react-router";
 import { auth } from "@/server/auth-instance";
 import { logger } from "@/lib/logger.server";
+import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, url }) => {
+    // The reset token is a credential, so this is a guessing surface (#2220).
+    // Same bucket as the JSON twin at api+/auth/reset-password.
+    const limited = await enforceAuthRateLimit(request, "auth:reset-password");
+    if (limited) {
+      return routeData(
+        {
+          success: null,
+          error: { message: "Too many attempts. Wait a minute and try again." },
+        },
+        { status: 429 },
+      );
+    }
+
     const formData = await request.formData();
     const passwordRaw = formData.get("password");
     const confirmPasswordRaw =

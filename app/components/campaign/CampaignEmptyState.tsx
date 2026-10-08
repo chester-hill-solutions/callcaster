@@ -33,8 +33,8 @@ const CampaignEmptyState = ({
         <NavLink
           to={
             isCampaignsRoute
-              ? "../settings/numbers/purchase"
-              : "./settings/numbers/purchase"
+              ? "../phone-numbers/purchase"
+              : "./phone-numbers/purchase"
           }
         >
           Get a Number

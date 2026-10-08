@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Tables } from "@/lib/db-types";
+import type { WorkspaceClientData } from "@/lib/workspace-client-projection.server";
 
 type CampaignRow = Tables<"campaign">;
 
 type LoaderData = {
-  workspace: Tables<"workspace"> & { campaign: CampaignRow[] | null };
+  workspace: WorkspaceClientData & { campaign: CampaignRow[] | null };
 };
 
 export default function WorkspaceCampaigns() {

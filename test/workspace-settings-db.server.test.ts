@@ -8,11 +8,7 @@ const workspaceDbMocks = vi.hoisted(() => ({
   listWorkspaceApiKeyRows: vi.fn(),
 }));
 
-const tdbMocks = vi.hoisted(() => ({
-  workspace_number: {
-    findMany: vi.fn(),
-  },
-}));
+const tdbMocks = vi.hoisted(() => ({}));
 
 describe("app/lib/workspace-settings-db.server.ts", () => {
   beforeEach(() => {
@@ -20,7 +16,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
     for (const fn of Object.values(workspaceDbMocks)) {
       fn.mockReset();
     }
-    tdbMocks.workspace_number.findMany.mockReset();
     workspaceDbMocks.listWorkspaceApiKeyRows.mockResolvedValue([]);
     vi.doMock("@/lib/workspace-members-db.server", () => workspaceDbMocks);
     vi.doMock("@/server/tenant-db", () => ({
@@ -52,13 +47,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
         role: "caller",
       },
     ]);
-    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([
-      {
-        id: 1,
-        phone_number: "+15550001111",
-        capabilities: { verification_status: "success" },
-      },
-    ]);
     workspaceDbMocks.listWorkspaceInvitesEnriched.mockResolvedValueOnce([
       {
         id: "inv1",
@@ -79,10 +67,21 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
       workspace: { id: "w1", name: "Acme" },
       userRole: "owner",
       users: [
-        { id: "u1", username: "owner@example.com", role: "owner" },
-        { id: "u2", username: "caller@example.com", role: "caller" },
+        {
+          id: "u1",
+          username: "owner@example.com",
+          first_name: "O",
+          last_name: "W",
+          role: "owner",
+        },
+        {
+          id: "u2",
+          username: "caller@example.com",
+          first_name: "C",
+          last_name: "A",
+          role: "caller",
+        },
       ],
-      phoneNumbers: [{ id: 1, phone_number: "+15550001111" }],
       pendingInvites: [
         expect.objectContaining({
           id: "inv1",
@@ -108,7 +107,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
         role: "caller",
       },
     ]);
-    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([]);
     workspaceDbMocks.listWorkspaceInvitesEnriched.mockResolvedValueOnce([]);
     workspaceDbMocks.getWorkspaceWebhookRow.mockResolvedValueOnce(null);
 
@@ -117,14 +115,23 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
 
     expect(result.userRole).toBe("caller");
     expect(result.hasAccess).toBe(false);
+    expect(JSON.parse(JSON.stringify(result.users))).toEqual([
+      {
+        id: "u2",
+        username: "caller@example.com",
+        first_name: null,
+        last_name: null,
+        role: "caller",
+      },
+    ]);
   });
 
   test("getWorkspaceSettingsPageData throws when workspace missing", async () => {
     workspaceDbMocks.getWorkspaceById.mockResolvedValueOnce(null);
 
     const mod = await import("../app/lib/workspace-settings-db.server");
-    await expect(mod.getWorkspaceSettingsPageData("missing", "u1")).rejects.toThrow(
-      "Workspace not found",
-    );
+    await expect(
+      mod.getWorkspaceSettingsPageData("missing", "u1"),
+    ).rejects.toThrow("Workspace not found");
   });
 });

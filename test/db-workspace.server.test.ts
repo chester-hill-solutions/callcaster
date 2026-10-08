@@ -18,19 +18,12 @@ vi.mock("@/lib/object-storage.server", () => ({
   listObjects: (...args: unknown[]) => objectStorageMocks.listObjects(...args),
 }));
 
-// removeWorkspacePhoneNumber (SID-based cleanup, Phase E) reads/updates the
-// messaging onboarding state to detach the released number from the MS sender
-// pool. Stub those two calls; keep the rest of the module real.
-vi.mock("@/lib/messaging-onboarding.server", async () => {
-  const actual = await vi.importActual<any>("@/lib/messaging-onboarding.server");
-  return {
-    ...actual,
-    getWorkspaceMessagingOnboardingState: vi.fn(async () => ({
-      ...actual.DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-    })),
-    updateWorkspaceMessagingOnboardingState: vi.fn(async () => undefined),
-  };
-});
+const releaseBoundary = vi.hoisted(() => ({ run: vi.fn() }));
+vi.mock("@/lib/number-release.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/number-release.server")>()),
+  releaseNumberForWorkspace: releaseBoundary.run,
+}));
+
 
 const adminDbMocks = vi.hoisted(() => ({
   workspaceFindFirst: vi.fn(),
@@ -136,6 +129,7 @@ function mockConversationTenantData({
 describe("app/lib/database/workspace.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();
+    releaseBoundary.run.mockReset();
     objectStorageMocks.createSignedObjectUrl.mockReset();
     objectStorageMocks.listObjects.mockReset();
     objectStorageMocks.createSignedObjectUrl.mockResolvedValue("u");
@@ -340,7 +334,9 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("createKeys: returns newKey; logs+throws on error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const Twilio = (await import("twilio")).default as any;
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import(
+      "../app/lib/database/workspace-twilio-subaccount.server"
+    );
 
     const ok = await mod.createKeys({
       workspace_id: "w1",
@@ -359,7 +355,9 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("createSubaccount returns account; logs on create rejection", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const Twilio = (await import("twilio")).default as any;
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import(
+      "../app/lib/database/workspace-twilio-subaccount.server"
+    );
 
     const ok = await mod.createSubaccount({ workspace_id: "w1" });
     expect(ok).toMatchObject({ sid: "AC_sub", authToken: "tok" });
@@ -820,57 +818,46 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(twilio).toMatchObject({ outgoingCallerIds: expect.any(Function) });
   });
 
-  test("removeWorkspacePhoneNumber handles errors and success path", async () => {
+  test("removeWorkspacePhoneNumber passes the workspace and bigint ID to durable release", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const Twilio = (await import("twilio")).default as any;
-
-    tdbMocks.workspace_number.findFirst.mockResolvedValue({
-      friendly_name: "FN",
-      phone_number: "+1",
-    });
     adminDbMocks.workspaceFindFirst.mockResolvedValue({
       twilio_data: { sid: "AC", authToken: "tok" },
       key: "k",
       token: "t",
     });
-    tdbMocks.workspace_number.delete.mockResolvedValue(undefined);
-
-    const ok = await mod.removeWorkspacePhoneNumber({
+    releaseBoundary.run.mockImplementation(async (args) => {
+      const twilio = await args.getTwilioClient();
+      expect(twilio).toMatchObject({
+        incomingPhoneNumbers: expect.any(Function),
+      });
+      return { error: null };
+    });
+    expect(
+      await mod.removeWorkspacePhoneNumber({ workspaceId: "w1", numberId: 1n }),
+    ).toEqual({ error: null });
+    expect(releaseBoundary.run).toHaveBeenCalledWith({
       workspaceId: "w1",
-      numberId: 1n as any,
+      numberId: 1n,
+      getTwilioClient: expect.any(Function),
     });
-    expect(ok).toEqual({ error: null });
-    expect(Twilio.__mocks.outgoingList).toHaveBeenCalled();
-    expect(Twilio.__mocks.incomingList).toHaveBeenCalled();
-
-    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce({
-      friendly_name: "",
-      phone_number: "+1",
-    });
-    const r2 = await mod.removeWorkspacePhoneNumber({
-      workspaceId: "w1",
-      numberId: 1n as any,
-    });
-    expect(r2.error).toBeTruthy();
-
-    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce(null);
-    const r3 = await mod.removeWorkspacePhoneNumber({
-      workspaceId: "w1",
-      numberId: 1n as any,
-    });
-    expect(r3.error).toBeTruthy();
-
-    tdbMocks.workspace_number.findFirst.mockResolvedValueOnce({
-      friendly_name: "FN",
-      phone_number: "+1",
-    });
-    tdbMocks.workspace_number.delete.mockRejectedValueOnce(new Error("del"));
-    const r4 = await mod.removeWorkspacePhoneNumber({
-      workspaceId: "w1",
-      numberId: 1n as any,
-    });
-    expect(r4.error).toBeTruthy();
   });
+
+  test("removeWorkspacePhoneNumber preserves the durable service's incomplete error", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    const { NumberReleaseIncompleteError } =
+      await import("@/lib/number-release.server");
+    const error = new NumberReleaseIncompleteError("+14165550285");
+    releaseBoundary.run.mockResolvedValue({ error });
+    expect(
+      (
+        await mod.removeWorkspacePhoneNumber({
+          workspaceId: "w1",
+          numberId: 1n,
+        })
+      ).error,
+    ).toBe(error);
+  });
+
 
   test("updateCallerId returns early without number; updates callerId names; logs on error", async () => {
     const { logger } = await import("../app/lib/logger.server");

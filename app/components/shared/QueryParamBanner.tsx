@@ -5,6 +5,7 @@ type QueryParamBannerVariant = {
   title?: string;
   description?: string;
   className?: string;
+  variant?: "default" | "destructive" | "success" | "warning" | "info";
 };
 
 type QueryParamBannerProps = {
@@ -30,26 +31,25 @@ export function QueryParamBanner({
   }
 
   const dismiss = () => {
-    setSearchParams((previous) => {
-      const next = new URLSearchParams(previous);
-      next.delete(param);
-      for (const key of clearParams ?? []) {
-        next.delete(key);
-      }
-      return next;
-    });
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete(param);
+        for (const key of clearParams ?? []) {
+          next.delete(key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   return (
-    <Alert className={variant.className}>
+    <Alert variant={variant.variant} className={variant.className}>
       {variant.title ? <AlertTitle>{variant.title}</AlertTitle> : null}
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{variant.description}</span>
-        <button
-          type="button"
-          className="text-sm underline"
-          onClick={dismiss}
-        >
+        <button type="button" className="text-sm underline" onClick={dismiss}>
           Dismiss
         </button>
       </AlertDescription>

@@ -1,64 +1,52 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
-import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider, type LoaderFunctionArgs } from "react-router";
+import { toast } from "sonner";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { Toaster } from "@/components/ui/sonner";
+import AudienceView from "../../app/routes/workspaces+/$id/audiences/$audience_id.route";
+import type { AudienceUpload } from "@/lib/audience-upload.types";
 
-const mocks = vi.hoisted(() => {
-  return {
-    fetchAudienceUploads: vi.fn(),
-    realtimeOpts: null as any,
-    formatDistanceToNow: vi.fn(() => "2 minutes ago"),
-    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
-  };
-});
-
-vi.mock("@/lib/chats/messaging-client", () => ({
-  fetchAudienceUploads: (...args: unknown[]) => mocks.fetchAudienceUploads(...args),
-}));
-
-vi.mock("date-fns", () => ({
-  formatDistanceToNow: (...args: any[]) => mocks.formatDistanceToNow(...args),
-}));
-
+const mocks = vi.hoisted(() => ({ callbacks: [] as Array<{ workspaceId: string; filter: string; onChange: (payload: any) => void }>, rawFetch: vi.fn() }));
+vi.mock("../../app/routes/workspaces+/$id/audiences/$audience_id.loader.server", () => ({ loader: vi.fn() }));
+vi.mock("@/components/audience/AudienceTable", () => ({ AudienceTable: () => <div>Contacts table</div> }));
+vi.mock("@/components/audience/AudienceUploader", () => ({ default: () => <div>Upload form</div> }));
 vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
-  useWorkspaceEventSubscription: (opts: unknown) => {
-    mocks.realtimeOpts = opts;
-    return undefined;
-  },
+  useWorkspaceEventSubscription: (opts: any) => { mocks.callbacks.push(opts); },
 }));
+vi.mock("@/lib/chats/messaging-client", () => ({ fetchAudienceUploads: (...args: unknown[]) => mocks.rawFetch(...args) }));
 
-vi.mock("@/lib/logger.client", () => ({ logger: mocks.logger }));
-
-vi.mock("lucide-react", () => ({
-  Loader2: (props: any) => <div {...props}>loader</div>,
-}));
-
-const postgresStub = { channel: vi.fn() } as const;
-
-function renderHistory(props: {
-  audienceId: number;
-  workspaceId?: string;
-}) {
-  return render(
-    <AudienceUploadHistory
-      audienceId={props.audienceId}
-      workspaceId={props.workspaceId ?? "ws-1"}
-      client={postgresStub as never}
-    />,
-  );
+const routers: Array<ReturnType<typeof createMemoryRouter>> = [];
+afterEach(() => { toast.dismiss(); for (const router of routers.splice(0)) router.dispose(); });
+beforeEach(() => { mocks.callbacks = []; mocks.rawFetch.mockReset().mockResolvedValue([]); });
+function upload(id = 1, audience_id = 1, file_name = "a.csv"): AudienceUpload {
+  return { id, audience_id, created_at: "2026-10-01T12:00:00Z", status: "pending", file_name, file_size: 1024,
+    total_contacts: 10, processed_contacts: 4, processed_at: null, error_message: null };
 }
+function page(workspace: string, audience: number, uploads: AudienceUpload[] | null, error: string | null = null) {
+  return { contacts: [], audience: { id: audience, name: `Audience ${audience}` }, workspace_id: workspace,
+    audience_id: String(audience), error: null, contactsError: null, pagination: { currentPage: 1, pageSize: 50, totalCount: 0 },
+    sorting: { sortKey: "id", sortDirection: "asc" }, latestUpload: null, uploadHistory: uploads, uploadHistoryError: error };
+}
+function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done; }); return { promise, resolve }; }
+async function setup(read: (workspace: string, audience: number) => ReturnType<typeof page> | Promise<ReturnType<typeof page>>, initial = "/workspaces/ws-1/audiences/1") {
+  const calls: Array<[string, number]> = [];
+  const router = createMemoryRouter([{ path: "/workspaces/:id/audiences/:audience_id", element: <AudienceView />,
+    loader: ({ params }: LoaderFunctionArgs) => { calls.push([params.id ?? "", Number(params.audience_id)]); return read(params.id ?? "", Number(params.audience_id)); },
+    HydrateFallback: () => <p>Loading audience...</p>,
+  }], { initialEntries: [initial] });
+  routers.push(router); render(<><RouterProvider router={router} /><Toaster position="top-right" /></>);
+  const user = userEvent.setup(); await user.click(await screen.findByRole("tab", { name: "Upload History" }));
+  return { router, calls, user };
+}
+function currentSubscription() { const subscription = mocks.callbacks.at(-1); if (!subscription) throw new Error("No current history subscription"); return subscription; }
+function historyRow(file: string) { const row = screen.getByText(file).closest("tr"); if (!row) throw new Error("History row is missing"); return row; }
+function progressStyle(row: HTMLTableRowElement) { const progress = row.querySelector("div[style]"); if (!progress) throw new Error("Progress bar is missing"); return progress.getAttribute("style"); }
 
-describe("app/components/audience/AudienceUploadHistory.tsx", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    mocks.realtimeOpts = null;
-    mocks.formatDistanceToNow.mockClear();
-    mocks.logger.error.mockReset();
-    mocks.fetchAudienceUploads.mockReset();
-  });
-
-  test("shows loading, then renders uploads with status/size/progress and file name fallback", async () => {
-    mocks.fetchAudienceUploads.mockResolvedValue([
+ describe("route-owned audience upload history (#2288)", () => {
+  test("initial route data renders status, sizes and progress without a raw mount fetch", async () => {
+    const rows: AudienceUpload[] = [
       {
         id: 1,
         audience_id: 99,
@@ -131,194 +119,110 @@ describe("app/components/audience/AudienceUploadHistory.tsx", () => {
         processed_at: null,
         error_message: null,
       },
-    ]);
-
-    renderHistory({ audienceId: 99 });
-    expect(screen.getByText("Loading upload history...")).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(screen.getByText("ok.csv")).toBeInTheDocument();
-    });
-
+    ];
+    const { calls } = await setup((workspace, audience) => page(workspace, audience, rows), "/workspaces/ws-1/audiences/99");
+    expect(screen.getByText("ok.csv")).toBeInTheDocument();
     expect(screen.getByText("Unknown file")).toBeInTheDocument();
-    expect(screen.getByText("1.0 KB")).toBeInTheDocument();
-    // "Unknown" now appears twice: the null file_size cell (id=2) and the
-    // "unknown" status badge (id=5), since StatusBadge capitalizes labels.
     expect(screen.getAllByText("Unknown")).toHaveLength(2);
+    expect(screen.getByText("1.0 KB")).toBeInTheDocument();
     expect(screen.getByText("1.0 MB")).toBeInTheDocument();
     expect(screen.getByText("1.0 GB")).toBeInTheDocument();
-
-    const processingRow = screen.getByText("Unknown file").closest("tr") as HTMLElement;
-    const progressInner = processingRow.querySelector("div[style]") as HTMLElement;
-    expect(progressInner.getAttribute("style")).toContain("40%");
-
-    const zeroRow = screen.getByText("zero.csv").closest("tr") as HTMLElement;
-    const zeroProgress = zeroRow.querySelector("div[style]") as HTMLElement;
-    expect(zeroProgress.getAttribute("style")).toContain("0%");
-
-    const completedRow = screen.getByText("ok.csv").closest("tr") as HTMLElement;
-    expect(within(completedRow).getByText("5")).toBeInTheDocument();
-
-    const errorRow = screen.getByText("bad.csv").closest("tr") as HTMLElement;
-    const warn = within(errorRow).getByTitle("boom");
-    expect(warn).toBeInTheDocument();
-
-    const unknownRow = screen.getByText("u.csv").closest("tr") as HTMLElement;
-    const pendingRow = screen.getByText("p.csv").closest("tr") as HTMLElement;
-
-    expect(within(pendingRow).getByText("Pending").className).toContain("bg-warning");
-    expect(within(processingRow).getByText("Processing").className).toContain("bg-secondary");
-    expect(within(completedRow).getByText("Completed").className).toContain("bg-success");
-    expect(within(errorRow).getByText("Error").className).toContain("bg-destructive");
-    expect(within(unknownRow).getByText("Unknown").className).toContain("text-foreground");
+    const processing = historyRow("Unknown file");
+    expect(progressStyle(processing)).toContain("40%");
+    expect(progressStyle(historyRow("zero.csv"))).toContain("0%");
+    expect(within(historyRow("ok.csv")).getByText("5")).toBeInTheDocument();
+    expect(within(historyRow("bad.csv")).getByTitle("boom")).toBeInTheDocument();
+    for (const [file, label] of [["p.csv", "Pending"], ["Unknown file", "Processing"], ["ok.csv", "Completed"], ["bad.csv", "Error"]]) {
+      expect(within(historyRow(file)).getByText(label)).toBeInTheDocument();
+    }
+    expect(calls).toEqual([["ws-1", 99]]); expect(mocks.rawFetch).not.toHaveBeenCalled();
   });
-
-  test("renders empty state when no uploads", async () => {
-    mocks.fetchAudienceUploads.mockResolvedValue([]);
-
-    renderHistory({ audienceId: 1 });
-    await waitFor(() => {
-      expect(screen.getByText("No upload history found for this audience")).toBeInTheDocument();
-    });
+  test("a successful empty route result has an empty state, not a failed read", async () => {
+    await setup((workspace, audience) => page(workspace, audience, []));
+    expect(screen.getByText("No upload history found for this audience")).toBeInTheDocument();
+    expect(screen.queryByText("Error loading upload history")).not.toBeInTheDocument();
   });
-
-  test("fetch failure shows error state and Try again refetches successfully", async () => {
-    mocks.fetchAudienceUploads
-      .mockRejectedValueOnce(new Error("nope"))
-      .mockResolvedValueOnce([
-        {
-          id: 1,
-          audience_id: 1,
-          created_at: new Date().toISOString(),
-          status: "completed",
-          file_name: "x.csv",
-          file_size: 1,
-          total_contacts: 1,
-          processed_contacts: 1,
-          processed_at: null,
-          error_message: null,
-        },
-      ]);
-
-    renderHistory({ audienceId: 1 });
-
-    await waitFor(() => {
-      expect(screen.getByText("Error loading upload history")).toBeInTheDocument();
-    });
-    expect(screen.getByText("nope")).toBeInTheDocument();
-    expect(mocks.logger.error).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => {
-      expect(screen.getByText("x.csv")).toBeInTheDocument();
-    });
+  test("initial failure retries through the page loader and keeps retry disabled until completion", async () => {
+    const pending = deferred<ReturnType<typeof page>>(); let reads = 0;
+    const { calls, user } = await setup((workspace, audience) => ++reads === 1 ? page(workspace, audience, null, "History read failed") : pending.promise);
+    expect(screen.getByText("Upload history is unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("No upload history found for this audience")).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Retrying..." })).toBeDisabled();
+    expect(calls).toEqual([["ws-1", 1], ["ws-1", 1]]);
+    await act(async () => pending.resolve(page("ws-1", 1, [upload()])));
+    expect(await screen.findByText("a.csv")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Error loading upload history")).not.toBeInTheDocument());
+    expect(mocks.rawFetch).not.toHaveBeenCalled();
   });
-
-  test("non-Error thrown during fetch shows generic error message", async () => {
-    mocks.fetchAudienceUploads.mockRejectedValueOnce("nope");
-
-    renderHistory({ audienceId: 1 });
-    await waitFor(() => {
-      expect(screen.getByText("Error loading upload history")).toBeInTheDocument();
-    });
-    expect(screen.getByText("An error occurred while fetching uploads")).toBeInTheDocument();
+  test("failed revalidation preserves prior rows, while a successful retry replaces the snapshot", async () => {
+    let reads = 0;
+    const { router, user } = await setup((workspace, audience) => page(workspace, audience, ++reads === 2 ? null : [upload(1, audience, reads === 1 ? "old.csv" : "new.csv")], reads === 2 ? "Read failed" : null));
+    await act(async () => { await router.revalidate(); });
+    expect(screen.getByText("old.csv")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("new.csv")).toBeInTheDocument();
+    expect(screen.queryByText("old.csv")).not.toBeInTheDocument();
   });
-
-  test("realtime subscription INSERT/UPDATE/DELETE mutate uploads without refetch", async () => {
-    mocks.fetchAudienceUploads.mockResolvedValue([
-      {
-        id: 1,
-        audience_id: 1,
-        created_at: new Date().toISOString(),
-        status: "pending",
-        file_name: "a.csv",
-        file_size: 1,
-        total_contacts: 2,
-        processed_contacts: 0,
-        processed_at: null,
-        error_message: null,
-      },
-    ]);
-
-    renderHistory({ audienceId: 1 });
-    await waitFor(() => expect(screen.getByText("a.csv")).toBeInTheDocument());
-    expect(mocks.realtimeOpts?.table).toBe("audience_upload");
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "INSERT",
-        new: {
-          id: 2,
-          audience_id: 1,
-          created_at: new Date().toISOString(),
-          status: "completed",
-          file_name: "b.csv",
-          file_size: 1,
-          total_contacts: 1,
-          processed_contacts: 1,
-          processed_at: null,
-          error_message: null,
-        },
-      });
-    });
-    await waitFor(() => expect(screen.getByText("b.csv")).toBeInTheDocument());
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "UPDATE",
-        new: { id: 2, status: "error", error_message: "e" },
-      });
-    });
-    await waitFor(() => expect(screen.getByText("Error")).toBeInTheDocument());
-    expect(screen.getByTitle("e")).toBeInTheDocument();
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "UPDATE",
-        new: { id: 999, status: "completed" },
-      });
-    });
-    expect(screen.getByText("a.csv")).toBeInTheDocument();
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "UPDATE",
-        new: { status: "completed" },
-      });
-    });
-    expect(screen.getByText("a.csv")).toBeInTheDocument();
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "DELETE",
-        old: { id: 2 },
-      });
-    });
-    await waitFor(() => expect(screen.queryByText("b.csv")).toBeNull());
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "DELETE",
-        old: {},
-      });
-    });
-    expect(screen.getByText("a.csv")).toBeInTheDocument();
-
-    await act(async () => {
-      mocks.realtimeOpts.onChange({
-        eventType: "UNKNOWN",
-        new: { id: 1 },
-        old: { id: 1 },
-      });
-    });
-    expect(screen.getByText("a.csv")).toBeInTheDocument();
+  test("updated failures and immediate reopen keep a persistent retry action", async () => {
+    let error: string | null = "First read failed";
+    const { router } = await setup((workspace, audience) => page(workspace, audience, error ? null : [], error));
+    await screen.findByRole("button", { name: "Try again" });
+    vi.useFakeTimers();
+    try {
+      error = "The retry also failed";
+      await act(async () => { await router.revalidate(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(screen.getByText("The retry also failed")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+      error = null;
+      await act(async () => { await router.revalidate(); });
+      error = "A new read failed";
+      await act(async () => { await router.revalidate(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(6000); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(screen.getByText("A new read failed")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+    } finally { vi.useRealTimers(); }
   });
-
-  test("audienceId=0 short-circuits fetch and remains loading", async () => {
-    mocks.fetchAudienceUploads.mockResolvedValue([]);
-
-    renderHistory({ audienceId: 0 });
-    expect(screen.getByText("Loading upload history...")).toBeInTheDocument();
-    expect(mocks.fetchAudienceUploads).not.toHaveBeenCalled();
+  test("INSERT, UPDATE and DELETE change current rows, deduplicate inserts and ignore foreign audience events", async () => {
+    const { calls } = await setup((workspace, audience) => page(workspace, audience, [upload()]));
+    expect(currentSubscription()).toMatchObject({ workspaceId: "ws-1", filter: "audience_id=eq.1" });
+    const change = (payload: unknown) => act(() => currentSubscription().onChange(payload));
+    await change({ eventType: "INSERT", new: upload(2, 1, "b.csv") });
+    await change({ eventType: "INSERT", new: upload(2, 1, "b.csv") });
+    expect(screen.getAllByText("b.csv")).toHaveLength(1);
+    await change({ eventType: "UPDATE", new: { id: 1, audience_id: 1, status: "completed", total_contacts: 10, processed_contacts: 10 } });
+    expect(within(historyRow("a.csv")).getByText("Completed")).toBeInTheDocument();
+    await change({ eventType: "INSERT", new: upload(3, 2, "foreign.csv") });
+    await change({ eventType: "UPDATE", new: { id: 1, audience_id: 2, file_name: "foreign.csv" } });
+    await change({ eventType: "DELETE", old: { id: 1, audience_id: 2 } });
+    expect(screen.getByText("a.csv")).toBeInTheDocument(); expect(screen.queryByText("foreign.csv")).not.toBeInTheDocument();
+    await change({ eventType: "DELETE", old: { id: 2 } });
+    await change({ eventType: "DELETE", old: {} });
+    await change({ eventType: "UNKNOWN", new: upload() });
+    expect(screen.queryByText("b.csv")).not.toBeInTheDocument(); expect(screen.getByText("a.csv")).toBeInTheDocument();
+    expect(calls).toHaveLength(1); expect(mocks.rawFetch).not.toHaveBeenCalled();
+  });
+  test.each(["/workspaces/ws-1/audiences/2", "/workspaces/ws-2/audiences/1"])("navigation to %s isolates rows and ignores a captured prior callback", async (next) => {
+    const { router } = await setup((workspace, audience) => page(workspace, audience, [upload(1, audience, `${workspace}-${audience}.csv`)]));
+    const previous = currentSubscription().onChange;
+    await act(async () => { await router.navigate(next); });
+    const expected = next.includes("ws-2") ? "ws-2-1.csv" : "ws-1-2.csv";
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText("ws-1-1.csv")).not.toBeInTheDocument();
+    await act(async () => previous({ eventType: "INSERT", new: upload(4, 1, "late-event.csv") }));
+    expect(screen.queryByText("late-event.csv")).not.toBeInTheDocument(); expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+  test("late retry completion cannot replace a newly selected audience", async () => {
+    const pending = deferred<ReturnType<typeof page>>(); let firstReads = 0;
+    const { router, user } = await setup((workspace, audience) => audience === 2 ? page(workspace, audience, [upload(2, 2, "current.csv")]) : ++firstReads === 1 ? page(workspace, audience, null, "Read failed") : pending.promise);
+    await user.click(await screen.findByRole("button", { name: "Try again" }));
+    await screen.findByRole("button", { name: "Retrying..." });
+    await act(async () => { await router.navigate("/workspaces/ws-1/audiences/2"); });
+    expect(await screen.findByText("current.csv")).toBeInTheDocument();
+    await act(async () => pending.resolve(page("ws-1", 1, [upload(1, 1, "late-retry.csv")])));
+    expect(screen.getByText("current.csv")).toBeInTheDocument(); expect(screen.queryByText("late-retry.csv")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Error loading upload history")).not.toBeInTheDocument());
   });
 });

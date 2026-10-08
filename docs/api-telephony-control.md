@@ -6,13 +6,15 @@ Public spec: [`/api/docs/openapi`](/api/docs/openapi) · UI: [`/docs`](/docs) ·
 
 ## Authentication (bearer policy)
 
-Dialer, handset, and agent-presence routes require an authenticated user via **session cookie** or **`Authorization: Bearer <supabase_access_token>`** (`requireJsonAuth`). Workspace API keys (`cc_…`) are **not** accepted on these routes — use a bearer token from `POST /api/auth/token` for headless dialer clients.
+Dialer, handset, and agent-presence routes require an authenticated user via **session cookie** or **`Authorization: Bearer <session_token>`** (`requireJsonAuth`). Workspace API keys (`cc_…`) are **not** accepted on these routes — use a bearer token from `POST /api/auth/token` for headless dialer clients.
 
 | Auth | Accepted on dialer routes |
 | --- | --- |
-| Session cookie (`sb-access-token`) | Yes |
-| Bearer Supabase access token | Yes |
+| Session cookie (`better-auth.session_token` on HTTP; `__Secure-better-auth.session_token` on HTTPS) | Yes |
+| Bearer session token | Yes |
 | Workspace API key | No |
+
+Keep the exact cookie name and signed value issued by the target deployment. Browser clients use their cookie jar. See [session client setup](./api-overview.md#session-browser) for generated SDK configuration.
 
 ## Workspace telephony (Phase 6)
 
@@ -58,6 +60,18 @@ Dialer, handset, and agent-presence routes require an authenticated user via **s
 | POST | `/api/auto-dial` | Start auto-dial session |
 | POST | `/api/auto-dial/end` | End auto-dial session |
 | POST | `/api/auto-dial/dialer` | **Internal** predictive dial worker (service role) |
+
+`POST /api/auto-dial/end` accepts JSON `{ "workspaceId": "...", "conferenceName": "..." }`.
+`conferenceName` is optional. When supplied, it must be a name generated for the
+signed-in user (`<user-id>~<session-id>`); an invalid name returns 400. Without a
+name, the route also finds that user's active conferences in the workspace's
+Twilio account, including conferences with no active call rows. Other users'
+conference names are excluded. Workspace access is required in both cases.
+
+A successful response is `{ "success": true }`. If a conference cannot be
+completed, the route returns 502 and the call screen keeps the device available
+for retry. Predictive Leave waits for this response before local teardown and
+does not reset the campaign queue.
 
 ## Inbound queue (session CRUD)
 

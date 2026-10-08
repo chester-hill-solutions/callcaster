@@ -40,7 +40,7 @@ function memberAuth(workspaceId = WS) {
     ctx: {
       headers: new Headers({ "set-cookie": "session=abc" }),
       user: { id: "u1" },
-      userRole: "owner",
+      userRole: { role: "owner" },
       workspaceId,
     },
   };

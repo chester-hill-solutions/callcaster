@@ -232,16 +232,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1356,
-    "verdict": "blocked-epic",
-    "summary": "The dev custom domain was attached in Railway; DNS and IaC ownership were still missing at the last verified report.",
-    "resolution": "Inspect current DNS and the Railway target. DNS changes need access to the domain zone, then codify the live mapping.",
-    "lookIn": [
-      ".railway/environments/dev.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1357,
     "verdict": "blocked-epic",
     "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
@@ -274,7 +264,7 @@
   {
     "issueNumber": 1752,
     "verdict": "blocked-epic",
-    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket \u2014 split PDF pipeline, CSV, and aggregation layers first.",
+    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -283,40 +273,28 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1802,
     "verdict": "blocked-epic",
-    "summary": "Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.",
-    "resolution": "Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.",
+    "summary": "Runtime security is a native Epic with separate package Tasks. Six source fixes are merged: Axios #2336, csv-parse #2338, Scalar SDK #2339, ws #2343, Twilio JWS #2345 and PostCSS #2346. Deployed acceptance and release promotion remain open. At dev@befe20fa, npm production audit is clear and the independently resolved Bun runtime graph has zero affected nodes.",
+    "resolution": "Complete each child’s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.",
     "lookIn": [
       "package.json",
       "package-lock.json",
       "bun.lock"
     ],
-    "trackerRecommendation": "Do not duplicate Nano ID #1805 or the active qs #1809 work."
-  },
-  {
-    "issueNumber": 1803,
-    "verdict": "blocked-epic",
-    "summary": "The development-scope dependency findings span multiple package families and need separate remediation slices.",
-    "resolution": "Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "trackerRecommendation": "The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope."
+    "trackerRecommendation": "The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open."
   },
   {
     "issueNumber": 1892,
     "verdict": "blocked-epic",
     "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
-    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).",
+    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).",
     "currentBehavior": "scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).",
     "rootCause": "Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.",
-    "resolution": "Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
+    "resolution": "Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
     "lookIn": [
       "scripts/dry-baseline.json",
       "scripts/check-dry.mjs"
@@ -330,7 +308,6 @@
       "One implementation per clone; call sites behave the same"
     ],
     "blockedBy": [
-      1911,
       1912,
       1913,
       1914,
@@ -342,7 +319,7 @@
     ],
     "size": "L",
     "risk": "medium",
-    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1911-#1919."
+    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1912-#1919."
   },
   {
     "issueNumber": 268,
@@ -615,11 +592,768 @@
       "Credentials are stored as secrets/vars, not in the repo",
       "IaC-vs-manual decision is recorded"
     ],
-    "blockedBy": [
-      1356
-    ],
+    "blockedBy": [],
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826."
+  },
+  {
+    "issueNumber": 2057,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(auth-pages): sign-in and sign-up share one layout, copy and error treatment",
+    "summary": "Six filed sign-in/sign-up issues (#2010, #2011, #2012, #2013, #2014, #2015) are one piece of work on one pair of pages. Filed as loose tickets they guarantee a churn loop: fix alignment (#2013), the scrollbar returns (#2010), add the mural (#2011), and the box is off-centre again. Created 2026-09-25 during board triage, when all six sat unenriched in Needs triage.",
+    "currentBehavior": "The two pages drift independently: different centring, different form width, different padding, one has a mural and the other does not, and two different copy treatments.",
+    "rootCause": "No shared form container between the pages, so every layout change is made twice and any one change can undo the other.",
+    "resolution": "Land #2013 first as the shared baseline. Then treat #2010 as a probable symptom rather than a separate defect — a mis-sized container is the usual cause of a scrollbar on a page that should fit — and close it if it resolves instead of carrying a fix for a symptom that is gone. #2011 and #2012 land after #2013 so the final visual pass sees final copy. #2014 keeps the sign-in page fix; its codebase-wide half is #2058. #2015 is business logic, independent of all of it, and is the one with real diagnostic value.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*",
+      "app/components/shared/AuthCard.tsx",
+      "app/routes.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "both pages share one form container",
+      "no scrollbar at 1x viewport height"
+    ],
+    "acceptanceCriteria": [
+      "Both pages share one form container with identical width, padding and centring",
+      "Sign-up carries the same mural treatment as sign-in",
+      "Copy is consistent across the two pages",
+      "The sign-in page surfaces the real error through a toast",
+      "The inline-error sweep ships as its own issue with a rule and an inventory, not a blanket change",
+      "#2010 is closed as resolved by #2013, or reopened with the specific remaining cause"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Parent epic. Sequencing lives here, not in the children. #2015 can proceed in parallel with the whole thing."
+  },
+  {
+    "issueNumber": 2010,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "auth pages: scrollbar appears even though the page fits the viewport",
+    "summary": "The sign-in and sign-up pages show a scrollbar even though the content fits within the viewport height. Grouped under the auth-pages epic (#2057).",
+    "currentBehavior": "A vertical scrollbar renders on pages whose content should fit.",
+    "rootCause": "Most likely an over-sized form container rather than genuinely long content.",
+    "resolution": "Blocked by #2013. Fix the shared container geometry first, then re-check. If the scrollbar is gone, close this as resolved-by rather than carrying a separate fix for a symptom that no longer exists. If it persists, reopen with the specific remaining cause rather than assuming it is the same issue.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*",
+      "app/components/shared/AuthCard.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "no scrollbar at 1x viewport height",
+      "regression guard once the container is fixed"
+    ],
+    "acceptanceCriteria": [
+      "No scrollbar at the supported viewport range",
+      "Either closed as resolved by #2013, or reopened with the specific remaining cause"
+    ],
+    "blockedBy": [
+      2013
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Suspect this closes for free with #2013. Do not fix it first — a scrollbar fix that is really a layout fix will be undone by the next alignment change."
+  },
+  {
+    "issueNumber": 2011,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "auth pages: sign-up is missing the background mural that sign-in has",
+    "summary": "The sign-up page lacks the background mural treatment the sign-in page already uses. Grouped under the auth-pages epic (#2057).",
+    "currentBehavior": "Sign-in has a background mural; sign-up does not.",
+    "rootCause": "The treatment was applied to one route only.",
+    "resolution": "Blocked by #2013 so the final visual pass sees the finished layout. Apply the same treatment to sign-up, ideally by extracting it so the two pages cannot drift apart again.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "both routes render the mural treatment"
+    ],
+    "acceptanceCriteria": [
+      "Sign-up renders the same mural treatment as sign-in",
+      "The treatment is shared, not duplicated per route"
+    ],
+    "blockedBy": [
+      2013
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards."
+  },
+  {
+    "issueNumber": 2002,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(authz): permission-based authorization instead of role checks",
+    "summary": "Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
+    "currentBehavior": "Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.",
+    "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape.",
+    "resolution": "Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
+    "lookIn": [
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/auth-layout.server.ts",
+      "eslint.config.mjs (no-restricted-imports, tenant boundary)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "permission model exists",
+      "each permission has a test at the route that enforces it"
+    ],
+    "acceptanceCriteria": [
+      "A permission model exists that roles map onto as default groupings",
+      "Authorization checks a permission rather than comparing a role string",
+      "Existing roles continue to work as groupings without a migration per user",
+      "No route is left checking a broad role where a specific permission is meant"
+    ],
+    "blockedBy": [
+      2030
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports."
+  },
+  {
+    "issueNumber": 2030,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Spike: weigh permission models against what the auth system already provides",
+    "summary": "The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.",
+    "currentBehavior": "Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.",
+    "rootCause": "Roles were adopted as the model without first checking whether a permission primitive was available.",
+    "resolution": "Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.",
+    "lookIn": [
+      "package.json (better-auth version and plugins in use)",
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/server/tenant-db.ts",
+      "app/lib/data-plane-middleware.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A written recommendation exists, reviewed before any implementation begins",
+      "better-auth permission capabilities are established from the installed version, not from documentation memory",
+      "Existing in-repo authorization is inventoried so it is extended rather than duplicated",
+      "Ruled-out options are recorded with reasons"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL."
+  },
+  {
+    "issueNumber": 2008,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",
+    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.",
+    "currentBehavior": "Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.",
+    "rootCause": "Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.",
+    "resolution": "Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
+    "lookIn": [
+      "app/components/layout/WorkspaceSidebar.tsx",
+      "app/lib/workspace-middleware.server.ts",
+      "app/routes/workspaces+/$id/**",
+      "app/db/workspace-scoped-tables.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "each capability has a route-level enforcement test",
+      "sidebar visibility and route enforcement agree"
+    ],
+    "acceptanceCriteria": [
+      "The Agent capability set is written down as data, not scattered conditionals",
+      "Every denied surface returns 403 on a direct URL attempt, not only when hidden",
+      "The 403-versus-404 boundary is decided and documented rather than incidental",
+      "Sidebar visibility and route enforcement read from the same source"
+    ],
+    "blockedBy": [
+      2030
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
+  },
+  {
+    "issueNumber": 2009,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Agent ABAC: adding an Agent to a campaign unlocks that campaign type for them",
+    "summary": "The attribute-based half of the cluster. Adding an Agent to a specific campaign should also unlock their broader ability to see and act on that campaign type: added to a live-call campaign, it appears on their list and is callable if open; added to an SMS campaign, its numbers become visible on the chats page.",
+    "currentBehavior": "Campaign membership is a relation, but it does not appear to confer the broader capability, and the broader capability does not appear to be scoped back down to the campaigns they are actually on.",
+    "rootCause": "Two separate concerns — which campaign types you may touch, and which campaigns within a type — are not expressed in the same model, so membership cannot imply the first.",
+    "resolution": "Blocked by #2008, which defines the type-level capability set this refines. Two distinct grants are needed and they must not be conflated: a type-level capability from the role defaults, and a campaign-level grant from membership. The test that matters is negative — an Agent with access to one SMS campaign must not see another campaign's numbers.",
+    "lookIn": [
+      "app/db/schema.ts (campaign membership relation)",
+      "app/lib/workspace-middleware.server.ts",
+      "app/routes/workspaces+/$id/**/chats",
+      "app/components/**/CampaignList"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "membership grants visibility of exactly that campaign",
+      "an Agent on one SMS campaign cannot see another campaign numbers"
+    ],
+    "acceptanceCriteria": [
+      "Campaign membership confers a campaign-level grant",
+      "An Agent sees only the campaigns they are on, within the types they may touch",
+      "The negative case is tested: one campaign membership does not leak another campaign",
+      "Type-level and campaign-level grants are separate and both readable in the code"
+    ],
+    "blockedBy": [
+      2008
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Blocked by #2008 on purpose — the two are easy to conflate and building this first would bake in the wrong model. The negative test is the one that proves it; without it a permissive implementation looks correct."
+  },
+  {
+    "issueNumber": 2031,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Sweep: authorization checks a permission, not a broad role",
+    "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.",
+    "currentBehavior": "Checks are inconsistent, comparing roles in some places and something narrower in others.",
+    "rootCause": "Each check was written locally against whatever was convenient at the time.",
+    "resolution": "Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
+    "lookIn": [
+      "app/lib/**-middleware.server.ts",
+      "scripts/checks/check-route-authz.mjs",
+      "eslint.config.mjs"
+    ],
+    "existingTests": [
+      "check:route-authz structural gate"
+    ],
+    "missingTests": [
+      "a gate that fails when a new route compares a role string directly"
+    ],
+    "acceptanceCriteria": [
+      "No route or loader compares a broad role string where a permission check is meant",
+      "check:route-authz fails when a new role comparison is introduced",
+      "The sweep lands after the model, not before"
+    ],
+    "blockedBy": [
+      2030,
+      2008
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
+  },
+  {
+    "issueNumber": 1885,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Retire the remaining auth schema after dependency verification",
+    "summary": "Partial fix only. Dead RPC removal and both actor rewrites are on dev; legacy auth shim remains and the fail-closed schema drop is absent. Issue discussion requires production dependency verification before the drop.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The two live RPCs now use app.current_user_id and get_outreach_attempts is dropped; auth.uid() is still created and schema auth remains to be retired.",
+    "rootCause": "The live RPC actor rewrites and dead RPC removal shipped. The baseline shim still creates auth.uid(), and the final dependency guard and schema retirement remain unshipped.",
+    "resolution": "Remaining work only: ship a dependency guard, verify all production dependencies/data, then release the schema drop separately and retire the bootstrap shim.",
+    "lookIn": [
+      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23",
+      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18",
+      "drizzle/0001_auth_uid_shim.sql:2",
+      "scripts/db/bootstrap-fresh-db.mjs:120",
+      "app/lib/db-rpc.server.ts",
+      "drizzle/0001_auth_uid_shim.sql",
+      "drizzle/0000_baseline.sql",
+      "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
+      "client/migrations/20260715140000_drop_legacy_rls.sql",
+      "scripts/db/check-db-orphans.mjs",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs"
+    ],
+    "existingTests": [
+      "test/queue-rpc-contract.test.ts",
+      "test/db-rpc-claim-queue-entry.test.ts",
+      "test/db-rpc-outreach-attempt.test.ts",
+      "test/atomic-manual-dial-claims.integration.test.ts"
+    ],
+    "missingTests": [
+      "No legacy-auth SQL guard is present on dev. Existing queue contract tests need latest-definition and actor/no-actor coverage. Database state was not queried in this read-only code audit."
+    ],
+    "acceptanceCriteria": [
+      "A dependency guard fails before any destructive operation when non-auth functions, policies, views or other schema objects still depend on auth.",
+      "Production dependencies and data-retention requirements are verified before the schema drop.",
+      "Guard and schema drop follow the separate release steps recorded in the issue.",
+      "The two rewritten RPC flows retain actor and missing-actor behavior.",
+      "A fresh bootstrap does not recreate auth.uid() after retirement."
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "high",
+    "trackerRecommendation": "Blocked / split first. Chunks 1–2 shipped in #1966. The 2026-09-28 issue comment explicitly requires production checks and separate guard/drop release work; do not merge the old chunk-3 branch as-is. Related PR evidence: #1966, #1887. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 1873,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Call recording: workspace recording policy + campaign opt-in, wired into IVR/predictive/test dials",
+    "summary": "The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.",
+    "rootCause": "Recording was built for specific agent call paths. The workspace/campaign policy model and other dial families are not yet wired; the issue combines several release units.",
+    "resolution": "Split policy/schema, dial-path recording and disclosure into separate changes. The optional disclosure model is stated in the issue; the jurisdiction gate and transcription scope still need exact requirements. #1989 is a separate, confirmed callback defect.",
+    "lookIn": [
+      "app/lib/campaign-test-call.server.ts:105",
+      "app/lib/twilio-ivr-runtime.server.ts:20",
+      "app/db/schema-campaign.ts:1",
+      "app/routes/api+/call.action.server.ts",
+      "app/routes/api+/recording.action.server.ts",
+      "app/lib/call-recording-storage.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/db/schema-campaign.ts",
+      "app/lib/coaching-schemas.ts"
+    ],
+    "existingTests": [
+      "test/recording.route.test.ts",
+      "test/webhook-side-effects.test.ts:445-560",
+      "test/call-recording-storage.server.test.ts",
+      "test/batch-transcription-gating.test.ts",
+      "test/api-call.route.test.ts:106 (dial record attrs)"
+    ],
+    "missingTests": [
+      "Check policy disabled, campaign opt-out, each supported dial path, callback persistence and disclosure before enabling recording."
+    ],
+    "acceptanceCriteria": [
+      "Workspace recording policy and campaign opt-in gate every supported recording path.",
+      "Enabled IVR, predictive and test calls persist audio through the recording callback.",
+      "#1989 callback work is verified separately.",
+      "Optional disclosure behavior and jurisdiction gating requirements are recorded before rollout."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked / split first: multiple dial families and policy requirements; keep #1989 available as a separate fix."
+  },
+  {
+    "issueNumber": 2168,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
+    "summary": "The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
+    "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
+    "resolution": "Report tool and the historical number cull are complete. Split durable keep-list configuration, name backfill and repeat policy into separate work. Workspace-row deletion was deferred in the issue discussion. Recheck current ownership before any new live cleanup.",
+    "lookIn": [
+      "scripts/cull-report.mjs:1",
+      "app/lib/twilio-resource-name.ts:1",
+      "scripts/cull-report.mjs (read-only cull tool, merged #2171)",
+      "app/lib/twilio-resource-name.ts (naming helper, merged #2167)",
+      "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
+    ],
+    "existingTests": [
+      "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings"
+    ],
+    "missingTests": [
+      "Keep-list lookup must protect an explicitly kept phone-named workspace; name backfill must be idempotent."
+    ],
+    "acceptanceCriteria": [
+      "Subaccount display names are backfilled to the #2167 format",
+      "The keep-list lives in the repository, not a shell argument",
+      "2608141501 survives, since it is on both the keep-list and the phone-number-named rule",
+      "The cull report remains read-only with no delete path"
+    ],
+    "blockedBy": [
+      2170
+    ],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Blocked / split first: keep-list/repeat policy and external name writes are separate concerns. Related PR evidence: #2171, #2167. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2213,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Correct the remaining temporal column types listed in the schema drift baseline",
+    "summary": "The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. 64 committed temporal mismatch lines remain; guard and first table slices are on dev. Tenant write type boundary was tightened in PR #2244, so the earlier untyped-write prerequisite is resolved.",
+    "rootCause": "The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.",
+    "resolution": "Split remaining tables into atomic tasks and start one table slice. Validate invalid/empty values, wire contracts and Date sorting at each boundary.",
+    "lookIn": [
+      "scripts/baselines/schema-type-drift.txt:1",
+      "test/integration-db/schema-type-drift.test.ts:141",
+      "app/server/tenant-db.ts:121",
+      "scripts/baselines/schema-type-drift.txt",
+      "test/integration-db/schema-type-drift.test.ts",
+      "test/helpers/schema-drift.ts",
+      "app/db/schema.ts",
+      "app/db/schema-campaign.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/schema-type-drift.test.ts"
+    ],
+    "missingTests": [
+      "Guard exists. Each slice needs behavior tests at Date/write/wire boundaries plus real-Postgres verification; no fresh database count performed here."
+    ],
+    "acceptanceCriteria": [
+      "The temporal drift baseline reaches zero in small table-specific changes.",
+      "The existing guard rejects both new drift and stale baseline entries."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Move to Blocked / split first as a multi-table parent. Create table-specific tasks; do not re-implement the guard or completed slices. Related PR evidence: #2231, #2233, #2241, #2244. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2300,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Consistent feedback without page movement",
+    "summary": "Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.",
+    "currentBehavior": "Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is reviewed local shared source at a4a07e5: 218 workbench tests, five CLI tests and four actual CallCaster shad-cc browser cases pass. Original flow adds 120px at narrow width. Shared source remains unmerged and not adopted. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.",
+    "rootCause": "Message tone, placement and lifecycle were selected independently at each call site.",
+    "resolution": "Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.",
+    "lookIn": [
+      "docs/design-system.md",
+      "docs/feedback-inventory.md",
+      "app/components/ui/",
+      "app/root.tsx"
+    ],
+    "existingTests": [
+      "PR #2302 full local/remote gates; PR #2310 full local/remote gates and four built-app geometry cases.",
+      "Canonical shared source proof is distinct from app adoption and fresh shared CI acceptance."
+    ],
+    "missingTests": [
+      "Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group."
+    ],
+    "acceptanceCriteria": [
+      "Canonical component library owns generic feedback presentation.",
+      "No dynamic alert moves page content or scroll.",
+      "Consumer groups retain domain actions and hard guards."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Split work through the native child issues; preserve the existing #2032 parent under #2000."
+  },
+  {
+    "issueNumber": 2305,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Show audio-upload failure once",
+    "summary": "Audio upload duplicates the server failure; removing its inline copy is held until the root toast stays accessible inside the open sheet.",
+    "currentBehavior": "Source audit at dev@cb88df8b. A held local duplicate-removal patch has two actual UI failures because React Aria hides the root toaster ancestor while the sheet stays open; six component/validation/retry controls pass. No green PR or completed fix is claimed.",
+    "rootCause": "The same action failure reaches localError and the root toast. The root host is also outside the modal accessibility top layer.",
+    "resolution": "Adopt the reviewed canonical modal-safe root host through #2312, then finish this atomic action-result repair with retained upload data, pending/retry and browser geometry. Local name/file validation is separate #2311 work; do not replace it with generic toasts.",
+    "lookIn": [
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [
+      "test/ui/audio-upload-feedback.test.tsx in held local commit 8c32e890: two modal accessibility regression failures and six passing controls."
+    ],
+    "missingTests": [
+      "Consumer modal-safe host adoption in #2312, restored accessible single-result proof, actual-browser geometry and full local/remote green gates."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [
+      2312
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by #2312 (native edge verified). Keep the held source and tests; do not push a patch whose only remaining failure result is inaccessible."
+  },
+  {
+    "issueNumber": 2307,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Show onboarding name-save failure once",
+    "summary": "Onboarding hides the name form before save acceptance and duplicates returned action failure. Preserve the entered name, retry and genuine field validation.",
+    "currentBehavior": "Source audit at dev@cb88df8b. The intro submits onContinue; the wizard force-hides it and starts step navigation before server acceptance. Actual route/wizard/hook/root-host tests fail retained pending form, retained name/retry after rejection and single returned result; native required validation, read-only access and the accepted path_selection redirect pass. Generic operation errors also mark the valid name invalid; blank/overlong server validation has no field discriminator.",
+    "rootCause": "Premature client intro-session advance races the server result. Generic actionError is rendered again and assigned to the name invalid state without a field contract.",
+    "resolution": "After shared field-error adoption #2311, keep operation failures in one root toast, associate genuine name validation with its field, and let the existing server redirect advance on acceptance. Preserve server onboarding statuses, step targets, provider writes and native/server validation.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding.route.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx",
+      "app/lib/platform-onboarding-handlers.server.ts",
+      "app/components/ui/form-field.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-intro-step.test.tsx",
+      "test/onboarding-save-workspace-name.test.ts",
+      "Actual route source-audit reproduction: three regression failures and three passing native validation/permission/accepted-redirect controls."
+    ],
+    "missingTests": [
+      "Retained input/disabled pending action, failed acknowledgement/retry, field-specific server validation versus operation failures, no replay, actual-browser appearance/update/clear geometry."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [
+      2311
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by #2311 (native edge and audited issue body verified on 2026-10-03). Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine."
+  },
+  {
+    "issueNumber": 2311,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Keep validation errors from moving form controls",
+    "summary": "Adopt the canonical field-error presentation while preserving correct accessible field association.",
+    "currentBehavior": "FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared #125 now has reviewed local source at a4a07e5: owning IDs/ARIA, SSR description, retained drafts, keyboard remedies and modal access. Full workbench/CLI checks and four actual CallCaster shad-cc browser cases pass; original flow fails geometry. Shared merge and consumer implementation/browser acceptance remain pending.",
+    "rootCause": "Conditional error rows add layout height; some validation is not associated with the invalid control.",
+    "resolution": "Implement the canonical shared contract in https://github.com/chester-hill-solutions/chester-hill-solutions/issues/125 first. Adopt its reviewed source through the existing vendor and thin FormField adapter; preserve labels, help, stable IDs, values, compound controls, hard validation and remedies. Do not make a second placement engine.",
+    "lookIn": [
+      "app/components/ui/form-field.tsx",
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "docs/design-system.md"
+    ],
+    "existingTests": [
+      "Existing FormField accessibility tests; canonical source audit at shared main@412bb1d.",
+      "Reviewed shared local source: 218 workbench tests, five CLI tests, nine focused cases with original/five faults failing and restored source passing. Four narrow/desktop light/dark actual shad-cc cases preserve 18 page/17 dialog landmarks."
+    ],
+    "missingTests": [
+      "Fresh full shared CI and merge, then actual consumer FormField/AddAudioSheet adoption with input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies."
+    ],
+    "acceptanceCriteria": [
+      "Canonical library owns generic placement and accessibility.",
+      "Appearance, update and clearing do not move page landmarks or scroll.",
+      "Retain domain validation, hard guards, field/control identity and required remedies."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
+  },
+  {
+    "issueNumber": 2312,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Keep modal action feedback accessible through the root toaster",
+    "summary": "Adopt the canonical modal-safe root toast before removing upload failure duplication.",
+    "currentBehavior": "Actual AddAudioSheet/router/themed-root-toast tests fail two accessibility checks while six controls pass. Shared #126 has a reviewed local canonical fix with 12 generic built-catalog browser cases; it is not merged or adopted. Fresh shared CI remains blocked by shared #122 and #123.",
+    "rootCause": "The root toast host is hidden by React Aria modal isolation; removing its inline copy would remove accessible failure feedback.",
+    "resolution": "Implement and merge https://github.com/chester-hill-solutions/chester-hill-solutions/issues/126 after its native CI prerequisites. Adopt its reviewed source with provenance and rebuilt vendor output, one root host, retained theme and actual modal accessibility/isolation/focus/geometry proof.",
+    "lookIn": [
+      "app/components/ui/sonner.tsx",
+      "app/components/ui/sheet.tsx",
+      "app/root.tsx",
+      "vendor/chester-hill-solutions/shad-cc/",
+      "docs/design-system.md"
+    ],
+    "existingTests": [
+      "Held app integration reproduction: two failures and six controls. Canonical shared #126 source proof: six focused/203 workbench tests and 12 browser cases; local prerequisites are not fresh CI acceptance."
+    ],
+    "missingTests": [
+      "Canonical green merge; consumer source/generated-output adoption; actual app Dialog/Sheet keyboard and narrow/desktop light/dark geometry with modal isolation, retained fields and retry."
+    ],
+    "acceptanceCriteria": [
+      "Canonical library owns generic placement and accessibility.",
+      "Appearance, update and clearing do not move page landmarks or scroll.",
+      "Retain domain validation, hard guards, field/control identity and required remedies."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
+  },
+  {
+    "issueNumber": 2128,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Complete audience upload recovery after opt-out normalization",
+    "summary": "Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.",
+    "currentBehavior": "Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.",
+    "resolution": "Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/lib/audience-upload-db.server.ts",
+      "app/routes/api+/audience-upload.action.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "shared/contact-import-headers.ts",
+      "app/lib/csv-contacts.ts",
+      "app/lib/chat-opt-out.ts"
+    ],
+    "existingTests": [
+      "#2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.",
+      "Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.",
+      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.",
+      "Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.",
+      "Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.",
+      "#2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green."
+    ],
+    "missingTests": [
+      "Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.",
+      "Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.",
+      "Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification."
+    ],
+    "acceptanceCriteria": [
+      "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
+      "An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.",
+      "A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).",
+      "Re-uploading the same file does not duplicate the rows that already landed.",
+      "An opt-out value is never dropped on the floor: the contact is excluded from dispatch."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.",
+    "rootCause": "Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed."
+  },
+  {
+    "issueNumber": 1771,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
+    "summary": "Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.",
+    "currentBehavior": "The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.",
+    "rootCause": "Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.",
+    "resolution": "Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "#2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.",
+      "Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance."
+    ],
+    "missingTests": [
+      "Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.",
+      "Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.",
+      "Applicable deployed original-file/reporting acceptance and release verification."
+    ],
+    "acceptanceCriteria": [
+      "reviewable per-row failure list or download",
+      "original CSV retained safely",
+      "aggregate counts unchanged"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 2356,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Reconcile audio objects left unattached after campaign update failure",
+    "summary": "Audio upload ownership and attachment reconciliation need a durable protocol before a safe cleanup implementation can ship.",
+    "currentBehavior": "The audio action has no cleanup after an empty or failed campaign update. A thrown database error can leave commit status uncertain; immediate deletion can remove an attached object. Current source/test evidence does not establish physical orphan counts or crash recovery.",
+    "rootCause": "Object upload and campaign attachment have separate acknowledgement/failure boundaries and no durable lifecycle record or reference/deletion coordination.",
+    "resolution": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/lib/handler.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "Actual-route audit proves storage-call ordering before an empty scoped update; provider/database I/O is stubbed."
+    ],
+    "missingTests": [
+      "Durable state-transition, uncertain commit, duplicate retry, restart, reference-read failure and reference/deletion race controls with suitable DB/storage integration."
+    ],
+    "acceptanceCriteria": [
+      "Define durable upload ownership and attachment state using existing media/storage and job patterns where they fit. Do not add a route-local garbage collector.",
+      "An upload that is known to be unattached can be reclaimed. A confirmed attachment is retained. An uncertain write result is retained until authoritative reconciliation resolves it.",
+      "The durable retry/reconciliation record survives a crash after upload or an uncertain database acknowledgement. Unresolved cases remain visible to operators and are retried.",
+      "Reconciliation cannot delete an existing or shared object. It verifies owned object identity and current attachment references; coordinate reference checks with supported attachment writes so a new attachment cannot race deletion.",
+      "Cleanup failures cannot replace the original user error or falsely report success. They retain actionable operator evidence and durable retry state.",
+      "Cover successful attachment, known rejection, uncertain commit, failed reference read, duplicate retries, process restart and a reference/deletion race with real state transitions and appropriate database/storage integration controls.",
+      "Verify deployed behavior and release promotion before closing the task. Do not claim physical orphan cleanup from mocked storage calls."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently."
+  },
+  {
+    "issueNumber": 1878,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
+    "summary": "The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. Native #2396 now blocks #1878.",
+    "rootCause": "The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.",
+    "resolution": "Resolve #2396 as a separate callback operation first, with durable duplicate/acknowledgement recovery. Then extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
+    "lookIn": [
+      "app/components/call/CallScreen.Dialogs.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCallScreen.ts",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/routes/api+/audiodrop.action.server.ts",
+      "app/lib/auto-dial-start.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/lib/openapi-platform-components.ts",
+      "app/lib/services/hooks-api.ts"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx",
+      "test/ui/call-screen-callarea.test.tsx",
+      "test/audiodrop.test.ts",
+      "test/auto-dial-start.server.test.ts",
+      "test/auto-dial.server.test.ts",
+      "test/auto-dial-room.route.test.ts",
+      "test/auto-dial-status.test.ts"
+    ],
+    "missingTests": [
+      "Session file identity/None through every continuation; loader revalidation and separate agents; no shared configuration writes; tenant/object/actor/session refusal before provider updates; provider delay/rejection and retry without ending the call; API schema parity; real shared Dialog/Select/Toaster and stable geometry. Existing AMD replay/acknowledgement findings must be tested explicitly before claiming robust playback."
+    ],
+    "acceptanceCriteria": [
+      "The welcome dialog surfaces the caller audio (name and a way to change it)",
+      "What is surfaced matches what the dialer actually plays",
+      "The choice is session-only and does not write the campaign config"
+    ],
+    "blockedBy": [
+      2396
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged."
+  },
+  {
+    "issueNumber": 1803,
+    "verdict": "blocked-epic",
+    "summary": "Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.",
+    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "trackerRecommendation": "Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments."
+  },
+  {
+    "issueNumber": 2099,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Harden public request rate limits",
+    "summary": "Retention source is merged. Trusted public client identity and deployed verification remain separate child tasks.",
+    "currentBehavior": "PR #2331 merged the indexed one-day retention repair at f877b636d963cf1154fbab81ef45ef1244bc61ec. The actual daily handler prunes bounded batches, protects reactivated rows, logs counts and preserves rescheduling after cleanup failure. #2329 remains open for deployed tick/retention acceptance. #2330 still owns client identity; current source reads leftmost X-Forwarded-For and falls back to unknown. The actual CallCaster ingress and header trust rule remain unverified.",
+    "resolution": "Complete and verify #2329 deployed retention and #2330 trusted client identity. Test the actual ingress and forged-header controls before selecting a new trusted source; do not reimplement the merged retention repair. Keep the parent open until both child outcomes are verified and promoted.",
+    "lookIn": [
+      "app/lib/platform-rate-limit.server.ts",
+      "app/lib/platform-rate-limit-db.server.ts",
+      "app/lib/worker/handlers/cron.server.ts",
+      "test/integration-db/rate-limit-retention.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/rate-limit-retention.test.ts",
+      "test/platform-api.test.ts",
+      "test/auth-catch-all-rate-limit.route.test.ts"
+    ],
+    "missingTests": [
+      "Actual deployed maintenance count/error and retained-row boundary; actual CallCaster ingress, direct/local peer identity, IPv4/IPv6 and forged-header controls in #2330."
+    ],
+    "acceptanceCriteria": [
+      "After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.",
+      "The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).",
+      "The job's row count is logged.",
+      "The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria)."
+    ],
+    "blockedBy": [
+      2329,
+      2330
+    ],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The parent tracks two independent child outcomes. Retention source completion does not complete trusted identity or release acceptance."
   }
 ]

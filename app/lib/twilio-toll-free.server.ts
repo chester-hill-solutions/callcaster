@@ -25,20 +25,17 @@ export type WorkspaceTollFreeVerificationSummary = {
 function normalizeVerificationStatus(
   value: string | undefined | null,
 ): TollFreeVerificationStatus {
-  const normalized = String(value ?? "").toLowerCase();
-  if (normalized.includes("approve")) return "approved";
-  if (normalized.includes("reject")) return "rejected";
-  if (
-    normalized.includes("pending") ||
-    normalized.includes("review") ||
-    normalized.includes("in_progress")
-  ) {
-    return "pending_review";
+  switch (String(value ?? "").trim().toUpperCase()) {
+    case "TWILIO_APPROVED":
+      return "approved";
+    case "TWILIO_REJECTED":
+      return "rejected";
+    case "PENDING_REVIEW":
+    case "IN_REVIEW":
+      return "pending_review";
+    default:
+      return "unknown";
   }
-  if (normalized.includes("not") && normalized.includes("submit")) {
-    return "not_submitted";
-  }
-  return "unknown";
 }
 
 export async function listWorkspaceTollFreeVerificationSummaries(args: {
@@ -46,8 +43,7 @@ export async function listWorkspaceTollFreeVerificationSummaries(args: {
   tollFreePhoneNumbers: Array<{ sid?: string; phoneNumber?: string }>;
 }): Promise<WorkspaceTollFreeVerificationSummary[]> {
   const verifications = await args.twilio.messaging.v1.tollfreeVerifications
-    .list({ limit: 200 })
-    .catch(() => []);
+    .list({ pageSize: 200 });
 
   return args.tollFreePhoneNumbers.map((number) => {
     const phoneNumber = number.phoneNumber ?? "";
@@ -58,7 +54,7 @@ export async function listWorkspaceTollFreeVerificationSummaries(args: {
     return {
       phoneNumber,
       phoneNumberSid: number.sid ?? null,
-      status: normalizeVerificationStatus(match?.status),
+      status: match ? normalizeVerificationStatus(match.status) : "not_submitted",
       rejectionReason:
         typeof match?.rejectionReason === "string"
           ? match.rejectionReason
@@ -70,12 +66,9 @@ export async function listWorkspaceTollFreeVerificationSummaries(args: {
 export function tollFreeVerificationBlocksBulkSms(
   summaries: WorkspaceTollFreeVerificationSummary[],
 ): boolean {
-  return summaries.some(
-    (summary) =>
-      summary.phoneNumber &&
-      summary.status !== "approved" &&
-      summary.status !== "unknown",
-  );
+  // Fail closed: absence, uncertainty and pending/rejected records cannot
+  // establish approval. Only an explicit provider-approved record permits SMS.
+  return summaries.some((summary) => summary.status !== "approved");
 }
 
 export type AvailableTollFreeNumber = {

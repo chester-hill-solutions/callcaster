@@ -1,4 +1,15 @@
 import { csvRow } from "@/lib/csv";
+
+/**
+ * A temporal value as it appears in a CSV cell.
+ *
+ * A `Date` stringifies to "Wed Oct 01 2026 12:00:00 GMT+0000 (Coordinated
+ * Universal Time)", so the export's columns would silently change format.
+ * These cells have always been ISO and must stay that way.
+ */
+function toExportIso(value: Date | null | undefined): string {
+  return value ? value.toISOString() : "";
+}
 import {
   countExportCampaignMessages,
   countExportOutreachAttempts,
@@ -14,7 +25,11 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
-import { resolveIvrAnswerLabel } from "@/lib/ivr-results";
+import {
+  normalizeIvrAnswerValue,
+  resolveIvrAnswerLabel,
+  stripInternalIvrResultMetadata,
+} from "@/lib/ivr-results";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
@@ -242,7 +257,9 @@ export async function processMessageCampaignExport(
           matchedMessages.push({
             ...message,
             contact: matchingContact,
-            message_date: message.date_sent || message.date_created || new Date().toISOString()
+            // The CSV cell must stay ISO: interpolating a Date yields
+            // "Wed Oct 01 2026 …", which would change the export's output.
+            message_date: toExportIso(message.date_sent ?? message.date_created)
           });
         }
       }
@@ -450,17 +467,18 @@ export async function processCallCampaignExport(
         // Track visited pages and responses
         const visitedPages = new Set<string>();
         const responses: Record<string, string> = {};
+        const exportResult = stripInternalIvrResultMetadata(item.result);
 
         // Extract responses from the attempt result
-        if (item.result) {
+        if (exportResult) {
           try {
             let resultObj: Record<string, unknown>;
 
             // Parse result if it's a string
-            if (typeof item.result === "string") {
-              resultObj = JSON.parse(item.result) as Record<string, unknown>;
+            if (typeof exportResult === "string") {
+              resultObj = JSON.parse(exportResult) as Record<string, unknown>;
             } else {
-              resultObj = item.result as Record<string, unknown>;
+              resultObj = exportResult as Record<string, unknown>;
             }
 
             Object.entries(resultObj).forEach(([pageId, pageData]) => {
@@ -471,7 +489,7 @@ export async function processCallCampaignExport(
                 Object.entries(pageData as Record<string, unknown>).forEach(
                   ([key, value]) => {
                     // Store response by the key directly - we'll match with script questions later
-                    responses[key] = String(value);
+                    responses[key] = normalizeIvrAnswerValue(value) ?? "";
                   },
                 );
               }
@@ -490,13 +508,13 @@ export async function processCallCampaignExport(
         const rowData = [
           item.id,
           item.disposition || item.call.status || "",
-          JSON.stringify(item.result),
+          JSON.stringify(exportResult),
           item.created_at,
           item.call.sid,
           durationSeconds.toString(),
           item.call.answered_by,
-          item.call.start_time || item.call.date_created || "",
-          item.call.end_time || item.call.date_updated || "",
+          toExportIso(item.call.start_time ?? item.call.date_created),
+          toExportIso(item.call.end_time ?? item.call.date_updated),
           item.contact.id,
           item.contact.firstname,
           item.contact.surname,

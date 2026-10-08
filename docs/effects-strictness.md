@@ -8,7 +8,7 @@ question to be answered in writing.
 
 ## The annotation
 
-Put a JSDoc block **immediately above** the effect:
+Put a JSDoc block **immediately above** the complete effect call, including any namespace prefix such as `React.`. The scanner collects actual direct and namespace calls; function declarations and hook-like text in comments or strings are not effects:
 
 ```tsx
 /**
@@ -54,6 +54,28 @@ legitimate effects.
   hit 0 and all dep warnings were resolved). Intentional omissions need an inline
   `eslint-disable-next-line` with a reason, mirrored in the `@effect-deps` tag.
 
+## Dependency annotation checks
+
+The guard compares the actual literal dependency array with dependency names in
+`@effect-deps`. Use a bracket list for an exact declaration; explanations can
+follow it. Wrapped tag values continue until the next tag or comment end. Prose
+remains supported: every actual dependency must be named, and
+ordinary explanatory words are not extra dependencies. `none` means an empty
+array. Optional member access is normalized, so `entry?.isIntersecting` and
+`entry.isIntersecting` name the same dependency. A member's name must match;
+`fetcher.state` does not account for `fetcher.data`.
+
+Unsupported array expressions or bracket declarations fail rather than silently
+skip the check. Existing annotation mismatches are counted by file, containing
+symbol and mismatch identity in
+[`effects-deps-baseline.json`](../scripts/effects-deps-baseline.json).
+The guard rejects new or increased mismatches and stale reduced or missing
+allowances. The existing unannotated-effect baseline also rejects stale entries.
+After correcting an annotation, run `npm run tools:effects:baseline` and review
+both baselines plus the generated inventory. Never raise an existing allowance
+to clear a new mismatch. The initial baseline is measured from the existing
+source; it does not authorize future mismatches.
+
 ## Pre-commit enforcement
 
 A checked-in `pre-commit` hook (`.githooks/pre-commit`, wired via
@@ -68,9 +90,9 @@ source of truth.
 
 ## Status
 
-Baseline is **0** — every `useEffect`/`useLayoutEffect` is documented in the
-[inventory](./effects-inventory.md). Any new un-annotated effect hard-fails
-`check:effects`. Remaining work is the **`CANDIDATE-REMOVE`** effects (annotations
+The current baseline allows **2** unannotated effects in `app/hooks/call/useCampaignCallFlow.ts`.
+All other collected effects are documented in the [inventory](./effects-inventory.md), including namespace calls.
+Any new unannotated effect above its file allowance fails `check:effects`. Remaining work is the **`CANDIDATE-REMOVE`** effects (annotations
 starting with that marker): effects that were really disguised data-fetching or
 derived state and should migrate to loaders / `useFetcher` / derived values. Grep
 `CANDIDATE-REMOVE` in the inventory for the current list.

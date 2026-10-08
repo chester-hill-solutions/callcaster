@@ -6,6 +6,7 @@ import { capitalize } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -14,7 +15,7 @@ import {
 
 import { Form } from "react-router";
 import { MdCancel } from "react-icons/md";
-import { User } from "@/lib/types";
+import type { WorkspaceMemberDisplay } from "@/lib/workspace-members";
 
 import { MemberRole } from "@/lib/member-role";
 import {
@@ -40,24 +41,36 @@ export const handleRoleTextStyles = (memberRole: MemberRole): string =>
     memberRole === MemberRole.Admin && "text-purple-500",
   );
 
-  type UserWithRole = Partial<User> & { role: string };
-
+function memberManagementPermissions(userRole: MemberRole, memberRole: string, platformAdmin: boolean) {
+  return {
+    canOpen: platformAdmin || userRole !== MemberRole.Caller,
+    canEdit: platformAdmin || userRole === MemberRole.Owner ||
+      (userRole === MemberRole.Admin && memberRole !== MemberRole.Admin),
+    canTransfer: !platformAdmin && userRole === MemberRole.Owner,
+  };
+}
 
 export default function TeamMember({
   member,
   userRole,
   memberIsUser,
   workspaceOwner,
+  platformAdmin = false,
 }: {
-  member: UserWithRole;
+  member: WorkspaceMemberDisplay;
   userRole: MemberRole;
   memberIsUser: boolean;
-  workspaceOwner: UserWithRole;
+  workspaceOwner: WorkspaceMemberDisplay;
+  /** Verified platform management page; workspace role remains display data. */
+  platformAdmin?: boolean;
 }) {  
   const memberRole = member.role;
-  const firstName = member.first_name ? capitalize(member.first_name) : "Unnamed";  
-  const lastName = member.last_name ? capitalize(member.last_name) : "";
-  const memberName = `${firstName} ${lastName}`;
+  const permissions = memberManagementPermissions(userRole, memberRole, platformAdmin);
+  const memberName =
+    [member.first_name, member.last_name]
+      .filter((name): name is string => Boolean(name))
+      .map((name) => capitalize(name))
+      .join(" ") || member.username;
 
   const iconStyles = handleIconStyles(memberRole as MemberRole);
   const roleTextStyles = handleRoleTextStyles(memberRole as MemberRole);
@@ -75,9 +88,9 @@ export default function TeamMember({
       </div>
       <div className="flex items-center gap-2">
         <p className={roleTextStyles}>{roleDisplayName}</p>
-        {!memberIsOwner && (
+        {(!memberIsOwner || platformAdmin) && (
           <Sheet>
-            {userRole !== MemberRole.Caller && memberRole !== "invited" && (
+            {permissions.canOpen && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button
                   className="h-fit rounded-full bg-transparent p-2"
@@ -99,7 +112,7 @@ export default function TeamMember({
                 </Button>
               </SheetTrigger>
             )}
-            {userRole !== MemberRole.Caller && memberRole === "invited" && (
+            {permissions.canOpen && memberRole === "invited" && (
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
@@ -125,7 +138,7 @@ export default function TeamMember({
               </Form>
             )}
 
-            <SheetContent className="z-[100] flex flex-col gap-4 bg-white dark:bg-inherit">
+            <SheetContent className="z-[100] flex flex-col bg-white dark:bg-inherit">
               <SheetHeader>
                 <SheetTitle>Manage Team Member</SheetTitle>
                 <SheetDescription>
@@ -133,99 +146,93 @@ export default function TeamMember({
                   workspace.
                 </SheetDescription>
               </SheetHeader>
-              <h4 className="text-center text-2xl font-bold text-black dark:text-white">
-                {memberName}
-              </h4>
-              {userRole === MemberRole.Owner ||
-              (userRole === MemberRole.Admin &&
-                memberRole !== MemberRole.Admin) ? (
-                <>
-                  <Form method="POST" className="flex w-full flex-col gap-4">
-                    <input type="hidden" name="formName" value="updateUser" />
-                    <input type="hidden" name="user_id" value={member.id} />
-                    <label
-                      htmlFor="updated_workspace_role"
-                      className="flex w-full flex-col gap-2 font-Zilla-Slab text-lg font-semibold dark:text-white"
-                    >
-                      Workspace Role
-                      <select
-                        className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
-                        name="updated_workspace_role"
-                        id="updated_workspace_role"
-                        defaultValue={memberRole}
-                        required
-                      >
-                        {Object.values(MemberRole).map((role) => {
-                          if (role.valueOf() === "owner") {
-                            return <></>;
-                          }
-                          return (
-                            <option
-                              key={role.valueOf()}
-                              value={role.valueOf()}
-                              className=""
-                            >
-                              {getWorkspaceRoleDisplayName(role)}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </label>
-                    <Button
-                      className="border-2 border-black dark:border-white"
-                      variant="outline"
-                    >
-                      Update Team Member
-                    </Button>
-                  </Form>
-
-                  {userRole === MemberRole.Owner && (
-                    <Form
-                      method="POST"
-                      name="transferWorkspaceOwnership"
-                      className="w-full"
-                    >
-                      <input
-                        type="hidden"
-                        name="formName"
-                        value="transferWorkspaceOwnership"
-                      />
-                      <input
-                        type="hidden"
-                        name="workspace_owner_id"
-                        value={workspaceOwner.id}
-                      />
+              <SheetBody className="flex flex-col gap-4">
+                <h4 className="text-center text-2xl font-bold text-black dark:text-white">
+                  {memberName}
+                </h4>
+                {permissions.canEdit ? (
+                  <>
+                    <Form method="POST" className="flex w-full flex-col gap-4">
+                      <input type="hidden" name="formName" value="updateUser" />
                       <input type="hidden" name="user_id" value={member.id} />
-                      <Button className="w-full bg-orange-400 hover:bg-orange-700">
-                        Transfer Workspace Ownership
+                      <label
+                        htmlFor="updated_workspace_role"
+                        className="font-Zilla-Slab flex w-full flex-col gap-2 text-lg font-semibold dark:text-white"
+                      >
+                        Workspace Role
+                        <select
+                          className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
+                          name="updated_workspace_role"
+                          id="updated_workspace_role"
+                          defaultValue={memberRole}
+                          required
+                        >
+                          {Object.values(MemberRole).map((role) => {
+                            if (role.valueOf() === "owner" && !platformAdmin) {
+                              return null;
+                            }
+                            return (
+                              <option
+                                key={role.valueOf()}
+                                value={role.valueOf()}
+                                className=""
+                              >
+                                {role === MemberRole.Owner && platformAdmin
+                                  ? "Workspace owner"
+                                  : getWorkspaceRoleDisplayName(role)}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </label>
+                      <Button
+                        type="submit"
+                        className="border-2 border-black dark:border-white"
+                        variant="outline"
+                      >
+                        Update Team Member
                       </Button>
                     </Form>
-                  )}
 
-                  <Form method="POST" className="w-full">
-                    <input type="hidden" name="formName" value="deleteUser" />
-                    <input type="hidden" name="user_id" value={member.id} />
-                    <Button className="w-full" variant="destructive">
-                      Remove Team Member
-                    </Button>
-                  </Form>
-                </>
-              ) : memberIsUser ? (
-                <></>
-              ) : (
-                <p className="text-center">
-                  You do not have permission to edit this user
-                </p>
-              )}
-              {memberIsUser && (
-                <Form method="POST" className="w-full">
-                  <input type="hidden" name="formName" value="deleteSelf" />
-                  <input type="hidden" name="user_id" value={member.id} />
-                  <Button className="w-full" variant="destructive">
-                    Quit This Workspace
-                  </Button>
-                </Form>
-              )}
+                    {permissions.canTransfer && (
+                      <Form
+                        method="POST"
+                        name="transferWorkspaceOwnership"
+                        className="w-full"
+                      >
+                        <input
+                          type="hidden"
+                          name="formName"
+                          value="transferWorkspaceOwnership"
+                        />
+                        <input
+                          type="hidden"
+                          name="workspace_owner_id"
+                          value={workspaceOwner.id}
+                        />
+                        <input type="hidden" name="user_id" value={member.id} />
+                        <Button type="submit" className="w-full bg-orange-400 hover:bg-orange-700">
+                          Transfer Workspace Ownership
+                        </Button>
+                      </Form>
+                    )}
+
+                    <Form method="POST" className="w-full">
+                      <input type="hidden" name="formName" value="deleteUser" />
+                      <input type="hidden" name="user_id" value={member.id} />
+                      <Button type="submit" className="w-full" variant="destructive">
+                        Remove Team Member
+                      </Button>
+                    </Form>
+                  </>
+                ) : memberIsUser ? (
+                  <></>
+                ) : (
+                  <p className="text-center">
+                    You do not have permission to edit this user
+                  </p>
+                )}
+              </SheetBody>
             </SheetContent>
           </Sheet>
         )}

@@ -44,6 +44,7 @@ export type MessagePersistFields = {
   workspace: string;
   contact_id?: string | number | null;
   campaign_id?: string | number | null;
+  outreach_attempt_id?: string | number | null;
   /** Sender-side reference for an intent row (#1582). */
   client_ref?: string | null;
   outbound_media?: unknown[];
@@ -96,10 +97,16 @@ export type TwilioSmsClientLike = {
   };
 };
 
-function toDateIso(value: Date | string | null | undefined): string | null {
+/**
+ * A Twilio/caller temporal value as the `Date` the `message` row now holds.
+ *
+ * The `string` arm is live: inbound webhook paths hand this an ISO string
+ * rather than a `Date`. An unparseable value stays unparseable, so the write
+ * fails at Postgres exactly as it did when the raw string was passed through.
+ */
+function toPersistDate(value: Date | string | null | undefined): Date | null {
   if (value == null) return null;
-  if (value instanceof Date) return value.toISOString();
-  return value;
+  return value instanceof Date ? value : new Date(value);
 }
 
 function toNumberOrNull(
@@ -115,8 +122,8 @@ function toNumberOrNull(
  * row, merged with caller-supplied extras (`workspace`, `contact_id`,
  * `campaign_id`, `date_created`, `outbound_media`, …).
  *
- * `Date` fields from the Twilio SDK are converted to ISO strings to match
- * the `message` table's text-based timestamp columns.
+ * `Date` fields from the Twilio SDK are carried through as `Date`s to match
+ * the `message` table's `timestamptz` columns.
  */
 export function twilioMessageToPersistFields(
   message: TwilioMessageLike,
@@ -130,7 +137,7 @@ export function twilioMessageToPersistFields(
     direction: message.direction,
     from: message.from,
     to: message.to,
-    date_updated: toDateIso(message.dateUpdated),
+    date_updated: toPersistDate(message.dateUpdated),
     price: message.price,
     error_message: message.errorMessage,
     account_sid: message.accountSid,
@@ -138,8 +145,8 @@ export function twilioMessageToPersistFields(
     num_media: message.numMedia,
     status: message.status,
     messaging_service_sid: message.messagingServiceSid,
-    date_sent: toDateIso(message.dateSent),
-    date_created: toDateIso(message.dateCreated),
+    date_sent: toPersistDate(message.dateSent),
+    date_created: toPersistDate(message.dateCreated),
     error_code: message.errorCode,
     price_unit: message.priceUnit,
     api_version: message.apiVersion,
@@ -157,7 +164,7 @@ export function buildMessageInsert(fields: MessagePersistFields): MessageInsert 
     direction: (fields.direction as MessageInsert["direction"]) ?? null,
     from: fields.from ?? null,
     to: fields.to ?? null,
-    date_updated: toDateIso(fields.date_updated),
+    date_updated: toPersistDate(fields.date_updated),
     price: fields.price ?? null,
     error_message: fields.error_message ?? null,
     account_sid: fields.account_sid ?? null,
@@ -165,7 +172,7 @@ export function buildMessageInsert(fields: MessagePersistFields): MessageInsert 
     num_media: fields.num_media ?? null,
     status: (fields.status as MessageInsert["status"]) ?? null,
     messaging_service_sid: fields.messaging_service_sid ?? null,
-    date_sent: toDateIso(fields.date_sent),
+    date_sent: toPersistDate(fields.date_sent),
     error_code: fields.error_code ?? null,
     price_unit: fields.price_unit ?? null,
     api_version: fields.api_version ?? null,
@@ -174,7 +181,7 @@ export function buildMessageInsert(fields: MessagePersistFields): MessageInsert 
     client_ref: fields.client_ref ?? null,
   };
   if (fields.date_created != null) {
-    row.date_created = toDateIso(fields.date_created);
+    row.date_created = toPersistDate(fields.date_created);
   }
   const contactId = toNumberOrNull(fields.contact_id);
   if (contactId !== null) {
@@ -184,11 +191,15 @@ export function buildMessageInsert(fields: MessagePersistFields): MessageInsert 
   if (campaignId !== null) {
     row.campaign_id = campaignId;
   }
+  const outreachAttemptId = toNumberOrNull(fields.outreach_attempt_id);
+  if (outreachAttemptId !== null) {
+    row.outreach_attempt_id = outreachAttemptId;
+  }
   if (fields.outbound_media && fields.outbound_media.length > 0) {
     row.outbound_media = [...fields.outbound_media] as string[];
   }
   if (fields.scheduled_at != null) {
-    row.scheduled_at = toDateIso(fields.scheduled_at);
+    row.scheduled_at = toPersistDate(fields.scheduled_at);
   }
   return row;
 }

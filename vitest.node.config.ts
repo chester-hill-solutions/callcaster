@@ -19,6 +19,7 @@ export default mergeConfig(
         "test/integration-twilio/**",
         "test/server-runtime.test.ts",
         "test/twilio-webhook-prehandler.test.ts",
+        "test/media-upload.runtime.test.ts",
       ],
       setupFiles: ["test/setup.node.ts"],
       coverage: {

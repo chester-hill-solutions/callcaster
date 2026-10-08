@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -45,8 +46,8 @@ export const MobileMenu = ({
         side="right"
         className="flex w-full max-w-sm flex-col gap-0 p-0"
       >
-        <SheetHeader className="border-b border-border/70 p-4 text-left">
-          <SheetTitle className="font-Tabac-Slab text-4xl font-black text-brand-primary">
+        <SheetHeader className="border-border/70 border-b p-4 text-left">
+          <SheetTitle className="font-Tabac-Slab text-brand-primary text-4xl font-black">
             <Link to="/" onClick={close}>
               CC
             </Link>
@@ -56,9 +57,12 @@ export const MobileMenu = ({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-5">
+        <SheetBody
+          inset="navigation"
+          className="flex flex-1 flex-col gap-6 overflow-y-auto"
+        >
           <div className="space-y-1">
-            <p className="px-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-muted-foreground px-2 text-xs uppercase tracking-[0.16em]">
               Main
             </p>
             <NavLink to="/" onClick={close} className={navLinkClass}>
@@ -81,7 +85,7 @@ export const MobileMenu = ({
 
           {user && workspaces && workspaces.length > 0 && (
             <div className="space-y-1">
-              <p className="px-2 text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-muted-foreground px-2 text-xs uppercase tracking-[0.16em]">
                 Your workspaces
               </p>
               {workspaces.map((workspace) => (
@@ -90,7 +94,9 @@ export const MobileMenu = ({
                   to={`/workspaces/${workspace.id}`}
                   onClick={close}
                   className={`${navLinkClass} truncate ${
-                    workspace.id === activeWorkspaceId ? "border-border bg-muted" : ""
+                    workspace.id === activeWorkspaceId
+                      ? "border-border bg-muted"
+                      : ""
                   }`}
                 >
                   {workspace.name}
@@ -100,19 +106,15 @@ export const MobileMenu = ({
           )}
 
           {user && (
-            <div className="space-y-3 rounded-xl border border-border/80 bg-card/70 p-3">
+            <div className="border-border/80 bg-card/70 space-y-3 rounded-xl border p-3">
               <div>
                 <p className="font-Zilla-Slab text-lg font-semibold">
                   {capitalize(user.first_name ?? "")}
                 </p>
-                <p className="text-sm text-muted-foreground">{user.username}</p>
+                <p className="text-muted-foreground text-sm">{user.username}</p>
               </div>
               <div className="space-y-1">
-                <NavLink
-                  to="/account"
-                  onClick={close}
-                  className={navLinkClass}
-                >
+                <NavLink to="/account" onClick={close} className={navLinkClass}>
                   Account
                 </NavLink>
                 <NavLink
@@ -136,13 +138,13 @@ export const MobileMenu = ({
                   void handleSignOut();
                   close();
                 }}
-                className="w-full font-Zilla-Slab text-base font-semibold"
+                className="font-Zilla-Slab w-full text-base font-semibold"
               >
                 Log Out
               </Button>
             </div>
           )}
-        </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

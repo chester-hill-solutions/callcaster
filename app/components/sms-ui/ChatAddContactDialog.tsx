@@ -1,14 +1,16 @@
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ContactForm } from "@/components/contact/ContactForm";
-import { useSubmit } from "react-router";
-import { useState } from "react";
+import { useFetcher } from "react-router";
+import { useEffect, useRef, useState } from "react";
 import { Contact } from "@/lib/types";
+import { toast } from "sonner";
 
 const getDisplayName = (contact: Partial<Contact>) => {
   if (contact.firstname && contact.surname) {
@@ -59,13 +61,37 @@ const ChatAddContactDialog = ({
       [e.target.name]: e.target.value,
     }));
   };
-  const submit = useSubmit();
+  const createFetcher = useFetcher<Contact | { error: string }>();
+  const createSubmittedRef = useRef(false);
+
+  /**
+   * @effect Handle the completed contact-create request once per submission.
+   * @effect-deps createFetcher state/data (waits for the POST result), setDialog
+   * @effect-side-effects toast + closes the sheet after a successful create
+   * @effect-why-not-loader The result is from this client-side form submission.
+   */
+  useEffect(() => {
+    if (createFetcher.state !== "idle" || !createSubmittedRef.current) return;
+
+    createSubmittedRef.current = false;
+    const response = createFetcher.data;
+    if (!response) {
+      toast.error("Contact could not be created.");
+      return;
+    }
+    if ("error" in response) {
+      toast.error(response.error);
+      return;
+    }
+    setDialog(false);
+  }, [createFetcher.data, createFetcher.state, setDialog]);
+
   const handleSaveContact = (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.currentTarget as HTMLFormElement;
     const formData = new FormData(form);
-    submit(formData, { method: "POST", action: "/api/contacts", navigate: false });
-    setDialog(false);
+    createSubmittedRef.current = true;
+    createFetcher.submit(formData, { method: "POST", action: "/api/contacts" });
   };
   return (
     <Sheet open={isDialogOpen} onOpenChange={setDialog}>
@@ -80,17 +106,17 @@ const ChatAddContactDialog = ({
             Contact details form
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-1 flex-col items-center py-4">
+        <SheetBody className="flex flex-1 flex-col items-center">
           <ContactForm
-            isNew={!(contact?.id)}
+            isNew={!contact?.id}
             newContact={contact}
             handleInputChange={handleUpdateContact}
             handleSaveContact={handleSaveContact}
             workspace_id={workspace_id}
             audience_id={null}
-            assignToDefaultSmsAudience={!(contact?.id)}
+            assignToDefaultSmsAudience={!contact?.id}
           />
-        </div>
+        </SheetBody>
       </SheetContent>
     </Sheet>
   );

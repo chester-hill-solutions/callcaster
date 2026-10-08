@@ -73,7 +73,7 @@ _Avoid_: The List, LL
 **Workspace Number**: A phone number owned by a workspace. Can be rented (monthly billing) or external (verified caller ID). Has inbound handling config (IVR script, queue, handset, forward, voicemail).
 _Avoid_: Phone (use for the device, not the workspace number)
 
-**Queue Entry**: A row in `campaign_queue` representing a contact queued for dialing. Has lifecycle: queued → assigned → dequeued/canceled. In v2, uses normalized `queue_state` + `assigned_to_user_id` + `provider_status` (not the overloaded `status` column).
+**Queue Entry**: A row in `campaign_queue` representing a contact queued for dialing. Has lifecycle: queued → assigned → dequeued/canceled. In v2, uses normalized `queue_state` + `assigned_to_user_id` + `provider_status` (not the overloaded `status` column). A call dequeues contacts and household members only in its campaign. Workspace-wide opt-out and do-not-call are explicit all-campaign operations.
 _Avoid_: Dial item, call target
 
 **Agent Status**: A per-workspace-per-user row (`agent_status`) tracking availability: offline, available, busy, wrap_up, away. Authoritative routing input for ACD. Replaces the legacy `user.activity` heartbeat.

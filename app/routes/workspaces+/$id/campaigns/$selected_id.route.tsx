@@ -13,6 +13,7 @@ import {
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { CampaignStatusRail } from "@/components/campaign/home/CampaignStatusRail";
+import { CampaignSendWindowNotice } from "@/components/campaign/CampaignSendWindowNotice";
 import { CampaignShellDirtyProvider } from "@/components/campaign/home/CampaignShellDirty";
 import { buildCampaignStatusRail } from "@/lib/campaign-status-rail";
 import { resolveReadinessQueueCount } from "@/lib/campaign-readiness";
@@ -137,6 +138,7 @@ export default function CampaignScreen() {
 
   return (
     <CampaignShellDirtyProvider>
+      <CampaignSendWindowNotice campaign={campaignData} canEdit={hasAccess} />
       <div className="flex h-full w-full flex-col">
         <CampaignHeader
           title={campaignData?.title || ""}

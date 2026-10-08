@@ -3,7 +3,7 @@
  *
  * The IVR response webhook writes a nested shape keyed by page and block title:
  *
- *   { [pageId]: { [blockTitle]: userInput } }
+ *   { [pageId]: { [blockTitle]: userInput | IvrRecordedAnswer } }
  *
  * Block titles are user-editable, so renaming a script block mid-campaign leaves
  * older attempts keyed by the previous title. Aggregation therefore groups on the
@@ -11,6 +11,8 @@
  * longer matches the script instead of dropping it — under-reporting a response is
  * worse than showing a stale question label.
  */
+
+import { resolveIvrOptionLabel, type IvrOptionLike } from "@/lib/ivr-option-value";
 
 /** Campaign types whose scripts collect IVR keypress/speech responses. */
 const IVR_RESULT_CAMPAIGN_TYPES = new Set<string>([
@@ -38,6 +40,33 @@ export type IvrResponseOption = {
   count: number;
 };
 
+export type IvrRecordedAnswer = {
+  value: string;
+  raw: string;
+  confidence: number | null;
+  inputType: "dtmf" | "speech";
+};
+
+export function isIvrRecordedAnswer(value: unknown): value is IvrRecordedAnswer {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const answer = value as Record<string, unknown>;
+  if (
+    typeof answer.value !== "string" ||
+    typeof answer.raw !== "string" ||
+    (answer.inputType !== "dtmf" && answer.inputType !== "speech")
+  ) {
+    return false;
+  }
+  if (answer.inputType === "dtmf") return answer.confidence === null;
+  return (
+    answer.confidence === null ||
+    (typeof answer.confidence === "number" &&
+      Number.isFinite(answer.confidence) &&
+      answer.confidence >= 0 &&
+      answer.confidence <= 1)
+  );
+}
+
 export type IvrQuestionResults = {
   pageId: string;
   /** Current script title for `pageId`, when the page still exists. */
@@ -50,11 +79,8 @@ export type IvrQuestionResults = {
   options: IvrResponseOption[];
 };
 
-export type IvrOptionShape = {
-  value?: string | number | null;
-  label?: string | null;
-  content?: string | null;
-};
+/** The stored option shape. The same one `ivr-option-value` reads; aliased so the two cannot drift. */
+export type IvrOptionShape = IvrOptionLike;
 
 export type IvrScriptShape = {
   pages?: Record<string, { title?: string | null; blocks?: string[] | null }> | null;
@@ -83,10 +109,23 @@ export function parseIvrResult(result: unknown): Record<string, unknown> | null 
   return value as Record<string, unknown>;
 }
 
+/** Remove runtime bookkeeping that older IVR attempts stored beside answers. */
+export function stripInternalIvrResultMetadata(result: unknown): unknown {
+  const parsed = parseIvrResult(result);
+  if (!parsed || !("__no_input_replays" in parsed)) return result;
+
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => key !== "__no_input_replays"),
+  );
+}
+
 /** Normalizes a recorded answer to a display value; `null` means "no answer given". */
-function normalizeAnswer(value: unknown): string | null {
+export function normalizeIvrAnswerValue(value: unknown): string | null {
   if (value == null) return null;
-  if (typeof value === "object") return null;
+  if (typeof value === "object") {
+    if (!isIvrRecordedAnswer(value)) return null;
+    value = value.value;
+  }
   const text = String(value).trim();
   return text.length > 0 ? text : null;
 }
@@ -111,11 +150,11 @@ export function resolveIvrAnswerLabel(
         ? block.title
         : blockId;
     if (key !== question) continue;
-    const option = block?.options?.find(
-      (candidate) => String(candidate?.value ?? "").trim() === value,
-    );
-    const label = option?.label ?? option?.content;
-    if (typeof label === "string" && label.trim().length > 0) return label.trim();
+    // Through the shared matcher, not a local `value`-only lookup: a
+    // documented-format option carries `content` and no `value`, and matching
+    // on `value` alone showed the raw DTMF digit for every such script (#2146).
+    const label = resolveIvrOptionLabel(block?.options, value);
+    if (label !== value) return label;
     break;
   }
   return value;
@@ -148,7 +187,7 @@ export function aggregateIvrResponses(
   const byQuestion = new Map<string, IvrQuestionResults & { counts: Map<string, number> }>();
 
   for (const attempt of attempts) {
-    const parsed = parseIvrResult(attempt?.result);
+    const parsed = parseIvrResult(stripInternalIvrResultMetadata(attempt?.result));
     if (!parsed) continue;
 
     for (const [pageId, pageData] of Object.entries(parsed)) {
@@ -159,7 +198,7 @@ export function aggregateIvrResponses(
       for (const [question, rawAnswer] of Object.entries(
         pageData as Record<string, unknown>,
       )) {
-        const answer = normalizeAnswer(rawAnswer);
+        const answer = normalizeIvrAnswerValue(rawAnswer);
         if (answer === null) continue;
 
         const mapKey = `${pageId}\u0000${question}`;

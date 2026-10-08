@@ -4,7 +4,10 @@ import {
   buildPublicPricingContent,
   buildPublicPricingRows,
 } from "../app/lib/public-pricing";
-import { formatCreditLabel } from "../shared/pricing";
+import {
+  formatCreditLabel,
+  voiceCreditsFromDurationSeconds,
+} from "../shared/pricing";
 
 describe("public-pricing", () => {
   test("buildPublicPricingRows still exposes the full flat list for legacy callers", () => {
@@ -42,20 +45,49 @@ describe("public-pricing", () => {
     }
   });
 
-  test("staffed live calls no longer expose a rate — they route to a reach-out prompt (#1392)", () => {
-    // "Don't include pricing for staffed calls, make it prompt you to reach
-    // out." The service list must not carry a staffed card, and the callout
-    // block ships a contact email instead.
+  test("calls placed by the CallCaster team retain a separate quote request (#1392)", () => {
     const { services, account, staffedCallout } = buildPublicPricingContent();
     for (const bucket of [services, account]) {
       for (const row of bucket) {
         expect(row.service.toLowerCase()).not.toContain("staffed");
       }
     }
-    expect(staffedCallout.heading).toMatch(/staffed/i);
+    expect(staffedCallout.heading).toBe("Calls placed by our team");
     expect(staffedCallout.contactEmail).toMatch(/@/);
-    expect(staffedCallout.body.length).toBeGreaterThan(0);
+    expect(staffedCallout.body).toMatch(/CallCaster team/);
+    expect(staffedCallout.body).toMatch(/quoted per project/);
   });
+
+  test.each([
+    { service: "Calling", kind: "staffed", first: 4, additional: 5 },
+    { service: "IVRs", kind: "ivr", first: 2, additional: 3 },
+  ] as const)(
+    "$service publishes its own billing rate",
+    ({ service, kind, first, additional }) => {
+      const row = buildPublicPricingContent().services.find(
+        (entry) => entry.service === service,
+      );
+      if (!row) throw new Error(`Missing ${service} rate card`);
+      expect(row.rates.map((rate) => rate.price)).toEqual([
+        `${first} credits / dial`,
+        `${additional} credits / minute`,
+      ]);
+      expect(row.rates[0].description).toMatch(/billable/);
+      expect(row.rates[1].description).toMatch(/additional started minute/);
+      for (const seconds of [1, 60, 61, 300]) {
+        const publishedFirst = Number.parseInt(row.rates[0].price, 10);
+        const publishedAdditional = Number.parseInt(row.rates[1].price, 10);
+        const publishedCredits =
+          publishedFirst + (Math.ceil(seconds / 60) - 1) * publishedAdditional;
+        expect(publishedCredits).toBe(
+          voiceCreditsFromDurationSeconds(seconds, kind),
+        );
+      }
+      expect(voiceCreditsFromDurationSeconds(300, kind)).toBe(
+        kind === "staffed" ? 24 : 14,
+      );
+    },
+  );
 
   test("credits card still prices in CAD (that IS the price-of-credits row itself)", () => {
     const { account } = buildPublicPricingContent();

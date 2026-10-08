@@ -76,21 +76,28 @@ jobs:
           # Vendored CHS auth packages do not need this; keep for future registry deps.
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
-      # The compose bootstrap applies drizzle/ + client/migrations via psql.
+      # ffmpeg normalises workspace audio uploads (see the production image).
       # Bounded + retried: apt mirror hangs stalled three runs for 20+ min
       # each on 2026-08-18/19; a dead mirror must fail fast, not wedge CI.
-      - name: Install psql client and ffmpeg
+      # This step used to install postgresql-client too. Nothing in this job
+      # needs it: the compose bootstrap applies drizzle/ + client/migrations
+      # over the `postgres` driver since #2227.
+      - name: Install ffmpeg
         timeout-minutes: 5
         run: |
-          # ubuntu-latest images ship both tools; apt only runs if an image
-          # ever drops them, so a dead mirror can't stall a normal run.
-          if command -v psql >/dev/null && command -v ffmpeg >/dev/null; then
-            psql --version; ffmpeg -version | head -1
+          # The guard below does NOT short-circuit in practice. Measured on
+          # ubuntu-latest 2026-10-01: the image ships neither tool, so apt
+          # runs on every build, and `ffmpeg` alone is 62.8 MB across 87
+          # packages. The 5-minute budget is therefore spent almost entirely
+          # downloading ffmpeg — which is why a slow mirror fails here and
+          # why removing psql does not make this step fast.
+          if command -v ffmpeg >/dev/null; then
+            ffmpeg -version | head -1
             exit 0
           fi
           for attempt in 1 2 3; do
             if sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update &&
-               sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 install -y --no-install-recommends postgresql-client ffmpeg; then
+               sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 install -y --no-install-recommends ffmpeg; then
               exit 0
             fi
             echo "apt attempt $attempt failed; retrying"
@@ -109,8 +116,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Single entry point, identical to the local gate: docker compose
-      # (postgres + minio + inbucket) → schema bootstrap → seed → build →
-      # bun server on :3100 → full Playwright suite.
+      # (postgres + inbucket) + the stow object-storage binary → schema
+      # bootstrap → seed → build → bun server on :3100 → full Playwright suite.
       - name: Run compose E2E gate
         run: npm run test:e2e:compose
         env:

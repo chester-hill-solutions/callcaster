@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
@@ -14,11 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -94,6 +96,7 @@ function BulkLocalOverrideActiveNotice({
 
 /** The deliberate confirmation behind "Send on this local number anyway" (#1482). */
 function BulkLocalOverrideDialog({
+  queueCount,
   open,
   onOpenChange,
   acknowledged,
@@ -101,6 +104,7 @@ function BulkLocalOverrideDialog({
   isSubmitting,
   onConfirm,
 }: {
+  queueCount: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   acknowledged: boolean;
@@ -108,30 +112,35 @@ function BulkLocalOverrideDialog({
   isSubmitting: boolean;
   onConfirm: () => void;
 }) {
+  const acknowledgementId = useId();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send on a local number at this volume?</DialogTitle>
+          <DialogTitle>Are you sure?</DialogTitle>
           <DialogDescription>
-            The safeguard stays on by default. Overriding it for this campaign
-            is deliberate and recorded, and you can remove it before starting.
+            This campaign has {queueCount.toLocaleString()} queued contacts on a
+            Canadian local number. Carriers may throttle or filter this send.
+            Confirming allows this campaign to start on this number; it does not
+            send messages now. Your choice is recorded, and you can remove it
+            before starting.
           </DialogDescription>
         </DialogHeader>
-        <label className="flex items-start gap-2 text-sm">
+        <FormField htmlFor={acknowledgementId} label={OVERRIDE_ACKNOWLEDGEMENT}>
           <Checkbox
+            id={acknowledgementId}
+            aria-label={OVERRIDE_ACKNOWLEDGEMENT}
+            disabled={isSubmitting}
             checked={acknowledged}
             onCheckedChange={(checked) => onAcknowledgedChange(checked === true)}
-            className="mt-0.5"
           />
-          <span>{OVERRIDE_ACKNOWLEDGEMENT}</span>
-        </label>
+        </FormField>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button type="button" variant="destructive" disabled={!acknowledged || isSubmitting} onClick={onConfirm}>
-            {isSubmitting ? "Saving…" : "Override and allow this send"}
+            {isSubmitting ? "Saving…" : "Send anyway"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -212,6 +221,12 @@ export function SplitCampaignPrompt({
     );
   }
 
+  const changeOverrideOpen = (nextOpen: boolean) => {
+    if (isSubmitting) return;
+    setOverrideAcknowledged(false);
+    setOverrideOpen(nextOpen);
+  };
+
   const perSegment = Math.ceil(queueCount / Math.max(2, segmentCount));
 
   return (
@@ -243,7 +258,7 @@ export function SplitCampaignPrompt({
             variant="ghost"
             size="sm"
             disabled={disabled}
-            onClick={() => setOverrideOpen(true)}
+            onClick={() => changeOverrideOpen(true)}
           >
             Send on this local number anyway
           </Button>
@@ -251,8 +266,9 @@ export function SplitCampaignPrompt({
       </AlertDescription>
 
       <BulkLocalOverrideDialog
+        queueCount={queueCount}
         open={overrideOpen}
-        onOpenChange={setOverrideOpen}
+        onOpenChange={changeOverrideOpen}
         acknowledged={overrideAcknowledged}
         onAcknowledgedChange={setOverrideAcknowledged}
         isSubmitting={isSubmitting}
@@ -270,7 +286,7 @@ export function SplitCampaignPrompt({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="space-y-4 py-4">
+          <SheetBody className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="split-segment-count">Number of segments</Label>
               <Input
@@ -287,14 +303,14 @@ export function SplitCampaignPrompt({
                 }}
                 className="max-w-[8rem]"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 ~{perSegment.toLocaleString()} contacts per segment.
               </p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Copy-variation checklist</p>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <ul className="text-muted-foreground space-y-1.5 text-sm">
                 {COPY_VARIATION_CHECKLIST.map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span
@@ -308,7 +324,9 @@ export function SplitCampaignPrompt({
               <label className="flex items-start gap-2 pt-1 text-sm">
                 <Checkbox
                   checked={acknowledged}
-                  onCheckedChange={(checked) => setAcknowledged(checked === true)}
+                  onCheckedChange={(checked) =>
+                    setAcknowledged(checked === true)
+                  }
                   className="mt-0.5"
                 />
                 <span>
@@ -317,7 +335,7 @@ export function SplitCampaignPrompt({
                 </span>
               </label>
             </div>
-          </div>
+          </SheetBody>
 
           <SheetFooter className="gap-2 sm:flex-row">
             <Button

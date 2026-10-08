@@ -20,6 +20,7 @@ import {
   fetchConversationSummary,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
+import { readWorkspaceUnreadConversationCount } from "@/lib/database/workspace-conversations.server";
 import type { Database } from "@/lib/db-types";
 import { AppError } from "@/lib/errors.server";
 import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
@@ -67,6 +68,7 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { resolveContactsOwnedByWorkspace } from "@/lib/contacts/tenant-scope.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject } from "@/lib/object-storage.server";
 
@@ -482,6 +484,10 @@ export async function patchCampaignQueueApi(
   }
 
   const campaignIdNum = Number(campaignId);
+  // ADR-0004: the only tenant-data accessor. The `add_` branches below resolve
+  // the caller's own contacts and audience through it rather than against a
+  // bare id from the request body (#2097).
+  const tdb = createTenantDb(workspaceId);
 
   try {
     switch (body.action) {
@@ -496,18 +502,49 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       case "add_contact_ids": {
-        await enqueueContactsForCampaign(
-          campaignIdNum,
+        // #2097 / #2176. The shared helper owns the scoping rule, the dedupe
+        // and the all-or-nothing decision — see contacts/tenant-scope.server.ts.
+        const resolved = await resolveContactsOwnedByWorkspace(
+          workspaceId,
           body.contact_ids,
-          { requeue: false },
         );
+        if (!resolved.ok) {
+          return { ok: false as const, error: "Contact not found", status: 404 };
+        }
+        await enqueueContactsForCampaign(campaignIdNum, resolved.contactIds, {
+          requeue: false,
+        });
         return { ok: true as const, success: true };
       }
       case "add_audience": {
+        // #2097. `contact_audience` carries no tenancy column, so the audience
+        // cannot be filtered by workspace at the join. Prove the audience is
+        // the caller's first, through the tenant client.
+        const audience = await tdb.audience.findFirst({
+          where: eq(audienceTable.id, body.audience_id),
+          columns: { id: true },
+        });
+        if (!audience) {
+          return { ok: false as const, error: "Audience not found", status: 404 };
+        }
+        // The audience being the caller's makes its links *probably* safe to
+        // read, but the guarantee that matters is "every enqueued contact is in
+        // the caller's workspace". Joining contact and filtering on its tenancy
+        // column makes that true by construction instead of by assumption, for
+        // the price of one predicate in the same query.
         const contacts = await db
           .select({ contact_id: contactAudienceTable.contact_id })
           .from(contactAudienceTable)
-          .where(eq(contactAudienceTable.audience_id, body.audience_id));
+          .innerJoin(
+            contactTable,
+            eq(contactAudienceTable.contact_id, contactTable.id),
+          )
+          .where(
+            and(
+              eq(contactAudienceTable.audience_id, audience.id),
+              eq(contactTable.workspace, workspaceId),
+            ),
+          );
         await enqueueContactsForCampaign(
           campaignIdNum,
           contacts.map((row) => row.contact_id),
@@ -802,6 +839,15 @@ export async function exportSurveyResponsesCsv(
     return result;
   }
   return { ok: true as const, data: csvResponse({ filename: result.filename, csv: result.csv }) };
+}
+
+export async function getWorkspaceUnreadConversationCountApi(workspaceId: string) {
+  try {
+    return { ok: true as const, unreadCount: await readWorkspaceUnreadConversationCount(workspaceId) };
+  } catch (error) {
+    logger.error("Failed to load workspace unread count", { workspaceId, error });
+    return { ok: false as const, error: "Failed to load unread count", status: 500 };
+  }
 }
 
 export async function listWorkspaceConversationsApi(

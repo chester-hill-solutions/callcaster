@@ -16,15 +16,30 @@ import {
 } from "@/lib/worker/job-registry.server";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+  PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
   ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+  RECORDING_REPAIR_SWEEP_JOB_TYPE,
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
   WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
+
+export const predictiveMachineParams = z.object({
+  operationId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+});
+
+export const predictiveMachineReconcileParams = predictiveMachineParams.extend({
+  successorCallSid: z
+    .string()
+    .regex(/^CA[0-9a-f]{32}$/i)
+    .optional(),
+});
 
 /**
  * Every registered job type's params schema, plus the typed enqueue/requeue
@@ -197,6 +212,9 @@ export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
   "recording_side_effects",
 );
 
+/** The repair sweep takes no params; its budget is a module constant. */
+export const recordingRepairSweepParams = noParams;
+
 /**
  * Every registered job type's `{type, params}` pair. `handlers.server.ts`
  * builds its `defineJob` registrations from these SAME schema objects
@@ -204,18 +222,29 @@ export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
  * guard that keeps this list and `jobRegistry` in sync.
  */
 export const jobParamsRegistry = [
+  {
+    type: PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
+    params: predictiveMachineParams,
+  },
+  {
+    type: PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
+    params: predictiveMachineReconcileParams,
+  },
   { type: "twilio_open_sync", params: twilioOpenSyncParams },
   { type: "billing_reconcile", params: billingReconcileParams },
   { type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE, params: elevenlabsBatchTranscribeParams },
   { type: WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE, params: workspaceTwilioComplianceParams },
   { type: "campaign_schedule_sync", params: noParams },
   { type: "number_rental_billing", params: numberRentalBillingParams },
+  { type: "number_purchase_recovery", params: noParams },
+  { type: "number_release_recovery", params: noParams },
   { type: "audience_upload", params: audienceUploadParams },
   { type: "low_credit_notify", params: noParams },
   { type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE, params: twilioWebhookAuditParams },
   { type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE, params: callStatusSideEffectsParams },
   { type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE, params: smsStatusSideEffectsParams },
   { type: RECORDING_SIDE_EFFECTS_JOB_TYPE, params: recordingSideEffectsParams },
+  { type: RECORDING_REPAIR_SWEEP_JOB_TYPE, params: recordingRepairSweepParams },
   { type: CAMPAIGN_EXPORT_JOB_TYPE, params: campaignExportParams },
   { type: CAMPAIGN_DISPATCH_JOB_TYPE, params: campaignDispatchParams },
   { type: WEBHOOK_DELIVERY_JOB_TYPE, params: webhookDeliveryParams },

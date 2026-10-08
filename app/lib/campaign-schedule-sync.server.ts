@@ -1,7 +1,10 @@
 import { and, inArray, isNotNull, ne } from "drizzle-orm";
 import { campaign as campaignTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
-import { checkSchedule } from "@/lib/database/campaign.server";
+import {
+  ivrCallingPolicy,
+  isDispatchAllowedAt,
+} from "@/lib/campaign-dispatch-policy";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { ACTIVE_CAMPAIGN_STATUSES } from "@/lib/campaign-status";
 import { logger } from "@/lib/logger.server";
@@ -21,9 +24,9 @@ export type CampaignScheduleSyncResult = {
  * - Voice campaigns only. Message campaigns are excluded because their
  *   dispatch chain owns their status (`campaign_dispatch` skips anything that
  *   is not `running`) and their send window is a separate mechanism.
- * - Only campaigns inside their start/end date range. Expiry is owned by the
- *   launch/complete flows; a campaign past its end date keeps whatever status
- *   it has rather than parking on "Waiting" forever.
+ * - Date bounds are optional and calling hours still apply when either is
+ *   absent. A future start displays waiting. Expiry stays with the dispatch
+ *   worker; this sweep does not park expired campaigns on waiting forever.
  */
 export async function runCampaignScheduleSync(): Promise<CampaignScheduleSyncResult> {
   const candidates = await adminDb.query.campaign.findMany({
@@ -46,13 +49,19 @@ export async function runCampaignScheduleSync(): Promise<CampaignScheduleSyncRes
   const now = new Date();
 
   for (const row of candidates) {
-    if (!row.workspace || !row.start_date || !row.end_date) continue;
-    const start = new Date(row.start_date);
-    const end = new Date(row.end_date);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
-    if (now < start || now > end) continue;
+    if (!row.workspace) continue;
+    const policy = ivrCallingPolicy(row);
+    // A malformed provided bound is not an absent bound. Preserve the
+    // existing skip; the canonical policy exposes only valid parsed bounds.
+    if (
+      (row.start_date && policy.notBeforeMs === null) ||
+      (row.end_date && policy.notAfterMs === null)
+    )
+      continue;
+    if (policy.notAfterMs !== null && now.getTime() > policy.notAfterMs)
+      continue;
 
-    const target = checkSchedule(row) ? "running" : "waiting";
+    const target = isDispatchAllowedAt(policy, now) ? "running" : "waiting";
     if (row.status === target) continue;
 
     try {

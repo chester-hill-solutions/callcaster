@@ -30,7 +30,7 @@ export const action = defineAction({
 
     const context = await loadInboundIvrPageContext(Number(numberId));
 
-    if (!context || call.to !== context.phoneNumber) {
+    if (!context || call.to !== context.phoneNumber || call.workspace !== context.workspaceId) {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();
       return new Response(twiml.toString(), {

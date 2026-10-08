@@ -29,16 +29,15 @@ const BASELINE_ALLOWLIST = {
   // Inbound-queue tables moved to db/schema-inbound-queue.ts on 2026-09-06
   // (713 lines after the move); the pin leaves room for a handful of columns.
   "db/schema.ts": 720,
-  // Crossed 800 on 2026-08-04 merging feat/live-coaching: this barrel re-exports
-  // both the onboarding-goal types and the new coaching hydration type. Pinned,
-  // not exempted — the next type added here fails, which is the moment to split
-  // the barrel by domain rather than raise the number.
-  "lib/types.ts": 804,
   // Lowered from 1080 on 2026-08-04: authForContact/Script/Survey/OutreachAttempt
   // collapsed into authForResource, so the file genuinely shrank.
   "lib/platform-data.server.ts": 1005,
   "lib/database/workspace.server.ts": 826,
-  "lib/survey-db.server.ts": 928,
+  // Lowered from 928 on 2026-10-02: the response-read and CSV-export half moved
+  // to lib/survey-responses.server.ts (#2126), leaving the question/page
+  // resolution and response-write half behind. Re-exported from the original
+  // path, so no import site changed.
+  "lib/survey-db.server.ts": 725,
 };
 
 async function walk(dir) {

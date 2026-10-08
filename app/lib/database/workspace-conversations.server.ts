@@ -8,10 +8,6 @@ import {
   type ChatSortOption,
   type ConversationSummary,
 } from "../chat-conversation-sort";
-import {
-  sumUnreadConversationCount,
-  UNREAD_CONVERSATION_PAGE_SIZE,
-} from "@/lib/chats/unread-count";
 import { stripPhoneNumber } from "@/lib/phone";
 
 type FetchConversationSummaryOptions = {
@@ -121,38 +117,29 @@ function buildSearchPredicate(workspaceId: string, search: string | undefined): 
   )`;
 }
 
+type ConversationScope = {
+  workspaceId: string;
+  workspacePhoneKeys: Set<string>;
+  campaignId: number | null;
+};
+
 /**
- * Builds the conversation-summary aggregation. Conversation identity mirrors
+ * Shared message scope and participant identity for list and unread queries.
+ * Conversation identity mirrors
  * `getConversationParticipantPhones`/`getConversationPhoneKey`
  * (app/lib/chat-conversation-sort.ts): the "contact" side of a message is
  * whichever of from/to is NOT a workspace-owned number (falling back to
  * direction when neither side matches a workspace number), and the grouping
  * key is that contact phone's digit-normalised key
  * (`public.normalise_phone_key`, the same function backing
- * idx_contact_workspace_normalised_phone — verified equivalent to
- * getConversationPhoneKey).
- *
- * Per-conversation scalar fields (contact_phone/user_phone/last_inbound_body)
- * use `array_agg(... ORDER BY date_created DESC) FILTER (...)` to take the
- * most-recent non-null value, matching the JS reference's "scan newest-first,
- * first non-null value wins" behavior.
+ * idx_contact_workspace_normalised_phone). Legacy nonblank phone text with
+ * no digits keeps the SQL normalizer's empty key so list and count agree.
  */
-function buildConversationSummaryQuery(params: {
-  workspaceId: string;
-  workspacePhoneKeys: Set<string>;
-  campaignId: number | null;
-  sort: ChatSortOption;
-  search: string | undefined;
-  limit: number;
-  offset: number;
-}): SQL {
-  const { workspaceId, workspacePhoneKeys, campaignId, sort, search, limit, offset } = params;
-
+function buildConversationParticipantsCte(params: ConversationScope): SQL {
+  const { workspaceId, workspacePhoneKeys, campaignId } = params;
   const campaignFilter =
     campaignId !== null ? sql`AND m.campaign_id = ${campaignId}` : sql``;
   const wsKeys = buildWorkspaceKeysArray(workspacePhoneKeys);
-  const sortPredicate = buildSortPredicate(sort);
-  const searchPredicate = buildSearchPredicate(workspaceId, search);
 
   return sql`
     WITH scoped AS (
@@ -219,7 +206,26 @@ function buildConversationSummaryQuery(params: {
           ELSE from_norm
         END AS user_phone
       FROM normed
-    ),
+    )
+  `;
+}
+
+/**
+ * Groups participants into conversations. Scalar fields use newest-first
+ * array aggregation to preserve the reference's first non-null value rule.
+ */
+function buildConversationSummaryQuery(params: ConversationScope & {
+  sort: ChatSortOption;
+  search: string | undefined;
+  limit: number;
+  offset: number;
+}): SQL {
+  const { workspaceId, sort, search, limit, offset } = params;
+  const sortPredicate = buildSortPredicate(sort);
+  const searchPredicate = buildSearchPredicate(workspaceId, search);
+
+  return sql`
+    ${buildConversationParticipantsCte(params)},
     agg AS (
       SELECT
         conv_key,
@@ -259,6 +265,19 @@ function buildConversationSummaryQuery(params: {
     ORDER BY conversation_last_update DESC, conv_key ASC
     LIMIT ${limit + 1}
     OFFSET ${offset}
+  `;
+}
+
+function buildWorkspaceUnreadCountQuery(
+  params: Omit<ConversationScope, "campaignId">,
+): SQL {
+  return sql`
+    ${buildConversationParticipantsCte({ ...params, campaignId: null })}
+    SELECT COUNT(*)::bigint AS unread_count
+    FROM participants
+    WHERE conv_key IS NOT NULL
+      AND direction = 'inbound'
+      AND status = 'received'
   `;
 }
 
@@ -483,28 +502,42 @@ export async function fetchConversationSummary(
   };
 }
 
-/**
- * Uses the same newest-100-conversation window as the persistent navigation
- * badge so the server-rendered Today action and client badge agree.
- */
+/** Reads the complete workspace total; failures propagate to the API boundary. */
+export async function readWorkspaceUnreadConversationCount(
+  workspaceId: string,
+): Promise<number> {
+  const tdb = createTenantDb(workspaceId);
+  const numbers = await tdb.workspace_number.findMany({
+    columns: { phone_number: true },
+  });
+  const workspacePhoneKeys = new Set(
+    numbers.map((row) => getConversationPhoneKey(row.phone_number))
+      .filter((phone): phone is string => Boolean(phone)),
+  );
+  const rows = await tdb.execute(buildWorkspaceUnreadCountQuery({
+    workspaceId, workspacePhoneKeys,
+  })) as Array<{ unread_count: string | number }>;
+  const count = Number(rows[0]?.unread_count);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error("Invalid workspace unread count");
+  }
+  return count;
+}
+
+/** Keeps the existing dashboard fallback while sharing the full aggregate. */
 export async function getWorkspaceUnreadConversationCount(
   workspaceId: string,
 ): Promise<number> {
-  const result = await fetchConversationSummary(workspaceId, null, {
-    enrichContacts: false,
-    limit: UNREAD_CONVERSATION_PAGE_SIZE,
-  });
-  if (result.chatsError) {
-    logger.error("Error loading unread conversation count", {
-      error: result.chatsError,
-      workspaceId,
-    });
+  try {
+    return await readWorkspaceUnreadConversationCount(workspaceId);
+  } catch (error) {
+    logger.error("Error loading unread conversation count", { error, workspaceId });
     return 0;
   }
-  return sumUnreadConversationCount(result.chats);
 }
 
-// Exposed for the SQL/JS parity fixture test (test/workspace-conversations-sql-parity.test.ts).
+// Exposed for real PostgreSQL query verification.
 export const __internal = {
   buildConversationSummaryQuery,
+  buildWorkspaceUnreadCountQuery,
 };

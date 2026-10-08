@@ -22,6 +22,7 @@ const NUMBER_RENT_PURCHASE_PREFIX = "number_rent_purchase:";
 const STRIPE_EVT_PREFIX = "stripe_evt:";
 const STRIPE_SESSION_PREFIX = "stripe_session:";
 const WELCOME_CREDITS_PREFIX = "welcome-credits:";
+const MANUAL_CREDIT_PREFIX = "manual-credit:";
 const TRANSCRIPTION_PREFIX = "transcription:";
 const TRANSCRIPTION_BATCH_PREFIX = "transcription_batch:";
 const COACHING_PREFIX = "coaching:";
@@ -70,6 +71,15 @@ export function stripeEventKey(eventId: string): string {
 /** One-time welcome grant on workspace creation (CREDIT, not a purchase). */
 export function welcomeCreditsKey(workspaceId: string): string {
   return `${WELCOME_CREDITS_PREFIX}${workspaceId}`;
+}
+
+/**
+ * Manual credit load by a platform admin. The nonce is a per-request value
+ * generated when the admin form renders, so a retried form submit maps to the
+ * same key and the ledger RPC inserts the grant exactly once.
+ */
+export function manualCreditLoadKey(workspaceId: string, nonce: string): string {
+  return `${MANUAL_CREDIT_PREFIX}${workspaceId}:${nonce}`;
 }
 
 /**

@@ -715,6 +715,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -778,6 +781,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -842,6 +848,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -907,6 +916,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -961,6 +973,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1025,6 +1040,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1077,6 +1095,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -1141,6 +1162,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1206,6 +1230,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1470,6 +1497,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1533,6 +1563,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1632,22 +1665,12 @@
     "/api/auth/register": {
       "post": {
         "summary": "Register a new user account",
+        "description": "Registration does not support response replay. Idempotency-Key is ignored, and retries use normal account-creation validation. Use the token endpoint to sign in after a successful registration whose response was lost.",
         "tags": [
           "Platform API",
           "Authentication"
         ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "maxLength": 256
-            },
-            "description": "Optional idempotency key for safe retries."
-          }
-        ],
+        "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -1777,6 +1800,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1962,6 +1988,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2027,6 +2056,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2091,6 +2123,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2156,6 +2191,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2221,6 +2259,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2285,6 +2326,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2348,6 +2392,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2401,6 +2448,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2464,6 +2514,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2517,6 +2570,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2580,6 +2636,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2643,6 +2702,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2697,6 +2759,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -2766,6 +2831,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -2820,6 +2888,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2873,6 +2944,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2939,6 +3013,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3008,6 +3085,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3062,6 +3142,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3112,6 +3195,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3220,7 +3306,7 @@
       "post": {
         "operationId": "sendChatSms",
         "summary": "Send a single SMS",
-        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
+        "description": "Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
@@ -3229,6 +3315,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3256,7 +3345,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Validation error, SMS-incapable recipient (landline: true), or unverified recipient (recipientVerificationError: true)",
             "content": {
               "application/json": {
                 "schema": {
@@ -3276,7 +3365,7 @@
             }
           },
           "403": {
-            "description": "Forbidden (workspace mismatch)",
+            "description": "Forbidden (workspace mismatch or opted-out recipient: optedOut: true)",
             "content": {
               "application/json": {
                 "schema": {
@@ -3324,6 +3413,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3389,6 +3481,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3454,6 +3549,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3507,6 +3605,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3621,6 +3722,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3684,6 +3788,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3747,6 +3854,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3801,6 +3911,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3858,6 +3971,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3912,6 +4028,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3966,6 +4085,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4031,6 +4153,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -4095,6 +4220,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4160,6 +4288,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4223,6 +4354,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4286,6 +4420,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4349,6 +4486,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4400,6 +4540,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -4464,6 +4607,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4529,6 +4675,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4594,6 +4743,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4657,6 +4809,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4698,7 +4853,7 @@
       "post": {
         "operationId": "postMedia",
         "summary": "POST /api/media",
-        "description": "",
+        "description": "Audio file limit: 10 MiB (10485760 bytes). Total encoded request limit: 10551296 bytes (10 MiB + 64 KiB for multipart fields and overhead). Oversized file or body returns 413; malformed form, invalid audio or invalid campaign ID returns 400. A missing or foreign-workspace campaign returns 404 before media work. A successful attachment returns 201; a failed final update returns 500. Campaign name does not control the object key.",
         "tags": [
           "Media",
           "User API"
@@ -4707,9 +4862,13 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4736,6 +4895,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -4748,6 +4917,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
             "content": {
               "application/json": {
                 "schema": {
@@ -4763,7 +4942,7 @@
       "post": {
         "operationId": "postMessage_media",
         "summary": "POST /api/message_media",
-        "description": "",
+        "description": "File limit: 10 MiB (10485760 bytes); file validation failures retain HTTP 200 with success:false and error. POST and DELETE encoded request limit: 10551296 bytes (10 MiB + 64 KiB for fields and overhead). Body overflow returns 413, malformed form returns 400, both with success:false and error.",
         "tags": [
           "Messaging",
           "User API"
@@ -4772,9 +4951,13 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4801,6 +4984,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -4820,13 +5013,23 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "delete": {
         "operationId": "deleteMessage_media",
         "summary": "DELETE /api/message_media",
-        "description": "",
+        "description": "File limit: 10 MiB (10485760 bytes); file validation failures retain HTTP 200 with success:false and error. POST and DELETE encoded request limit: 10551296 bytes (10 MiB + 64 KiB for fields and overhead). Body overflow returns 413, malformed form returns 400, both with success:false and error.",
         "tags": [
           "Messaging",
           "User API"
@@ -4835,9 +5038,13 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-request-body-limit": 10551296,
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4852,6 +5059,16 @@
               }
             }
           },
+          "400": {
+            "description": "Malformed form body; see operation notes for file validation behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
             "content": {
@@ -4864,6 +5081,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded request exceeds 10551296 bytes; see operation notes for file limits",
             "content": {
               "application/json": {
                 "schema": {
@@ -4891,6 +5118,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4954,6 +5184,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -5018,6 +5251,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5083,6 +5319,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5148,6 +5387,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5213,6 +5455,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5276,6 +5521,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -5327,6 +5575,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -5380,6 +5631,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5445,6 +5699,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5513,6 +5770,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -5564,6 +5824,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -5781,6 +6044,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5846,6 +6112,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5909,6 +6178,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5972,6 +6244,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6026,6 +6301,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -6085,6 +6363,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -6139,6 +6420,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6192,6 +6476,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6257,6 +6544,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -6370,6 +6660,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6433,6 +6726,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6486,6 +6782,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6539,6 +6838,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6602,6 +6904,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6653,6 +6958,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -6716,7 +7024,8 @@
             "schema": {
               "type": "string",
               "maxLength": 256
-            }
+            },
+            "description": "Workspace creation retries are scoped to the authenticated user. Reuse this key to replay that user's original result without creating another workspace."
           }
         ],
         "requestBody": {
@@ -6767,6 +7076,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6815,6 +7127,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Rename a workspace. Requires an admin-or-higher signed-in session.",
@@ -6891,6 +7206,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Permanently delete a workspace. Owner session only.",
@@ -6950,6 +7268,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7004,6 +7325,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7063,6 +7387,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Requires a workspace admin session. Requested scopes are capped at the capabilities the creating member's role holds — a scope outside that set is rejected with 403 naming it. Returns the full secret once; store it immediately.",
@@ -7129,6 +7456,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Requires a workspace admin session.",
@@ -7195,6 +7525,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Lists key metadata without secrets.",
@@ -7249,6 +7582,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7319,6 +7655,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7385,6 +7724,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7455,6 +7797,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7520,6 +7865,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7583,6 +7931,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7643,6 +7994,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7731,6 +8085,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7794,6 +8151,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7846,7 +8206,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_billing_checkout_session",
         "summary": "POST /api/workspaces/:workspaceId/billing/checkout-session",
-        "description": "",
+        "description": "Requires an Admin or Owner user session before checkout replay or Stripe calls. Member and Caller receive 403; non-members receive 404; workspace API keys without a user session receive 401.",
         "tags": [
           "Billing",
           "Workspace Admin"
@@ -7858,6 +8218,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7923,6 +8286,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7975,7 +8341,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
         "summary": "GET /api/workspaces/:workspaceId/billing/sessions/:sessionId",
-        "description": "",
+        "description": "Requires an Admin or Owner user session before Stripe retrieval or credit confirmation. Member and Caller receive 403; non-members receive 404; workspace API keys without a user session receive 401.",
         "tags": [
           "Billing",
           "Workspace Admin"
@@ -7987,6 +8353,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8051,6 +8420,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8111,6 +8483,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8187,6 +8562,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8250,6 +8628,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8304,6 +8685,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8368,6 +8752,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8454,6 +8841,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8522,6 +8912,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -8574,8 +8967,6 @@
     "/api/workspaces/{workspaceId}/conversations": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations",
-        "summary": "GET /api/workspaces/:workspaceId/conversations",
-        "description": "",
         "tags": [
           "Messaging",
           "Integrator API"
@@ -8585,9 +8976,14 @@
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
         "x-callcaster-capability": "campaigns.read",
+        "summary": "List conversations or read the workspace unread total",
+        "description": "Requires campaigns.read. With summary=unread, returns the complete workspace unread message total using the conversation list's received/inbound definition. This count ignores list pagination, search, sort and campaign filters. Without summary, returns the existing conversation page.",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8595,23 +8991,124 @@
         ],
         "parameters": [
           {
-            "name": "workspace_id",
-            "in": "query",
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationSummaryMode"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "hasReplied",
+                "hasUnreadReply"
+              ]
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Conversation page, or complete workspace unread total when summary=unread",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkspaceUnreadCountResponse"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "conversations",
+                        "pagination"
+                      ],
+                      "properties": {
+                        "conversations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                          }
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "required": [
+                            "page",
+                            "page_size",
+                            "has_more"
+                          ],
+                          "properties": {
+                            "page": {
+                              "type": "integer"
+                            },
+                            "page_size": {
+                              "type": "integer"
+                            },
+                            "has_more": {
+                              "type": "boolean"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown summary mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -8621,17 +9118,47 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Missing campaigns.read capability",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace membership or scope mismatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unread count unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -8643,18 +9170,22 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "POST /api/workspaces/:workspaceId/conversations/:contactNumber",
-        "description": "",
+        "description": "GET reads a conversation; POST acknowledges received messages as read. Both require campaigns.read through a workspace API key or session. POST accepts an optional sid to acknowledge one received message; without sid it acknowledges the conversation. This does not set outbound provider delivery receipts.",
         "tags": [
           "Messaging",
           "Integrator API"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-exposure": "publicSdk",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8709,19 +9240,22 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "GET /api/workspaces/:workspaceId/conversations/:contactNumber",
-        "description": "",
+        "description": "GET reads a conversation; POST acknowledges received messages as read. Both require campaigns.read through a workspace API key or session. POST accepts an optional sid to acknowledge one received message; without sid it acknowledges the conversation. This does not set outbound provider delivery receipts.",
         "tags": [
           "Messaging",
           "Integrator API"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-exposure": "publicSdk",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
         "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8789,6 +9323,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8841,18 +9378,25 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_events",
         "summary": "GET /api/workspaces/:workspaceId/events",
-        "description": "SSE stream for workspace events (activity log).",
+        "description": "SSE stream for workspace events (activity log). Requires the audit.read capability: the payload includes verbatim call transcripts, so it is the same class of surface as /audit-events. The auth class is derived from dataPlaneCapabilityAuth and is deliberately not declared here.",
         "tags": [
           "Misc",
-          "User API"
+          "Integrator API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "x-callcaster-capability": "audit.read",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "parameters": [
@@ -8917,6 +9461,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8980,6 +9527,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9044,6 +9594,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9095,6 +9648,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9155,6 +9711,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9224,6 +9783,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
@@ -9300,9 +9862,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+        "description": "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite in this workspace. Foreign, missing and non-pending invites return the same 404 without a change.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9376,6 +9941,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route.",
@@ -9415,9 +9983,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
-        "description": "Requires sufficient workspace credits and numbers-manager role.",
+        "description": "Requires sufficient available workspace credits and numbers-manager role. Purchases check current Canadian inventory and a validated regulatory address on the purchasing account when required. Missing or rejected regulatory addresses return 400 before a completed purchase. Concurrent purchases reserve their rental budget. A 409 can mean the number is unavailable, already owned, or awaiting provider verification. Follow the returned message; do not retry a purchase awaiting verification until recovery completes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9429,7 +10000,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Number purchased",
             "content": {
               "application/json": {
@@ -9439,8 +10010,18 @@
               }
             }
           },
+          "207": {
+            "description": "Number purchased; Messaging Service attachment needs attention",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseNumberResponse"
+                }
+              }
+            }
+          },
           "400": {
-            "description": "Validation error",
+            "description": "Invalid input or missing or rejected regulatory address",
             "content": {
               "application/json": {
                 "schema": {
@@ -9478,6 +10059,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Number unavailable, already owned or purchase awaiting recovery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
           }
         }
       },
@@ -9492,6 +10083,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9530,6 +10124,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9554,7 +10151,7 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Invalid number settings or inbound menu. The previous configuration is preserved.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9592,6 +10189,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The menu changed during this save. Review it and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
           }
         }
       },
@@ -9606,6 +10213,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9648,6 +10258,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Release incomplete; retry to finish sender cleanup and number release",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
           }
         }
       }
@@ -9668,6 +10288,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9731,6 +10354,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9795,6 +10421,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9861,6 +10490,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9931,6 +10563,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -9991,9 +10626,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
-        "description": "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
+        "description": "Owner session only. Choose a different existing workspace member as the incoming owner. The incoming owner must have MFA enrolled (SEC-08). Self transfer returns 400 without changing ownership.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10016,7 +10654,7 @@
             }
           },
           "400": {
-            "description": "Transfer blocked",
+            "description": "Self transfer or another transfer failure",
             "content": {
               "application/json": {
                 "schema": {
@@ -10064,6 +10702,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -10123,9 +10764,12 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
+        "description": "Member-or-higher signed-in session required. Delivers a sample event via safe outbound fetch. Ten tests per minute per user, shared across workspaces and both webhook test URLs. Unsaved destinations and headers are permitted.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10176,6 +10820,34 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Workspace not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
+              }
+            }
           }
         }
       },
@@ -10189,6 +10861,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
@@ -10255,6 +10930,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route.",
@@ -10298,8 +10976,14 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "sb-access-token",
-        "description": "Session cookie (browser). Use workspace API key for server/script access."
+        "name": "better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
+      },
+      "secureSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Secure-better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
       },
       "apiKey": {
         "type": "apiKey",
@@ -10317,6 +11001,26 @@
         "properties": {
           "error": {
             "type": "string"
+          }
+        }
+      },
+      "ConversationSummaryMode": {
+        "type": "string",
+        "enum": [
+          "unread"
+        ],
+        "description": "Return the complete workspace unread message total instead of a conversation page."
+      },
+      "WorkspaceUnreadCountResponse": {
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
           }
         }
       },
@@ -10491,7 +11195,7 @@
           },
           "contact_id": {
             "type": "string",
-            "description": "Optional contact ID for template tag substitution."
+            "description": "Optional contact ID. Must identify the unique workspace contact whose normalized phone equals to_number."
           },
           "media": {
             "type": "string",
@@ -10604,7 +11308,7 @@
               "type": "object",
               "additionalProperties": true
             },
-            "description": "Always empty on a deferral; present so clients can treat both variants alike."
+            "description": "Results for contacts processed before the send window closed. Contacts that remain queued are not included."
           }
         }
       },
@@ -11610,7 +12314,9 @@
           },
           "inbound_script_id": {
             "type": "integer",
-            "nullable": true
+            "minimum": 1,
+            "nullable": true,
+            "description": "An inbound_ivr script in this workspace with valid document and routing targets. Referenced queues must belong to this workspace. Null clears the attachment. Invalid selection preserves the previous configuration."
           },
           "handset_enabled": {
             "type": "boolean"

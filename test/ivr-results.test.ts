@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
   aggregateIvrResponses,
+  normalizeIvrAnswerValue,
   parseIvrResult,
   resolveIvrAnswerLabel,
+  stripInternalIvrResultMetadata,
   type IvrScriptShape,
 } from "../app/lib/ivr-results";
 
@@ -42,7 +44,41 @@ describe("parseIvrResult", () => {
   });
 });
 
+describe("normalizeIvrAnswerValue", () => {
+  test("unwraps valid structured answers and keeps legacy string answers", () => {
+    expect(
+      normalizeIvrAnswerValue({
+        value: "yes",
+        raw: "Yes, please.",
+        confidence: 0.91,
+        inputType: "speech",
+      }),
+    ).toBe("yes");
+    expect(normalizeIvrAnswerValue("1")).toBe("1");
+  });
+
+  test("rejects malformed structured answers", () => {
+    expect(
+      normalizeIvrAnswerValue({ value: "yes", raw: "yes", confidence: 2, inputType: "speech" }),
+    ).toBeNull();
+  });
+});
+
 describe("aggregateIvrResponses", () => {
+  test("keeps replay bookkeeping out of visible answers and export data", () => {
+    const result = {
+      page_1: { "Support?": "1" },
+      __no_input_replays: { page_1: { block_1: 2 } },
+    };
+
+    expect(aggregateIvrResponses([{ result }], script)).toMatchObject([
+      { pageId: "page_1", question: "Support?", total: 1 },
+    ]);
+    expect(JSON.parse(JSON.stringify(stripInternalIvrResultMetadata(result)))).toEqual({
+      page_1: { "Support?": "1" },
+    });
+  });
+
   test("counts each distinct answer per question", () => {
     const results = aggregateIvrResponses(
       [
@@ -64,6 +100,32 @@ describe("aggregateIvrResponses", () => {
         { value: "1", count: 2 },
         { value: "2", count: 1 },
       ],
+    });
+  });
+
+  test("aggregates structured speech answers by value and keeps legacy answers", () => {
+    const results = aggregateIvrResponses(
+      [
+        {
+          result: {
+            page_1: {
+              "Support?": {
+                value: "yes",
+                raw: "Yes, please.",
+                confidence: 0.91,
+                inputType: "speech",
+              },
+            },
+          },
+        },
+        { result: { page_1: { "Support?": "yes" } } },
+      ],
+      script,
+    );
+
+    expect(results[0]).toMatchObject({
+      total: 2,
+      options: [{ value: "yes", count: 2 }],
     });
   });
 

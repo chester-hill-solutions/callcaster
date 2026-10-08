@@ -93,7 +93,7 @@ export const action = defineAction({
           input.workspace_id,
           input.role,
         );
-        if (!result.ok) return jsonError(result.error, 400);
+        if (!result.ok) return jsonError(result.error, result.status);
         return jsonResponse({
           success: true,
           message: "User added to workspace successfully",
@@ -105,7 +105,7 @@ export const action = defineAction({
           input.workspace_id,
           input.role,
         );
-        if (!result.ok) return jsonError(result.error, 500);
+        if (!result.ok) return jsonError(result.error, result.status);
         return jsonResponse({ success: true, message: "User role updated successfully" });
       }
       case "remove_from_workspace": {
@@ -113,7 +113,7 @@ export const action = defineAction({
           userId,
           input.workspace_id,
         );
-        if (!result.ok) return jsonError(result.error, 500);
+        if (!result.ok) return jsonError(result.error, result.status);
         return jsonResponse({
           success: true,
           message: "User removed from workspace successfully",

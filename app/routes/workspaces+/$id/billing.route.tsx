@@ -180,13 +180,14 @@ export default function Credits() {
                 <div>SMS: 2 credits per segment ($0.04)</div>
                 <div>MMS: 4 credits per message ($0.08)</div>
                 <div>
-                  IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits
-                  per additional minute ($0.06)
+                  IVR calls: 2 credits for the first minute ($0.04), then 3 credits
+                  per additional started minute ($0.06)
                 </div>
                 <div>
-                  Live staffed calls: 4 credits per dial ($0.08), then 5 credits
-                  per additional minute ($0.10)
+                  Calls placed by your agents: 4 credits for the first minute ($0.08), then 5 credits
+                  per additional started minute ($0.10)
                 </div>
+                <div>Zero-duration calls are not billed.</div>
                 <div>Phone numbers: 100 credits per month ($2.00)</div>
               </div>
             </AccordionContent>

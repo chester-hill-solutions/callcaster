@@ -119,12 +119,18 @@ export const action = defineAction({
         nextCampaignData.type = normalizeIvrCampaignType(nextCampaignData.type);
 
         const schedule = normalizeSchedule(nextCampaignData.schedule);
-        const scheduleValidation = getScheduleValidation(schedule);
+        const smsSendWindow = normalizeSchedule(nextCampaignData.sms_send_window);
+        const isMessage = nextCampaignData.type === "message";
+        const scheduleValidation = getScheduleValidation(
+          isMessage ? nextCampaignData.sms_send_window : nextCampaignData.schedule,
+        );
         if (scheduleValidation.hasInvalidIntervals) {
           return routeData(
             {
               error:
-                "Each active calling day needs at least one valid time window (start and end must be different).",
+                isMessage
+                  ? "Each active SMS send day needs valid start and end times (start and end must be different)."
+                  : "Each active calling day needs at least one valid time window (start and end must be different).",
               actionType: "save" as const,
             },
             { status: 400 },
@@ -137,7 +143,7 @@ export const action = defineAction({
             campaign_id: Number(selected_id),
             workspace: workspace_id,
             schedule,
-            sms_send_window: normalizeSchedule(nextCampaignData.sms_send_window),
+            sms_send_window: smsSendWindow,
           },
           campaignDetails: {
             ...nextCampaignDetails,

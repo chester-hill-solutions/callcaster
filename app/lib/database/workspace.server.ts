@@ -1,3 +1,4 @@
+import { releaseNumberForWorkspace } from "@/lib/number-release.server";
 /**
  * Workspace-related database functions
  */
@@ -11,10 +12,8 @@ import {
   workspace_member,
   workspace_number,
 } from "@/db/schema";
-import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { PG_ERROR_CODES } from "@/lib/parse-utils.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
-import type { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
@@ -24,10 +23,6 @@ import {
 } from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "../logger.server";
 import { rpcGetWorkspaceUsers, rpcUpdateUserWorkspaceLastAccessTime } from "@/lib/db-rpc.server";
-import {
-  getWorkspaceMessagingOnboardingState,
-  updateWorkspaceMessagingOnboardingState,
-} from "@/lib/messaging-onboarding.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { sortCampaignsForList } from "@/lib/campaign-list-order";
@@ -106,7 +101,7 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
       .from(workspace_member)
       .innerJoin(
         workspace,
-        eqChsTextToUuid(workspace_member.workspace_id, workspace.id),
+        eq(workspace_member.workspace_id, workspace.id),
       )
       .where(eq(workspace_member.user_id, userId))
       .orderBy(desc(workspace.created_at));
@@ -117,43 +112,6 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
     logger.error("Error on function getUserWorkspaces: ", error);
     return { data: null, error: toDbError(error) };
   }
-}
-
-export async function createKeys({
-  workspace_id,
-  sid,
-  token,
-}: {
-  workspace_id: string;
-  sid: string;
-  token: string;
-}): Promise<NewKeyInstance> {
-  const TwilioSdk = await loadTwilioSdk();
-  const twilio = new TwilioSdk.Twilio(sid, token);
-  try {
-    const newKey = await twilio.newKeys.create({ friendlyName: workspace_id });
-    return newKey;
-  } catch (error) {
-    logger.error("Error creating keys", error);
-    throw error;
-  }
-}
-
-export async function createSubaccount({
-  workspace_id,
-}: {
-  workspace_id: string;
-}) {
-  const TwilioSdk = await loadTwilioSdk();
-  const twilio = new TwilioSdk.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
-  const account = await twilio.api.v2010.accounts
-    .create({
-      friendlyName: workspace_id,
-    })
-    .catch((error) => {
-      logger.error("Error creating subaccount", error);
-    });
-  return account;
 }
 
 /** Twilio `AccountInstance` is not JSON-serializable (circular `_version`); tests may return plain objects without `toJSON`. */
@@ -513,110 +471,15 @@ export async function createWorkspaceTwilioInstance({
   return twilio;
 }
 
-export async function removeWorkspacePhoneNumber({
-  workspaceId,
-  numberId,
-  tdb: tdbIn,
-}: {
+export async function removeWorkspacePhoneNumber({ workspaceId, numberId }: {
   workspaceId: string;
   numberId: bigint;
-  tdb?: TenantDb;
   null?: never;
 }) {
-  const normalizedNumberId = Number(numberId);
-  const tdb = tdbIn ?? createTenantDb(workspaceId);
-  try {
-    const number = await tdb.workspace_number.findFirst({
-      where: eq(workspace_number.id, normalizedNumberId),
-    });
-    if (!number) {
-      throw new Error("Number not found");
-    }
-    const twilio = await createWorkspaceTwilioInstance({
-      workspace_id: workspaceId,
-    });
-
-    // Prefer the stored Twilio IncomingPhoneNumber SID for a direct,
-    // SID-based release. Only fall back to friendly_name matching for legacy
-    // rows that predate the twilio_phone_number_sid column.
-    const storedSid = number.twilio_phone_number_sid ?? null;
-    let incomingSids: string[];
-    if (storedSid) {
-      incomingSids = [storedSid];
-    } else {
-      if (!number.friendly_name) {
-        throw new Error("Friendly name is required");
-      }
-      const incomingIds = await twilio.incomingPhoneNumbers.list({
-        friendlyName: number.friendly_name,
-      });
-      incomingSids = incomingIds.map((id) => id.sid);
-    }
-
-    // Explicitly detach from the workspace Messaging Service before releasing
-    // the number, so the MS sender pool does not hold a dangling reference.
-    const onboarding = await getWorkspaceMessagingOnboardingState({
-      workspaceId,
-    });
-    const msSid = onboarding.messagingService.serviceSid;
-    if (msSid) {
-      for (const sid of incomingSids) {
-        try {
-          await twilio.messaging.v1.services(msSid).phoneNumbers(sid).remove();
-        } catch (detachError) {
-          // Ignore "not attached" / already-detached errors.
-          logger.warn(
-            `MS detach skipped for ${sid}: ${
-              detachError instanceof Error
-                ? detachError.message
-                : String(detachError)
-            }`,
-          );
-        }
-      }
-    }
-
-    // Outgoing caller-ID cleanup (match by friendly_name when available).
-    const outgoingIds = number.friendly_name
-      ? await twilio.outgoingCallerIds.list({
-          friendlyName: number.friendly_name,
-        })
-      : [];
-
-    await Promise.all([
-      ...outgoingIds.map(async (id) => {
-        return await twilio.outgoingCallerIds(id.sid).remove();
-      }),
-      ...incomingSids.map(async (sid) => {
-        return await twilio.incomingPhoneNumbers(sid).remove();
-      }),
-    ]);
-    await tdb.workspace_number.delete({
-      where: eq(workspace_number.id, normalizedNumberId),
-    });
-
-    // Drop the released number from the Messaging Service attached senders.
-    if (number.phone_number) {
-      const releasedPhone = number.phone_number;
-      await updateWorkspaceMessagingOnboardingState({
-        workspaceId,
-        updates: {
-          messagingService: {
-            ...onboarding.messagingService,
-            attachedSenderPhoneNumbers:
-              onboarding.messagingService.attachedSenderPhoneNumbers.filter(
-                (p) => p !== releasedPhone,
-              ),
-          },
-        },
-        actorUserId: null,
-      });
-    }
-
-    return { error: null };
-  } catch (error) {
-    return { error };
-  }
+  return releaseNumberForWorkspace({
+    workspaceId, numberId,
+    getTwilioClient: () => createWorkspaceTwilioInstance({ workspace_id: workspaceId }),
+  });
 }
 
 export async function updateCallerId({

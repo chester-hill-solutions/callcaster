@@ -1,3 +1,4 @@
+import { listTwilioBillingUsage } from "@/lib/twilio-billing-usage.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { handleBillingReconciliationDrift } from "@/lib/billing-reconciliation-alert.server";
 import {
@@ -40,23 +41,14 @@ export async function reconcileWorkspaceBilling(args: {
   // of ledger events, growing without bound as an account ages until
   // materialVariance was permanently true and the drift alert permanently
   // meaningless. workspace-twilio-sync.server.ts already fetched usage this way.
-  const usageRecords = await withTwilioRetry(
+  const twilioUsage = await withTwilioRetry(
     () =>
-      twilio.usage.records.list({
+      listTwilioBillingUsage(twilio.usage.records, {
         startDate: new Date(startDate),
         endDate: new Date(endDate),
       }),
     { workspaceId: args.workspaceId, operation: "billing_reconcile_usage_list" },
   );
-  const twilioUsage = usageRecords.map((record) => ({
-    category: record.category,
-    description: record.description,
-    usage: record.usage,
-    usageUnit: record.usageUnit,
-    price: record.price.toString(),
-    startDate: record.startDate?.toISOString(),
-    endDate: record.endDate?.toISOString(),
-  }));
 
   const report = await loadBillingReconciliationReport({
     workspaceId: args.workspaceId,

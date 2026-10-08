@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { RouterContextProvider } from "react-router";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL =
@@ -390,8 +391,103 @@ describe("app/routes/api+/inbound-sms", () => {
     });
   });
 
+  describe.each(["", "STOP", "LEAVE ME ALONE"])(
+    "required opt-out keywords with config %s",
+    (configured) => {
+      test.each([
+        "STOP",
+        "UNSUBSCRIBE",
+        "END",
+        "QUIT",
+        "STOPALL",
+        "REVOKE",
+        "OPTOUT",
+        "CANCEL",
+        "OPT OUT",
+      ])("%s opts out every matching contact", async (keyword) => {
+        onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce(
+          {
+            businessProfile: { optOutKeywords: configured },
+          },
+        );
+        const number = {
+          workspace: "w1",
+          twilio_data: { sid: "sid", authToken: "tok" },
+          webhook: [],
+        };
+        mocks.createClient.mockReturnValueOnce(
+          makeDbClient({ number, contacts: [{ id: 9 }, { id: 10 }] }),
+        );
+        const { action } = await import("../app/routes/api+/inbound-sms");
+        const response = await asRouteResponse(
+          action({
+            request: makeInboundSmsRequest({
+              Body: ` ${keyword.toLowerCase()} `,
+              NumMedia: "0",
+            }),
+            params: {},
+            context: new RouterContextProvider(),
+          }),
+        );
+        expect(response.status).toBe(201);
+        expect(tenantDbStubState.messageInsertCalls).toContainEqual(
+          expect.objectContaining({ body: ` ${keyword.toLowerCase()} ` }),
+        );
+        expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+          expect.objectContaining({ set: { opt_out: true } }),
+        );
+        expect(queueDbMocks.dequeueQueueEntry.mock.calls).toEqual([
+          [
+            {
+              by: { contactId: 9, allCampaigns: true },
+              userId: null,
+              reason: "Contact opted out via SMS",
+              workspaceId: "w1",
+            },
+          ],
+          [
+            {
+              by: { contactId: 10, allCampaigns: true },
+              userId: null,
+              reason: "Contact opted out via SMS",
+              workspaceId: "w1",
+            },
+          ],
+        ]);
+      });
+    },
+  );
+
+  test.each(["hello", "STOP please", "please stop", "OPT OUT NOW"])(
+    "%s stays an ordinary reply",
+    async (body) => {
+      const number = {
+        workspace: "w1",
+        twilio_data: { sid: "sid", authToken: "tok" },
+        webhook: [],
+      };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }] }),
+      );
+      const { action } = await import("../app/routes/api+/inbound-sms");
+      const response = await asRouteResponse(
+        action({
+          request: makeInboundSmsRequest({ Body: body, NumMedia: "0" }),
+          params: {},
+          context: new RouterContextProvider(),
+        }),
+      );
+      expect(response.status).toBe(201);
+      expect(tenantDbStubState.messageInsertCalls).toContainEqual(
+        expect.objectContaining({ body }),
+      );
+      expect(tenantDbStubState.contactUpdateCalls).toHaveLength(0);
+      expect(queueDbMocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    },
+  );
+
   describe("workspace-configurable opt-out keywords", () => {
-    test("marks contact opted out on a custom configured keyword", async () => {
+    test("marks contact opted out on a custom multiword keyword", async () => {
       onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
         businessProfile: { optOutKeywords: "QUIT, LEAVE ME ALONE" },
       });
@@ -401,7 +497,7 @@ describe("app/routes/api+/inbound-sms", () => {
       );
       const mod = await import("../app/routes/api+/inbound-sms");
       const res = await asRouteResponse(mod.action({
-          request: makeInboundSmsRequest({ Body: "quit", NumMedia: "0" }),
+          request: makeInboundSmsRequest({ Body: " leave   me alone ", NumMedia: "0" }),
         } as any),
       );
       expect(res.status).toBe(201);
@@ -410,7 +506,7 @@ describe("app/routes/api+/inbound-sms", () => {
       );
     });
 
-    test("does not opt out on default STOP keyword when a custom keyword list doesn't include it", async () => {
+    test("retains STOP when a custom keyword list omits it", async () => {
       onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
         businessProfile: { optOutKeywords: "QUIT" },
       });
@@ -424,10 +520,12 @@ describe("app/routes/api+/inbound-sms", () => {
         } as any),
       );
       expect(res.status).toBe(201);
-      expect(tenantDbStubState.contactUpdateCalls).toHaveLength(0);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
     });
 
-    test("falls back to default STOP/UNSUBSCRIBE keywords when onboarding lookup fails", async () => {
+    test.each(["STOP", "UNSUBSCRIBE", "END", "QUIT", "STOPALL", "REVOKE", "OPTOUT", "CANCEL", "OPT OUT"])("retains %s when onboarding lookup fails", async (keyword) => {
       onboardingMocks.getWorkspaceMessagingOnboardingState.mockRejectedValueOnce(
         new Error("onboarding unavailable"),
       );
@@ -437,7 +535,7 @@ describe("app/routes/api+/inbound-sms", () => {
       );
       const mod = await import("../app/routes/api+/inbound-sms");
       const res = await asRouteResponse(mod.action({
-          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+          request: makeInboundSmsRequest({ Body: keyword.toLowerCase(), NumMedia: "0" }),
         } as any),
       );
       expect(res.status).toBe(201);
@@ -465,7 +563,7 @@ describe("app/routes/api+/inbound-sms", () => {
         expect.objectContaining({ set: { opt_out: true } }),
       );
       expect(queueDbMocks.dequeueQueueEntry).toHaveBeenCalledWith({
-        by: { contactId: 9 },
+        by: { contactId: 9, allCampaigns: true },
         userId: null,
         reason: "Contact opted out via SMS",
         workspaceId: "w1",
@@ -672,6 +770,29 @@ describe("app/routes/api+/inbound-sms", () => {
     res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  /**
+   * The message row's temporal columns are `timestamptz` (real `Date`), and
+   * postgres.js encodes a Date bind parameter by calling `.toISOString()` on it.
+   * An ISO *string* therefore fails at the driver, not at the type checker:
+   * `createTenantDb`'s `insert` takes `Record<string, unknown>`, so nothing
+   * checks the value. That is how this reached the e2e gate as a 400.
+   *
+   * The stub records the payload, so the contract can be asserted here rather
+   * than only in the real-Postgres tier — the tier that would otherwise be the
+   * only place it can be observed.
+   */
+  test("inserts Date values for the timestamptz columns, not ISO strings", async () => {
+    const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, smsWebhook: true }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
+    expect(res.status).toBe(201);
+
+    const payload = tenantDbStubState.messageInsertCalls[0];
+    expect(payload?.date_created).toBeInstanceOf(Date);
+    expect(payload?.date_sent).toBeInstanceOf(Date);
   });
 
   test("covers media_urls branch, contact lookup error logging, and no-webhook path", async () => {

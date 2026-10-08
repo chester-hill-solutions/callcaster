@@ -523,7 +523,7 @@ const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: 
       aria-label={`Voicemail message for ${number?.phone_number ?? "number"}`}
     >
       <option value="">Select a voice message</option>
-      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number | string; name: string }, index: number) => (
+      {mediaNames.map((mediaName: { id: number | string; name: string }, index: number) => (
         <option key={index} value={mediaName.name}>
           {mediaName.name}
         </option>

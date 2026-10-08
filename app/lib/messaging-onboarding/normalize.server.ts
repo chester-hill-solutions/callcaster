@@ -40,93 +40,96 @@ export {
   normalizeReviewState,
 } from "@/lib/messaging-onboarding/normalize-sections.server";
 
-export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnboardingState = {
-  version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
-  status: "not_started",
-  currentStep: "path_selection",
-  operatingCountry: "CA",
-  selectedChannels: [],
-  selectedGoal: null,
-  steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
-  businessProfile: EMPTY_BUSINESS_PROFILE,
-  messagingService: {
-    desiredSendMode: "messaging_service",
-    serviceSid: null,
-    friendlyName: null,
-    provisioningStatus: "not_started",
-    attachedSenderPhoneNumbers: [],
-    supportedChannels: [],
-    stickySenderEnabled: true,
-    advancedOptOutEnabled: false,
-    lastProvisionedAt: null,
-    lastError: null,
-  },
-  subaccountBootstrap: {
+export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnboardingState =
+  {
+    version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
     status: "not_started",
-    authMode: "mixed",
-    callbackBaseUrl: null,
-    inboundVoiceUrl: null,
-    inboundSmsUrl: null,
-    statusCallbackUrl: null,
-    createdResources: [],
-    featureFlags: [
-      "messaging_service",
-      "sticky_sender",
-      "advanced_opt_out",
-      "future_channel_onboarding",
-    ],
-    driftMessages: [],
-    lastSyncedAt: null,
-    lastError: null,
-  },
-  emergencyVoice: {
-    status: "not_started",
-    enabled: false,
-    emergencyEligiblePhoneNumbers: [],
-    ineligibleCallerIds: [],
-    allowedCallerIdTypes: ["rented"],
-    complianceNotes: "",
-    address: normalizeEmergencyAddress(null),
-    lastReviewedAt: null,
-  },
-  a2p10dlc: {
-    status: "not_started",
-    brandSid: null,
-    campaignSid: null,
-    trustProductSid: null,
-    customerProfileBundleSid: null,
-    brandType: null,
-    tcrId: null,
-    rejectionReason: null,
-    lastSubmittedAt: null,
-    lastSyncedAt: null,
-  },
-  rcs: {
-    status: "not_started",
-    provider: null,
-    agentId: null,
-    senderId: null,
-    displayName: "",
-    publicDescription: "",
-    logoImageUrl: "",
-    bannerImageUrl: "",
-    accentColor: "",
-    optInPolicyImageUrl: "",
-    useCaseVideoUrl: "",
-    representativeName: "",
-    representativeTitle: "",
-    representativeEmail: "",
-    notificationEmail: "",
-    regions: [],
-    prerequisites: [],
-    notes: "",
-    lastSubmittedAt: null,
-    lastSyncedAt: null,
-  },
-  reviewState: normalizeReviewState(null),
-  lastUpdatedAt: null,
-  lastUpdatedBy: null,
-};
+    currentStep: "path_selection",
+    operatingCountry: "CA",
+    selectedChannels: [],
+    selectedGoal: null,
+    steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
+    businessProfile: EMPTY_BUSINESS_PROFILE,
+    messagingService: {
+      desiredSendMode: "messaging_service",
+      serviceSid: null,
+      friendlyName: null,
+      provisioningStatus: "not_started",
+      attachedSenderPhoneNumbers: [],
+      supportedChannels: [],
+      stickySenderEnabled: true,
+      advancedOptOutEnabled: false,
+      lastProvisionedAt: null,
+      lastError: null,
+    },
+    subaccountBootstrap: {
+      status: "not_started",
+      authMode: "mixed",
+      callbackBaseUrl: null,
+      inboundVoiceUrl: null,
+      inboundSmsUrl: null,
+      statusCallbackUrl: null,
+      createdResources: [],
+      featureFlags: [
+        "messaging_service",
+        "sticky_sender",
+        "advanced_opt_out",
+        "future_channel_onboarding",
+      ],
+      driftMessages: [],
+      lastSyncedAt: null,
+      lastError: null,
+    },
+    emergencyVoice: {
+      status: "not_started",
+      enabled: false,
+      emergencyEligiblePhoneNumbers: [],
+      ineligibleCallerIds: [],
+      allowedCallerIdTypes: ["rented"],
+      complianceNotes: "",
+      address: normalizeEmergencyAddress(null),
+      lastReviewedAt: null,
+    },
+    a2p10dlc: {
+      status: "not_started",
+      brandSid: null,
+      campaignSid: null,
+      trustProductSid: null,
+      messagingProfileEndUserSid: null,
+      messagingProfileStatus: "not_started",
+      customerProfileBundleSid: null,
+      brandType: null,
+      tcrId: null,
+      rejectionReason: null,
+      lastSubmittedAt: null,
+      lastSyncedAt: null,
+    },
+    rcs: {
+      status: "not_started",
+      provider: null,
+      agentId: null,
+      senderId: null,
+      displayName: "",
+      publicDescription: "",
+      logoImageUrl: "",
+      bannerImageUrl: "",
+      accentColor: "",
+      optInPolicyImageUrl: "",
+      useCaseVideoUrl: "",
+      representativeName: "",
+      representativeTitle: "",
+      representativeEmail: "",
+      notificationEmail: "",
+      regions: [],
+      prerequisites: [],
+      notes: "",
+      lastSubmittedAt: null,
+      lastSyncedAt: null,
+    },
+    reviewState: normalizeReviewState(null),
+    lastUpdatedAt: null,
+    lastUpdatedBy: null,
+  };
 
 function inferOperatingCountryFromAddress(
   countryCode: string,
@@ -147,7 +150,9 @@ export function normalizeWorkspaceMessagingOnboardingState(
 
     return {
       ...defaultState,
-      steps: buildOnboardingStepsForState(defaultState, { hasFirstNumber: false }),
+      steps: buildOnboardingStepsForState(defaultState, {
+        hasFirstNumber: false,
+      }),
     };
   }
 
@@ -161,7 +166,9 @@ export function normalizeWorkspaceMessagingOnboardingState(
   const selectedGoalRaw = parseOptionalString(value.selectedGoal);
   const selectedGoal: WorkspaceOnboardingGoal | null =
     selectedGoalRaw &&
-    WORKSPACE_ONBOARDING_GOAL_VALUES.includes(selectedGoalRaw as WorkspaceOnboardingGoal)
+    WORKSPACE_ONBOARDING_GOAL_VALUES.includes(
+      selectedGoalRaw as WorkspaceOnboardingGoal,
+    )
       ? (selectedGoalRaw as WorkspaceOnboardingGoal)
       : null;
 
@@ -231,6 +238,8 @@ export function normalizeWorkspaceMessagingOnboardingState(
 
   return {
     ...normalizedState,
-    steps: buildOnboardingStepsForState(normalizedState, { hasFirstNumber: false }),
+    steps: buildOnboardingStepsForState(normalizedState, {
+      hasFirstNumber: false,
+    }),
   };
 }

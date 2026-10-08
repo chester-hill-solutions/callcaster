@@ -7,6 +7,7 @@ import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { defineAction } from "@/lib/handler.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
 
 /**
@@ -27,6 +28,11 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth: authResult }) => {
+
+  // Bucket is the API key id, not the IP (#2135): a leaked key is the case an
+  // IP bucket does not stop. Before the body is read and before any dispatch.
+  const rateLimited = await apiWriteRateLimitResponse(authResult, "api-sms");
+  if (rateLimited) return rateLimited;
 
   try {
     const parsed = await parseJsonBodyOrResponse(
@@ -122,13 +128,51 @@ export const action = defineAction({
             headers: { "Content-Type": "application/json" },
           },
         );
-      case "deferred_send_window":
+      case "caller_id_not_usable":
+        // The caller id was present and well-formed; it just cannot be used by
+        // this workspace. Distinct messages, because "supply one you already
+        // supplied" hides the real reason, and a suspended number needs a
+        // different remedy from someone else's number.
+        return new Response(
+          JSON.stringify({
+            error:
+              outcome.reason === "suspended"
+                ? "caller_id is suspended for an unpaid rental — add credits to restore it"
+                : "caller_id must be a phone number that belongs to this workspace",
+            callerId: outcome.callerId,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      case "deferred":
+        // A deferred batch is 200 + `deferred`, never an error: nothing failed
+        // and nothing was sent, so a caller that treated this as an error would
+        // either retry blindly or report a per-contact failure for a condition
+        // that applies to the whole workspace or campaign. Each cause carries
+        // the detail the operator needs — the window boundary, or the real
+        // compliance reasons (#2081) rather than a dead-lettered queue.
+        if (outcome.because === "workspace_not_ready") {
+          return new Response(
+            JSON.stringify({
+              deferred: true,
+              reason: "Workspace is not cleared to send SMS",
+              reasons: outcome.reasons,
+              responses: outcome.responses,
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+              status: 200,
+            },
+          );
+        }
         return new Response(
           JSON.stringify({
             deferred: true,
             reason: "Outside campaign send window",
             nextOpenAt: outcome.nextOpenAt.toISOString(),
-            responses: [],
+            responses: outcome.responses,
           }),
           {
             headers: { "Content-Type": "application/json" },

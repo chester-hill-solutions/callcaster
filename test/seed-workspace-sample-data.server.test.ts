@@ -104,6 +104,9 @@ describe("app/lib/database/workspace-provisioning.server.ts createNewWorkspace +
   // fixture must be a real uuid like Better Auth's generateId=crypto.randomUUID().
   const AUTH_USER_ID = "3f8b1c2a-5d4e-4f6a-9b7c-8e1d2a3b4c5d";
 
+  /** Stands in for the uuid the `create_new_workspace` RPC returns. */
+  const WORKSPACE_ID = "6aff2ab3-8a7a-48b2-92e6-f86ec7441ca0";
+
   const workspaceDbMocks = vi.hoisted(() => ({
     seedWorkspaceSampleData: vi.fn(),
   }));
@@ -190,6 +193,80 @@ describe("app/lib/database/workspace-provisioning.server.ts createNewWorkspace +
         };
       } as unknown as new (...args: unknown[]) => unknown;
       return { default: { Twilio: TwilioCtor } };
+    });
+  });
+
+  /**
+   * The Twilio console used to read as a wall of workspace UUIDs because the
+   * subaccount and API key were both created with `workspace_id` as their
+   * friendlyName. These assert the name actually reaches the Twilio SDK —
+   * passing it into the function is not the same as using it.
+   */
+  describe("Twilio resources are named after the workspace", () => {
+    async function createAndCaptureTwilioCalls(workspaceName: string) {
+      vi.doMock("@/lib/db-rpc.server", () => ({
+        rpcCreateNewWorkspace: vi.fn(async () => WORKSPACE_ID),
+        rpcGetWorkspaceUsers: vi.fn(),
+        rpcUpdateUserWorkspaceLastAccessTime: vi.fn(),
+      }));
+
+      const accountsCreate = vi.fn(async () => ({
+        sid: "AC_sub",
+        authToken: "tok",
+      }));
+      const newKeysCreate = vi.fn(async () => ({ sid: "SK1", secret: "sec" }));
+      vi.doMock("twilio", () => {
+        const TwilioCtor = function (this: unknown) {
+          return {
+            newKeys: { create: newKeysCreate },
+            api: { v2010: { accounts: { create: accountsCreate } } },
+          };
+        } as unknown as new (...args: unknown[]) => unknown;
+        return { default: { Twilio: TwilioCtor } };
+      });
+
+      const mod = await import(
+        "../app/lib/database/workspace-provisioning.server"
+      );
+      const result = await mod.createNewWorkspace({
+        workspaceName,
+        user_id: AUTH_USER_ID,
+      });
+
+      expect(result.data).toBe(WORKSPACE_ID);
+      return { accountsCreate, newKeysCreate };
+    }
+
+    test("the subaccount is named after the workspace, not its uuid", async () => {
+      const { accountsCreate } = await createAndCaptureTwilioCalls(
+        "Civic Action",
+      );
+
+      expect(accountsCreate).toHaveBeenCalledWith({
+        friendlyName: `Civic Action · ${WORKSPACE_ID.slice(0, 8)}`,
+      });
+    });
+
+    test("the API key is named after the workspace and marked as a key", async () => {
+      const { newKeysCreate } = await createAndCaptureTwilioCalls("Civic Action");
+
+      expect(newKeysCreate).toHaveBeenCalledWith({
+        friendlyName: `Civic Action · ${WORKSPACE_ID.slice(0, 8)} · key`,
+      });
+    });
+
+    /**
+     * Kill-check for the two above. Passing `workspace_name: undefined` is
+     * what the code did before this change, and it silently produces the bare
+     * uuid — a regression that compiles, typechecks, and passes every other
+     * test in this file.
+     */
+    test("a workspace with no usable name falls back to its uuid", async () => {
+      const { accountsCreate } = await createAndCaptureTwilioCalls("   ");
+
+      expect(accountsCreate).toHaveBeenCalledWith({
+        friendlyName: WORKSPACE_ID,
+      });
     });
   });
 

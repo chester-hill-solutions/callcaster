@@ -13,6 +13,7 @@ import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { MemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
+import { AppError } from "@/lib/errors.server";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -109,6 +110,9 @@ export const action = defineAction({
           }
           return jsonResponse({ ok: true }, 200);
         } catch (error) {
+          if (error instanceof AppError && error.statusCode === 400) {
+            return jsonError(error.message, 400);
+          }
           logger.error("Failed to update queue member", error);
           return jsonError(error instanceof Error ? error.message : "Failed to update member", 500);
         }

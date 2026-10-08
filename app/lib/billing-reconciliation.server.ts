@@ -6,6 +6,7 @@ import {
   type TwilioUsageRecord,
 } from "../../shared/billing-reconciliation";
 import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
+import { loadNumberRentalReconciliationInput } from "@/lib/number-rental-reconciliation.server";
 import {
   TERMINAL_BILLABLE_CALL_STATUSES,
   TERMINAL_BILLABLE_SMS_STATUSES,
@@ -29,8 +30,13 @@ export async function loadBillingEntityAudit(args: {
   workspaceId: string;
   period: { startDate: string; endDate: string };
 }): Promise<BillingEntityAudit> {
-  const periodStart = `${args.period.startDate}T00:00:00.000Z`;
-  const periodEnd = `${args.period.endDate}T23:59:59.999Z`;
+  const periodStart = new Date(`${args.period.startDate}T00:00:00.000Z`);
+  const periodEnd = new Date(`${args.period.endDate}T23:59:59.999Z`);
+  // `transaction_history.created_at` is still declared `text()`, so its
+  // comparisons take an ISO string. It is one of the remaining #2213 columns
+  // and is deliberately not corrected in this slice.
+  const periodStartIso = periodStart.toISOString();
+  const periodEndIso = periodEnd.toISOString();
   const tdb = createTenantDb(args.workspaceId);
 
   const messageWhere = and(
@@ -56,14 +62,14 @@ export async function loadBillingEntityAudit(args: {
   );
   const smsDebitWhere = and(
     eq(transactionHistoryTable.type, "DEBIT"),
-    gte(transactionHistoryTable.created_at, periodStart),
-    lte(transactionHistoryTable.created_at, periodEnd),
+    gte(transactionHistoryTable.created_at, periodStartIso),
+    lte(transactionHistoryTable.created_at, periodEndIso),
     like(transactionHistoryTable.idempotency_key, "sms:%"),
   );
   const callDebitWhere = and(
     eq(transactionHistoryTable.type, "DEBIT"),
-    gte(transactionHistoryTable.created_at, periodStart),
-    lte(transactionHistoryTable.created_at, periodEnd),
+    gte(transactionHistoryTable.created_at, periodStartIso),
+    lte(transactionHistoryTable.created_at, periodEndIso),
     like(transactionHistoryTable.idempotency_key, "call:%"),
   );
 
@@ -107,12 +113,13 @@ export async function loadBillingReconciliationReport(args: {
   twilioUsage: TwilioUsageRecord[];
   referenceDate?: Date;
 }): Promise<BillingReconciliationReport> {
-  const period = getTwilioUsageDateRange(args.referenceDate);
+  const referenceDate = args.referenceDate ?? new Date();
+  const period = getTwilioUsageDateRange(referenceDate);
   const periodStart = `${period.startDate}T00:00:00.000Z`;
   const periodEnd = `${period.endDate}T23:59:59.999Z`;
   const tdb = createTenantDb(args.workspaceId);
 
-  const [ledgerRows, entityAudit] = await Promise.all([
+  const [ledgerRows, entityAudit, numberRentals] = await Promise.all([
     tdb.transaction_history.findMany({
       where: and(
         gte(transactionHistoryTable.created_at, periodStart),
@@ -123,12 +130,15 @@ export async function loadBillingReconciliationReport(args: {
         amount: true,
         idempotency_key: true,
         created_at: true,
+        note: true,
+        message_sid: true,
       },
     }),
     loadBillingEntityAudit({
       workspaceId: args.workspaceId,
       period,
     }),
+    loadNumberRentalReconciliationInput({ workspaceId: args.workspaceId, referenceDate }),
   ]);
 
   return buildBillingReconciliationReport({
@@ -136,5 +146,6 @@ export async function loadBillingReconciliationReport(args: {
     twilioUsage: args.twilioUsage,
     ledgerRows: ledgerRows as LedgerTransactionRow[],
     entityAudit,
+    numberRentals,
   });
 }

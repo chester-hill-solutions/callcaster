@@ -56,6 +56,8 @@ export async function markContactLineType({
 }
 
 export interface GetOrLookupLineTypeParams {
+  /** Propagate lookup failures when the caller must verify a recipient before sending. */
+  throwOnError?: boolean;
   workspaceId: string;
   contactId: number | string;
   phone: string;
@@ -72,13 +74,15 @@ export interface GetOrLookupLineTypeParams {
  * - Cache miss + enabled: calls Twilio Lookup v2 (line_type_intelligence),
  *   persists the result, and returns it.
  * - FAIL OPEN: any lookup/read error is logged and swallowed — a lookup
- *   failure must never block an SMS send. Returns null on any error.
+ *   failure does not block existing callers. `throwOnError` propagates failures
+ *   to callers that require verification before sending.
  */
 export async function getOrLookupLineType({
   workspaceId,
   contactId,
   phone,
   tdb,
+  throwOnError = false,
 }: GetOrLookupLineTypeParams): Promise<string | null> {
   const tenantDb = tdb ?? createTenantDb(workspaceId);
   const numericContactId = Number(contactId);
@@ -95,6 +99,7 @@ export async function getOrLookupLineType({
       workspaceId,
       contactId,
     });
+    if (throwOnError) throw error;
     return null;
   }
 
@@ -128,6 +133,7 @@ export async function getOrLookupLineType({
       workspaceId,
       contactId,
     });
+    if (throwOnError) throw error;
     return null;
   }
 }

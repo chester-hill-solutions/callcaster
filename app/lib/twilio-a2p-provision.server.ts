@@ -32,16 +32,23 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import {
-  assignA2pTrustProductEntity,
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  businessProfileFieldRequiredMessage,
+  findMissingBusinessProfileFields,
+} from "@/lib/messaging-onboarding/predicates";
+import {
   createA2pBrandRegistration,
   createA2pCampaign,
-  createA2pTrustProduct,
   createWorkspaceTwilioClient,
   fetchA2pBrandRegistration,
   listA2pCampaigns,
-  listA2pTrustProductEntities,
-  submitA2pTrustProduct,
+  listA2pBrandRegistrations,
 } from "@/lib/twilio-client.server";
+import {
+  resolveA2pPolicySid,
+  a2pBusinessProfileChanged,
+} from "@/lib/a2p-messaging-profile.server";
+import { prepareA2pMessagingProfile } from "@/lib/twilio-a2p-messaging-profile.server";
 import { ensureA2pEventStreamsSink } from "@/lib/twilio-event-streams.server";
 import type {
   TwilioAccountData,
@@ -49,35 +56,28 @@ import type {
   WorkspaceMessagingOnboardingState,
 } from "@/lib/types";
 
-/**
- * Global Twilio "A2P Messaging" Trust Product policy SID. Overridable via
- * `TWILIO_A2P_MESSAGING_POLICY_SID`.
- *
- * TODO(a2p-policy-sid): confirm this default against the Twilio Console /
- * `trusthub.v1.policies.list()` before go-live — a wrong policy SID surfaces
- * when the trust product is submitted for review.
- */
-const DEFAULT_A2P_MESSAGING_POLICY_SID = "RNb0d4771c2c98518d916a3d4cd70a8f8b";
-
-function resolveA2pPolicySid(): string {
-  const override = process.env.TWILIO_A2P_MESSAGING_POLICY_SID;
-  return override && override.trim() ? override.trim() : DEFAULT_A2P_MESSAGING_POLICY_SID;
-}
-
 function mapBrandStatus(raw: string | null | undefined): ComplianceStepStatus {
   const normalized = String(raw ?? "").toUpperCase();
   if (normalized === "APPROVED") return "approved";
-  if (normalized === "FAILED" || normalized === "DELETED" || normalized.includes("REJECT")) {
+  if (
+    normalized === "FAILED" ||
+    normalized === "DELETED" ||
+    normalized.includes("REJECT")
+  ) {
     return "action_needed";
   }
-  if (normalized === "IN_REVIEW" || normalized === "PENDING") return "in_review";
+  if (normalized === "IN_REVIEW" || normalized === "PENDING")
+    return "in_review";
   return "pending";
 }
 
-function mapCampaignStatus(raw: string | null | undefined): ComplianceStepStatus {
+function mapCampaignStatus(
+  raw: string | null | undefined,
+): ComplianceStepStatus {
   const normalized = String(raw ?? "").toUpperCase();
   if (normalized === "APPROVED" || normalized === "VERIFIED") return "approved";
-  if (normalized === "FAILED" || normalized.includes("REJECT")) return "action_needed";
+  if (normalized === "FAILED" || normalized.includes("REJECT"))
+    return "action_needed";
   if (
     normalized === "IN_REVIEW" ||
     normalized === "PENDING" ||
@@ -97,7 +97,8 @@ function readA2pInputs(onboarding: WorkspaceMessagingOnboardingState): {
 } {
   const a2p = onboarding.a2p10dlc as unknown as Record<string, unknown>;
   const usAppToPersonUsecase =
-    typeof a2p.usAppToPersonUsecase === "string" && a2p.usAppToPersonUsecase.trim()
+    typeof a2p.usAppToPersonUsecase === "string" &&
+    a2p.usAppToPersonUsecase.trim()
       ? (a2p.usAppToPersonUsecase as string).trim()
       : "LOW_VOLUME";
   return {
@@ -110,7 +111,6 @@ function readA2pInputs(onboarding: WorkspaceMessagingOnboardingState): {
 async function persistA2pSids(
   workspaceId: string,
   actorUserId: string | null,
-  current: WorkspaceA2POnboardingState,
   patch: Partial<WorkspaceA2POnboardingState>,
 ): Promise<void> {
   await updateWorkspaceMessagingOnboardingState({
@@ -118,7 +118,6 @@ async function persistA2pSids(
     actorUserId,
     updates: {
       a2p10dlc: {
-        ...current,
         ...patch,
         lastSyncedAt: new Date().toISOString(),
       },
@@ -147,6 +146,17 @@ export async function provisionA2pRegistration(
     };
   }
 
+  const missingFields = findMissingBusinessProfileFields(
+    onboarding.businessProfile,
+    [...BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc, "optInWorkflow"],
+  );
+  if (missingFields.length > 0) {
+    return {
+      status: "action_needed",
+      blockingIssues: missingFields.map(businessProfileFieldRequiredMessage),
+    };
+  }
+
   const twilio = await createWorkspaceTwilioClient({ workspaceId });
   const policySid = resolveA2pPolicySid();
   const email =
@@ -164,87 +174,30 @@ export async function provisionA2pRegistration(
     hasCampaign: Boolean(a2p.campaignSid),
   });
 
-  // ── 1. A2P Messaging Trust Product (a2PProfileBundle) ──────────────────────
-  let trustProductSid = a2p.trustProductSid;
-  if (!trustProductSid) {
-    const trustProduct = await createA2pTrustProduct(
+  const { trustProductSid, messagingProfileEndUserSid } =
+    await prepareA2pMessagingProfile({
       twilio,
-      {
-        friendlyName:
-          onboarding.businessProfile.legalBusinessName.trim() ||
-          `Workspace ${workspaceId} A2P Profile`,
-        email,
-        policySid,
-        statusCallback,
-      },
-      { workspaceId, operation: "trusthub.trustProducts.create" },
-    );
-    trustProductSid = trustProduct.sid ?? null;
-    if (!trustProductSid) {
-      throw new Error("A2P Trust Product SID was not returned");
-    }
-
-    // Attach the Secondary Customer Profile bundle to the trust product.
-    await assignA2pTrustProductEntity(
-      twilio,
-      trustProductSid,
+      workspaceId,
+      actorUserId,
       customerProfileBundleSid,
-      { workspaceId, operation: "trusthub.trustProducts.entityAssignments.create" },
-    );
-
-    // TODO(a2p-trust-product-entities): a real A2P Messaging Profile typically
-    // also requires an `us_a2p_messaging_profile_information` end-user (company
-    // type, stock exchange/ticker or EIN-backed attributes) assigned before the
-    // trust product will pass evaluation. The onboarding agent captures those
-    // fields; wire the corresponding end-user creation + assignment here once the
-    // field shapes land. Submitting without them yields a review rejection that
-    // surfaces via the status webhook/poll.
-
-    await submitA2pTrustProduct(
-      twilio,
-      trustProductSid,
-      { workspaceId, operation: "trusthub.trustProducts.submit" },
+      onboarding,
+      policySid,
+      email,
       statusCallback,
-    ).catch((error) => {
-      // Submission may fail if required entities are missing — log, don't abort:
-      // the SID is persisted so a later run can resubmit.
-      logger.warn("twilio.compliance.a2p.trust_product_submit_failed", {
-        workspaceId,
-        trustProductSid,
-        error: presentTwilioError(error).adminDetail,
-      });
     });
-
-    await persistA2pSids(workspaceId, actorUserId, a2p, { trustProductSid });
-    a2p = { ...a2p, trustProductSid };
-  } else {
-    // Idempotent re-run: make sure the customer profile is assigned.
-    try {
-      const entities = await listA2pTrustProductEntities(twilio, trustProductSid, {
-        workspaceId,
-        operation: "trusthub.trustProducts.entityAssignments.list",
-      });
-      const assigned = entities.some(
-        (e) => (e as { objectSid?: string }).objectSid === customerProfileBundleSid,
-      );
-      if (!assigned) {
-        await assignA2pTrustProductEntity(
-          twilio,
-          trustProductSid,
-          customerProfileBundleSid,
-          {
-            workspaceId,
-            operation: "trusthub.trustProducts.entityAssignments.create",
-          },
-        );
-      }
-    } catch (error) {
-      logger.warn("twilio.compliance.a2p.trust_product_entity_check_failed", {
-        workspaceId,
-        trustProductSid,
-        error: presentTwilioError(error).adminDetail,
-      });
-    }
+  const fresh = getWorkspaceMessagingOnboardingFromTwilioData(
+    await loadWorkspaceTwilioData(workspaceId),
+  );
+  a2p = fresh.a2p10dlc;
+  if (
+    a2p.messagingProfileStatus !== "ready" ||
+    a2p.trustProductSid !== trustProductSid ||
+    a2p.messagingProfileEndUserSid !== messagingProfileEndUserSid ||
+    a2pBusinessProfileChanged(onboarding.businessProfile, fresh.businessProfile)
+  ) {
+    throw new Error(
+      "A2P Messaging Profile changed before brand registration. Retry with the saved information.",
+    );
   }
 
   // ── 2. Brand Registration ──────────────────────────────────────────────────
@@ -252,6 +205,31 @@ export async function provisionA2pRegistration(
   let brandRawStatus: string | null = null;
   let brandFailureReason: string | null = null;
 
+  if (!brandSid) {
+    const brands = await listA2pBrandRegistrations(twilio, {
+      workspaceId,
+      operation: "messaging.brandRegistrations.list",
+    });
+    const matches = brands.filter(
+      (brand) =>
+        brand.customerProfileBundleSid === customerProfileBundleSid &&
+        brand.a2pProfileBundleSid === trustProductSid,
+    );
+    if (matches.length > 1)
+      throw new Error(
+        "Multiple brands reference the A2P Messaging Profile. Review them before retrying.",
+      );
+    if (matches[0]) {
+      brandSid = matches[0].sid;
+      if (!brandSid)
+        throw new Error("Existing A2P brand SID was not returned.");
+      await persistA2pSids(workspaceId, actorUserId, {
+        brandSid,
+        brandType: "STANDARD",
+      });
+      a2p = { ...a2p, brandSid };
+    }
+  }
   if (!brandSid) {
     // NOTE: `brandType` accepts "STANDARD" | "SOLE_PROPRIETOR". LOW_VOLUME_STANDARD
     // is a Twilio/TCR-assigned brand *tier* (based on vetting/volume), not a
@@ -273,7 +251,7 @@ export async function provisionA2pRegistration(
     if (!brandSid) {
       throw new Error("A2P Brand Registration SID was not returned");
     }
-    await persistA2pSids(workspaceId, actorUserId, a2p, {
+    await persistA2pSids(workspaceId, actorUserId, {
       brandSid,
       brandType: "STANDARD",
       lastSubmittedAt: new Date().toISOString(),
@@ -310,7 +288,12 @@ export async function provisionA2pRegistration(
         brandFailureReason?.trim() ||
           "A2P brand registration failed. Review the business profile and resubmit.",
       ],
-      details: buildDetails({ trustProductSid, brandSid, campaignSid: a2p.campaignSid, brandRawStatus }),
+      details: buildDetails({
+        trustProductSid,
+        brandSid,
+        campaignSid: a2p.campaignSid,
+        brandRawStatus,
+      }),
     };
   }
   if (brandStatus !== "approved") {
@@ -318,7 +301,12 @@ export async function provisionA2pRegistration(
     return {
       status: "in_review",
       blockingIssues: [],
-      details: buildDetails({ trustProductSid, brandSid, campaignSid: a2p.campaignSid, brandRawStatus }),
+      details: buildDetails({
+        trustProductSid,
+        brandSid,
+        campaignSid: a2p.campaignSid,
+        brandRawStatus,
+      }),
     };
   }
 
@@ -327,33 +315,26 @@ export async function provisionA2pRegistration(
   let campaignRawStatus: string | null = null;
 
   if (!campaignSid) {
-    // Idempotency guard: reuse an existing campaign on the service if present.
-    try {
-      const existing = await listA2pCampaigns(twilio, serviceSid, {
-        workspaceId,
-        operation: "messaging.usAppToPerson.list",
-      });
-      const match = existing.find(
-        (c) => (c as { brandRegistrationSid?: string }).brandRegistrationSid === brandSid,
-      );
-      if (match) {
-        campaignSid = match.sid ?? null;
-        campaignRawStatus = (match as { campaignStatus?: string }).campaignStatus ?? null;
-      }
-    } catch {
-      // Non-fatal — fall through to create.
+    // A failed lookup is not evidence that no campaign exists. Do not create
+    // another provider resource after an uncertain lookup.
+    const existing = await listA2pCampaigns(twilio, serviceSid, {
+      workspaceId,
+      operation: "messaging.usAppToPerson.list",
+    });
+    const match = existing.find(
+      (campaign) => campaign.brandRegistrationSid === brandSid,
+    );
+    if (match) {
+      campaignSid = match.sid ?? null;
+      campaignRawStatus = match.campaignStatus ?? null;
     }
   }
 
   if (!campaignSid) {
     const bp = onboarding.businessProfile;
     const inputs = readA2pInputs(onboarding);
-    const description =
-      bp.useCaseSummary.trim() ||
-      `${bp.legalBusinessName.trim()} customer messaging`;
-    const messageFlow =
-      bp.optInWorkflow.trim() ||
-      "Consumers opt in via a web form on our website and consent to receive messages.";
+    const description = bp.useCaseSummary.trim();
+    const messageFlow = bp.optInWorkflow.trim();
     const messageSamples = bp.sampleMessages.filter(
       (s) => typeof s === "string" && s.trim().length > 0,
     );
@@ -370,20 +351,24 @@ export async function provisionA2pRegistration(
         hasEmbeddedLinks: inputs.hasEmbeddedLinks,
         hasEmbeddedPhone: inputs.hasEmbeddedPhone,
         ...(bp.optInKeywords
-          ? { optInKeywords: splitKeywords(bp.optInKeywords), optInMessage: bp.optInWorkflow.trim() || undefined }
+          ? {
+              optInKeywords: splitKeywords(bp.optInKeywords),
+              optInMessage: bp.optInWorkflow.trim() || undefined,
+            }
           : {}),
         ...(bp.optOutKeywords
           ? { optOutKeywords: splitKeywords(bp.optOutKeywords) }
           : {}),
-        ...(bp.helpKeywords ? { helpKeywords: splitKeywords(bp.helpKeywords) } : {}),
+        ...(bp.helpKeywords
+          ? { helpKeywords: splitKeywords(bp.helpKeywords) }
+          : {}),
       },
       { workspaceId, operation: "messaging.usAppToPerson.create" },
     );
     campaignSid = campaign.sid ?? null;
     campaignRawStatus = campaign.campaignStatus ?? null;
-    if (campaignSid) {
-      await persistA2pSids(workspaceId, actorUserId, a2p, { campaignSid });
-      a2p = { ...a2p, campaignSid };
+    if (!campaignSid) {
+      throw new Error("A2P Campaign SID was not returned");
     }
     logger.info("twilio.compliance.a2p.campaign_created", {
       workspaceId,
@@ -391,18 +376,18 @@ export async function provisionA2pRegistration(
       status: campaignRawStatus,
     });
   } else if (!campaignRawStatus) {
-    // Persisted campaign — refresh its status.
-    try {
-      const existing = await listA2pCampaigns(twilio, serviceSid, {
-        workspaceId,
-        operation: "messaging.usAppToPerson.list",
-      });
-      const match = existing.find((c) => c.sid === campaignSid);
-      campaignRawStatus =
-        (match as { campaignStatus?: string } | undefined)?.campaignStatus ?? null;
-    } catch {
-      // Non-fatal.
-    }
+    // Persisted campaign — refresh its status without inventing approval.
+    const existing = await listA2pCampaigns(twilio, serviceSid, {
+      workspaceId,
+      operation: "messaging.usAppToPerson.list",
+    });
+    campaignRawStatus =
+      existing.find((campaign) => campaign.sid === campaignSid)
+        ?.campaignStatus ?? null;
+  }
+
+  if (campaignSid !== a2p.campaignSid) {
+    await persistA2pSids(workspaceId, actorUserId, { campaignSid });
   }
 
   const campaignStatus = mapCampaignStatus(campaignRawStatus);

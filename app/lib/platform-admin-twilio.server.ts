@@ -1,9 +1,11 @@
+import { listTwilioBillingUsage } from "@/lib/twilio-billing-usage.server";
 import {
   createWorkspaceTwilioInstance,
   syncWorkspaceTwilioSnapshot,
   updateWorkspaceTwilioPortalConfig,
 } from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import { getTwilioUsageDateRange } from "@/lib/twilio-usage";
 import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
@@ -15,7 +17,6 @@ import {
   TWILIO_RCS_PROVIDER,
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
   ensureWorkspaceTwilioBootstrap,
   repairWorkspaceTwilioWebhooks,
@@ -185,20 +186,17 @@ export async function dispatchAdminTwilioAction({
 
         const twilio = await createWorkspaceTwilioInstance({           workspace_id: workspaceId,
         });
-        const usageRecords = await twilio.usage.records.list();
-        const twilioUsage = usageRecords.map((record) => ({
-          category: record.category,
-          description: record.description,
-          usage: record.usage,
-          usageUnit: record.usageUnit,
-          price: record.price.toString(),
-          startDate: record.startDate?.toISOString(),
-          endDate: record.endDate?.toISOString(),
-        }));
+        const referenceDate = new Date();
+        const { startDate, endDate } = getTwilioUsageDateRange(referenceDate);
+        const twilioUsage = await listTwilioBillingUsage(twilio.usage.records, {
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+        });
 
         const report = await loadBillingReconciliationReport({
           workspaceId,
           twilioUsage,
+          referenceDate,
         });
         const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
           workspaceId,
@@ -309,11 +307,11 @@ export async function dispatchAdminTwilioAction({
 
     case "provision_workspace_a2p":
       try {
-        await provisionWorkspaceA2P({
-          workspaceId,
-          actorUserId,
-        });
-        return { ok: true, message: "Workspace A2P provisioning started" };
+        await enqueueWorkspaceComplianceJob(workspaceId, "admin_provision_a2p");
+        return {
+          ok: true,
+          message: "A2P compliance setup is queued. Status will update after the worker runs.",
+        };
       } catch (error) {
         logger.error("Error provisioning workspace A2P:", error);
         return {

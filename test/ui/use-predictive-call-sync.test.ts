@@ -14,6 +14,7 @@ function baseProps(overrides: Partial<HookProps> = {}): HookProps {
     setNextRecipient: vi.fn(),
     setUpdate: vi.fn(),
     conference: "test-conf",
+    setConference: vi.fn(),
     ...overrides,
   };
 }

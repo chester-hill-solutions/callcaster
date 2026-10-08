@@ -1,5 +1,35 @@
 [
   {
+    "issueNumber": 2051,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide what happens to unsettled messages when a campaign expires",
+    "summary": "The #2048 settled-message gate is bypassed on the expired-campaign path: app/lib/worker/handlers/campaign.server.ts writes status=complete directly via updateCampaignStatusInWorkspace and never calls try_complete_campaign_if_drained. An expired message campaign can therefore read complete while Twilio still holds unsettled messages. Worse, runSmsStatusSideEffects only calls cancelQueuedMessagesForCampaign AFTER the end date has passed, so the bypass fires before the cancellation is even attempted.",
+    "currentBehavior": "Expired campaign terminalizes to 'complete' regardless of unsettled provider messages; the #2048 gate does not apply.",
+    "rootCause": "Genuine rule conflict, not an oversight. The RPC also requires an empty queue, and this path exists so a campaign that expires mid-drain does not stay stuck 'running' (#1512). Routing it through the gate would re-break that.",
+    "resolution": "Decide between: (1) complete anyway and accept abandoned messages, specifying credit treatment and operator warning; (2) cancel everything still unsettled at the provider, wait, then let the normal gate complete it; (3) terminalize to a distinct status such as expired/cancelled so 'complete' always means settled, which keeps the #2048 promise intact but needs a campaign_status enum value plus UI handling. Option 3 is the one that preserves the new invariant.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts (expired-campaign branch of campaignDispatchHandler)",
+      "app/lib/worker/webhook-side-effects.server.ts (cancelQueuedMessagesForCampaign, only after end_date)",
+      "client/migrations/20260925120000_gate_campaign_completion_on_settled_messages.sql"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "expired campaign with unsettled messages does not read complete (under the chosen rule)",
+      "expired campaign with an undrained queue still terminalizes (#1512 preserved)"
+    ],
+    "acceptanceCriteria": [
+      "Decision recorded in the issue and in the relevant doc",
+      "Expired campaign with unsettled messages does not read complete under option 2 or 3",
+      "#1512 anti-stuck behaviour preserved",
+      "Option 1 also specifies credit treatment and an operator warning for abandoned messages",
+      "Real-Postgres test pins whichever rule is chosen"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "DECLINED by the maintainer on 2026-09-25 ('no 2051'). Do not pick this up and do not re-raise it. The gap is real and still worth knowing about: an expired message campaign writes status=complete directly, bypassing the #2048 settled-message gate, so a campaign whose end_date passed while Twilio still held messages can read complete. It is deliberately left as-is rather than fixed, and the code carries a comment marking it a known gap so nobody mistakes it for covered. The genuine rule conflict stands: routing it through the gate would re-break #1512, because the RPC also requires an empty queue and this path exists so a campaign that expires mid-drain does not stay stuck running."
+  },
+  {
     "issueNumber": 1129,
     "verdict": "needs-decision",
     "recommendedTitle": "Define campaign draft/publish semantics and block dirty setup navigation",
@@ -213,63 +243,6 @@
     "trackerRecommendation": "Scope with #1771 (can ship together or split)."
   },
   {
-    "issueNumber": 1771,
-    "verdict": "needs-decision",
-    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
-    "summary": "Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.",
-    "currentBehavior": "Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.",
-    "rootCause": "No per-row capture or artifact retention, unlike gocanvass.",
-    "resolution": "Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "per-row errors persisted + listed",
-      "original retained under workspace prefix"
-    ],
-    "acceptanceCriteria": [
-      "reviewable per-row failure list or download",
-      "original CSV retained safely",
-      "aggregate counts unchanged"
-    ],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Co-ordinate with #1770."
-  },
-  {
-    "issueNumber": 1773,
-    "verdict": "needs-decision",
-    "recommendedTitle": "feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention",
-    "summary": "No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.",
-    "currentBehavior": "No daily data backup exists; worker only does job-row retention.",
-    "rootCause": "Gap — no snapshot job.",
-    "resolution": "Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.",
-    "lookIn": [
-      "app/lib/worker/handlers.server.ts",
-      "app/lib/object-storage.server.ts",
-      "app/db/workspace-scoped-tables.ts",
-      "app/lib/env.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "daily snapshot + manifest appear",
-      "retention pruned",
-      "one failing workspace does not stop others"
-    ],
-    "acceptanceCriteria": [
-      "per-workspace snapshot + manifest daily",
-      "older-than-retention pruned",
-      "failure isolation + errored job",
-      "restore documented"
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
-  },
-  {
     "issueNumber": 1699,
     "verdict": "needs-decision",
     "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
@@ -477,46 +450,6 @@
     ]
   },
   {
-    "issueNumber": 1813,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Finish the on-dev Status config: mint PROJECT_TOKEN",
-    "summary": "Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.",
-    "currentBehavior": "issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.",
-    "rootCause": "None — automation now exists and is Status-first; the token secret is the sole unconfigured input.",
-    "resolution": "Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.",
-    "lookIn": [
-      ".github/workflows/issue-on-dev.yml"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A dev-merge PR auto-moves its referenced issues to the 'On dev' Status",
-      "No on-dev label is applied anywhere (Status is the only signal)"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Ops/config: only PROJECT_TOKEN remains; overlaps #1697/#1686."
-  },
-  {
-    "issueNumber": 1814,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Decide agent verbosity when quoting resolved sibling issues",
-    "summary": "Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity — referencing a resolved fix on a non-matching context reads as noise.",
-    "currentBehavior": "Issue comments may restate resolved fixes from sibling issues; #1325's record (verify-close) already points at #1731 and #1730.",
-    "rootCause": "None in code — comment placement/copy discipline for agents.",
-    "resolution": "Decide the agent guideline: do not re-post resolution snippets from another issue's thread; prefer a one-line pointer and check whether the issue is already marked tested/on-dev before commenting.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Issue comments avoid restating resolved sibling fixes",
-      "Agent checks issue state/labels before commenting"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Process decision; overlaps #1813 (on-dev marking) and the agent-skills guidance."
-  },
-  {
     "issueNumber": 1815,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide TWO_FACTOR_ENABLED kill-switch state per environment",
@@ -668,5 +601,470 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "needs-decision: the reporter questions the overhead; confirm the heuristic is wanted before implementing."
+  },
+  {
+    "issueNumber": 1983,
+    "verdict": "needs-decision",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Receipts and charges should include tax",
+    "summary": "Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.",
+    "currentBehavior": "Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.",
+    "resolution": "Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.",
+    "lookIn": [
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx",
+      "shared/pricing.ts"
+    ],
+    "acceptanceCriteria": [
+      "No implementation until the tax decision is recorded"
+    ]
+  },
+  {
+    "issueNumber": 1347,
+    "verdict": "needs-decision",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Robocall vs IVR vs Automated Phone Menu — terminology consistency",
+    "summary": "Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.",
+    "currentBehavior": "Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.",
+    "resolution": "Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+    ],
+    "acceptanceCriteria": [
+      "One customer-facing term; API values unaffected"
+    ]
+  },
+  {
+    "issueNumber": 2036,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide the scope of flattening the call screen: the call screen only, or the shared workspace panel every page uses",
+    "summary": "The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen — it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.",
+    "currentBehavior": "The live calling screen stacks three card treatments — the workspace panel, the sticky top bar, and inner section cards — and the invisible ones still cost padding.",
+    "rootCause": "The workspace panel treatment is a single shared className with no per-surface override, and the top bar re-states rounded/border/shadow locally. Two owners for the same visual concept, so the call screen cannot opt out.",
+    "resolution": "Decide the scope, then it is a small edit either way. Option A (call screen only): add an isCallScreen branch next to the existing isChatsScreen branch at app/routes/workspaces+/$id.tsx:204-207 that drops rounded-2xl, border and shadow-sm and reduces p-6 for the call route, and flatten the sticky header at CallScreen.Header.tsx:239. Nothing else on the product changes; the risk is that the call screen now looks different from every page beside it. Option B (whole product): flatten the shared panel for all workspace routes, so the page is a flat canvas and cards mean something when they appear. Bigger visual diff, needs a pass over every workspace page to check what depended on the panel's padding, but it is the version that actually establishes 'a card is a deliberate container'. Option C (middle): keep the panel as-is and change the top bar only, which fixes the half the reporter named twice but leaves the outer card. Whichever is chosen, express it as a variant on the panel rather than a route-conditional className string, so the next surface can opt out without editing a ternary. Also decide the padding: the reporter asks to 'punch back' the padding the invisible cards were creating, which means auditing the space-* classes between the panel and the first inner card as part of the change, not just deleting rounded and shadow.",
+    "lookIn": [
+      "app/components/call/CallScreen.Header.tsx:239 (the sticky top bar: rounded-xl, border, shadow-sm, backdrop-blur)",
+      "app/routes/workspaces+/$id.tsx:202-208 (the shared workspace panel, with the isChatsScreen branch as the pattern for a call-screen branch)",
+      "app/components/call/CallScreen.Layout.tsx:191 (the call screen's own space-y-6, the padding the invisible cards create)",
+      "app/components/call/CallScreen.Coaching.tsx:53,73 and CallScreen.DTMFPhone.tsx:22 (inner cards, which the issue says to keep)"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-header.test.tsx (CampaignHeader only)",
+      "test/ui/call-screen-callarea.test.tsx, call-screen-queuelist.test.tsx (inner cards)"
+    ],
+    "missingTests": [
+      "no test asserts the call screen's panel treatment, so a regression to the nested-card look passes silently",
+      "no visual or class-level test would catch a re-introduced rounded/shadow on the top bar"
+    ],
+    "acceptanceCriteria": [
+      "The chosen scope is written down, and the panel treatment is a named variant rather than a route-conditional className string",
+      "The named surfaces (outer card, top bar) have no curved edges or drop shadow",
+      "The padding the removed cards were creating is punched back, verified by measuring the gap at the top of the call screen",
+      "Inner section cards keep their treatment — they are the containers that should still read as cards",
+      "No other workspace page changed unintentionally, or changed deliberately and listed"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Needs decision, briefly, then fix. The implementation is an hour either way; what is unresolved is whether this is a call-screen change or a product-wide one, and picking wrong means either an inconsistent product or an unreviewable visual diff across every page. The reporter's phrasing ('the call screen has the page, an outer card, and inner cards') reads as a call-screen complaint, which points to Option A, but the outer card is shared and the reporter may not know that. Answer that one question and this becomes a fix-now."
+  },
+  {
+    "issueNumber": 2029,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide the release list and the retention policy for unused dev-environment Twilio numbers",
+    "summary": "An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check — a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.",
+    "currentBehavior": "76 numbers are held in the dev Twilio account; an unspecified subset is unused, and nobody can say which.",
+    "rootCause": "Dev numbers accumulate because renting is cheap and there is no reaper. The list of what is safe to release is held in people's heads and in Slack, not in the repo or the database.",
+    "resolution": "Answer two questions and it becomes a 30-minute console task. (1) The release list: get Arfin's workspaces, then release every number not on the combined keep-list. (2) The safety rule, and this is the part worth writing down: what counts as 'in use'. The concrete options are (a) query the app for references — any workspace_number row not in a released state, any campaign using it as sender or caller ID, any messaging service with it attached, any caller-ID verification pending — and refuse to release a number with a live reference; (b) a time-based rule, release anything not rented in the last N days, accepting that a dormant campaign sender breaks; (c) purely manual, the operator eyeballs the console, which is what happens today and is how 76 accumulated. (a) is the only one that cannot break a workspace, and it is cheap because the reference check is a handful of queries over tables that already exist. Also decide whether dev numbers get a periodic reaper on the same rule, or whether this stays a one-off clean-up. Note the numbers in the keep-list are per-workspace, so record the mapping (number -> workspace) before releasing, otherwise the next clean-up starts from zero knowledge again.",
+    "lookIn": [
+      "app/lib/number-rental-billing.server.ts:170-200 (existing suspend/release lifecycle and its workspace notification)",
+      "app/lib/platform-workspace-numbers.server.ts (the workspace_number accessor to build the reference check on)",
+      "app/db/workspace-scoped-tables.ts (workspace_number, campaign, workspace_audio — the tables a reference check must cover)",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/ (the admin Twilio panels; no release action exists there today)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "no check reports which numbers in an account are referenced by a live workspace record, which is the check that would make this repeatable",
+      "no test covers a release that is refused because a reference exists",
+      "no test asserts that a released number cannot still be selected as a campaign sender"
+    ],
+    "acceptanceCriteria": [
+      "Arfin's keep-list is recorded in the issue, with the workspace each kept number belongs to",
+      "Every number released is confirmed to have no live workspace reference, checked by query and not by eye",
+      "The kept numbers are confirmed still working after the release run",
+      "The rule for 'in use' is written down, with the chosen option",
+      "A decision is recorded on whether the clean-up repeats on a schedule or stays a one-off"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs decision, and it is a short one. The engineering is a console exercise; what is genuinely unresolved is the safety rule, and getting that wrong breaks a dev workspace in a way nobody notices until later. If the answer is 'a reference check first', that is worth filing as its own small issue, because it makes every future clean-up safe and is more valuable than this particular release."
+  },
+  {
+    "issueNumber": 2043,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide how far to expand the campaign-split feature: promote it, widen its trigger, or automate the copy variation it asks for by hand",
+    "summary": "This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works — SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.",
+    "currentBehavior": "A working but single-purpose warning-path tool: one entry point, one trigger condition, manual copy variation.",
+    "rootCause": "The feature was scoped as a safeguard inside the bulk-send warning rather than as a campaign operation, so its reach and its automation were never designed.",
+    "resolution": "Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment — a per-segment message variant, or a merge field carrying the segment index — instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.",
+    "lookIn": [
+      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx (the whole feature: the alert, the sheet, the checklist, the split submit)",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:211-226 (the only render site)",
+      "app/lib/throughput-config.ts:102-108 (isBulkSmsSenderMisaligned: ca_local and >= 500)",
+      "test/ui/split-campaign-override.test.tsx (existing coverage of the override path)",
+      "app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment — locate it before scoping any change)"
+    ],
+    "existingTests": [
+      "test/ui/split-campaign-override.test.tsx (the bulk-on-local override and its acknowledgement)"
+    ],
+    "missingTests": [
+      "the split itself is not covered end to end: no test asserts the contacts are distributed across the clones or that the clones are created with the requested segment count",
+      "no test asserts the clones are reachable and correctly scoped to the workspace",
+      "if copy variation is automated, no test asserts the variants differ per segment",
+      "no test covers a split taken while a send is in flight"
+    ],
+    "acceptanceCriteria": [
+      "The reporter has stated which expansion is wanted",
+      "The chosen scope is written into the issue before work starts",
+      "If the split is promoted, it is reachable outside the bulk-send warning and its trigger is documented",
+      "If copy variation is automated, the clones differ in the copy that reaches the carrier",
+      "The behaviour of a split during an in-flight send is documented"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Needs decision. The issue as filed is a note to a person plus a screenshot, and the three plausible readings are unrelated in size and risk. Cheapest next step is a one-line question to the reporter. If the answer is copy automation, that is a real feature worth doing and should be specced properly; if the answer is reach, it is a small change on top of existing tests."
+  },
+  {
+    "issueNumber": 1996,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide whether a daily full PII snapshot ships, into which bucket, with what retention and who can restore it",
+    "summary": "Canonical for the daily backup work; #1773 was folded in here as a duplicate. The code half is fully mapped and none of it is built, so the engineering risk is low and the open questions are product and data-protection ones. Every integration point the issue names exists: the job type constant file (app/lib/worker/job-types.server.ts), the params and registry (app/lib/worker/job-params.server.ts, app/lib/worker/handlers.server.ts), the cron handler pattern (app/lib/worker/handlers/cron.server.ts) with withReschedule from handlers/shared.server.ts, the per-workspace error isolation fanout (app/lib/cron-workspace-fanout.server.ts), the CSV serializer (app/lib/rpc-csv.server.ts rowsToCsv, app/lib/csv.ts escapeCsvCell), and the object-storage bucket union (app/lib/object-storage.server.ts ObjectStorageBucket, which today has no 'backups' member). ONE FACTUAL DRIFT to correct in the issue: it says 27 tenant tables and AGENTS.md says 26; WORKSPACE_SCOPED_TABLES in app/db/workspace-scoped-tables.ts currently has 28. Enumerate the table list from the constant rather than from either number, so the snapshot cannot silently miss a table. The unresolved decisions are below.",
+    "currentBehavior": "No scheduled backup exists. A workspace's data exists only in the live database.",
+    "rootCause": "The backup system was never ported; the gocanvass blueprint it copies is described in the issue and nothing in CallCaster implements it.",
+    "resolution": "Answer the four questions, then implement. (1) What is in the snapshot: the issue proposes every tenant table, which includes contact PII (names, phones, emails, street addresses) and the full billing ledger. Options: everything (maximum recoverability, maximum exposure), or contacts and the ledger excluded (a schema-and-reference backup that cannot restore customer records), or a middle option that includes contact identifiers without free-text fields. This is the decision that has to be made by someone accountable for the data, not by the implementer. (2) Where it lands: a dedicated backups bucket with its own retention, or the existing S3_BUCKET under a backups/ prefix. A dedicated bucket is the better answer on isolation grounds and the issue already designs for it; the prefix is cheaper and needs no new env var. Pick one and say why, because the object-storage bucket union has to grow either way. (3) Retention and deletion: BACKUP_RETENTION_DAYS defaults to 30 and pruning deletes objects. Confirm the default and confirm the retention is long enough to be useful for the incident it is insurance against. (4) Who can restore: the issue explicitly puts restore tooling out of scope, which means the snapshots are written and never read. Decide whether that is acceptable as phase one, or whether a restore runbook is part of the deliverable — an unread backup is a liability, since it is a full copy of customer data with no access control beyond the bucket. Once those are answered the implementation is the issue's own step list: job type and registry entry, daily dedupe via an idempotency key of backups:<YYYY-MM-DD> (or a self-scheduling chain seeded by ensure-scheduled-jobs), per-workspace fanout so one failure does not error the job, one CSV per table from createTenantDb over the 28 tables, a manifest.json, and a prune pass over the date segments.",
+    "lookIn": [
+      "app/db/workspace-scoped-tables.ts:41-95 (WORKSPACE_SCOPED_TABLES — 28 tables today, the single source of truth for the snapshot list)",
+      "app/lib/object-storage.server.ts:8-13 (ObjectStorageBucket, no backups member) and :57-62 (BUCKET_ENV_VARS)",
+      "app/lib/worker/job-types.server.ts, app/lib/worker/job-params.server.ts:206-222, app/lib/worker/handlers.server.ts:89-178 (job type, params, registry)",
+      "app/lib/worker/handlers/cron.server.ts:176-230 (handler pattern) and app/lib/worker/handlers/shared.server.ts:19-42 (withReschedule)",
+      "app/lib/cron-workspace-fanout.server.ts:42-89 (per-workspace error isolation)",
+      "app/lib/rpc-csv.server.ts and app/lib/csv.ts:55-75 (rowsToCsv, escapeCsvCell)",
+      "~/Documents/gocanvass/app/server/backup-schedule.server.ts and workspace-csv-backup.server.ts (the blueprint being ported)"
+    ],
+    "existingTests": [
+      "test/job-registry.test.ts (guards registry drift — a new job type must be registered here)",
+      "test/worker-cron-handlers.server.test.ts (the pattern for handler tests)",
+      "test/call-recording-storage.server.test.ts and test/object-storage-upsert.test.ts (the pattern for storage-adapter tests)"
+    ],
+    "missingTests": [
+      "no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES — a new tenant table would silently not be backed up",
+      "no test asserts the daily dedupe key prevents a second run on the same UTC day",
+      "no test asserts that one workspace failing does not error the whole job",
+      "no test asserts the manifest is written and lists the files it claims to",
+      "no test asserts pruning removes date keys older than the retention and leaves newer ones, including a partial run's directory",
+      "no test asserts a resumed or retried run is idempotent",
+      "no test asserts retention configuration is validated (a zero or negative BACKUP_RETENTION_DAYS must fail closed, not delete everything)"
+    ],
+    "acceptanceCriteria": [
+      "The four decisions above are answered and recorded in the issue",
+      "A workspace gets a dated snapshot in object storage at most once per UTC day",
+      "The snapshot list is generated from WORKSPACE_SCOPED_TABLES, and a test fails when a tenant table is added without being handled",
+      "Per-workspace failures are isolated and reported, and any failure errors the job",
+      "A manifest lists what was written, and pruning removes only date keys older than the configured retention",
+      "An invalid retention configuration fails closed",
+      "The access and deletion story for the snapshot bucket is documented alongside whatever restore path is decided"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Needs decision before implementation, then it is well-specified work. The engineering is a known pattern in this repo, but shipping a daily full copy of customer PII with a 30-day retention, no access story and no restore path is a decision with an owner, not an implementation detail. Ask the four questions in one go; do not start by writing the job handler, because the answers change which tables the handler walks and where it writes."
+  },
+  {
+    "issueNumber": 2139,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Member-level role management is server-permitted but UI-invisible, so the Member floor on updateUser/deleteUser is dead code",
+    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" — for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
+    "currentBehavior": "One side of the permission model is implemented and the other is not, and the user-visible message is on the wrong side. A test that asserts the server permits it and a UI that asserts the user cannot do it are both green, which is why this survived.",
+    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` → `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
+    "lookIn": [
+      "app/components/workspace/TeamMember.tsx:78,139-141",
+      "app/routes/workspaces+/$id/settings.action.server.ts:44-53",
+      "app/lib/platform-members.server.ts:53-75",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts (`assertNoRoleEscalation`, `requireActorOutranksTarget`)",
+      "e2e/specs/rbac.spec.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "The UI visibility matches the chosen policy (kill-check).",
+      "A `member` is not offered `admin`.",
+      "The e2e assertion."
+    ],
+    "acceptanceCriteria": [
+      "The UI and the server agree: a `member` either sees a working manage form, or is told the truth and the server agrees (kill-check: flip one side and confirm a test goes red).",
+      "A `member` is never offered a role they cannot grant.",
+      "The sole owner still cannot be removed or demoted.",
+      "An e2e assertion covers the visibility, matching the chosen policy."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
+  },
+  {
+    "issueNumber": 2164,
+    "verdict": "needs-decision",
+    "recommendedTitle": "workspace.disabled does not block sign-in or API access, so the platform suspension lever does not suspend",
+    "summary": "Disabling a workspace stops money moving out (rental DEBITs, billing_reconcile, twilio_open_sync) but does not stop anyone using the product. `disabled` is read in only three places and no auth path reads it, so a suspended workspace's members still sign in and still use the API.",
+    "currentBehavior": "A disabled workspace can still be signed into and can still call the API with valid credentials. Number RELEASE deliberately keeps running, because freezing it would strand every unpaid number in a suspended workspace.",
+    "rootCause": "`disabled` was specified and implemented as a billing lever only. It was never given an auth meaning, so the name implies a kill switch it does not provide. Not a missing check — a missing decision.",
+    "resolution": "Decide the semantics before scoping, because the two plausible answers have very different blast radius. (a) `disabled` blocks sign-in and API access, becoming a true kill switch; the warn->suspend->release ladder still runs server-side, so numbers are still released. (b) `disabled` stays billing-only and a separate field carries access suspension. Recommendation: (a), because one field with one meaning is what operators assume, and the release ladder already runs in background jobs that do not need user access. Do NOT implement by adding a single auth-path check — that would leave `disabled` still reading as billing-only everywhere else.",
+    "lookIn": [
+      "app/lib/workspace-middleware.server.ts (workspaceContext — no disabled check)",
+      "app/lib/data-plane-middleware.server.ts (dataPlaneAuthContext — no disabled check)",
+      "app/lib/admin-middleware.server.ts (adminContext)",
+      "app/db/schema.ts (workspace.disabled)"
+    ],
+    "existingTests": [
+      "none covering disabled-workspace sign-in or API access"
+    ],
+    "missingTests": [
+      "a disabled workspace's member cannot sign in",
+      "a disabled workspace's API token is rejected",
+      "number release still runs for a disabled workspace"
+    ],
+    "acceptanceCriteria": [
+      "The disabled semantics are chosen and recorded, not assumed",
+      "If (a): sign-in and API access are blocked for a disabled workspace",
+      "The warn->suspend->release ladder still releases numbers for disabled workspaces",
+      "Existing disabled-workspace billing tests stay green"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs a decision, not an implementation. Blocked only on the product call. Related to #2116, whose original single-guard proposal was already rejected in favour of splitting the billing lever from number release."
+  },
+  {
+    "issueNumber": 2217,
+    "verdict": "needs-decision",
+    "recommendedTitle": "No product analytics exists anywhere, so every product decision is an untested guess",
+    "summary": "No product analytics in the codebase. A scan of app/, shared/, services/, worker/ and server/ for PostHog, Segment, Mixpanel, Amplitude, Google Analytics, gtag and Plausible returns nothing. Sentry is wired for errors only, at 8 call sites (app/entry.server.tsx:133, app/lib/errors.server.ts:118, app/lib/ops-alert.server.ts:141, app/lib/worker/poll-jobs.server.ts:365,390, server/bun.ts:449,471,536,543,622, worker/index.ts:28). The two tables that look like usage data are not: workspace_events (app/db/schema.ts:443) is an SSE feed whose rows are deleted past a retention window by app/lib/worker/job-retention.server.ts:67-90, and workspace_audit_event (app/db/schema.ts:451) is a security log gated behind the owner-only audit.read capability.",
+    "currentBehavior": "Nothing about product usage is measurable. There is no funnel across the five steps a new workspace must pass (signup, workspace creation, first rented number, first campaign, first accepted send), no cohort or retention measure, and no acquisition attribution. The build is far wider than the revealed product — 53 tables, 542 route modules, and 90 days of commits at 355 fix against 134 feat — and nothing in the code indicates which parts anyone walks. NEW_WORKSPACE_WELCOME_CREDITS = 100 (app/lib/database/workspace-provisioning.server.ts:33) is an untested guess at whether $2 of free usage is enough to convert.",
+    "rootCause": "Analytics was never treated as a product surface. The codebase has an unusually deliberate answer for most other concerns — tenancy is enforced by a scoped client, billing by one idempotent RPC, compliance by one shared predicate table — and each of those was a decision. Instrumentation was left to default, and the default was none. There is also no team-time argument that resolves it: adding a vendor is a privacy and data-sharing decision on a product that holds Canadian political contact data, and that decision has not been made rather than been deferred.",
+    "resolution": "Answer the sink question first, deliberately. Do not start by adding a vendor. A first-party event table behind the existing tenant client is more consistent with how everything else in this codebase works, costs no third-party data-sharing decision on a product holding voter and contact data, and inherits the tenancy enforcement that already exists. A vendor is faster to stand up and is the right answer if the team wants cohorts and funnels without building them. Either is defensible; picking by default is not. THEN, in order: (1) define the activation event and measure that alone — a workspace that has completed a first accepted send is the closest thing to a north-star metric this product has; (2) instrument the five-step funnel; (3) keep the data tenant-scoped and role-gated from day one, copying the audit.log model (workspace_audit_event plus the owner-only audit.read capability in app/lib/capabilities.ts:47-78), because looser access than that would be a regression in a codebase that deliberately went the other way; (4) keep the analytics client out of the session route's hot path and off check:client-bundle's denylist, sampling if volume requires it.",
+    "lookIn": [
+      "app/db/schema.ts:443 (workspace_events — an SSE feed, not usage analytics)",
+      "app/db/schema.ts:451 (workspace_audit_event — a security log, the access model to copy)",
+      "app/lib/workspace-events.server.ts:26 (the insert path a first-party event table would mirror)",
+      "app/lib/capabilities.ts:47-78 (audit.read is owner-only — the model to copy)",
+      "app/lib/worker/job-retention.server.ts:67-90 (workspace_events rows are pruned, so it is a feed and not a record)",
+      "app/lib/database/workspace-provisioning.server.ts:33 (the untested welcome-credit guess)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Each of the five funnel steps emits exactly one event, asserted per step (kill-check: break one emission and confirm the test goes red)",
+      "A cohort query by activation state is reproducible from the database",
+      "Analytics routes are covered by check:route-authz and gated at least as tightly as the audit log"
+    ],
+    "acceptanceCriteria": [
+      "A written decision exists in the repo on the sink, stating why — vendor or first-party",
+      "The activation event is defined in writing and is queryable",
+      "The five funnel steps emit one event each, each asserted",
+      "Analytics data sits behind the same or tighter role gate than the audit log"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Needs decision, not fix-now, because the first task is a product and privacy choice rather than code: whether a product holding Canadian voter and contact data may send events to a third party. That choice changes the implementation substantially, so implementing before it is made risks doing the work twice. This is the largest gap between what the code does and what the business needs, and it is the reason the other open decisions in this batch are hard to answer — several of them (welcome-credit sizing, which features to keep, whether the product is one vertical or two) are product questions that measurement would settle and that currently rest on intuition. Not a duplicate of #1185, which was a narrower credit-variance cross-reference and is closed completed."
+  },
+  {
+    "issueNumber": 2218,
+    "verdict": "needs-decision",
+    "recommendedTitle": "No recurring revenue exists: there is no plan, subscription or invoice table, and the only pay path is a one-time credit top-up",
+    "summary": "There is no plan, subscription or invoice table anywhere in the schema or in any migration. The only pay path is a one-time credit purchase with a $10 minimum (shared/pricing.ts:9) at $0.02 per credit (shared/pricing.ts:8). Half the plumbing already exists: createNewWorkspace creates a Stripe customer at provisioning (app/lib/database/workspace-provisioning.server.ts:138-145), workspace.stripe_id is stored (app/db/schema.ts:106), and a webhook is handled (app/routes/api+/stripe-webhook.action.server.ts). What is missing is the product: what a customer subscribes to, and what a lapse does.",
+    "currentBehavior": "Revenue stops when a customer's credits run out and someone tops up manually. For the revealed buyer this is a structural problem rather than a pricing one: the contact schema is political campaign outreach (voter_list_source holds elections_canada and elections_ontario at app/db/schema.ts:89; contact carries voter_id and support_level at app/db/schema.ts:285-290), and a campaign runs a season then stops. A platform funded only by usage therefore earns less the better a customer does, and no customer can budget against it.",
+    "rootCause": "The credit ledger was built first and well — one idempotent plpgsql RPC for ledger insert plus balance update, a single shared rate card, shared idempotency-key builders per billing kind, and a reconciliation path using the same terminal-status set as the debit gate (shared/pricing.ts:84-99). That is a metered-billing foundation, and it was mistaken for a finished billing product. What is absent is the layer above it: a plan, a period, and a lapse behaviour. Note that a recurring charge already exists in everything but name — number rental bills on a cycle (app/lib/number-rental-billing.server.ts) with a suspension lifecycle (workspace_number.suspended_at, rental_warned_cycle; client/migrations/20260731160000_workspace_number_rental_lifecycle.sql). The gap is a plan that bundles that with metered usage, not the absence of recurring machinery.",
+    "resolution": "This is a product decision before it is an engineering task. Answer these five before writing code, because each changes the schema rather than just the checkout: (1) WHAT IS SOLD — a plan with included minutes and credits, metered overage, or a hybrid. Number rental is the natural anchor because it already recurs. (2) PERIOD — monthly, and whether annual exists. (3) LAPSE BEHAVIOUR — suspend sending at zero credits as today, or something softer; the rental lifecycle above is a working precedent for the whole workspace. (4) CREDIT SEMANTICS — whether credits become a grant that refreshes each period or remain a prepaid balance drawn down by a subscription. This is the core modelling question and it changes the ledger, not just checkout. (5) CURRENCY — CAD or USD or both; CREDIT_PRICE_CAD and formatCadFromCredits are CAD-only today (shared/pricing.ts:8,144-149). Once 1-5 are answered the schema work is a subscription table with a Stripe id, status and period, plus a plan table if plans are configurable. Everything else reuses the existing ledger, which is the asset here.",
+    "lookIn": [
+      "shared/pricing.ts:8-10 (price per credit and minimum purchase — the whole current pay model)",
+      "shared/pricing.ts:84-99 (terminal billable status sets, shared by debit and reconciliation)",
+      "app/db/schema.ts:106 (workspace.stripe_id, currently the only billing identity on the tenant)",
+      "app/lib/database/workspace-provisioning.server.ts:138-145 (Stripe customer created at provisioning)",
+      "app/lib/number-rental-billing.server.ts (a recurring charge that already exists)",
+      "client/migrations/20260731160000_workspace_number_rental_lifecycle.sql (the suspension precedent for a lapse)",
+      "client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql (the idempotent ledger RPC the subscription would reuse)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "The subscription write path is idempotent, consistent with how transaction_history is written today",
+      "A lapsed subscription produces a defined and tested workspace state",
+      "A refresh-period grant does not double-credit on replay (kill-check: replay the grant webhook and confirm the balance is unchanged)"
+    ],
+    "acceptanceCriteria": [
+      "The five questions above are answered in writing, in the repo",
+      "A subscription table exists with an idempotent write path",
+      "A lapsed subscription produces a defined, tested workspace state",
+      "Refunds and disputes are handled — #1521 is the open decision and it blocks this"
+    ],
+    "blockedBy": [
+      1521
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Needs decision, and the five questions are the deliverable, not a preamble to them. The single most consequential answer is credit semantics: if a subscription grants credits that refresh, the existing ledger's meaning changes and the reconciliation logic that shares the debit gate has to be reworked rather than extended. Do not start implementation before that is settled. This issue is blocked by #1521 (whether refunds and disputes reverse credits), which is a narrower decision about the same ledger. Sequence it AFTER the open credit-ledger defects are fixed rather than before — a subscription layered onto a ledger that drops out-of-order rows or mis-bills MMS makes those bugs more expensive and harder to attribute, and it is worth saying plainly that the ledger is currently correct by design and only its callers and schema are not."
+  },
+  {
+    "issueNumber": 2046,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Attribute inbound SMS replies to a campaign",
+    "summary": "Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.",
+    "rootCause": "The inbound write path knows only the contact (matched by From number); the outbound path knows its queue/campaign at dispatch. No conversation/thread link is written on the inbound row.",
+    "resolution": "Choose and document attribution precedence, correlation window, sender matching and ambiguity behavior. Then implement one model with STOP behavior preserved.",
+    "lookIn": [
+      "app/routes/api+/inbound-sms.action.server.ts:178",
+      "app/lib/campaign-export-db.server.ts:73",
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/lib/campaign-export.server.ts",
+      "app/lib/campaign-export-db.server.ts",
+      "app/db/schema.ts (message table)"
+    ],
+    "existingTests": [
+      "test/inbound-sms.route.test.ts"
+    ],
+    "missingTests": [
+      "No source test proves single-blast attribution or deterministic ambiguous attribution."
+    ],
+    "acceptanceCriteria": [
+      "Single-blast reply attributed to exactly that campaign",
+      "Export lists replies with deterministic reply_to_campaign_ids + documented precedence",
+      "STOP/opt-out dequeue unaffected",
+      "Attribution covered by a test"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Move to Needs decision. Choose reply attribution semantics before adding a historical heuristic as fact."
+  },
+  {
+    "issueNumber": 2194,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",
+    "summary": "The old survey identified 111 apparent candidates and 31 live dev owners. Dev, staging and production share the account; current ownership and deletion safety have not been established.",
+    "risk": "high",
+    "size": "S",
+    "trackerRecommendation": "Needs decision: a historical empty-resource count does not authorize shared-account deletion. Related PR evidence: #2193, #2195. A PR reference alone does not prove deployed behavior.",
+    "resolution": "Refresh the read-only inventory, reconcile each candidate with every environment and decide an explicit keep/delete list before Console cleanup.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The 111 deletion candidates come from a dated shared-account survey. The inventory only reads Twilio resources; it does not prove that all candidates lack live dev, staging and production owners.",
+    "missingTests": [
+      "Every candidate must have an evidenced absence of live ownership; no current deletion count can be inferred from the old survey."
+    ],
+    "lookIn": [
+      "scripts/twilio-subaccount-inventory.mjs:24",
+      "scripts/twilio-subaccount-inventory.mjs:29",
+      "scripts/twilio-subaccount-inventory.mjs:65"
+    ]
+  },
+  {
+    "issueNumber": 2216,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Email verification is half-wired: a verify-email route and a \"verify your email\" prompt both exist, but no verification email is ever sent",
+    "summary": "Email verification remains half-wired: auth has reset email callback but no verification callback/requirement; register fallback claims verification and a verify handler survives. The live issue explicitly leaves mandatory verification versus removal undecided.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Passwords are enabled and sessions issue without email verification; verification handler/message exist with no send callback. Registration can occupy an unverified email, while password reset goes to the mailbox owner.",
+    "rootCause": "Auth configuration enables password signup and reset delivery but has no email-verification delivery or enforcement configuration. Verification handlers and a verification message remain without a configured issuance flow. Source does not establish that the feature was deliberately removed.",
+    "resolution": "Choose mandatory verification with delivery/resend/pending-session UX, or deliberately remove misleading verification surface. EmailVerified is a Better Auth schema field and should not be deleted blindly. Cover actual registration behavior.",
+    "lookIn": [
+      "app/server/auth-instance.ts:21",
+      "app/lib/platform-auth.server.ts:195",
+      "app/lib/platform-auth.server.ts:347",
+      "app/routes/api+/auth/verify-email.action.server.ts:9",
+      "app/server/auth-instance.ts:22-31 (emailAndPassword: no sendVerificationEmail, no requireEmailVerification)",
+      "app/lib/platform-auth.server.ts:339-380 (the unreachable verify-email handler)",
+      "app/lib/platform-auth.server.ts:189-198 (the unreachable success branch)",
+      "app/routes/api+/auth/verify-email.action.server.ts:9 (a rate limit on a dead route)",
+      "app/db/auth-schema.ts:16 (emailVerified column, default false, never written)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "No test exercises real registration to assert verification issuance and session policy. Account-address occupancy is established; automatic account takeover by the first registrant is not, since reset goes to the actual mailbox owner."
+    ],
+    "acceptanceCriteria": [
+      "A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return",
+      "No user-visible string references verification unless verification happens",
+      "The dead route and its rate limit are either live or removed",
+      "A test covers the chosen path end to end"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs decision. The issue explicitly requires Option A/B product policy and states funnel cost is unknown; do not select cheaper removal as a bug fix. Then implement/test the chosen policy. Related PR evidence: #2223, #2222. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2263,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Scope unknown-sender opt-out enforcement in the consent ledger rollout",
+    "summary": "Unknown-sender opt-out messages are saved, but no contact flag or app phone-level suppression protects later imports and sends.",
+    "currentBehavior": "The inbound route saves the message, then updates and dequeues only matching contacts. Zero matching IDs leave no app suppression record. The original claim that the message was discarded was incorrect.",
+    "rootCause": "ADR-0034 already adopts recipient consent and fail-closed automated sends. The unknown-sender path lacks that ledger; its rollout boundary and implementation slices need definition.",
+    "resolution": "Scope the unknown-sender path in the adopted consent ledger rollout under #1268. Define recipient key, normalization, future imports, every send entry point, atomic pending-send suppression, recipient START and the legacy migration boundary. An operator warning can expose the interim legacy gap but cannot replace ADR-0034 enforcement or satisfy completion.",
+    "lookIn": [
+      "docs/adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md",
+      "docs/interactive-sms-delivery-plan.md",
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/lib/inbound-sms-context.server.ts",
+      "app/lib/chat-sms-guards.server.ts",
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "existingTests": [
+      "Inbound tests cover known contacts; this decision has no implementation yet."
+    ],
+    "missingTests": [
+      "After the decision: unknown-sender opt-out followed by import and manual/campaign sends, another-workspace control and explicit opt-in."
+    ],
+    "acceptanceCriteria": [
+      "Rollout boundary and slices follow ADR-0034 and the delivery plan.",
+      "Authoritative consent, enforcement points, atomic suppression and recipient START are defined.",
+      "Implementation and real prerequisites are split after scoping."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Independent follow-up from #2090. Keep visible until the adopted ledger rollout is scoped; the keyword fix does not resolve it."
+  },
+  {
+    "issueNumber": 2264,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Define operator guidance for Advanced Opt-Out",
+    "summary": "The saved Advanced Opt-Out request is not verified provider state. Decide how operators see the request, verification limits and Console action.",
+    "currentBehavior": "The saved flag defaults false. Console guidance appears only for requested true with a Messaging Service SID. Standard long-code provider opt-out exists by default, so a false local flag does not establish absent STOP protection.",
+    "rootCause": "Operator guidance for requested state versus verified provider state is undefined.",
+    "resolution": "Choose the operator flow and any warning or justified setup blocker. Define true/false requested state, missing/present Messaging Service SID and unverified provider state. Do not label an unverified provider setting as disabled.",
+    "lookIn": [
+      "app/lib/messaging-onboarding/normalize.server.ts",
+      "app/lib/database/workspace-twilio-recommendations.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.OperationalGuidancePanel.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "After the decision: UI coverage for requested true/false, SID missing/present and unverified provider state."
+    ],
+    "acceptanceCriteria": [
+      "Display-state meanings and operator flow are recorded.",
+      "Guidance does not imply the saved request verifies provider settings or that standard protection needs Advanced Opt-Out.",
+      "A small implementation issue with UI coverage follows the decision."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance."
   }
 ]

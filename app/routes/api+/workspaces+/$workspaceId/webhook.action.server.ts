@@ -56,11 +56,14 @@ export const action = defineAction({
       if (parsed instanceof Response) return parsed;
 
       const result = await testWorkspaceWebhook(
+        userId,
+        workspaceId,
         parsed.destination_url,
-        parsed.custom_headers as Record<string, string> | [string, string][],
+        parsed.custom_headers,
         parsed.event,
       );
 
+      if (result instanceof Response) return result;
       if (!result.ok) {
         return jsonError(result.error, result.status);
       }

@@ -30,6 +30,6 @@ export const loader = defineLoader({
       }
     }
 
-    return redirect("/auth/auth-code-error");
+    return redirect("/signin");
   },
 });

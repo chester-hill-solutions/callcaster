@@ -86,9 +86,10 @@ export default function WorkspaceUsers() {
   } = useLoaderData<LoaderData>();
   
   const actionData = useActionData();
-  const workspaceOwner = users.find(
+  const workspaceOwners = users.filter(
     (member) => member.role === MemberRole.Owner,
   );
+  const workspaceOwner = workspaceOwners[0];
   const sortedUsers = [...users].sort(compareMembersByRole);
   const membersExcludingOwner = sortedUsers.filter(
     (member) => member.role !== MemberRole.Owner,
@@ -168,16 +169,6 @@ export default function WorkspaceUsers() {
                       required
                     >
                       {Object.values(MemberRole).map((role) => {
-                        if (role === MemberRole.Owner) {
-                          return null;
-                        }
-                        if (
-                          role === MemberRole.Admin &&
-                          userRole === MemberRole.Member
-                        ) {
-                          return null;
-                        }
-
                         return (
                           <option
                             key={role}
@@ -211,14 +202,16 @@ export default function WorkspaceUsers() {
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
                 Owner
               </p>
-              {workspaceOwner && (
+              {workspaceOwners.map((owner) => (
                 <TeamMember
-                  member={{ ...workspaceOwner }}
+                  key={owner.id}
+                  member={{ ...owner }}
                   userRole={currentUserRole}
-                  memberIsUser={workspaceOwner.id === activeUserId}
-                  workspaceOwner={{ ...workspaceOwner }}
+                  memberIsUser={owner.id === activeUserId}
+                  workspaceOwner={{ ...owner }}
+                  platformAdmin
                 />
-              )}
+              ))}
             </div>
             <div className="flex flex-col py-4">
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
@@ -230,6 +223,7 @@ export default function WorkspaceUsers() {
                       <TeamMember
                       member={{ ...member }}
                       userRole={currentUserRole}
+                      platformAdmin
                         memberIsUser={member.id === activeUserId}
                       workspaceOwner={fallbackWorkspaceOwner}
                       />
@@ -257,6 +251,7 @@ export default function WorkspaceUsers() {
                         <TeamMember
                           member={inviteMember}
                           userRole={currentUserRole}
+                          platformAdmin
                           memberIsUser={false}
                           workspaceOwner={fallbackWorkspaceOwner}
                         />

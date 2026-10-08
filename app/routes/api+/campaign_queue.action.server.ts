@@ -1,5 +1,4 @@
 import { data as routeData } from "react-router";
-import { and, eq, inArray } from "drizzle-orm";
 import {
   deleteCampaignQueueByIds,
 } from "@/lib/campaign-queue-db.server";
@@ -10,7 +9,8 @@ import { parseRequestData } from "@/lib/request-utils.server";
 import { safeNumber } from "@/lib/type-safety-utils";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
-import { contact as contactTable } from "@/db/schema";
+import { resolveContactsOwnedByWorkspace } from "@/lib/contacts/tenant-scope.server";
+import { logger } from "@/lib/logger.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 // campaign_queue is a join table without a workspace column; tdb cannot scope it.
@@ -34,7 +34,7 @@ export const action = defineAction({
 
     try {
       if (request.method === "POST") {
-        const { ids, campaign_id, startOrder = 0, requeue = false } = data;
+        const { ids, campaign_id, requeue = false } = data;
         const contactIds = ids.map((id: string | number) =>
           typeof id === "string" ? parseInt(id, 10) : id,
         );
@@ -45,26 +45,23 @@ export const action = defineAction({
         }
         await requireWorkspaceAccess({ user, workspaceId });
 
-        const validContactIds = await db
-          .select({ id: contactTable.id })
-          .from(contactTable)
-          .where(
-            and(
-              inArray(contactTable.id, contactIds),
-              eq(contactTable.workspace, workspaceId),
-            ),
-          );
-        if (validContactIds.length !== contactIds.length) {
-          return routeData(
-            { error: "One or more contacts do not belong to the campaign workspace" },
-            { status: 400 },
-          );
+        const resolved = await resolveContactsOwnedByWorkspace(
+          workspaceId,
+          contactIds,
+        );
+        if (!resolved.ok) {
+          logger.warn("campaign_queue.contact_scope_rejected", {
+            workspaceId,
+            campaignId: campaignIdNum,
+            foreignCount: resolved.foreignCount,
+          });
+          return routeData({ error: "Contact not found" }, { status: 404 });
         }
 
         await enqueueContactsForCampaign(
           campaignIdNum,
-          contactIds,
-          { startOrder, requeue },
+          resolved.contactIds,
+          { requeue },
         );
         return routeData({ success: true });
       }

@@ -11,10 +11,10 @@ import {
   rpcResetStaleCampaignQueueClaims,
   rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
+import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import {
   claimNextQueueContact,
-  dequeueQueueEntry,
-  requeueCampaignQueueById,
+  dequeueQueueEntry
 } from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
@@ -35,7 +35,7 @@ export async function getNextAutoDialQueueContact(
 }
 
 export async function createOutreachAttempt(
-  contactRecord: { queue_id: number, contact_id: number, contact_phone: string }, 
+  contactRecord: { queue_id: number, contact_id: number, contact_phone: string },
   campaign_id: number,
   workspace_id: string,
   user_id: string,
@@ -55,14 +55,16 @@ export async function createTwilioCall(
   fromNumber: string,
   conference_id: string,
   selected_device: string,
+  voiceUrl?: string,
+  statusUrl?: string,
 ) {
   return await client.calls.create({
     to: toNumber,
     from: fromNumber,
-    url: `${env.BASE_URL()}/api/auto-dial/${conference_id}`,
+    url: voiceUrl ?? `${env.BASE_URL()}/api/auto-dial/${conference_id}`,
     machineDetection: "Enable",
     statusCallbackEvent: ["answered", "completed", "ringing"],
-    statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
+    statusCallback: statusUrl ?? `${env.BASE_URL()}/api/auto-dial/status`,
   });
 }
 
@@ -78,8 +80,8 @@ function buildCallRow(callData: Partial<Call>) {
     to: callData.to || null,
     from: callData.from || null,
     status: callData.status || null,
-    start_time: callData.start_time ? new Date(callData.start_time).toISOString() : null,
-    end_time: callData.end_time ? new Date(callData.end_time).toISOString() : null,
+    start_time: callData.start_time ?? null,
+    end_time: callData.end_time ?? null,
     duration: callData.duration ? String(callData.duration) : null,
     price: callData.price ? String(callData.price) : null,
     direction: callData.direction || null,
@@ -97,9 +99,7 @@ function buildCallRow(callData: Partial<Call>) {
     conference_id: callData.conference_id || null,
     phone_number_sid: callData.phone_number_sid || null,
     parent_call_sid: callData.parent_call_sid || null,
-    date_updated: callData.date_updated
-      ? new Date(callData.date_updated).toISOString()
-      : null,
+    date_updated: callData.date_updated ?? null,
   };
 }
 
@@ -134,7 +134,7 @@ export async function saveCallToDatabase(
     }
     await tdb.call.insert({
       ...row,
-      date_created: new Date().toISOString(),
+      date_created: new Date(),
       is_last: false,
     });
     return true;
@@ -175,11 +175,23 @@ export type AutoDialerTurnInput = {
   workspace_id: string;
   selected_device?: string;
   conference_id?: string | null;
+  /** Durable predictive continuation checkpoints; ordinary dial turns omit them. */
+  continuation?: {
+    beforeDial: (
+      contact: { queue_id: number; contact_id: number },
+      attemptId: number,
+    ) => Promise<void | { voiceUrl: string; statusUrl: string }>;
+    afterDial: (callData: Partial<Call>) => Promise<void>;
+  };
 };
 
 export type AutoDialerTurnResult =
   | { success: true; message?: string }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: string;
+      failureKind?: "not-sent" | "rejected" | "uncertain";
+    };
 
 /**
  * Advances the predictive dialer by one turn: claims the next queued contact
@@ -235,6 +247,7 @@ export async function runAutoDialerTurn(
     logger.error("reset_stale_campaign_queue_claims RPC error", error);
   }
 
+  let failureKind: "not-sent" | "rejected" | "uncertain" = "not-sent";
   try {
     // Claim the next contact that is inside the recipient-local calling
     // window (TCPA/CRTC 8am–9pm recipient time). Out-of-window claims are
@@ -302,6 +315,8 @@ export async function runAutoDialerTurn(
       // predictive dialer's queue for that contact.
       let toNumber: string;
       let outreach_attempt_id: number;
+      let voiceUrl: string | undefined;
+      let statusUrl: string | undefined;
       try {
         toNumber = normalizePhoneNumber(contactRecord.contact_phone);
         outreach_attempt_id = await createOutreachAttempt(
@@ -310,6 +325,12 @@ export async function runAutoDialerTurn(
           workspace_id,
           user_id,
         );
+        const reservation = await input.continuation?.beforeDial(
+          contactRecord,
+          outreach_attempt_id,
+        );
+        voiceUrl = reservation?.voiceUrl;
+        statusUrl = reservation?.statusUrl;
       } catch (prepError) {
         try {
           await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
@@ -331,17 +352,23 @@ export async function runAutoDialerTurn(
       // dequeueing it with an explicit reason for manual/open-sync review.
       let call: Awaited<ReturnType<typeof createTwilioCall>>;
       try {
+        failureKind = "uncertain";
         call = await createTwilioCall(
           twilioClient,
           toNumber,
           contactRecord.caller_id,
           conferenceId,
           selected_device ?? "",
+          voiceUrl,
+          statusUrl,
         );
       } catch (dialError) {
         const restStatus = (dialError as { status?: unknown }).status;
         const callDefinitelyNotCreated =
-          typeof restStatus === "number" && restStatus >= 400;
+          typeof restStatus === "number" &&
+          restStatus >= 400 &&
+          (!input.continuation || restStatus < 500);
+        failureKind = callDefinitelyNotCreated ? "rejected" : "uncertain";
         try {
           if (callDefinitelyNotCreated) {
             await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
@@ -353,7 +380,10 @@ export async function runAutoDialerTurn(
               outreachAttemptId: outreach_attempt_id,
             });
             await dequeueQueueEntry({
-              by: { contactId: contactRecord.contact_id },
+              by: {
+                contactId: contactRecord.contact_id,
+                campaignId: Number(campaign_id),
+              },
               workspaceId: workspace_id,
               // false, not omitted: the guarded RPC path, not plain Drizzle
               // — deliberately parks only this one row (no household
@@ -378,33 +408,24 @@ export async function runAutoDialerTurn(
         throw dialError;
       }
 
-      await dequeueQueueEntry({
-        by: { contactId: contactRecord.contact_id },
-        workspaceId: workspace_id,
-        household: true,
-        userId: user_id,
-        reason: "Predictive Dialer called contact",
-        exec: tdb,
-      });
-
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's
-      // `CallInstance` type, while `Call.date_updated`/`start_time`/`end_time`
-      // are `text()` (string) columns — convert them here so `callData` is a
-      // real `Partial<Call>` the compiler checks, instead of force-casting a
-      // mismatched shape past it. The `? … : null` guards are defensive: Twilio's
-      // docs note these fields come back empty for a call that hasn't
-      // started/ended yet, despite the SDK typing them as always-present.
+      // `CallInstance` type, and `Call.date_updated`/`start_time`/`end_time` are
+      // `timestamptz` — so they are handed over as the Dates they already are,
+      // and `callData` stays a real `Partial<Call>` the compiler checks. The
+      // `? … : null` guards are defensive: Twilio's docs note these fields come
+      // back empty for a call that hasn't started/ended yet, despite the SDK
+      // typing them as always-present.
       const callData: Partial<Call> = {
         sid: call.sid,
-        date_updated: call.dateUpdated ? call.dateUpdated.toISOString() : null,
+        date_updated: call.dateUpdated ?? null,
         parent_call_sid: call.parentCallSid,
         account_sid: call.accountSid,
         to: toNumber,
         from: call.from,
         phone_number_sid: call.phoneNumberSid,
         status: call.status,
-        start_time: call.startTime ? call.startTime.toISOString() : null,
-        end_time: call.endTime ? call.endTime.toISOString() : null,
+        start_time: call.startTime ?? null,
+        end_time: call.endTime ?? null,
         duration: call.duration,
         price: call.price,
         direction: call.direction,
@@ -419,7 +440,24 @@ export async function runAutoDialerTurn(
         workspace: workspace_id,
         outreach_attempt_id,
         conference_id: conferenceId,
+        ...(input.continuation
+          ? { queue_id: contactRecord.queue_id, user_id }
+          : {}),
       };
+
+      await input.continuation?.afterDial(callData);
+
+      await dequeueQueueEntry({
+        by: {
+          contactId: contactRecord.contact_id,
+          campaignId: Number(campaign_id),
+        },
+        workspaceId: workspace_id,
+        household: true,
+        userId: user_id,
+        reason: "Predictive Dialer called contact",
+        exec: tdb,
+      });
 
       await saveCallToDatabase(workspace_id, callData);
       return { success: true };
@@ -453,6 +491,8 @@ export async function runAutoDialerTurn(
   } catch (error) {
     logger.error("Error dialing number:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return { success: false, error: errorMessage };
+    return input.continuation
+      ? { success: false, error: errorMessage, failureKind }
+      : { success: false, error: errorMessage };
   }
 }

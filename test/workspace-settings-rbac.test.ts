@@ -21,7 +21,6 @@ const settingsPageMocks = vi.hoisted(() => ({
     workspace: { id: "w1", name: "Acme" },
     userRole: "member",
     users: [],
-    phoneNumbers: [],
     pendingInvites: [],
     webhook: null,
     hasAccess: true,
@@ -32,7 +31,6 @@ const utilsMocks = vi.hoisted(() => ({
   handleAddUser: vi.fn(async () => ({ data: "ok", error: null })),
   handleUpdateUser: vi.fn(async () => ({ data: "ok", error: null })),
   handleDeleteUser: vi.fn(async () => ({ data: "ok", error: null })),
-  handleDeleteSelf: vi.fn(async () => new Response(null, { status: 302 })),
   handleTransferWorkspace: vi.fn(async () => ({ data: "ok", error: null })),
   handleDeleteWorkspace: vi.fn(async () => new Response(null, { status: 302 })),
   removeInvite: vi.fn(async () => ({ data: "ok", error: null })),
@@ -135,23 +133,6 @@ describe("workspace settings RBAC", () => {
       expect(utilsMocks.handleDeleteWorkspace).not.toHaveBeenCalled();
     });
 
-    test("rejects deleteSelf when form user_id does not match the session user", async () => {
-      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
-
-      const fd = new FormData();
-      fd.set("formName", "deleteSelf");
-      fd.set("user_id", "u2");
-      const res = await asRouteResponse(mod.action(
-          await withWorkspaceRouteArgs(
-            { request: buildRequest(fd), params: { id: "w1" } },
-            { userId: "u1", workspaceId: "w1", userRole: "member" },
-          ),
-        ),
-      );
-      expect(res.status).toBe(403);
-      expect(utilsMocks.handleDeleteSelf).not.toHaveBeenCalled();
-    });
-
     test("passes the session user as the invite actor for addUser", async () => {
       const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 
@@ -229,7 +210,6 @@ describe("workspace settings RBAC", () => {
         workspace: { id: "w1", name: "Acme" },
         userRole: "owner",
         users: [],
-        phoneNumbers: [],
         pendingInvites: [],
         webhook: null,
         hasAccess: true,
@@ -257,7 +237,6 @@ describe("workspace settings RBAC", () => {
           "grantableApiKeyScopes",
           "hasAccess",
           "pendingInvites",
-          "phoneNumbers",
           "userRole",
           "users",
           "webhook",
@@ -270,10 +249,10 @@ describe("workspace settings RBAC", () => {
     });
   });
 
-  describe("settings/numbers loader", () => {
+  describe("phone-numbers loader", () => {
     test("returns 404 for non-members", async () => {
       dbMocks.requireWorkspaceAccess.mockRejectedValue(new Error("Workspace not found"));
-      const mod = await import("../app/routes/workspaces+/$id/settings/numbers.loader.server");
+      const mod = await import("../app/routes/workspaces+/$id/phone-numbers.loader.server");
 
       const res = await asRouteResponse(mod.loader(
           await withWorkspaceRouteArgs(

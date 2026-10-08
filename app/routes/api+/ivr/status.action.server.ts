@@ -2,8 +2,10 @@ import { Call, OutreachAttempt } from "@/lib/types";
 import { fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
+import { rpcTryCompleteCampaignIfDrained } from "@/lib/db-rpc.server";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { createTenantDb } from "@/server/tenant-db";
 import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
@@ -102,7 +104,7 @@ export const action = defineAction({
 
         if (isMachineAnswered(event.answeredBy, callStatus)) {
             await recordMachineAnswer(dbCall, campaignData);
-        } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
+        } else if (['failed', 'no-answer', 'completed', 'busy', 'canceled'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
                 campaignType: campaignData.type ?? null,
@@ -124,6 +126,30 @@ export const action = defineAction({
                 await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, {
                     disposition: callStatus,
                 });
+            }
+            // Completion is gated on settled calls (#1728): the dispatch chain
+            // dequeues at dial time, so a campaign must not read 'complete'
+            // while any of its calls is still in flight. This terminal callback
+            // is the last-settle trigger — the RPC itself re-checks the queue
+            // and the call table, so an early callback (e.g. a failed dial
+            // while others ring) is a no-op.
+            // Best-effort: failing to mark a label must never fail the webhook.
+            try {
+              const completed = await rpcTryCompleteCampaignIfDrained(
+                createTenantDb(String(dbCall.workspace)),
+                dbCall.campaign_id,
+              );
+              if (completed) {
+                logger.info("campaign.completed_on_settled_call", {
+                  campaignId: dbCall.campaign_id,
+                  callSid,
+                });
+              }
+            } catch (error) {
+              logger.error("campaign.complete_on_settled_call_failed", {
+                campaignId: dbCall.campaign_id,
+                error: error instanceof Error ? error.message : String(error),
+              });
             }
         }
     } catch (error) {

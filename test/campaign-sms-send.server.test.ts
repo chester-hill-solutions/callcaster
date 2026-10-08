@@ -1,11 +1,14 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import type { DispatchPolicy } from "@/lib/campaign-dispatch-policy";
 
 const mocks = vi.hoisted(() => ({
   messagesCreate: vi.fn(),
   dequeueQueueEntry: vi.fn(async () => undefined),
   persistMessageRecord: vi.fn(async () => ({ data: [{ id: 1 }], error: null as { message: string } | null })),
+  isDispatchAllowedAt: vi.fn<(policy: DispatchPolicy) => boolean>(() => true),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ campaign_id: 1 })),
   rpcCreateOutreachAttempt: vi.fn(async () => 7),
+  linkMessage: vi.fn(async () => [{ sid: "pending:fixture" }]),
   resolveMessageByClientRef: vi.fn(async () => ({ id: 1 })),
   deleteMessageByClientRef: vi.fn(async () => undefined),
   notifyOps: vi.fn(async () => ({ ok: true })),
@@ -40,6 +43,10 @@ vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db-rpc.server")>()),
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
 }));
+vi.mock("@/lib/campaign-dispatch-policy", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-dispatch-policy")>()),
+  isDispatchAllowedAt: (...args: unknown[]) => mocks.isDispatchAllowedAt(...args),
+}));
 vi.mock("@/lib/twilio-readiness.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/twilio-readiness.server")>()),
   assertWorkspaceCanSendSms: vi.fn(async () => undefined),
@@ -54,10 +61,12 @@ vi.mock("@/lib/logger.server", async (importOriginal) => ({
 }));
 vi.mock("@/server/tenant-db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/tenant-db")>()),
-  createTenantDb: vi.fn(() => ({})),
+  createTenantDb: vi.fn(() => ({ message: { update: mocks.linkMessage } })),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
 }));
 
 import { sendSingleCampaignSms } from "../app/lib/campaign-sms-send.server";
+import { smsSendPolicy } from "@/lib/campaign-dispatch-policy";
 import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
 function params() {
@@ -74,15 +83,20 @@ function params() {
     portalConfig: makePortalConfig(),
     messageIntent: null,
     messagingServiceSidFromRequest: null,
+    sendPolicy: smsSendPolicy(null),
   };
 }
+
+afterEach(() => vi.useRealTimers());
 
 describe("sendSingleCampaignSms intent row (#1582)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isDispatchAllowedAt.mockReset().mockReturnValue(true);
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
     mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
+    mocks.linkMessage.mockReset().mockResolvedValue([{ sid: "pending:fixture" }]);
   });
 
   test("writes a pending intent row before calling Twilio, then resolves it with the real SID", async () => {
@@ -125,11 +139,95 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
     await expect(sendSingleCampaignSms(params())).rejects.toThrow(/before sending/);
     expect(mocks.messagesCreate).not.toHaveBeenCalled();
   });
+
+  test("defers and removes the intent when preparation crosses the send-window boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
+    mocks.isDispatchAllowedAt.mockReturnValueOnce(false);
+    mocks.persistMessageRecord.mockImplementationOnce(async () => {
+      vi.setSystemTime(new Date("2026-09-09T21:00:00.100Z"));
+      return { data: [{ id: 1 }], error: null };
+    });
+
+    const result = await sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).not.toHaveBeenCalled();
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
+  });
+
+  test("does not retry a provider request after the campaign window closes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const policy = await vi.importActual<typeof import("@/lib/campaign-dispatch-policy")>("@/lib/campaign-dispatch-policy");
+    mocks.isDispatchAllowedAt.mockImplementation(policy.isDispatchAllowedAt);
+    mocks.messagesCreate.mockImplementationOnce(async () => {
+      vi.setSystemTime(new Date("2026-09-09T21:00:00.100Z"));
+      throw Object.assign(new Error("temporary provider error"), { status: 503 });
+    });
+    const send = sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await send;
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledTimes(1);
+    const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
+  });
+
+  test("does not count an outreach attempt when the final gate blocks the first provider call", async () => {
+    mocks.isDispatchAllowedAt
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    const result = await sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).not.toHaveBeenCalled();
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+  });
 });
 
 describe("sendSingleCampaignSms persist failure", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isDispatchAllowedAt.mockReset().mockReturnValue(true);
+    mocks.linkMessage.mockReset().mockResolvedValue([{ sid: "pending:fixture" }]);
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
     mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });

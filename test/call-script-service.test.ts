@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { documentToScript, scriptToDocument } from "@/lib/call-script-service";
+import {
+  documentToScript,
+  scriptToDocument,
+  validateScriptSteps,
+} from "@/lib/call-script-service";
 import type { Script } from "@/lib/types";
 
 describe("Callcaster ScriptKit adapter", () => {
@@ -94,5 +98,53 @@ describe("Callcaster ScriptKit adapter", () => {
 
     expect(once.blocks.a?.title).toBe("Block 1");
     expect(twice.blocks.a?.title).toBe("Block 1");
+  });
+});
+
+describe("validateScriptSteps routing fold (#1884)", () => {
+  test("passes a linear script that ends at hangup/end", () => {
+    const steps = {
+      pages: {
+        page_1: { id: "page_1", title: "P", blocks: ["a"] },
+      },
+      blocks: {
+        a: { id: "a", type: "recorded", options: [{ value: "1", next: "end" }] },
+      },
+    };
+    const result = validateScriptSteps(steps);
+    expect(result.ok).toBe(true);
+  });
+
+  test("fails a routing cycle", () => {
+    const steps = {
+      pages: {
+        page_1: { id: "page_1", title: "P", blocks: ["a", "b"] },
+      },
+      blocks: {
+        a: { id: "a", type: "recorded", options: [{ value: "1", next: "b" }] },
+        b: { id: "b", type: "recorded", options: [{ value: "1", next: "a" }] },
+      },
+    };
+    const result = validateScriptSteps(steps);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join("; ")).toMatch(/cycle/i);
+    }
+  });
+
+  test("fails a dangling target", () => {
+    const steps = {
+      pages: {
+        page_1: { id: "page_1", title: "P", blocks: ["a"] },
+      },
+      blocks: {
+        a: { id: "a", type: "recorded", options: [{ value: "1", next: "block_ghost" }] },
+      },
+    };
+    const result = validateScriptSteps(steps);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join("; ")).toMatch(/unknown target|missing block/);
+    }
   });
 });

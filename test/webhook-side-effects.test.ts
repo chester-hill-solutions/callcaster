@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   persistCallRecordingToStorage: vi.fn(),
   isBatchTranscriptionEnabled: vi.fn(),
   enqueueJob: vi.fn(),
+  recheckCampaignCompletion: vi.fn(async () => false),
+  recheckCampaignsWithUnsettledMessages: vi.fn(async () => 0),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
@@ -115,6 +117,14 @@ vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
   return { env: new Proxy({}, handler) };
 });
+
+vi.mock("@/lib/campaign-settle-recheck.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-settle-recheck.server")>()),
+  recheckCampaignCompletion: (...args: unknown[]) =>
+    mocks.recheckCampaignCompletion(...args),
+  recheckCampaignsWithUnsettledMessages: (...args: unknown[]) =>
+    mocks.recheckCampaignsWithUnsettledMessages(...args),
+}));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -236,7 +246,7 @@ describe("webhook side-effect handlers", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
       expect.objectContaining({
-        by: { contactId: 123 },
+        by: { contactId: 123, campaignId: 7 },
         workspaceId: "w1",
         household: false,
         userId: "user-1",
@@ -311,6 +321,20 @@ describe("webhook side-effect handlers", () => {
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
+  test("a terminal call without a campaign keeps billing but does not dequeue", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CA1", workspace: "w1", status: "completed", contact_id: 123,
+      campaign_id: null, outreach_attempt_id: 10,
+    });
+    const { runCallStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runCallStatusSideEffects({
+      callSid: "CA1", event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
+    });
+    expect(mocks.billTerminalCallStatus).toHaveBeenCalled();
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.tenantDb.campaign_queue.findFirst).not.toHaveBeenCalled();
+  });
+
   test("non-terminal status does not dequeue the queue row", async () => {
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA1",
@@ -358,6 +382,68 @@ describe("webhook side-effect handlers", () => {
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
+  test("runSmsStatusSideEffects re-checks campaign completion (#2048)", async () => {
+    // The dispatch chain stops when the local queue empties, so this callback is
+    // the only moment the settled-message gate can be re-asked. Without it, a
+    // campaign whose queue drained before its messages settled would stay
+    // `running` forever.
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM1",
+      twilioParams: { SmsSid: "SM1", SmsStatus: "delivered" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      { workspaceId: "w1", campaignId: 7, reason: "sms_status:delivered" },
+    );
+  });
+
+  test("runSmsStatusSideEffects re-checks on a non-terminal status too (#2048)", async () => {
+    // A non-terminal callback still carries fresh message state, and asking is
+    // cheap. Pinning this stops a future "only re-check terminal statuses"
+    // optimisation from re-opening the stranding hole.
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM1",
+      twilioParams: { SmsSid: "SM1", SmsStatus: "sending" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      { workspaceId: "w1", campaignId: 7, reason: "sms_status:sending" },
+    );
+  });
+
+  test("runSmsStatusSideEffects does not re-check completion for an inbound reply (#2048)", async () => {
+    // The inbound write path leaves message.campaign_id NULL (#2046), so there
+    // is no campaign to re-check and no RPC to make.
+    mocks.findMessageBySid.mockResolvedValue({
+      sid: "SM4",
+      workspace: "w1",
+      campaign_id: null,
+      status: "received",
+      num_segments: "1",
+      num_media: "0",
+    });
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM4",
+      twilioParams: { SmsSid: "SM4", SmsStatus: "received" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ campaignId: null }),
+    );
+  });
+
   test("runSmsStatusSideEffects bills terminal SMS", async () => {
     const { runSmsStatusSideEffects } = await import(
       "@/lib/worker/webhook-side-effects.server"
@@ -377,7 +463,45 @@ describe("webhook side-effect handlers", () => {
         campaignId: 7,
       }),
     );
-    expect(mocks.sendWorkspaceWebhookNotification).toHaveBeenCalled();
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(expect.objectContaining({
+      type: "webhook_delivery",
+      workspaceId: "w1",
+      dedupe: { kind: "idempotency", key: "outbound_sms:SM1:delivered" },
+      params: expect.objectContaining({
+        workspaceId: "w1",
+        eventCategory: "outbound_sms",
+        eventType: "UPDATE",
+        optional: true,
+        payload: expect.objectContaining({
+          type: "outbound_sms",
+          record: expect.objectContaining({ message_sid: "SM1", status: "delivered" }),
+          old_record: { message_sid: "SM1" },
+        }),
+      }),
+    }));
+  });
+
+  test("SMS callback status stays distinct from the later saved message status", async () => {
+    const { runSmsStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runSmsStatusSideEffects({ messageSid: "SM1", twilioParams: { SmsStatus: "SENT" } });
+    await runSmsStatusSideEffects({ messageSid: "SM1", twilioParams: { SmsStatus: "delivered" } });
+    expect(mocks.enqueueJob.mock.calls.map(([args]) => args.dedupe.key)).toEqual([
+      "outbound_sms:SM1:sent", "outbound_sms:SM1:delivered",
+    ]);
+    expect(mocks.enqueueJob.mock.calls.map(([args]) => args.params.payload.record.status)).toEqual([
+      "sent", "delivered",
+    ]);
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
+  });
+
+  test("SMS side effects fail when durable delivery cannot be queued", async () => {
+    mocks.enqueueJob.mockRejectedValueOnce(new Error("Queue unavailable"));
+    const { runSmsStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await expect(runSmsStatusSideEffects({
+      messageSid: "SM1", twilioParams: { SmsStatus: "sent" },
+    })).rejects.toThrow("Queue unavailable");
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
   });
 
   test("runSmsStatusSideEffects records a null campaign for non-campaign SMS", async () => {
@@ -522,12 +646,23 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
-  test("runRecordingSideEffects logs and continues when persist fails", async () => {
-    mocks.persistCallRecordingToStorage.mockResolvedValueOnce({
-      ok: false,
-      reason: "download_failed",
-      error: "Twilio recording fetch failed (404 Not Found)",
-    });
+  /**
+   * #2166 — INVERTED. This test previously asserted that a failed copy resolves
+   * `{ ok: true }` and logs a warning. That behaviour marked the job successful,
+   * consumed its idempotency key, and left `audio_url` NULL with no mechanism
+   * left to ever fetch the audio again — the recording was silently lost even
+   * though Twilio still held it.
+   *
+   * The job must now FAIL so the worker's retry/dead-letter machinery takes
+   * over, and the recording identity must already be persisted so the repair
+   * sweep can find and re-drive it.
+   */
+  test("runRecordingSideEffects FAILS when the copy fails, so the worker retries", async () => {
+    mocks.persistCallRecordingToStorage.mockRejectedValueOnce(
+      new Error(
+        "call_recording: download_failed — Twilio recording fetch failed (404 Not Found) (call CA1, recording RE1)",
+      ),
+    );
 
     const { runRecordingSideEffects } = await import(
       "@/lib/worker/webhook-side-effects.server"
@@ -543,20 +678,58 @@ describe("webhook side-effect handlers", () => {
           RecordingDuration: "12",
         }),
       }),
-    ).resolves.toEqual({ ok: true });
+    ).rejects.toThrow(/download_failed/);
 
-    expect(mocks.logger.warn).toHaveBeenCalledWith(
-      "call_recording.persist_skipped",
-      expect.objectContaining({ reason: "download_failed" }),
-    );
-    expect(mocks.updateCallBySid).toHaveBeenCalledWith("w1", "CA1", {
-      recording_sid: "RE1",
-      recording_duration: "12",
+    // No audio_url was written, so nothing claims we hold the recording.
+    for (const call of mocks.updateCallBySid.mock.calls) {
+      expect((call[2] as Record<string, string>).audio_url).toBeUndefined();
+    }
+  });
+
+  /**
+   * The repair sweep finds calls by `recording_sid` set and `audio_url` NULL.
+   * If the identity were only written after a successful copy, a failed copy
+   * would leave no trace to search on and the sweep could never repair it.
+   */
+  test("the recording identity is persisted BEFORE the copy is attempted", async () => {
+    mocks.persistCallRecordingToStorage.mockImplementationOnce(async () => {
+      // Assert from inside the copy attempt: the identity must already be on
+      // the row by the time we try to copy.
+      const payloads = mocks.updateCallBySid.mock.calls.map(
+        (call) => call[2] as Record<string, string>,
+      );
+      expect(payloads.some((p) => p.recording_sid === "RE1")).toBe(true);
+      return { ok: true, audioUrl: "w1/recording-CA1.mp3", skipped: false };
     });
-    const updatePayload = mocks.updateCallBySid.mock.calls.at(-1)?.[2] as Record<
-      string,
-      string
-    >;
-    expect(updatePayload.audio_url).toBeUndefined();
+
+    const { runRecordingSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runRecordingSideEffects({
+      callSid: "CA1",
+      event: parseTwilioVoiceCallback({
+        CallSid: "CA1",
+        AccountSid: "ACmain",
+        RecordingSid: "RE1",
+        RecordingDuration: "12",
+      }),
+    });
+
+    // The FIRST write carries the identity only; the second adds audio_url.
+    expect(mocks.updateCallBySid.mock.calls[0]).toEqual([
+      "w1",
+      "CA1",
+      { recording_sid: "RE1", recording_duration: "12" },
+    ]);
+    expect(mocks.updateCallBySid.mock.calls[1]).toEqual([
+      "w1",
+      "CA1",
+      {
+        recording_sid: "RE1",
+        recording_duration: "12",
+        audio_url: "w1/recording-CA1.mp3",
+      },
+    ]);
   });
 });

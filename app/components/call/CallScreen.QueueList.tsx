@@ -15,10 +15,7 @@ import {
   callPanelHeaderSecondaryClass,
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
-import type { Tables } from "@/lib/db-types";
-
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+import type { Contact, QueueItem } from "@/lib/types";
 
 interface HouseholdMap {
   [key: string]: QueueItem[];

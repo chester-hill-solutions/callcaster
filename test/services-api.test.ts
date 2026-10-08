@@ -93,13 +93,9 @@ describe.each(services)("$name service", ({ path }) => {
     ).rejects.toThrow("Missing required parameters");
   });
 
-  test("startConferenceAndDial throws on non-ok response with text", async () => {
+  test("startConferenceAndDial uses safe retry feedback for a non-JSON server response", async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      text: async () => "err",
-    });
+    fetchMock.mockResolvedValueOnce(new Response("err", { status: 500 }));
     await expect(
       mod.startConferenceAndDial({
         user_id: "u",
@@ -108,7 +104,7 @@ describe.each(services)("$name service", ({ path }) => {
         campaign_id: "cmp",
         selected_device: "dev",
       }),
-    ).rejects.toThrow("HTTP error! status: 500, message: err");
+    ).rejects.toThrow("Could not start dialing. Try again.");
   });
 
   test("startConferenceAndDial returns creditsError structure when present", async () => {
@@ -168,7 +164,7 @@ describe.each(services)("$name service", ({ path }) => {
         campaign_id: "cmp",
         selected_device: "dev",
       }),
-    ).rejects.toThrow("Conference started but no conference name returned");
+    ).rejects.toThrow("Could not start dialing. Try again.");
   });
 
   test("startConferenceAndDial returns data on happy path", async () => {
@@ -199,7 +195,7 @@ describe.each(services)("$name service", ({ path }) => {
         campaign_id: "cmp",
         selected_device: "dev",
       }),
-    ).rejects.toThrow("An unexpected error occurred during conference setup");
+    ).rejects.toThrow("Could not start dialing. Try again.");
   });
 });
 

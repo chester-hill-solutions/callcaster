@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { RouterContextProvider } from "react-router";
 
 import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueDualAuthSession, queueJsonAuthSession, setDualAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
@@ -291,6 +292,26 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "No users found for workspace",
+    });
+  });
+
+  test("address requirement response retains 400 and its actionable message (#2144)", async () => {
+    mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
+      ok: false, status: 400, addressRequirementError: true,
+      error: "This number requires a validated CA address on file. Add one in Numbers settings, then retry.",
+    });
+    const fd = new FormData();
+    fd.set("phoneNumber", "+14165550214");
+    fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
+    const mod = await import("../app/routes/api+/numbers");
+    const request = new Request("http://localhost/api/numbers", { method: "POST", body: fd });
+    const response = await asRouteResponse(mod.action({
+      request, url: new URL(request.url), params: {}, context: new RouterContextProvider(),
+    }));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      addressRequirementError: true,
+      error: "This number requires a validated CA address on file. Add one in Numbers settings, then retry.",
     });
   });
 

@@ -6,25 +6,62 @@ import {
   errorResponse,
   rateLimitResponse,
 } from "@/lib/openapi-platform-components";
-
-const cutoverTelephonySecurity = [{ sessionCookie: [] }, { apiKey: [] }];
-const cutoverDataPlaneSecurity = [{ sessionCookie: [] }, { apiKey: [] }];
-const sessionOnlySecurity = [{ sessionCookie: [] }];
+import {
+  apiKeyOrSessionSecurity,
+  sessionCookieSecurity,
+} from "@/lib/openapi-integrator";
 
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
+  "/api/workspaces/{workspaceId}/conversations": {
+    get: {
+      operationId: "getWorkspaces_workspaceId_conversations",
+      tags: ["Messaging", "Integrator API"],
+      "x-callcaster-supported": true,
+      "x-callcaster-exposure": "sessionOnly",
+      "x-callcaster-auth-class": "apiKeyOrSession",
+      "x-callcaster-docs-guide": "docs/api-data-plane.md",
+      "x-callcaster-capability": "campaigns.read",
+      summary: "List conversations or read the workspace unread total",
+      description: "Requires campaigns.read. With summary=unread, returns the complete workspace unread message total using the conversation list's received/inbound definition. This count ignores list pagination, search, sort and campaign filters. Without summary, returns the existing conversation page.",
+      security: [...apiKeyOrSessionSecurity],
+      parameters: [
+        { name: "workspaceId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        { name: "summary", in: "query", required: false, schema: { $ref: "#/components/schemas/ConversationSummaryMode" } },
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+        { name: "page_size", in: "query", schema: { type: "integer", minimum: 10, maximum: 100, default: 20 } },
+        { name: "campaign_id", in: "query", schema: { type: "integer" } },
+        { name: "search", in: "query", schema: { type: "string" } },
+        { name: "sort", in: "query", schema: { type: "string", enum: ["recent", "hasReplied", "hasUnreadReply"] } },
+      ],
+      responses: {
+        "200": {
+          description: "Conversation page, or complete workspace unread total when summary=unread",
+          content: { "application/json": { schema: { oneOf: [
+            { $ref: "#/components/schemas/WorkspaceUnreadCountResponse" },
+            { type: "object", required: ["conversations", "pagination"], properties: {
+              conversations: { type: "array", items: { type: "object", additionalProperties: true } },
+              pagination: { type: "object", required: ["page", "page_size", "has_more"], properties: {
+                page: { type: "integer" }, page_size: { type: "integer" }, has_more: { type: "boolean" },
+              } },
+            } },
+          ] } } },
+        },
+        "400": errorResponse("Unknown summary mode"),
+        "401": errorResponse("Unauthorized"),
+        "403": errorResponse("Missing campaigns.read capability"),
+        "404": errorResponse("Workspace membership or scope mismatch"),
+        "405": errorResponse("Method not allowed"),
+        "500": errorResponse("Unread count unavailable"),
+      },
+    },
+  },
   "/api/auth/register": {
     post: {
       summary: "Register a new user account",
+      description:
+        "Registration does not support response replay. Idempotency-Key is ignored, and retries use normal account-creation validation. Use the token endpoint to sign in after a successful registration whose response was lost.",
       tags: ["Platform API", "Authentication"],
-      parameters: [
-        {
-          name: "Idempotency-Key",
-          in: "header",
-          required: false,
-          schema: { type: "string", maxLength: 256 },
-          description: "Optional idempotency key for safe retries.",
-        },
-      ],
+      parameters: [],
       requestBody: {
         required: true,
         content: {
@@ -127,6 +164,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           in: "header",
           required: false,
           schema: { type: "string", maxLength: 256 },
+          description:
+            "Workspace creation retries are scoped to the authenticated user. Reuse this key to replay that user's original result without creating another workspace.",
         },
       ],
       requestBody: {
@@ -156,7 +195,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Get workspace details",
       tags: ["Platform API", "Workspace"],
       "x-callcaster-capability": "campaigns.read",
-      security: cutoverDataPlaneSecurity,
+      security: apiKeyOrSessionSecurity,
       description:
         "Returns workspace metadata for an authorized session member or workspace API key with campaigns.read scoped to the route workspace.",
       responses: {
@@ -176,7 +215,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "updateWorkspace",
       summary: "Update workspace settings",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description: "Rename a workspace. Requires an admin-or-higher signed-in session.",
       requestBody: {
         required: true,
@@ -205,7 +244,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "deleteWorkspace",
       summary: "Delete a workspace",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description: "Permanently delete a workspace. Owner session only.",
       responses: {
         "200": {
@@ -228,7 +267,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Start auto-dial conference for a campaign",
       tags: ["Platform API", "Dialer", "Telephony"],
       "x-callcaster-capability": "calls.start",
-      security: cutoverTelephonySecurity,
+      security: apiKeyOrSessionSecurity,
       description:
         "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
       requestBody: {
@@ -261,7 +300,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Disconnect an active workspace call",
       tags: ["Platform API", "Telephony"],
       "x-callcaster-capability": "calls.control",
-      security: cutoverTelephonySecurity,
+      security: apiKeyOrSessionSecurity,
       description:
         "Pause/hang up a live call using workspace Twilio credentials. Requires session or API key scoped to the call workspace.",
       responses: {
@@ -286,7 +325,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "List workspace audit events",
       tags: ["Platform API", "Workspace"],
       "x-callcaster-capability": "audit.read",
-      security: cutoverDataPlaneSecurity,
+      security: apiKeyOrSessionSecurity,
       description:
         "Cursor-paginated immutable audit log for privileged workspace actions. Requires owner session or an API key with the audit.read capability.",
       parameters: [
@@ -324,7 +363,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "listWorkspaceApiKeys",
       summary: "List workspace API keys",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
         "Session-only trust-root route. Lists key metadata without secrets.",
       responses: {
@@ -344,7 +383,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "createWorkspaceApiKey",
       summary: "Create a workspace API key",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
         "Session-only trust-root route. Requires a workspace admin session. " +
         "Requested scopes are capped at the capabilities the creating member's " +
@@ -378,7 +417,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "deleteWorkspaceApiKey",
       summary: "Revoke a workspace API key",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description: "Session-only trust-root route. Requires a workspace admin session.",
       requestBody: {
         required: true,
@@ -408,7 +447,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "listWorkspaceMembers",
       summary: "List workspace members and pending invites",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description: "Session-only trust-root route.",
       responses: {
         "200": {
@@ -427,7 +466,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Invite a workspace member",
       tags: ["Platform API", "Workspace"],
       "x-callcaster-capability": "members.invite",
-      security: cutoverDataPlaneSecurity,
+      security: apiKeyOrSessionSecurity,
       description:
         "Invite a teammate by email (session with role subordination, or API key with members.invite for member/caller-only roles). Email-first: the invitee does not need an account — the invite is attached to the email and accepted via the emailed link (SEC-03 / #1713). Privileged session role assignment may require MFA enrollment.",
       requestBody: {
@@ -456,7 +495,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "updateWorkspaceMemberRole",
       summary: "Update a member role",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
         "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
       requestBody: {
@@ -486,9 +525,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "removeWorkspaceMember",
       summary: "Remove a member or cancel an invite",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
-        "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+        "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite in this workspace. Foreign, missing and non-pending invites return the same 404 without a change.",
       requestBody: {
         required: true,
         content: {
@@ -518,7 +557,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "getWorkspaceWebhook",
       summary: "Get workspace webhook configuration",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description: "Session-only trust-root route.",
       responses: {
         "200": {
@@ -537,7 +576,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "upsertWorkspaceWebhook",
       summary: "Create or update workspace webhook",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
         "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
       requestBody: {
@@ -566,9 +605,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "testWorkspaceWebhook",
       summary: "Send a test webhook payload",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
-        "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
+        "Member-or-higher signed-in session required. Delivers a sample event via safe outbound fetch. Ten tests per minute per user, shared across workspaces and both webhook test URLs. Unsaved destinations and headers are permitted.",
       requestBody: {
         required: true,
         content: {
@@ -589,6 +628,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "400": errorResponse("Validation error or blocked destination URL"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Member manager role required"),
+        "404": errorResponse("Workspace not found"),
+        "429": rateLimitResponse,
       },
     },
   },
@@ -597,9 +638,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "transferWorkspaceOwnership",
       summary: "Transfer workspace ownership",
       tags: ["Platform API", "Workspace"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       description:
-        "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
+        "Owner session only. Choose a different existing workspace member as the incoming owner. The incoming owner must have MFA enrolled (SEC-08). Self transfer returns 400 without changing ownership.",
       requestBody: {
         required: true,
         content: {
@@ -617,7 +658,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
             },
           },
         },
-        "400": errorResponse("Transfer blocked"),
+        "400": errorResponse("Self transfer or another transfer failure"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Owner session and new-owner MFA required"),
       },
@@ -628,7 +669,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "listWorkspaceNumbers",
       summary: "List workspace phone numbers",
       tags: ["Platform API", "Workspace", "Telephony"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       responses: {
         "200": {
           description: "Phone numbers",
@@ -645,8 +686,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "purchaseWorkspaceNumber",
       summary: "Purchase and provision a phone number",
       tags: ["Platform API", "Workspace", "Telephony"],
-      security: sessionOnlySecurity,
-      description: "Requires sufficient workspace credits and numbers-manager role.",
+      security: sessionCookieSecurity,
+      description: "Requires sufficient available workspace credits and numbers-manager role. Purchases check current Canadian inventory and a validated regulatory address on the purchasing account when required. Missing or rejected regulatory addresses return 400 before a completed purchase. Concurrent purchases reserve their rental budget. A 409 can mean the number is unavailable, already owned, or awaiting provider verification. Follow the returned message; do not retry a purchase awaiting verification until recovery completes.",
       requestBody: {
         required: true,
         content: {
@@ -656,7 +697,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         },
       },
       responses: {
-        "200": {
+        "201": {
           description: "Number purchased",
           content: {
             "application/json": {
@@ -664,8 +705,13 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
             },
           },
         },
+        "207": {
+          description: "Number purchased; Messaging Service attachment needs attention",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PurchaseNumberResponse" } } },
+        },
         "402": errorResponse("Insufficient credits"),
-        "400": errorResponse("Validation error"),
+        "409": errorResponse("Number unavailable, already owned or purchase awaiting recovery"),
+        "400": errorResponse("Invalid input or missing or rejected regulatory address"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
       },
@@ -676,7 +722,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       operationId: "patchWorkspaceNumber",
       summary: "Update phone number settings",
       tags: ["Platform API", "Workspace", "Telephony"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       requestBody: {
         required: true,
         content: {
@@ -694,17 +740,18 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
             },
           },
         },
-        "400": errorResponse("Validation error"),
+        "400": errorResponse("Invalid number settings or inbound menu. The previous configuration is preserved."),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
         "404": errorResponse("Number not found"),
+        "409": errorResponse("The menu changed during this save. Review it and retry."),
       },
     },
     delete: {
       operationId: "deleteWorkspaceNumber",
       summary: "Release a workspace phone number",
       tags: ["Platform API", "Workspace", "Telephony"],
-      security: sessionOnlySecurity,
+      security: sessionCookieSecurity,
       responses: {
         "200": {
           description: "Number released",
@@ -716,6 +763,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         },
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Numbers manager role required"),
+        "409": errorResponse("Release incomplete; retry to finish sender cleanup and number release"),
         "404": errorResponse("Number not found"),
       },
     },

@@ -11,7 +11,7 @@ export const patchNumberBodySchema = z
     inbound_audio: z.string().nullable().optional(),
     inbound_ring_count: z.number().int().min(1).max(10).optional(),
     inbound_queue_id: z.number().int().nullable().optional(),
-    inbound_script_id: z.number().int().nullable().optional(),
+    inbound_script_id: z.number().int().positive().nullable().optional(),
     handset_enabled: z.boolean().optional(),
   })
   .refine(

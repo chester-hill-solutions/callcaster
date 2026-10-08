@@ -60,7 +60,11 @@ const mocks = vi.hoisted(() => ({
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
   rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
   recordQueueAttemptFailure: vi.fn(async () => undefined),
-  createTenantDb: vi.fn(() => ({ tenant: true })),
+  createTenantDb: vi.fn(() => ({
+    tenant: true,
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+    message: { update: async () => [{ outreach_attempt_id: 1 }] },
+  })),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
 
   isWithinSendWindow: vi.fn(() => true),
@@ -100,6 +104,15 @@ vi.mock("@/lib/database/workspace.server", () => ({
   getWorkspaceTwilioPortalConfig: (...args: unknown[]) => mocks.getWorkspaceTwilioPortalConfig(...args),
   createWorkspaceTwilioInstance: (...args: unknown[]) => mocks.createWorkspaceTwilioInstance(...args),
 }));
+vi.mock("@/lib/campaign-queue-claim.server", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/campaign-queue-claim.server")
+  >()),
+  // #2208: the dispatch claims the row before the provider call. These
+  // suites cover gates, pacing and row failures, not claim contention,
+  // and the real claim would go to the database.
+  claimQueueEntryForSms: async () => true,
+}));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
   recordQueueAttemptFailure: (...args: unknown[]) => mocks.recordQueueAttemptFailure(...args),
@@ -137,7 +150,9 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
     mocks.rpcFailExhaustedCampaignQueueContacts(...args),
 }));
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  withAppCurrentUser: vi.fn(async (_userId: string, run: (tx: unknown) => Promise<unknown>) => run(undefined)),
   createTenantDb: (...args: unknown[]) => mocks.createTenantDb(...args),
 }));
 vi.mock("@/lib/object-storage.server", () => ({
@@ -267,10 +282,9 @@ const SCENARIOS: Scenario[] = [
       },
     ],
     expect: {
-      // Order: first row sends and dequeues as sent; second row dequeues as
-      // duplicate. Order is deterministic because handleMember reserves the
-      // number synchronously before its first await.
-      dequeueReasons: ["Duplicate SMS prevented", "SMS message sent"],
+      // The same-number row waits for the first row's send result, so the
+      // sent dequeue completes before the duplicate dequeue.
+      dequeueReasons: ["SMS message sent", "Duplicate SMS prevented"],
       sendsAttempted: 1,
     },
   },
@@ -502,9 +516,13 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
 
     expect(startTimes.length).toBe(3);
     const gaps = [startTimes[1] - startTimes[0], startTimes[2] - startTimes[1]];
-    // ~16.7ms nominal; floor of 10ms absorbs setTimeout jitter on a busy CI
-    // runner while still catching a coordinator that fires the whole batch
-    // simultaneously (which would produce ~0ms gaps).
+    // ~16.7ms nominal. This floor was previously read as setTimeout jitter on
+    // a busy CI runner; it was not. The coordinator stamped its pacing clock at
+    // dispatch rather than at the provider request, so per-row preparation
+    // work shifted requests inside each other's slots and the gap collapsed
+    // for real under load (#2172). The 10ms floor is the regression detector
+    // for that and must not be relaxed — the deterministic version of the same
+    // claim lives in campaign-sms-dispatch-pacing.test.ts.
     for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(10);
     }
@@ -652,5 +670,32 @@ describe("SMS dispatch contract — response bodies match the generated API cont
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
     expect(zod.zInsufficientCreditsError.safeParse(await res.json()).success).toBe(true);
+  });
+});
+
+describe("MMS storage key contract", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue({
+      ...baseCampaignData(),
+      message_media: ["legacy.png", "11111111-1111-4111-8111-111111111111-photo.png"],
+    });
+    mocks.getCampaignQueueById.mockResolvedValue(SCENARIOS[1].queue);
+    mocks.createSignedObjectUrl.mockImplementation(async (_bucket, key) => {
+      if (key === `${TEST_WORKSPACE_ID}/legacy.png`) return "https://media.example/old-image";
+      if (key === `${TEST_WORKSPACE_ID}/11111111-1111-4111-8111-111111111111-photo.png`) return "https://media.example/new-image";
+      throw new Error("Unexpected media key");
+    });
+  });
+
+  test.each(["HTTP", "worker"])("%s sends both historic and new media keys", async adapter => {
+    const createMessage = vi.fn(async (input: { mediaUrl?: string[] }) => ({ sid: "SM-media", ...input }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ messages: { create: createMessage } });
+    if (adapter === "HTTP") await runHttpAdapter();
+    else await runWorkerAdapter();
+    expect(createMessage).toHaveBeenCalledWith(expect.objectContaining({
+      mediaUrl: ["https://media.example/old-image", "https://media.example/new-image"],
+    }));
   });
 });

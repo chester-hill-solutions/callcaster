@@ -6,10 +6,12 @@ import {
   type ReactNode,
 } from "react";
 import type { ScriptBlock } from "@chester-hill-solutions/scriptkit-call-script-core";
+import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
 import { Mic, Volume2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -27,6 +29,7 @@ import {
   voicePatch,
 } from "@/lib/ivr-script-editor";
 import { DEFAULT_VOICE_ID, TTS_VOICES } from "@/lib/tts-voices";
+import { ivrNoInputSchema, type IvrNoInput } from "@/lib/ivr-no-input";
 
 export type IvrStepFieldsProps = {
   block: ScriptBlock;
@@ -34,11 +37,14 @@ export type IvrStepFieldsProps = {
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
+  routingTargets: RoutingTarget[];
+  /** blockId -> owning pageId, for the no-input route target. */
+  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
 };
 
 /**
- * The audio half of an IVR step: what plays to the caller, and how.
+ * The audio half of an IVR step: what plays to the recipient, and how.
  *
  * Two modes map onto the runtime's two verbs — a spoken step becomes
  * `<Say>` of the step's text in the chosen voice, a recording step becomes
@@ -51,6 +57,8 @@ export function IvrStepFields({
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
+  routingTargets,
+  pageByBlockId,
   onChange,
 }: IvrStepFieldsProps) {
   const mode = getIvrPlaybackMode(block);
@@ -117,7 +125,7 @@ export function IvrStepFields({
   return (
     <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">What the caller hears</span>
+        <span className="text-sm font-semibold">What the recipient hears</span>
         <div role="group" aria-label="Playback mode" className="flex gap-1">
           <Button
             type="button"
@@ -169,6 +177,159 @@ export function IvrStepFields({
           uploadControl={renderUploadControl(false)}
         />
       )}
+
+      <NoInputFields
+        block={block}
+        readOnly={readOnly}
+        routingTargets={routingTargets}
+        pageByBlockId={pageByBlockId}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+/**
+ * Per-step no-input behavior (#1883): how long to wait for a keypress and what
+ * to do when the recipient stays silent. Writes `gatherTimeoutSeconds` +
+ * `noInput` through wireExtras so editor serialization retains them; the wire model is
+ * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
+ */
+function NoInputFields({
+  block,
+  readOnly,
+  routingTargets,
+  pageByBlockId,
+  onChange,
+}: {
+  block: ScriptBlock;
+  readOnly: boolean;
+  routingTargets: RoutingTarget[];
+  pageByBlockId: Record<string, string>;
+  onChange: (patch: Partial<ScriptBlock>) => void;
+}) {
+  const timeoutSeconds = typeof block.wireExtras?.gatherTimeoutSeconds === "number" ? block.wireExtras.gatherTimeoutSeconds : 5;
+  const parsedNoInput = ivrNoInputSchema.safeParse(block.wireExtras?.noInput);
+  const noInput = parsedNoInput.success ? parsedNoInput.data : undefined;
+  const action: string = noInput
+    ? typeof noInput.action === "object"
+      ? "route"
+      : noInput.action
+    : "next";
+  const maxReplays = noInput?.maxReplays ?? 2;
+  const routeBlockId =
+    noInput && typeof noInput.action === "object" ? noInput.action.blockId : "";
+  const timeoutId = useId();
+  const actionId = useId();
+  const maxId = useId();
+  const routeId = useId();
+
+  const setNoInput = (patch: IvrNoInput) => {
+    onChange({ wireExtras: { ...block.wireExtras, noInput: patch } });
+  };
+
+  const routeBlockOptions = routingTargets.filter((target) => target.kind === "block");
+  const routeTargets = routeBlockOptions
+    .filter((target) => pageByBlockId[target.id])
+    .map((target) => ({ value: target.id, label: target.label }));
+
+  return (
+    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
+      <span className="text-sm font-semibold">If the recipient stays silent</span>
+
+      <FormField label="Wait (seconds)" htmlFor={timeoutId}>
+        <Input
+          id={timeoutId}
+          type="number"
+          min={1}
+          max={60}
+          value={timeoutSeconds}
+          readOnly={readOnly}
+          onChange={(event) => {
+            const value = parseInt(event.target.value, 10);
+            const gathered =
+              Number.isFinite(value) && value >= 1 && value <= 60
+                ? value
+                : undefined;
+            onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
+          }}
+        />
+      </FormField>
+
+      <FormField label="On no input" htmlFor={actionId}>
+        <Select
+          value={action}
+          disabled={readOnly}
+          onValueChange={(next) => {
+            if (next === "next") setNoInput({ action: "next" });
+            else if (next === "hangup") setNoInput({ action: "hangup" });
+            else if (next === "replay") {
+              setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
+            } else if (next === "route") {
+              const blockId = routeTargets[0]?.value;
+              const pageId = blockId ? pageByBlockId[blockId] : undefined;
+              if (blockId && pageId) {
+                setNoInput({ action: { pageId, blockId } });
+              }
+            }
+          }}
+        >
+          <SelectTrigger id={actionId}>
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="next">Continue to the next step</SelectItem>
+            <SelectItem value="hangup">Hang up</SelectItem>
+            <SelectItem value="replay">Replay these instructions</SelectItem>
+            <SelectItem value="route">Route to a step</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormField>
+
+      {action === "replay" && (
+        <FormField label="Max replays" htmlFor={maxId}>
+          <Input
+            id={maxId}
+            type="number"
+            min={1}
+            max={10}
+            value={maxReplays}
+            readOnly={readOnly}
+            onChange={(event) => {
+              const value = parseInt(event.target.value, 10);
+              const parsed =
+                Number.isFinite(value) && value >= 1 && value <= 10 ? value : 2;
+              setNoInput({ action: "replay", maxReplays: parsed });
+            }}
+          />
+        </FormField>
+      )}
+
+      {action === "route" && (
+        <FormField label="Route to" htmlFor={routeId}>
+          <Select
+            value={routeBlockId || routeTargets[0]?.value || ""}
+            disabled={readOnly || routeTargets.length === 0}
+            onValueChange={(nextBlockId) => {
+              const pageId = pageByBlockId[nextBlockId];
+              if (pageId) {
+                setNoInput({ action: { pageId, blockId: nextBlockId } });
+              }
+            }}
+          >
+            <SelectTrigger id={routeId}>
+              <SelectValue placeholder="Select a step…" />
+            </SelectTrigger>
+            <SelectContent>
+              {routeTargets.map((target) => (
+                <SelectItem key={target.value} value={target.value}>
+                  {target.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
+      )}
     </div>
   );
 }
@@ -199,7 +360,7 @@ function SpokenStepFields({
       <FormField
         label="Speech text"
         htmlFor={textId}
-        description="Read aloud to the caller in the selected voice."
+        description="Read aloud to the recipient in the selected voice."
       >
         <Textarea
           id={textId}
@@ -259,7 +420,7 @@ function SpokenStepFields({
       {isSilent && (
         <Alert variant="warning">
           <AlertDescription>
-            Callers hear nothing at this step yet. Enter the text to speak, or
+            Recipients hear nothing at this step yet. Enter the text to speak, or
             switch to a recording.
           </AlertDescription>
         </Alert>
@@ -300,9 +461,7 @@ function RecordingStepFields({
         label="Recording"
         htmlFor={fileId}
         description={
-          hasChoices
-            ? "From the workspace audio library."
-            : "No recordings in the library yet. Upload one below."
+          hasChoices ? undefined : "No recordings in the library yet. Upload one below."
         }
       >
         {hasChoices ? (
@@ -346,7 +505,7 @@ function RecordingStepFields({
       {fileName.length === 0 && (
         <Alert variant="warning">
           <AlertDescription>
-            Choose or upload a recording, or callers hear nothing at this step.
+            Choose or upload a recording, or recipients hear nothing at this step.
           </AlertDescription>
         </Alert>
       )}

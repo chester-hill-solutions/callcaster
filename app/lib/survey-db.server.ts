@@ -18,10 +18,81 @@ import { formatSurveyAnswer } from "@/lib/survey-format";
 
 export { formatSurveyAnswer };
 import { createTenantDb } from "@/server/tenant-db";
+import { completeSurveyResponse } from "@/server/survey-completion";
+export { completeSurveyResponse };
+
+/**
+ * Response reads and CSV export moved to `./survey-responses.server` (#2126), when
+ * this file hit its 928-line pin. Re-exported rather than left behind so no
+ * import site had to change.
+ */
+export {
+  buildSurveyResponsesCsv,
+  getSurveyResponsesForWorkspace,
+  loadActiveSurveysForWorkspace,
+  loadExistingResponseWithAnswers,
+} from "./survey-responses.server";
 
 
 type SurveyRow = typeof surveyTable.$inferSelect;
 type SurveyResponseRow = typeof surveyResponseTable.$inferSelect;
+
+/**
+ * Resolve a page's internal id from its public label, scoped to one survey.
+ *
+ * `survey_page.page_id` is a short per-survey label — `page-1` recurs in every
+ * survey — so the label alone does not identify a page, and neither does it
+ * identify a question: `survey_question.question_id` is likewise a per-page
+ * label, so `question-1` exists on every page of every survey. An unscoped
+ * `where page_id = ?` therefore returns an arbitrary row from the whole table.
+ *
+ * Both public entry points that resolve a question go through here, because the
+ * two lookups differ only in where they read the label from. Returning `null`
+ * rather than throwing lets each caller choose its own status: `saveSurveyAnswer`
+ * answers 404, `submitSurveyResponse` treats it as "no page scope" and still
+ * scopes by survey through the join.
+ */
+async function resolveSurveyPageInternalId(
+  surveyInternalId: number,
+  pageLabel: string,
+): Promise<number | null> {
+  const [page] = await db
+    .select({ id: surveyPageTable.id })
+    .from(surveyPageTable)
+    .where(
+      and(
+        eq(surveyPageTable.survey_id, surveyInternalId),
+        eq(surveyPageTable.page_id, pageLabel),
+      ),
+    )
+    .limit(1);
+
+  return page?.id ?? null;
+}
+
+/**
+ * Resolve a question's internal id from its public label, scoped to one page.
+ *
+ * Scoping by page is only sufficient because the page was itself resolved
+ * through its survey — see {@link resolveSurveyPageInternalId}.
+ */
+async function resolveSurveyQuestionInternalId(
+  pageInternalId: number,
+  questionLabel: string,
+): Promise<number | null> {
+  const [question] = await db
+    .select({ id: surveyQuestionTable.id })
+    .from(surveyQuestionTable)
+    .where(
+      and(
+        eq(surveyQuestionTable.page_id, pageInternalId),
+        eq(surveyQuestionTable.question_id, questionLabel),
+      ),
+    )
+    .limit(1);
+
+  return question?.id ?? null;
+}
 
 export async function findUserById(userId: string) {
   const [row] = await db.select().from(userTable).where(eq(userTable.id, userId)).limit(1);
@@ -192,48 +263,6 @@ export async function loadRecentSurveyResponses(surveyInternalId: number, limit 
   }));
 }
 
-export async function loadExistingResponseWithAnswers(args: {
-  surveyInternalId: number;
-  contactId: number;
-}) {
-  const [response] = await db
-    .select()
-    .from(surveyResponseTable)
-    .where(
-      and(
-        eq(surveyResponseTable.survey_id, args.surveyInternalId),
-        eq(surveyResponseTable.contact_id, args.contactId),
-      ),
-    )
-    .orderBy(desc(surveyResponseTable.created_at))
-    .limit(1);
-
-  if (!response) {
-    return { response: null, answers: {} as Record<string, string | string[]> };
-  }
-
-  const answers = await db
-    .select({
-      answer_value: responseAnswerTable.answer_value,
-      question_id: surveyQuestionTable.question_id,
-    })
-    .from(responseAnswerTable)
-    .innerJoin(
-      surveyQuestionTable,
-      eq(responseAnswerTable.question_id, surveyQuestionTable.id),
-    )
-    .where(eq(responseAnswerTable.response_id, response.id));
-
-  const answersByQuestionId = answers.reduce<Record<string, string | string[]>>(
-    (acc, answer) => {
-      acc[answer.question_id] = answer.answer_value;
-      return acc;
-    },
-    {},
-  );
-
-  return { response, answers: answersByQuestionId };
-}
 
 export async function createSurveyWithStructure(args: {
   workspaceId: string;
@@ -359,7 +388,6 @@ async function getOrCreateSurveyResponse(args: {
   contactId: number | null;
   startedAt: string;
   lastPageCompleted: string | null;
-  completedAt?: string | null;
 }): Promise<{ row: SurveyResponseRow; created: boolean } | { error: unknown }> {
   try {
     const [inserted] = await db
@@ -369,7 +397,6 @@ async function getOrCreateSurveyResponse(args: {
         result_id: args.resultId,
         contact_id: args.contactId ?? undefined,
         started_at: args.startedAt,
-        completed_at: args.completedAt ?? null,
         last_page_completed: args.lastPageCompleted,
         created_at: args.startedAt,
         updated_at: args.startedAt,
@@ -401,6 +428,34 @@ async function getOrCreateSurveyResponse(args: {
   }
 
   return { row: existing, created: false };
+}
+
+export async function completePublicSurveyResponse(args: {
+  surveyInternalId: number;
+  resultId: string;
+  contactId: number | null;
+  completed: boolean;
+}) {
+  if (args.completed) {
+    // A signed respondent can finish without saving any optional answer.
+    const created = await getOrCreateSurveyResponse({
+      surveyInternalId: args.surveyInternalId,
+      resultId: args.resultId,
+      contactId: args.contactId,
+      startedAt: new Date().toISOString(),
+      lastPageCompleted: null,
+    });
+    if ("error" in created) {
+      logger.error("Error creating survey response:", created.error);
+      return { ok: false as const, error: "Failed to create survey response", status: 500 };
+    }
+  }
+
+  return completeSurveyResponse({
+    surveyInternalId: args.surveyInternalId,
+    resultId: args.resultId,
+    completed: args.completed,
+  });
 }
 
 async function upsertResponseAnswer(args: {
@@ -485,19 +540,28 @@ export async function saveSurveyAnswer(args: {
     logger.error("Error updating survey response:", error);
   }
 
-  const [question] = await db
-    .select({ id: surveyQuestionTable.id })
-    .from(surveyQuestionTable)
-    .where(eq(surveyQuestionTable.question_id, args.questionPublicId))
-    .limit(1);
+  // Scope the question by page, scoped in turn by survey. `question_id` is a
+  // short per-page label — `question-1` recurs on every page of every survey —
+  // so `where question_id = ? limit 1` with no other predicate returns an
+  // *arbitrary* row from the whole table. An anonymous caller could name another
+  // tenant's `question-1` and have the answer stored against it, where it renders
+  // in that survey's results and export (#2126).
+  const pageInternalId = await resolveSurveyPageInternalId(survey.id, args.pageId);
+  if (pageInternalId === null) {
+    return { ok: false as const, error: "Page not found", status: 404 };
+  }
 
-  if (!question) {
+  const questionInternalId = await resolveSurveyQuestionInternalId(
+    pageInternalId,
+    args.questionPublicId,
+  );
+  if (questionInternalId === null) {
     return { ok: false as const, error: "Question not found", status: 404 };
   }
 
   const upsert = await upsertResponseAnswer({
     responseId: created.row.id,
-    questionInternalId: question.id,
+    questionInternalId,
     answerValue: args.answerValue,
     answeredAt: nowIso,
   });
@@ -544,7 +608,6 @@ export async function submitSurveyResponse(args: {
     contactId: args.responseData.contact_id ?? null,
     startedAt: nowIso,
     lastPageCompleted: args.responseData.last_page_completed ?? null,
-    completedAt: args.responseData.completed ? nowIso : null,
   });
 
   if ("error" in created) {
@@ -556,7 +619,6 @@ export async function submitSurveyResponse(args: {
     await db
       .update(surveyResponseTable)
       .set({
-        completed_at: args.responseData.completed ? nowIso : null,
         last_page_completed: args.responseData.last_page_completed ?? null,
         updated_at: nowIso,
       })
@@ -564,23 +626,21 @@ export async function submitSurveyResponse(args: {
   }
 
   if (args.responseData.answers?.length) {
-    let pageInternalId: number | null = null;
-    if (args.responseData.last_page_completed) {
-      const [page] = await db
-        .select({ id: surveyPageTable.id })
-        .from(surveyPageTable)
-        .where(
-          and(
-            eq(surveyPageTable.survey_id, survey.id),
-            eq(surveyPageTable.page_id, args.responseData.last_page_completed),
-          ),
-        )
-        .limit(1);
-      pageInternalId = page?.id ?? null;
-    }
+    // `null` when no page label was submitted, which is the case the
+    // survey-scoping join below exists for.
+    const pageInternalId = args.responseData.last_page_completed
+      ? await resolveSurveyPageInternalId(survey.id, args.responseData.last_page_completed)
+      : null;
 
     for (const answer of args.responseData.answers) {
-      const conditions = [eq(surveyQuestionTable.question_id, answer.question_id)];
+      // Join the page so the question is always scoped to THIS survey, whether or
+      // not `last_page_completed` resolved. Previously the page predicate was
+      // conditional, so a submission without it matched `question_id` across the
+      // whole table — the same cross-survey write as #2126, on the sibling path.
+      const conditions = [
+        eq(surveyQuestionTable.question_id, answer.question_id),
+        eq(surveyPageTable.survey_id, survey.id),
+      ];
       if (pageInternalId != null) {
         conditions.push(eq(surveyQuestionTable.page_id, pageInternalId));
       }
@@ -588,6 +648,7 @@ export async function submitSurveyResponse(args: {
       const [question] = await db
         .select({ id: surveyQuestionTable.id })
         .from(surveyQuestionTable)
+        .innerJoin(surveyPageTable, eq(surveyQuestionTable.page_id, surveyPageTable.id))
         .where(and(...conditions))
         .limit(1);
 
@@ -613,298 +674,16 @@ export async function submitSurveyResponse(args: {
     }
   }
 
+  const completion = await completeSurveyResponse({
+    surveyInternalId: survey.id,
+    resultId: args.responseData.result_id,
+    completed: args.responseData.completed === true,
+  });
+  if (!completion.ok) return completion;
+
   return {
     ok: true as const,
     response_id: created.row.id,
     result_id: args.responseData.result_id,
   };
-}
-
-export async function completeSurveyResponse(args: {
-  surveyInternalId: number;
-  resultId: string;
-  completed: boolean;
-}) {
-  const nowIso = new Date().toISOString();
-  try {
-    await db
-      .update(surveyResponseTable)
-      .set({
-        completed_at: args.completed ? nowIso : null,
-        updated_at: nowIso,
-      })
-      .where(
-        and(
-          eq(surveyResponseTable.survey_id, args.surveyInternalId),
-          eq(surveyResponseTable.result_id, args.resultId),
-        ),
-      );
-  } catch (error) {
-    logger.error("Error completing survey:", error);
-    return { ok: false as const, error: "Failed to complete survey", status: 500 };
-  }
-
-  return { ok: true as const, result_id: args.resultId };
-}
-
-export async function loadActiveSurveysForWorkspace(workspaceId: string) {
-  const tdb = createTenantDb(workspaceId);
-  return tdb.survey.findMany({
-    where: eq(surveyTable.is_active, true),
-    columns: { survey_id: true, title: true },
-  });
-}
-
-export async function getSurveyResponsesForWorkspace(
-  surveyPublicId: string,
-  workspaceId: string,
-) {
-  const tdb = createTenantDb(workspaceId);
-
-  try {
-    const survey = await tdb.survey.findFirst({
-      where: eq(surveyTable.survey_id, surveyPublicId),
-      columns: {
-        id: true,
-        survey_id: true,
-        title: true,
-        workspace: true,
-      },
-    });
-    if (!survey) {
-      return { ok: false as const, error: "Survey not found", status: 404 };
-    }
-
-    const responseRows = await db
-      .select()
-      .from(surveyResponseTable)
-      .where(eq(surveyResponseTable.survey_id, survey.id))
-      .orderBy(desc(surveyResponseTable.created_at));
-
-    if (responseRows.length === 0) {
-      return {
-        ok: true as const,
-        survey_id: survey.survey_id,
-        responses: [],
-        stats: {
-          total: 0,
-          completed: 0,
-          in_progress: 0,
-          completion_rate: 0,
-        },
-      };
-    }
-
-    const responseIds = responseRows.map((response) => response.id);
-    const contactIds = [
-      ...new Set(
-        responseRows
-          .map((response) => response.contact_id)
-          .filter((id): id is number => typeof id === "number"),
-      ),
-    ];
-
-    const pages = await db
-      .select({ id: surveyPageTable.id })
-      .from(surveyPageTable)
-      .where(eq(surveyPageTable.survey_id, survey.id));
-    const pageIds = pages.map((page) => page.id);
-    const questions =
-      pageIds.length === 0
-        ? []
-        : await db
-            .select()
-            .from(surveyQuestionTable)
-            .where(inArray(surveyQuestionTable.page_id, pageIds));
-    const questionIds = questions.map((question) => question.id);
-
-    const [contacts, answerRows, options] = await Promise.all([
-      contactIds.length > 0
-        ? db
-            .select({
-              id: contactTable.id,
-              firstname: contactTable.firstname,
-              surname: contactTable.surname,
-              phone: contactTable.phone,
-              email: contactTable.email,
-            })
-            .from(contactTable)
-            .where(
-              and(
-                eq(contactTable.workspace, workspaceId),
-                inArray(contactTable.id, contactIds),
-              ),
-            )
-        : Promise.resolve([]),
-      db
-        .select()
-        .from(responseAnswerTable)
-        .where(inArray(responseAnswerTable.response_id, responseIds)),
-      questionIds.length === 0
-        ? Promise.resolve([])
-        : db
-            .select()
-            .from(questionOptionTable)
-            .where(inArray(questionOptionTable.question_id, questionIds)),
-    ]);
-
-    const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
-    const questionById = new Map(questions.map((question) => [question.id, question]));
-    const optionsByQuestionId = new Map<number, typeof options>();
-    for (const option of options) {
-      const existing = optionsByQuestionId.get(option.question_id) ?? [];
-      existing.push(option);
-      optionsByQuestionId.set(option.question_id, existing);
-    }
-
-    const answersByResponseId = new Map<
-      number,
-      Array<
-        (typeof answerRows)[number] & {
-          survey_question: {
-            question_id: string;
-            question_text: string;
-            question_type: string;
-            question_option: Array<{ option_label: string }>;
-          } | null;
-        }
-      >
-    >();
-
-    for (const answer of answerRows) {
-      const question = questionById.get(answer.question_id);
-      const enrichedAnswer = {
-        ...answer,
-        survey_question: question
-          ? {
-              question_id: question.question_id,
-              question_text: question.question_text,
-              question_type: question.question_type,
-              question_option: (optionsByQuestionId.get(question.id) ?? []).map(
-                (option) => ({ option_label: option.option_label }),
-              ),
-            }
-          : null,
-      };
-      const existing = answersByResponseId.get(answer.response_id) ?? [];
-      existing.push(enrichedAnswer);
-      answersByResponseId.set(answer.response_id, existing);
-    }
-
-    const responses = responseRows.map((response) => ({
-      ...response,
-      contact: response.contact_id
-        ? (contactById.get(response.contact_id) ?? null)
-        : null,
-      response_answer: answersByResponseId.get(response.id) ?? [],
-    }));
-
-    const total = responses.length;
-    const completed = responses.filter((row) => row.completed_at)?.length ?? 0;
-
-    return {
-      ok: true as const,
-      survey_id: survey.survey_id,
-      responses,
-      stats: {
-        total,
-        completed,
-        in_progress: total - completed,
-        completion_rate: total > 0 ? (completed / total) * 100 : 0,
-      },
-    };
-  } catch (error) {
-    logger.error("getSurveyResponsesForWorkspace error", error);
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to load survey responses",
-      status: 500,
-    };
-  }
-}
-
-export async function buildSurveyResponsesCsv(args: {
-  workspaceId: string;
-  surveyId: string;
-}) {
-  const result = await getSurveyResponsesForWorkspace(args.surveyId, args.workspaceId);
-  if (!result.ok) {
-    return result;
-  }
-
-  const survey = await loadSurveyDetailByPublicId(args.surveyId, {
-    workspaceId: args.workspaceId,
-  });
-  if (!survey) {
-    return { ok: false as const, error: "Survey not found", status: 404 };
-  }
-
-  type SurveyPageWithQuestions = {
-    page_order?: number;
-    survey_question?: Array<{
-      id: number;
-      question_id: string;
-      question_text: string;
-      question_type: string;
-      question_order: number;
-    }>;
-  };
-
-  const allQuestions = ((survey.survey_page ?? []) as SurveyPageWithQuestions[])
-    .flatMap((page) => page.survey_question ?? [])
-    .sort((a, b) => (a.question_order ?? 0) - (b.question_order ?? 0));
-
-  type ResponseRow = (typeof result.responses)[number];
-
-  const getContactName = (response: ResponseRow) => {
-    if (response.contact?.firstname && response.contact?.surname) {
-      return `${response.contact.firstname} ${response.contact.surname}`;
-    }
-    if (response.contact?.phone) return response.contact.phone;
-    if (response.contact?.email) return response.contact.email;
-    return "Anonymous";
-  };
-
-  const getAnswerForQuestion = (response: ResponseRow, questionId: string) => {
-    const question = allQuestions.find((q) => q.question_id === questionId);
-    if (!question) return "-";
-    const answer = response.response_answer?.find((a) => a.question_id === question.id);
-    return answer ? formatSurveyAnswer(answer) : "-";
-  };
-
-  const headers = [
-    "Respondent",
-    "Status",
-    "Started",
-    "Completed",
-    "Last Page",
-    ...allQuestions.map((question) => question.question_text),
-  ];
-
-  const rows = result.responses.map((response) => [
-    getContactName(response),
-    response.completed_at ? "Completed" : "In Progress",
-    formatDateUtc(response.started_at),
-    response.completed_at ? formatDateUtc(response.completed_at) : "-",
-    response.last_page_completed || "-",
-    ...allQuestions.map((question) =>
-      getAnswerForQuestion(response, question.question_id),
-    ),
-  ]);
-
-  const headerKeys = headers.map((_, idx) => `c${idx}`);
-  const csvRows = rows.map((row) =>
-    Object.fromEntries(row.map((cell, idx) => [`c${idx}`, cell])),
-  );
-  const csv = toCsvString({
-    headers: headerKeys,
-    headerLabels: headers,
-    rows: csvRows,
-  });
-
-  const filename = `survey-responses-${safeFilenamePart(String(survey.title ?? "survey"))}-${new Date()
-    .toISOString()
-    .slice(0, 10)}.csv`;
-
-  return { ok: true as const, filename, csv };
 }

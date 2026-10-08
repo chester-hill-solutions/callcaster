@@ -93,7 +93,7 @@ export async function initiateIvrCall(
     await dequeueQueueEntry({
       by: { id: input.contact.id },
       userId: input.user_id,
-      reason: "IVR call completed",
+      reason: "IVR dial dispatched",
     });
 
     return { success: true, callSid: call.sid };

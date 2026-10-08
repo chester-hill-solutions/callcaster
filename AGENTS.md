@@ -7,6 +7,8 @@ Always talk to me like I have ADHD.
 
 > **Platform context:** Read [docs/AGENT-PLATFORM-GUIDE.md](docs/AGENT-PLATFORM-GUIDE.md) for CHS portfolio role, shared `@chester-hill-solutions/*` packages, and migration-branch boundaries before cross-cutting work.
 
+- **`require-issue-reference` needs the `no-issue` LABEL, not the words.** Every PR into `dev` must reference an issue, via `Closes #N` or a bare `Issues: #N, #N` line, *or* carry the `no-issue` label ([`pr-issue-reference.yml`](.github/workflows/pr-issue-reference.yml) greps `github.event.pull_request.labels[*].name`). Writing `no-issue` in the PR body does nothing — the check still fails. Add it with `gh pr edit <n> --add-label no-issue` at creation time.
+- **Do not add `Issues:` lines for issues you only reference.** Those lines feed the `issue-on-dev` workflow, which moves the CHS project Status to `on-dev` on merge. Referencing #2172 as context in a board PR would falsely mark it in progress. Reference such issues in the body prose instead and label the PR `no-issue`.
 - When the user says `do the needful`, continue with the most obvious next implementation, cleanup, or verification steps without waiting for repeated confirmation unless blocked.
 - **Atomic PRs:** Each PR is one logical concern (one issue/decision) with all its changes and nothing else. Plan work as PR-sized chunks aligned to a single ticket before implementing; keep the diff small and reviewable, and do not bundle unrelated fixes, refactors, or cleanup into a PR.
 - **Full `npm run ci:local` green before every push/PR — no partial gates.** tsc + one suite + a build is NOT the bar; the push runs `check:*` guards, both suites, the production build, bundle guard, and codegen verify, and anything skipped locally surfaces as a red PR (the #1379 Railway deploy failure shipped on partial gates). Deploys ride the same push, so a broken push blocks environments, not just CI.
@@ -39,11 +41,11 @@ Always talk to me like I have ADHD.
 | [`api+/audiodrop.action.server.ts`](app/routes/api+/audiodrop.action.server.ts) | Flat dual-auth |
 | [`api+/auto-dial/end.action.server.ts`](app/routes/api+/auto-dial/end.action.server.ts) | JSON auth inject |
 | [`api+/audiodrop.tsx`](app/routes/api+/audiodrop.tsx) | Route module ref |
-- **Auth layout adapter:** Until `@chester-hill-solutions/auth-react-router` is installable, use [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`).
+- **Auth layout adapter:** This repository currently uses [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`) for the auth layout boundary.
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
-- **Pre-PR CI bar:** `npm run ci:local` mirrors the quality + bundle-guard jobs (typecheck, lint, tests, route-tree verify, API surface/codegen drift, structural guards).
-- **Structural guards:** 15 `check:*` commands wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — 14 in the `quality` job (`check:route-server-leaks`, `check:twilio-webhooks`, `check:request-body-consumption`, `check:middleware`, `check:credit-writes`, `check:route-authz`, `check:workspace-projection`, `check:effects`, `check:type-safety`, `check:dry`, `check:handlers`, `check:test-mocks`, `check:bun-lock`, `check:lint-ratchet`) plus `check:client-bundle` in `bundle-guard`. That job list also runs `tools:routes:verify`, `tools:api:surface:check`, `db:ledger:check`, `db:bootstrap:check`, `tools:check-file-size` and `ci:codegen:verify`.
+- **Pre-PR CI bar:** `npm run ci:local` is the repository's comprehensive local gate. It runs typecheck, lint, both test suites, route and API checks, structural guards, the production build, the client-bundle check, and codegen verification.
+- **Structural guards:** The check list changes with the scripts and workflow. Use `npm run ci:local` for the full local gate; use [`package.json`](package.json) and [`.github/workflows/ci.yml`](.github/workflows/ci.yml) as the source of truth instead of relying on a fixed count.
 
 ## Public APIs (doc-first / Hey API)
 
@@ -94,7 +96,7 @@ Always talk to me like I have ADHD.
 
 **Default: use the CLI** for deploy, cleanup, env vars, DB ops, and anything that must run non-interactively. Use **MCP for read-only inspection** (status, logs, deployments). Avoid `railway-agent` for multi-step infra unless the CLI cannot do it.
 
-### CLI (prefer `@railway/cli` ≥ 5.x)
+### CLI
 
 - Link context first: `railway environment <env>` → `railway service <name>` → `railway status`.
 - **CallCaster** project (`32b36c6c-5f3d-463b-8c7f-bbcd70351e8f`); **migration/review env** is **`visual-asset-review`** (`18ef9173-4b33-4a62-9b94-9dfc7a36eb05`) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05); see [`docs/railway-review-env.md`](docs/railway-review-env.md).
@@ -108,7 +110,6 @@ Always talk to me like I have ADHD.
 
 - **Good for:** `list-projects`, `list-services`, `get-status`, `list-deployments`, `get-logs` — quick read-only checks without linking cwd.
 - **`accept-deploy`** — commits **all** staged environment changes and deploys; destructive; only when the user explicitly wants deploy.
-- **`railway-agent`** — multi-step ops but unreliable here: truncates service IDs, **`commitStagedChangesTool` often fails**, may **`discardStagedChangesTool`** and revert work, dual-volume PATCH merges instead of replacing. Prefer CLI when agent reports “staged” or “send another message”.
 - MCP **hides secret values** in config; use CLI `railway variables` / `railway run` when you need to run migrations against the DB.
 
 ### Postgres on Railway (this repo)
@@ -116,3 +117,7 @@ Always talk to me like I have ADHD.
 - App **`DATABASE_URL`** should reference the single Postgres service variable (e.g. `${{PostgreSQL 18.DATABASE_URL}}`).
 - Schema/data restore: dump from linked Postgres (`client db dump --linked` + **PostgreSQL 17+ `pg_dump`** locally), restore via `psql "$DATABASE_PUBLIC_URL"`, seed `AUTH_migrations.schema_migrations`, then `client db push --db-url "$DATABASE_PUBLIC_URL" --yes`.
 - One volume per Postgres service; changing major PG version requires a **fresh volume** (cannot reuse PG18 data dir on PG17 image).
+
+## Optional developer tools
+
+For Graphify setup and use, read [.opencode/skills/graphify/SKILL.md](.opencode/skills/graphify/SKILL.md). Check graph findings against current source.

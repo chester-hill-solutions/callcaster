@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { transaction_history as transactionHistoryTable, workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { MemberRole } from "@/lib/member-role";
 import type { Database } from "@/lib/db-types";
 import {
   CREDIT_PRICE_CAD,
@@ -14,7 +15,10 @@ import {
 import { billingPricingSchema } from "@/lib/schemas/api/platform-billing";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import {
+  LEDGER_ACTIVITY_COLUMNS,
+  insertTransactionHistoryIdempotent,
+} from "@/lib/transaction-history.server";
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
@@ -35,7 +39,9 @@ async function ensureStripeCustomer(
   workspaceId: string,
 ): Promise<{ ok: true; stripeCustomerId: string } | { ok: false; error: string; status: number }> {
   const [workspace] = await adminDb
-    .select({ stripe_id: workspaceTable.stripe_id })
+    .select({ stripe_id: workspaceTable.stripe_id, stripe_customer_conflict: workspaceTable.stripe_customer_conflict,
+      stripe_customer_creation: workspaceTable.stripe_customer_creation,
+      stripe_customer_creation_completed_id: workspaceTable.stripe_customer_creation_completed_id })
     .from(workspaceTable)
     .where(eq(workspaceTable.id, workspaceId))
     .limit(1);
@@ -50,17 +56,13 @@ async function ensureStripeCustomer(
 
   let stripeCustomerId = workspace.stripe_id ?? null;
 
-  if (!stripeCustomerId) {
+  if (!stripeCustomerId || workspace.stripe_customer_conflict ||
+      (workspace.stripe_customer_creation && workspace.stripe_customer_creation_completed_id !== stripeCustomerId)) {
     try {
       const customer = await createStripeContact({
         workspace_id: workspaceId,
       });
       stripeCustomerId = customer.id;
-
-      await adminDb
-        .update(workspaceTable)
-        .set({ stripe_id: stripeCustomerId })
-        .where(eq(workspaceTable.id, workspaceId));
     } catch {
       return {
         ok: false,
@@ -100,14 +102,7 @@ export async function getWorkspaceBilling(
 
   const tdb = createTenantDb(workspaceId);
   const history = await tdb.transaction_history.findMany({
-    columns: {
-      id: true,
-      created_at: true,
-      type: true,
-      amount: true,
-      note: true,
-      idempotency_key: true,
-    },
+    columns: LEDGER_ACTIVITY_COLUMNS,
     orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
     limit: 500,
   });
@@ -131,6 +126,7 @@ export async function createBillingCheckoutSession(args: {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: MemberRole.Admin,
   });
 
   if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
@@ -158,8 +154,11 @@ export async function createBillingCheckoutSession(args: {
           price_data: {
             currency: "cad",
             product_data: {
-              name: "Workspace credits",
-              description: `${formatCredits(amount)} credits for your workspace`,
+              // The count is in the line name, not the quantity (#1981): the
+              // receipt then reads "12,500 workspace credits" instead of
+              // "Workspace credits × 1", and no Stripe Checkout quantity
+              // ceiling is ever hit (packages go up to 25,000 credits).
+              name: `${formatCredits(amount)} workspace credits`,
             },
             unit_amount: priceInCents,
             tax_behavior: "exclusive",
@@ -216,6 +215,7 @@ export async function pollBillingCheckoutSession(args: {
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: MemberRole.Admin,
   });
 
   const stripe = createStripeClient();

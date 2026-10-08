@@ -52,11 +52,11 @@ export function useChatThread({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef<number>(initialMessages.length);
-  const scrollPositionRef = useRef<number>(0);
+  const lastMessageCountRef = useRef<number>(0);
   const hasMarkedAsReadRef = useRef<boolean>(false);
   const savedScrollRef = useRef<{ height: number; top: number } | null>(null);
   const didPrependRef = useRef(false);
+  const skipAutoScrollRef = useRef(false);
   const lastMergedFetcherDataRef = useRef<unknown>(null);
   const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore);
 
@@ -68,26 +68,6 @@ export function useChatThread({
       workspace: workspace.id,
       contact_number,
     });
-
-  /**
-   * @effect CANDIDATE-REMOVE: mirror the loader's initialHasMore into local hasMoreOlder state every time the thread's loader data changes (e.g. switching contact_number).
-   * @effect-deps initialHasMore (loader value for the freshly-loaded thread)
-   * @effect-side-effects none (setState only)
-   * @effect-why-not-loader This copies loader data into state after a render — the "reset state when a prop changes" pattern the effects guide recommends avoiding (e.g. via a `key` remount or reading useLoaderData directly). It's an effect today because hasMoreOlder is also mutated later by the older-messages fetcher merge, and this route doesn't remount per contact_number.
-   */
-  useEffect(() => {
-    setHasMoreOlder(initialHasMore);
-  }, [initialHasMore]);
-
-  /**
-   * @effect Clear the "already merged" fetcher-data marker when the active conversation changes, so a stale older-messages page from the previous thread isn't mistaken for already-merged data.
-   * @effect-deps contact_number (a new thread means any previously loaded olderFetcher.data no longer applies)
-   * @effect-side-effects none (ref mutation only)
-   * @effect-why-not-loader This resets bookkeeping in a ref, not render state; it exists purely to keep the fetcher-merge effect below correct across thread switches.
-   */
-  useEffect(() => {
-    lastMergedFetcherDataRef.current = null;
-  }, [contact_number]);
 
   const loadingOlder =
     olderFetcher.state === "loading" || olderFetcher.state === "submitting";
@@ -125,11 +105,11 @@ export function useChatThread({
    */
   useEffect(() => {
     const data = olderFetcher.data;
-    if (!data?.messages?.length || data === lastMergedFetcherDataRef.current)
-      return;
+    if (!data || data === lastMergedFetcherDataRef.current) return;
     lastMergedFetcherDataRef.current = data;
-    const older = data.messages as Message[];
     setHasMoreOlder(data.hasMore === true);
+    if (!data.messages?.length) return;
+    const older = data.messages as Message[];
     setMessages((prev) => {
       const ids = new Set(prev.map((m) => m?.sid).filter(Boolean));
       const prepend = older.filter((m) => m?.sid && !ids.has(m.sid));
@@ -155,17 +135,8 @@ export function useChatThread({
         top + (scrollContainerRef.current.scrollHeight - height);
       didPrependRef.current = false;
       savedScrollRef.current = null;
+      skipAutoScrollRef.current = true;
     }
-  }, [messages.length]);
-
-  /**
-   * @effect Track the previous rendered message count in a ref so the scroll-to-bottom effect below can detect when new messages arrived.
-   * @effect-deps messages.length (records the count after every render where it changes)
-   * @effect-side-effects none (ref mutation only)
-   * @effect-why-not-loader Pure "previous value" bookkeeping for another effect's comparison; not data that can be derived at render time since it must reflect what was last rendered.
-   */
-  useEffect(() => {
-    lastMessageCountRef.current = messages.length;
   }, [messages.length]);
 
   /**
@@ -266,8 +237,6 @@ export function useChatThread({
     );
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
     messageElements.forEach((el) => observer.observe(el));
-    lastMessageCountRef.current = messageElements.length;
-
     return () => {
       observer.disconnect();
     };
@@ -281,32 +250,25 @@ export function useChatThread({
   }, [messages]);
 
   /**
-   * @effect Auto-scroll the thread to the newest message when new messages arrive, but only if the user was already near the bottom; otherwise preserve their current scroll position.
-   * @effect-deps messages (detects new arrivals by comparing messages.length to lastMessageCountRef)
-   * @effect-side-effects dom (scrollIntoView, and manual scrollTop restoration via requestAnimationFrame)
+   * @effect Auto-scroll the thread to the newest message on initial render and when a message arrives. Older-message pagination preserves the current viewport instead.
+   * @effect-deps messages.length (detects initial and newly-added messages)
+   * @effect-side-effects dom (writes scrollTop on the history scroller)
    * @effect-why-not-loader Scroll positioning must run after the new messages are in the DOM; it's not expressible as loader/derived data.
    */
   useEffect(() => {
-    if (!messagesEndRef.current) return;
-
-    const container = messagesEndRef.current.parentElement;
+    const container = scrollContainerRef.current;
     if (!container) return;
 
-    const isAtBottom =
-      container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
     const hasNewMessages = messages.length > lastMessageCountRef.current;
 
-    if (hasNewMessages) {
-      if (isAtBottom) {
-        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-      } else {
-        scrollPositionRef.current = container.scrollTop;
-        requestAnimationFrame(() => {
-          container.scrollTop = scrollPositionRef.current;
-        });
-      }
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false;
+    } else if (hasNewMessages) {
+      container.scrollTop = container.scrollHeight;
     }
-  }, [messages]);
+
+    lastMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   const lastInboundBody = [...messages]
     .reverse()

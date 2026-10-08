@@ -74,7 +74,7 @@ So **page order** in the `pages` object matters for linear segments, and **array
 
 ### 2. Branching via `option.next`
 
-When the caller’s input matches an option, **`next`** is interpreted by [`handleNextStep`](../app/routes/api.ivr.$campaignId.$pageId.$blockId.response.tsx) roughly as:
+When the recipient’s input matches an option, **`next`** is interpreted by [`handleNextStep`](../app/routes/api.ivr.$campaignId.$pageId.$blockId.response.tsx) roughly as:
 
 | `next` value | Effect |
 |--------------|--------|

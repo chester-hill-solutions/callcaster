@@ -9,6 +9,8 @@ import { AUTH_CLASS_TAGS } from "@/lib/api-surface-types";
 import {
   integratorOpenApiComponents,
   integratorPathOverrides,
+  apiKeyOrSessionSecurity,
+  sessionCookieSecurity,
 } from "@/lib/openapi-integrator";
 import { platformOpenApiComponents } from "@/lib/openapi-platform-components";
 import { platformPathOverrides } from "@/lib/openapi-platform";
@@ -145,16 +147,20 @@ function responsesForEntry(entry: ApiSurfaceEntry, op: ApiSurfaceOperation) {
     },
     "401": errorResponse("Unauthorized"),
     "403": errorResponse("Forbidden"),
+    ...(entry.requestBodyLimit && op.handler === "action" ? {
+      "400": errorResponse("Malformed form body; see operation notes for file validation behavior"),
+      "413": errorResponse(`Encoded request exceeds ${entry.requestBodyLimit} bytes; see operation notes for file limits`),
+    } : {}),
   };
 }
 
 function securityForAuth(authClass: AuthClass) {
   switch (authClass) {
     case "apiKeyOrSession":
-      return [{ sessionCookie: [] }, { apiKey: [] }];
+      return apiKeyOrSessionSecurity;
     case "session":
     case "workspaceAdmin":
-      return [{ sessionCookie: [] }];
+      return sessionCookieSecurity;
     case "publicForm":
       return [];
     case "twilioSignature":
@@ -241,6 +247,9 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
         "x-callcaster-exposure": entry.exposure,
         "x-callcaster-auth-class": entry.authClass,
         "x-callcaster-docs-guide": entry.docsGuide,
+        ...(entry.requestBodyLimit && op.handler === "action"
+          ? { "x-callcaster-request-body-limit": entry.requestBodyLimit }
+          : {}),
         ...(op.capability
           ? { "x-callcaster-capability": op.capability }
           : {}),

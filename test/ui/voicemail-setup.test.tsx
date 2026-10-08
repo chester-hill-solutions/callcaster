@@ -160,10 +160,10 @@ describe("app/routes/workspaces+/$id/voicemails/setup.route.tsx", () => {
   test("the empty-state link lands on workspace number settings, not a nested 404", async () => {
     await renderSetup({ numbers: [] });
     // A path-relative ".." from /workspaces/:id/voicemails/setup would resolve
-    // to /workspaces/ws-1/voicemails/settings/numbers, which does not exist.
+    // to /workspaces/ws-1/voicemails/phone-numbers, which does not exist.
     expect(screen.getByRole("link", { name: /Add a phone number/i })).toHaveAttribute(
       "href",
-      "/workspaces/ws-1/settings/numbers",
+       "/workspaces/ws-1/phone-numbers",
     );
   });
 });

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   requireOutboundCredits: vi.fn(async () => ({ ok: true, balance: 100 })),
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
+  scheduleSweepFindMany: vi.fn(),
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
   createTenantDb: vi.fn(() => ({ tenant: true })),
   getCampaignReadiness: vi.fn(() => ({
@@ -43,13 +44,23 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,
   updateCampaignStatusInWorkspace: mocks.updateCampaignStatusInWorkspace,
 }));
+vi.mock("@/server/admin-db", () => ({
+  adminDb: {
+    query: {
+      campaign: {
+        findMany: (...args: unknown[]) => mocks.scheduleSweepFindMany(...args),
+      },
+    },
+  },
+}));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcTryCompleteCampaignIfDrained: mocks.rpcTryCompleteCampaignIfDrained,
 }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: mocks.createTenantDb,
 }));
-vi.mock("@/lib/campaign-readiness", () => ({
+vi.mock("@/lib/campaign-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-readiness")>()),
   getCampaignReadiness: mocks.getCampaignReadiness,
 }));
 vi.mock("@/lib/logger.server", () => ({
@@ -75,6 +86,7 @@ import {
   type CampaignDispatchParams,
 } from "@/lib/worker/handlers/campaign.server";
 import { kickoffCampaign, launchCampaign } from "@/lib/campaign-execution.server";
+import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 const WORKSPACE_ID = "3b6f0a52-6f5e-4b2d-9d55-000000000001";
@@ -155,9 +167,9 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
   });
 
-  test("terminalizes an expired campaign to complete instead of dispatching (#1512)", async () => {
+  test.each(["message", "robocall", "simple_ivr", "complex_ivr"])("terminalizes an expired %s campaign to complete instead of dispatching (#1512)", async (type) => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
-      runningMessageCampaign({ end_date: "2000-01-01T00:00:00.000Z" }),
+      runningMessageCampaign({ type, end_date: "2000-01-01T00:00:00.000Z" }),
     );
     const result = await campaignDispatchHandler(makeJob());
     expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
@@ -343,15 +355,26 @@ describe("campaignDispatchHandler", () => {
   test("send-window deferral schedules the successor at the exact next open (#1352)", async () => {
     const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
+      progress: {
+        counts: { sent: 1, failed: 0, dequeued: 0, deferred: 1, unaffordable: 0, exhausted: 0 },
+        queuedRemaining: 1,
+      },
     });
-    await campaignDispatchHandler(makeJob());
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({
+      ok: true,
+      deferred: "send_window",
+      progress: { counts: { sent: 1, deferred: 1 }, queuedRemaining: 1 },
+    });
     const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
     expect(call.runAt).toBeInstanceOf(Date);
     // Two Date.now() calls (handler + successor) may differ by a tick —
     // require the scheduled instant to land on the window boundary.
     expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
   });
 
   test("a far-future window boundary is capped so a stale schedule cannot pin the chain", async () => {
@@ -360,7 +383,8 @@ describe("campaignDispatchHandler", () => {
     const maxDeferMs = 60 * 60 * 1000;
     const nextOpenAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
     });
     await campaignDispatchHandler(makeJob());
@@ -461,6 +485,50 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
     vi.useRealTimers();
   });
 
+  test("a waiting voice campaign dispatches only after the sweep changes its status", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T14:05:00.000Z"));
+    let status = "waiting";
+    const campaign = {
+      id: 42,
+      workspace: WORKSPACE_ID,
+      status,
+      type: "simple_ivr",
+      schedule: {
+        wednesday: { active: true, intervals: [{ start: "14:05", end: "15:00" }] },
+      },
+      start_date: "2026-09-01T00:00:00.000Z",
+      end_date: "2026-09-30T00:00:00.000Z",
+    };
+    mocks.scheduleSweepFindMany.mockResolvedValueOnce([campaign]);
+    mocks.updateCampaignStatusInWorkspace.mockImplementationOnce(async (_ws, _id, update) => {
+      status = update.status;
+      return { id: 42 };
+    });
+    mocks.findCampaignInWorkspace.mockImplementation(async () =>
+      runningMessageCampaign({ ...campaign, status }),
+    );
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched",
+      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
+      queuedRemaining: 0,
+    });
+
+    try {
+      await campaignDispatchHandler(makeJob());
+      expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
+      expect(status).toBe("waiting");
+
+      expect(await runCampaignScheduleSync()).toEqual({ scanned: 1, transitioned: 1 });
+      expect(status).toBe("running");
+
+      await campaignDispatchHandler(makeJob());
+      expect(mocks.dispatchCampaignIvrBatch).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("paused voice campaign ends the chain without dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ type: "simple_ivr", status: "paused" }),
@@ -524,12 +592,25 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
   });
 
   test("IVR schedule deferral schedules a delayed successor", async () => {
+    const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
-      kind: "deferred_send_window",
-      nextOpenAt: new Date(Date.now() + 5 * 60 * 1000),
+      kind: "deferred",
+      because: "send_window",
+      nextOpenAt,
+      progress: {
+        counts: { called: 1, failed: 0, dequeued: 0, deferred: 1, exhausted: 0 },
+        queuedRemaining: 1,
+      },
     });
     const result = await campaignDispatchHandler(makeJob());
-    expect(result).toMatchObject({ ok: true, deferred: "send_window" });
+    expect(result).toMatchObject({
+      ok: true,
+      deferred: "send_window",
+      progress: { counts: { called: 1, deferred: 1 }, queuedRemaining: 1 },
+    });
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
     expect(mocks.enqueueJob).toHaveBeenCalledWith(
       expect.objectContaining({ runAt: expect.any(Date) }),
     );

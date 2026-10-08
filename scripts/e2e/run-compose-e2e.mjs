@@ -7,13 +7,14 @@
  *   npm run test:e2e:compose
  *
  * Optional:
- *   E2E_SKIP_BOOTSTRAP=1  — skip psql migrate (DB already bootstrapped)
+ *   E2E_SKIP_BOOTSTRAP=1  — skip the schema bootstrap (DB already migrated)
  *   E2E_SKIP_BUILD=1      — skip npm run build
  */
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
+import { isDatabaseReady } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -54,22 +55,26 @@ function runAsync(command, args, env = process.env) {
   });
 }
 
-console.log("[e2e-compose] starting Postgres + MinIO via docker compose…");
-run("docker", ["compose", "-f", composeFile, "up", "-d", "postgres", "minio", "inbucket"]);
+console.log("[e2e-compose] starting Postgres + Inbucket via docker compose…");
+run("docker", ["compose", "-f", composeFile, "up", "-d", "postgres", "inbucket"]);
+
+// Object storage is `stow`, not a container. Docker Hub's minio/minio and
+// quay.io/minio/minio both return 401 for anonymous pulls, which failed this
+// job before a single test ran (#1800, and again from 2026-09-24). A pinned
+// release binary needs no registry at all.
+console.log("[e2e-compose] starting stow object storage…");
+run("node", ["scripts/e2e/start-stow.mjs", "--start"]);
 
 console.log("[e2e-compose] waiting for Postgres…");
 await (async function waitForPostgres() {
   // The official postgres image starts a temporary server for initdb, then
   // RESTARTS the real server — so an early host connection to the mapped port
   // gets "server closed the connection unexpectedly". Probe the SAME host path
-  // the bootstrap uses (psql → DATABASE_URL) and require two consecutive
-  // successes so a mid-restart drop can't be mistaken for readiness.
+  // the bootstrap uses (DATABASE_URL) and require two consecutive successes so
+  // a mid-restart drop can't be mistaken for readiness.
   let consecutive = 0;
   for (let i = 0; i < 90; i += 1) {
-    const probe = spawnSync("psql", [databaseUrl, "-tAc", "select 1"], {
-      stdio: "ignore",
-    });
-    if (probe.status === 0) {
+    if (await isDatabaseReady(databaseUrl)) {
       consecutive += 1;
       if (consecutive >= 2) return;
     } else {
@@ -81,7 +86,7 @@ await (async function waitForPostgres() {
 })();
 console.log("[e2e-compose] Postgres ready");
 
-run("node", ["scripts/e2e/ensure-minio-bucket.mjs"], {
+run("node", ["scripts/e2e/ensure-bucket.mjs"], {
   env: { ...process.env, ...e2eS3Env },
 });
 
@@ -250,6 +255,17 @@ try {
     if (child.exitCode == null && child.signalCode == null) {
       child.kill("SIGKILL");
     }
+  }
+  // stow is detached (it outlives the harness), so nothing above reaps it.
+  // Without this it holds :9000 and the next run's `stow serve` cannot bind.
+  // spawnSync directly, not run(): run() calls process.exit on failure, which
+  // would replace the real exit code with stow's.
+  const stopStow = spawnSync("node", ["scripts/e2e/start-stow.mjs", "--stop"], {
+    cwd: rootDir,
+    stdio: "inherit",
+  });
+  if (stopStow.status !== 0) {
+    console.warn("[e2e-compose] WARNING: could not stop stow; :9000 may be held");
   }
   process.exit(exitCode);
 }

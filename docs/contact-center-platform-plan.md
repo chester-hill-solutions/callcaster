@@ -93,9 +93,19 @@ RLS: workspace-membership read; `agent_status` self-update for own row; queue co
 
 ### 1.2 Call flow
 
+The legacy `claim_inbound_queue_entry` RPC returns a row only for a new offer.
+For each `(queue_id, call_sid)`, `queued`, `offered` and `accepted` rows are active;
+`declined` and `timed_out` permit a new offer. Duplicate requests cannot reserve
+another agent or redial an existing offer. The database partial unique index
+also protects writers outside the RPC. Upgrades reject pre-existing duplicate
+active rows rather than choosing which live call to end. Retry agent preference
+is not changed by the duplicate-offer guard.
+
+
 1. **Inbound webhook** ([inbound.action.server.ts](../app/routes/api+/inbound.action.server.ts)): if `workspace_number.inbound_queue_id` set → evaluate `business_hours` (closed → `after_hours_action` directly, no queue entry) and `max_queue_size` (full → `overflow_action`); otherwise insert `inbound_queue_entry` (`waiting`), respond `<Play greeting/><Enqueue waitUrl="/api/acd/wait/{entryId}">q-{queueId}</Enqueue>` with an `action` URL (`/api/acd/enqueue-result/{entryId}`) to record abandonment/overflow when the call leaves the queue.
 2. **Wait loop** (`/api/acd/wait/{entryId}`): plays `hold_audio` (or twimlet hold music); checks elapsed vs `max_wait_seconds` → on timeout, `<Leave>` and the enqueue `action` handler executes `overflow_action`.
 3. **Router tick** (new Edge function `acd-router`, modeled on `queue-next`): woken by a DB webhook on `inbound_queue_entry` insert and on `agent_status` transitions to `available`; self-chains at 1s while entries are `waiting`. Each tick, per queue: longest-waiting `waiting` entry × eligible agent per `ring_strategy` (eligible = queue member, `status = 'available'`, fresh heartbeat). Claims atomically via RPC (`claim_queue_entry_for_offer`) — same claim/lease/stale-reset approach as `campaign_queue` claims.
+
 4. **Offer**: set entry `offering`, agent `busy(reason=offering)`; realtime broadcast to the agent desktop. Accept → server dequeues the specific Twilio queue member (`queues(q).members(callSid).update({ url: /api/acd/bridge/{entryId} })`) which `<Dial><Conference>acd-{entryId}</Conference></Dial>`s the caller, and creates the agent client leg into the same conference (reusing the `addToConference` pattern from [auto-dial](../app/routes/api+/auto-dial/)). Caller keeps hearing hold audio until the agent leg actually joins — never silence.
 5. **Offer failure handling** (the cases that make or break trust in an ACD):
    - **Decline**: entry → `waiting` (original `enqueued_at` preserved, so the caller stays at the front), agent → `available`, decline logged to `agent_status_event`. Router excludes the declining agent for that entry's next offer.
@@ -128,16 +138,25 @@ RLS: workspace-membership read; `agent_status` self-update for own row; queue co
 ### 2.1 Data model
 
 - Reuse the `script` table with `type = 'inbound_ivr'`; same `steps` pages/blocks document ([docs/script-json-format.md](script-json-format.md)).
-- New **option target grammar** (extends the existing `next` values `hangup` / `pageId:blockId` / `page_…`):
+- New **option target grammar** (extends the existing `next` values `hangup` / `end` / `pageId:blockId` / a declared page ID):
   - `queue:{queueId}` — enqueue into an inbound queue (milestone 1 flow takes over).
   - `forward:{e164}` — `<Dial>` a number.
   - `voicemail:{email}` — reuse [inbound-voicemail-twiml](../app/lib/inbound-voicemail-twiml.server.ts).
+- Attachment accepts only `inbound_ivr` scripts owned by the number's workspace. Queue targets use positive safe integer IDs and must belong to that workspace. Forward targets use E.164 syntax: `+`, a nonzero first digit and at most 15 digits ([Twilio E.164 reference](https://www.twilio.com/docs/glossary/what-e164)). This checks syntax, not whether the number exists or can receive a call. Voicemail targets use a conservative email address with a dotted domain. The validated target is bound to the inbound call before recording starts; the recording callback uses that inbox instead of the number default.
+- A `pageId:blockId` target must refer to a block in that page. Bare block IDs are not inbound targets. A response with no `next` continues to the next ordered step; at the end, the call hangs up. No-input routes must refer to a block in the declared page, and replay limits must be nonnegative safe integers.
+- The platform number API, phone-number form and automated-menu preset validate before attachment. Workspace and campaign saves validate an attached menu before overwriting it. A rejected save keeps the last valid stored menu and the editor draft. Unattached invalid drafts and explicit copies can be saved. Null clears a number's attachment. Concurrent attachment/save conflicts return 409 with a retry message.
+- The editor uses the same inbound document and target validator. The permanent **Script validation** toolbar action opens shared shad-cc sheet details. Validation changes do not add a row to the page. Queue ownership is checked on the server, so a syntactically valid draft can still fail attachment.
 - `workspace_number`: add `inbound_script_id bigint null FK script(id)`. Precedence: **IVR script → queue → handset → forward → voicemail**.
 
 ### 2.2 Runtime
 
 - New routes `api+/inbound-ivr/$numberId/$pageId/$blockId(.response)` cloned from the campaign IVR runtime ([api+/ivr/](../app/routes/api+/ivr/)) — same `handleAudio`/`handleOptions`/Gather semantics, minus campaign/outreach-attempt coupling; the terminal targets above replace campaign result writes. Build on the **Remix runtime only** (do not extend the Edge IVR runtime; consolidation is already pending per [docs/ivr-remix-vs-edge-audit.md](ivr-remix-vs-edge-audit.md)).
 - Inbound webhook: when `inbound_script_id` set → `<Redirect>` to the script's first page/block.
+- `voicemail:{email}` uses trusted, workspace-scoped call metadata. The first valid recipient binding wins, including duplicate menu responses. Later script edits and callback email/query fields cannot replace it. The callback checks the stored call, dialed number, workspace and account before media or email work.
+- Each recording has durable delivery state. The exact recipient, signed link and email payload are saved before sending. Concurrent callbacks share one active attempt; retries reuse the same provider key and payload. A stored sent receipt prevents another send even if saving the call's recording URL failed. A general recording callback's URL write does not suppress a bound IVR email.
+- [Resend retains idempotency keys for 24 hours](https://resend.com/docs/dashboard/emails/idempotency-keys). Automatic uncertain retries stop after 23 hours from the first send attempt, leaving a margin for clocks and transport. The callback returns 503 with a reconciliation error; it does not resend with a new key or choose another inbox. Support must verify the provider outcome for that call/recording before any manual resend. Delivery state and the last error are retained in `inbound_voicemail_delivery`.
+- Without an IVR binding, the first valid number default remains the legacy recipient. A prepared retry keeps that original inbox even if number settings change. Existing no-email acknowledgement and handset fallback behavior remain. Current ACD queue timeout/exhausted-offer paths hang up; this change adds no queue voicemail policy.
+
 
 ### 2.3 Builder UI
 
@@ -212,7 +231,7 @@ RLS: workspace-membership read; `agent_status` self-update for own row; queue co
 
 ### IVR builder edges (M2)
 
-- **Activation validation**: extend the existing script validation ([docs/script-validator.js](script-validator.js) lineage) for inbound scripts — unreachable blocks, options with no `next`, dangling `queue:{id}` references (queue deleted), missing audio files. A script with errors can be saved but not assigned to a number.
+- **Activation validation**: extend the existing script validation ([docs/script-validator.js](script-validator.js) lineage) for inbound scripts — unreachable blocks, dangling `queue:{id}` references (queue deleted), missing audio files. A response with no `next` follows the documented linear continuation. A script with errors can be saved but not assigned to a number.
 - **Always-an-exit rule**: every block must terminate (hangup/forward/voicemail/queue) or navigate; gather-timeout fallbacks get a default destination so silent callers (rotary phones, pocket dials, IVR-confused humans) aren't looped forever — default after 2 unmatched attempts: replay menu once, then route to the script's configured fallback destination.
 - DTMF-first for inbound menus: speech matching stays supported (existing engine), but the builder defaults new inbound options to digits — speech recognition surprises (`vx-any`) are opt-in.
 

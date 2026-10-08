@@ -22,6 +22,14 @@ const telephonyDbMocks = vi.hoisted(() => ({
   updateOutreachAttemptForWorkspace: vi.fn(),
 }));
 
+const rpcMocks = vi.hoisted(() => ({
+  rpcTryCompleteCampaignIfDrained: vi.fn(),
+}));
+
+const tenantDbMocks = vi.hoisted(() => ({
+  createTenantDb: vi.fn(),
+}));
+
 const campaignIvrMocks = vi.hoisted(() => ({
   fetchCampaignWithScript: vi.fn(),
   resolveCampaignScript: vi.fn((campaign: any) => campaign?.script ?? null),
@@ -51,6 +59,14 @@ vi.mock("@/lib/telephony-db.server", () => ({
   upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
   updateOutreachAttemptForWorkspace: (...args: any[]) =>
     telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
+}));
+vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/db-rpc.server")>()),
+  rpcTryCompleteCampaignIfDrained: (...args: unknown[]) =>
+    rpcMocks.rpcTryCompleteCampaignIfDrained(...args),
+}));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: (...args: unknown[]) => tenantDbMocks.createTenantDb(...args),
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
@@ -124,6 +140,10 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
     objectStorageMocks.createSignedObjectUrl.mockResolvedValue("https://signed");
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({ inserted: true, existingId: 1 });
+    rpcMocks.rpcTryCompleteCampaignIfDrained.mockReset();
+    rpcMocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
+    tenantDbMocks.createTenantDb.mockReset();
+    tenantDbMocks.createTenantDb.mockImplementation(() => ({ __tenant: true }));
   });
 
   test("returns 403 on invalid signature", async () => {
@@ -366,5 +386,69 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(telephonyDbMocks.upsertCallBySid).not.toHaveBeenCalled();
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+  });
+
+  test("a non-terminal (answering) callback does not trigger campaign completion", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "in-progress", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(rpcMocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+  });
+
+  test.each(["busy", "canceled"])(
+    "persists %s as terminal and asks the campaign completion gate",
+    async (callStatus) => {
+      const mod = await import("../app/routes/api+/ivr/status.route");
+      mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+
+      const res = await asRouteResponse(mod.action({
+        request: makeReq({ CallSid: "CA1", CallStatus: callStatus, Timestamp: new Date().toISOString() }),
+      } as any));
+      await expect(res.json()).resolves.toEqual({ success: true });
+      expect(telephonyDbMocks.upsertCallBySid).toHaveBeenCalled();
+      expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+        "w1",
+        1,
+        { disposition: callStatus },
+      );
+      expect(rpcMocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(
+        { __tenant: true },
+        1,
+      );
+    },
+  );
+
+  test("completing the last settled call reports the campaign complete (#1728)", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    rpcMocks.rpcTryCompleteCampaignIfDrained.mockResolvedValueOnce(true);
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "campaign.completed_on_settled_call",
+      expect.objectContaining({ campaignId: 1 }),
+    );
+  });
+
+  test("a failing completion gate never fails the status webhook", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    rpcMocks.rpcTryCompleteCampaignIfDrained.mockRejectedValueOnce(new Error("gate-down"));
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "campaign.complete_on_settled_call_failed",
+      expect.objectContaining({ campaignId: 1 }),
+    );
   });
 });

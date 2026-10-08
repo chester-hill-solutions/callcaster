@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type {
   ScriptBlock,
   ScriptDocument,
@@ -22,8 +22,12 @@ import {
   nextIvrStepTitle,
   type IvrPlaybackMode,
 } from "@/lib/ivr-script-editor";
+import { validateIvrRouting } from "@/lib/ivr-script-validation";
+import { scripts } from "@/lib/call-script-service";
+import { validateInboundScriptSteps } from "@/lib/inbound-script-validation";
 import { cn } from "@/lib/utils";
 import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
+import { ScriptValidationDetails } from "./ScriptValidationDetails";
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   instruction: "Instruction",
@@ -36,8 +40,9 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 export type ScriptEditorShellProps = {
   document: ScriptDocument;
   onChange: (doc: ScriptDocument) => void;
-  /** Author audio steps for a caller instead of form blocks for an agent. */
+  /** Author audio steps for a recipient instead of form blocks for an agent. */
   audioFlow?: boolean;
+  inboundFlow?: boolean;
   mediaNames?: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
@@ -49,6 +54,7 @@ export function ScriptEditorShell({
   document,
   onChange,
   audioFlow = false,
+  inboundFlow = false,
   mediaNames = [],
   audioPreviewUrl,
   onUploadAudio,
@@ -65,12 +71,40 @@ export function ScriptEditorShell({
     onChange,
   });
 
+  // Routing validation (#1884): option `next` targets that dangle or form
+  // cycles without a terminal are surfaced alongside scriptkit's structural
+  // errors. Same logic runs server-side at the launch gate.
+  const validationErrors = useMemo(
+    () => {
+      if (inboundFlow) {
+        const validation = validateInboundScriptSteps(scripts.serializeToCallcasterFlow(editor.document));
+        return validation.ok ? [] : validation.errors;
+      }
+      return [
+        ...(editor.validation.ok ? [] : editor.validation.errors),
+        ...validateIvrRouting(editor.document).issues.map((issue) => issue.error),
+      ];
+    },
+    [editor.document, editor.validation, inboundFlow],
+  );
+
   const activePageIndex = editor.orderedPages.findIndex(
     (page) => page.id === editor.activePageId,
   );
   const pageCount = editor.orderedPages.length;
   const isStartPage =
     editor.activePageId === editor.document.startPageId;
+
+  // blockId -> owning pageId, for the IVR no-input route target (#1883).
+  const pageByBlockId = useMemo(() => {
+    const lookup: Record<string, string> = {};
+    for (const page of Object.values(editor.document.pages)) {
+      for (const blockId of page.blockIds) {
+        lookup[blockId] = page.id;
+      }
+    }
+    return lookup;
+  }, [editor.document.pages]);
 
   // The hook's addBlock only knows the agent-form palette, and a follow-up
   // patch in the same tick would read a stale document. Build the audio step
@@ -187,6 +221,7 @@ export function ScriptEditorShell({
                     }
                   />
                   <div className="flex flex-wrap gap-1">
+                    <ScriptValidationDetails errors={validationErrors} inbound={inboundFlow} />
                     {!readOnly && (
                       <>
                         <Button
@@ -311,7 +346,7 @@ export function ScriptEditorShell({
                 {editor.activePage.blockIds.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
                     {audioFlow
-                      ? "Add a step to this page. Callers hear steps in order."
+                      ? "Add a step to this page. Recipients hear steps in order."
                       : "Add a block to this page."}
                   </p>
                 ) : (
@@ -336,10 +371,12 @@ export function ScriptEditorShell({
                           block={block}
                           readOnly={readOnly}
                           audioFlow={audioFlow}
+                          inboundFlow={inboundFlow}
                           mediaNames={mediaNames}
                           audioPreviewUrl={audioPreviewUrl}
                           onUploadAudio={onUploadAudio}
                           routingTargets={editor.routingTargets}
+                          pageByBlockId={pageByBlockId}
                           onChange={(patch) =>
                             editor.updateBlock(blockId, patch)
                           }
@@ -366,19 +403,17 @@ export function ScriptEditorShell({
               </div>
             </>
           ) : (
-            <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-              Select a page from the list.
-            </p>
+            <>
+              <ScriptValidationDetails errors={validationErrors} inbound={inboundFlow} />
+              <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
+                Select a page from the list.
+              </p>
+            </>
           )}
 
         </div>
       </div>
 
-      {!editor.validation.ok && (
-        <div className="text-sm text-destructive-text" role="alert">
-          {editor.validation.errors.join("; ")}
-        </div>
-      )}
     </div>
   );
 }

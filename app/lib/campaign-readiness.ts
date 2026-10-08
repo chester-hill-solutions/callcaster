@@ -3,11 +3,11 @@ import type {
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
-  ScheduleDay,
   ScheduleInterval,
   TwilioSmsSenderClass,
 } from "@/lib/types";
 import { isBulkSmsSenderMisaligned } from "@/lib/throughput-config";
+import { parseSendWindow } from "@/lib/campaign-send-window";
 
 type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | undefined;
 
@@ -32,7 +32,8 @@ export type CampaignReadinessCode =
   | "script_unavailable"
   | "audio_unavailable"
   | "voicemail_audio_required"
-  | "message_content_required";
+  | "message_content_required"
+  | "script_routing_invalid";
 
 export type CampaignReadinessIssue = {
   code: CampaignReadinessCode;
@@ -41,6 +42,7 @@ export type CampaignReadinessIssue = {
 
 export type CampaignReadiness = {
   issues: CampaignReadinessIssue[];
+  warnings: CampaignSendWindowWarning[];
   startIssues: string[];
   scheduleIssues: string[];
   startDisabledReason: string | null;
@@ -67,7 +69,23 @@ type CampaignReadinessOptions = {
   now?: Date;
 };
 
-type NormalizedSchedule = Record<string, ScheduleDay>;
+export type CampaignSendWindowWarning = {
+  code: "send_window_unrestricted";
+  message: string;
+};
+
+export function getCampaignSendWindowWarning(
+  campaignData: Campaign | null | undefined,
+): CampaignSendWindowWarning | null {
+  if (campaignData?.type !== "message" || parseSendWindow(campaignData.sms_send_window)) {
+    return null;
+  }
+  return {
+    code: "send_window_unrestricted",
+    message: "SMS can send at any hour, including overnight. Set an SMS send window to limit sending hours." +
+      (campaignData.schedule != null ? " The voice schedule does not restrict SMS sending." : ""),
+  };
+}
 
 const SCHEDULE_READINESS_CODES = new Set<CampaignReadinessCode>([
   "dates_required",
@@ -84,6 +102,7 @@ export const CAMPAIGN_CONTENT_READINESS_CODES = [
   "script_unavailable",
   "audio_unavailable",
   "message_content_required",
+  "script_routing_invalid",
 ] as const satisfies readonly CampaignReadinessCode[];
 
 function issue(
@@ -124,7 +143,11 @@ function parseClockMinutes(time: string): number | null {
   return hours * 60 + minutes;
 }
 
-function isValidCallingInterval(interval: ScheduleInterval): boolean {
+function isValidCallingInterval(interval: unknown): interval is ScheduleInterval {
+  if (!interval || typeof interval !== "object" || !("start" in interval) ||
+      !("end" in interval) || typeof interval.start !== "string" || typeof interval.end !== "string") {
+    return false;
+  }
   const startMinutes = parseClockMinutes(interval.start);
   const endMinutes = parseClockMinutes(interval.end);
   if (startMinutes === null || endMinutes === null) {
@@ -137,7 +160,7 @@ function isValidCallingInterval(interval: ScheduleInterval): boolean {
   return true;
 }
 
-function parseSchedule(schedule: Campaign["schedule"]): NormalizedSchedule | null {
+function parseSchedule(schedule: Campaign["schedule"]): Record<string, unknown> | null {
   if (!schedule) return null;
 
   if (typeof schedule === "string") {
@@ -148,28 +171,9 @@ function parseSchedule(schedule: Campaign["schedule"]): NormalizedSchedule | nul
     }
   }
 
-  const normalizedEntries = Object.entries(schedule).flatMap(([day, value]) => {
-    if (!value || typeof value !== "object" || !("active" in value)) {
-      return [];
-    }
-
-    const intervals = Array.isArray(value.intervals)
-      ? value.intervals.filter(
-          (interval: unknown): interval is ScheduleInterval =>
-            Boolean(interval) &&
-            typeof interval === "object" &&
-            interval !== null &&
-            "start" in interval &&
-            "end" in interval &&
-            typeof interval.start === "string" &&
-            typeof interval.end === "string",
-        )
-      : [];
-
-    return [[day, { active: Boolean(value.active), intervals }] as const];
-  });
-
-  return Object.fromEntries(normalizedEntries);
+  if (typeof schedule !== "object" || Array.isArray(schedule)) return null;
+  // Keep raw intervals: filtering here hides incomplete rows beside valid ones.
+  return schedule as Record<string, unknown>;
 }
 
 export function getScheduleValidation(schedule: Campaign["schedule"]) {
@@ -178,7 +182,7 @@ export function getScheduleValidation(schedule: Campaign["schedule"]) {
   if (!parsedSchedule) {
     return {
       hasCallingHours: false,
-      hasInvalidIntervals: false,
+      hasInvalidIntervals: schedule != null && schedule !== "" && schedule !== "null",
     };
   }
 
@@ -186,11 +190,11 @@ export function getScheduleValidation(schedule: Campaign["schedule"]) {
   let hasInvalidIntervals = false;
 
   Object.values(parsedSchedule).forEach((day) => {
-    if (!day.active) {
+    if (!day || typeof day !== "object" || !("active" in day) || !day.active) {
       return;
     }
 
-    if (!day.intervals.length) {
+    if (!("intervals" in day) || !Array.isArray(day.intervals) || !day.intervals.length) {
       hasInvalidIntervals = true;
       return;
     }
@@ -214,7 +218,17 @@ export function getScheduleValidation(schedule: Campaign["schedule"]) {
   };
 }
 
-function getDateIssue(campaignData: Campaign): CampaignReadinessIssue | null {
+export function isCampaignExpired(
+  endDateStr: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!endDateStr) return false;
+  const endDate = new Date(endDateStr);
+  if (Number.isNaN(endDate.getTime())) return false;
+  return endDate < now;
+}
+
+function getDateIssue(campaignData: Campaign, now: Date): CampaignReadinessIssue | null {
   if (!campaignData.start_date || !campaignData.end_date) {
     return null;
   }
@@ -228,6 +242,13 @@ function getDateIssue(campaignData: Campaign): CampaignReadinessIssue | null {
 
   if (startDate > endDate) {
     return issue("start_after_end", "Start date must be before the end date");
+  }
+
+  if (isCampaignExpired(campaignData.end_date, now)) {
+    return issue(
+      "campaign_ended",
+      "This campaign's end date has passed. Update the dates or create a new campaign.",
+    );
   }
 
   return null;
@@ -419,6 +440,7 @@ export function getCampaignReadiness(
     const issues = [issue("campaign_not_loaded", "Campaign could not be loaded")];
     return {
       issues,
+      warnings: [],
       startIssues: issuesToMessages(issues),
       scheduleIssues: issuesToMessages(issues),
       startDisabledReason: issues[0]?.message ?? null,
@@ -467,14 +489,14 @@ export function getCampaignReadiness(
     commonIssues.push(issue("dates_required", "Start and end dates are required"));
   }
 
-  const dateIssue = getDateIssue(campaignData);
+  const dateIssue = getDateIssue(campaignData, options.now ?? new Date());
   if (dateIssue) {
     commonIssues.push(dateIssue);
   }
 
   if (campaignData.type === "message") {
     // Message campaigns prefer sms_send_window (nullable jsonb).
-    // null = unrestricted (send anytime) — no issue.
+    // null = unrestricted. Report it separately as a warning, not a blocker.
     // Cast needed: sms_send_window is in Drizzle schema but not in generated db-types.
     const smsSendWindow = (campaignData as Record<string, unknown>).sms_send_window;
     if (smsSendWindow != null) {
@@ -488,15 +510,6 @@ export function getCampaignReadiness(
         commonIssues.push(
           issue("invalid_intervals", "Each active send day needs at least one valid time window"),
         );
-      }
-    } else if (campaignData.schedule != null) {
-      // Backward compat: check legacy schedule field for existing campaigns.
-      const scheduleValidation = getScheduleValidation(campaignData.schedule);
-      if (!scheduleValidation.hasCallingHours) {
-        commonIssues.push(issue("send_window_required", "Calling hours are required"));
-      }
-      if (scheduleValidation.hasInvalidIntervals) {
-        commonIssues.push(issue("invalid_intervals", "Each active calling day needs at least one valid time window"));
       }
     }
   } else {
@@ -549,9 +562,11 @@ export function getCampaignReadiness(
   commonIssues.push(...getResourceIssues(campaignData, details, options));
 
   const startIssues = issuesToMessages(commonIssues);
+  const sendWindowWarning = getCampaignSendWindowWarning(campaignData);
 
   return {
     issues: commonIssues,
+    warnings: sendWindowWarning ? [sendWindowWarning] : [],
     startIssues,
     scheduleIssues: startIssues,
     startDisabledReason: startIssues[0] ?? null,

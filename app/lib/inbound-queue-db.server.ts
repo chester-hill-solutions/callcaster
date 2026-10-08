@@ -1,10 +1,20 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   inbound_queue as inboundQueueTable,
   inbound_queue_member as inboundQueueMemberTable,
+  user as userTable,
 } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
-import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
+import { findWorkspaceMembership, listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
+import { handleValidationError } from "@/lib/errors.server";
+
+export async function findInboundQueueInWorkspace(workspaceId: string, queueId: number, tdbIn?: TenantDb) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  return tdb.inbound_queue.findFirst({
+    columns: { id: true },
+    where: eq(inboundQueueTable.id, queueId),
+  });
+}
 
 export async function loadInboundQueueSettings(
   workspaceId: string,
@@ -101,6 +111,25 @@ export async function addInboundQueueMember(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
+  if (!Number.isSafeInteger(args.queueId) || args.queueId <= 0) {
+    handleValidationError("Choose a valid queue.");
+  }
+  if (typeof args.userId !== "string" || !args.userId) {
+    handleValidationError("Choose a workspace member.");
+  }
+  const queue = await findInboundQueueInWorkspace(args.workspaceId, args.queueId, tdb);
+  if (!queue) {
+    handleValidationError("Queue does not belong to this workspace.");
+  }
+  const membership = await findWorkspaceMembership(args.workspaceId, args.userId, tdb);
+  if (!membership) {
+    handleValidationError("User is not a member of this workspace.");
+  }
+  const users = await tdb.execute(sql`select ${userTable.id} from ${userTable}
+    where ${userTable.id}::text = ${args.userId} limit 1`);
+  if (users.length === 0) {
+    handleValidationError("User does not exist.");
+  }
   const now = new Date().toISOString();
   await tdb.inbound_queue_member.insert({
     queue_id: args.queueId,

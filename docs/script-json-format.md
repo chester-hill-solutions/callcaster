@@ -73,6 +73,15 @@ Here's the basic structure of a script JSON:
 }
 ```
 
+## IVR start page and page order
+
+Optional root fields control the caller flow:
+
+- `startPageId`: the page where an outbound or inbound IVR call starts. It must name an existing page. A missing declared page blocks campaign launch.
+- `pageOrder`: the page IDs in the chosen order. When a block falls through to the next page, IVR uses this order. Unknown and repeated IDs are ignored; omitted pages are appended in their existing order.
+
+A script without `startPageId` starts on its first ordered page. A script without `pageOrder` keeps its existing page order. Explicit page and block navigation keeps its target.
+
 ## Detailed Field Descriptions
 
 ### Pages

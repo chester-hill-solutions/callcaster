@@ -1,7 +1,11 @@
+import type { A2pCompanyType, A2pStockExchange } from "@/lib/a2p-messaging-profile";
 import type { Database, Tables } from "@/lib/db-types";
+import type { WorkspaceTwilioSyncSnapshot } from "@/lib/workspace-twilio-sync";
+export type { WorkspaceTwilioSyncSnapshot, WorkspaceTwilioSyncStatus } from "@/lib/workspace-twilio-sync";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
 import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
+import type { TollFreeOptInType } from "@/lib/toll-free-opt-in";
 export {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
   type WorkspaceOnboardingGoal,
@@ -193,12 +197,6 @@ export type TwilioMessageIntent = (typeof TWILIO_MESSAGE_INTENT_VALUES)[number];
 export type TwilioSendMode = (typeof TWILIO_SEND_MODE_VALUES)[number];
 export type TwilioOnboardingStatus = (typeof TWILIO_ONBOARDING_STATUS_VALUES)[number];
 export type TwilioSmsSenderClass = (typeof TWILIO_SMS_SENDER_CLASS_VALUES)[number];
-export type WorkspaceTwilioSyncStatus =
-  | "never_synced"
-  | "syncing"
-  | "healthy"
-  | "error";
-
 export interface WorkspaceTwilioOpsAuditEntry {
   changedAt: string;
   actorUserId: string | null;
@@ -255,23 +253,6 @@ export interface WorkspaceTwilioPortalMetrics {
   voiceConcurrentCallLimit: number;
   parallelDispatchEnabled: boolean;
   smsSenderClass: TwilioSmsSenderClass;
-}
-
-export interface WorkspaceTwilioSyncSnapshot {
-  accountStatus: string | null;
-  accountFriendlyName: string | null;
-  phoneNumberCount: number;
-  /** Capability flags observed on workspace numbers (sms, mms, voice). */
-  numberTypes: string[];
-  /** Twilio sender taxonomy inferred from phone inventory (toll_free, local, …). */
-  senderTypes: string[];
-  recentUsageCount: number;
-  usageTotalPrice: number | null;
-  lastSyncedAt: string | null;
-  lastSyncStatus: WorkspaceTwilioSyncStatus;
-  lastSyncError: string | null;
-  /** True when toll-free verification blocks bulk SMS for synced inventory. */
-  tollFreeVerificationBlocked?: boolean;
 }
 
 export interface WorkspaceTwilioPortalSnapshot {
@@ -362,6 +343,7 @@ export interface WorkspaceMessagingBusinessProfile {
   supportPhone: string;
   useCaseSummary: string;
   optInWorkflow: string;
+  tollFreeOptInType: TollFreeOptInType | null;
   optInKeywords: string;
   optOutKeywords: string;
   helpKeywords: string;
@@ -372,6 +354,10 @@ export interface WorkspaceMessagingBusinessProfile {
   businessRegistrationNumber: string;
   ageGatedContent: boolean;
   // --- US A2P 10DLC Trust Hub brand inputs: ---
+  a2pCompanyType: A2pCompanyType | null;
+  a2pStockExchange: A2pStockExchange | null;
+  a2pStockTicker: string;
+  a2pBrandContactEmail: string;
   ein: string;
   industry: string;
   authorizedRepName: string;
@@ -436,6 +422,8 @@ export interface WorkspaceA2POnboardingState {
   brandSid: string | null;
   campaignSid: string | null;
   trustProductSid: string | null;
+  messagingProfileEndUserSid: string | null;
+  messagingProfileStatus: "not_started" | "ready" | "action_needed";
   customerProfileBundleSid: string | null;
   brandType: string | null;
   tcrId: string | null;
@@ -443,6 +431,13 @@ export interface WorkspaceA2POnboardingState {
   lastSubmittedAt: string | null;
   lastSyncedAt: string | null;
 }
+
+export type WorkspaceMessagingOnboardingUpdates = Omit<
+  Partial<WorkspaceMessagingOnboardingState>,
+  "a2p10dlc"
+> & {
+  a2p10dlc?: Partial<WorkspaceA2POnboardingState>;
+};
 
 export interface WorkspaceRcsOnboardingState {
   status: WorkspaceOnboardingStatus;
@@ -801,4 +796,3 @@ export function generateSurveyLink(contactId: number, surveyId: string, baseUrl:
   const encoded = btoa(`${contactId}:${surveyId}`);
   return `${baseUrl}/?q=${encoded}`;
 }
-    

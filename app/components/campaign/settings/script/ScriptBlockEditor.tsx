@@ -26,15 +26,18 @@ export type ScriptBlockEditorProps = {
   block: ScriptBlock;
   readOnly?: boolean;
   /**
-   * The script is played to a caller rather than read by an agent, so every
+   * The script is played to a recipient rather than read by an agent, so every
    * block is an audio step — including ones that still carry an input wire
    * type from an older editor or a live-call script.
    */
   audioFlow?: boolean;
+  inboundFlow?: boolean;
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
   routingTargets: RoutingTarget[];
+  /** blockId -> owning pageId, for the IVR no-input route target. */
+  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -58,10 +61,12 @@ export function ScriptBlockEditor({
   block,
   readOnly = false,
   audioFlow = false,
+  inboundFlow = false,
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
   routingTargets,
+  pageByBlockId,
   onChange,
   onRemove,
   onDuplicate,
@@ -119,12 +124,15 @@ export function ScriptBlockEditor({
           mediaNames={mediaNames}
           audioPreviewUrl={audioPreviewUrl}
           onUploadAudio={onUploadAudio}
+          routingTargets={routingTargets}
+          pageByBlockId={pageByBlockId}
           onChange={onChange}
         />
         <IvrResponsesEditor
           options={options}
           readOnly={readOnly}
           routingTargets={routingTargets}
+          inboundPageByBlockId={inboundFlow ? pageByBlockId : undefined}
           onOptionAdd={onOptionAdd}
           onOptionChange={onOptionChange}
           onOptionRemove={onOptionRemove}

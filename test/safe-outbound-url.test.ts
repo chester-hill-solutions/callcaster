@@ -38,6 +38,7 @@ vi.mock("node:https", () => ({
 
     const req = Object.assign(new EventEmitter(), {
       write: vi.fn(),
+      destroy: vi.fn(),
       end: vi.fn(() => {
         queueMicrotask(() => {
           const res = Object.assign(new EventEmitter(), {

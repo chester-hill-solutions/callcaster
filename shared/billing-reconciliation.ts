@@ -1,25 +1,12 @@
-import { SMS_SEGMENT_CREDITS } from "./pricing";
+import {
+  buildNumberRentalReconciliation,
+  type NumberRentalReconciliation,
+  type NumberRentalReconciliationInput,
+} from "./number-rental-reconciliation";
+import { MMS_CREDITS, SMS_SEGMENT_CREDITS } from "./pricing";
+import { bucketFromIdempotencyKey, type BillingBucket } from "./billing-keys";
 
-// Inline bucket classifier. Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
-type LedgerBucket = "sms" | "voice" | "numbers" | "purchase" | "ai" | "other";
-
-function bucketFromIdempotencyKey(
-  idempotencyKey: string | null | undefined,
-): LedgerBucket {
-  const key = idempotencyKey?.trim() ?? "";
-  if (key.startsWith("sms:")) return "sms";
-  if (key.startsWith("call:")) return "voice";
-  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) return "numbers";
-  if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) return "purchase";
-  if (
-    key.startsWith("transcription:") ||
-    key.startsWith("transcription_batch:") ||
-    key.startsWith("coaching:")
-  ) {
-    return "ai";
-  }
-  return "other";
-}
+type LedgerBucket = BillingBucket | "mms";
 
 export type TwilioUsageRecord = {
   category: string;
@@ -27,6 +14,7 @@ export type TwilioUsageRecord = {
   usage: string;
   usageUnit: string;
   price: string;
+  priceUnit?: string;
   startDate?: string;
   endDate?: string;
 };
@@ -36,6 +24,8 @@ export type LedgerTransactionRow = {
   amount: number;
   idempotency_key: string | null;
   created_at: string;
+  note?: string | null;
+  message_sid?: string | null;
 };
 
 export type BillingReconciliationPeriod = {
@@ -49,6 +39,11 @@ export type BillingCategoryReconciliation = {
   ledgerEvents: number;
   ledgerCredits: number;
   variance: number;
+};
+
+export type BillingMessageReconciliation = Omit<BillingCategoryReconciliation, "twilioUnits" | "variance"> & {
+  twilioUnits: number | null;
+  variance: number | null;
 };
 
 export type BillingEntityAudit = {
@@ -70,12 +65,13 @@ export type BillingEntityAudit = {
 export type BillingReconciliationReport = {
   period: BillingReconciliationPeriod;
   categories: {
-    sms: BillingCategoryReconciliation;
+    sms: BillingMessageReconciliation;
+    mms: BillingMessageReconciliation;
     voice: BillingCategoryReconciliation;
-    numbers: BillingCategoryReconciliation;
+    numbers: NumberRentalReconciliation;
   };
   entityAudit: BillingEntityAudit;
-  twilioTotalCostUsd: number;
+  twilioTotalCostUsd: number | null;
   ledgerDebitCredits: number;
   ledgerCreditPurchases: number;
   unrecognizedDebitEvents: number;
@@ -101,19 +97,70 @@ function sumTwilioUsage(
   }, 0);
 }
 
-function sumTwilioCostUsd(
+function messageUsageUnits(
   records: TwilioUsageRecord[],
-  categoryMatcher: (category: string) => boolean,
-): number {
-  return records.reduce((sum, record) => {
-    if (record.category === "totalprice") {
-      return sum;
+  kind: "sms" | "mms",
+): number | null {
+  const aggregate = `${kind}-outbound`;
+  const totals = records.filter((record) => record.category === aggregate);
+  const subtypes = [`${aggregate}-longcode`, `${aggregate}-shortcode`];
+  const selected = totals.length > 0
+    ? totals
+    : records.filter((record) => subtypes.includes(record.category));
+
+  // Aggregate records already include their subtypes. Unknown outbound
+  // categories cannot establish complete coverage when no aggregate exists.
+  const hasUnknownSubtype = records.some((record) =>
+    record.category.startsWith(`${aggregate}-`) && !subtypes.includes(record.category),
+  );
+  if (totals.length > 1 || (totals.length === 0 && hasUnknownSubtype)) {
+    return null;
+  }
+  if (new Set(selected.map((record) => record.category)).size !== selected.length) {
+    return null;
+  }
+
+  let units = 0;
+  for (const record of selected) {
+    // Twilio bills each SMS segment as a message in UsageRecords.
+    // The explicit segments unit also supports the existing adapter fixtures.
+    const supportedUnit = record.usageUnit === "messages" ||
+      (kind === "sms" && record.usageUnit === "segments");
+    const quantity = record.usage.trim() === "" ? NaN : Number(record.usage);
+    if (!supportedUnit || !Number.isSafeInteger(quantity) || quantity < 0) {
+      return null;
     }
-    if (!categoryMatcher(record.category)) {
-      return sum;
-    }
-    return sum + parseUsageAmount(record.price);
-  }, 0);
+    units += quantity;
+    if (!Number.isSafeInteger(units)) return null;
+  }
+  return units;
+}
+
+function providerTotalCostUsd(
+  records: TwilioUsageRecord[],
+  period: BillingReconciliationPeriod,
+): number | null {
+  const totals = records.filter((record) => record.category === "totalprice");
+  const total = totals[0];
+  if (!total || totals.length !== 1) return null;
+  if (total.priceUnit?.toLowerCase() !== "usd") return null;
+  if (
+    ![period.startDate, `${period.startDate}T00:00:00.000Z`].includes(
+      total.startDate ?? "",
+    ) ||
+    ![period.endDate, `${period.endDate}T00:00:00.000Z`].includes(
+      total.endDate ?? "",
+    )
+  )
+    return null;
+
+  // Category prices can overlap and can omit account costs. Only the provider
+  // total establishes the complete cost for this currency and reporting period.
+  const value = total.price.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(value))
+    return null;
+  const price = Number(value);
+  return Number.isFinite(price) ? price : null;
 }
 
 export function categorizeLedgerRow(row: LedgerTransactionRow): {
@@ -127,7 +174,22 @@ export function categorizeLedgerRow(row: LedgerTransactionRow): {
     return { bucket: "purchase", credits };
   }
 
-  return { bucket: bucketFromIdempotencyKey(key), credits };
+  const bucket = bucketFromIdempotencyKey(key);
+  if (bucket !== "sms") return { bucket, credits };
+
+  // Both kinds use sms:<sid>. The durable debit note supplies kind; a
+  // two-segment SMS and one MMS have the same credit amount.
+  const marker = /^(SMS|MMS) (\S+) \S/.exec(row.note ?? "");
+  const kind = marker?.[1];
+  const rate = kind === "MMS" ? MMS_CREDITS : SMS_SEGMENT_CREDITS;
+  if (
+    !marker || key !== `sms:${marker[2]}` ||
+    (row.message_sid != null && row.message_sid !== marker[2]) ||
+    row.amount >= 0 || !Number.isSafeInteger(credits / rate) || credits === 0
+  ) {
+    return { bucket: "other", credits };
+  }
+  return { bucket: kind === "MMS" ? "mms" : "sms", credits };
 }
 
 export function filterLedgerRowsInPeriod(
@@ -145,6 +207,7 @@ export function filterLedgerRowsInPeriod(
 export function summarizeLedger(rows: LedgerTransactionRow[]) {
   const summary = {
     sms: { events: 0, credits: 0 },
+    mms: { events: 0, credits: 0 },
     voice: { events: 0, credits: 0 },
     numbers: { events: 0, credits: 0 },
     purchase: { events: 0, credits: 0 },
@@ -173,34 +236,23 @@ export function buildBillingReconciliationReport(args: {
   twilioUsage: TwilioUsageRecord[];
   ledgerRows: LedgerTransactionRow[];
   entityAudit: BillingEntityAudit;
+  numberRentals: NumberRentalReconciliationInput;
 }): BillingReconciliationReport {
   const ledgerInPeriod = filterLedgerRowsInPeriod(args.ledgerRows, args.period);
   const ledgerSummary = summarizeLedger(ledgerInPeriod);
   const smsLedgerSegments =
     ledgerSummary.sms.credits / SMS_SEGMENT_CREDITS;
 
-  const smsTwilioUnits = sumTwilioUsage(
-    args.twilioUsage,
-    (category) =>
-      category === "sms-outbound" || category.startsWith("sms-outbound-"),
-  );
+  const smsTwilioUnits = messageUsageUnits(args.twilioUsage, "sms");
+  const mmsTwilioUnits = messageUsageUnits(args.twilioUsage, "mms");
   const voiceTwilioMinutes = sumTwilioUsage(
     args.twilioUsage,
     (category) =>
       category === "calls-outbound" || category.startsWith("calls-outbound-"),
   );
-  const numbersTwilioUnits = sumTwilioUsage(
-    args.twilioUsage,
-    (category) =>
-      category === "phonenumbers" || category.startsWith("phonenumbers-"),
-  );
+  const numbers = buildNumberRentalReconciliation(args.numberRentals);
 
-  const twilioTotalCostUsd =
-    sumTwilioCostUsd(args.twilioUsage, () => true) ||
-    parseUsageAmount(
-      args.twilioUsage.find((record) => record.category === "totalprice")
-        ?.price ?? "0",
-    );
+  const twilioTotalCostUsd = providerTotalCostUsd(args.twilioUsage, args.period);
 
   return {
     period: args.period,
@@ -213,7 +265,14 @@ export function buildBillingReconciliationReport(args: {
         // Segments against segments. The ledger stores credits, so divide by
         // the per-segment rate to get segments back — whereas the row count
         // is one per message, making every multi-segment SMS look like drift.
-        variance: smsTwilioUnits - smsLedgerSegments,
+        variance: smsTwilioUnits === null ? null : smsTwilioUnits - smsLedgerSegments,
+      },
+      mms: {
+        twilioUnits: mmsTwilioUnits,
+        twilioUnitLabel: "messages",
+        ledgerEvents: ledgerSummary.mms.events,
+        ledgerCredits: ledgerSummary.mms.credits,
+        variance: mmsTwilioUnits === null ? null : mmsTwilioUnits - ledgerSummary.mms.credits / MMS_CREDITS,
       },
       voice: {
         twilioUnits: voiceTwilioMinutes,
@@ -226,18 +285,13 @@ export function buildBillingReconciliationReport(args: {
         // to Twilio's minutes.
         variance: voiceTwilioMinutes - args.entityAudit.billedVoiceMinutes,
       },
-      numbers: {
-        twilioUnits: numbersTwilioUnits,
-        twilioUnitLabel: "number-months",
-        ledgerEvents: ledgerSummary.numbers.events,
-        ledgerCredits: ledgerSummary.numbers.credits,
-        variance: numbersTwilioUnits - ledgerSummary.numbers.events,
-      },
+      numbers,
     },
     entityAudit: args.entityAudit,
     twilioTotalCostUsd,
     ledgerDebitCredits:
       ledgerSummary.sms.credits +
+      ledgerSummary.mms.credits +
       ledgerSummary.voice.credits +
       ledgerSummary.numbers.credits +
       ledgerSummary.ai.credits +
@@ -250,8 +304,9 @@ export function buildBillingReconciliationReport(args: {
 /** Twilio-vs-ledger unit/event gaps above this count trigger material-variance alerts. */
 export const BILLING_RECONCILIATION_VARIANCE_THRESHOLD = 2;
 
-export function exceedsBillingVarianceThreshold(value: number): boolean {
-  return Math.abs(value) > BILLING_RECONCILIATION_VARIANCE_THRESHOLD;
+export function exceedsBillingVarianceThreshold(value: number | null): boolean {
+  // An unavailable comparison must not clear a drift alert.
+  return value === null || Math.abs(value) > BILLING_RECONCILIATION_VARIANCE_THRESHOLD;
 }
 
 export function hasMaterialBillingVariance(
@@ -259,7 +314,9 @@ export function hasMaterialBillingVariance(
 ): boolean {
   return (
     exceedsBillingVarianceThreshold(report.categories.sms.variance) ||
+    exceedsBillingVarianceThreshold(report.categories.mms.variance) ||
     exceedsBillingVarianceThreshold(report.categories.voice.variance) ||
+    exceedsBillingVarianceThreshold(report.categories.numbers.variance) ||
     exceedsBillingVarianceThreshold(report.entityAudit.messageGap) ||
     exceedsBillingVarianceThreshold(report.entityAudit.callGap) ||
     report.unrecognizedDebitEvents > 0
@@ -268,12 +325,15 @@ export function hasMaterialBillingVariance(
 
 export type BillingReconciliationAlertDetails = {
   period: BillingReconciliationPeriod;
-  smsVariance: number;
+  smsVariance: number | null;
+  mmsVariance: number | null;
   voiceVariance: number;
+  numbersVariance: number | null;
+  numbersPeriod: BillingReconciliationPeriod | null;
   messageGap: number;
   callGap: number;
   unrecognizedDebitEvents: number;
-  twilioTotalCostUsd: number;
+  twilioTotalCostUsd: number | null;
   ledgerDebitCredits: number;
 };
 
@@ -283,7 +343,10 @@ export function buildBillingReconciliationAlertDetails(
   return {
     period: report.period,
     smsVariance: report.categories.sms.variance,
+    mmsVariance: report.categories.mms.variance,
     voiceVariance: report.categories.voice.variance,
+    numbersVariance: report.categories.numbers.variance,
+    numbersPeriod: report.categories.numbers.period ?? null,
     messageGap: report.entityAudit.messageGap,
     callGap: report.entityAudit.callGap,
     unrecognizedDebitEvents: report.unrecognizedDebitEvents,
@@ -297,8 +360,11 @@ export type BillingReconciliationSnapshot = {
   lastRunSource: "cron" | "admin";
   materialVariance: boolean;
   period: BillingReconciliationPeriod;
-  smsVariance: number;
+  smsVariance: number | null;
+  mmsVariance: number | null;
   voiceVariance: number;
+  numbersVariance: number | null;
+  numbersPeriod: BillingReconciliationPeriod | null;
   messageGap: number;
   callGap: number;
   unrecognizedDebitEvents: number;
@@ -314,7 +380,10 @@ export function buildBillingReconciliationSnapshot(
     materialVariance: hasMaterialBillingVariance(report),
     period: report.period,
     smsVariance: report.categories.sms.variance,
+    mmsVariance: report.categories.mms.variance,
     voiceVariance: report.categories.voice.variance,
+    numbersVariance: report.categories.numbers.variance,
+    numbersPeriod: report.categories.numbers.period ?? null,
     messageGap: report.entityAudit.messageGap,
     callGap: report.entityAudit.callGap,
     unrecognizedDebitEvents: report.unrecognizedDebitEvents,

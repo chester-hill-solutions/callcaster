@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetFooter,
   SheetHeader,
@@ -126,54 +127,55 @@ export function AddAudioSheet({
         <SheetHeader>
           <SheetTitle>Add audio</SheetTitle>
           <SheetDescription>
-            Upload a file to this workspace library, then select it for voicemail
-            or live voice drop.
+            Upload a file to this workspace library, then select it for
+            voicemail or live voice drop.
           </SheetDescription>
         </SheetHeader>
         <form
           ref={formRef}
-          className="mt-6 space-y-6"
           onSubmit={handleSubmit}
           encType="multipart/form-data"
         >
-          <FormField htmlFor="add-audio-name" label="Audio name" required>
-            <Input
-              id="add-audio-name"
-              name="name"
-              type="text"
-              autoComplete="off"
-              disabled={isSubmitting}
-            />
-          </FormField>
-          <FormField htmlFor="add-audio-file" label="Upload" required>
-            <label
-              htmlFor="add-audio-file"
-              className="flex w-full cursor-pointer items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted"
-            >
-              {pendingFileName === "" ? (
-                <Plus className="h-6 w-6 text-muted-foreground" aria-hidden />
-              ) : (
-                <span className="px-3 text-sm">{pendingFileName}</span>
-              )}
-              <input
-                id="add-audio-file"
-                name="file"
-                type="file"
-                accept={getAudioUploadAcceptValue()}
-                className="hidden"
+          <SheetBody className="space-y-6">
+            <FormField htmlFor="add-audio-name" label="Audio name" required>
+              <Input
+                id="add-audio-name"
+                name="name"
+                type="text"
+                autoComplete="off"
                 disabled={isSubmitting}
-                onChange={(event) => {
-                  const filePath = event.target.value;
-                  setPendingFileName(filePath.split("\\").at(-1) ?? "");
-                }}
               />
-            </label>
-          </FormField>
-          {localError ? (
-            <p className="text-sm text-destructive-text" role="alert">
-              {localError}
-            </p>
-          ) : null}
+            </FormField>
+            <FormField htmlFor="add-audio-file" label="Upload" required>
+              <label
+                htmlFor="add-audio-file"
+                className="border-border hover:bg-muted flex w-full cursor-pointer items-center justify-center rounded-xl border-2 py-8 transition-colors duration-150 ease-in-out"
+              >
+                {pendingFileName === "" ? (
+                  <Plus className="text-muted-foreground h-6 w-6" aria-hidden />
+                ) : (
+                  <span className="px-3 text-sm">{pendingFileName}</span>
+                )}
+                <input
+                  id="add-audio-file"
+                  name="file"
+                  type="file"
+                  accept={getAudioUploadAcceptValue()}
+                  className="hidden"
+                  disabled={isSubmitting}
+                  onChange={(event) => {
+                    const filePath = event.target.value;
+                    setPendingFileName(filePath.split("\\").at(-1) ?? "");
+                  }}
+                />
+              </label>
+            </FormField>
+            {localError ? (
+              <p className="text-destructive-text text-sm" role="alert">
+                {localError}
+              </p>
+            ) : null}
+          </SheetBody>
           <SheetFooter className="flex-col gap-2 sm:flex-col">
             <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? "Uploading…" : "Upload audio"}

@@ -45,6 +45,22 @@ export async function findExportContactsByIds(
   });
 }
 
+/**
+ * The lower bound, or no bound at all.
+ *
+ * The caller passes `campaign.start_date ?? ""`, so an empty string is a live
+ * input. While the column was `text()`, `gte(col, "")` compared
+ * lexicographically and was therefore true of every non-empty value — the
+ * bound silently did nothing. `new Date("")` is an Invalid Date, so wrapping
+ * it would turn that no-op into a query that throws or matches nothing.
+ * Omitting the clause preserves what the export actually did: no lower bound.
+ */
+function messageDateLowerBound(startDate: string) {
+  const parsed = new Date(startDate);
+  if (!startDate.trim() || Number.isNaN(parsed.getTime())) return undefined;
+  return gte(messageTable.date_created, parsed);
+}
+
 export async function countExportCampaignMessages(
   workspaceId: string,
   campaignId: number,
@@ -55,8 +71,8 @@ export async function countExportCampaignMessages(
   return tdb.message.count({
     where: and(
       eq(messageTable.campaign_id, campaignId),
-      gte(messageTable.date_created, startDate),
-      lte(messageTable.date_created, endDate),
+      messageDateLowerBound(startDate),
+      lte(messageTable.date_created, new Date(endDate)),
     ),
   });
 }
@@ -73,8 +89,8 @@ export async function listExportCampaignMessages(
   return tdb.message.findMany({
     where: and(
       eq(messageTable.campaign_id, campaignId),
-      gte(messageTable.date_created, startDate),
-      lte(messageTable.date_created, endDate),
+      messageDateLowerBound(startDate),
+      lte(messageTable.date_created, new Date(endDate)),
     ),
     orderBy: asc(messageTable.date_created),
     offset,

@@ -100,9 +100,9 @@ describe("twilio-webhook.server", () => {
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
 
-  test("resolveCanonicalTwilioWebhookUrl uses BASE_URL and pathname", () => {
+  test("resolveCanonicalTwilioWebhookUrl uses BASE_URL and preserves the query", () => {
     const req = makeRequest("http://wrong-host/api/test?x=1");
-    expect(resolveCanonicalTwilioWebhookUrl(req)).toBe("http://localhost:3000/api/test");
+    expect(resolveCanonicalTwilioWebhookUrl(req)).toBe("http://localhost:3000/api/test?x=1");
   });
 
   test("returns null when webhook validation is disabled", async () => {

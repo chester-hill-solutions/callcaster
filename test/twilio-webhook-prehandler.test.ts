@@ -20,6 +20,20 @@ const { handleTwilioWebhookRequest } = await import("../server/twilio-webhook.ts
 const { isTwilioWebhookPath } = await import("../server/twilio-webhook-paths.ts");
 
 describe("handleTwilioWebhookRequest", () => {
+  test("validates complete signed URLs through the real Bun boundaries", async () => {
+    const child = Bun.spawn([process.execPath, "run", "test/fixtures/twilio-webhook-query.bun.ts"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [code, output, errors] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(code, errors).toBe(0);
+    expect(output).toContain('"executed":12,"failed":0');
+  }, 30000);
+
   test("does not classify session API routes as Twilio webhooks", () => {
     expect(isTwilioWebhookPath("/api/dial")).toBe(false);
     expect(isTwilioWebhookPath("/api/ivr")).toBe(false);

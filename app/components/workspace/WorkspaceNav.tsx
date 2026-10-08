@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -135,6 +136,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     name: "Setup",
     items: [
+      {
+        name: "Phone Numbers",
+        path: "phone-numbers",
+        minRole: MemberRole.Member,
+        icon: Phone,
+      },
       { name: "Settings", path: "settings", icon: Settings },
     ],
   },
@@ -409,7 +416,12 @@ const WorkspaceNav = ({
                 Navigate workspace sections and utilities.
               </SheetDescription>
             </SheetHeader>
-            <div className="flex h-full flex-col bg-background">{navBody}</div>
+            <SheetBody
+              inset="none"
+              className="bg-background flex h-full flex-col"
+            >
+              {navBody}
+            </SheetBody>
           </SheetContent>
         </Sheet>
       </div>

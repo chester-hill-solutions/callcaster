@@ -95,6 +95,42 @@ describe("SQL text handling", () => {
     expect(parseQueueWrites(`update campaign_queue set queue_state = v_next where id = 1`)
       .updates[0]).toMatchObject({ targetState: null, targetIsLiteral: false });
   });
+
+  test("includes tuple assignments after a scalar assignment", () => {
+    expect(parseQueueWrites(`update campaign_queue set provider_status = 'sent',
+      (queue_order, attempt_count) = (4, 0) where id = 2`).updates[0].columns)
+      .toEqual(["provider_status", "queue_order", "attempt_count"]);
+  });
+
+  test("includes conflict assignments only for the queue INSERT statement", () => {
+    const sql = `insert into campaign_queue (contact_id) values (2)
+      on conflict (contact_id) do update set (queue_order, attempt_count) = (4, 0);
+      insert into contact (id) values (2) on conflict (id) do update set queue_order = 9;`;
+    expect(parseQueueWrites(sql).updates.map((write) => write.columns))
+      .toEqual([["queue_order", "attempt_count"]]);
+  });
+
+  test("a quoted semicolon or conflict phrase does not change INSERT boundaries", () => {
+    expect(parseQueueWrites(`insert into campaign_queue (contact_id, dequeued_reason)
+      values (2, 'a; on conflict do update set queue_order = 9')
+      on conflict (contact_id) do update set attempts = 1`).updates[0].columns)
+      .toEqual(["attempts"]);
+    expect(parseQueueWrites(`insert into campaign_queue (dequeued_reason)
+      values ('on conflict do update set queue_order = 9')`).updates).toEqual([]);
+  });
+
+  test("does not silently drop an unknown assignment after a known one", () => {
+    expect(parseQueueWrites(`update campaign_queue set provider_status = 'sent', __expression`).updates[0].columns)
+      .toEqual(["provider_status", "__expression"]);
+  });
+
+  test("commas in quoted values do not hide or invent write columns", () => {
+    expect(parseQueueWrites(`update campaign_queue set dequeued_reason = 'a,b', attempts = 1`).updates[0].columns)
+      .toEqual(["dequeued_reason", "attempts"]);
+    expect(parseQueueWrites(`insert into campaign_queue (contact_id) values (2)
+      on conflict (contact_id) do update set dequeued_reason = 'a,''b,c', attempts = 1`).updates[0].columns)
+      .toEqual(["dequeued_reason", "attempts"]);
+  });
 });
 
 describe("seeded drift is caught", () => {
@@ -147,7 +183,7 @@ describe("seeded drift is caught", () => {
         `create or replace function public.drifted_column() returns void language plpgsql as $$
          begin
            update campaign_queue set queue_state = 'dequeued', assigned_to_user_id = null,
-             provider_status = null, dequeued_at = now(), dequeued_by = null,
+             provider_status = null, claimed_at = null, dequeued_at = now(), dequeued_by = null,
              dequeued_reason = 'x', invented_column = 42 where id = 1;
          end; $$;`,
       ),
@@ -208,7 +244,7 @@ describe("seeded drift is caught", () => {
         `create or replace function public.full_dequeue() returns void language plpgsql as $$
          begin
            update campaign_queue set queue_state = 'dequeued', assigned_to_user_id = null,
-             provider_status = null, dequeued_at = now(), dequeued_by = v_user,
+             provider_status = null, claimed_at = null, dequeued_at = now(), dequeued_by = v_user,
              dequeued_reason = 'done' where id = 1;
          end; $$;`,
       ),
@@ -283,11 +319,14 @@ describe("the real migration lineage", () => {
   });
 
   test("resolves the LATEST definition, not a superseded one", () => {
-    // handle_campaign_queue_entry is defined three times across the lineage
-    // (baseline, 20260716120000, 20260814120000). Checking a superseded body
-    // would report drift repaired months ago.
+    // handle_campaign_queue_entry is defined several times across the lineage
+    // (baseline, 20260716120000, 20260814120000, and 20260930150000, which
+    // added `claimed_at = null` for #2208). Checking a superseded body would
+    // report drift that was repaired by a later migration.
     const enqueue = rpcs.find((r) => r.name === "handle_campaign_queue_entry");
-    expect(enqueue!.file).toBe("client/migrations/20260814120000_requeue_clears_assigned_user.sql");
+    expect(enqueue!.file).toBe(
+      "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+    );
   });
 
   test("no queue RPC still references the dropped `status` column", () => {

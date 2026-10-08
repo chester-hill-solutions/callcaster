@@ -11,7 +11,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1843,
@@ -40,5 +40,39 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Duplicate of #1883; the goto half belongs to #1884. Close, do not re-scope."
+  },
+  {
+    "issueNumber": 2000,
+    "verdict": "duplicate",
+    "duplicateOf": 2032,
+    "recommendedTitle": "Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast",
+    "summary": "Duplicate of #2032. PR #2362 removes the invitation banner and uses the existing root success toast. Tone, deployed geometry and telemetry acceptance remain to verify with the canonical report.",
+    "currentBehavior": "Source verified on dev@46ba4b7e, 2026-10-04: the invitation-only QueryParamBanner row is removed. The root toast consumes a signed finite receipt; deployed acceptance remains pending.",
+    "rootCause": "The historical invitation confirmation used replayable URL state and an inline Alert. The source fix in #2032 replaces that transport and removes the invitation-specific Alert surface.",
+    "resolution": "Do not implement a separate colour patch. Verify the original tone, replay, layout and telemetry criteria with #2032. Retain the native parent relation and keep this report open for deployed QA and release.",
+    "lookIn": [
+      "app/routes/workspaces+/index.tsx",
+      "app/lib/invitation-flash.server.ts",
+      "app/lib/flash-telemetry.client.ts",
+      "app/root.tsx",
+      "test/ui/workspaces-invitation-feedback.test.tsx"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts (clean redirect and signed receipt)",
+      "test/ui/workspaces-invitation-feedback.test.tsx (root toast, nonce suppression and no invitation banner row)"
+    ],
+    "missingTests": [
+      "Deployed success tone and absence of an error-surface beacon remain to verify."
+    ],
+    "acceptanceCriteria": [
+      "Invite acceptance shows a green one-time success toast",
+      "The message does not replay on refresh or revisit",
+      "The success surface is no longer beaconed to client-flash as an error",
+      "No colour-only change is shipped on its own"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Duplicate of #2032; its source fix is merged in PR #2362. Verify the original acceptance criteria together, preserve the native parent, and wait for QA and default-branch release before closure."
   }
 ]

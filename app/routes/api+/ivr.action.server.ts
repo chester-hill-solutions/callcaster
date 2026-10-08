@@ -1,3 +1,4 @@
+import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { data as routeData } from "react-router";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
@@ -10,13 +11,13 @@ import {
   outboundCreditsResponse,
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -64,6 +65,13 @@ export const action = defineAction({
       const credits = await requireOutboundCredits(workspace_id);
       if (!credits.ok) return outboundCreditsResponse(credits);
 
+      // Same rule as every other send path: the workspace must own the number
+      // it is dialling from, and it must not be suspended for an unpaid rental.
+      const refusal = callerIdRefusalMessage(
+        await resolveCallerIdUsability(workspace_id, caller_id),
+      );
+      if (refusal) throw new Response(refusal, { status: 400 });
+
       const tdb = createTenantDb(workspace_id);
       outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
         contactId: Number(contact_id),
@@ -73,15 +81,16 @@ export const action = defineAction({
         queueId: Number(queue_id),
       });
 
+      const ivrUrls = resolveIvrCallUrls(campaign_id);
       call = await withTwilioRetry(
         () =>
           twilio.calls.create({
             to: to_number,
             from: caller_id,
-            url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
+            url: ivrUrls.flowUrl,
             machineDetection: "Enable",
             statusCallbackEvent: ["answered", "completed"],
-            statusCallback: `${env.BASE_URL()}/api/ivr/status`,
+            statusCallback: ivrUrls.statusCallback,
           }),
         { workspaceId: workspace_id, operation: "calls.create" },
       );
@@ -101,7 +110,7 @@ export const action = defineAction({
       await dequeueQueueEntry({
         by: { id: Number(queue_id) },
         userId: user_id,
-        reason: "IVR call completed",
+        reason: "IVR dial dispatched",
       });
 
       return new Response(JSON.stringify({ success: true, callSid: call.sid }), {

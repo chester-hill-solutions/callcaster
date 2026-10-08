@@ -7,6 +7,11 @@ import {
 import type { Json } from "@/lib/db-types";
 import { db, type Database } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import {
+  lockInboundScript,
+  validateAttachedInboundScriptUpdate,
+  withInboundScriptWrite,
+} from "@/server/inbound-script-write.server";
 
 type ScriptRow = typeof scriptTable.$inferSelect;
 
@@ -32,6 +37,7 @@ type PersistenceContext = {
   actorId: string;
   timestamp?: string;
   tdb?: TenantDb;
+  dbInstance?: Pick<Database, "transaction">;
 };
 
 function scriptContentFields(content: ScriptContent) {
@@ -92,12 +98,11 @@ export async function getScriptUsage(args: {
   };
 }
 
-export async function persistWorkspaceScript(
+async function persistWorkspaceScriptWithTenantDb(
   args: PersistenceContext & WorkspaceScriptSave,
+  tdb: TenantDb,
+  timestamp: string,
 ): Promise<ScriptRow | null> {
-  const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const timestamp = args.timestamp ?? new Date().toISOString();
-
   switch (args.mode) {
     case "create":
       return insertScript(tdb, args.content, args.actorId, timestamp);
@@ -117,6 +122,13 @@ export async function persistWorkspaceScript(
       );
     }
     case "update": {
+      await lockInboundScript(tdb, args.workspaceId, args.scriptId);
+      const original = await tdb.script.findFirst({ where: eq(scriptTable.id, args.scriptId) });
+      if (!original) return null;
+      await validateAttachedInboundScriptUpdate(tdb, args.scriptId, {
+        ...args.content,
+        type: args.content.type === undefined ? original.type : args.content.type,
+      });
       const [updated] = await tdb.script.update({
         set: {
           ...scriptContentFields(args.content),
@@ -134,6 +146,14 @@ export async function persistWorkspaceScript(
   }
 }
 
+export async function persistWorkspaceScript(args: PersistenceContext & WorkspaceScriptSave): Promise<ScriptRow | null> {
+  const timestamp = args.timestamp ?? new Date().toISOString();
+  const write = (tdb: TenantDb) => persistWorkspaceScriptWithTenantDb(args, tdb, timestamp);
+  return args.mode === "update" && !args.tdb
+    ? withInboundScriptWrite(args.workspaceId, write, args.dbInstance)
+    : write(args.tdb ?? createTenantDb(args.workspaceId));
+}
+
 export async function persistCampaignScript(args: {
   workspaceId: string;
   campaignId: number;
@@ -145,9 +165,9 @@ export async function persistCampaignScript(args: {
   dbInstance?: Database;
 }): Promise<ScriptRow> {
   const database = args.dbInstance ?? db;
-  return database.transaction(
-    async (txRaw) => {
-      const tdb = createTenantDb(args.workspaceId, txRaw as unknown as Database);
+  return withInboundScriptWrite(
+    args.workspaceId,
+    async (tdb) => {
       const saved = await persistCampaignScriptWithTenantDb({
         ...args,
         tdb,
@@ -162,7 +182,7 @@ export async function persistCampaignScript(args: {
       }
       return saved;
     },
-    { isolationLevel: "serializable" },
+    database,
   );
 }
 
@@ -181,6 +201,7 @@ export async function persistCampaignScriptWithTenantDb(args: {
     return insertScript(args.tdb, args.content, args.actorId, timestamp);
   }
 
+  await lockInboundScript(args.tdb, args.workspaceId, args.scriptId);
   const original = await args.tdb.script.findFirst({
     where: eq(scriptTable.id, args.scriptId),
   });
@@ -188,12 +209,6 @@ export async function persistCampaignScriptWithTenantDb(args: {
     throw new Error("Script not found");
   }
 
-  const usage = await getScriptUsage({
-    workspaceId: args.workspaceId,
-    scriptId: args.scriptId,
-    excludeCampaignId: args.campaignId,
-    tdb: args.tdb,
-  });
   const shouldCopy = args.saveAsCopy;
 
   if (shouldCopy) {
@@ -208,6 +223,11 @@ export async function persistCampaignScriptWithTenantDb(args: {
       timestamp,
     );
   }
+
+  await validateAttachedInboundScriptUpdate(args.tdb, args.scriptId, {
+    ...args.content,
+    type: args.content.type === undefined ? original.type : args.content.type,
+  });
 
   const [updated] = await args.tdb.script.update({
     set: {

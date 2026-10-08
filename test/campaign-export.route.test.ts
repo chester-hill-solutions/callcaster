@@ -696,7 +696,7 @@ describe("api.campaign-export", () => {
           body: '=HYPERLINK("x")',
           from: "+1 (555) 000-0000",
           to: "1",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
         {
           id: "m2",
@@ -704,7 +704,7 @@ describe("api.campaign-export", () => {
           body: "no match",
           from: "000",
           to: "999",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
       ],
     });
@@ -760,7 +760,7 @@ describe("api.campaign-export", () => {
           body: "included",
           from: "+1 (555) 000-0000",
           to: "1",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
         {
           id: "m2",
@@ -768,7 +768,7 @@ describe("api.campaign-export", () => {
           body: "excluded",
           from: "+1 (555) 000-0000",
           to: "1",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
       ],
     });
@@ -887,7 +887,7 @@ describe("api.campaign-export", () => {
           id: "m1",
           from: "+1 (111) 111-1111",
           to: "x",
-          date_sent: new Date("2026-01-03").toISOString(),
+          date_sent: new Date("2026-01-03"),
         },
         {
           id: "m2",
@@ -1093,7 +1093,7 @@ describe("api.campaign-export", () => {
       contacts: [{ id: 1, phone: "+1 (555) 555-5555", workspace: "w1" }],
       messageCount: 1,
       messages: [
-        { id: "m", from: "0", to: "0", date_created: new Date().toISOString() },
+        { id: "m", from: "0", to: "0", date_created: new Date() },
       ],
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
@@ -1162,13 +1162,13 @@ describe("api.campaign-export", () => {
           id: "m1",
           from: "5550000000",
           to: null,
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
         {
           id: "m2",
           from: null,
           to: undefined,
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
       ],
     });
@@ -1346,8 +1346,8 @@ describe("api.campaign-export", () => {
           sid: "s1",
           duration: "61",
           status: "completed",
-          start_time: "st",
-          end_time: "en",
+          start_time: new Date("2026-01-01T00:00:00.000Z"),
+          end_time: new Date("2026-01-01T00:01:01.000Z"),
         },
         {
           outreach_attempt_id: "a2",

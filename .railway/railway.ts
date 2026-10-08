@@ -1,7 +1,7 @@
 import { defineRailway, project } from "railway/iac";
-import { devResources } from "./environments/dev.js";
-import { productionResources } from "./environments/production.js";
-import { stagingResources } from "./environments/staging.js";
+import { devResources } from "./environments/dev.ts";
+import { productionResources } from "./environments/production.ts";
+import { stagingResources } from "./environments/staging.ts";
 
 export default defineRailway((ctx) => {
   if (ctx.isEnvironment("production")) {

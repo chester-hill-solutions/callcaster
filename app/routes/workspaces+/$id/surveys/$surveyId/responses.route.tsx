@@ -1,6 +1,6 @@
 export { loader } from "./responses.loader.server";
 
-import { type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
+import { type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 import { formatSurveyAnswer } from "@/lib/survey-format";
@@ -28,7 +28,6 @@ import {
   Clock,
 } from "lucide-react";
 import { useState } from "react";
-import { downloadBlobPart } from "@/lib/download-blob.client";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/db-types";
 
@@ -63,17 +62,6 @@ export default function SurveyResponsesPage() {
   const { survey, responses, workspaceId, stats } =
     useLoaderData();
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
-  const exportFetcher = useFetcher();
-  const handleExport = async () => {
-    await exportFetcher.load("./export");
-    if (typeof exportFetcher.data === "string") {
-      downloadBlobPart({
-        data: exportFetcher.data,
-        filename: `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`,
-        mimeType: "text/csv",
-      });
-    }
-  };
 
   const allQuestions =
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
@@ -92,15 +80,9 @@ export default function SurveyResponsesPage() {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
-    const question = allQuestions.find(
-      (q) => q.question_id === questionId,
-    );
-    if (!question) return "-";
-
-    // Find the answer by the database question ID
+  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: number) => {
     const answer = response.response_answer?.find(
-      (a) => a.question_id === question.id,
+      (a) => a.question_id === questionId,
     );
     return answer ? formatSurveyAnswer(answer) : "-";
   };
@@ -130,15 +112,11 @@ export default function SurveyResponsesPage() {
             {survey.title} - Response Analysis
           </Text>
         </div>
-        <Button 
-          variant="outline"
-          onClick={() => {
-            void handleExport();
-          }}
-          disabled={exportFetcher.state === "loading"}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {exportFetcher.state === "loading" ? "Exporting..." : "Export Data"}
+        <Button variant="outline" asChild>
+          <a href={`/workspaces/${workspaceId}/surveys/${survey.survey_id}/responses/export`}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Data
+          </a>
         </Button>
       </div>
 
@@ -295,7 +273,7 @@ export default function SurveyResponsesPage() {
                           </TableHead>
                           {allQuestions.map((question) => (
                             <TableHead
-                              key={question.question_id}
+                              key={question.id}
                               className="w-48 border border-border px-4 py-2"
                             >
                               {question.question_text}
@@ -331,12 +309,12 @@ export default function SurveyResponsesPage() {
                               </TableCell>
                               {allQuestions.map((question) => (
                                 <TableCell
-                                  key={question.question_id}
+                                  key={question.id}
                                   className="truncate border border-border px-4 py-2"
                                 >
                                   {getAnswerForQuestion(
                                     response,
-                                    question.question_id,
+                                    question.id,
                                   )}
                                 </TableCell>
                               ))}

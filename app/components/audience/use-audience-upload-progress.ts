@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
@@ -8,6 +10,8 @@ import type {
   AudienceUploadServerSnapshot,
   AudienceUploadStatusResponse,
 } from "./audience-upload-phase";
+
+type UploadAttempt = { uploadId: number; workspaceId: string | undefined };
 
 type UseAudienceUploadProgressArgs = {
   workspaceId: string | undefined;
@@ -39,6 +43,9 @@ export function useAudienceUploadProgress({
   const audienceIdRef = useRef<string | null>(existingAudienceId ?? null);
   const totalContactsRef = useRef(0);
   const handedOffRef = useRef(false);
+  const attemptRef = useRef<UploadAttempt | null>(null);
+  const workspaceIdRef = useRef(workspaceId);
+  workspaceIdRef.current = workspaceId;
 
   const onUploadCompleteRef = useRef(onUploadComplete);
   const onStandaloneCompleteRef = useRef(onStandaloneComplete);
@@ -51,8 +58,8 @@ export function useAudienceUploadProgress({
 
   /**
    * @effect Hand a completed upload off to the caller's callback exactly once.
-   * @effect-deps progress (fires when the upload state machine reaches "completed")
-   * @effect-side-effects none (invokes caller-provided completion callbacks via refs)
+   * @effect-deps [progress, workspaceId] — completion state and tenant report destination
+   * @effect-side-effects DOM (root toast report action), completion callbacks via refs
    * @effect-why-not-loader Completion arrives asynchronously via realtime/poll
    * snapshots, not a route transition; the callbacks advance the wizard or
    * schedule the standalone redirect.
@@ -61,20 +68,41 @@ export function useAudienceUploadProgress({
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
     const audienceId = progress.audienceId;
+    if (workspaceId && progress.uploadId != null && progress.reportAvailable) {
+      const reportUrl = audienceImportReportUrl(workspaceId, progress.uploadId);
+      toast.success("Call-list upload completed", {
+        id: `audience-import-report-${workspaceId}-${progress.uploadId}`,
+        description: "Download the row report to review imported, skipped and consent-warning rows.",
+        duration: Infinity,
+        action: { label: "Download row report", onClick: () => window.location.assign(reportUrl) },
+      });
+    }
     if (onUploadCompleteRef.current) {
       onUploadCompleteRef.current(audienceId);
     } else if (onStandaloneCompleteRef.current) {
       onStandaloneCompleteRef.current(audienceId);
     }
-  }, [progress]);
+  }, [progress, workspaceId]);
 
-  const applyServerSnapshot = (snapshot: AudienceUploadServerSnapshot) => {
+  const isCurrentAttempt = (
+    state: AudienceUploadProgressState,
+    attempt: UploadAttempt | null,
+  ): state is Extract<AudienceUploadProgressState, { kind: "processing" }> =>
+    attempt != null && attemptRef.current === attempt &&
+    workspaceIdRef.current === attempt.workspaceId &&
+    state.kind === "processing" && state.uploadId === attempt.uploadId;
+
+  const applyServerSnapshot = (snapshot: AudienceUploadServerSnapshot, attempt: UploadAttempt | null) => {
     setProgress((prev) => {
-      if (prev.kind !== "processing" && prev.kind !== "submitting") {
+      if (!isCurrentAttempt(prev, attempt) ||
+        (snapshot.id != null && String(snapshot.id) !== String(prev.uploadId)) ||
+        (snapshot.uploadId != null && snapshot.uploadId !== prev.uploadId)) {
         return prev;
       }
 
       const nextStatus = snapshot.status || null;
+      const reportAvailable = snapshot.report_available ?? (snapshot.import_run_id !== undefined
+        ? Boolean(snapshot.import_run_id) : prev.reportAvailable ?? false);
       const serverTotal =
         typeof snapshot.total_contacts === "number"
           ? snapshot.total_contacts
@@ -84,17 +112,16 @@ export function useAudienceUploadProgress({
           ? snapshot.processed_contacts
           : null;
 
-      if (serverTotal != null && serverTotal > 0) {
+      if (serverTotal != null && serverTotal >= 0) {
         totalContactsRef.current = serverTotal;
       }
 
       const totalContacts =
-        serverTotal != null && serverTotal > 0
+        serverTotal != null && serverTotal >= 0
           ? serverTotal
           : prev.totalContacts || totalContactsRef.current;
 
-      const prevAudienceId =
-        prev.kind === "processing" ? prev.audienceId : null;
+      const prevAudienceId = prev.audienceId;
       const nextAudienceId = audienceIdFromSnapshot(
         snapshot,
         audienceIdRef.current ?? prevAudienceId,
@@ -112,12 +139,19 @@ export function useAudienceUploadProgress({
           ? snapshot.skipped_duplicate_contacts
           : (prev.skippedDuplicateContacts ?? null);
 
+      let progressPct = prev.progress;
+      if (serverProcessed != null && totalContacts > 0) {
+        progressPct = Math.round((serverProcessed / totalContacts) * 100);
+      }
+
       if (nextStatus === "completed") {
         const completedAudienceId = nextAudienceId ?? audienceIdRef.current;
         if (!completedAudienceId) return prev;
 
         return {
           kind: "completed",
+          reportAvailable,
+          uploadId: prev.uploadId,
           audienceId: completedAudienceId,
           totalContacts,
           processedContacts: serverProcessed ?? totalContacts,
@@ -130,6 +164,14 @@ export function useAudienceUploadProgress({
       if (nextStatus === "error") {
         return {
           kind: "error",
+          reportAvailable,
+          uploadId: prev.uploadId,
+          audienceId: nextAudienceId,
+          totalContacts,
+          processedContacts: serverProcessed ?? prev.processedContacts,
+          progress: progressPct,
+          skippedInvalidContacts,
+          skippedDuplicateContacts,
           message:
             snapshot.error_message || "An error occurred during upload",
         };
@@ -140,97 +182,65 @@ export function useAudienceUploadProgress({
         return prev;
       }
 
-      const uploadIdForState =
-        prev.kind === "processing" ? prev.uploadId : null;
-      if (uploadIdForState == null) return prev;
-
-      let progressPct = prev.progress;
-      if (serverProcessed != null && totalContacts > 0) {
-        progressPct = Math.round((serverProcessed / totalContacts) * 100);
-      }
+      const uploadIdForState = prev.uploadId;
 
       return {
         kind: "processing",
+        reportAvailable,
         uploadId: uploadIdForState,
         audienceId: nextAudienceId ?? prevAudienceId,
         totalContacts,
         processedContacts:
           serverProcessed != null ? serverProcessed : prev.processedContacts,
         progress: progressPct,
-        warning: snapshot.stage
-          ? null
-          : prev.kind === "processing"
-            ? prev.warning
-            : null,
+        warning: snapshot.stage ? null : prev.warning,
         skippedInvalidContacts,
         skippedDuplicateContacts,
       };
     });
   };
 
+  const activeAttempt = attemptRef.current;
   useWorkspaceEventSubscription({
     workspaceId: workspaceId ?? "",
     table: "audience_upload",
     ...(uploadId ? { filter: `id=eq.${uploadId}` } : {}),
     onChange: (payload) => {
       if (payload.eventType !== "UPDATE" || !payload.new) return;
-      applyServerSnapshot(payload.new as AudienceUploadServerSnapshot);
+      applyServerSnapshot(payload.new as AudienceUploadServerSnapshot, activeAttempt);
     },
   });
 
   const fetchStatusSnapshot = async (targetUploadId: number) => {
-      if (!targetUploadId || !workspaceId) return;
-
+    const attempt = attemptRef.current;
+    if (!targetUploadId || !workspaceId || attempt?.uploadId !== targetUploadId ||
+      attempt.workspaceId !== workspaceId) return;
+    const setWarning = (warning: string | null) => setProgress(prev =>
+      isCurrentAttempt(prev, attempt) ? { ...prev, warning } : prev,
+    );
+    const delayed = "Live progress is delayed. Retrying automatically...";
+    try {
+      const response = await fetch(
+        `/api/audience-upload-status?uploadId=${targetUploadId}&workspaceId=${workspaceId}`,
+      );
+      let data: AudienceUploadStatusResponse | null = null;
       try {
-        const response = await fetch(
-          `/api/audience-upload-status?uploadId=${targetUploadId}&workspaceId=${workspaceId}`,
-        );
-
-        let data: AudienceUploadStatusResponse | null = null;
-        try {
-          data = (await response.json()) as AudienceUploadStatusResponse;
-        } catch (parseError) {
-          logger.error("Error parsing upload status response:", parseError);
-          setProgress((prev) =>
-            prev.kind === "processing"
-              ? {
-                  ...prev,
-                  warning:
-                    "Live progress is delayed. Retrying automatically...",
-                }
-              : prev,
-          );
-          return;
-        }
-
-        if (!response.ok || data == null || data.ok === false) {
-          setProgress((prev) =>
-            prev.kind === "processing"
-              ? {
-                  ...prev,
-                  warning:
-                    "Live progress is delayed. Retrying automatically...",
-                }
-              : prev,
-          );
-          return;
-        }
-
-        setProgress((prev) =>
-          prev.kind === "processing" ? { ...prev, warning: null } : prev,
-        );
-        applyServerSnapshot(data.snapshot);
-      } catch (error) {
-        logger.error("Error polling status:", error);
-        setProgress((prev) =>
-          prev.kind === "processing"
-            ? {
-                ...prev,
-                warning: "Live progress is delayed. Retrying automatically...",
-              }
-            : prev,
-        );
+        data = (await response.json()) as AudienceUploadStatusResponse;
+      } catch (parseError) {
+        logger.error("Error parsing upload status response:", parseError);
+        setWarning(delayed);
+        return;
       }
+      if (!response.ok || data == null || data.ok === false) {
+        setWarning(delayed);
+        return;
+      }
+      setWarning(null);
+      applyServerSnapshot(data.snapshot, attempt);
+    } catch (error) {
+      logger.error("Error polling status:", error);
+      setWarning(delayed);
+    }
   };
 
   useInterval(async () => {
@@ -239,6 +249,7 @@ export function useAudienceUploadProgress({
   }, pollingEnabled ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null);
 
   const startSubmitting = (totalContacts: number) => {
+    attemptRef.current = null;
     handedOffRef.current = false;
     totalContactsRef.current = totalContacts;
     setProgress({
@@ -255,6 +266,7 @@ export function useAudienceUploadProgress({
     audienceId: string;
     totalContacts: number;
   }) => {
+    attemptRef.current = { uploadId: args.uploadId, workspaceId };
     handedOffRef.current = false;
     audienceIdRef.current = args.audienceId;
     totalContactsRef.current = args.totalContacts;
@@ -273,10 +285,18 @@ export function useAudienceUploadProgress({
   };
 
   const fail = (message: string) => {
-    setProgress({ kind: "error", message });
+    setProgress(prev => ({ kind: "error", message,
+      reportAvailable: prev.kind === "idle" ? false : prev.reportAvailable,
+      uploadId: prev.kind === "processing" || prev.kind === "completed" || prev.kind === "error" ? prev.uploadId : null,
+      audienceId: audienceIdRef.current,
+      totalContacts: prev.kind === "idle" ? 0 : prev.totalContacts,
+      processedContacts: prev.kind === "idle" ? 0 : prev.processedContacts,
+      progress: prev.kind === "idle" ? 0 : prev.progress,
+    }));
   };
 
   const reset = () => {
+    attemptRef.current = null;
     handedOffRef.current = false;
     setProgress({ kind: "idle" });
   };

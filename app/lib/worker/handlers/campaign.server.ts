@@ -1,4 +1,4 @@
-import { processAudienceUpload } from "@/lib/audience-upload-process.server";
+import { processAudienceUpload, normalizeVoterListSource } from "@/lib/audience-upload-process.server";
 import {
   processCallCampaignExport,
   processMessageCampaignExport,
@@ -6,8 +6,14 @@ import {
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
 import { runWorkspaceTwilioComplianceJob } from "@/lib/twilio-compliance-job.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
-import { dispatchCampaignIvrBatch } from "@/lib/campaign-ivr-dispatch.server";
+import {
+  dispatchCampaignSmsBatch,
+  type CampaignSmsDispatchCounts,
+} from "@/lib/campaign-sms-dispatch.server";
+import {
+  dispatchCampaignIvrBatch,
+  type CampaignIvrDispatchCounts,
+} from "@/lib/campaign-ivr-dispatch.server";
 import {
   isMachineDispatchedVoiceCampaignType,
 } from "@/lib/campaign-execution.server";
@@ -25,7 +31,7 @@ import { DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS } from "@/lib/throughput-con
 import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import type { VoterListSource } from "@/lib/audience-upload-process.server";
+import type { CampaignDeferralCause } from "@/lib/campaign-batch-outcome";
 
 // Re-exported for backwards compatibility: moved to job-types.server.ts in
 // #1239 A3 so job-params.server.ts can reference it without importing this
@@ -54,21 +60,14 @@ export async function audienceUploadHandler(
     throw new Error("audience_upload: missing workspaceId or userId");
   }
 
-  await processAudienceUpload(
-    params.uploadId,
-    params.audienceId,
-    workspaceId,
-    userId,
-    params.fileContent,
-    params.headerMapping,
-    params.splitNameColumn,
-    undefined,
-    // Same blind cast the old narrowing did — voterListSource was never
-    // validated against the enum at this layer (see legacyNullableStringParam
-    // in job-registry.server.ts for why that stays true post-migration).
-    params.voterListSource as VoterListSource | null,
-  );
-  return { ok: true, uploadId: params.uploadId, audienceId: params.audienceId };
+  if (!job.claimed_by) throw new Error("audience_upload: worker claim owner missing");
+
+  return processAudienceUpload({
+    uploadId: params.uploadId, audienceId: params.audienceId, workspaceId, userId,
+    fileContent: params.fileContent, headerMapping: params.headerMapping,
+    splitNameColumn: params.splitNameColumn, voterListSource: normalizeVoterListSource(params.voterListSource),
+    claim: { jobId: job.id, attemptCount: job.attempt_count, claimedBy: job.claimed_by },
+  });
 }
 
 export type WorkspaceTwilioComplianceParams = {
@@ -271,6 +270,14 @@ export async function campaignDispatchHandler(
   // campaign stuck "running" with an undrained queue. Only active/queued
   // states move to complete; paused/draft/archived/complete keep the status
   // the user chose.
+  //
+  // Known gap: this writes `complete` without the settled-message gate (#2048),
+  // so an expired message campaign can still read complete while Twilio holds
+  // unsettled messages. Routing it through try_complete_campaign_if_drained
+  // would re-break the anti-stuck behaviour above, because that RPC also needs
+  // an empty queue — the exact state this path exists to escape. Deciding
+  // whether "expired" means "complete" or "cancel the remainder, then settle"
+  // is a product call, tracked on #2048.
   if (
     campaignRecord.end_date &&
     new Date(campaignRecord.end_date) < new Date()
@@ -406,6 +413,26 @@ export async function campaignDispatchHandler(
 }
 
 /**
+ * The blocked outcomes a dispatch can hand back, narrowed to what an adapter
+ * actually reads.
+ *
+ * Named rather than written out inline, because the SMS outcome, the IVR
+ * outcome and this signature all spell the same `deferred` shape, and three
+ * copies of a union is how the fourth dispatcher gets it subtly wrong. The
+ * counts are a union because SMS and IVR count different things; everything
+ * else is shared.
+ */
+type CampaignBlockedOutcome =
+  | { kind: "insufficient_credits" }
+  | { kind: "caller_id_required" }
+  /** A request- or config-supplied caller id this workspace cannot send from. */
+  | { kind: "caller_id_not_usable"; callerId: string; reason: "not_owned" | "suspended" }
+  | {
+      kind: "deferred";
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
+    } & CampaignDeferralCause;
+
+/**
  * The non-dispatched tail of the machine dispatch chain: park on
  * insufficient credit, stop on a caller-id config error, or reschedule the
  * successor at the send-window boundary. Shared by the SMS and IVR branches.
@@ -413,14 +440,23 @@ export async function campaignDispatchHandler(
 async function resolveDispatchBlockedCase(
   job: ClaimedJobRow,
   args: DispatchChainContext,
-  outcome:
-    | { kind: "insufficient_credits" }
-    | { kind: "caller_id_required" }
-    | { kind: "deferred_send_window"; nextOpenAt: Date },
+  outcome: CampaignBlockedOutcome,
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
   | { ok: true; campaignId: number; blocked: "caller_id_required" }
-  | { ok: true; campaignId: number; deferred: "send_window" }
+  | { ok: true; campaignId: number; blocked: "caller_id_not_usable" }
+  | {
+      ok: true;
+      campaignId: number;
+      deferred: "send_window";
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
+    }
+  | {
+      ok: true;
+      campaignId: number;
+      deferred: "workspace_not_ready";
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
+    }
 > {
   const { workspaceId, campaignId, userId } = args;
 
@@ -434,7 +470,47 @@ async function resolveDispatchBlockedCase(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window": {
+    case "caller_id_not_usable":
+      // A caller id this workspace cannot send from. Same shape as
+      // `caller_id_required` — a config error no retry can fix — but it is either
+      // a cross-tenant attempt or an unpaid-rental suspension, so the rejected
+      // number and the reason are logged for the operator.
+      logger.error("campaign_dispatch.caller_id_not_usable", {
+        campaignId,
+        workspaceId,
+        callerId: outcome.callerId,
+        reason: outcome.reason,
+      });
+      return { ok: true, campaignId, blocked: "caller_id_not_usable" };
+    case "deferred": {
+      if (outcome.because === "workspace_not_ready") {
+        // Workspace compliance, not a contact problem (#2081). Log the actual
+        // reasons loudly — this used to end as a whole audience dead-lettered
+        // with "Max queue attempts exceeded", which told the operator nothing
+        // about the A2P registration or sender pool that was the real cause.
+        logger.error("campaign_dispatch.workspace_not_ready", {
+          campaignId,
+          workspaceId,
+          reasons: outcome.reasons,
+        });
+        // Retry on the normal tick cadence rather than stopping the chain: a
+        // re-approved A2P registration or a re-synced sender pool clears this on
+        // its own, and the whole audience is still queued. Capped like the send
+        // window so a long-lived block cannot pin the chain to stale config.
+        await enqueueDispatchSuccessor({
+          workspaceId,
+          campaignId,
+          userId,
+          completedJobId: job.id,
+          delayMs: Math.min(DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS),
+        });
+        return {
+          ok: true,
+          campaignId,
+          deferred: "workspace_not_ready",
+          ...(outcome.progress ? { progress: outcome.progress } : {}),
+        };
+      }
       // Schedule the successor at the exact window boundary: the
       // batch's outcome carries the next open instant, so dispatch resumes
       // the moment sending is allowed. Cap the sleep (see
@@ -448,7 +524,12 @@ async function resolveDispatchBlockedCase(
         completedJobId: job.id,
         delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
-      return { ok: true, campaignId, deferred: "send_window" };
+      return {
+        ok: true,
+        campaignId,
+        deferred: "send_window",
+        ...(outcome.progress ? { progress: outcome.progress } : {}),
+      };
     }
   }
 }

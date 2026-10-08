@@ -176,6 +176,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any));
     expect(res.status).toBe(403);
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
   test("advances flow for matched option, vx-any, and fallthrough next/hangup; merges outreach result", async () => {
@@ -270,6 +271,130 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     const text = await res.text();
     expect(text).not.toContain("page_9/bZ");
     expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_1/bX/</Redirect>");
+    expect(telephonyStubState.outreachUpdateCalls).toEqual([]);
+  });
+
+  test("replays unmatched input without recording it as an answer", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["menu", "next"] } },
+      blocks: {
+        menu: {
+          id: "menu",
+          title: "Menu answer",
+          options: [
+            { value: "1", next: "page_1:next" },
+            { value: "2", next: "page_1:next" },
+          ],
+          noInput: { action: "replay", maxReplays: 1 },
+        },
+        next: { id: "next" },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    let persistedResult: Record<string, unknown> = {};
+    const client = makeDbClient({
+      call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+      campaignData,
+    });
+    mocks.createClient.mockReturnValue(client);
+    telephonyDbMocks.findOutreachAttemptById.mockImplementation(async () => ({
+      result: persistedResult,
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockImplementation(
+      async (_workspaceId, _id, patch) => {
+        if ("result" in patch) persistedResult = patch.result as Record<string, unknown>;
+        return { result: persistedResult };
+      },
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const respondWithUnknownKey = () =>
+      mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId: "menu" },
+        request: makeReq({ CallSid: "CA1", Digits: "9" }),
+      } as any);
+
+    const firstResponse = await respondWithUnknownKey();
+    expect(await firstResponse.text()).toContain(
+      "<Redirect>https://base.example/api/ivr/1/page_1/menu/</Redirect>",
+    );
+    expect(persistedResult).toEqual({
+      __no_input_replays: { page_1: { menu: 1 } },
+    });
+
+    const responseAfterReplayLimit = await respondWithUnknownKey();
+    expect(await responseAfterReplayLimit.text()).toContain(
+      "<Redirect>https://base.example/api/ivr/1/page_1/next/</Redirect>",
+    );
+    expect(persistedResult).toEqual({
+      __no_input_replays: { page_1: { menu: 1 } },
+    });
+  });
+
+  test("replay keeps every earlier and later caller answer across repeated timeouts", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["first", "second", "third"] } },
+      blocks: {
+        first: { id: "first", title: "First answer" },
+        second: { id: "second", title: "Second answer" },
+        third: {
+          id: "third",
+          title: "Third answer",
+          noInput: { action: "replay", maxReplays: 2 },
+        },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    let persistedResult: Record<string, unknown> = {};
+    const client = makeDbClient({
+      call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+      campaignData,
+    });
+    mocks.createClient.mockReturnValue(client);
+    telephonyDbMocks.findOutreachAttemptById.mockImplementation(async () => ({
+      result: persistedResult,
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockImplementation(
+      async (_workspaceId, _id, patch) => {
+        if ("result" in patch) {
+          persistedResult = patch.result as Record<string, unknown>;
+        }
+        return { result: persistedResult };
+      },
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    const respond = async (blockId: string, fields: Record<string, string>) => {
+      const response = await mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId },
+        request: makeReq({ CallSid: "CA1", ...fields }),
+      } as any);
+      return response.text();
+    };
+
+    await respond("first", { Digits: "1" });
+    await respond("second", { Digits: "2" });
+    const earlierAnswers = {
+      "First answer": { value: "1", raw: "1", confidence: null, inputType: "dtmf" },
+      "Second answer": { value: "2", raw: "2", confidence: null, inputType: "dtmf" },
+    };
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+
+    expect(await respond("third", {})).toContain("/api/ivr/1/page_1/third/");
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+    expect(await respond("third", {})).toContain("/api/ivr/1/page_1/third/");
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+    expect(persistedResult).toMatchObject({
+      __no_input_replays: { page_1: { third: 2 } },
+    });
+
+    await respond("third", { Digits: "3" });
+    expect(persistedResult).toMatchObject({
+      page_1: {
+        ...earlierAnswers,
+        "Third answer": { value: "3", raw: "3", confidence: null, inputType: "dtmf" },
+      },
+      __no_input_replays: { page_1: { third: 2 } },
+    });
   });
 
   test("covers page_ redirect branch and error handling branches", async () => {
@@ -436,7 +561,14 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       expect.objectContaining({
         support_level: 2,
         result: expect.objectContaining({
-          page_1: expect.objectContaining({ "Support Level": "2" }),
+          page_1: expect.objectContaining({
+            "Support Level": {
+              value: "2",
+              raw: "2",
+              confidence: null,
+              inputType: "dtmf",
+            },
+          }),
         }),
       }),
       expect.objectContaining({ tdb: expect.anything() }),
@@ -445,6 +577,49 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       set: { support_level: 2 },
       where: expect.anything(),
     });
+  });
+
+  test("stores the transcript, raw speech, and Twilio confidence", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: { b1: { id: "b1", title: "Caller response", options: [] } },
+    };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+        campaignData: { script: { steps: script } },
+        outreachResult: {},
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    const response = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({
+        CallSid: "CA1",
+        SpeechResult: "  yes, please  ",
+        Confidence: "0.87",
+      }),
+    } as any);
+
+    expect(await response.text()).toMatch(/hangup/i);
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      9,
+      expect.objectContaining({
+        result: expect.objectContaining({
+          page_1: expect.objectContaining({
+            "Caller response": {
+              value: "yes, please",
+              raw: "  yes, please  ",
+              confidence: 0.87,
+              inputType: "speech",
+            },
+          }),
+        }),
+      }),
+      expect.objectContaining({ tdb: expect.anything() }),
+    );
   });
 
   test("returns hangup when campaign_id mismatches URL or call is missing", async () => {

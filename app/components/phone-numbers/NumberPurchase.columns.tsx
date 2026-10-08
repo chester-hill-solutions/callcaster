@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Text } from "@/components/ui/typography";
 import { numberRentalPriceLabel } from "@/lib/number-rental";
 import { formatNumberLocation } from "@/lib/number-locality";
+import { addressRequirementLabel } from "@/lib/number-address-requirements";
 import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -38,9 +39,19 @@ export function buildNumberPurchaseColumns(
     {
       accessorKey: "friendlyName",
       header: "Name",
-      cell: ({ row }) => (
-        <span className="text-sm">{row.original.friendlyName}</span>
-      ),
+      cell: ({ row }) => {
+        const requirement = addressRequirementLabel(
+          row.original.addressRequirements,
+        );
+        return (
+          <div className="flex flex-col items-start gap-1">
+            <span className="text-sm">{row.original.friendlyName}</span>
+            {requirement && (
+              <Badge variant="secondary">{requirement}</Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "phoneNumber",

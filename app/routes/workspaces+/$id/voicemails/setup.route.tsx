@@ -95,7 +95,7 @@ export default function VoicemailSetupPage() {
             there is nothing to attach a greeting to yet.
           </Text>
           <Button asChild>
-            <Link to={`/workspaces/${workspaceId}/settings/numbers`}>
+            <Link to={`/workspaces/${workspaceId}/phone-numbers`}>
               Add a phone number
             </Link>
           </Button>

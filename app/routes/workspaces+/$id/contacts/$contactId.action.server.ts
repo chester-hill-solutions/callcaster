@@ -1,5 +1,7 @@
 import { data as routeData } from "react-router";
-import { findContactsByPhone, updateContact } from "@/lib/database/contact.server";
+import { findContactsByPhone } from "@/lib/database/contact.server";
+import { parseContactEditorData, saveContactEditor } from "@/server/contact-editor.server";
+import { AppError } from "@/lib/errors.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { defineAction } from "@/lib/handler.server";
@@ -46,6 +48,7 @@ export const action = defineAction({
     });
 
     const formData = await request.formData();
+    const editor = parseContactEditorData(formData);
     // Normalize phone using the same helper as CSV import path (app/lib/csv-contacts.ts).
     // Read-side compensates today via buildExactPhoneCandidates fan-out;
     // normalizing on write fixes silent lookup failures for non-candidate formats.
@@ -81,7 +84,7 @@ export const action = defineAction({
       }
 
       const { workspace: _workspace, id: _id, ...insertValues } = contactData;
-      const [newContact] = await tdb.contact.insert(insertValues);
+      const newContact = await saveContactEditor(workspace_id, null, insertValues, editor);
 
       if (!newContact) {
         throw new Error("Failed to create contact");
@@ -89,6 +92,7 @@ export const action = defineAction({
 
       return routeData({
         success: true,
+        created: true,
         contact: newContact,
         ...(duplicateWarning ? { warning: duplicateWarning } : {}),
       });
@@ -96,13 +100,15 @@ export const action = defineAction({
 
     const contactId = Number(selected_id);
     const { workspace: _workspace, ...updateValues } = contactData;
-    const updatedContact = await updateContact(workspace_id, {
-      ...updateValues,
-      id: contactId,
-    });
+    if (!Number.isSafeInteger(contactId) || contactId <= 0) {
+      return routeData({ error: "Invalid contact ID" }, { status: 400, headers });
+    }
+    const { id: _submittedId, ...fields } = updateValues;
+    const updatedContact = await saveContactEditor(workspace_id, contactId, fields, editor);
 
     return routeData({ success: true, contact: updatedContact });
   } catch (error) {
+    if (error instanceof AppError) return routeData({ error: error.message }, { status: error.statusCode, headers });
     logger.error("Error in contact action:", error);
     return routeData({ error: "Failed to save contact" }, { status: 500 });
   }

@@ -1,7 +1,7 @@
 /**
  * Contact-related database functions
  */
-import { and, eq, ilike, inArray, isNotNull, ne, or, type SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
 import type { Database } from "@/lib/db-types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
@@ -17,6 +17,7 @@ import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { householdKeyFor } from "@/lib/household-key";
 import { stripPhoneNumber } from "@/lib/phone";
+import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
 
 function dedupeContactsById(contacts: Contact[]): Contact[] {
   return Array.from(
@@ -84,6 +85,20 @@ function phoneLookupFilters(exactPhoneCandidates: string[]): SQL | undefined {
     isNotNull(contactTable.phone),
     ne(contactTable.phone, ""),
   );
+}
+
+/** Search prefixes cannot establish recipient identity or prove uniqueness. */
+export async function findSmsRecipientContacts(
+  workspaceId: string,
+  phoneNumber: string,
+): Promise<Contact[]> {
+  const phoneKey = getConversationPhoneKey(phoneNumber);
+  if (!phoneKey) return [];
+  const digits = sql`regexp_replace(coalesce(${contactTable.phone}, ''), '[^0-9]', '', 'g')`;
+  const normalizedPhone = sql`case when length(${digits}) = 10 then '1' || ${digits} else ${digits} end`;
+  return createTenantDb(workspaceId).contact.findMany({
+    where: eq(normalizedPhone, phoneKey),
+  });
 }
 
 export async function findContactsByPhone(

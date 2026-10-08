@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "railway": {
+      "type": "local",
+      "command": [
+        "railway",
+        "mcp"
+      ]
+    },
+    "twilio": {
+      "type": "remote",
+      "url": "https://mcp.twilio.com/docs"
+    }
+  }
+}

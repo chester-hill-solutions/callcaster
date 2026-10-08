@@ -195,23 +195,24 @@ export async function claimAgentForQueue(args: {
 
 export async function dialAgent(args: {
   twilioCredentials: TwilioCredentials;
+  workspaceId: string;
   agentUserId: string;
   queueId: number;
   entryId: number;
   baseUrl: string;
   callerNumber: string;
 }): Promise<void> {
-  const { default: TwilioRestClient } = await import("twilio/lib/rest/Twilio.js");
-  const client = new TwilioRestClient(
-    args.twilioCredentials.accountSid,
-    args.twilioCredentials.authToken,
-    { timeout: TWILIO_REQUEST_TIMEOUT_MS },
-  );
-  const queueName = makeQueueName(args.queueId);
-  const agentBridgeUrl = `${args.baseUrl}/api/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;
-  const agentStatusUrl = `${args.baseUrl}/api/acd-router/agent-status?entry_id=${args.entryId}&queue_id=${args.queueId}`;
-
   try {
+    const { default: TwilioRestClient } = await import("twilio/lib/rest/Twilio.js");
+    const client = new TwilioRestClient(
+      args.twilioCredentials.accountSid,
+      args.twilioCredentials.authToken,
+      { timeout: TWILIO_REQUEST_TIMEOUT_MS },
+    );
+    const queueName = makeQueueName(args.queueId);
+    const agentBridgeUrl = `${args.baseUrl}/api/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;
+    const agentStatusUrl = `${args.baseUrl}/api/acd-router/agent-status?entry_id=${args.entryId}&queue_id=${args.queueId}`;
+
     await client.calls.create({
       to: `client:agent_${args.agentUserId.replace(/-/g, "_")}`,
       from: args.callerNumber,
@@ -224,6 +225,8 @@ export async function dialAgent(args: {
   } catch (error) {
     logger.error("Failed to dial agent", {
       agentUserId: args.agentUserId,
+      workspaceId: args.workspaceId,
+      queueId: args.queueId,
       entryId: args.entryId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -292,21 +295,35 @@ async function resolveWorkspaceId(
   return null;
 }
 
-async function validateAcdSignature(args: {
+async function validatedAcdCredentials(args: {
   request: Request;
   pathSuffix: string;
   formData: FormData;
   workspaceId: string;
-}): Promise<boolean> {
-  const creds = await loadWorkspaceTwilioCredentialsForAcd(args.workspaceId);
+  queueId?: number;
+}): Promise<TwilioCredentials | null> {
+  let creds: TwilioCredentials | null;
+  try {
+    creds = await loadWorkspaceTwilioCredentialsForAcd(args.workspaceId);
+  } catch (error) {
+    logger.error("ACD workspace Twilio credentials could not be loaded", {
+      workspaceId: args.workspaceId, queueId: args.queueId, path: args.pathSuffix, error,
+    });
+    throw error;
+  }
   const authToken = resolveTwilioWebhookAuthToken(
     creds ? { sid: creds.accountSid, authToken: creds.authToken } : null,
   );
-  if (!authToken) return false;
+  if (!authToken || !creds) {
+    logger.error("ACD workspace Twilio credentials are unavailable", {
+      workspaceId: args.workspaceId, queueId: args.queueId, path: args.pathSuffix,
+    });
+    return null;
+  }
   const signature = args.request.headers.get("x-twilio-signature") || "";
   const params = Object.fromEntries(args.formData.entries()) as Record<string, string>;
   const validationUrl = buildValidationUrl(args.request.url, args.pathSuffix);
-  return validateTwilioWebhookParams(params, signature, validationUrl, authToken);
+  return validateTwilioWebhookParams(params, signature, validationUrl, authToken) ? creds : null;
 }
 
 const invalidSignature = (): Response =>
@@ -376,13 +393,14 @@ async function handleWaitUrl(
     });
   }
 
-  const isValid = await validateAcdSignature({
+  const credentials = await validatedAcdCredentials({
     request,
     pathSuffix,
     formData,
     workspaceId: queue.workspace_id,
+    queueId,
   });
-  if (!isValid) return invalidSignature();
+  if (!credentials) return invalidSignature();
 
   const queueName = makeQueueName(queueId);
   const parsedQueueTime = parseInt(queueTime, 10);
@@ -407,6 +425,17 @@ async function handleWaitUrl(
       });
     }
 
+    let baseUrl: string;
+    try {
+      baseUrl = getBaseUrl();
+    } catch (error) {
+      logger.error("ACD call URL configuration is unavailable", {
+        workspaceId: queue.workspace_id, queueId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } });
+    }
+
     const claimed = await claimAgentForQueue({
       queueId,
       workspaceId: queue.workspace_id,
@@ -415,17 +444,15 @@ async function handleWaitUrl(
     });
 
     if (claimed) {
-      const credentials = await loadWorkspaceTwilioCredentialsForAcd(queue.workspace_id);
-      if (credentials) {
-        await dialAgent({
-          twilioCredentials: credentials,
-          agentUserId: claimed.agentUserId,
-          queueId,
-          entryId: claimed.entryId,
-          baseUrl: getBaseUrl(),
-          callerNumber,
-        });
-      }
+      await dialAgent({
+        twilioCredentials: credentials,
+        workspaceId: queue.workspace_id,
+        agentUserId: claimed.agentUserId,
+        queueId,
+        entryId: claimed.entryId,
+        baseUrl,
+        callerNumber,
+      });
     }
   }
 
@@ -455,13 +482,13 @@ async function handleAgentBridge(
   const formData = await request.formData().catch(() => new FormData());
   const workspaceId = await resolveWorkspaceId(url, formData);
   if (workspaceId) {
-    const isValid = await validateAcdSignature({
+    const credentials = await validatedAcdCredentials({
       request,
       pathSuffix,
       formData,
       workspaceId,
     });
-    if (!isValid) return invalidSignature();
+    if (!credentials) return invalidSignature();
   } else if (entryId) {
     return invalidSignature();
   }
@@ -496,13 +523,13 @@ async function handleAgentStatus(
 
   const workspaceId = await resolveWorkspaceId(url, formData);
   if (workspaceId) {
-    const isValid = await validateAcdSignature({
+    const credentials = await validatedAcdCredentials({
       request,
       pathSuffix,
       formData,
       workspaceId,
     });
-    if (!isValid) return invalidSignature();
+    if (!credentials) return invalidSignature();
   } else {
     return invalidSignature();
   }
@@ -532,13 +559,13 @@ async function handleComplete(
 
   const workspaceId = await resolveWorkspaceId(url, formData);
   if (!workspaceId) return invalidSignature();
-  const isValid = await validateAcdSignature({
+  const credentials = await validatedAcdCredentials({
     request,
     pathSuffix,
     formData,
     workspaceId,
   });
-  if (!isValid) return invalidSignature();
+  if (!credentials) return invalidSignature();
 
   // The <Enqueue action> URL is rendered before any queue entry exists, so it
   // cannot carry a real entry_id. Prefer an explicit entry_id when present

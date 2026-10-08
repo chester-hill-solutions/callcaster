@@ -139,6 +139,7 @@ describe("WorkspaceNav task groups and destinations", () => {
       ["Contacts", "/workspaces/ws-1/contacts"],
       ["Analytics", "/workspaces/ws-1/analytics"],
       ["Exports", "/workspaces/ws-1/exports"],
+       ["Phone Numbers", "/workspaces/ws-1/phone-numbers"],
       ["Settings", "/workspaces/ws-1/settings"],
     ];
 
@@ -154,6 +155,7 @@ describe("WorkspaceNav task groups and destinations", () => {
     expect(screen.queryByRole("link", { name: "Scripts" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Call lists" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Exports" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Phone Numbers" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Credits" })).toBeNull();
   });
 
@@ -164,6 +166,7 @@ describe("WorkspaceNav task groups and destinations", () => {
     expect(screen.getByRole("link", { name: "Scripts" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Call lists" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Exports" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Phone Numbers" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Credits" })).toBeNull();
   });
 

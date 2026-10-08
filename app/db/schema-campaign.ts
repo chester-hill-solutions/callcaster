@@ -12,6 +12,7 @@
 import {
   pgTable,
   text,
+  timestamp,
   integer,
   bigint,
   numeric,
@@ -20,30 +21,95 @@ import {
   uuid,
   unique,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const campaign = pgTable("campaign", {
   allow_bulk_local_send: boolean().notNull().default(false),
   body_text: text(),
   caller_id: text(),
-  created_at: text().notNull(),
-  dial_ratio: numeric({ mode: "number" }).notNull(),
-  dial_type: text(),
+  created_at: text().notNull().default(sql`now()`),
+  dial_ratio: numeric({ mode: "number" }).notNull().default(1),
+  dial_type: text().default("call"),
   disposition_options: jsonb(),
-  end_date: text(),
-  group_household_queue: boolean().notNull(),
+  end_date: text().default(sql`now() + '30 days'::interval`),
+  group_household_queue: boolean().notNull().default(true),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   is_sample: boolean().notNull().default(false),
   live_questions: jsonb(),
   message_media: text().array(),
-  next_queue_order: integer().notNull(),
-  schedule: jsonb(),
+  next_queue_order: integer().notNull().default(1),
+  schedule: jsonb().default({
+                               friday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               monday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               sunday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               tuesday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               saturday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               thursday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               wednesday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                             }),
   script_id: integer(),
   sms_messaging_service_sid: text(),
   sms_send_mode: text(),
   sms_send_window: jsonb(),
-  start_date: text(),
+  start_date: text().default(sql`now()`),
   status: text(),
-  title: text().notNull(),
+  title: text().notNull().default("unnamed campaign"),
   type: text(),
   voicemail_drop_enabled: boolean().notNull().default(false),
   voicemail_file: text(),
@@ -54,7 +120,7 @@ export const campaign = pgTable("campaign", {
 export const campaign_audience = pgTable("campaign_audience", {
   audience_id: bigint({ mode: "number" }).notNull(),
   campaign_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
-  created_at: text().notNull(),
+  created_at: text().notNull().default(sql`now()`),
 });
 
 export const campaign_queue = pgTable(
@@ -64,17 +130,17 @@ export const campaign_queue = pgTable(
     attempt_count: integer().notNull(),
     attempts: integer().notNull(),
     campaign_id: bigint({ mode: "number" }).notNull(),
-    claimed_at: text(),
+    claimed_at: timestamp({ withTimezone: true, mode: "date" }),
     contact_id: bigint({ mode: "number" }).notNull(),
-    created_at: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
     id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-    last_attempt_at: text(),
+    last_attempt_at: timestamp({ withTimezone: true, mode: "date" }),
     last_attempt_error: text(),
     provider_status: text(),
     queue_order: integer(),
     queue_state: text(),
     dequeued_by: uuid(),
-    dequeued_at: text(),
+    dequeued_at: timestamp({ withTimezone: true, mode: "date" }),
     dequeued_reason: text(),
     workspace: uuid().notNull(),
   },

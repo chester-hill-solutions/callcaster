@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 
@@ -57,6 +57,14 @@ async function renderBilling(userRole?: string) {
 // submit for a caller. This mirrors the create-campaign fix: gate the
 // page's own content, not just its nav entry point.
 describe("billing page hides Purchase Credits from roles that can't use it", () => {
+  test("rate panel separates IVR from agent calls and excludes zero duration", async () => {
+    await renderBilling("member");
+    fireEvent.click(screen.getByRole("button", { name: "Credit rates for messaging and calling" }));
+    expect(screen.getByText(/IVR calls: 2 credits for the first minute.*3 credits per additional started minute/)).toBeInTheDocument();
+    expect(screen.getByText(/Calls placed by your agents: 4 credits for the first minute.*5 credits per additional started minute/)).toBeInTheDocument();
+    expect(screen.getByText("Zero-duration calls are not billed.")).toBeInTheDocument();
+    expect(screen.queryByText(/IVR \/ auto-dial/)).toBeNull();
+  });
   test("caller sees an explanation instead of the purchase form", async () => {
     await renderBilling("caller");
 

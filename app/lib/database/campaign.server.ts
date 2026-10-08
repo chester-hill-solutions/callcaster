@@ -12,10 +12,18 @@ import {
 import { logger } from "../logger.server";
 import { isUniqueViolation } from "@/lib/parse-utils.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
+import { claimIsLive } from "../campaign-queue-claim";
 import { campaign as campaignTable } from "@/db/schema";
-import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { createTenantDb, withAppCurrentUser, type TenantDb } from "@/server/tenant-db";
+// `withAppCurrentUser` hands its callback a transaction client; this is that
+// type, taken from the module that produces it rather than re-declared here.
+type TransactionClient = Parameters<Parameters<typeof withAppCurrentUser>[1]>[0];
 import { db, type Database } from "@/server/db";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { withInboundScriptWrite } from "@/server/inbound-script-write.server";
+import {
+  dequeueQueueEntry,
+  type DeferredEmit,
+} from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
   persistCampaignScript,
@@ -390,6 +398,14 @@ export type SplitMessageCampaignResult = {
     contactCount: number;
   }>;
   movedContactCount: number;
+  /**
+   * Contacts left on the source because a dispatcher holds a live in-flight
+   * claim on them (#2208). They stay queued and will be picked up by the
+   * campaign they already belong to, so nothing is lost — but the operator has
+   * to be told, because a split that silently leaves rows behind reads as a
+   * successful full move.
+   */
+  heldBackInFlightCount: number;
 };
 
 /**
@@ -460,11 +476,20 @@ export async function splitMessageCampaign({
     onlyQueued: true,
   });
 
+  // #2208: a member with a live in-flight claim is mid-send. Moving it now
+  // would leave it queued in the new segment while the in-flight send also
+  // completes — the contact gets two texts, and is billed for both. Hold those
+  // rows on the source and report how many, rather than dropping them.
+  const splittable = members.filter(
+    (member) => !claimIsLive(member.claimed_at),
+  );
+  const heldBackInFlightCount = members.length - splittable.length;
+
   const buckets: number[][] = Array.from(
     { length: normalizedSegments },
     () => [],
   );
-  members.forEach((member, index) => {
+  splittable.forEach((member, index) => {
     const bucket = buckets[index % normalizedSegments];
     if (!bucket) {
       throw new Error(
@@ -480,44 +505,85 @@ export async function splitMessageCampaign({
     ...clonableFields
   } = source;
 
-  const segments: SplitMessageCampaignResult["segments"] = [];
-  for (let index = 0; index < normalizedSegments; index++) {
-    const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
-    // type-cast justified: clonableFields spread contains required props (type, etc.), but not visible to literal syntax
-    const { campaign: created } = await createCampaign({
-      campaignData: {
-        ...(clonableFields as unknown as Record<string, unknown>),
-        workspace: workspaceId,
-        title,
-        status: "draft",
-      } as unknown as CampaignData,
-      tdb,
-    });
+  // One transaction across all three phases (#2154). The irreversible part —
+  // contacts moving between campaigns — and the part that makes it visible (the
+  // dequeue) have to commit together, or a failure between them leaves contacts
+  // in two campaigns at once and the next dispatch dials them twice.
+  //
+  // `withAppCurrentUser` rather than `db.transaction` directly: the dequeue RPCs
+  // are SECURITY DEFINER and read the actor from `app.current_user_id`, so the
+  // setting has to be transaction-local or it leaks between requests on the
+  // pooled connection.
+  const deferredPublishes: Array<() => Promise<void>> = [];
+  const deferEmit: DeferredEmit = (publish) => {
+    deferredPublishes.push(publish);
+  };
 
-    const contactIds = buckets[index] ?? [];
-    if (contactIds.length > 0) {
-      await enqueueContactsForCampaign(Number(created.id), contactIds);
+  const splitInTransaction = async (tx: TransactionClient): Promise<
+    SplitMessageCampaignResult
+  > => {
+    const txTdb = createTenantDb(workspaceId, tx);
+    const segments: SplitMessageCampaignResult["segments"] = [];
+
+    for (let index = 0; index < normalizedSegments; index++) {
+      const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
+      // type-cast justified: clonableFields spread contains required props (type, etc.), but not visible to literal syntax
+      const { campaign: created } = await createCampaign({
+        campaignData: {
+          ...(clonableFields as unknown as Record<string, unknown>),
+          workspace: workspaceId,
+          title,
+          status: "draft",
+        } as unknown as CampaignData,
+        tdb: txTdb,
+      });
+
+      const contactIds = buckets[index] ?? [];
+      if (contactIds.length > 0) {
+        await enqueueContactsForCampaign(Number(created.id), contactIds, {
+          exec: tx,
+        });
+      }
+
+      segments.push({
+        campaignId: Number(created.id),
+        title,
+        contactCount: contactIds.length,
+      });
     }
 
-    segments.push({
-      campaignId: Number(created.id),
-      title,
-      contactCount: contactIds.length,
-    });
+    // Remove the redistributed rows from the source so volume isn't
+    // double-sent. Only the rows actually moved: a held-back row must stay
+    // QUEUED on the source, because the in-flight send's own dequeue is the
+    // thing that will retire it. Dequeueing it here would leave a contact
+    // whose send then fails queued nowhere at all — a silent drop traded for
+    // the duplicate we are removing.
+    let movedContactCount = 0;
+    for (const member of splittable) {
+      await dequeueQueueEntry({
+        by: { id: Number(member.id) },
+        userId,
+        reason: "Moved to parallel split segment",
+        workspaceId,
+        exec: tx,
+        deferEmit,
+      });
+      movedContactCount++;
+    }
+
+    return { segments, movedContactCount, heldBackInFlightCount };
+  };
+
+  const result = await withAppCurrentUser(userId, splitInTransaction);
+
+  // Only now that the commit has succeeded. An emit issued before the commit
+  // tells a subscriber about rows that a rollback would erase, and never tells
+  // it the change was undone.
+  for (const publish of deferredPublishes) {
+    await publish();
   }
 
-  // Remove the redistributed rows from the source so volume isn't double-sent.
-  let movedContactCount = 0;
-  for (const member of members) {
-    await dequeueQueueEntry({
-      by: { id: Number(member.id) },
-      userId,
-      reason: "Moved to parallel split segment",
-    });
-    movedContactCount++;
-  }
-
-  return { segments, movedContactCount };
+  return result;
 }
 
 export async function updateOrCopyScript({
@@ -577,13 +643,9 @@ export async function updateCampaignWithScript(args: {
   const database = args.dbInstance ?? db;
 
   try {
-    return await database.transaction(
-      async (txRaw) => {
-        // type-cast justified: drizzle transaction callback type is not precisely exported as Database
-        const tdb = createTenantDb(
-          args.workspaceId,
-          txRaw as unknown as Database,
-        );
+    return await withInboundScriptWrite(
+      args.workspaceId,
+      async (tdb) => {
         const script = await persistCampaignScriptWithTenantDb({
           workspaceId: args.workspaceId,
           campaignId,
@@ -610,7 +672,7 @@ export async function updateCampaignWithScript(args: {
         });
         return { ...updated, scriptId: script.id, script };
       },
-      { isolationLevel: "serializable" },
+      database,
     );
   } catch (error: unknown) {
     if (isUniqueViolation(error)) {

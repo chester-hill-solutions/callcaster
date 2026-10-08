@@ -1,7 +1,8 @@
-import { isRouteErrorResponse, useRouteError } from "react-router";
+import { isRouteErrorResponse, Link, useRouteError } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { toUserMessage } from "@/lib/user-message";
+import { Heading, Text } from "@/components/ui/typography";
+import { toResponseMessage, toUserMessage } from "@/lib/user-message";
 
 const FALLBACK_MESSAGE =
   "Something went wrong. Please try again or contact support if the problem persists.";
@@ -9,6 +10,37 @@ const FALLBACK_MESSAGE =
 /** Route-module ErrorBoundary compatible with React Router 7 typegen. */
 export function RouteErrorBoundary() {
   const error = useRouteError();
+
+  if (
+    isRouteErrorResponse(error) &&
+    (error.status === 401 || error.status === 403)
+  ) {
+    const signIn = error.status === 401;
+    const message = toResponseMessage(
+      error.data,
+      signIn
+        ? "Sign in to continue to this page."
+        : "You don't have permission to view this page. Contact your workspace administrator if you need access.",
+    );
+
+    return (
+      <div className="flex min-h-48 items-center justify-center p-6">
+        <div className="w-full max-w-md text-center">
+          <Heading as="h3" level={4}>
+            {signIn ? "Sign in required" : "Access denied"}
+          </Heading>
+          <Text variant="muted" className="mt-2">
+            {message}
+          </Text>
+          <Button asChild variant="outline" className="mt-4">
+            <Link to={signIn ? "/signin" : "/workspaces"}>
+              {signIn ? "Sign in" : "Go to workspaces"}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isRouteErrorResponse(error) && error.status === 404) {
     return (
@@ -32,7 +64,7 @@ export function RouteErrorBoundary() {
   }
 
   const message = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}`
+    ? toResponseMessage(error.data, `${error.status} ${error.statusText}`)
     : toUserMessage(error, FALLBACK_MESSAGE);
 
   return (

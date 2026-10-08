@@ -58,7 +58,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     });
   }, 30000);
 
-  test("redirects to auth-code-error on verifyOtp error and logs", async () => {
+  test("redirects to sign-in on verifyOtp error and logs", async () => {
     authApiMocks.verifyEmail.mockRejectedValue(new Error("bad"));
 
     const { logger } = await import("@/lib/logger.server");
@@ -70,7 +70,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     } as any)));
 
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/auth/auth-code-error");
+    expect(res.headers.get("Location")).toBe("/signin");
     expect(logger.error).toHaveBeenCalled();
   });
 
@@ -91,7 +91,7 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     expect(res.headers.get("Location")).toBe("/");
   });
 
-  test("redirects to auth-code-error when token_hash/type missing", async () => {
+  test("redirects to sign-in when token_hash/type missing", async () => {
     vi.doMock("@client/ssr", () => ({
       createServerClient: vi.fn(() => ({ auth: { verifyOtp: vi.fn() } })),
       parse: vi.fn(() => ({})),
@@ -102,12 +102,12 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     const res1 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?type=signup"),
     } as any)));
-    expect(res1.headers.get("Location")).toBe("/auth/auth-code-error");
+    expect(res1.headers.get("Location")).toBe("/signin");
 
     const res2 = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api/auth/callback?token_hash=th"),
     } as any)));
-    expect(res2.headers.get("Location")).toBe("/auth/auth-code-error");
+    expect(res2.headers.get("Location")).toBe("/signin");
   });
 });
 

@@ -33,7 +33,6 @@ import {
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
@@ -51,9 +50,13 @@ import {
 // plain strings here.
 const COMPLIANCE_CHANNELS = ["toll_free_bulk_sms", "a2p10dlc"] as const;
 
-async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+async function handleAdvanceStep(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const targetStep = String(formData.get("targetStep") ?? formData.get("target_step") ?? "");
+  const targetStep = String(
+    formData.get("targetStep") ?? formData.get("target_step") ?? "",
+  );
   if (!isWizardOnboardingStepId(targetStep)) {
     return {
       kind: "payload",
@@ -61,7 +64,8 @@ async function handleAdvanceStep(ctx: OnboardingActionContext): Promise<Onboardi
       status: 400,
     };
   }
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: targetStep },
   });
@@ -112,7 +116,9 @@ async function handleSaveWorkspaceName(
   return { kind: "redirect", step: "path_selection" };
 }
 
-async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+async function handleSkipFirstNumber(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
   const current = await getWorkspaceMessagingOnboardingState({
     workspaceId: ctx.workspaceId,
   });
@@ -130,10 +136,16 @@ async function handleSkipFirstNumber(ctx: OnboardingActionContext): Promise<Onbo
   };
 }
 
-async function handleVerifyCallerId(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+async function handleVerifyCallerId(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const phoneNumber = String(formData.get("phoneNumber") ?? formData.get("phone_number") ?? "");
-  const friendlyName = String(formData.get("friendlyName") ?? formData.get("friendly_name") ?? "");
+  const phoneNumber = String(
+    formData.get("phoneNumber") ?? formData.get("phone_number") ?? "",
+  );
+  const friendlyName = String(
+    formData.get("friendlyName") ?? formData.get("friendly_name") ?? "",
+  );
   if (!phoneNumber.trim() || !friendlyName.trim()) {
     return {
       kind: "payload",
@@ -141,7 +153,8 @@ async function handleVerifyCallerId(ctx: OnboardingActionContext): Promise<Onboa
       status: 400,
     };
   }
-  const { validationRequest } = await startWorkspaceCallerIdVerification({workspaceId: ctx.workspaceId,
+  const { validationRequest } = await startWorkspaceCallerIdVerification({
+    workspaceId: ctx.workspaceId,
     phoneNumber,
     friendlyName,
   });
@@ -154,9 +167,12 @@ async function handleVerifyCallerId(ctx: OnboardingActionContext): Promise<Onboa
   };
 }
 
-async function handleSaveChannels(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+async function handleSaveChannels(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
+  const current = await getWorkspaceMessagingOnboardingState({
+    workspaceId: ctx.workspaceId,
   });
   const selectedGoal = readSelectedGoal(formData) ?? current.selectedGoal;
   const channelsFromForm = readSelectedChannels(formData);
@@ -223,7 +239,8 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   const nextStep =
     nextWizardStep("path_selection", selectedGoal) ?? "business_identity";
 
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
       selectedChannels: resolvedChannels,
@@ -238,7 +255,10 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   // The seeded sample campaign follows the chosen goal; best-effort.
   if (selectedGoal) {
     try {
-      await retargetSampleCampaignForGoal({ workspaceId: ctx.workspaceId, goal: selectedGoal });
+      await retargetSampleCampaignForGoal({
+        workspaceId: ctx.workspaceId,
+        goal: selectedGoal,
+      });
     } catch (error) {
       logger.warn("onboarding.sample_retarget_failed", {
         workspaceId: ctx.workspaceId,
@@ -253,7 +273,8 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
   const previousChannels = new Set(current.selectedChannels as string[]);
   const nextChannels = resolvedChannels as string[];
   const newlySelectedCompliance = COMPLIANCE_CHANNELS.some(
-    (channel) => nextChannels.includes(channel) && !previousChannels.has(channel),
+    (channel) =>
+      nextChannels.includes(channel) && !previousChannels.has(channel),
   );
   if (newlySelectedCompliance) {
     await enqueueWorkspaceComplianceJob(ctx.workspaceId, "channels_selected");
@@ -286,17 +307,35 @@ async function handleSaveBusinessProfile(
   ctx: OnboardingActionContext,
 ): Promise<OnboardingHandlerResult> {
   const formData = resolveOnboardingInput(ctx.input);
-  const current = await getWorkspaceMessagingOnboardingState({workspaceId: ctx.workspaceId,
+  const current = await getWorkspaceMessagingOnboardingState({
+    workspaceId: ctx.workspaceId,
   });
-  const businessProfile = buildBusinessProfile(formData, current.businessProfile);
+  const businessProfile = buildBusinessProfile(
+    formData,
+    current.businessProfile,
+  );
 
   const wizardStepRaw = String(
     formData.get("wizardStep") ?? formData.get("wizard_step") ?? "",
   ).trim();
   const wizardStep =
-    wizardStepRaw === "business_identity" || wizardStepRaw === "business_program"
+    wizardStepRaw === "business_identity" ||
+    wizardStepRaw === "business_program"
       ? wizardStepRaw
       : null;
+  const identityRequiredFields = [...BUSINESS_IDENTITY_REQUIRED_FIELDS];
+  if (current.selectedChannels.includes("toll_free_bulk_sms"))
+    identityRequiredFields.push("tollFreeOptInType");
+  if (current.selectedChannels.includes("a2p10dlc")) {
+    identityRequiredFields.push("a2pCompanyType");
+    if (businessProfile.a2pCompanyType === "public") {
+      identityRequiredFields.push(
+        "a2pStockExchange",
+        "a2pStockTicker",
+        "a2pBrandContactEmail",
+      );
+    }
+  }
 
   // Identity / Program screens validate a subset; capability gates and API posts
   // without a wizard hint still require the full baseline.
@@ -304,7 +343,7 @@ async function handleSaveBusinessProfile(
     wizardStep === "business_identity"
       ? findMissingBusinessProfileFields(
           businessProfile,
-          BUSINESS_IDENTITY_REQUIRED_FIELDS,
+          identityRequiredFields,
         )
       : wizardStep === "business_program"
         ? findMissingBusinessProfileFields(
@@ -331,9 +370,11 @@ async function handleSaveBusinessProfile(
   const nextStep =
     wizardStep === "business_identity" || wizardStep === "business_program"
       ? (nextWizardStep(wizardStep, current.selectedGoal) ?? "audience")
-      : (nextWizardStep("business_identity", current.selectedGoal) ?? "audience");
+      : (nextWizardStep("business_identity", current.selectedGoal) ??
+        "audience");
 
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: {
       businessProfile,
@@ -390,10 +431,14 @@ async function handleSaveServiceAddress(
     formData.get("addressRegion") ?? formData.get("address_region") ?? "",
   ).trim();
   const addressPostalCode = String(
-    formData.get("addressPostalCode") ?? formData.get("address_postal_code") ?? "",
+    formData.get("addressPostalCode") ??
+      formData.get("address_postal_code") ??
+      "",
   ).trim();
   const addressCountryCode = String(
-    formData.get("addressCountryCode") ?? formData.get("address_country_code") ?? "CA",
+    formData.get("addressCountryCode") ??
+      formData.get("address_country_code") ??
+      "CA",
   ).trim();
   const customerName = String(
     formData.get("customerName") ??
@@ -473,41 +518,30 @@ async function handleReviewEmergencyVoice(
   );
 }
 
-async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
-  const nextState = await provisionWorkspaceA2P({workspaceId: ctx.workspaceId,
-    actorUserId: ctx.user.id,
-  });
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+async function handleProvisionA2p(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
+  await enqueueWorkspaceComplianceJob(
+    ctx.workspaceId,
+    "onboarding_a2p_requested",
+  );
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "launch_checks" },
   });
-  if (nextState.reviewState.blockingIssues.length > 0) {
-    return {
-      kind: "payload",
-      data: {
-        error:
-          "A2P submission is blocked until the required onboarding and Trust Hub prerequisites are completed.",
-      },
-    };
-  }
-  if (nextState.a2p10dlc.rejectionReason || nextState.reviewState.lastError) {
-    return {
-      kind: "payload",
-      data: {
-        error:
-          nextState.a2p10dlc.rejectionReason ??
-          nextState.reviewState.lastError ??
-          "A2P provisioning failed.",
-      },
-    };
-  }
   return {
     kind: "payload",
-    data: { success: "A2P brand and campaign were submitted for review." },
+    data: {
+      success:
+        "A2P compliance setup is queued. Check Launch checks for the latest status.",
+    },
   };
 }
 
-async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
+async function handleSaveRcs(
+  ctx: OnboardingActionContext,
+): Promise<OnboardingHandlerResult> {
   if (!isRcsOnboardingEnabled()) {
     return {
       kind: "payload",
@@ -518,41 +552,72 @@ async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHa
 
   const formData = resolveOnboardingInput(ctx.input);
 
-  await updateWorkspaceRcsOnboarding({workspaceId: ctx.workspaceId,
+  await updateWorkspaceRcsOnboarding({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.user.id,
     provider: TWILIO_RCS_PROVIDER,
-    displayName: String(formData.get("rcsDisplayName") ?? formData.get("rcs_display_name") ?? ""),
+    displayName: String(
+      formData.get("rcsDisplayName") ?? formData.get("rcs_display_name") ?? "",
+    ),
     publicDescription: String(
-      formData.get("rcsPublicDescription") ?? formData.get("rcs_public_description") ?? "",
+      formData.get("rcsPublicDescription") ??
+        formData.get("rcs_public_description") ??
+        "",
     ),
-    logoImageUrl: String(formData.get("rcsLogoImageUrl") ?? formData.get("rcs_logo_image_url") ?? ""),
+    logoImageUrl: String(
+      formData.get("rcsLogoImageUrl") ??
+        formData.get("rcs_logo_image_url") ??
+        "",
+    ),
     bannerImageUrl: String(
-      formData.get("rcsBannerImageUrl") ?? formData.get("rcs_banner_image_url") ?? "",
+      formData.get("rcsBannerImageUrl") ??
+        formData.get("rcs_banner_image_url") ??
+        "",
     ),
-    accentColor: String(formData.get("rcsAccentColor") ?? formData.get("rcs_accent_color") ?? ""),
+    accentColor: String(
+      formData.get("rcsAccentColor") ?? formData.get("rcs_accent_color") ?? "",
+    ),
     optInPolicyImageUrl: String(
-      formData.get("rcsOptInPolicyImageUrl") ?? formData.get("rcs_opt_in_policy_image_url") ?? "",
+      formData.get("rcsOptInPolicyImageUrl") ??
+        formData.get("rcs_opt_in_policy_image_url") ??
+        "",
     ),
     useCaseVideoUrl: String(
-      formData.get("rcsUseCaseVideoUrl") ?? formData.get("rcs_use_case_video_url") ?? "",
+      formData.get("rcsUseCaseVideoUrl") ??
+        formData.get("rcs_use_case_video_url") ??
+        "",
     ),
     representativeName: String(
-      formData.get("rcsRepresentativeName") ?? formData.get("rcs_representative_name") ?? "",
+      formData.get("rcsRepresentativeName") ??
+        formData.get("rcs_representative_name") ??
+        "",
     ),
     representativeTitle: String(
-      formData.get("rcsRepresentativeTitle") ?? formData.get("rcs_representative_title") ?? "",
+      formData.get("rcsRepresentativeTitle") ??
+        formData.get("rcs_representative_title") ??
+        "",
     ),
     representativeEmail: String(
-      formData.get("rcsRepresentativeEmail") ?? formData.get("rcs_representative_email") ?? "",
+      formData.get("rcsRepresentativeEmail") ??
+        formData.get("rcs_representative_email") ??
+        "",
     ),
     notificationEmail: String(
-      formData.get("rcsNotificationEmail") ?? formData.get("rcs_notification_email") ?? "",
+      formData.get("rcsNotificationEmail") ??
+        formData.get("rcs_notification_email") ??
+        "",
     ),
     agentId:
-      String(formData.get("rcsAgentId") ?? formData.get("rcs_agent_id") ?? "").trim() || null,
+      String(
+        formData.get("rcsAgentId") ?? formData.get("rcs_agent_id") ?? "",
+      ).trim() || null,
     senderId:
-      String(formData.get("rcsSenderId") ?? formData.get("rcs_sender_id") ?? "").trim() || null,
-    regions: String(formData.get("rcsRegions") ?? formData.get("rcs_regions") ?? "")
+      String(
+        formData.get("rcsSenderId") ?? formData.get("rcs_sender_id") ?? "",
+      ).trim() || null,
+    regions: String(
+      formData.get("rcsRegions") ?? formData.get("rcs_regions") ?? "",
+    )
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
@@ -561,7 +626,8 @@ async function handleSaveRcs(ctx: OnboardingActionContext): Promise<OnboardingHa
       formData.get("rcsStatus") ?? formData.get("rcs_status"),
     ),
   });
-  await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
+  await persistWorkspaceOnboardingState({
+    workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "launch_checks" },
   });
@@ -582,12 +648,16 @@ async function handleAttachRcsSender(
     };
   }
 
-  const result = await attachWorkspaceRcsSenderToPool({ workspaceId: ctx.workspaceId });
+  const result = await attachWorkspaceRcsSenderToPool({
+    workspaceId: ctx.workspaceId,
+  });
 
   if (!result.serviceSid) {
     return {
       kind: "payload",
-      data: { error: "Provision a Messaging Service before attaching the RCS sender." },
+      data: {
+        error: "Provision a Messaging Service before attaching the RCS sender.",
+      },
       status: 400,
     };
   }
@@ -625,4 +695,7 @@ export const ONBOARDING_ACTION_HANDLERS = {
   provision_a2p: handleProvisionA2p,
   save_rcs: handleSaveRcs,
   attach_rcs_sender: handleAttachRcsSender,
-} satisfies Record<OnboardingActionName, (ctx: OnboardingActionContext) => Promise<OnboardingHandlerResult>>;
+} satisfies Record<
+  OnboardingActionName,
+  (ctx: OnboardingActionContext) => Promise<OnboardingHandlerResult>
+>;

@@ -1,4 +1,5 @@
-import { and, desc, eq, inArray, isNotNull, like, lt, or, sql } from "drizzle-orm";
+import { andConditions } from "@/lib/sql-conditions";
+import { and, desc, eq, inArray, isNotNull, like, lt, or, sql, type SQL } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -72,7 +73,12 @@ export async function fetchMessagePageForContact(
     where: and(
       isNotNull(messageTable.date_created),
       or(eq(messageTable.from, contactFilter), eq(messageTable.to, contactFilter)),
-      ...(before ? [lt(messageTable.date_created, before)] : []),
+      // `before` is a cursor the client sends back, so it is an ISO string. An
+      // unparseable cursor must not become a filter: `new Date("junk")` is an
+      // Invalid Date, which would throw here rather than return the first page.
+      ...(before && !Number.isNaN(new Date(before).getTime())
+        ? [lt(messageTable.date_created, new Date(before))]
+        : []),
     ),
     orderBy: [desc(messageTable.date_created)],
     limit: pageSize + 1,
@@ -200,24 +206,84 @@ export async function findMessageBySid(sid: string): Promise<MessageRow | null> 
 }
 
 /**
+ * The columns whose guarded writes are SQL fragments rather than plain values.
+ *
+ * `message.status` is the `message_status` ENUM and `message.date_sent` a
+ * timestamptz in every real database, while the schema types both as text. A
+ * `sql` fragment's result is therefore legitimately not the text the schema
+ * promises, and assigning one needs a widening that the compiler cannot
+ * verify.
+ *
+ * Rather than cast that widening inside every guard — which is what this
+ * module used to do, once per guard, as `as unknown as Partial<MessageRow>` —
+ * it is declared once, here, where the reason is visible. Two casts became
+ * zero and the type-safety ratchet moved down with them.
+ */
+type GuardedMessageColumn = "status" | "date_sent";
+
+/**
+ * A message write, where the two guarded columns may carry a SQL fragment.
+ *
+ * The guarded keys are spelled out per column rather than as
+ * `Record<GuardedMessageColumn, …>`. That union form resolved to
+ * `MessageRow["status" | "date_sent"]`, i.e. `string | Date | null`, so `status`
+ * silently accepted a `Date` — the mistake #2213 had already fixed on the model,
+ * and the tenant-db boundary would now have caught. Per-column keeps
+ * `status: string | SQL` and `date_sent: Date | SQL`.
+ *
+ * `ScopedUpdate` admits `SQL` on every column because that is Drizzle's own
+ * `PgUpdateSetSource`, so a guarded write needs no second type.
+ */
+type MessageUpdate = Omit<Partial<MessageRow>, GuardedMessageColumn> & {
+  status?: MessageRow["status"] | SQL;
+  date_sent?: MessageRow["date_sent"] | SQL;
+};
+
+/**
  * Status-transition guard, enforced atomically inside the UPDATE (same shape
  * as updateCallBySid): keep the row's current status when it is already
  * terminal and the incoming status is not — out-of-order Twilio callbacks
  * must not regress delivered/failed back to sent/sending. `::text` because
  * message.status is the message_status ENUM in every real database (#1289).
  */
-function withTerminalStatusGuard(update: Partial<MessageRow>): Partial<MessageRow> {
+function withTerminalStatusGuard(update: MessageUpdate): MessageUpdate {
   if (update.status == null) return update;
   return {
     ...update,
     status: sql`CASE WHEN LOWER(${messageTable.status}::text) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
-  } as unknown as Partial<MessageRow>;
+  };
+}
+
+/**
+ * Provider send-time guard, first-write-wins (#2049).
+ *
+ * `date_sent` is the historical fact of when the carrier took the message. It
+ * is NOT a piece of mutable message state like `status`, so this cannot reuse
+ * the terminal-wins guard above: a later sweep, or a straggling callback, must
+ * never rewrite a send time the provider has already reported. `coalesce`
+ * also means an update that says nothing about `date_sent` leaves the column
+ * alone, which is what lets a status-only write run without clearing it.
+ *
+ * Note this is deliberately NOT inferred from `date_created`. Writing the
+ * request time into the send time is the exact defect this guard exists to
+ * prevent: on the Eric Lombardi blast the two differed by up to 7.7 hours, and
+ * an inferred value would have made that look like zero.
+ */
+function withDateSentGuard(update: MessageUpdate): MessageUpdate {
+  if (update.date_sent === undefined) return update;
+  const incoming = update.date_sent instanceof Date
+    ? sql.param(update.date_sent, messageTable.date_sent)
+    : update.date_sent;
+  return {
+    ...update,
+    date_sent: sql`coalesce(${messageTable.date_sent}, ${incoming})`,
+  };
 }
 
 export async function updateMessageBySid(
   workspaceId: string,
   sid: string,
-  update: Partial<MessageRow>,
+  update: MessageUpdate,
   options?: { tdb?: TenantDb },
 ): Promise<MessageRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
@@ -231,7 +297,8 @@ export async function updateMessageBySid(
   // shape as updateCallBySid): keep the row's current status when it is
   // already terminal and the incoming status is not — out-of-order Twilio
   // callbacks must not regress delivered/failed back to sent/sending.
-  const set = withTerminalStatusGuard(update);
+  // The send-time guard composes on top so one call can safely carry both.
+  const set = withDateSentGuard(withTerminalStatusGuard(update));
 
   const [row] = await tdb.message.update({
     set,
@@ -266,6 +333,15 @@ export function isPendingMessageSid(sid: string | null | undefined): boolean {
   return typeof sid === "string" && sid.startsWith(PENDING_MESSAGE_SID_PREFIX);
 }
 
+/** Include pending intents, except failures that never reached the provider. */
+export function campaignSmsDuplicateWhere(campaignId: number, destination: SQL): SQL {
+  return andConditions([
+    eq(messageTable.campaign_id, campaignId),
+    destination,
+    sql`NOT (${messageTable.sid} LIKE ${`${PENDING_MESSAGE_SID_PREFIX}%`} AND LOWER(${messageTable.status}::text) = 'failed')`,
+  ], "campaign SMS duplicate check");
+}
+
 export async function countCampaignMessagesToPhone(
   workspaceId: string,
   campaignId: string | number,
@@ -274,14 +350,7 @@ export async function countCampaignMessagesToPhone(
 ): Promise<number> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
   return tdb.message.count({
-    where: and(
-      eq(messageTable.campaign_id, Number(campaignId)),
-      eq(messageTable.to, to),
-      // An intent row counts (it is the double-send guard), except one that
-      // was marked failed without ever reaching Twilio: nothing was sent, so
-      // the contact must stay eligible.
-      sql`NOT (${messageTable.sid} LIKE ${`${PENDING_MESSAGE_SID_PREFIX}%`} AND LOWER(${messageTable.status}::text) = 'failed')`,
-    ),
+    where: campaignSmsDuplicateWhere(Number(campaignId), eq(messageTable.to, to)),
   });
 }
 

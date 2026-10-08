@@ -99,7 +99,7 @@ export function selectWorkspaceToday(
   if (canAdminister && !input.hasWorkspaceNumber) {
     return selection(
       "get_number",
-      `${baseUrl}/settings/numbers`,
+      `${baseUrl}/phone-numbers`,
       input,
     );
   }

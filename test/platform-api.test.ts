@@ -194,5 +194,6 @@ describe("platform openapi schemas", () => {
       "#/components/schemas/RegisterRequest",
     );
     expect(openApiSpec.components.schemas.RegisterRequest).toBeDefined();
+    expect(openApiSpec.paths["/api/auth/register"]?.post).toMatchObject({ parameters: [] });
   });
 });

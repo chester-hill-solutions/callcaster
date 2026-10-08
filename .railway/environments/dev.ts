@@ -1,5 +1,5 @@
-import { bucket, postgres, service, volume } from "railway/iac";
-import { preservedVariables, source } from "../config/shared.js";
+import { bucket, image, service, volume } from "railway/iac";
+import { preservedVariables, source } from "../config/shared.ts";
 
 const appVariables = [
   "BASE_URL",
@@ -49,19 +49,40 @@ const workerVariables = [
   "TWILIO_SID",
 ] as const;
 
+const databaseVariables = [
+  "DATABASE_PUBLIC_URL",
+  "DATABASE_URL",
+  "PGDATA",
+  "PGDATABASE",
+  "PGHOST",
+  "PGPASSWORD",
+  "PGPORT",
+  "PGUSER",
+  "POSTGRES_DB",
+  "POSTGRES_PASSWORD",
+  "POSTGRES_USER",
+  "RAILWAY_DEPLOYMENT_DRAINING_SECONDS",
+  "RAILWAY_DOCKERFILE_PATH",
+  "SSL_CERT_DAYS",
+] as const;
+
 export function devResources() {
   const appSource = source("dev");
-  // The live dev database uses this custom image; the SDK type omits the option.
-  // @ts-expect-error Railway's runtime supports an image override for database helpers.
-  const database = postgres("PostgreSQL 18", {
-    image: "xlab/postgres-ssl-18:latest",
-    region: "us-east4-eqdc4a",
-  });
   const databaseVolume = volume("postgresql-18-volume", {
     alerts: { usage: { "100": {}, "80": {}, "95": {} } },
     allowOnlineResize: true,
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
+  });
+  const database = service("PostgreSQL 18", {
+    source: image("xlab/postgres-ssl-18:latest"),
+    replicas: { "us-east4-eqdc4a": 1 },
+    env: preservedVariables(databaseVariables),
+    networking: { privateNetworkEndpoint: "postgresql-18" },
+    tcp: [5432],
+    volumeMounts: {
+      "/var/lib/postgresql/data": databaseVolume,
+    },
   });
   // Renamed from "callcaster" 2026-08-18: the display name collided with the
   // production app service (also "callcaster"), which made ${{callcaster.*}}
@@ -73,12 +94,8 @@ export function devResources() {
     healthcheck: "/readyz",
     healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
-    networking: {
-      privateNetworkEndpoint: "callcaster-review",
-      // Codifies the manually-attached dev.callcaster.ca (#1356). No port pin:
-      // the live domain routes to the service's default exposed port.
-      customDomains: { "dev.callcaster.ca": {} },
-    },
+    networking: { privateNetworkEndpoint: "callcaster-review" },
+    domains: [{ domain: "dev.callcaster.ca", port: 3000 }],
     env: {
       ...preservedVariables(appVariables),
       // Not a secret: replay client/migrations at app boot so a migration

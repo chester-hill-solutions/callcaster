@@ -8,8 +8,8 @@ type CampaignSettingsScriptProps = {
   script: Script;
   onChange: (nextScript: Script) => void;
   /**
-   * Edit as audio steps for a caller. Defaults from the script's own type; a
-   * campaign that plays any script to callers passes `true` regardless.
+   * Edit as audio steps for a recipient. Defaults from the script's own type; a
+   * campaign that plays any script to recipients passes `true` regardless.
    */
   audioFlow?: boolean;
   mediaNames: string[];
@@ -56,6 +56,7 @@ export default function CampaignSettingsScript({
       document={document}
       onChange={handleChange}
       audioFlow={audioFlow ?? isAudioScriptType(script.type)}
+      inboundFlow={script.type === "inbound_ivr"}
       mediaNames={mediaNames}
       audioPreviewUrl={audioPreviewUrl}
       onUploadAudio={onUploadAudio}

@@ -12,7 +12,10 @@ const toastMocks = vi.hoisted(() => ({
   success: vi.fn(),
 }));
 
-vi.mock("sonner", () => ({ toast: toastMocks }));
+vi.mock("sonner", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("sonner")>()),
+  toast: toastMocks,
+}));
 
 const messageFetcher = createMockFetcher<
   | { error?: string; billing?: { nextSendBlocked?: boolean } }
@@ -64,6 +67,12 @@ vi.mock("@/hooks/chats/useImageHandling", () => ({
   }),
 }));
 
+// Stable, like the real hook: `useSearchParams` memoises the URLSearchParams
+// and returns a stable setter. A per-call pair puts a new identity in any
+// consumer effect dep (#2054).
+const STABLE_SEARCH_PARAMS = new URLSearchParams();
+const STABLE_SET_SEARCH_PARAMS = vi.fn();
+
 vi.mock("react-router", async () => {
   const actual =
     await vi.importActual<typeof import("react-router")>("react-router");
@@ -71,7 +80,7 @@ vi.mock("react-router", async () => {
     ...actual,
     useOutletContext: () => ({ workspace: { id: "ws1" } }),
     useLoaderData: () => stableLoaderData,
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
+    useSearchParams: () => [STABLE_SEARCH_PARAMS, STABLE_SET_SEARCH_PARAMS],
     useFetcher: ({ key }: { key?: string } = {}) =>
       key === "messages" ? messageFetcher : paginationFetcher,
     useOutlet: () => null,
@@ -131,10 +140,14 @@ describe("useChatsPage optimistic failure handling", () => {
       }),
     );
     // Composer is cleared immediately on submit.
-    expect(textarea.value).toBe("");
+    expect(result.current.bodyValue).toBe("");
 
     const pendingSid = addOptimisticMessage.mock.calls[0]?.[0]?.sid as string;
     expect(pendingSid).toMatch(/^pending-/);
+
+    messageFetcher.state = "submitting";
+    rerender();
+    messageFetcher.state = "idle";
 
     // Simulate the fetcher completing with a credit/Twilio error.
     messageFetcher.data = { error: "Insufficient credits" };
@@ -142,7 +155,7 @@ describe("useChatsPage optimistic failure handling", () => {
 
     expect(markOptimisticMessageFailed).toHaveBeenCalledWith(pendingSid);
     // Text is restored into the composer so the user can retry.
-    expect(textarea.value).toBe("hello there");
+    expect(result.current.bodyValue).toBe("hello there");
   });
 
   test("does not touch the composer or mark failure when the fetcher succeeds", async () => {
@@ -171,13 +184,16 @@ describe("useChatsPage optimistic failure handling", () => {
       result.current.handleSubmit(fakeEvent);
     });
 
+    messageFetcher.state = "submitting";
+    rerender();
+    messageFetcher.state = "idle";
     messageFetcher.data = { error: undefined };
     rerender();
 
     expect(markOptimisticMessageFailed).not.toHaveBeenCalled();
     expect(toastMocks.error).not.toHaveBeenCalled();
     expect(toastMocks.warning).not.toHaveBeenCalled();
-    expect(textarea.value).toBe("");
+    expect(result.current.bodyValue).toBe("");
   });
 
   test("shows a billing warning, not a failure, when the send used up the balance", async () => {
@@ -204,6 +220,9 @@ describe("useChatsPage optimistic failure handling", () => {
       } as unknown as FormEvent<HTMLFormElement>);
     });
 
+    messageFetcher.state = "submitting";
+    rerender();
+    messageFetcher.state = "idle";
     messageFetcher.data = { billing: { nextSendBlocked: true } };
     rerender();
 
@@ -212,6 +231,6 @@ describe("useChatsPage optimistic failure handling", () => {
     expect(toastMocks.warning).toHaveBeenCalledWith(
       expect.stringMatching(/^Message sent\./),
     );
-    expect(textarea.value).toBe("");
+    expect(result.current.bodyValue).toBe("");
   });
 });

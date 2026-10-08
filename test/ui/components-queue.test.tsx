@@ -16,13 +16,19 @@ const fetcher = {
   Form: ({ children, ...p }: any) => <form {...p}>{children}</form>,
 };
 
+// Stable, like the real hook: `useSearchParams` memoises the URLSearchParams
+// and returns a stable setter. A per-call pair puts a new identity in any
+// consumer effect dep (#2054).
+const STABLE_SEARCH_PARAMS = new URLSearchParams();
+const STABLE_SET_SEARCH_PARAMS = vi.fn();
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
     ...actual,
     useFetcher: () => fetcher,
     useNavigation: () => ({ state: "idle" }),
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
+    useSearchParams: () => [STABLE_SEARCH_PARAMS, STABLE_SET_SEARCH_PARAMS],
     Form: ({ children, ...p }: any) => <form {...p}>{children}</form>,
   };
 });

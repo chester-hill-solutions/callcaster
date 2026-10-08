@@ -1,0 +1,20 @@
+# Toolchain pinning for local development.
+#
+# Why this file exists: `engines.node` and `.nvmrc` pin Node, and `.bun-version`
+# pins Bun for CI, but nothing enforced them locally. A developer on Node 24 and
+# Bun 1.3 passed `check:bun-lock` for the wrong reason — the gate shells out to
+# whatever `bun` is on PATH, so a version mismatch can look like lockfile drift,
+# or hide real drift. This file makes the versions a checked-in declaration that
+# mise installs, instead of an environment accident.
+#
+# CI is the source of truth for these values:
+#   - Node 22: .github/workflows/ci.yml (`node-version: "22"`) and .nvmrc
+#   - Bun 1.2.15: .bun-version, read by oven-sh/setup-bun in ci.yml
+#
+# If you change either, change all three. `bun.lock` is consumed by the Railway
+# Docker build with `--frozen-lockfile`, so a local Bun that rewrites the lockfile
+# in a newer format will break the deploy image build, not just local checks.
+
+[tools]
+node = "22"
+bun = "1.2.15"

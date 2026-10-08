@@ -16,7 +16,10 @@ import {
   type RentalLifecycleAction,
 } from "@/lib/number-rental-lifecycle";
 import { numberRentalCycleKey } from "@/lib/billing-keys";
-import { debitAmountFromCredits } from "@/lib/pricing";
+import {
+  NUMBER_RENTAL_MONTHLY_CREDITS,
+  debitAmountFromCredits,
+} from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import {
   createWorkspaceTwilioInstance,
@@ -28,8 +31,10 @@ import {
 } from "@/lib/workspace-members-db.server";
 import { env } from "@/lib/env.server";
 
-const NUMBER_RENTAL_MONTHLY_CREDITS = 100;
-const ROLLOUT_CUTOFF_DATE = "2026-04-01";
+import {
+  NUMBER_RENTAL_ROLLOUT_CUTOFF_DATE as ROLLOUT_CUTOFF_DATE,
+  numberRentalDueDate as getDueDate,
+} from "../../shared/number-rental-cycle";
 const REMINDER_WINDOWS_DAYS = [25, 15, 3];
 
 function getCycleKey(date: Date): string {
@@ -52,18 +57,6 @@ function getNextDueDate(anchorDate: string, today: Date): Date {
     Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1),
   );
   return getDueDate(anchorDate, nextMonthCursor);
-}
-
-function getDueDate(anchorDate: string, targetDate: Date): Date {
-  const anchor = new Date(anchorDate);
-  const year = targetDate.getUTCFullYear();
-  const month = targetDate.getUTCMonth();
-
-  // Month-end fallback: if anchor is 31st, Feb 28/29, etc.
-  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const day = Math.min(anchor.getUTCDate(), lastDayOfMonth);
-
-  return new Date(Date.UTC(year, month, day));
 }
 
 function isSameDay(a: Date, b: Date): boolean {
@@ -223,10 +216,8 @@ async function applyRentalLifecycleAction(args: {
     // clearable: a suspended customer who partially pays drops back to one
     // unpaid cycle and would get daily warn mail while still suspended.
     //
-    // The marker stores the CYCLE COUNT, not a boolean: if the customer pays
-    // some and falls behind again, the count differs from the stored one and a
-    // fresh warning is correct. A boolean would suppress that second,
-    // legitimate warning forever.
+    // The marker belongs to the current unpaid episode. Full payment resets
+    // it; partial payment must retain it so daily sweeps do not warn again.
     if (Number(number.rental_warned_cycle) === unpaidCycles) return "none";
 
     await tdb.workspace_number.update({
@@ -282,7 +273,6 @@ async function applyRentalLifecycleAction(args: {
   const release = await removeWorkspacePhoneNumber({
     workspaceId: number.workspace,
     numberId: BigInt(number.id),
-    tdb,
   });
   if (release?.error) {
     throw release.error instanceof Error
@@ -345,16 +335,54 @@ async function sendRentalLifecycleEmail(args: {
 type RentedNumberRow = Awaited<ReturnType<TenantDb["workspace_number"]["findMany"]>>[number];
 
 /**
+ * Resolve the two facts this sweep needs about the workspace row: its name for
+ * operator and customer copy, and whether it may be charged.
+ *
+ * #2116: `disabled` stops the DEBIT but not the non-payment ladder, so a
+ * suspended workspace stops paying without its numbers being held open forever.
+ *
+ * A failed lookup fails OPEN — billing continues. Silently stopping charges for
+ * every workspace on a transient read error is the worse failure, and the
+ * ladder still bounds a genuinely unaffordable number.
+ */
+async function loadWorkspaceBillingContext(
+  workspaceId: string,
+): Promise<{ workspaceName: string; billingEnabled: boolean }> {
+  try {
+    const workspace = await getWorkspaceById(workspaceId);
+    return {
+      workspaceName: workspace?.name ?? workspaceId,
+      billingEnabled: !workspace?.disabled,
+    };
+  } catch (error) {
+    logger.warn("number_rental_billing.workspace_name_lookup_failed", {
+      workspaceId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { workspaceName: workspaceId, billingEnabled: true };
+  }
+}
+
+/**
  * Bill every elapsed, not-yet-billed cycle for one number. Stops at the first
  * cycle the workspace cannot afford (genuine non-payment) or at the first
  * technical failure (balance lookup failed/unknown, ledger write threw), which
  * is OUR problem and must never count as the customer's non-payment.
+ *
+ * `billingEnabled: false` (a disabled workspace, #2116) makes every cycle
+ * unbillable. The balance is never touched, and the cycles stay unbilled on
+ * purpose so the caller derives them as unpaid and the warn -> suspend ->
+ * release ladder keeps escalating. This is the "stop debiting, keep
+ * releasing" split: the platform does not charge a suspended workspace, and a
+ * number nobody pays for is still eventually released rather than held open by
+ * the suspension itself.
  */
 async function billElapsedCycles(args: {
   number: RentedNumberRow;
   dueDates: Date[];
   tdb: TenantDb;
   phoneNumberLabel: string;
+  billingEnabled: boolean;
 }): Promise<{
   previouslyBilled: number;
   charged: number;
@@ -362,7 +390,7 @@ async function billElapsedCycles(args: {
   unsuspended: number;
   technicalFailure: boolean;
 }> {
-  const { number, dueDates, tdb, phoneNumberLabel } = args;
+  const { number, dueDates, tdb, phoneNumberLabel, billingEnabled } = args;
 let previouslyBilled = 0;
 let charged = 0;
 let unpaid = 0;
@@ -389,6 +417,19 @@ let unsuspended = 0;
     if (alreadyBilled) {
       previouslyBilled++;
       continue;
+    }
+
+    // Suspended workspace: charge nothing. Do NOT read the balance — a
+    // workspace we are not billing must not be probed for funds, and the
+    // balance cannot influence the outcome either way.
+    if (!billingEnabled) {
+      unpaid++;
+      logger.info("number_rental_billing.debit_suppressed_workspace_disabled", {
+        numberId: number.id,
+        workspaceId: number.workspace,
+        cycleKey,
+      });
+      break;
     }
 
     // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
@@ -515,15 +556,9 @@ export async function runNumberRentalBilling(args: {
   // Find all rented numbers created after rollout cutoff.
   const tdb = createTenantDb(workspaceId);
 
-  let workspaceName = workspaceId;
-  try {
-    workspaceName = (await getWorkspaceById(workspaceId))?.name ?? workspaceId;
-  } catch (error) {
-    logger.warn("number_rental_billing.workspace_name_lookup_failed", {
-      workspaceId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const { workspaceName, billingEnabled } = await loadWorkspaceBillingContext(
+    workspaceId,
+  );
 
   const numbers = await tdb.workspace_number.findMany({
     where: and(
@@ -598,7 +633,13 @@ export async function runNumberRentalBilling(args: {
     // caps the count at 1 no matter how many cycles are owed, so suspend and
     // release could never be reached.
     const dueDates = elapsedDueDates(anchorDate, today);
-    const billing = await billElapsedCycles({ number, dueDates, tdb, phoneNumberLabel });
+    const billing = await billElapsedCycles({
+      number,
+      dueDates,
+      tdb,
+      phoneNumberLabel,
+      billingEnabled,
+    });
     charged += billing.charged;
     unpaid += billing.unpaid;
     unsuspended += billing.unsuspended;
@@ -617,6 +658,22 @@ export async function runNumberRentalBilling(args: {
     // must not prevent the eventual release.
     const unpaidCyclesForNumber =
       dueDates.length - previouslyBilledCycles - chargedCyclesForNumber;
+
+    if (unpaidCyclesForNumber === 0 && number.rental_warned_cycle != null) {
+      try {
+        await tdb.workspace_number.update({
+          set: { rental_warned_cycle: null },
+          where: eq(workspaceNumberTable.id, number.id),
+        });
+      } catch (error) {
+        technicalFailures++;
+        logger.error("number_rental_billing.warning_reset_failed", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     if (unpaidCyclesForNumber > 0) {
       const action = rentalActionForUnpaidCycles(unpaidCyclesForNumber, {

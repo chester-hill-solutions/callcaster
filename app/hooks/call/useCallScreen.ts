@@ -195,6 +195,32 @@ export function useCallScreen() {
   // meter reflects the same input the call will use.
   const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream });
 
+  const showStartError = useCallback((message: string, creditFailure: boolean) => {
+    if (creditFailure) {
+      toast.error(hasAccess
+        ? "Add credits to start dialing, then try again."
+        : "Contact a workspace administrator to add credits, then try again.", {
+        action: hasAccess ? {
+          label: "Add credits",
+          onClick: () => navigate(`/workspaces/${workspaceId}/billing`),
+        } : undefined,
+      });
+      return;
+    }
+    toast.error(message);
+  }, [hasAccess, navigate, workspaceId]);
+
+  const { begin, conference, setConference, isLoading: isStartingConference, disabledReason: startDisabledReason } = useStartConferenceAndDial(
+    {
+      userId: user.id,
+      campaignId: campaign?.id?.toString() || "",
+      workspaceId,
+      callerId: campaign?.caller_id || "",
+      selectedDevice: phoneVerification.selectedDevice,
+      showError: showStartError,
+    },
+  );
+
   const {
     status: liveStatus,
     users: onlineUsers,
@@ -203,6 +229,7 @@ export function useCallScreen() {
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,
+    conference,
   });
 
   const {
@@ -291,21 +318,10 @@ export function useCallScreen() {
     hangUp,
   });
 
-  const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
-    {
-      userId: user.id,
-      campaignId: campaign?.id?.toString() || "",
-      workspaceId,
-      callerId: campaign?.caller_id || "",
-      selectedDevice: phoneVerification.selectedDevice,
-    },
-  );
-
   const fetcher = useFetcher<{ creditsError?: boolean; error?: string }>();
   const submit = fetcher.submit;
   const creditsError =
     fetcher.data?.creditsError ||
-    conferenceCreditsError ||
     availableCredits <= 0;
 
   useDialFailureRecovery({
@@ -316,10 +332,7 @@ export function useCallScreen() {
   });
 
   const { startCall } = handleCall({ submit });
-  const { handleConferenceEnd } = handleConference({
-    submit,
-    begin,
-  });
+  const { handleConferenceEnd } = handleConference({ begin });
 
   const queueFlow = useCampaignQueueFlow({
     campaign: campaign ?? null,
@@ -478,6 +491,7 @@ export function useCallScreen() {
     setNextRecipient,
     setUpdate,
     conference,
+    setConference,
   });
 
   const handleDeviceSelect = useCallback(
@@ -520,6 +534,8 @@ export function useCallScreen() {
     callState,
     callDuration,
     deviceIsBusy,
+    isStartingConference,
+    startDisabledReason,
     handleDialButton,
     handleDequeueNext,
     handleVoiceDrop,

@@ -1,10 +1,15 @@
-import { updateCampaignVoicedropAudio } from "@/lib/campaign-ivr.server";
+import { randomUUID } from "node:crypto";
+import { findCampaignInWorkspace, updateCampaignVoicedropAudio } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
+import { MAX_MEDIA_BODY_BYTES, validateMediaFile } from "@/lib/media-upload.server";
+import { FormBodyError, readBoundedFormData } from "@/lib/bounded-form-data.server";
 import { defineAction } from "@/lib/handler.server";
+import { AppError, ErrorCode } from "@/lib/errors.server";
+import { parsePositiveIntegerParam } from "@/lib/route-params";
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -18,25 +23,45 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "external"],
   handler: async ({ request, auth }) => {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const live_campaign_id_raw = formData.get('live_campaign_id');
-    const live_campaign_id = live_campaign_id_raw == null ? null : Number(live_campaign_id_raw);
-    const workspace_id = formData.get('workspace_id');
-    const campaignName = formData.get('campaign_name') as string || Date.now().toString();
+    let formData: FormData;
     try {
-        if (live_campaign_id == null || typeof workspace_id !== "string" || !workspace_id) {
+      formData = await readBoundedFormData(request, MAX_MEDIA_BODY_BYTES);
+    } catch (error) {
+      if (!(error instanceof FormBodyError)) throw error;
+      return routeData({ error: error.message }, { status: error.status });
+    }
+    const file = formData.get('file');
+    const live_campaign_id_raw = formData.get('live_campaign_id');
+    const live_campaign_id = parsePositiveIntegerParam(
+      typeof live_campaign_id_raw === "string" ? live_campaign_id_raw : null,
+    );
+    const workspace_id = formData.get('workspace_id');
+    if (live_campaign_id === null) {
+      return routeData({ error: "A valid campaign ID is required" }, { status: 400 });
+    }
+    try {
+        if (typeof workspace_id !== "string" || !workspace_id) {
           throw new Error("Campaign and workspace are required");
         }
         await requireWorkspaceAccess({
           user: auth.user,
           workspaceId: workspace_id,
         });
-        const arrayBuffer = await file.arrayBuffer();
+        const validation = validateMediaFile(file, "audio");
+        if (!validation.ok) {
+          return routeData({ error: validation.error }, {
+            status: validation.status,
+          });
+        }
+        const campaign = await findCampaignInWorkspace(workspace_id, live_campaign_id);
+        if (!campaign) {
+          throw new AppError("Campaign not found", 404, ErrorCode.NOT_FOUND);
+        }
+        const arrayBuffer = await validation.file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
-        const fileName = `${auth.user.id}.${campaignName}`;
+        const fileName = `${randomUUID()}-${validation.safeName}`;
         await uploadObject("audio", fileName, buffer, {
-          contentType: file.type,
+          contentType: validation.file.type,
         });
         const signedUrl = await createSignedObjectUrl("audio", fileName, 3600);
         const updated = await updateCampaignVoicedropAudio(
@@ -50,6 +75,7 @@ export const action = defineAction({
         return routeData(signedUrl, { status: 201 });
     }
     catch (error) {
+        if (error instanceof AppError) throw error;
         logger.error("Error uploading media:", error);
         return routeData({ error }, { status: 500 });
     }

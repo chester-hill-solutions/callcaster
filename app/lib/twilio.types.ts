@@ -17,6 +17,9 @@ export interface TwilioSmsStatusWebhook {
   MessageStatus?: string;
   /** Twilio error code on failed/undelivered statuses (e.g. "30006" = landline). */
   ErrorCode?: string;
+  /** Optional callback fields; fetch the Message resource when absent. */
+  NumSegments?: string;
+  NumMedia?: string;
 }
 
 /**

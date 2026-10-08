@@ -78,6 +78,12 @@ vi.mock("@/lib/auto-dial.server", () => ({
   runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
 }));
 
+const predictiveResponseMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/predictive-machine.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/predictive-machine.server")>()),
+  predictiveMachineResponse: predictiveResponseMock,
+}));
+
 const roomRpcState = vi.hoisted(() => ({ client: null as any }));
 const roomStorageState = vi.hoisted(() => ({ error: null as Error | null }));
 const createSignedObjectUrlMock = vi.hoisted(() => vi.fn());
@@ -174,6 +180,8 @@ function makeDbClient(overrides: Partial<any>) {
 describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   beforeEach(() => {
     configureTelephonyStub();
+    predictiveResponseMock.mockReset();
+    predictiveResponseMock.mockResolvedValue(new Response("<Response><Hangup/></Response>", {headers:{"Content-Type":"text/xml"}}));
     roomDbMocks.dequeueCampaignQueueByContact.mockReset();
     roomDbMocks.dequeueCampaignQueueByContact.mockResolvedValue([{ ok: 1 }]);
     roomDbMocks.getUserVerifiedAudioNumbers.mockReset();
@@ -301,498 +309,6 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     );
   });
 
-  test("machine answer: plays voicemail, dequeues (rpc), triggers next dial, and updates call twiml", async () => {
-    const updateCallTwiml = vi.fn(async () => ({}));
-    const twilio = {
-      calls: (_sid: string) => ({ update: updateCallTwiml }),
-      conferences: Object.assign(
-        (_sid: string) => ({ update: vi.fn() }),
-        { list: vi.fn(async () => [{ sid: "CONF1" }]) },
-      ),
-    };
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: {
-                  campaign_id: 1,
-                  outreach_attempt_id: 1,
-                  contact_id: 2,
-                  workspace: "w1",
-                  conference_id: "u1~00000000-0000-0000-0000-000000000000",
-                },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "user") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: () => ({
-              select: async () => ({
-                data: [{ user_id: "u1", campaign_id: 1 }],
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    });
-
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(updateCallTwiml).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
-    );
-    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
-      "w1",
-      "1",
-      "voicemail",
-    );
-    // Regression guard: dialer turn is invoked in-process, not via self-fetch.
-    expect(mocks.fetch).not.toHaveBeenCalledWith(
-      "https://base.example/api/auto-dial/dialer",
-      expect.anything(),
-    );
-    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: "u1",
-        campaign_id: "1",
-        workspace_id: "w1",
-        conference_id: "u1~00000000-0000-0000-0000-000000000000",
-      }),
-    );
-  });
-
-  test("machine answer with the drop off records no-answer, hangs up, and advances", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_drop_enabled: false,
-      voicemail_file: "vm.mp3",
-      group_household_queue: true,
-      caller_id: "+1555",
-    });
-    const updateCallTwiml = vi.fn();
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: updateCallTwiml }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => [{ sid: "CONF1" }]) }),
-    } as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { voicemail_file: null, group_household_queue: true, caller_id: "+1555" },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "user") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-
-    const body = await res.text();
-    expect(body).toContain("<Hangup/>");
-    expect(body).not.toContain("<Play>");
-    expect(updateCallTwiml).not.toHaveBeenCalled();
-    expect(createSignedObjectUrlMock).not.toHaveBeenCalled();
-    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
-      "w1",
-      "1",
-      "no-answer",
-    );
-    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
-  });
-
-  test("machine answer with no voicemail audio records no-answer and advances", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_drop_enabled: true,
-      voicemail_file: null,
-      group_household_queue: true,
-      caller_id: "+1555",
-    });
-    const updateCallTwiml = vi.fn();
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: updateCallTwiml }),
-      conferences: Object.assign(
-        (_sid: string) => ({ update: vi.fn() }),
-        { list: vi.fn(async () => [{ sid: "CONF1" }]) },
-      ),
-    } as any);
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    useRoomPostgres(client);
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/room", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-
-    expect(await res.text()).toContain("<Hangup/>");
-    expect(updateCallTwiml).not.toHaveBeenCalled();
-    expect(createSignedObjectUrlMock).not.toHaveBeenCalled();
-    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
-      "w1",
-      "1",
-      "no-answer",
-    );
-    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
-  });
-
-  test("concurrent machine callbacks claim only one next dialer turn", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_drop_enabled: false,
-      voicemail_file: "vm.mp3",
-      group_household_queue: true,
-      caller_id: "+1555",
-    });
-    const conferencesList = vi.fn(async () => [{ sid: "CONF1" }]);
-    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign(
-        (_sid: string) => ({ update: vi.fn() }),
-        { list: conferencesList },
-      ),
-    } as any);
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    useRoomPostgres(client);
-    telephonyDbMocks.claimTerminalOutreachDisposition
-      .mockResolvedValueOnce({ user_id: "u1", campaign_id: 1 })
-      .mockResolvedValueOnce(null);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const invoke = () => {
-      const fd = new FormData();
-      fd.set("CallSid", "CA1");
-      fd.set("AnsweredBy", "machine_start");
-      fd.set("CallStatus", "ringing");
-      fd.set("Called", "+1888");
-      return mod.action({
-        request: new Request("http://localhost/api/auto-dial/room", { method: "POST", body: fd }),
-        params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-      } as any);
-    };
-
-    await Promise.all([invoke(), invoke()]);
-
-    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledTimes(2);
-    expect(conferencesList).toHaveBeenCalledTimes(1);
-    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
-    expect(client.rpc).not.toHaveBeenCalled();
-    expect(roomDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
-  });
-
-  test("machine answer: conferences empty uses fallbacks", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_drop_enabled: true,
-      voicemail_file: "vm.mp3",
-      group_household_queue: null,
-      caller_id: null,
-    });
-    const updateCallTwiml = vi.fn(async () => ({}));
-    const twilio = {
-      calls: (_sid: string) => ({ update: updateCallTwiml }),
-      conferences: Object.assign(
-        (_sid: string) => ({ update: vi.fn() }),
-        { list: vi.fn(async () => []) },
-      ),
-    };
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: {
-                  campaign_id: 1,
-                  outreach_attempt_id: 1,
-                  contact_id: 2,
-                  workspace: "w1",
-                  conference_id: "u1~00000000-0000-0000-0000-000000000000",
-                },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { voicemail_file: "vm.mp3", group_household_queue: null, caller_id: null },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: () => ({
-              select: async () => ({
-                data: [{}], // user_id/campaign_id undefined => cover fallbacks
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "campaign_queue") {
-        return {
-          update: () => ({
-            eq: () => ({
-              select: async () => ({ data: [{ ok: 1 }], error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(updateCallTwiml).toHaveBeenCalled();
-  });
-
-  test("machine answer does not dequeue again after dispatch", async () => {
-    const updateCallTwiml = vi.fn();
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: updateCallTwiml }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
-    } as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    client.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(updateCallTwiml).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
-    );
-    expect(client.rpc).not.toHaveBeenCalled();
-  });
-
-  test("machine answer: outreach_attempt update error is caught", async () => {
-    configureTelephonyStub({ outreachUpdateError: new Error("oa") });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
-    } as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: null, error: new Error("oa") }) }) }) };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(await res.text()).toContain("<Hangup/>");
-  });
-
   test("user device lookup error is caught", async () => {
     roomDbMocks.getUserVerifiedAudioNumbers.mockRejectedValueOnce(new Error("user"));
     const client = makeDbClient({});
@@ -860,83 +376,6 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-  });
-
-  test("covers triggerAutoDialer fallbacks when outreachStatus/user/workspace are missing", async () => {
-    // Simulate a sparse outreach row (no user/campaign) to exercise the
-    // '' fallbacks in the dialer-turn arguments.
-    configureTelephonyStub({
-      outreachRowOverrides: { user_id: undefined, campaign_id: undefined },
-    });
-    const updateCallTwiml = vi.fn(async () => ({}));
-    const twilio = {
-      calls: (_sid: string) => ({ update: updateCallTwiml }),
-      conferences: Object.assign(
-        (_sid: string) => ({ update: vi.fn() }),
-        { list: vi.fn(async () => [{ sid: "CONF1" }]) },
-      ),
-    };
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: [{}], error: null }) }) }) };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    client.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
-    // Regression guard: dialer turn is invoked in-process, not via self-fetch.
-    expect(mocks.fetch).not.toHaveBeenCalledWith(
-      "https://base.example/api/auto-dial/dialer",
-      expect.anything(),
-    );
-    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user_id: "",
-        campaign_id: "",
-        workspace_id: "w1",
-        conference_id: "u1~00000000-0000-0000-0000-000000000000",
-      }),
-    );
   });
 
   test("human answer: returns conference dial twiml and updates answered_at when called is not client", async () => {
@@ -1082,31 +521,6 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(body).toContain('statusCallbackEvent="join leave modify"');
   });
 
-  test("errors are caught and return Hangup response", async () => {
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("call") }) }) }) };
-      }
-      throw new Error("unexpected");
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "");
-    fd.set("CallStatus", "in-progress");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(mocks.logger.error).toHaveBeenCalled();
-    expect(await res.text()).toContain("<Hangup/>");
-  });
-
   test("device-check: called equals campaign caller_id", async () => {
     const client = makeDbClient({});
     roomRpcState.client = client;
@@ -1194,130 +608,6 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
 
-  test("machine answer: campaign fetch error is caught", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockRejectedValueOnce(new Error("camp"));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
-    } as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: null, error: new Error("camp") }) }) }) };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(await res.text()).toContain("<Hangup/>");
-  });
-
-  test("machine answer: voicemail storage error is caught", async () => {
-    roomStorageState.error = new Error("storage");
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
-    } as any);
-
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
-      }
-      if (table === "user") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: ["+1666"] }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: null, error: new Error("storage") }),
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(await res.text()).toContain("<Hangup/>");
-  });
-
-  test("machine answer does not repeat the non-household queue update", async () => {
-    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_drop_enabled: true,
-      voicemail_file: "vm.mp3",
-      group_household_queue: false,
-      caller_id: "+1555",
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
-    } as any);
-
-    roomDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(new Error("q"));
-    const client = makeDbClient({});
-    roomRpcState.client = client;
-    client.from.mockImplementation((table: string) => {
-      if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" }, error: null }) }) }) };
-      }
-      if (table === "campaign") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
-      }
-      if (table === "outreach_attempt") {
-        return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
-      }
-      throw new Error(`unexpected ${table}`);
-    });
-    client.storage.from.mockReturnValueOnce({
-      createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
-    });
-    useRoomPostgres(client);
-
-    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
-    const fd = new FormData();
-    fd.set("CallSid", "CA1");
-    fd.set("AnsweredBy", "machine_start");
-    fd.set("CallStatus", "ringing");
-    fd.set("Called", "+1888");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
-      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
-    } as any));
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(roomDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
-  });
-
   test("human answer: called starts with client skips answered_at update", async () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: () => ({ update: vi.fn() }),
@@ -1361,4 +651,50 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     // Only called from machine paths / answered-at branch; should not be invoked here.
     expect(outreachSelect).not.toHaveBeenCalledWith(expect.anything());
   });
+  async function machineRequest(query = "", answeredBy = "machine_start") {
+    const mod = await import("@/routes/api+/auto-dial/$roomId.route");
+    const request = new Request("http://localhost/api/auto-dial/room-authority" + query, {
+      method: "POST", body: new URLSearchParams({CallSid:"CA1",AnsweredBy:answeredBy,CallStatus:"in-progress",Called:"+15551230001"}),
+    });
+    return asRouteResponse(mod.action({request,params:{roomId:"room-authority"},context:{}} as Parameters<typeof mod.action>[0]));
+  }
+  test("machine answer delegates the call and URL binding without an immediate next turn", async () => {
+    const response=await machineRequest();
+    expect(response.status).toBe(200);
+    expect(predictiveResponseMock).toHaveBeenCalledWith({workspaceId:"w1",callSid:"CA1",conferenceId:"room-authority"});
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.claimTerminalOutreachDisposition).not.toHaveBeenCalled();
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+  });
+  test.each(["complete","wait"])("%s callback forwards its phase and operation before device checks", async phase => {
+    const response=await machineRequest("?machine="+phase+"&operation=bound-operation", "human");
+    expect(response.status).toBe(200);
+    expect(predictiveResponseMock).toHaveBeenCalledWith({workspaceId:"w1",callSid:"CA1",conferenceId:"room-authority"},phase,"bound-operation");
+    expect(roomDbMocks.getUserVerifiedAudioNumbers).not.toHaveBeenCalled();
+    expect(mocks.fetchCampaignByIdForWorkspace).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+  });
+  test("machine service response is returned unchanged", async () => {
+    const serviceResponse=new Response("<Response><Pause length=\"1\"/><Redirect>https://fixture.example/wait</Redirect></Response>",{headers:{"Content-Type":"text/xml"}});
+    predictiveResponseMock.mockResolvedValueOnce(serviceResponse);
+    const response=await machineRequest();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("text/xml");
+    expect(await response.text()).toBe("<Response><Pause length=\"1\"/><Redirect>https://fixture.example/wait</Redirect></Response>");
+  });
+  test("a failed machine operation returns retryable 500 Hangup", async () => {
+    predictiveResponseMock.mockRejectedValueOnce(new Error("Fixture operation failure"));
+    const response=await machineRequest();
+    expect(response.status).toBe(500);
+    expect(await response.text()).toContain("<Hangup/>");
+    expect(mocks.logger.error).toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+  });
+  test("a missing call cannot invoke the machine service", async () => {
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
+    expect((await machineRequest()).status).toBe(500);
+    expect(predictiveResponseMock).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+  });
+
 });

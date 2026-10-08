@@ -44,6 +44,10 @@ function requireRegistration(type: string): (typeof jobRegistry)[number] {
 // The exact `jobHandlers` key set that existed in handlers.server.ts before
 // the registry landed (job-types.server.ts constants + bare string literals).
 const EXPECTED_JOB_TYPES = [
+  "predictive_machine_continue",
+  "predictive_machine_reconcile",
+  "number_purchase_recovery",
+  "number_release_recovery",
   "twilio_open_sync",
   "workspace_twilio_compliance",
   "billing_reconcile",
@@ -55,6 +59,7 @@ const EXPECTED_JOB_TYPES = [
   "call_status_side_effects",
   "sms_status_side_effects",
   "recording_side_effects",
+  "recording_repair_sweep",
   "campaign_export",
   "campaign_dispatch",
   "webhook_delivery",
@@ -63,6 +68,8 @@ const EXPECTED_JOB_TYPES = [
 
 // The exact set poll-jobs.server.ts hand-maintained as `PAGING_JOB_TYPES`.
 const EXPECTED_PAGING_JOB_TYPES = [
+  "predictive_machine_continue",
+  "predictive_machine_reconcile",
   "call_status_side_effects",
   "sms_status_side_effects",
   "billing_reconcile",
@@ -70,27 +77,35 @@ const EXPECTED_PAGING_JOB_TYPES = [
   "workspace_twilio_compliance",
 ].sort();
 
-// The exact set ensure-scheduled-jobs.server.ts hand-maintained as
-// `SELF_SCHEDULING_JOB_TYPES`.
+// The exact set `SELF_SCHEDULING_JOB_TYPES` derives from `jobRegistry` in
+// handlers.server.ts. Deliberate snapshot: adding a job with `schedule: true`
+// must fail here until its name is recorded, so a new self-scheduling type is
+// an intentional diff rather than a silent schedule change.
 const EXPECTED_SELF_SCHEDULING_JOB_TYPES = [
+  "number_purchase_recovery",
+  "number_release_recovery",
   "low_credit_notify",
   "twilio_webhook_audit",
   "twilio_open_sync",
   "billing_reconcile",
   "number_rental_billing",
   "campaign_schedule_sync",
+  "recording_repair_sweep",
 ].sort();
 
-// The exact seed params map ensure-scheduled-jobs.server.ts hand-maintained
-// (only twilio_open_sync had non-empty seed params; every other
-// self-scheduling type seeded with `{}`).
+// The exact seed params `SELF_SCHEDULING_SEED_PARAMS` derives from
+// `jobRegistry` (only twilio_open_sync has non-empty seed params; every other
+// self-scheduling type seeds with `{}`).
 const EXPECTED_SEED_PARAMS: Record<string, Record<string, unknown>> = {
+  number_purchase_recovery: {},
+  number_release_recovery: {},
   low_credit_notify: {},
   twilio_webhook_audit: {},
   twilio_open_sync: { callLimit: 50, messageLimit: 50, maxAgeMinutes: 120 },
   billing_reconcile: {},
   number_rental_billing: {},
   campaign_schedule_sync: {},
+  recording_repair_sweep: {},
 };
 
 describe("job registry — derived-set equality guard (#1239 A1)", () => {

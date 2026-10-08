@@ -1,19 +1,14 @@
 import React from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { MemberRole } from "@/components/workspace/TeamMember";
 
 const mocks = vi.hoisted(() => ({
-  fetchConversationSummaries: vi.fn(),
+  fetch: vi.fn(),
   realtimeOpts: null as any,
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
-}));
-
-vi.mock("@/lib/chats/messaging-client", () => ({
-  fetchConversationSummaries: (...args: unknown[]) =>
-    mocks.fetchConversationSummaries(...args),
 }));
 
 vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
@@ -25,18 +20,8 @@ vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
 
 vi.mock("@/lib/logger.client", () => ({ logger: mocks.logger }));
 
-function makeSummary(overrides: Record<string, unknown> = {}) {
-  return {
-    contact_phone: "+15550001111",
-    user_phone: "+15559998888",
-    conversation_start: new Date().toISOString(),
-    conversation_last_update: new Date().toISOString(),
-    message_count: 1,
-    unread_count: 0,
-    contact_firstname: null,
-    contact_surname: null,
-    ...overrides,
-  };
+function replyWithCount(unread_count: number) {
+  mocks.fetch.mockImplementation(() => Promise.resolve(Response.json({ unread_count })));
 }
 
 function renderNav() {
@@ -54,29 +39,25 @@ function renderNav() {
 describe("app/components/workspace/WorkspaceNav.tsx unread chats badge", () => {
   beforeEach(() => {
     mocks.realtimeOpts = null;
-    mocks.fetchConversationSummaries.mockReset();
+    mocks.fetch.mockReset();
+    vi.stubGlobal("fetch", mocks.fetch);
     mocks.logger.error.mockReset();
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   test("renders nothing when unread total is 0", async () => {
-    mocks.fetchConversationSummaries.mockResolvedValue([
-      makeSummary({ unread_count: 0 }),
-      makeSummary({ unread_count: 0 }),
-    ]);
+    replyWithCount(0);
 
     renderNav();
 
     await waitFor(() =>
-      expect(mocks.fetchConversationSummaries).toHaveBeenCalled(),
+      expect(mocks.fetch).toHaveBeenCalled(),
     );
     expect(screen.queryAllByTestId("chats-unread-badge")).toHaveLength(0);
   });
 
-  test("renders the summed unread_count across conversations", async () => {
-    mocks.fetchConversationSummaries.mockResolvedValue([
-      makeSummary({ unread_count: 3 }),
-      makeSummary({ unread_count: 4, contact_phone: "+15550002222" }),
-    ]);
+  test("renders the workspace unread total returned by the count API", async () => {
+    replyWithCount(7);
 
     renderNav();
 
@@ -87,16 +68,11 @@ describe("app/components/workspace/WorkspaceNav.tsx unread chats badge", () => {
       expect(badge.textContent).toBe("7");
     }
 
-    // Fetches the largest page the endpoint allows so the client-side sum
-    // covers as many conversations as possible in a single request.
-    const [, params] = mocks.fetchConversationSummaries.mock.calls[0];
-    expect((params as URLSearchParams).get("page_size")).toBe("100");
+    expect(mocks.fetch).toHaveBeenCalledWith("/api/workspaces/ws-1/conversations?summary=unread");
   });
 
   test("caps the displayed count at 99+", async () => {
-    mocks.fetchConversationSummaries.mockResolvedValue([
-      makeSummary({ unread_count: 150 }),
-    ]);
+    replyWithCount(150);
 
     renderNav();
 
@@ -109,9 +85,7 @@ describe("app/components/workspace/WorkspaceNav.tsx unread chats badge", () => {
   });
 
   test("increments on realtime inbound message INSERT, ignores outbound and non-INSERT events", async () => {
-    mocks.fetchConversationSummaries.mockResolvedValue([
-      makeSummary({ unread_count: 1 }),
-    ]);
+    replyWithCount(1);
 
     renderNav();
 
@@ -149,7 +123,7 @@ describe("app/components/workspace/WorkspaceNav.tsx unread chats badge", () => {
   });
 
   test("logs and leaves count at 0 when the fetch fails", async () => {
-    mocks.fetchConversationSummaries.mockRejectedValue(new Error("network down"));
+    mocks.fetch.mockRejectedValue(new Error("network down"));
 
     renderNav();
 

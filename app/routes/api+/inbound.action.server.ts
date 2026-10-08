@@ -1,3 +1,5 @@
+import { resolveIvrEntryPageId } from "@/lib/ivr-page-order";
+import type { IvrScript } from "@/lib/ivr-block-runtime.server";
 import {
   requireTwilioSignature,
   twilioWebhookBadRequest,
@@ -24,6 +26,7 @@ import { getWorkspaceById, getWorkspaceWebhookRow } from "@/lib/workspace-member
 import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
+import { appendInboundQueueTwiml } from "@/lib/inbound-queue-twiml.server";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -159,7 +162,7 @@ async function handleInboundAction(
       to: data.To || null,
       from: data.From || null,
       status: "completed",
-      start_time: new Date().toISOString(),
+      start_time: new Date(),
       direction: data.Direction || null,
       api_version: data.ApiVersion || null,
       workspace: workspaceId,
@@ -184,7 +187,10 @@ async function handleInboundAction(
         to: call.to,
         status: call.status,
         direction: call.direction,
-        start_time: call.start_time,
+        // Integrator-facing webhook payload: `timestamp` is a string on the wire and
+        // this contract must not change shape, so the row's Date is rendered
+        // back to ISO here rather than sent as a Date.
+        start_time: call.start_time?.toISOString() ?? null,
       },
       sendWebhookNotification,
       logger,
@@ -196,10 +202,10 @@ async function handleInboundAction(
       workspaceId,
       scriptId: number.inbound_script_id,
     });
-    const pages = steps?.pages as Record<string, { blocks: string[] }> | undefined;
-    if (pages) {
-      const pageIds = Object.keys(pages);
-      const firstPageId = pageIds[0];
+    const script = steps as IvrScript | null | undefined;
+    const pages = script?.pages;
+    if (pages && script) {
+      const firstPageId = resolveIvrEntryPageId(script);
       const firstPage = firstPageId ? pages[firstPageId] : undefined;
       const firstBlockId = firstPage?.blocks[0];
       if (firstPageId && firstBlockId) {
@@ -223,21 +229,15 @@ async function handleInboundAction(
   }
 
   if (number.inbound_queue_id) {
-    const baseUrl = env.BASE_URL().replace(/\/$/, "");
-    const acdUrl = `${baseUrl}/api/acd-router`;
-    const queueName = `inbound_q_${number.inbound_queue_id}`;
     logger.info("api.inbound routing to queue", {
       workspaceId,
       CallSid: data.CallSid,
       queueId: number.inbound_queue_id,
     });
-    // The queue entry does not exist yet, so no entry_id can go in the action
-    // URL — /complete resolves the entry by CallSid + queue_name instead.
-    const enqueue = twiml.enqueue({
-      waitUrl: `${acdUrl}?queue_id=${number.inbound_queue_id}&CallSid=${data.CallSid}&From=${data.From || ""}`,
-      action: `${acdUrl}/complete?queue_name=${queueName}`,
+    await appendInboundQueueTwiml({
+      twiml, workspaceId, queueId: number.inbound_queue_id,
+      callSid: data.CallSid, callerNumber: data.From ?? "", baseUrl: env.BASE_URL(),
     });
-    enqueue.queue(queueName);
     return new Response(twiml.toString(), {
       headers: { "Content-Type": "text/xml" },
     });

@@ -12,15 +12,30 @@ const errorResponse = (description: string) => ({
   },
 });
 
-const publicSecurity = [{ sessionCookie: [] }, { apiKey: [] }] as const;
+export const sessionCookieSecurity = [
+  { sessionCookie: [] },
+  { secureSessionCookie: [] },
+] as const;
+
+export const apiKeyOrSessionSecurity = [
+  ...sessionCookieSecurity,
+  { apiKey: [] },
+] as const;
 
 const securitySchemes = {
   sessionCookie: {
     type: "apiKey" as const,
     in: "cookie" as const,
-    name: "sb-access-token",
+    name: "better-auth.session_token",
     description:
-      "Session cookie (browser). Use workspace API key for server/script access.",
+      "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key.",
+  },
+  secureSessionCookie: {
+    type: "apiKey" as const,
+    in: "cookie" as const,
+    name: "__Secure-better-auth.session_token",
+    description:
+      "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key.",
   },
   apiKey: {
     type: "apiKey" as const,
@@ -32,6 +47,18 @@ const securitySchemes = {
 };
 
 const schemas = {
+  ConversationSummaryMode: {
+    type: "string" as const,
+    enum: ["unread"] as const,
+    description: "Return the complete workspace unread message total instead of a conversation page.",
+  },
+  WorkspaceUnreadCountResponse: {
+    type: "object" as const,
+    required: ["unread_count"] as const,
+    properties: {
+      unread_count: { type: "integer" as const, minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
+    },
+  },
   Error: {
     type: "object" as const,
     required: ["error"] as const,
@@ -167,7 +194,7 @@ const schemas = {
       body: { type: "string" as const, description: "SMS message body." },
       contact_id: {
         type: "string" as const,
-        description: "Optional contact ID for template tag substitution.",
+        description: "Optional contact ID. Must identify the unique workspace contact whose normalized phone equals to_number.",
       },
       media: {
         type: "string" as const,
@@ -257,7 +284,8 @@ const schemas = {
       responses: {
         type: "array" as const,
         items: { type: "object" as const, additionalProperties: true },
-        description: "Always empty on a deferral; present so clients can treat both variants alike.",
+        description:
+          "Results for contacts processed before the send window closed. Contacts that remain queued are not included.",
       },
     },
   },
@@ -293,7 +321,7 @@ export const integratorPathOverrides = {
         "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Campaigns"],
       "x-callcaster-capability": "campaigns.write",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {
@@ -347,10 +375,10 @@ export const integratorPathOverrides = {
       operationId: "sendChatSms",
       summary: "Send a single SMS",
       description:
-        "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
+        "Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
       "x-callcaster-capability": "messages.send",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {
@@ -368,9 +396,9 @@ export const integratorPathOverrides = {
             },
           },
         },
-        "400": errorResponse("Validation error"),
+        "400": errorResponse("Validation error, SMS-incapable recipient (landline: true), or unverified recipient (recipientVerificationError: true)"),
         "401": errorResponse("Unauthorized"),
-        "403": errorResponse("Forbidden (workspace mismatch)"),
+        "403": errorResponse("Forbidden (workspace mismatch or opted-out recipient: optedOut: true)"),
         "404": errorResponse("Invalid phone number"),
         "500": errorResponse("Send failure"),
       },
@@ -384,7 +412,7 @@ export const integratorPathOverrides = {
         "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
       "x-callcaster-capability": "campaigns.dispatch",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {

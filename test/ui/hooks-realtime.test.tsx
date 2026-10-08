@@ -280,7 +280,7 @@ describe("realtime hooks", () => {
           direction: "inbound",
           from: "+15558888888",
           to: "+15550000000",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
         old: null,
       });
@@ -293,7 +293,7 @@ describe("realtime hooks", () => {
           direction: "outbound",
           from: "+15550000000",
           to: "+15559999999",
-          date_created: new Date().toISOString(),
+          date_created: new Date(),
         },
         old: null,
       });

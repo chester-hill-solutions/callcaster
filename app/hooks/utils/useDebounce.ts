@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 /**
  * Hook that debounces a callback function
@@ -28,6 +28,17 @@ export function useDebounce<T extends (...args: any[]) => void>(
   delay: number
 ): T {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * @effect Cancel the pending debounce timer when its owner unmounts.
+   * @effect-deps none — timeoutRef belongs to this mounted hook instance
+   * @effect-side-effects clears the pending timeout on cleanup
+   * @effect-why-not-loader Browser timer lifetime is a component resource.
+   */
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
 
   const debouncedCallback = useCallback(
     (...args: Parameters<T>) => {

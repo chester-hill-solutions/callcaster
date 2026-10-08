@@ -10,8 +10,17 @@ import { CallWorkbench } from "@/components/call/CallScreen.Workbench";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
+  SheetBody,
   SheetDescription,
   SheetHeader,
   SheetTitle,
@@ -26,8 +35,9 @@ import {
 import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Tables } from "@/lib/db-types";
+import { toast } from "sonner";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
 function ErrorBanner({
@@ -76,6 +86,8 @@ export function CallScreenLayout({
   callSid,
   initialCoaching,
 }: CallScreenLayoutProps) {
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const {
     hangUp,
     answer,
@@ -85,6 +97,8 @@ export function CallScreenLayout({
     callState,
     callDuration,
     deviceIsBusy,
+    isStartingConference,
+    startDisabledReason,
     handleDialButton,
     handleDequeueNext,
     handleVoiceDrop,
@@ -161,15 +175,37 @@ export function CallScreenLayout({
     label: option,
   }));
 
-  // The one sanctioned way off the call screen (#1313) — reused by TopChrome,
-  // the settings sheet, and the welcome/no-script dialogs' "Leave" action
-  // instead of each wiring its own copy or a bare navigation link.
-  const handleLeaveCampaign = () => {
-    hangUp();
-    device?.destroy();
-    requeueContacts();
-    navigate(-1);
+  const endPredictiveConference = async () => {
+    try {
+      await handleConferenceEnd({
+        activeCall,
+        setConference: () => setConference(null),
+        workspaceId,
+        conferenceName: conference,
+      });
+      return true;
+    } catch {
+      toast.error("Could not stop the predictive conference. Stay on this screen and try again.");
+      return false;
+    }
   };
+
+  const handleLeaveCampaign = async () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    try {
+      if (campaign.dial_type === "predictive") {
+        if (!(await endPredictiveConference())) return;
+      }
+      hangUp();
+      device?.destroy();
+      if (campaign.dial_type !== "predictive") requeueContacts();
+      navigate(-1);
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+  const requestLeaveCampaign = () => setLeaveDialogOpen(true);
 
   // One queue list instance shared by the mobile sheet and the desktop rail.
   const queueList = (
@@ -235,7 +271,7 @@ export function CallScreenLayout({
         creditState={creditState}
         hasAccess={hasAccess}
         predictive={campaign.dial_type === "predictive"}
-        onLeaveCampaign={handleLeaveCampaign}
+        onLeaveCampaign={requestLeaveCampaign}
         onReportError={() => setReportDialog(!isReportDialogOpen)}
       >
         <Sheet>
@@ -251,13 +287,13 @@ export function CallScreenLayout({
             </Button>
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,32rem)] overflow-y-auto sm:max-w-lg">
-            <SheetHeader className="mb-4">
+            <SheetHeader>
               <SheetTitle>Call queue</SheetTitle>
               <SheetDescription>
                 Review recipients, skip contacts, or load the next queue.
               </SheetDescription>
             </SheetHeader>
-            {queueList}
+            <SheetBody>{queueList}</SheetBody>
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -272,20 +308,22 @@ export function CallScreenLayout({
             </Button>
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,22rem)]">
-            <SheetHeader className="mb-4">
+            <SheetHeader>
               <SheetTitle>DTMF keypad</SheetTitle>
               <SheetDescription>
                 Send keypad tones during the active call. Keyboard digits remain
                 available.
               </SheetDescription>
             </SheetHeader>
-            <PhoneKeypad
-              onKeyPress={handleDTMF}
-              displayState={displayState}
-              displayColor={displayColor}
-              callDuration={callDuration}
-              showStatus={false}
-            />
+            <SheetBody>
+              <PhoneKeypad
+                onKeyPress={handleDTMF}
+                displayState={displayState}
+                displayColor={displayColor}
+                callDuration={callDuration}
+                showStatus={false}
+              />
+            </SheetBody>
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -306,42 +344,64 @@ export function CallScreenLayout({
                 Choose audio devices, calling device, and microphone state.
               </SheetDescription>
             </SheetHeader>
-            <CampaignHeader
-              settingsOnly
-              className="px-0"
-              campaign={campaign}
-              count={count}
-              completed={completed}
-              onLeaveCampaign={handleLeaveCampaign}
-              onReportError={() => setReportDialog(!isReportDialogOpen)}
-              mediaStream={stream}
-              availableMicrophones={availableMicrophones}
-              availableSpeakers={availableSpeakers}
-              selectedMicrophone={selectedMicrophone}
-              selectedSpeaker={selectedSpeaker}
-              handleMicrophoneChange={handleMicrophoneChange}
-              handleSpeakerChange={handleSpeakerChange}
-              handleMuteMicrophone={handleMuteMicrophone}
-              isMicrophoneMuted={isMicrophoneMuted}
-              availableCredits={availableCredits}
-              creditState={creditState}
-              hasAccess={hasAccess}
-              phoneStatus={phoneConnectionStatus}
-              selectedDevice={selectedDevice}
-              onDeviceSelect={setSelectedDevice}
-              verifiedNumbers={verifiedNumbers}
-              isAddingNumber={isAddingNumber}
-              onAddNumberClick={() => setIsAddingNumber(true)}
-              onAddNumberCancel={() => setIsAddingNumber(false)}
-              newPhoneNumber={newPhoneNumber}
-              onNewPhoneNumberChange={setNewPhoneNumber}
-              onVerifyNewNumber={handleVerifyNewNumber}
-              verificationPhoneNumber={verificationPhoneNumber}
-              {...audioTest}
-            />
+            <SheetBody>
+              <CampaignHeader
+                settingsOnly
+                className="px-0"
+                campaign={campaign}
+                count={count}
+                completed={completed}
+                onLeaveCampaign={requestLeaveCampaign}
+                onReportError={() => setReportDialog(!isReportDialogOpen)}
+                mediaStream={stream}
+                availableMicrophones={availableMicrophones}
+                availableSpeakers={availableSpeakers}
+                selectedMicrophone={selectedMicrophone}
+                selectedSpeaker={selectedSpeaker}
+                handleMicrophoneChange={handleMicrophoneChange}
+                handleSpeakerChange={handleSpeakerChange}
+                handleMuteMicrophone={handleMuteMicrophone}
+                isMicrophoneMuted={isMicrophoneMuted}
+                availableCredits={availableCredits}
+                creditState={creditState}
+                hasAccess={hasAccess}
+                phoneStatus={phoneConnectionStatus}
+                selectedDevice={selectedDevice}
+                onDeviceSelect={setSelectedDevice}
+                verifiedNumbers={verifiedNumbers}
+                isAddingNumber={isAddingNumber}
+                onAddNumberClick={() => setIsAddingNumber(true)}
+                onAddNumberCancel={() => setIsAddingNumber(false)}
+                newPhoneNumber={newPhoneNumber}
+                onNewPhoneNumberChange={setNewPhoneNumber}
+                onVerifyNewNumber={handleVerifyNewNumber}
+                verificationPhoneNumber={verificationPhoneNumber}
+                {...audioTest}
+              />
+            </SheetBody>
           </SheetContent>
         </Sheet>
       </TopChrome>
+      <Dialog open={leaveDialogOpen} onOpenChange={(open) => { if (!isLeaving) setLeaveDialogOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave campaign?</DialogTitle>
+            <DialogDescription>
+              {campaign.dial_type === "predictive"
+                ? "Your conference and predictive dialer will stop. Contacts will not be reset."
+                : "Your active call will end and available contacts will return to the queue."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={isLeaving} onClick={() => setLeaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" disabled={isLeaving} onClick={handleLeaveCampaign}>
+              {isLeaving ? "Stopping campaign…" : "Leave Campaign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CallWorkbench
         incoming={
           incomingCall &&
@@ -363,6 +423,8 @@ export function CallScreenLayout({
             conference={conference ? { parameters: { Sid: conference } } : null}
             isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
+            isStartingConference={isStartingConference}
+            startDisabledReason={startDisabledReason}
             nextRecipient={nextRecipient}
             questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}
@@ -370,12 +432,7 @@ export function CallScreenLayout({
             handleVoiceDrop={handleVoiceDrop}
             hangUp={
               campaign.dial_type === "predictive"
-                ? () =>
-                    handleConferenceEnd({
-                      activeCall: activeCall as unknown as ActiveCall,
-                      setConference: () => setConference(null),
-                      workspaceId,
-                    })
+                ? endPredictiveConference
                 : () => {
                     if (hangUp) hangUp();
                   }
@@ -501,7 +558,7 @@ export function CallScreenLayout({
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
-        onLeaveCampaign={handleLeaveCampaign}
+        onLeaveCampaign={requestLeaveCampaign}
         onJoin={onJoin}
       />
     </div>

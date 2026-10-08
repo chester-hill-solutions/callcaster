@@ -62,12 +62,12 @@ async function waitForReady(readyUrl, attempts = 90) {
 // the server still boots for flows that never touch object storage.
 const bucketCheck = spawnSync(
   "node",
-  ["scripts/e2e/ensure-minio-bucket.mjs", "--keep-objects"],
+  ["scripts/e2e/ensure-bucket.mjs", "--keep-objects"],
   { cwd: rootDir, env, stdio: "inherit" },
 );
 if (bucketCheck.status !== 0) {
   console.warn(
-    "[e2e-server] WARNING: could not ensure MinIO bucket — uploads will dead-letter until it exists",
+    "[e2e-server] WARNING: could not ensure the object-storage bucket — uploads will dead-letter until it exists",
   );
 }
 

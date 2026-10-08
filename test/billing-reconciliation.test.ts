@@ -32,7 +32,7 @@ describe("billing-reconciliation", () => {
       category: "phonenumbers-local",
       description: "Numbers",
       usage: "2",
-      usageUnit: "number-months",
+      usageUnit: "numbers",
       price: "2.00",
     },
   ];
@@ -41,8 +41,9 @@ describe("billing-reconciliation", () => {
     expect(
       categorizeLedgerRow({
         type: "DEBIT",
-        amount: -1,
+        amount: -2,
         idempotency_key: "sms:SM123",
+        note: "SMS SM123 delivered",
         created_at: "2026-05-10T12:00:00.000Z",
       }).bucket,
     ).toBe("sms");
@@ -71,12 +72,14 @@ describe("billing-reconciliation", () => {
           type: "DEBIT",
           amount: -1,
           idempotency_key: "sms:SM1",
+        note: "SMS SM1 delivered",
           created_at: "2026-05-10T12:00:00.000Z",
         },
         {
           type: "DEBIT",
           amount: -1,
           idempotency_key: "sms:SM2",
+        note: "SMS SM2 delivered",
           created_at: "2026-06-01T12:00:00.000Z",
         },
       ],
@@ -91,12 +94,14 @@ describe("billing-reconciliation", () => {
         type: "DEBIT",
         amount: -2,
         idempotency_key: "sms:SM1",
+        note: "SMS SM1 delivered",
         created_at: "2026-05-10T12:00:00.000Z",
       },
       {
         type: "DEBIT",
         amount: -2,
         idempotency_key: "sms:SM2",
+        note: "SMS SM2 delivered",
         created_at: "2026-05-11T12:00:00.000Z",
       },
       {
@@ -129,6 +134,30 @@ describe("billing-reconciliation", () => {
       period,
       twilioUsage,
       ledgerRows,
+      numberRentals: {
+        period,
+        twilioUsage: [
+          ...twilioUsage,
+          {
+            category: "phonenumbers-setups",
+            description: "Setups",
+            usage: "0",
+            usageUnit: "number-setups",
+            price: "0",
+            startDate: period.startDate,
+            endDate: period.endDate,
+          },
+        ].map((record) => ({
+          ...record,
+          startDate: period.startDate,
+          endDate: period.endDate,
+        })),
+        ledgerRows,
+        history: [
+          { id: 42, createdAt: "2026-04-01T00:00:00Z" },
+          { id: 43, createdAt: "2026-04-02T00:00:00Z" },
+        ],
+      },
       entityAudit: {
         billableMessages: 118,
         debitedMessages: 2,
@@ -165,18 +194,21 @@ describe("billing-reconciliation", () => {
         type: "DEBIT",
         amount: -2, // one-segment SMS at 2 credits per segment
         idempotency_key: "sms:SM1",
+        note: "SMS SM1 delivered",
         created_at: "2026-05-10T12:00:00.000Z",
       },
       {
         type: "DEBIT",
         amount: -6, // three-segment SMS at 2 credits per segment
         idempotency_key: "sms:SM2",
+        note: "SMS SM2 delivered",
         created_at: "2026-05-11T12:00:00.000Z",
       },
     ];
 
     const report = buildBillingReconciliationReport({
       period,
+      numberRentals: { period, ledgerRows: [], twilioUsage: [], history: [] },
       twilioUsage: [
         {
           category: "sms-outbound",
@@ -221,6 +253,7 @@ describe("billing-reconciliation", () => {
 
     const report = buildBillingReconciliationReport({
       period,
+      numberRentals: { period, ledgerRows: [], twilioUsage: [], history: [] },
       twilioUsage: [
         {
           category: "calls-outbound",

@@ -36,6 +36,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 
 const ROOT = process.cwd();
 const ROUTES = path.join(ROOT, "app/routes");
@@ -50,12 +51,12 @@ const NON_USER_SURFACE =
 
 /**
  * Touches tenant data at all. A route with no tenancy has nothing to prove.
- * Import lines are stripped first: `WorkspaceSettingUtils.server` in a path is
- * not evidence that a route reads tenant data, and matching it flagged
- * test-webhook, which only posts to a caller-supplied URL.
+ * Import paths alone do not prove that a route touches tenant data.
  */
 const TOUCHES_TENANT_DATA =
   /createTenantDb\s*\(|workspace_id|workspaceId|\bworkspace\b/;
+
+const EXTERNAL_EFFECT = /sideEffects:\s*\[[^\]]*["']external["']/;
 
 /**
  * `getUserRole` returns null for a non-member, so calling it AND acting on the
@@ -75,6 +76,9 @@ const PUBLIC_BY_DESIGN = new Map([
   ["api+/survey-complete.action.server.ts", "public survey respondent; workspace comes from the survey"],
   ["api+/contact-form.action.server.ts", "public marketing contact form; no tenant data"],
   ["api+/auth/callback.loader.server.ts", "auth callback; no workspace in play"],
+  ["api+/auth/token.action.server.ts", "rate-limited user sign-in; no workspace yet"],
+  ["api+/auth/refresh.action.server.ts", "rate-limited user token refresh; no workspace scope"],
+  ["api+/auth/$.loader.server.ts", "Better Auth user/session endpoints; mutating requests are rate limited"],
   ["auth/confirm.loader.server.ts", "email verification; no workspace in play"],
   ["remember.action.server.ts", "password reset request; no workspace in play"],
   ["signin.action.server.ts", "sign-in; no workspace yet"],
@@ -139,7 +143,7 @@ function functionBody(source, name) {
   );
   const start = source.search(decl);
   if (start === -1) return null;
-  const rest = source.slice(start + 1);
+  const rest = source.slice(start);
   const next = rest.search(/\nexport\s/);
   return next === -1 ? rest : rest.slice(0, next);
 }
@@ -154,24 +158,39 @@ function functionBody(source, name) {
  * watching this guard stay green. Only invocations count.
  */
 function callSitesOnly(source) {
-  return source
-    .split("\n")
-    .filter((line) => !/^\s*(import|export)\s/.test(line))
+  const parsed = ts.createSourceFile("route.ts", source, ts.ScriptTarget.Latest, true);
+  return parsed.statements
+    .filter((statement) => !ts.isImportDeclaration(statement) &&
+      !ts.isImportEqualsDeclaration(statement) && !ts.isExportDeclaration(statement))
+    .map((statement) => statement.getText(parsed))
     .join("\n");
 }
 
-function importedSources(file, source) {
-  const out = [];
-  for (const match of source.matchAll(IMPORT_RE)) {
-    const resolved = resolveLocal(match[1], file);
+function* usedImportedBodies(file, source) {
+  const calls = callSitesOnly(source);
+  for (const match of source.matchAll(NAMED_IMPORT_RE)) {
+    const resolved = resolveLocal(match[2], file);
     if (!resolved) continue;
+    let imported;
     try {
-      out.push(fs.readFileSync(resolved, "utf8"));
+      imported = fs.readFileSync(resolved, "utf8");
     } catch {
-      /* unreadable import; treated as proving nothing */
+      continue;
+    }
+    const names = match[1]
+      .split(",")
+      .map((part) => part.trim().split(/\s+as\s+/))
+      .filter(([name]) => /^[\w$]+$/.test(name));
+
+    for (const [name, alias = name] of names) {
+      const local = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const used = new RegExp(`\\b${local}\\s*\\(|\\bauth\\s*:\\s*${local}\\b`);
+      if (!used.test(calls)) continue;
+      const body = functionBody(imported, name);
+      if (!body) continue;
+      yield callSitesOnly(body);
     }
   }
-  return out;
 }
 
 /**
@@ -205,36 +224,17 @@ function provesMembership(file, source, depth = 0) {
     }
   }
 
-  // Otherwise look only inside the specific functions this route imports.
-  for (const match of source.matchAll(NAMED_IMPORT_RE)) {
-    const resolved = resolveLocal(match[2], file);
-    if (!resolved) continue;
-    let imported;
-    try {
-      imported = fs.readFileSync(resolved, "utf8");
-    } catch {
-      continue;
-    }
-    const names = match[1]
-      .split(",")
-      .map((part) => part.split(/\sas\s/)[0].trim())
-      .filter(Boolean);
-
-    for (const name of names) {
-      const body = functionBody(imported, name);
-      if (!body) continue;
-      const bodyCalls = callSitesOnly(body);
-      if (MEMBERSHIP_PROOF.test(bodyCalls)) return true;
-      if (GETS_ROLE.test(bodyCalls) && ACTS_ON_ROLE.test(bodyCalls)) return true;
-    }
+  for (const bodyCalls of usedImportedBodies(file, source)) {
+    if (MEMBERSHIP_PROOF.test(bodyCalls)) return true;
+    if (GETS_ROLE.test(bodyCalls) && ACTS_ON_ROLE.test(bodyCalls)) return true;
   }
   return false;
 }
 
 /** Same one-hop rule for webhook/cron surfaces, whose auth lives in a helper. */
 function isNonUserSurface(file, source) {
-  if (NON_USER_SURFACE.test(source)) return true;
-  return importedSources(file, source).some((s) => NON_USER_SURFACE.test(s));
+  if (NON_USER_SURFACE.test(callSitesOnly(source))) return true;
+  return [...usedImportedBodies(file, source)].some((body) => NON_USER_SURFACE.test(body));
 }
 
 const offenders = [];
@@ -246,7 +246,8 @@ for (const file of walk(ROUTES)) {
 
   if (PUBLIC_BY_DESIGN.has(rel)) continue;
   if (isNonUserSurface(file, source)) continue;
-  if (!TOUCHES_TENANT_DATA.test(callSitesOnly(source))) continue;
+  const calls = callSitesOnly(source);
+  if (!TOUCHES_TENANT_DATA.test(calls) && !EXTERNAL_EFFECT.test(calls)) continue;
 
   scanned++;
   if (!provesMembership(file, source)) offenders.push(rel);
@@ -254,7 +255,7 @@ for (const file of walk(ROUTES)) {
 
 if (offenders.length > 0) {
   console.error(
-    "Routes touching tenant data with no workspace-membership proof:\n",
+    "Routes touching tenant data or declaring external effects with no workspace-membership proof:\n",
   );
   for (const rel of offenders) console.error(`  app/routes/${rel}`);
   console.error(
@@ -267,5 +268,5 @@ if (offenders.length > 0) {
 }
 
 console.log(
-  `Route membership check passed: ${scanned} tenant-data route(s), all prove membership.`,
+  `Route membership check passed: ${scanned} tenant-data/external route(s), all prove membership.`,
 );

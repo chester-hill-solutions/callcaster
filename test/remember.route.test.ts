@@ -32,7 +32,7 @@ describe("app/routes/remember.action.server.ts", () => {
     });
   });
 
-  test("calls requestPasswordReset with callback redirect", async () => {
+  test("calls requestPasswordReset with the password page redirect", async () => {
     mocks.requestPasswordReset.mockResolvedValueOnce({});
 
     const form = new FormData();
@@ -55,7 +55,7 @@ describe("app/routes/remember.action.server.ts", () => {
     expect(mocks.requestPasswordReset).toHaveBeenCalledWith({
       body: {
         email: "user@example.com",
-        redirectTo: "http://localhost/api/auth/callback",
+        redirectTo: "http://localhost/reset-password",
       },
       headers: expect.any(Headers),
     });

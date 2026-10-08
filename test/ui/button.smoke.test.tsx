@@ -22,6 +22,14 @@ describe("Button", () => {
     expect(button.className).not.toContain("cursor-pointer");
   });
 
+  test("#1705: default variant uses the selected stronger primary hover", () => {
+    render(<Button>Continue</Button>);
+    const button = screen.getByRole("button", { name: "Continue" });
+
+    expect(button.className).toContain("hover:bg-primary/80");
+    expect(button.className).not.toContain("hover:bg-primary/90");
+  });
+
   // upstream shad-cc destructive variant hovers to a lightened
   // red while keeping near-white text — reads as low-contrast on the
   // "Leave Campaign" / "Delete" buttons the design team flagged. The

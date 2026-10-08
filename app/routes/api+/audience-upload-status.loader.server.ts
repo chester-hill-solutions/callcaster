@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { getAudienceImportProgress } from "@/lib/audience-import-report.server";
 import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
 import { markAudienceUploadInterruptedIfStale } from "@/lib/audience-upload-process.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
@@ -123,29 +124,10 @@ export const loader = defineLoader({
         });
       }
 
-      const snapshot: AudienceUploadServerSnapshot = {
-        uploadId: uploadData.id,
-        audience_id: uploadData.audience_id,
-        status: uploadData.status,
-        file_name: uploadData.file_name,
-        file_size: uploadData.file_size,
-        total_contacts: uploadData.total_contacts,
-        processed_contacts: uploadData.processed_contacts,
-        error_message:
-          uploadData.error_message ?? sidecarErrorMessage(statusFileData),
-        stage:
-          typeof statusFileData.stage === "string"
-            ? statusFileData.stage
-            : defaultStage(uploadData.status),
-        skipped_invalid_contacts:
-          typeof statusFileData.skipped_invalid_contacts === "number"
-            ? statusFileData.skipped_invalid_contacts
-            : null,
-        skipped_duplicate_contacts:
-          typeof statusFileData.skipped_duplicate_contacts === "number"
-            ? statusFileData.skipped_duplicate_contacts
-            : null,
-      };
+      const durable = uploadData.import_run_id
+        ? await getAudienceImportProgress(workspaceId, uploadData.import_run_id, uploadData.audience_id)
+        : null;
+      const snapshot = buildSnapshot(uploadData, statusFileData, durable);
 
       return routeData({ ok: true as const, snapshot });
     } catch (error) {
@@ -176,3 +158,34 @@ export const loader = defineLoader({
     }
   },
 });
+
+function buildSnapshot(
+  uploadData: NonNullable<Awaited<ReturnType<typeof findAudienceUploadById>>>,
+  statusFileData: Record<string, unknown>,
+  durable: Awaited<ReturnType<typeof getAudienceImportProgress>> | null,
+): AudienceUploadServerSnapshot {
+  return {
+        uploadId: uploadData.id,
+        report_available: Boolean(durable),
+        audience_id: uploadData.audience_id,
+        status: uploadData.status,
+        file_name: uploadData.file_name,
+        file_size: uploadData.file_size,
+        total_contacts: uploadData.total_contacts,
+        processed_contacts: uploadData.processed_contacts,
+        error_message:
+          durable ? uploadData.error_message : uploadData.error_message ?? sidecarErrorMessage(statusFileData),
+        stage:
+          durable ? defaultStage(uploadData.status) : typeof statusFileData.stage === "string"
+            ? statusFileData.stage
+            : defaultStage(uploadData.status),
+        skipped_invalid_contacts:
+          durable ? durable.invalid : typeof statusFileData.skipped_invalid_contacts === "number"
+            ? statusFileData.skipped_invalid_contacts
+            : null,
+        skipped_duplicate_contacts:
+          durable ? durable.duplicates : typeof statusFileData.skipped_duplicate_contacts === "number"
+            ? statusFileData.skipped_duplicate_contacts
+            : null,
+      };
+}

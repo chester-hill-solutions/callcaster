@@ -7,6 +7,7 @@ const numberFindFirst = vi.fn();
 const numberUpdate = vi.fn();
 
 const tdb = {
+  execute: async () => [],
   inbound_queue: { findFirst: queueFindFirst },
   script: { findFirst: scriptFindFirst },
   workspace_number: { findFirst: numberFindFirst, update: numberUpdate },
@@ -28,7 +29,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "queue",
         queueId: 7,
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({ ok: true, number: { id: 2 } });
 
     expect(queueFindFirst).toHaveBeenCalledTimes(1);
@@ -41,7 +42,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
           inbound_queue_id: 7,
           inbound_script_id: null,
         },
-      }),
+      }, "ws-1"),
     );
   });
 
@@ -52,7 +53,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "queue",
         queueId: 99,
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({
       ok: false,
       error: "Choose a queue in this workspace",
@@ -68,7 +69,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "automated_menu",
         scriptId: 99,
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({
       ok: false,
       error: "Choose an automated menu in this workspace",
@@ -88,7 +89,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "forward",
         phoneNumber: "+14165550100",
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({ ok: true, number: { id: 2 } });
 
     numberFindFirst.mockResolvedValueOnce({
@@ -100,7 +101,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "forward",
         phoneNumber: "+14165550101",
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({
       ok: false,
       error: "Choose a verified caller ID in this workspace",
@@ -115,7 +116,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
     await expect(
       applyRoutingPresetWithTenantDb(tdb, "88", {
         presetId: "webhook_only",
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({
       ok: false,
       error: "Phone number not found",
@@ -129,7 +130,7 @@ describe("applyRoutingPresetWithTenantDb", () => {
       applyRoutingPresetWithTenantDb(tdb, "2", {
         presetId: "voicemail",
         notificationEmail: "invalid",
-      }),
+      }, "ws-1"),
     ).resolves.toEqual({
       ok: false,
       error: "A valid voicemail notification email is required",

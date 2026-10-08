@@ -1,3 +1,4 @@
+import type { IvrPageLayout } from "@/lib/ivr-page-order";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { resolveIvrPromptObjectKey } from "@/lib/ivr-wav.server";
 import { resolveVoiceForBlock } from "@/lib/tts-voices";
@@ -9,7 +10,7 @@ import {
 import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 /**
- * Shared outbound IVR block renderer.
+ * Shared inbound and outbound IVR block renderer.
  *
  * The flow-entry page route used to answer with a `<Redirect>` to the first
  * block's URL, so every call paid an extra Twilio round-trip (and a second
@@ -20,7 +21,7 @@ import type { TwimlResponse } from "@/lib/twilio-twiml.server";
  * roster, signed audio URL) must be identical whichever route renders it.
  */
 
-export type IvrRenderScript = {
+export type IvrRenderScript = IvrPageLayout & {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<
     string,

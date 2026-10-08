@@ -3,6 +3,8 @@
  *
  * Policy set by the product owner on 2026-07-31: one unpaid cycle warns, the
  * next suspends, the next releases.
+ * Full payment ends the warning episode; a later lapse must warn again.
+ * Partial payment and billing errors do not end an unpaid episode.
  *
  * Pure and shared so the decision can be tested exhaustively without a
  * database, a Twilio client, or a clock — and so the escalation ladder is

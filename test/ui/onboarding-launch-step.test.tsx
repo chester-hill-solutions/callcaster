@@ -53,7 +53,7 @@ describe("setup review (#1745)", () => {
     renderReview();
     expect(screen.getByRole("heading", { name: "Review your setup" })).toBeVisible();
     expect(screen.queryByText("Ready to launch")).toBeNull();
-    expect(screen.getByText("2 of 7 setup items complete")).toBeVisible();
+    expect(screen.queryByText(/setup items complete/)).toBeNull();
     expect(screen.getByRole("link", { name: "Continue setup" })).toHaveAttribute("href", "/workspaces/w1/onboarding?step=audience");
     for (const [label, step] of [
       ["Add contacts", "audience"], ["Connect a phone number", "first_number"],
@@ -65,7 +65,7 @@ describe("setup review (#1745)", () => {
 
   test("completed items remain reviewable and one primary action opens the workspace", () => {
     renderReview(readyResources);
-    expect(screen.getByText("7 of 7 setup items complete")).toBeVisible();
+    expect(screen.queryByText(/setup items complete/)).toBeNull();
     expect(screen.getAllByRole("link", { name: "Go to workspace" })).toHaveLength(1);
     expect(screen.queryByRole("link", { name: "Continue setup" })).toBeNull();
     expect(screen.getByRole("link", { name: "Review: Connect a phone number" })).toHaveAttribute("href", "/workspaces/w1/onboarding?step=first_number");
@@ -77,7 +77,7 @@ describe("setup review (#1745)", () => {
       onboarding: onboardingFixture({ selectedGoal: "rent_number" }),
       phoneNumbers: [onboardingNumberFixture()], creditsBalance: 100,
     });
-    expect(screen.getByText("4 of 4 setup items complete")).toBeVisible();
+    expect(screen.queryByText(/setup items complete/)).toBeNull();
     expect(screen.queryByText("Add contacts")).toBeNull();
     expect(screen.queryByText("Create a script")).toBeNull();
     expect(screen.queryByText("Create a campaign")).toBeNull();

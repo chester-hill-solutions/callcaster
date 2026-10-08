@@ -46,7 +46,25 @@ With API key auth, `workspace_id` is optional (inferred from the key). With sess
 
 ### Session (browser)
 
-Send the session cookie (`sb-access-token`). Public routes require `workspace_id` in the JSON body and enforce workspace access via `requireWorkspaceAccess`.
+Use the signed cookie issued by the target CallCaster server. With the current auth configuration, HTTP deployments issue `better-auth.session_token` and HTTPS deployments issue `__Secure-better-auth.session_token`. The OpenAPI schemes `sessionCookie` and `secureSessionCookie` describe these deployment alternatives. Keep the issued name and signed value together; changing the name does not convert a cookie to the other deployment form.
+
+Browser clients use the browser cookie jar. The cookies are HTTP-only, so JavaScript cannot read their value. For the generated Hey API SDK, use the browser's fetch credentials on the app origin. Server clients that hold an issued cookie can select its exact mechanism:
+
+```ts
+import { createClient } from "@hey-api/client-fetch";
+
+const client = createClient({
+  baseUrl: "https://app.example.com",
+  auth: (scheme) =>
+    scheme.in === "cookie" && scheme.name === issuedCookieName
+      ? issuedCookieValue
+      : undefined,
+});
+```
+
+`issuedCookieName` and `issuedCookieValue` come from the target server's `Set-Cookie` response. Preserve the signed value as issued, including its URL encoding. Pass this client to the generated SDK operation. A workspace API key is the preferred alternative for server/script access.
+
+Session requests must supply workspace scope where the route requires it: in the URL, query string or request body. Workspace access and capability checks still apply.
 
 ### Workspace API key (server/scripts)
 

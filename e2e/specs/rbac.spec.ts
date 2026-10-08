@@ -21,15 +21,14 @@ test.describe("RBAC @rbac @security", () => {
     await expect(page.getByRole("link", { name: "Exports" })).toHaveCount(0);
   });
 
-  callerTest("RBAC-03 caller settings limited", async ({ page }) => {
+  callerTest("RBAC-03 caller settings hide member management", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings"));
-    await expect(page.getByText(/quit this workspace/i)).toBeVisible();
     await expect(page.getByText(/invite user/i)).toHaveCount(0);
   });
 
-  callerTest("RBAC-04 caller blocked from numbers settings", async ({ page }) => {
-    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings/numbers"));
-    await expect(page).not.toHaveURL(/settings\/numbers$/);
+  callerTest("RBAC-04 caller blocked from Phone Numbers", async ({ page }) => {
+    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "phone-numbers"));
+    await expect(page).not.toHaveURL(/phone-numbers$/);
   });
 
   memberTest("RBAC-09 member empty campaign CTA", async ({ page }) => {
@@ -64,7 +63,47 @@ test.describe("RBAC @rbac @security", () => {
   callerTest("RBAC-06 caller surveys new forbidden", async ({ page }) => {
     const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "surveys/new"));
     expect(response?.status()).toBe(403);
+    await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+    await expect(page.getByText(/You don't have permission to view this page/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reload Page" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Go to workspaces" }).click();
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(page.getByRole("heading", { name: "Your Workspaces", exact: true })).toBeVisible();
   });
+
+  ownerTest("RBAC-06 owner can open the new survey form", async ({ page }) => {
+    const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "surveys/new"));
+    expect(response?.status()).toBe(200);
+    await expect(page.getByLabel("Survey ID")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Access denied" })).toHaveCount(0);
+  });
+
+  for (const [role, roleTest] of [["caller", callerTest], ["member", memberTest]] as const) {
+    roleTest(`RBAC-19 ${role} cannot read billing directly`, async ({ page }) => {
+      const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "billing"));
+      expect(response?.status()).toBe(403);
+      await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+      await expect(page.getByText("You don't have permission to view billing.")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Credits", exact: true })).toHaveCount(0);
+      const api = await page.request.get(`/api/workspaces/${E2E_WORKSPACES.ready.id}/billing`);
+      expect(api.status()).toBe(403);
+      const body = await api.json();
+      expect(body).not.toHaveProperty("balance");
+      expect(body).not.toHaveProperty("transactions");
+    });
+  }
+
+  for (const [role, roleTest] of [["admin", adminTest], ["owner", ownerTest]] as const) {
+    roleTest(`RBAC-19 ${role} can read billing directly`, async ({ page }) => {
+      const response = await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "billing"));
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { name: "Credits", exact: true })).toBeVisible();
+      const api = await page.request.get(`/api/workspaces/${E2E_WORKSPACES.ready.id}/billing`);
+      expect(api.status()).toBe(200);
+      expect(await api.json()).toHaveProperty("balance");
+    });
+  }
 
   callerTest("RBAC-18 caller zero credits dialog", async ({ page }) => {
     // #1435: try/finally guarantees the credit restore runs even when

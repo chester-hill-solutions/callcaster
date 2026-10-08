@@ -54,7 +54,7 @@ test.describe("Auth @smoke", () => {
 
   test("AUTH-08 open signup UI when SIGNUP_OPEN is enabled", async ({ page }) => {
     await page.goto("/signup");
-    await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign Up" })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Password")).toBeVisible();
   });

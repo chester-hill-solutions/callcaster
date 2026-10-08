@@ -4,11 +4,11 @@
  * Apply Drizzle SQL migrations to a fresh Postgres (compose dev stack).
  * Usage: DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster node scripts/e2e/bootstrap-compose-db.mjs
  */
-import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
+import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -79,6 +79,22 @@ const steps = [
   "client/migrations/20260920120000_drop_get_outreach_attempts.sql",
   "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql",
   "client/migrations/20260920120200_rewrite_last_access_actor.sql",
+  "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
+  "client/migrations/20260925120000_gate_campaign_completion_on_settled_messages.sql",
+  "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
+  "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+  "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
+  "client/migrations/20261003231500_guard_active_inbound_offers.sql",
+  "client/migrations/20261005000000_persist_stripe_customer_creation.sql",
+  "client/migrations/20261006000000_number_purchase_recovery.sql",
+  "client/migrations/20261006000001_number_release_recovery.sql",
+  "client/migrations/20261006000002_predictive_machine_operation.sql",
+  "client/migrations/20261006000003_inbound_voicemail_delivery.sql",
+  "client/migrations/20261007000001_uuid_workspace_references.sql",
+  "client/migrations/20261007000002_workspace_audio_workspace_reference.sql",
+  "client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql",
+  "client/migrations/20261007000004_workspace_member_workspace_reference.sql",
+  "client/migrations/20261007000005_audience_import_recovery.sql",
 ];
 
 /**
@@ -95,7 +111,6 @@ const coveredByBaseline = new Set([
   "20260704000003_extend_job_table.sql",
   "20260704000005_drop_legacy_triggers.sql",
   "20260705000100_add_call_user_id.sql",
-  "20260705000200_acd_duplicate_offer_guard.sql",
   "20260705000200_add_campaign_queue_workspace.sql",
   "20260705000200_survey_response_unique_result_id.sql",
   "20260706120000_auth_two_factor.sql",
@@ -111,6 +126,11 @@ const coveredByBaseline = new Set([
  * appending its migration turned every bare `select()` on `workspace` into
  * `column "coaching_config" does not exist`.
  */
+// The later guard replaces the legacy index and final claim function.
+const coveredByLaterMigration = new Set([
+  "20260705000200_acd_duplicate_offer_guard.sql",
+]);
+
 const listed = new Set(
   steps
     .filter((step) => step.startsWith("client/migrations/"))
@@ -118,13 +138,13 @@ const listed = new Set(
 );
 const unwired = readdirSync(path.join(rootDir, "client/migrations"))
   .filter((file) => file.endsWith(".sql"))
-  .filter((file) => !listed.has(file) && !coveredByBaseline.has(file))
+  .filter((file) => !listed.has(file) && !coveredByBaseline.has(file) && !coveredByLaterMigration.has(file))
   .sort();
 
 if (unwired.length > 0) {
   console.error(
-    "[e2e-bootstrap] migrations exist in client/migrations/ but are wired into neither\n" +
-      "`steps` nor `coveredByBaseline` in this file:\n" +
+    "[e2e-bootstrap] migrations exist in client/migrations/ but are wired into none of\n" +
+      "`steps`, `coveredByBaseline` or `coveredByLaterMigration` in this file:\n" +
       unwired.map((file) => `  ${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
       "the drizzle/ baseline already contains its effect.",
@@ -134,16 +154,9 @@ if (unwired.length > 0) {
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
 
-for (const step of steps) {
-  const file = path.join(rootDir, step);
-  console.log(`[e2e-bootstrap] applying ${step}`);
-  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", file], {
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    console.error(`[e2e-bootstrap] failed on ${step}`);
-    process.exit(result.status ?? 1);
-  }
-}
-
-console.log("[e2e-bootstrap] complete");
+await applySqlSteps({
+  databaseUrl,
+  steps,
+  rootDir,
+  label: "e2e-bootstrap",
+});

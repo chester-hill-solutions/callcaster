@@ -44,6 +44,7 @@ vi.mock("resend", () => {
 import {
   BILLING_RECONCILIATION_VARIANCE_THRESHOLD,
   buildBillingReconciliationAlertDetails,
+  buildBillingReconciliationSnapshot,
   exceedsBillingVarianceThreshold,
   hasMaterialBillingVariance,
   type BillingReconciliationReport,
@@ -65,6 +66,7 @@ function sampleReport(overrides?: Partial<BillingReconciliationReport>): Billing
         ledgerCredits: 10,
         variance: 0,
       },
+      mms: { twilioUnits: 0, twilioUnitLabel: "messages", ledgerEvents: 0, ledgerCredits: 0, variance: 0 },
       voice: {
         twilioUnits: 5,
         twilioUnitLabel: "minutes",
@@ -87,6 +89,7 @@ function sampleReport(overrides?: Partial<BillingReconciliationReport>): Billing
       billableCalls: 5,
       debitedCalls: 5,
       callGap: 0,
+      billedVoiceMinutes: 5,
     },
     twilioTotalCostUsd: 12.5,
     ledgerDebitCredits: 130,
@@ -117,6 +120,7 @@ describe("billing reconciliation alerting", () => {
         materialVariance: true,
         period: { startDate: "2026-05-01", endDate: "2026-05-31" },
         smsVariance: 10,
+        mmsVariance: 0,
         voiceVariance: 0,
         messageGap: 10,
         callGap: 0,
@@ -148,6 +152,7 @@ describe("billing reconciliation alerting", () => {
         materialVariance: true,
         period: { startDate: "2026-05-01", endDate: "2026-05-31" },
         smsVariance: 10,
+        mmsVariance: 0,
         voiceVariance: 0,
         messageGap: 10,
         callGap: 0,
@@ -197,6 +202,7 @@ describe("billing reconciliation alerting", () => {
       materialVariance: true,
       period: { startDate: "2026-05-01", endDate: "2026-05-31" },
       smsVariance: 10,
+        mmsVariance: 0,
       voiceVariance: 0,
       messageGap: 10,
       callGap: 0,
@@ -208,6 +214,7 @@ describe("billing reconciliation alerting", () => {
         periodStart: "2026-05-01",
         periodEnd: "2026-05-31",
         smsVariance: 10,
+        mmsVariance: 0,
         voiceVariance: 0,
         messageGap: 10,
         callGap: 0,
@@ -247,6 +254,7 @@ describe("billing reconciliation alerting", () => {
           materialVariance: false,
           period: { startDate: "2026-05-01", endDate: "2026-05-31" },
           smsVariance: 0,
+        mmsVariance: 0,
           voiceVariance: 0,
           messageGap: 0,
           callGap: 0,
@@ -255,5 +263,36 @@ describe("billing reconciliation alerting", () => {
         marker: null,
       }),
     ).toBe(false);
+  });
+});
+
+
+describe("MMS drift reaches customer alert output", () => {
+  test("MMS-only drift uses the real material flag, details and snapshot", async () => {
+    const report = sampleReport();
+    report.categories.mms = { twilioUnits: 3, twilioUnitLabel: "messages", ledgerEvents: 0, ledgerCredits: 0, variance: 3 };
+    mocks.loadWorkspaceTwilioData.mockResolvedValue({});
+    mocks.listWorkspaceOwnerAdminEmails.mockResolvedValue(["owner@example.com"]);
+    mocks.getWorkspaceById.mockResolvedValue({ name: "MMS fixture" });
+    const snapshot = buildBillingReconciliationSnapshot(report, "cron");
+    expect(snapshot.materialVariance).toBe(true);
+    await handleBillingReconciliationDrift({ workspaceId: "w1", report, snapshot });
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({
+      text: expect.stringContaining("MMS variance: 3"),
+      html: expect.stringContaining("<li>MMS variance: 3</li>"),
+    }));
+    expect(mocks.patchWorkspaceTwilioData).toHaveBeenLastCalledWith("w1", expect.objectContaining({
+      billingReconciliationDriftAlert: expect.objectContaining({ mmsVariance: 3, smsVariance: 0 }),
+    }));
+  });
+  test("unknown provider units are named unavailable in alert text", async () => {
+    const report = sampleReport();
+    report.categories.mms = { twilioUnits: null, twilioUnitLabel: "messages", ledgerEvents: 0, ledgerCredits: 0, variance: null };
+    mocks.loadWorkspaceTwilioData.mockResolvedValue({});
+    mocks.listWorkspaceOwnerAdminEmails.mockResolvedValue(["owner@example.com"]);
+    const snapshot = buildBillingReconciliationSnapshot(report, "cron");
+    await handleBillingReconciliationDrift({ workspaceId: "w1", report, snapshot });
+    expect(mocks.send).toHaveBeenLastCalledWith(expect.objectContaining({ text: expect.stringContaining("MMS variance: Unavailable (unsupported usage)") }));
+    expect(getBillingReconciliationDriftMarker({ billingReconciliationDriftAlert: { alertedAt: "2026-05-31", periodStart: "2026-05-01", periodEnd: "2026-05-31", mmsVariance: null } })?.mmsVariance).toBeNull();
   });
 });

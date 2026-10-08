@@ -63,7 +63,7 @@ export default function AcceptInvite() {
   const { state } = useNavigation();
 
   useActionFeedback(state === "idle" ? actionData : undefined, {
-    getSuccess: (data) => data?.status === "updated" || data?.status === "resend_sent",
+    getSuccess: (data) => data?.status === "resend_sent",
     successMessage: "Invitation link sent",
     getError: (data) =>
       data?.status === "accept_failed"
@@ -133,9 +133,6 @@ export default function AcceptInvite() {
             <ExistingUserInvites invites={loaderData.invites} state={state} />
           ))}
         {loaderData.status === "error" && <div>{loaderData.error}</div>}
-        {actionData?.status === "accept_failed" && (
-          <div role="alert">{actionData.error}</div>
-        )}
       </AuthCard>
     </main>
   );

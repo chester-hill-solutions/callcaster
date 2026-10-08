@@ -1,4 +1,7 @@
-import { capabilityIdsForRole, type ProductCapabilityId } from "@/lib/capabilities";
+import {
+  capabilityIdsForRole,
+  type ProductCapabilityId,
+} from "@/lib/capabilities";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import type { User, WorkspaceWebhook } from "@/lib/types";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
@@ -11,8 +14,7 @@ import {
 } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import type { WorkspaceInvitationView } from "@/lib/workspace-invitations.server";
-
-type UserWithRole = Partial<User> & { role: string };
+import type { WorkspaceMemberDisplay } from "@/lib/workspace-members";
 
 /** Email-first pending invite with a resolved display user (SEC-03 / #1713). */
 export type PendingInvitationRow = WorkspaceInvitationView & {
@@ -22,10 +24,7 @@ export type PendingInvitationRow = WorkspaceInvitationView & {
 export type WorkspaceSettingsPageData = {
   workspace: { id: string; name: string | null };
   userRole: MemberRole | undefined;
-  users: UserWithRole[];
-  phoneNumbers: Awaited<
-    ReturnType<ReturnType<typeof createTenantDb>["workspace_number"]["findMany"]>
-  >;
+  users: WorkspaceMemberDisplay[];
   pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook | null;
   hasAccess: boolean;
@@ -57,19 +56,20 @@ export async function getWorkspaceSettingsPageData(
   }
 
   const tdb = createTenantDb(workspaceId);
-  const [members, phoneNumbers, pendingInvites, webhookRow] = await Promise.all([
+  const [members, pendingInvites, webhookRow] = await Promise.all([
     listWorkspaceMembersEnriched(workspaceId),
-    tdb.workspace_number.findMany(),
     listWorkspaceInvitesEnriched(workspaceId),
     getWorkspaceWebhookRow(workspaceId, tdb),
   ]);
 
   const currentMember = members.find((member) => member.user_id === userId);
   const userRole = currentMember?.role as MemberRole | undefined;
-  const users: UserWithRole[] = members.map((member) => ({
+  const users: WorkspaceMemberDisplay[] = members.map((member) => ({
     role: member.role,
     id: member.user_id,
     username: member.username,
+    first_name: member.first_name,
+    last_name: member.last_name,
   }));
   const hasAccess = userRole !== MemberRole.Caller;
   const canManageApiKeys = hasMinRole(userRole, MemberRole.Admin);
@@ -81,7 +81,6 @@ export async function getWorkspaceSettingsPageData(
     workspace: { id: workspace.id, name: workspace.name },
     userRole,
     users,
-    phoneNumbers,
     pendingInvites: pendingInvites.map((invite) => ({
       ...invite,
       user: invite.user ?? null,

@@ -33,6 +33,12 @@ const tenantDbMocks = vi.hoisted(() => ({
   },
   contact: {
     findFirst: vi.fn(async () => null),
+    findMany: vi.fn(),
+  },
+  // Fixture: this workspace owns the sending number. Ownership itself is proved
+  // in test/integration-db/caller-id-usability.test.ts against a real database.
+  workspace_number: {
+    findFirst: vi.fn(async () => ({ id: 1, suspended_at: null })),
   },
 }));
 
@@ -177,6 +183,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     tenantDbMocks.message.update.mockResolvedValue([{ id: 1 }]);
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
+    tenantDbMocks.contact.findMany.mockReset().mockResolvedValue([]);
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
       trafficClass: "unknown",
       throughputProduct: "none",
@@ -646,7 +653,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalledWith("Invalid phone number:", expect.anything());
   });
 
-  test("action skips template processing when contact lookup errors", async () => {
+  test("action blocks when recipient lookup errors", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const dbClient = makeDbClientStub({
       contactRow: null,
@@ -667,9 +674,10 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: "Hello {{firstname}}" })) },
     });
 
+    tenantDbMocks.contact.findMany.mockRejectedValue(new Error("db down"));
     const mod = await import("../app/routes/api+/chat_sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
   });
 
@@ -679,9 +687,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
-    // Not mockResolvedValueOnce: the opt-out gate does its own contact lookup
-    // before the template-tag branch fetches the contact again.
-    tenantDbMocks.contact.findFirst.mockResolvedValue({ firstname: "A", opt_out: false });
+    tenantDbMocks.contact.findMany.mockResolvedValue([{ id: 1, phone: "+15551234567", firstname: "A", opt_out: false, line_type: "mobile" }]);
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session",  user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",
@@ -710,6 +716,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       contactRow: { firstname: "A" },
       webhookRows: [],
     });
+    tenantDbMocks.contact.findMany.mockResolvedValue([{ id: 1, phone: "+15551234567", firstname: "A", opt_out: false, line_type: "mobile" }]);
     const create = vi.fn(async (args: any) => ({
       sid: "SM2",
       body: args.body,
