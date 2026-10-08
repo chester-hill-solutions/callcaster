@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Restore login on fresh previews and resume unfinished database startup files ([PR #2488](https://github.com/chester-hill-solutions/callcaster/pull/2488), [#2487](https://github.com/chester-hill-solutions/callcaster/issues/2487)).
+
 - Added: Call-list uploads have a tenant-scoped CSV row report with exact source positions and saved outcomes. Report actions remain available after completion, stale upload updates cannot enable another attempt’s report, and notices use shared dialogs without moving the page ([PR #2486](https://github.com/chester-hill-solutions/callcaster/pull/2486), [#2480](https://github.com/chester-hill-solutions/callcaster/issues/2480)).
 
 - Fixed: Call-list imports save exact row receipts with their database writes, resume committed rows without duplication, and report failed worker attempts accurately ([PR #2485](https://github.com/chester-hill-solutions/callcaster/pull/2485), [#2479](https://github.com/chester-hill-solutions/callcaster/issues/2479)).

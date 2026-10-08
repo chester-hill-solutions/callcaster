@@ -133,6 +133,15 @@ After the worktree's locked install completes, run project tools with
 checkout has no dependencies. Use the prepared worktree instead of fetching a
 missing tool into a read-only audit.
 
+After repairing a baseline-listed shared-module mock with `importOriginal`,
+run `npm run tools:test-mocks:baseline`; require only the repaired entry to
+shrink, then rerun full CI. The guard rejects stale debt as well as new debt.
+
+Runtime startup and the compose/fresh bootstrap scripts have separate SQL
+execution paths. When changing startup, test `applyClientMigrationsOnBoot` on
+an owned fresh database and a tracked partial baseline. A green compose
+bootstrap does not prove runtime session state or per-file recovery.
+
 ## Route authentication tests
 
 React Router 8 action and loader fixtures must include `url: new URL(request.url)`
