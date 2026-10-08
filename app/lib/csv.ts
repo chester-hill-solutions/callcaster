@@ -2,7 +2,8 @@ import {
   csvFirstRowIsHeader,
   generatedContactImportHeaders,
 } from "../../shared/contact-import-headers";
-import { parse as parseSync } from "csv-parse/sync";
+import { parse as parseSync, type InfoRecord } from "csv-parse/sync";
+import { createCsvSourceTracker, type CsvSource } from "./csv-source";
 
 export const CSV_UTF8_BOM = "\ufeff";
 export const CSV_DEFAULT_LINE_ENDING = "\r\n";
@@ -176,17 +177,26 @@ export type CSVParseResult = {
  * - Skips empty lines.
  * - Strips BOM if present.
  */
-export function parseCSV(csvContent: string): CSVParseResult {
-  const records = parseSync(csvContent, {
+function parseCsvRecords(
+  csvContent: string,
+  capture?: (context: InfoRecord) => void,
+): unknown[][] {
+  return parseSync(csvContent, {
     bom: true,
     relax_quotes: true,
     relax_column_count: true,
     skip_empty_lines: true,
-  }) as unknown[][];
+    on_record: capture ? (record, context) => {
+      capture(context);
+      return record;
+    } : undefined,
+  });
+}
 
+function mapCsvRecords(records: unknown[][]) {
   const firstRow = records[0];
   if (!Array.isArray(firstRow) || firstRow.length === 0) {
-    return { headers: [], contacts: [] };
+    return { headers: [], contacts: [], hasHeader: false };
   }
 
   // A headerless export keeps its first row as data under generated column
@@ -205,5 +215,32 @@ export function parseCSV(csvContent: string): CSVParseResult {
     contacts.push(obj);
   }
 
+  return { headers, contacts, hasHeader };
+}
+
+export function parseCSV(csvContent: string): CSVParseResult {
+  const { headers, contacts } = mapCsvRecords(parseCsvRecords(csvContent));
   return { headers, contacts };
+}
+
+export type CsvSourceParseResult = {
+  headers: string[];
+  headerSource: CsvSource | null;
+  contacts: { data: Record<string, string>; source: CsvSource }[];
+};
+
+export function parseCSVWithSource(csvContent: string): CsvSourceParseResult {
+  const trackSource = createCsvSourceTracker(csvContent);
+  const sources: CsvSource[] = [];
+  const records = parseCsvRecords(csvContent, (context) => {
+    sources.push(trackSource(context.bytes));
+  });
+  const { headers, contacts, hasHeader } = mapCsvRecords(records);
+  const offset = hasHeader ? 1 : 0;
+  const mappedContacts = contacts.map((data, index) => {
+    const source = sources[index + offset];
+    if (!source) throw new Error("Missing CSV source boundary");
+    return { data, source };
+  });
+  return { headers, headerSource: hasHeader ? sources[0] ?? null : null, contacts: mappedContacts };
 }
