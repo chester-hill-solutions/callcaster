@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Call-list imports save exact row receipts with their database writes, resume committed rows without duplication, and report failed worker attempts accurately ([#2479](https://github.com/chester-hill-solutions/callcaster/issues/2479)).
+- Fixed: Call-list imports save exact row receipts with their database writes, resume committed rows without duplication, and report failed worker attempts accurately ([PR #2485](https://github.com/chester-hill-solutions/callcaster/pull/2485), [#2479](https://github.com/chester-hill-solutions/callcaster/issues/2479)).
 
 - Added: CSV imports can retain exact source row positions for recovery and error reports, including blank lines and multiline fields ([PR #2481](https://github.com/chester-hill-solutions/callcaster/pull/2481), [#2478](https://github.com/chester-hill-solutions/callcaster/issues/2478)).
 
