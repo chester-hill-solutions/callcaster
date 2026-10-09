@@ -132,7 +132,8 @@ export async function getQueueByDialType(
 ) {
   const rows = await fetchActiveCampaignQueueWithContacts({
     campaignId: parseInt(campaignId, 10),
-    limit: 200,
+    limit: dialType === "call" ? 50 : 200,
+    assignedToUserId: dialType === "call" ? userId : undefined,
   });
   const queueItems: QueueItem[] = rows;
 

@@ -196,6 +196,11 @@ describe("call-screen.server", () => {
 
     const queue = await getQueueByDialType("1", "call", "user-1");
     expect(queue.map((row) => (row as { id: number }).id)).toEqual([2]);
+    expect(queueSearchMocks.fetchActiveCampaignQueueWithContacts).toHaveBeenCalledWith({
+      campaignId: 1,
+      limit: 50,
+      assignedToUserId: "user-1",
+    });
   });
 
   test("getQueueByDialType (call) does not expose unclaimed rows before atomic claim", async () => {
