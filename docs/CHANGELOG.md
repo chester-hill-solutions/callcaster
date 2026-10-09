@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Manual callers receive only contacts claimed for them, in batches of up to 10 with household contacts kept together ([#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523)).
+
 - Fixed: Workspace setup notices keep a direct link to voice setup while a complete service address awaits validation or voice remains incomplete ([PR #2499](https://github.com/chester-hill-solutions/callcaster/pull/2499), [#2498](https://github.com/chester-hill-solutions/callcaster/issues/2498)).
 
 - Fixed: Restore login on fresh previews and resume unfinished database startup files ([PR #2488](https://github.com/chester-hill-solutions/callcaster/pull/2488), [#2487](https://github.com/chester-hill-solutions/callcaster/issues/2487)).
