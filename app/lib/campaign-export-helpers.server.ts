@@ -4,6 +4,7 @@ import {
   createSignedObjectUrl,
   uploadObject,
 } from "@/lib/object-storage.server";
+import type { CampaignSmsReportFile } from "@/lib/campaign-sms-report.server";
 import {
   isProcessingStale,
   PROCESSING_INTERRUPTED_MESSAGE,
@@ -27,6 +28,8 @@ export type CampaignExportStatus = {
   processed?: number;
   total?: number;
   downloadUrl?: string;
+  exportType?: "campaign-csv" | "sms-report";
+  downloads?: Array<{ label: string; filename: string; downloadUrl: string }>;
   error?: string;
 };
 
@@ -108,6 +111,46 @@ export async function finalizeCsvExport(
   });
 }
 
+export async function finalizeCampaignSmsReportExport(
+  workspaceId: string,
+  exportId: string,
+  statusData: CampaignExportStatus,
+  files: CampaignSmsReportFile[],
+  completionPatch: Partial<CampaignExportStatus> = {},
+): Promise<CampaignExportStatus> {
+  const downloads = await Promise.all(
+    files.map(async (file) => {
+      const objectPath = `${workspaceId}/${exportId}/${file.filename}`;
+      await uploadObject("campaign-exports", objectPath, file.body, {
+        contentType: file.contentType,
+        cacheControl: "private, max-age=0, no-store",
+        upsert: true,
+      });
+      return {
+        label: file.label,
+        filename: file.filename,
+        downloadUrl: await createSignedObjectUrl(
+          "campaign-exports",
+          objectPath,
+          24 * 60 * 60,
+          file.filename,
+        ),
+      };
+    }),
+  );
+
+  return writeExportStatus(workspaceId, exportId, statusData, {
+    status: "completed",
+    progress: 100,
+    filename: downloads[0]?.filename ?? statusData.filename,
+    downloadUrl: downloads[0]?.downloadUrl,
+    downloads,
+    exportType: "sms-report",
+    stage: "SMS report completed",
+    ...completionPatch,
+  });
+}
+
 export async function writeExportErrorStatus(
   workspaceId: string,
   exportId: string,
@@ -153,11 +196,16 @@ export async function markCampaignExportInterruptedIfStale(
     return { interrupted: false, statusData };
   }
 
-  const nextStatus = await writeExportStatus(workspaceId, exportId, statusData, {
-    status: "error",
-    error: PROCESSING_INTERRUPTED_MESSAGE,
-    stage: "Export failed",
-  });
+  const nextStatus = await writeExportStatus(
+    workspaceId,
+    exportId,
+    statusData,
+    {
+      status: "error",
+      error: PROCESSING_INTERRUPTED_MESSAGE,
+      stage: "Export failed",
+    },
+  );
 
   logger.error("campaign_export.watchdog.interrupted", {
     workspaceId,
@@ -172,13 +220,17 @@ export type ScriptQuestion = {
   title: string;
 };
 
-export function extractScriptQuestions(script: ExportScript | null | undefined): ScriptQuestion[] {
+export function extractScriptQuestions(
+  script: ExportScript | null | undefined,
+): ScriptQuestion[] {
   const scriptQuestions: ScriptQuestion[] = [];
-  const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
-    id: pageId,
-    title: pageData.title || pageId,
-    blocks: pageData.blocks || [],
-  }));
+  const pages = Object.entries(script?.steps?.pages ?? {}).map(
+    ([pageId, pageData]) => ({
+      id: pageId,
+      title: pageData.title || pageId,
+      blocks: pageData.blocks || [],
+    }),
+  );
   const blocks = script?.steps?.blocks ?? {};
 
   for (const page of pages) {
@@ -223,7 +275,9 @@ export function parseAttemptResult(result: unknown): Record<string, string> {
   }
 
   const responses: Record<string, string> = {};
-  for (const [key, value] of Object.entries(result as Record<string, unknown>)) {
+  for (const [key, value] of Object.entries(
+    result as Record<string, unknown>,
+  )) {
     if (value == null) {
       responses[key] = "";
     } else if (typeof value === "string") {

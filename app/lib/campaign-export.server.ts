@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { csvRow } from "@/lib/csv";
 
 /**
@@ -25,6 +26,7 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
+import { buildCampaignSmsReport } from "@/lib/campaign-sms-report.server";
 import {
   normalizeIvrAnswerValue,
   resolveIvrAnswerLabel,
@@ -39,6 +41,7 @@ import {
   createInitialExportStatus,
   extractScriptQuestions,
   finalizeCsvExport,
+  finalizeCampaignSmsReportExport,
   writeExportErrorStatus,
   writeExportStatus,
   type CampaignExportStatus,
@@ -55,9 +58,7 @@ import type {
 } from "@/lib/campaign-export-types.server";
 
 export function generateCampaignExportId() {
-  const timestamp = Date.now().toString(36);
-  const randomStr = Math.random().toString(36).substring(2, 10);
-  return `${timestamp}-${randomStr}`;
+  return randomUUID();
 }
 
 async function appendDequeuedRowsToCsv(args: {
@@ -72,7 +73,10 @@ async function appendDequeuedRowsToCsv(args: {
   for (const c of contactDetails) {
     contactById.set(String(c.id), c);
   }
-  const dequeuedRows = await findDequeuedQueueRowsForCampaign(campaignId, workspaceId);
+  const dequeuedRows = await findDequeuedQueueRowsForCampaign(
+    campaignId,
+    workspaceId,
+  );
   for (const dequeuedRow of dequeuedRows) {
     // A successful SMS is dequeued after Twilio accepts it. The message row
     // above is the canonical export row; adding a synthesized skipped row for
@@ -124,7 +128,7 @@ export async function processMessageCampaignExport(
   campaignId: number,
   workspaceId: string,
   exportId: string,
-  campaignName: string
+  campaignName: string,
 ) {
   // Initialize status
   let statusData: CampaignExportStatus = createInitialExportStatus({
@@ -135,14 +139,12 @@ export async function processMessageCampaignExport(
   });
 
   try {
-    statusData = await writeExportStatus(
-      workspaceId,
-      exportId,
-      statusData,
-      {},
-    );
+    statusData = await writeExportStatus(workspaceId, exportId, statusData, {});
 
-    const campaignData = await findCampaignForMessageExport(workspaceId, campaignId);
+    const campaignData = await findCampaignForMessageExport(
+      workspaceId,
+      campaignId,
+    );
 
     if (!campaignData) {
       throw new Error("Campaign not found");
@@ -180,19 +182,20 @@ export async function processMessageCampaignExport(
     }
 
     // Process contacts to get phone patterns
-    const contactPhonePatterns: ExportContactWithPhonePatterns[] = contactDetails.map(contact => {
-      const phone = contact.phone || '';
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      const cleanPhoneNoCountry = cleanPhone.substring(1);
-      const cleanPhoneWithCountry = `1${cleanPhone}`;
+    const contactPhonePatterns: ExportContactWithPhonePatterns[] =
+      contactDetails.map((contact) => {
+        const phone = contact.phone || "";
+        const cleanPhone = phone.replace(/[^0-9]/g, "");
+        const cleanPhoneNoCountry = cleanPhone.substring(1);
+        const cleanPhoneWithCountry = `1${cleanPhone}`;
 
-      return {
-        ...contact,
-        cleanPhone,
-        cleanPhoneNoCountry,
-        cleanPhoneWithCountry
-      };
-    });
+        return {
+          ...contact,
+          cleanPhone,
+          cleanPhoneNoCountry,
+          cleanPhoneWithCountry,
+        };
+      });
 
     // Build a fast lookup for phone -> contact to avoid O(N*M) scans.
     const phoneToContact = new Map<string, ExportContactWithPhonePatterns>();
@@ -211,7 +214,7 @@ export async function processMessageCampaignExport(
     const extendedEndDate = new Date();
     if (campaign.end_date) {
       const endDate = new Date(campaign.end_date);
-      extendedEndDate.setTime(endDate.getTime() + (5 * 24 * 60 * 60 * 1000)); // Add 5 days
+      extendedEndDate.setTime(endDate.getTime() + 5 * 24 * 60 * 60 * 1000); // Add 5 days
     }
 
     const MESSAGE_CHUNK_SIZE = 100;
@@ -247,8 +250,8 @@ export async function processMessageCampaignExport(
       const matchedMessages: ExportMessageWithContact[] = [];
 
       for (const message of messages as unknown as ExportMessage[]) {
-        const cleanFrom = (message.from || '').replace(/[^0-9]/g, '');
-        const cleanTo = (message.to || '').replace(/[^0-9]/g, '');
+        const cleanFrom = (message.from || "").replace(/[^0-9]/g, "");
+        const cleanTo = (message.to || "").replace(/[^0-9]/g, "");
 
         const matchingContact =
           phoneToContact.get(cleanFrom) || phoneToContact.get(cleanTo);
@@ -259,7 +262,9 @@ export async function processMessageCampaignExport(
             contact: matchingContact,
             // The CSV cell must stay ISO: interpolating a Date yields
             // "Wed Oct 01 2026 …", which would change the export's output.
-            message_date: toExportIso(message.date_sent ?? message.date_created)
+            message_date: toExportIso(
+              message.date_sent ?? message.date_created,
+            ),
           });
         }
       }
@@ -284,7 +289,7 @@ export async function processMessageCampaignExport(
                 item.contact.email,
                 item.contact.address,
                 item.contact.city,
-                item.contact.opt_out ? 'true' : 'false',
+                item.contact.opt_out ? "true" : "false",
                 item.contact.created_at,
                 item.contact.workspace,
                 item.contact.external_id,
@@ -307,7 +312,8 @@ export async function processMessageCampaignExport(
 
       processedMessages += messages.length;
 
-      const progress = 30 + Math.round((processedMessages / totalMessages) * 70);
+      const progress =
+        30 + Math.round((processedMessages / totalMessages) * 70);
       statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.min(progress, 99),
         stage: "Processing messages",
@@ -318,7 +324,7 @@ export async function processMessageCampaignExport(
       });
 
       // Small delay to prevent overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
     // append synthesized rows for queue entries that were
@@ -343,13 +349,12 @@ export async function processMessageCampaignExport(
   }
 }
 
-// Process call campaign export in chunks
-
-export async function processCallCampaignExport(
+/** Generate the private campaign-completion report files for an authorized UI request. */
+export async function processCampaignSmsReportExport(
   campaignId: number,
   workspaceId: string,
   exportId: string,
-  campaignName: string
+  campaignName: string,
 ) {
   let statusData: CampaignExportStatus = createInitialExportStatus({
     exportId,
@@ -359,12 +364,47 @@ export async function processCallCampaignExport(
   });
 
   try {
-    statusData = await writeExportStatus(
+    statusData = await writeExportStatus(workspaceId, exportId, statusData, {
+      exportType: "sms-report",
+      stage: "Building campaign report",
+    });
+    const files = await buildCampaignSmsReport(workspaceId, campaignId);
+    statusData = await finalizeCampaignSmsReportExport(
       workspaceId,
       exportId,
       statusData,
-      {},
+      files,
+      { campaignId, campaignName },
     );
+    return statusData;
+  } catch (error) {
+    logger.error("SMS campaign report export failed", {
+      campaignId,
+      workspaceId,
+      error,
+    });
+    await writeExportErrorStatus(workspaceId, exportId, statusData, error);
+    throw error;
+  }
+}
+
+// Process call campaign export in chunks
+
+export async function processCallCampaignExport(
+  campaignId: number,
+  workspaceId: string,
+  exportId: string,
+  campaignName: string,
+) {
+  let statusData: CampaignExportStatus = createInitialExportStatus({
+    exportId,
+    campaignName,
+    workspaceId,
+    campaignId,
+  });
+
+  try {
+    statusData = await writeExportStatus(workspaceId, exportId, statusData, {});
 
     // Initialize CSV lines (store as lines to avoid O(n^2) string concatenation).
     const csvLines: string[] = [];
@@ -382,12 +422,17 @@ export async function processCallCampaignExport(
     const campaign = campaignWithScript as ExportCampaign;
     const billingKind = voiceBillingKindFromCampaignType(campaign.type);
     const scriptQuestions = extractScriptQuestions(script);
-    const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
-      id: pageId,
-      title: pageData.title || pageId,
-    }));
+    const pages = Object.entries(script?.steps?.pages ?? {}).map(
+      ([pageId, pageData]) => ({
+        id: pageId,
+        title: pageData.title || pageId,
+      }),
+    );
 
-    const totalAttempts = await countExportOutreachAttempts(workspaceId, campaignId);
+    const totalAttempts = await countExportOutreachAttempts(
+      workspaceId,
+      campaignId,
+    );
     const ATTEMPT_CHUNK_SIZE = 100;
     let processedAttempts = 0;
 
@@ -415,7 +460,10 @@ export async function processCallCampaignExport(
 
       const attemptIds = attempts.map((a) => a.id);
 
-      const calls = await findExportCallsByOutreachAttemptIds(workspaceId, attemptIds);
+      const calls = await findExportCallsByOutreachAttemptIds(
+        workspaceId,
+        attemptIds,
+      );
 
       const callsMap: Record<string, ExportCall> = {};
       for (const call of calls) {
@@ -425,14 +473,17 @@ export async function processCallCampaignExport(
       }
 
       // Match attempts with contacts and calls
-      const matchedAttempts: ExportAttemptWithDetails[] = (attempts as ExportOutreachAttempt[]).map(attempt => {
-        const contact = contactsMap[attempt.contact_id] || ({} as ExportContact);
+      const matchedAttempts: ExportAttemptWithDetails[] = (
+        attempts as ExportOutreachAttempt[]
+      ).map((attempt) => {
+        const contact =
+          contactsMap[attempt.contact_id] || ({} as ExportContact);
         const call = callsMap[attempt.id] || ({} as ExportCall);
 
         return {
           ...attempt,
           contact,
-          call
+          call,
         };
       });
 
@@ -452,7 +503,8 @@ export async function processCallCampaignExport(
       }
 
       for (const item of matchedAttempts) {
-        const rawDurationSeconds = item.call.duration == null ? 0 : Number(item.call.duration);
+        const rawDurationSeconds =
+          item.call.duration == null ? 0 : Number(item.call.duration);
         const durationSeconds =
           Number.isFinite(rawDurationSeconds) && rawDurationSeconds > 0
             ? rawDurationSeconds
@@ -460,9 +512,10 @@ export async function processCallCampaignExport(
         // A missing, zero, negative, or invalid duration means the call did
         // not connect and has no billable usage. Connected calls use the same
         // campaign-aware rate card as the billing path.
-        const creditsUsed = durationSeconds > 0
-          ? voiceCreditsFromDurationSeconds(durationSeconds, billingKind)
-          : 0;
+        const creditsUsed =
+          durationSeconds > 0
+            ? voiceCreditsFromDurationSeconds(durationSeconds, billingKind)
+            : 0;
 
         // Track visited pages and responses
         const visitedPages = new Set<string>();
@@ -495,7 +548,12 @@ export async function processCallCampaignExport(
               }
             });
           } catch (e) {
-            logger.error("Error parsing result:", e, "Raw result:", item.result);
+            logger.error(
+              "Error parsing result:",
+              e,
+              "Raw result:",
+              item.result,
+            );
           }
         }
 
@@ -563,7 +621,7 @@ export async function processCallCampaignExport(
       });
 
       // Small delay to prevent overwhelming the database
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
     await finalizeCsvExport(workspaceId, exportId, statusData, csvLines);

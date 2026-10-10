@@ -5,6 +5,7 @@ import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { findCampaignExportMeta } from "@/lib/campaign-ivr.server";
 import {
   generateCampaignExportId,
+  processCampaignSmsReportExport,
   processCallCampaignExport,
   processMessageCampaignExport,
 } from "@/lib/campaign-export.server";
@@ -31,72 +32,117 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "external"],
   handler: async ({ request, auth: user }) => {
-  try {
-    const formData = await request.formData();
-    const campaignId = formData.get("campaignId");
-    const workspaceId = formData.get("workspaceId");
+    try {
+      const formData = await request.formData();
+      const campaignId = formData.get("campaignId");
+      const workspaceId = formData.get("workspaceId");
+      const exportType = formData.get("exportType");
 
-    if (!campaignId || !workspaceId) {
-      return new Response("Missing required parameters", { status: 400 });
-    }
+      if (!campaignId || !workspaceId) {
+        return new Response("Missing required parameters", { status: 400 });
+      }
+      if (exportType != null && exportType !== "sms-report") {
+        return routeData({ error: "Invalid export type" }, { status: 400 });
+      }
 
-    await requireWorkspaceAccess({
-      user,
-      workspaceId: workspaceId.toString(),
-    });
+      await requireWorkspaceAccess({
+        user,
+        workspaceId: workspaceId.toString(),
+        ...(exportType === "sms-report" ? { minRole: "admin" } : {}),
+      });
 
-    const campaignRow = await findCampaignExportMeta(
-      workspaceId.toString(),
-      Number(campaignId),
-    );
-    if (!campaignRow) {
-      return new Response("Campaign not found", { status: 404 });
-    }
+      const numericCampaignId = Number(campaignId);
+      if (!Number.isSafeInteger(numericCampaignId) || numericCampaignId < 1) {
+        return routeData({ error: "Invalid campaign ID" }, { status: 400 });
+      }
 
-    const exportId = generateCampaignExportId();
-
-    if (campaignRow.type === "message") {
-      trackBackgroundFailure(
-        processMessageCampaignExport(
-          Number(campaignId),
-          workspaceId.toString(),
-          exportId,
-          campaignRow.title || "",
-        ),
-        "campaign_export.background_failed",
-        { exportId, campaignId, workspaceId },
+      const campaignRow = await findCampaignExportMeta(
+        workspaceId.toString(),
+        numericCampaignId,
       );
-    } else if (
-      campaignRow.type === "live_call" ||
-      isMachineDispatchedVoiceCampaignType(campaignRow.type)
-    ) {
-      trackBackgroundFailure(
-        processCallCampaignExport(
-          Number(campaignId),
-          workspaceId.toString(),
-          exportId,
-          campaignRow.title || "",
-        ),
-        "campaign_export.background_failed",
-        { exportId, campaignId, workspaceId },
-      );
-    } else {
-      return new Response("Invalid campaign type", { status: 400 });
-    }
+      if (!campaignRow) {
+        return new Response("Campaign not found", { status: 404 });
+      }
 
-    return routeData({
-      exportId,
-      status: "started",
-      statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
-    });
-  } catch (error) {
-    logger.error("Export request error:", error);
-    return routeData(
-      {
-        error: toUserMessage(error, "Unknown error"),
-      },
-      { status: 500 },
-    );
-  }
+      if (exportType === "sms-report") {
+        if (
+          campaignRow.type !== "message" ||
+          campaignRow.status !== "complete" ||
+          campaignRow.is_sample ||
+          /(^|[^a-z0-9])test([^a-z0-9]|$)/i.test(campaignRow.title || "")
+        ) {
+          return routeData(
+            {
+              error:
+                "Only completed, non-test message campaigns can have a report",
+            },
+            { status: 400 },
+          );
+        }
+
+        const exportId = generateCampaignExportId();
+        trackBackgroundFailure(
+          processCampaignSmsReportExport(
+            numericCampaignId,
+            workspaceId.toString(),
+            exportId,
+            campaignRow.title || "",
+          ),
+          "campaign_export.sms_report_failed",
+          { exportId, campaignId: numericCampaignId, workspaceId },
+        );
+
+        return routeData({
+          exportId,
+          status: "started",
+          statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
+        });
+      }
+
+      const exportId = generateCampaignExportId();
+
+      if (campaignRow.type === "message") {
+        trackBackgroundFailure(
+          processMessageCampaignExport(
+            numericCampaignId,
+            workspaceId.toString(),
+            exportId,
+            campaignRow.title || "",
+          ),
+          "campaign_export.background_failed",
+          { exportId, campaignId, workspaceId },
+        );
+      } else if (
+        campaignRow.type === "live_call" ||
+        isMachineDispatchedVoiceCampaignType(campaignRow.type)
+      ) {
+        trackBackgroundFailure(
+          processCallCampaignExport(
+            numericCampaignId,
+            workspaceId.toString(),
+            exportId,
+            campaignRow.title || "",
+          ),
+          "campaign_export.background_failed",
+          { exportId, campaignId, workspaceId },
+        );
+      } else {
+        return new Response("Invalid campaign type", { status: 400 });
+      }
+
+      return routeData({
+        exportId,
+        status: "started",
+        statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
+      });
+    } catch (error) {
+      logger.error("Export request error:", error);
+      return routeData(
+        {
+          error: toUserMessage(error, "Unknown error"),
+        },
+        { status: 500 },
+      );
+    }
   },
 });

@@ -37,6 +37,7 @@ interface ExportItem {
   id: string;
   createdAt: Date;
   downloadUrl?: string;
+  downloads?: Array<{ label: string; filename: string; downloadUrl: string }>;
   campaignId: string;
   campaignName: string;
   expiresAt: Date;
@@ -52,6 +53,7 @@ interface SerializedExportItem {
   id: string;
   createdAt: string;
   downloadUrl?: string;
+  downloads?: Array<{ label: string; filename: string; downloadUrl: string }>;
   campaignId: string;
   campaignName: string;
   expiresAt: string;
@@ -75,12 +77,15 @@ interface LoaderData {
 }
 
 export default function WorkspaceExports() {
-  const { exports: serializedExports = [], campaigns = [] } = useLoaderData<LoaderData>();
+  const { exports: serializedExports = [], campaigns = [] } =
+    useLoaderData<LoaderData>();
   const { id: workspaceId } = useParams();
   const { revalidate } = useRevalidator();
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [startState, setStartState] = useState<
-    { status: "idle" } | { status: "starting" } | { status: "error"; message: string }
+    | { status: "idle" }
+    | { status: "starting" }
+    | { status: "error"; message: string }
   >({ status: "idle" });
 
   // Starting an export only needs the POST: the row it creates is picked up by
@@ -94,7 +99,10 @@ export default function WorkspaceExports() {
       const body = new FormData();
       body.append("campaignId", selectedCampaign);
       body.append("workspaceId", workspaceId);
-      const response = await fetch("/api/campaign-export", { method: "POST", body });
+      const response = await fetch("/api/campaign-export", {
+        method: "POST",
+        body,
+      });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
         setStartState({
@@ -113,27 +121,30 @@ export default function WorkspaceExports() {
       logger.error("Failed to start export", error);
       setStartState({
         status: "error",
-        message: "Could not reach the server. Check your connection and try again.",
+        message:
+          "Could not reach the server. Check your connection and try again.",
       });
     }
   };
 
   // Convert serialized dates back to Date objects
-  const exports = serializedExports.map(exp => ({
+  const exports = serializedExports.map((exp) => ({
     ...exp,
     createdAt: new Date(exp.createdAt),
-    expiresAt: new Date(exp.expiresAt)
+    expiresAt: new Date(exp.expiresAt),
   }));
 
   // Poll for updates if there are any in-progress exports
-  const hasInProgressExports = exports.some(exp =>
-    exp.status === "processing" || exp.status === "started"
+  const hasInProgressExports = exports.some(
+    (exp) => exp.status === "processing" || exp.status === "started",
   );
   usePollingRevalidator(hasInProgressExports, 5000);
 
   const getProgressDisplay = (exportItem: ExportItem) => {
     if (exportItem.status === "completed") {
-      return <span className="text-emerald-600 dark:text-emerald-400">Complete</span>;
+      return (
+        <span className="text-emerald-600 dark:text-emerald-400">Complete</span>
+      );
     }
 
     if (exportItem.status === "error") {
@@ -145,11 +156,10 @@ export default function WorkspaceExports() {
       return (
         <div className="flex items-center gap-2">
           <Progress value={progress} className="w-[100px]" />
-          <span className="text-xs text-muted-foreground">
-            {exportItem.processed && exportItem.total ? 
-              `${exportItem.processed}/${exportItem.total}` :
-              `${progress}%`
-            }
+          <span className="text-muted-foreground text-xs">
+            {exportItem.processed && exportItem.total
+              ? `${exportItem.processed}/${exportItem.total}`
+              : `${progress}%`}
           </span>
         </div>
       );
@@ -173,7 +183,7 @@ export default function WorkspaceExports() {
           onClick={() => revalidate()}
           variant="outline"
           size="sm"
-          className="flex items-center gap-2 w-full sm:w-auto justify-center"
+          className="flex w-full items-center justify-center gap-2 sm:w-auto"
         >
           <RefreshCw className="h-4 w-4" />
           Refresh
@@ -188,7 +198,10 @@ export default function WorkspaceExports() {
       {campaigns.length > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center">
           <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-            <SelectTrigger className="w-full sm:w-[320px]" aria-label="Campaign to export">
+            <SelectTrigger
+              className="w-full sm:w-[320px]"
+              aria-label="Campaign to export"
+            >
               <SelectValue placeholder="Choose a campaign to export" />
             </SelectTrigger>
             <SelectContent>
@@ -238,17 +251,24 @@ export default function WorkspaceExports() {
                 <TableHead className="min-w-[100px]">Status</TableHead>
                 <TableHead className="min-w-[150px]">Progress</TableHead>
                 <TableHead className="min-w-[180px]">Expires</TableHead>
-                <TableHead className="min-w-[120px] text-right">Actions</TableHead>
+                <TableHead className="min-w-[120px] text-right">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {exports.map((exportItem) => (
-                <TableRow key={exportItem.id} className={exportItem.isExpired ? "opacity-50" : ""}>
+                <TableRow
+                  key={exportItem.id}
+                  className={exportItem.isExpired ? "opacity-50" : ""}
+                >
                   <TableCell className="font-medium">
                     <div className="break-words">
                       {exportItem.campaignName}
                       {exportItem.stage && (
-                        <div className="text-sm text-muted-foreground">{exportItem.stage}</div>
+                        <div className="text-muted-foreground text-sm">
+                          {exportItem.stage}
+                        </div>
                       )}
                     </div>
                   </TableCell>
@@ -258,35 +278,58 @@ export default function WorkspaceExports() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="capitalize whitespace-nowrap">{exportItem.status}</div>
+                    <div className="whitespace-nowrap capitalize">
+                      {exportItem.status}
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    {getProgressDisplay(exportItem)}
-                  </TableCell>
+                  <TableCell>{getProgressDisplay(exportItem)}</TableCell>
                   <TableCell>
                     <div className="whitespace-nowrap">
                       {exportItem.expiresAt.toLocaleString()}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    {!exportItem.isExpired && exportItem.status === "completed" && (
-                      <a
-                        href={exportItem.downloadUrl}
-                        download
-                        className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-8 px-3 py-2 whitespace-nowrap"
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </a>
-                    )}
+                    {!exportItem.isExpired &&
+                      exportItem.status === "completed" &&
+                      (exportItem.downloads?.length ? (
+                        <div className="flex flex-col items-end gap-1">
+                          {exportItem.downloads.map((download) => (
+                            <a
+                              key={download.filename}
+                              href={download.downloadUrl}
+                              download={download.filename}
+                              className="text-primary inline-flex items-center justify-center rounded-md text-sm font-medium underline-offset-4 hover:underline"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              {download.label}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <a
+                          href={exportItem.downloadUrl}
+                          download
+                          className="ring-offset-background focus-visible:ring-ring bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </a>
+                      ))}
                     {exportItem.isExpired && (
-                      <span className="text-sm text-destructive-text">Expired</span>
+                      <span className="text-destructive-text text-sm">
+                        Expired
+                      </span>
                     )}
-                    {(exportItem.status === "processing" || exportItem.status === "started") && (
-                      <span className="text-sm text-muted-foreground">Processing...</span>
+                    {(exportItem.status === "processing" ||
+                      exportItem.status === "started") && (
+                      <span className="text-muted-foreground text-sm">
+                        Processing...
+                      </span>
                     )}
                     {exportItem.status === "error" && (
-                      <span className="text-sm text-destructive-text">Failed</span>
+                      <span className="text-destructive-text text-sm">
+                        Failed
+                      </span>
                     )}
                   </TableCell>
                 </TableRow>
