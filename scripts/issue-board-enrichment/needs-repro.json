@@ -156,16 +156,15 @@
     "summary": "Confirmed parent/child call rows inflate the disposition attempt count. The original zero-contact and stale-button symptoms need current browser reproduction.",
     "currentBehavior": "At dev b1d40c1c, a real child-call callback copies its parent outreach_attempt_id. One stored completed attempt then produces count=2 in get_campaign_stats. Repeated real hangup actions with Twilio 21220 keep one attempt and one dequeued queue row; the current contact counter returns 1.",
     "rootCause": "The outer LEFT JOIN to call multiplies attempt rows in COUNT(*) and weights average wait time by call-leg count. Contacts completed is a queue-contact count; disposition bars aggregate attempts but do not name the unit.",
-    "resolution": "Remove only the outer call join through a migration in both fresh-install lists. Preserve the separate call-duration aggregate and message branch. Name attempt/message disposition units. Keep the issue open until the original stale-button/zero-contact report is checked in the current browser.",
+    "resolution": "Count attempts and average wait from workspace-scoped Drizzle rows. Aggregate call-leg durations separately so multiple legs cannot duplicate attempts or weight wait time. Preserve the message path. Name attempt/message disposition units. Keep the issue open until the original stale-button/zero-contact report is checked in the current browser.",
     "lookIn": [
       "app/components/campaign/home/CampaignHomeScreen/ResultsScreen.Disposition.tsx",
       "app/lib/database/campaign-stats.server.ts",
       "app/lib/twilio-call-status.server.ts",
       "app/routes/api+/hangup.action.server.ts",
-      "client/migrations/20261007000005_campaign_stats_count_attempts.sql"
     ],
     "existingTests": [
-      "test/integration-db/campaign-results-counts.test.ts: real callback inheritance, actual RPC/results service, distinct attempts, call-less attempts, attempt-weighted wait, campaign/filter controls and ended-call retries",
+      "test/integration-db/campaign-results-counts.test.ts: real callback inheritance, app-layer results query, distinct attempts, call-less attempts, attempt-weighted wait, campaign/filter controls and ended-call retries",
       "test/ui/campaign-result-display.test.tsx: contact/attempt units and message unit",
       "test/ui/hooks-call.test.tsx: lifecycle and stale connected state"
     ],
@@ -182,7 +181,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Local results-count correction prepared on codex/bug/2034-campaign-results-counts; do not close the full report from database counts alone. Publication is held by the separate CI audit-export approval."
+    "trackerRecommendation": "Local results-count correction prepared on bug/2034-campaign-results-counts; do not close the full report from database counts alone. Publication is held by the separate CI audit-export approval."
   },
   {
     "issueNumber": 2053,
