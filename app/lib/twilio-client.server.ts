@@ -5,6 +5,7 @@ import type { UsAppToPersonListInstanceCreateOptions } from "twilio/lib/rest/mes
 import type { TrustProductsListInstanceCreateOptions } from "twilio/lib/rest/trusthub/v1/trustProducts";
 import type { SinkListInstanceCreateOptions } from "twilio/lib/rest/events/v1/sink";
 import type { SubscriptionListInstanceCreateOptions } from "twilio/lib/rest/events/v1/subscription";
+import type { TollFreeOptInType } from "@/lib/toll-free-opt-in";
 
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
@@ -219,8 +220,10 @@ export async function listMessagingServiceChannelSenders(
 
 // ─── Toll-Free Verification (Phase C) ───────────────────────────────────────
 
-export type TollFreeVerificationCreateInput =
-  TollfreeVerificationListInstanceCreateOptions;
+export type TollFreeVerificationCreateInput = Omit<
+  TollfreeVerificationListInstanceCreateOptions,
+  "optInType"
+> & { optInType?: TollFreeOptInType };
 
 /**
  * Submit a Toll-Free Verification (TFV) for a toll-free number. Wraps
@@ -231,8 +234,10 @@ export async function createTollFreeVerification(
   input: TollFreeVerificationCreateInput,
   options: TwilioClientCallOptions,
 ) {
+  // Twilio's API accepts IMPORT_PLEASE_REPLACE, but the current SDK union omits it.
+  const sdkInput = input as TollfreeVerificationListInstanceCreateOptions;
   return withTwilioRetry(
-    () => twilio.messaging.v1.tollfreeVerifications.create(input),
+    () => twilio.messaging.v1.tollfreeVerifications.create(sdkInput),
     options,
   );
 }
