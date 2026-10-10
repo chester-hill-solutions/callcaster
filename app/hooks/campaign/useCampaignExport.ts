@@ -6,6 +6,13 @@ import { logger } from "@/lib/logger.client";
 type UseCampaignExportArgs = {
   campaignId: string | number | null | undefined;
   workspaceId: string | number | null | undefined;
+  exportType?: "sms-report";
+};
+
+export type CampaignExportDownload = {
+  label: string;
+  filename: string;
+  downloadUrl: string;
 };
 
 /**
@@ -19,6 +26,7 @@ type UseCampaignExportArgs = {
 export function useCampaignExport({
   campaignId,
   workspaceId,
+  exportType,
 }: UseCampaignExportArgs) {
   const campaignIdStr = campaignId == null ? "" : String(campaignId);
   const workspaceIdStr = workspaceId == null ? "" : String(workspaceId);
@@ -28,6 +36,7 @@ export function useCampaignExport({
   const [exportId, setExportId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloads, setDownloads] = useState<CampaignExportDownload[]>([]);
 
   /**
    * @effect Poll the campaign export status every 2s until it completes or errors.
@@ -49,7 +58,8 @@ export function useCampaignExport({
         const data = await response.json();
 
         // A transient 404/500 must not end polling — skip this tick and retry.
-        if (cancelled || !response.ok || typeof data?.status !== "string") return;
+        if (cancelled || !response.ok || typeof data?.status !== "string")
+          return;
 
         if (data.progress) setProgress(data.progress);
 
@@ -58,6 +68,7 @@ export function useCampaignExport({
           clearInterval(intervalId);
           setIsExporting(false);
           setDownloadUrl(data.downloadUrl);
+          setDownloads(Array.isArray(data.downloads) ? data.downloads : []);
           toast.success("Export completed", {
             description: "Your campaign data export is ready for download.",
           });
@@ -90,11 +101,13 @@ export function useCampaignExport({
 
     setIsExporting(true);
     setDownloadUrl(null);
+    setDownloads([]);
 
     try {
       const formData = new FormData();
       formData.append("campaignId", campaignIdStr);
       formData.append("workspaceId", workspaceIdStr);
+      if (exportType) formData.append("exportType", exportType);
 
       const response = await fetch("/api/campaign-export", {
         method: "POST",
@@ -121,7 +134,14 @@ export function useCampaignExport({
       });
       logger.error("Export error:", error);
     }
-  }, [canExport, campaignIdStr, workspaceIdStr]);
+  }, [canExport, campaignIdStr, workspaceIdStr, exportType]);
 
-  return { isExporting, progress, downloadUrl, canExport, startExport };
+  return {
+    isExporting,
+    progress,
+    downloadUrl,
+    downloads,
+    canExport,
+    startExport,
+  };
 }

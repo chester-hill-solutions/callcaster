@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Completed message campaigns can generate a private PDF report and message CSVs. Only workspace owners and admins can create or download reports; test campaigns are excluded ([#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).
 - Fixed: Campaign results count each call attempt once across parent and child calls, and name the disposition units ([#2034](https://github.com/chester-hill-solutions/callcaster/issues/2034)).
 - Fixed: Campaign script text keeps its authored line breaks in the caller view ([#2522](https://github.com/chester-hill-solutions/callcaster/issues/2522)).
 - Fixed: Manual callers receive up to 10 contacts per batch; each household stays together, even when it has more than 10 contacts ([PR #2525](https://github.com/chester-hill-solutions/callcaster/pull/2525), [#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523)).
