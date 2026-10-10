@@ -25,12 +25,15 @@ function deferredResponse() {
   return { promise, resolve };
 }
 
-function setup(dialType: "predictive" | "call" = "predictive") {
+function setup(
+  dialType: "predictive" | "call" = "predictive",
+  activeCall: unknown = null,
+) {
   const controls = {
     hangUp: vi.fn(),
     setConference: vi.fn(),
     handleConferenceEnd: handleConference({ begin: vi.fn() }).handleConferenceEnd,
-    activeCall: null,
+    activeCall,
     conference: "agent~campaign",
     disposition: "",
     availableCredits: 100,
@@ -99,8 +102,8 @@ describe("Leave Campaign", () => {
     await act(async () => pending.resolve(Response.json({ success: true })));
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
     expect(controls.setConference).toHaveBeenCalledWith(null);
-    expect(controls.device.destroy).toHaveBeenCalledTimes(1);
-    expect(controls.hangUp).toHaveBeenCalledTimes(1);
+    expect(controls.device.destroy).not.toHaveBeenCalled();
+    expect(controls.hangUp).not.toHaveBeenCalled();
     expect(controls.requeueContacts).not.toHaveBeenCalled();
   });
 
@@ -137,13 +140,24 @@ describe("Leave Campaign", () => {
     expect(controls.requeueContacts).not.toHaveBeenCalled();
   });
 
-  test("live Leave retains local hangup, device teardown and queue reset", async () => {
-    const controls = setup("call");
+  test("live Leave waits for hangup before navigation and leaves device teardown to its hook", async () => {
+    const controls = setup("call", {});
+    let finishHangUp!: () => void;
+    controls.hangUp.mockImplementation(
+      () => new Promise<void>((resolve) => { finishHangUp = resolve; }),
+    );
     fireEvent.click(confirmLeave());
+
+    expect(controls.hangUp).toHaveBeenCalledTimes(1);
+    expect(controls.navigate).not.toHaveBeenCalled();
+    expect(controls.requeueContacts).not.toHaveBeenCalled();
+    expect(controls.device.destroy).not.toHaveBeenCalled();
+
+    await act(async () => finishHangUp());
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(controls.hangUp).toHaveBeenCalledTimes(1);
-    expect(controls.device.destroy).toHaveBeenCalledTimes(1);
+    expect(controls.device.destroy).not.toHaveBeenCalled();
     expect(controls.requeueContacts).toHaveBeenCalledTimes(1);
   });
 
