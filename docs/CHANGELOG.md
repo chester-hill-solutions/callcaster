@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Call ringback stops when a call connects or reaches voicemail, so it does not overlap with call audio ([#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
+- Fixed: Call ringback stops when a call connects or reaches voicemail, so it does not overlap with call audio ([PR #2534](https://github.com/chester-hill-solutions/callcaster/pull/2534), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
 - Fixed: Campaign results count each call attempt once across parent and child calls, and name the disposition units ([#2034](https://github.com/chester-hill-solutions/callcaster/issues/2034)).
 - Fixed: Campaign script text keeps its authored line breaks in the caller view ([#2522](https://github.com/chester-hill-solutions/callcaster/issues/2522)).
 - Fixed: Manual callers receive up to 10 contacts per batch; each household stays together, even when it has more than 10 contacts ([PR #2525](https://github.com/chester-hill-solutions/callcaster/pull/2525), [#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523)).
