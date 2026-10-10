@@ -50,7 +50,9 @@ export const DispositionBreakdown = ({
   results,
   totalsByDisposition,
   totalOfAllResults,
+  unit,
 }: {
+  unit: "attempts" | "messages";
   results: DispositionResult[] | null;
   totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
@@ -59,7 +61,7 @@ export const DispositionBreakdown = ({
 
   return (
     <div className="mb-8">
-      <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
+      <h3 className="mb-4 text-xl font-semibold">{unit === "messages" ? "Message Dispositions" : "Attempt Dispositions"}</h3>
       {hasResults ? (
         results.map((result) => (
           <DispositionBar

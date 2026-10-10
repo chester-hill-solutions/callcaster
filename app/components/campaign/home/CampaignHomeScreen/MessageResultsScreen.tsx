@@ -49,6 +49,7 @@ const MessageResultsScreen = ({
           {queueCounts.fullCount || 0}
         </p>
         <DispositionBreakdown
+          unit="messages"
           results={results}
           totalsByDisposition={totalsByDisposition}
           totalOfAllResults={totalOfAllResults}

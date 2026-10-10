@@ -58,6 +58,7 @@ const ResultsScreen = ({
           <CampaignExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown
+          unit="attempts"
           results={results}
           totalsByDisposition={safeDispositionTotals}
           totalOfAllResults={totalOfAllResults}

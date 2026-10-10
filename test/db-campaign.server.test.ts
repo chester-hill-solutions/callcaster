@@ -21,15 +21,14 @@ const tdbMocks = vi.hoisted(() => ({
     findMany: vi.fn(),
     count: vi.fn(),
   },
+  campaign_queue: {
+    count: vi.fn(),
+  },
 }));
 
 const dbMocks = vi.hoisted(() => ({
   select: vi.fn(),
   transaction: vi.fn(),
-}));
-
-const rpcMocks = vi.hoisted(() => ({
-  rpcGetCampaignStats: vi.fn(),
 }));
 
 const persistenceMocks = vi.hoisted(() => ({
@@ -82,9 +81,6 @@ describe("app/lib/database/campaign.server.ts", () => {
     vi.doMock("../app/lib/database/workspace.server", () => ({
       getSignedUrls: vi.fn(async () => ["signed-1"]),
     }));
-    vi.doMock("../app/lib/db-rpc.server", () => ({
-      rpcGetCampaignStats: rpcMocks.rpcGetCampaignStats,
-    }));
     vi.doMock("../app/lib/campaign-queue-search.server", () => ({
       countCampaignQueueRows: queueSearchMocks.countCampaignQueueRows,
       countQueuedCampaignQueueRows: queueSearchMocks.countQueuedCampaignQueueRows,
@@ -94,7 +90,6 @@ describe("app/lib/database/campaign.server.ts", () => {
       fetchCampaignQueueWithContacts: queueSearchMocks.fetchCampaignQueueWithContacts,
       fetchDialableCampaignQueueWithContacts: queueSearchMocks.fetchDialableCampaignQueueWithContacts,
     }));
-    rpcMocks.rpcGetCampaignStats.mockReset();
     for (const fn of Object.values(queueSearchMocks)) {
       fn.mockReset();
     }
@@ -556,11 +551,10 @@ describe("app/lib/database/campaign.server.ts", () => {
     ).rejects.toBeInstanceOf(Error);
   });
 
-  test("fetchBasicResults logs on error and returns []", async () => {
+  test("fetchBasicResults logs a campaign lookup error and returns []", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    rpcMocks.rpcGetCampaignStats.mockRejectedValueOnce(new Error("x"));
-    tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
+    tdbMocks.campaign.findFirst.mockRejectedValueOnce(new Error("x"));
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
@@ -569,16 +563,39 @@ describe("app/lib/database/campaign.server.ts", () => {
     expect(logger.error).toHaveBeenCalled();
   });
 
-  test("fetchBasicResults success returns data", async () => {
+  test("fetchBasicResults groups message statuses", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    rpcMocks.rpcGetCampaignStats.mockResolvedValueOnce([{ ok: 1 }]);
-    tdbMocks.campaign.findFirst.mockResolvedValueOnce({ type: "live_call" });
+    tdbMocks.campaign.findFirst.mockResolvedValueOnce({
+      type: "message",
+      dial_ratio: 1,
+    });
+    tdbMocks.message.findMany.mockResolvedValueOnce([
+      { status: "delivered" },
+      { status: "delivered" },
+      { status: "failed" },
+    ]);
+    tdbMocks.outreach_attempt.findMany.mockResolvedValueOnce([]);
     const out = await mod.fetchBasicResults({
       workspaceId: "w1",
       campaignId: "1",
     });
-    expect(out).toEqual([{ ok: 1 }]);
+    expect(out).toEqual([
+      {
+        disposition: "delivered",
+        count: 2,
+        average_call_duration: "00:00:00",
+        average_wait_time: "00:00:00",
+        expected_total: 0,
+      },
+      {
+        disposition: "failed",
+        count: 1,
+        average_call_duration: "00:00:00",
+        average_wait_time: "00:00:00",
+        expected_total: 0,
+      },
+    ]);
     expect(logger.error).not.toHaveBeenCalled();
   });
 
