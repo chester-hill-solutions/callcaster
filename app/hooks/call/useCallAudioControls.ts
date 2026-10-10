@@ -27,8 +27,24 @@ export function useCallAudioControls({
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const microphoneRequestGenerationRef = useRef(0);
 
   const isMicrophoneMuted = micCoordinator.isMicMuted;
+
+  /**
+   * @effect Invalidate pending microphone requests when this hook unmounts.
+   * @effect-deps [] — one generation belongs to this hook lifetime.
+   * @effect-side-effects none (guards async media acquisition).
+   * @effect-why-not-loader Media acquisition is a browser-only operation.
+   */
+  useEffect(() => {
+    const generation = ++microphoneRequestGenerationRef.current;
+    return () => {
+      if (microphoneRequestGenerationRef.current === generation) {
+        microphoneRequestGenerationRef.current += 1;
+      }
+    };
+  }, []);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -49,11 +65,17 @@ export function useCallAudioControls({
   }, []);
 
   const requestMicrophoneAccess = useCallback(async () => {
+    const generation = microphoneRequestGenerationRef.current;
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
       });
+
+      if (microphoneRequestGenerationRef.current !== generation) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+        return;
+      }
 
       setStream(mediaStream);
       setPermissionError(null);
@@ -72,6 +94,19 @@ export function useCallAudioControls({
       }
     }
   }, [refreshDevices]);
+
+  /**
+   * @effect Stop microphone tracks when the stream is replaced or this hook unmounts.
+   * @effect-deps stream (the stream whose tracks this hook owns).
+   * @effect-side-effects media device capture is released by stopping each track.
+   * @effect-why-not-loader This releases a browser media resource.
+   */
+  useEffect(() => {
+    if (!stream) return;
+    return () => {
+      stream.getTracks().forEach((track) => track.stop());
+    };
+  }, [stream]);
 
   const handleMicrophoneChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {

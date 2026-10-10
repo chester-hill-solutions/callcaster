@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**122** documented / **124** total effects (2 grandfathered, ratcheting to 0).
+**124** documented / **126** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -35,6 +35,8 @@
 | `app/hooks/agent/useAgentStatus.ts` | Load the agent's current status on mount and send a heartbeat POST every 30s while mounted. | workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus | timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change | The recurring heartbeat is live client-only polling a loader can't express; |
 | `app/hooks/billing/useCreditReconciliation.ts` | Poll the workspace balance endpoint after a terminal call until the credit display converges on the ledger. | isTerminal (call reached/left a terminal outcome), workspaceId | setInterval polling GET /api/workspaces/:workspaceId/credits (max 30s, 2s cadence); cleared on convergence, timeout, new dial, unmount | Convergence is a client-time bounded retry against a missed SSE event; a loader only runs on navigation/revalidation and cannot poll. |
 | `app/hooks/call/useAudioDeviceTest.ts` | Tear down both timers, the raf loop, the AudioContext, the | [] — mount-once cleanup, no external state. | timer (clearTimeout ×2), subscription (cancelAnimationFrame), | Pure resource release, not data fetching. |
+| `app/hooks/call/useCallAudioControls.ts` | Invalidate pending microphone requests when this hook unmounts. | [] — one generation belongs to this hook lifetime. | none (guards async media acquisition). | Media acquisition is a browser-only operation. |
+| `app/hooks/call/useCallAudioControls.ts` | Stop microphone tracks when the stream is replaced or this hook unmounts. | stream (the stream whose tracks this hook owns). | media device capture is released by stopping each track. | This releases a browser media resource. |
 | `app/hooks/call/useCallAudioControls.ts` | Create a Web Audio API AudioContext on mount for DTMF tone | [] — intentionally mount-once; the AudioContext should be created exactly once per hook lifetime, not recreated per render. | dom (Web Audio API AudioContext construction/close) | Browser audio API object construction, not |
 | `app/hooks/call/useCallAudioControls.ts` | Enumerate audio devices on mount and subscribe to OS | refreshDevices (stable callback) | subscription (mediaDevices "devicechange" listener) | Browser hardware enumeration is a client-only API. |
 | `app/hooks/call/useCallAudioControls.ts` | Apply the selected microphone and speaker device IDs to the | device, microphone, output | dom (Twilio Device audio input/output routing) | Live Twilio audio routing follows user device picks. |
