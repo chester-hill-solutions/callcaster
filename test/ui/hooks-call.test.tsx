@@ -406,6 +406,45 @@ describe("call hooks", () => {
     expect(result.current.deviceIsBusy).toBe(true);
   });
 
+  test("unmount does not hang up a call again after hangUp completes", async () => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const { hangupCall } = await import("@/lib/services/hooks-api");
+    const call = createMockTwilioCall();
+    mockTwilioDevice.connect.mockResolvedValueOnce(call as never);
+    const { result, unmount } = renderHook(() =>
+      useTwilioDevice({
+        token: "tok",
+        selectedDevice: "computer",
+        workspaceId: "ws",
+        send: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await mockTwilioDevice.register();
+    });
+    await act(async () => {
+      result.current.makeCall({ To: "+15551234567" });
+      await Promise.resolve();
+    });
+    expect(result.current.activeCall).toBe(call);
+
+    await act(async () => {
+      await result.current.hangUp();
+    });
+    expect(vi.mocked(hangupCall)).toHaveBeenCalledTimes(1);
+    expect(call.disconnect).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(vi.mocked(hangupCall)).toHaveBeenCalledTimes(1);
+    expect(call.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+  });
+
   // Regression: useTwilioDevice keeps its own `error` state (set via the
   // onError callback from useTwilioConnection) separate from the
   // connection's internal error — clearing one without the other still left
