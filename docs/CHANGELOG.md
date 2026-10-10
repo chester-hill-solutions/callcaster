@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Manual callers receive up to 10 contacts per batch; each household stays together, even when it has more than 10 contacts ([PR #2525](https://github.com/chester-hill-solutions/callcaster/pull/2525), [#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523)).
 - Fixed: Leaving the call screen stops microphone tracks, including streams that finish opening after navigation, and waits for an active call to hang up before the screen closes ([#2524](https://github.com/chester-hill-solutions/callcaster/issues/2524)).
 
 - Fixed: Workspace setup notices keep a direct link to voice setup while a complete service address awaits validation or voice remains incomplete ([PR #2499](https://github.com/chester-hill-solutions/callcaster/pull/2499), [#2498](https://github.com/chester-hill-solutions/callcaster/issues/2498)).
