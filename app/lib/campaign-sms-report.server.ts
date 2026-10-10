@@ -51,6 +51,27 @@ export type CampaignSmsReportFile = {
   body: string | Uint8Array;
 };
 
+type CampaignReportData = {
+  campaign: CampaignReportRow;
+  outbound: ReportMessage[];
+  outboundWithContacts: ReportMessage[];
+  inboundWithContacts: ReportMessage[];
+};
+
+type CampaignReportSummary = {
+  recipients: Set<string>;
+  optouts: ReportMessage[];
+  sent: number;
+  delivered: number;
+  undelivered: number;
+  outboundCount: number;
+  inboundCount: number;
+  errorCounts: Map<number, number>;
+  replyCounts: Map<string, number>;
+  dailyVolume: Map<string, number>;
+  allMessages: unknown[][];
+};
+
 const digits = (value: string | null | undefined) =>
   (value ?? "").replace(/\D/g, "");
 const isStop = (body: string | null | undefined) =>
@@ -194,29 +215,7 @@ function replyTheme(body: string | null) {
   return "Other";
 }
 
-/**
- * Build the SMS report from rows scoped to one workspace. The campaign id is
- * never treated as a global identifier at this boundary.
- */
-export async function buildCampaignSmsReport(
-  workspaceId: string,
-  campaignId: number,
-): Promise<CampaignSmsReportFile[]> {
-  const tdb = createTenantDb(workspaceId);
-  const campaign = (await tdb.campaign.findFirst({
-    where: eq(campaignTable.id, campaignId),
-    columns: {
-      id: true,
-      title: true,
-      type: true,
-      status: true,
-      start_date: true,
-      caller_id: true,
-      body_text: true,
-      is_sample: true,
-    },
-  })) as CampaignReportRow | undefined;
-
+function validateCampaign(campaign: CampaignReportRow | undefined) {
   if (!campaign) throw new Error("Campaign not found");
   if (campaign.type !== "message")
     throw new Error("This report is for message campaigns");
@@ -228,14 +227,75 @@ export async function buildCampaignSmsReport(
   ) {
     throw new Error("Test campaigns cannot be exported");
   }
+  return campaign;
+}
 
-  const outboundRows = (await tdb.message.findMany({
+async function getInboundMessages(
+  tdb: ReturnType<typeof createTenantDb>,
+  workspaceId: string,
+  campaign: CampaignReportRow,
+  outbound: ReportMessage[],
+) {
+  const recipientPhones = [
+    ...new Set(outbound.map((message) => digits(message.to)).filter(Boolean)),
+  ];
+  const campaignStart = campaign.start_date
+    ? new Date(campaign.start_date)
+    : new Date(0);
+  const since = Number.isNaN(campaignStart.getTime())
+    ? new Date(0)
+    : campaignStart;
+  const inbound: ReportMessage[] = [];
+
+  for (let offset = 0; offset < recipientPhones.length; offset += 500) {
+    const phoneBatch = recipientPhones.slice(offset, offset + 500);
+    const batch = (await tdb.execute(sql`
+      select m.sid, m.status, m."from", m."to", m.body, m.num_segments,
+             m.error_code, m.date_created, m.date_sent, m.contact_id,
+             c.firstname, c.surname, c.phone
+      from ${messageTable} as m
+      left join ${contactTable} as c
+        on c.id = m.contact_id and c.workspace = ${workspaceId}
+      where m.workspace = ${workspaceId}
+        and m.direction = 'inbound'
+        and m.date_created >= ${since}
+        and regexp_replace(coalesce(m."from", ''), '[^0-9]', '', 'g') in
+          (${sql.join(
+            phoneBatch.map((phone) => sql`${phone}`),
+            sql`, `,
+          )})
+      order by m.date_created, m.sid
+    `)) as ReportMessage[];
+    inbound.push(...batch);
+  }
+  return inbound;
+}
+
+async function loadCampaignReportData(
+  workspaceId: string,
+  campaignId: number,
+): Promise<CampaignReportData> {
+  const tdb = createTenantDb(workspaceId);
+  const campaign = validateCampaign(
+    (await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, campaignId),
+      columns: {
+        id: true,
+        title: true,
+        type: true,
+        status: true,
+        start_date: true,
+        caller_id: true,
+        body_text: true,
+        is_sample: true,
+      },
+    })) as CampaignReportRow | undefined,
+  );
+  const messages = (await tdb.message.findMany({
     where: eq(messageTable.campaign_id, campaignId),
     orderBy: asc(messageTable.date_created),
   })) as ReportMessage[];
-  const outbound = outboundRows.filter(
-    (message) => message.direction !== "inbound",
-  );
+  const outbound = messages.filter((message) => message.direction !== "inbound");
   const contactIds = [
     ...new Set(
       outbound.flatMap((message) =>
@@ -255,81 +315,73 @@ export async function buildCampaignSmsReport(
     ...message,
     ...(contactById.get(Number(message.contact_id)) ?? {}),
   }));
-
-  const recipientPhones = [
-    ...new Set(outbound.map((message) => digits(message.to)).filter(Boolean)),
-  ];
-  const sinceDate = campaign.start_date
-    ? new Date(campaign.start_date)
-    : new Date(0);
-  const since = Number.isNaN(sinceDate.getTime()) ? new Date(0) : sinceDate;
-  const inbound: ReportMessage[] = [];
-  for (let offset = 0; offset < recipientPhones.length; offset += 500) {
-    const phoneBatch = recipientPhones.slice(offset, offset + 500);
-    const inboundBatch = (await tdb.execute(sql`
-        select m.sid, m.status, m."from", m."to", m.body, m.num_segments,
-               m.error_code, m.date_created, m.date_sent, m.contact_id,
-               c.firstname, c.surname, c.phone
-        from ${messageTable} as m
-        left join ${contactTable} as c
-          on c.id = m.contact_id and c.workspace = ${workspaceId}
-        where m.workspace = ${workspaceId}
-          and m.direction = 'inbound'
-          and m.date_created >= ${since}
-          and regexp_replace(coalesce(m."from", ''), '[^0-9]', '', 'g') in
-            (${sql.join(
-              phoneBatch.map((phone) => sql`${phone}`),
-              sql`, `,
-            )})
-        order by m.date_created, m.sid
-      `)) as ReportMessage[];
-    inbound.push(...inboundBatch);
-  }
-
-  const outboundPhones = new Map<string, string>();
+  const inbound = await getInboundMessages(
+    tdb,
+    workspaceId,
+    campaign,
+    outbound,
+  );
+  const outboundNames = new Map<string, string>();
   for (const message of outboundWithContacts) {
     const phone = digits(message.to);
-    if (phone && !outboundPhones.has(phone)) {
-      outboundPhones.set(
-        phone,
-        [message.firstname, message.surname].filter(Boolean).join(" ").trim() ||
-          "Unknown",
-      );
+    if (phone && !outboundNames.has(phone)) {
+      outboundNames.set(phone, contactName(message));
     }
   }
   const inboundWithContacts = inbound.map((message) => {
     if (message.firstname || message.surname) return message;
     return {
       ...message,
-      firstname: outboundPhones.get(digits(message.from)) ?? "Unknown",
+      firstname: outboundNames.get(digits(message.from)) ?? "Unknown",
     };
   });
-  const optouts = inboundWithContacts.filter((message) => isStop(message.body));
+  return { campaign, outbound, outboundWithContacts, inboundWithContacts };
+}
+
+function messageCsvRow(direction: string, message: ReportMessage) {
+  return [
+    direction,
+    message.sid,
+    message.status,
+    message.from,
+    message.to,
+    contactName(message),
+    iso(message.date_created),
+    iso(message.date_sent),
+    message.num_segments,
+    message.error_code,
+    errorDescription(message.error_code),
+    message.body,
+  ];
+}
+
+function createReportSummary(data: CampaignReportData): CampaignReportSummary {
+  const { outbound, outboundWithContacts, inboundWithContacts } = data;
   const recipients = new Set(
     outbound.map((message) => digits(message.to)).filter(Boolean),
   );
+  const optouts = inboundWithContacts.filter((message) => isStop(message.body));
   const statusCounts = new Map<string, number>();
   const errorCounts = new Map<number, number>();
   const replyCounts = new Map<string, number>();
   for (const message of outbound) {
-    if (message.status)
+    if (message.status) {
       statusCounts.set(
         message.status,
         (statusCounts.get(message.status) ?? 0) + 1,
       );
-    if (message.error_code != null)
+    }
+    if (message.error_code != null) {
       errorCounts.set(
         message.error_code,
         (errorCounts.get(message.error_code) ?? 0) + 1,
       );
+    }
   }
   for (const message of inboundWithContacts) {
     const theme = replyTheme(message.body);
     replyCounts.set(theme, (replyCounts.get(theme) ?? 0) + 1);
   }
-  const sent = statusCounts.get("sent") ?? 0;
-  const delivered = statusCounts.get("delivered") ?? 0;
-  const undelivered = statusCounts.get("undelivered") ?? 0;
   const dailyVolume = new Map<string, number>();
   for (const message of [...outbound, ...inboundWithContacts]) {
     if (!message.date_created) continue;
@@ -342,51 +394,42 @@ export async function buildCampaignSmsReport(
     dailyVolume.set(day, (dailyVolume.get(day) ?? 0) + 1);
   }
   const allMessages = [
-    ...outboundWithContacts.map((message) => [
-      "outbound",
-      message.sid,
-      message.status,
-      message.from,
-      message.to,
-      contactName(message),
-      iso(message.date_created),
-      iso(message.date_sent),
-      message.num_segments,
-      message.error_code,
-      errorDescription(message.error_code),
-      message.body,
-    ]),
-    ...inboundWithContacts.map((message) => [
-      "inbound",
-      message.sid,
-      message.status,
-      message.from,
-      message.to,
-      contactName(message),
-      iso(message.date_created),
-      iso(message.date_sent),
-      message.num_segments,
-      message.error_code,
-      errorDescription(message.error_code),
-      message.body,
-    ]),
+    ...outboundWithContacts.map((message) => messageCsvRow("outbound", message)),
+    ...inboundWithContacts.map((message) => messageCsvRow("inbound", message)),
   ].sort((left, right) => String(left[6]).localeCompare(String(right[6])));
 
-  const csvHeaders = [
-    "direction",
-    "sid",
-    "status",
-    "from",
-    "to",
-    "contact_name",
-    "date_created",
-    "date_sent",
-    "num_segments",
-    "error_code",
-    "error_description",
-    "body",
-  ];
-  const markdown: string[] = [
+  return {
+    recipients,
+    optouts,
+    sent: statusCounts.get("sent") ?? 0,
+    delivered: statusCounts.get("delivered") ?? 0,
+    undelivered: statusCounts.get("undelivered") ?? 0,
+    outboundCount: outbound.length,
+    inboundCount: inboundWithContacts.length,
+    errorCounts,
+    replyCounts,
+    dailyVolume,
+    allMessages,
+  };
+}
+
+function summaryOutboundDate(
+  summary: CampaignReportSummary,
+  edge: "first" | "last",
+) {
+  const outboundRows = summary.allMessages.filter((row) => row[0] === "outbound");
+  const row = outboundRows[edge === "first" ? 0 : outboundRows.length - 1];
+  return row?.[6] ? new Date(String(row[6])) : null;
+}
+
+function appendReportOverview(
+  lines: string[],
+  campaign: CampaignReportRow,
+  summary: CampaignReportSummary,
+) {
+  const { recipients, sent, delivered, undelivered, inboundCount, optouts } =
+    summary;
+  lines.push(
     `# ${campaign.title} — SMS Report`,
     "",
     `**Campaign:** ${campaign.title} (id ${campaign.id})`,
@@ -401,11 +444,22 @@ export async function buildCampaignSmsReport(
     `| Sent | ${formatNumber(sent)} |`,
     `| Delivered | ${formatNumber(delivered)} |`,
     `| Undelivered | ${formatNumber(undelivered)} |`,
-    `| Delivery rate | ${percent(delivered, outbound.length)}% |`,
-    `| Inbound replies | ${formatNumber(inboundWithContacts.length)} |`,
+    `| Delivery rate | ${percent(delivered, summary.outboundCount)}% |`,
+    `| Inbound replies | ${formatNumber(inboundCount)} |`,
     `| Opt-outs (STOP) | ${formatNumber(optouts.length)} |`,
-    `| Active window | ${et(outbound[0]?.date_created ?? null)} – ${et(outbound[outbound.length - 1]?.date_created ?? null)} ET |`,
+    `| Active window | ${et(summaryOutboundDate(summary, "first"))} – ${et(summaryOutboundDate(summary, "last"))} ET |`,
     "",
+  );
+}
+
+function appendOutboundSections(
+  lines: string[],
+  campaign: CampaignReportRow,
+  summary: CampaignReportSummary,
+) {
+  const { recipients, sent, delivered, undelivered, errorCounts, dailyVolume } =
+    summary;
+  lines.push(
     "## Outbound",
     "",
     "### Send run",
@@ -435,112 +489,195 @@ export async function buildCampaignSmsReport(
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([day, count]) => `| ${day} | ${formatNumber(count)} |`),
     "",
+  );
+}
+
+function appendInboundSections(
+  lines: string[],
+  inbound: ReportMessage[],
+  summary: CampaignReportSummary,
+) {
+  const replyBodies = new Map<string, number>();
+  for (const message of inbound) {
+    const body = message.body?.trim() || "(empty)";
+    replyBodies.set(body, (replyBodies.get(body) ?? 0) + 1);
+  }
+  lines.push(
     "## Inbound",
     "",
     "### Replies by theme",
     "",
     "| Theme | Count | Share |",
     "|---|---|---|",
-    ...[...replyCounts].map(
+    ...[...summary.replyCounts].map(
       ([theme, count]) =>
-        `| ${theme} | ${formatNumber(count)} | ${percent(count, inboundWithContacts.length)}% |`,
+        `| ${theme} | ${formatNumber(count)} | ${percent(count, summary.inboundCount)}% |`,
     ),
     "",
     "### Verbatim reply text",
     "",
     "| Reply text | Count |",
     "|---|---|",
-    ...[
-      ...inboundWithContacts.reduce((counts, message) => {
-        const body = message.body?.trim() || "(empty)";
-        counts.set(body, (counts.get(body) ?? 0) + 1);
-        return counts;
-      }, new Map<string, number>()),
-    ].map(
+    ...[...replyBodies].map(
       ([body, count]) => `| ${markdownCell(body)} | ${formatNumber(count)} |`,
     ),
     "",
+  );
+}
+
+function appendHealthSection(lines: string[], summary: CampaignReportSummary) {
+  lines.push(
     "## Campaign health",
     "",
-    `- Delivery rate: ${percent(delivered, outbound.length)}% (${delivered} of ${outbound.length}).`,
-    `- Opt-out rate: ${((optouts.length / (outbound.length || 1)) * 100).toFixed(2)}% (${optouts.length} of ${outbound.length}).`,
-    `- Replies per recipient: ${percent(inboundWithContacts.length, recipients.size)}%.`,
+    `- Delivery rate: ${percent(summary.delivered, summary.outboundCount)}% (${summary.delivered} of ${summary.outboundCount}).`,
+    `- Opt-out rate: ${((summary.optouts.length / (summary.outboundCount || 1)) * 100).toFixed(2)}% (${summary.optouts.length} of ${summary.outboundCount}).`,
+    `- Replies per recipient: ${percent(summary.inboundCount, summary.recipients.size)}%.`,
     "",
-    `## Appendix A — Conversations (${[...new Set(inboundWithContacts.filter((message) => !isStop(message.body)).map((message) => digits(message.from)))].length})`,
-    "",
-  ];
+  );
+}
+
+function groupInboundThreads(messages: ReportMessage[]) {
   const threadGroups = new Map<string, ReportMessage[]>();
-  for (const message of inboundWithContacts) {
+  for (const message of messages) {
     const phone = digits(message.from);
-    if (!threadGroups.has(phone)) threadGroups.set(phone, []);
-    threadGroups.get(phone)?.push(message);
+    const thread = threadGroups.get(phone) ?? [];
+    thread.push(message);
+    threadGroups.set(phone, thread);
   }
+  return threadGroups;
+}
+
+function appendThreadPageHeader(
+  lines: string[],
+  firstMessage: ReportMessage,
+  phone: string,
+) {
+  lines.push(
+    '<div style="page-break-before: always;"></div>',
+    `### ${contactName(firstMessage)} — ${phone}`,
+    "",
+  );
+}
+
+function appendConversationAppendix(
+  lines: string[],
+  data: CampaignReportData,
+  threadGroups: Map<string, ReportMessage[]>,
+) {
+  const replyThreads = [...threadGroups.values()].filter((messages) =>
+    messages.some((message) => !isStop(message.body)),
+  );
+  lines.push(`## Appendix A — Conversations (${replyThreads.length})`, "");
   for (const [phone, messages] of threadGroups) {
     if (messages.every((message) => isStop(message.body))) continue;
     const firstMessage = messages[0];
     if (!firstMessage) continue;
-    markdown.push(
-      '<div style="page-break-before: always;"></div>',
-      `### ${contactName(firstMessage)} — ${phone}`,
-      "",
-    );
-    const sentMessage = outboundWithContacts.find(
+    appendThreadPageHeader(lines, firstMessage, phone);
+    const sentMessage = data.outboundWithContacts.find(
       (message) => digits(message.to) === phone,
     );
-    if (sentMessage)
-      markdown.push(
+    if (sentMessage) {
+      lines.push(
         `> **Outbound** (${et(sentMessage.date_created)} ET) — ${markdownCell(sentMessage.body)}`,
         "",
       );
-    for (const message of messages)
-      markdown.push(
+    }
+    for (const message of messages) {
+      lines.push(
         `> **Reply** (${et(message.date_created)} ET) — ${markdownCell(message.body)}`,
         "",
       );
+    }
   }
-  markdown.push(
-    `## Appendix B — Opt-out threads (${[...threadGroups.values()].filter((messages) => messages.every((message) => isStop(message.body))).length})`,
-    "",
+}
+
+function appendOptOutAppendix(
+  lines: string[],
+  threadGroups: Map<string, ReportMessage[]>,
+) {
+  const optOutThreads = [...threadGroups.values()].filter((messages) =>
+    messages.every((message) => isStop(message.body)),
   );
+  lines.push(`## Appendix B — Opt-out threads (${optOutThreads.length})`, "");
   for (const [phone, messages] of threadGroups) {
     if (messages.some((message) => !isStop(message.body))) continue;
     const firstMessage = messages[0];
     if (!firstMessage) continue;
-    markdown.push(
-      '<div style="page-break-before: always;"></div>',
-      `### ${contactName(firstMessage)} — ${phone}`,
-      "",
-    );
-    for (const message of messages)
-      markdown.push(
+    appendThreadPageHeader(lines, firstMessage, phone);
+    for (const message of messages) {
+      lines.push(
         `> **${markdownCell(message.body)}** (${et(message.date_created)} ET)`,
         "",
       );
+    }
   }
+}
 
+function createReportMarkdown(
+  data: CampaignReportData,
+  summary: CampaignReportSummary,
+) {
+  const lines: string[] = [];
+  appendReportOverview(lines, data.campaign, summary);
+  appendOutboundSections(lines, data.campaign, summary);
+  appendInboundSections(lines, data.inboundWithContacts, summary);
+  appendHealthSection(lines, summary);
+  const threads = groupInboundThreads(data.inboundWithContacts);
+  appendConversationAppendix(lines, data, threads);
+  appendOptOutAppendix(lines, threads);
+  return lines.join("\n");
+}
+
+/**
+ * Build the SMS report from rows scoped to one workspace. The campaign id is
+ * never treated as a global identifier at this boundary.
+ */
+export async function buildCampaignSmsReport(
+  workspaceId: string,
+  campaignId: number,
+): Promise<CampaignSmsReportFile[]> {
+  const data = await loadCampaignReportData(workspaceId, campaignId);
+  const summary = createReportSummary(data);
+  const markdown = createReportMarkdown(data, summary);
   const prefix = `campaign-${campaignId}`;
-  const reportMarkdown = markdown.join("\n");
-  const replyBreakdown = [
-    ...[...replyCounts].map(([theme, count]) => [theme, theme, count]),
+  const csvHeaders = [
+    "direction",
+    "sid",
+    "status",
+    "from",
+    "to",
+    "contact_name",
+    "date_created",
+    "date_sent",
+    "num_segments",
+    "error_code",
+    "error_description",
+    "body",
   ];
+  const replyBreakdown = [...summary.replyCounts].map(([theme, count]) => [
+    theme,
+    theme,
+    count,
+  ]);
+
   return [
     {
       filename: `${prefix}-report.pdf`,
       label: "Report (PDF)",
       contentType: "application/pdf",
-      body: await reportPdf(reportMarkdown),
+      body: await reportPdf(markdown),
     },
     {
       filename: `${prefix}-report.md`,
       label: "Report (Markdown)",
       contentType: "text/markdown; charset=utf-8",
-      body: reportMarkdown,
+      body: markdown,
     },
     {
       filename: `${prefix}-all-messages.csv`,
       label: "All messages (CSV)",
       contentType: "text/csv; charset=utf-8",
-      body: csv(csvHeaders, allMessages),
+      body: csv(csvHeaders, summary.allMessages),
     },
     {
       filename: `${prefix}-opt-outs.csv`,
@@ -548,7 +685,7 @@ export async function buildCampaignSmsReport(
       contentType: "text/csv; charset=utf-8",
       body: csv(
         ["contact_name", "phone", "body", "date_created"],
-        optouts.map((message) => [
+        summary.optouts.map((message) => [
           contactName(message),
           message.from,
           message.body,

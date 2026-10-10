@@ -20,6 +20,45 @@ const unauthorized = () =>
     headers: { "content-type": "application/json" },
   });
 
+type CampaignExportMeta = NonNullable<
+  Awaited<ReturnType<typeof findCampaignExportMeta>>
+>;
+
+function requestSmsReport(
+  campaignRow: CampaignExportMeta,
+  workspaceId: string,
+  campaignId: number,
+) {
+  if (
+    campaignRow.type !== "message" ||
+    campaignRow.status !== "complete" ||
+    campaignRow.is_sample ||
+    /(^|[^a-z0-9])test([^a-z0-9]|$)/i.test(campaignRow.title || "")
+  ) {
+    return routeData(
+      { error: "Only completed, non-test message campaigns can have a report" },
+      { status: 400 },
+    );
+  }
+
+  const exportId = generateCampaignExportId();
+  trackBackgroundFailure(
+    processCampaignSmsReportExport(
+      campaignId,
+      workspaceId,
+      exportId,
+      campaignRow.title || "",
+    ),
+    "campaign_export.sms_report_failed",
+    { exportId, campaignId, workspaceId },
+  );
+  return routeData({
+    exportId,
+    status: "started",
+    statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
+  });
+}
+
 export const action = defineAction({
   auth: async ({ request }) => {
     const auth = await requireDualAuth(request);
@@ -65,38 +104,11 @@ export const action = defineAction({
       }
 
       if (exportType === "sms-report") {
-        if (
-          campaignRow.type !== "message" ||
-          campaignRow.status !== "complete" ||
-          campaignRow.is_sample ||
-          /(^|[^a-z0-9])test([^a-z0-9]|$)/i.test(campaignRow.title || "")
-        ) {
-          return routeData(
-            {
-              error:
-                "Only completed, non-test message campaigns can have a report",
-            },
-            { status: 400 },
-          );
-        }
-
-        const exportId = generateCampaignExportId();
-        trackBackgroundFailure(
-          processCampaignSmsReportExport(
-            numericCampaignId,
-            workspaceId.toString(),
-            exportId,
-            campaignRow.title || "",
-          ),
-          "campaign_export.sms_report_failed",
-          { exportId, campaignId: numericCampaignId, workspaceId },
+        return requestSmsReport(
+          campaignRow,
+          workspaceId.toString(),
+          numericCampaignId,
         );
-
-        return routeData({
-          exportId,
-          status: "started",
-          statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
-        });
       }
 
       const exportId = generateCampaignExportId();
