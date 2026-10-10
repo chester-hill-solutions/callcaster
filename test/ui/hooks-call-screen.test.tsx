@@ -178,7 +178,9 @@ describe("useCallScreen", () => {
         };
       }
       createMediaStreamDestination() {
-        return { stream: {} as MediaStream };
+        return {
+          stream: { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream,
+        };
       }
       close = vi.fn().mockResolvedValue(undefined);
     }

@@ -56,14 +56,31 @@ export function createTonePlayer({
     });
   }
 
+  let stopped = false;
+
   return {
     burst: (onMs: number) => {
+      if (stopped) return;
       const now = ctx.currentTime;
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gainValue, now);
       gain.gain.setValueAtTime(0, now + onMs / 1000);
     },
     stop: () => {
+      if (stopped) return;
+      stopped = true;
+
+      // Stop the output element and its stream before closing the context.
+      // Closing Web Audio alone can leave buffered audio audible for a short time.
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(0, now);
+      audioEl.volume = 0;
+      if (!audioEl.paused) audioEl.pause();
+      audioEl.srcObject = null;
+      for (const track of dest.stream.getTracks()) {
+        track.stop();
+      }
       for (const oscillator of oscillators) {
         try {
           oscillator.stop();
@@ -71,7 +88,6 @@ export function createTonePlayer({
           // already stopped
         }
       }
-      audioEl.srcObject = null;
       ctx
         .close()
         .catch((err) => logger.debug("call-tone-player ctx close", err));
