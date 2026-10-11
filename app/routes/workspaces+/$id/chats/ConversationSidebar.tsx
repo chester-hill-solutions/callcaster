@@ -60,7 +60,7 @@ export function ConversationSidebar({
   onHideStopChange,
   updateFilters,
 }: ConversationSidebarProps) {
-  const [scrollRoot, setScrollRoot] = useState<Element | null>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const selectedCampaignId = searchParams.get("campaign_id");
   const campaignFilterValue = selectedCampaignId ?? ALL_CAMPAIGNS_VALUE;
 
@@ -228,6 +228,7 @@ export function ConversationSidebar({
         ) : null}
         <ConversationList
           chats={chats}
+          scrollRoot={scrollRoot}
           contactNumber={contactNumber}
           handleExistingConversationClick={handleExistingConversationClick}
           formatDate={formatDate}

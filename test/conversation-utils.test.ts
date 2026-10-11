@@ -1,5 +1,21 @@
 import { describe, expect, test, vi } from "vitest";
 
+const performanceReads = vi.hoisted(() => ({
+  comparisonCalls: 0,
+  phoneKeyReads: 0,
+}));
+
+vi.mock("@/lib/chat-conversation-sort", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/chat-conversation-sort")>();
+  return {
+    ...original,
+    getConversationPhoneKey: (...args: Parameters<typeof original.getConversationPhoneKey>) => {
+      performanceReads.phoneKeyReads += 1;
+      return original.getConversationPhoneKey(...args);
+    },
+  };
+});
+
 import type { ConversationSummary } from "../app/lib/chat-conversation-sort";
 import {
   ALL_CAMPAIGNS_VALUE,
@@ -11,6 +27,7 @@ import {
 
 vi.mock("@/hooks/realtime/useChatRealtime", () => ({
   phoneNumbersMatch: (a: string | null, b: string | null) => {
+    performanceReads.comparisonCalls += 1;
     if (!a || !b) return false;
     return a.replace(/\D/g, "") === b.replace(/\D/g, "");
   },
@@ -54,6 +71,38 @@ describe("conversation-utils", () => {
     expect(merged).toHaveLength(2);
     expect(merged[0]?.message_count).toBe(5);
     expect(merged[1]?.contact_phone).toBe("+15550000002");
+  });
+
+  test("mergeConversationPages treats formatted versions of one phone as one conversation", () => {
+    const merged = mergeConversationPages(
+      [createConversation({ contact_phone: "+15550000001", message_count: 1 })],
+      [createConversation({ contact_phone: "1 (555) 000-0001", message_count: 5 })],
+    );
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.message_count).toBe(5);
+  });
+
+  test("merges 1,000 refreshed conversations in linear phone-key reads", () => {
+    const current = Array.from({ length: 1_000 }, (_, index) =>
+      createConversation({
+        contact_phone: `+1555${String(index).padStart(7, "0")}`,
+        message_count: 1,
+      }),
+    );
+    const next = current.map((conversation) => ({
+      ...conversation,
+      message_count: 2,
+    }));
+    performanceReads.comparisonCalls = 0;
+    performanceReads.phoneKeyReads = 0;
+
+    const merged = mergeConversationPages(current, next);
+
+    expect(merged).toHaveLength(1_000);
+    expect(merged[999]?.message_count).toBe(2);
+    expect(performanceReads.phoneKeyReads).toBe(2_000);
+    expect(performanceReads.comparisonCalls).toBeLessThanOrEqual(2_000);
   });
 
   test("getWorkspacePhoneKeys normalizes workspace numbers", () => {

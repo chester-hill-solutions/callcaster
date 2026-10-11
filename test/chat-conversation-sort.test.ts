@@ -192,5 +192,7 @@ describe("chat conversation sorting", () => {
     expect(getChatSortOption("recent")).toBe("recent");
     expect(getChatSortOption("other")).toBe("recent");
     expect(getChatSortOption(null)).toBe("recent");
+    expect(getChatSortOption(null, "hasReplied")).toBe("hasReplied");
+    expect(getChatSortOption("other", "hasReplied")).toBe("hasReplied");
   });
 });

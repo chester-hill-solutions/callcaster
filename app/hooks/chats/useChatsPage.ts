@@ -59,7 +59,7 @@ export function useChatsPage() {
   const messageFetcher = useFetcher({ key: "messages" });
   const paginationFilterKey = useMemo(() => {
     const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
-    const sortFilter = getChatSortOption(searchParams.get("sort"));
+    const sortFilter = getChatSortOption(searchParams.get("sort"), "hasReplied");
     const searchFilter = searchParams.get("search") ?? "";
     return `${campaignFilter}:${sortFilter}:${searchFilter}`;
   }, [searchParams]);
@@ -125,7 +125,7 @@ export function useChatsPage() {
     [composerKey],
   );
   const formatDate = formatMessageTimestamp;
-  const sortBy = getChatSortOption(searchParams.get("sort"));
+  const sortBy = getChatSortOption(searchParams.get("sort"), "hasReplied");
   const [loadedChats, setLoadedChats] = useState(chats);
   const [paginationState, setPaginationState] = useState(pagination);
   const workspacePhoneKeys = useMemo(

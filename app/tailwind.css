@@ -10,6 +10,15 @@
 @source "../vendor/chester-hill-solutions/shad-cc/src";
 @source "./**/*.{ts,tsx}";
 
+@utility conversation-list-virtual-height {
+  height: var(--conversation-list-height);
+}
+
+@utility conversation-list-virtual-row {
+  height: var(--conversation-list-row-height);
+  top: var(--conversation-list-row-top);
+}
+
 /*
  * Tone text tokens (roadmap E3.1). The shared `--success` / `--warning` /
  * `--info` / `--destructive` tokens are surface colours: right for solid
