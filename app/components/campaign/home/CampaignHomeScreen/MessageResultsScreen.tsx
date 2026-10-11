@@ -1,14 +1,15 @@
-import { ResultsScreenProps, DispositionResult } from "@/lib/types";
+import { DispositionResult } from "@/lib/types";
 import { TotalMessages } from "./ResultsScreen.TotalCalls";
 import { CampaignExportButton } from "./CampaignExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
-import { NavLink, useNavigation, useParams } from "react-router";
+import { useParams } from "react-router";
 
 interface MessageResultsScreenProps {
   results: DispositionResult[];
-  type?: string;
   hasAccess?: boolean;
+  campaignStatus?: string | null;
+  campaignTitle?: string | null;
   totalsByDisposition: Record<string, number>;
   totalOfAllResults: number;
   queueCounts: {
@@ -20,13 +21,13 @@ interface MessageResultsScreenProps {
 
 const MessageResultsScreen = ({
   results = [],
-  type,
   hasAccess = false,
+  campaignStatus,
+  campaignTitle,
   totalsByDisposition,
   totalOfAllResults,
   queueCounts,
 }: MessageResultsScreenProps) => {
-  const { state } = useNavigation();
   const params = useParams();
   const campaignId = params.selected_id || "";
   const workspaceId = params.id || "";
@@ -39,10 +40,16 @@ const MessageResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalMessages totalMessages={totalOfAllResults || 0} />
-          <CampaignExportButton
-            campaignId={campaignId}
-            workspaceId={workspaceId}
-          />
+          {!/(^|[^a-z0-9])test([^a-z0-9]|$)/i.test(campaignTitle ?? "") ? (
+            <CampaignExportButton
+              campaignId={campaignId}
+              workspaceId={workspaceId}
+              exportType="sms-report"
+              label="Generate SMS report"
+              downloadingLabel="Download report"
+              disabled={!hasAccess || campaignStatus !== "complete"}
+            />
+          ) : null}
         </div>
         <p className="text-muted-foreground mb-6 text-sm">
           Contacts completed: {queueCounts.completedCount || 0} of{" "}

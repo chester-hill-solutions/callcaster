@@ -21,17 +21,21 @@ export function resolveCampaignScript<T extends { steps?: unknown }>(
   campaign: { script?: T | T[] | null } | null | undefined,
 ): T | null {
   if (!campaign?.script) return null;
-  return Array.isArray(campaign.script) ? (campaign.script[0] ?? null) : campaign.script;
+  return Array.isArray(campaign.script)
+    ? (campaign.script[0] ?? null)
+    : campaign.script;
 }
 
 export function ivrScriptStepsFromCampaign(
-  campaign: { script?: { steps?: unknown } | { steps?: unknown }[] | null } | null | undefined,
+  campaign:
+    | { script?: { steps?: unknown } | { steps?: unknown }[] | null }
+    | null
+    | undefined,
 ): unknown {
   return resolveCampaignScript(campaign)?.steps ?? null;
 }
 
-export async function fetchCampaignWithScript(campaignId: string | number,
-) {
+export async function fetchCampaignWithScript(campaignId: string | number) {
   const campaign = await adminDb.query.campaign.findFirst({
     where: eq(campaignTable.id, Number(campaignId)),
   });
@@ -96,7 +100,14 @@ export async function findCampaignExportMeta(
   const tdb = createTenantDb(workspaceId);
   return tdb.campaign.findFirst({
     where: eq(campaignTable.id, campaignId),
-    columns: { id: true, type: true, title: true, workspace: true },
+    columns: {
+      id: true,
+      type: true,
+      title: true,
+      status: true,
+      is_sample: true,
+      workspace: true,
+    },
   });
 }
 
@@ -166,18 +177,22 @@ export async function updateCampaignStatusInWorkspace(
   // A schedule sweep can be working from a stale candidate row. When it
   // supplies the status it observed, make that observation part of the
   // UPDATE predicate so a newer pause/completion wins the race.
-  const existing = options.expectedStatus === undefined
-    ? ((await tdb.campaign.findMany({
-        where: eq(campaignTable.id, campaignId),
-        limit: 1,
-      }))[0] ?? null)
-    : null;
-  const where = options.expectedStatus === undefined
-    ? eq(campaignTable.id, campaignId)
-    : and(
-        eq(campaignTable.id, campaignId),
-        eq(campaignTable.status, options.expectedStatus),
-      );
+  const existing =
+    options.expectedStatus === undefined
+      ? ((
+          await tdb.campaign.findMany({
+            where: eq(campaignTable.id, campaignId),
+            limit: 1,
+          })
+        )[0] ?? null)
+      : null;
+  const where =
+    options.expectedStatus === undefined
+      ? eq(campaignTable.id, campaignId)
+      : and(
+          eq(campaignTable.id, campaignId),
+          eq(campaignTable.status, options.expectedStatus),
+        );
   const [row] = await tdb.campaign.update({
     set: update,
     where,

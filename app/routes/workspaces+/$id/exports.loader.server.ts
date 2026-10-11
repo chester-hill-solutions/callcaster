@@ -9,6 +9,7 @@ interface ExportItem {
   id: string;
   createdAt: Date;
   downloadUrl?: string;
+  downloads?: Array<{ label: string; filename: string; downloadUrl: string }>;
   campaignId: string;
   campaignName: string;
   expiresAt: Date;
@@ -24,6 +25,7 @@ interface SerializedExportItem {
   id: string;
   createdAt: string;
   downloadUrl?: string;
+  downloads?: Array<{ label: string; filename: string; downloadUrl: string }>;
   campaignId: string;
   campaignName: string;
   expiresAt: string;
@@ -47,98 +49,137 @@ interface LoaderData {
 }
 
 export const loader = defineLoader({
-  auth: ({ request, params }) => requireWorkspaceLoaderContext(request, params["id"]),
+  auth: ({ request, params }) =>
+    requireWorkspaceLoaderContext(request, params["id"]),
   sideEffects: ["db-read", "external"],
   handler: async ({ auth }) => {
-  if (!auth.ok) return auth.response;
-  const { user, workspaceId } = auth.ctx;
-
-  // Populates the "export a campaign" picker. Object storage is the flaky
-  // dependency here, not the database, so this is read before the try block
-  // that owns storage failures — a picker that works is still useful on a page
-  // whose export list failed to load.
-  let campaigns: ExportableCampaign[] = [];
-  try {
-    const rows = await listExportableCampaignsInWorkspace(workspaceId);
-    campaigns = rows.map((row) => ({
-      id: row.id,
-      title: row.title,
-      type: row.type,
-    }));
-  } catch (error) {
-    logger.error("Error listing exportable campaigns:", error);
-  }
-
-  try {
-    // List all files in the workspace's exports directory
-    const files = await listObjects(
-      "campaign-exports",
-      workspaceId,
-      { sortBy: { column: "created_at", order: "desc" } },
+    if (!auth.ok) return auth.response;
+    const { user, workspaceId } = auth.ctx;
+    const canReadSmsReports = ["owner", "admin"].includes(
+      auth.ctx.userRole.role,
     );
 
-    // Filter and process export files
-    const now = Date.now();
+    // Populates the "export a campaign" picker. Object storage is the flaky
+    // dependency here, not the database, so this is read before the try block
+    // that owns storage failures — a picker that works is still useful on a page
+    // whose export list failed to load.
+    let campaigns: ExportableCampaign[] = [];
+    try {
+      const rows = await listExportableCampaignsInWorkspace(workspaceId);
+      campaigns = rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        type: row.type,
+      }));
+    } catch (error) {
+      logger.error("Error listing exportable campaigns:", error);
+    }
 
-    // Process only JSON status files
-    const statusFiles = files?.filter(file => file.name.endsWith('.json')) || [];
+    try {
+      // List all files in the workspace's exports directory
+      const files = await listObjects("campaign-exports", workspaceId, {
+        sortBy: { column: "created_at", order: "desc" },
+      });
 
-    // Process all export files
-    const processedExports = await Promise.all(statusFiles.map(async (file) => {
-      try {
-        let content: any;
-        try {
-          const buffer = await downloadObject(
-            "campaign-exports",
-            `${workspaceId}/${file.name}`,
-          );
-          content = JSON.parse(buffer.toString("utf-8"));
-        } catch (downloadError) {
-          logger.error(`Error downloading status file ${file.name}:`, downloadError);
-          return null;
-        }
-        const createdAt = new Date(content.created_at || file.created_at || Date.now());
-        const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
+      // Filter and process export files
+      const now = Date.now();
 
-        const exportItem: ExportItem = {
-          id: file.name.replace('.json', ''),
-          createdAt,
-          downloadUrl: content.downloadUrl,
-          campaignId: content.campaignId?.toString() || '',
-          campaignName: content.campaignName || 'Unnamed Campaign',
-          expiresAt,
-          isExpired: now > expiresAt.getTime(),
-          status: content.status || 'unknown',
-          progress: content.progress || 0,
-          stage: content.stage,
-          processed: content.processed,
-          total: content.total
-        };
+      // Process only JSON status files
+      const statusFiles =
+        files?.filter((file) => file.name.endsWith(".json")) || [];
 
-        return exportItem;
-      } catch (error) {
-        logger.error(`Error processing file ${file.name}:`, error);
-        return null;
-      }
-    }));
+      // Process all export files
+      const processedExports = await Promise.all(
+        statusFiles.map(async (file) => {
+          try {
+            let content: any;
+            try {
+              const buffer = await downloadObject(
+                "campaign-exports",
+                `${workspaceId}/${file.name}`,
+              );
+              content = JSON.parse(buffer.toString("utf-8"));
+            } catch (downloadError) {
+              logger.error(
+                `Error downloading status file ${file.name}:`,
+                downloadError,
+              );
+              return null;
+            }
+            if (content.exportType === "sms-report" && !canReadSmsReports) {
+              return null;
+            }
+            const downloads = Array.isArray(content.downloads)
+              ? content.downloads.flatMap((item: unknown) => {
+                  if (!item || typeof item !== "object") return [];
+                  const record = item as Record<string, unknown>;
+                  if (
+                    typeof record.label !== "string" ||
+                    typeof record.filename !== "string" ||
+                    typeof record.downloadUrl !== "string"
+                  ) {
+                    return [];
+                  }
+                  return [
+                    {
+                      label: record.label,
+                      filename: record.filename,
+                      downloadUrl: record.downloadUrl,
+                    },
+                  ];
+                })
+              : undefined;
+            const createdAt = new Date(
+              content.created_at || file.created_at || Date.now(),
+            );
+            const expiresAt = new Date(
+              createdAt.getTime() + 24 * 60 * 60 * 1000,
+            );
 
-    // Filter out nulls and sort by newest first
-    const validExports = processedExports
-      .filter((exp): exp is ExportItem => exp !== null)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            const exportItem: ExportItem = {
+              id: file.name.replace(".json", ""),
+              createdAt,
+              downloadUrl: content.downloadUrl,
+              downloads,
+              campaignId: content.campaignId?.toString() || "",
+              campaignName: content.campaignName || "Unnamed Campaign",
+              expiresAt,
+              isExpired: now > expiresAt.getTime(),
+              status: content.status || "unknown",
+              progress: content.progress || 0,
+              stage: content.stage,
+              processed: content.processed,
+              total: content.total,
+            };
 
-    return routeData<LoaderData>({
-      campaigns,
-      exports: validExports.map((exp) => ({
-        ...exp,
-        createdAt: exp.createdAt.toISOString(),
-        expiresAt: exp.expiresAt.toISOString(),
-      })),
-    });
-  } catch (error) {
-    logger.error("Error fetching exports:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return routeData({ campaigns, error: message, exports: [] }, { status: 500 });
-  }
+            return exportItem;
+          } catch (error) {
+            logger.error(`Error processing file ${file.name}:`, error);
+            return null;
+          }
+        }),
+      );
+
+      // Filter out nulls and sort by newest first
+      const validExports = processedExports
+        .filter((exp): exp is ExportItem => exp !== null)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      return routeData<LoaderData>({
+        campaigns,
+        exports: validExports.map((exp) => ({
+          ...exp,
+          createdAt: exp.createdAt.toISOString(),
+          expiresAt: exp.expiresAt.toISOString(),
+        })),
+      });
+    } catch (error) {
+      logger.error("Error fetching exports:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return routeData(
+        { campaigns, error: message, exports: [] },
+        { status: 500 },
+      );
+    }
   },
 });

@@ -105,8 +105,9 @@ export const ResultsDisplay = ({
       totalsByDisposition={totalsByDisposition}
       totalOfAllResults={totalOfAllResults}
       results={visibleResults}
-      type={campaign.type}
       hasAccess={hasAccess}
+      campaignStatus={campaign.status}
+      campaignTitle={campaign.title}
       queueCounts={queueCounts}
     />
   ) : (
