@@ -23,11 +23,21 @@ import { createTenantDb } from "@/server/tenant-db";
 
 import type { Json } from "@/lib/db-types";
 import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
+import { addIvrTransitionSource } from "@/lib/ivr-transition-timing.server";
+import type { IvrRecordedAnswer } from "@/lib/ivr-results";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
   return row.result;
 };
+
+const summarizeIvrInput = (
+  userInput: string | null,
+  answer: IvrRecordedAnswer | null,
+) => ({
+  hasInput: Boolean(userInput?.trim()),
+  inputType: answer ? answer.inputType : null,
+});
 
 interface Script extends IvrScript {
   pages: Record<string, { blocks: string[] }>;
@@ -60,10 +70,41 @@ const findNextStep = (
 const handleNextStep = (
   twiml: TwimlResponse,
   nextStep: string,
-  campaignId: string,
-  pageId: string,
-  baseUrl: string,
+  context: {
+    campaignId: string;
+    pageId: string;
+    currentBlockId: string;
+    baseUrl: string;
+    callSid: string;
+    responseReceivedAtMs: number;
+  },
 ) => {
+  const {
+    campaignId,
+    pageId,
+    currentBlockId,
+    baseUrl,
+    callSid,
+    responseReceivedAtMs,
+  } = context;
+  const responseReadyAtMs = Date.now();
+  const redirect = (targetUrl: string, destination: string) => {
+    logger.info("ivr.gather.response_routed", {
+      callSid,
+      campaignId,
+      pageId,
+      blockId: currentBlockId,
+      destination,
+      responseHandlingMs: responseReadyAtMs - responseReceivedAtMs,
+    });
+    twiml.redirect(
+      addIvrTransitionSource(targetUrl, {
+        responseReadyAtMs,
+        pageId,
+        blockId: currentBlockId,
+      }),
+    );
+  };
   if (nextStep === "hangup" || nextStep === "end") {
     // Both are terminal. `end` is the documented terminal target
     // (docs/script-json-format.md); the old code fell through and treated it as
@@ -76,16 +117,16 @@ const handleNextStep = (
       twiml.hangup();
       return;
     }
-    twiml.redirect(
-      `${baseUrl}/api/ivr/${campaignId}/${nextPageId}/${nextBlockId}/`
+    redirect(
+      `${baseUrl}/api/ivr/${campaignId}/${nextPageId}/${nextBlockId}/`,
+      `${nextPageId}:${nextBlockId}`,
     );
   } else if (nextStep.startsWith("page_")) {
-    twiml.redirect(
-      `${baseUrl}/api/ivr/${campaignId}/${nextStep}/`
-    );
+    redirect(`${baseUrl}/api/ivr/${campaignId}/${nextStep}/`, nextStep);
   } else {
-    twiml.redirect(
-      `${baseUrl}/api/ivr/${campaignId}/${pageId}/${nextStep}/`
+    redirect(
+      `${baseUrl}/api/ivr/${campaignId}/${pageId}/${nextStep}/`,
+      `${pageId}:${nextStep}`,
     );
   }
 };
@@ -95,6 +136,8 @@ export const action = defineAction({
     requireTwilioSignatureForIvrResponse(request, [params.campaignId, params.pageId, params.blockId]),
   sideEffects: ["db-write"],
   handler: async ({ params, auth }) => {
+  const handlerStartedAtMs = Date.now();
+  const responseReceivedAtMs = auth.requestReceivedAtMs;
   const baseUrl = env.BASE_URL();
 
   const twiml = createVoiceResponse();
@@ -108,6 +151,14 @@ export const action = defineAction({
   const campaignId = params.campaignId as string;
 
   const { callSid, userInput, answer } = auth;
+  logger.info("ivr.gather.response_received", {
+    callSid,
+    campaignId,
+    pageId,
+    blockId,
+    ...summarizeIvrInput(userInput, answer),
+    authMs: handlerStartedAtMs - responseReceivedAtMs,
+  });
 
   try {
     const [call, campaignData] = await Promise.all([
@@ -185,9 +236,14 @@ export const action = defineAction({
           handleNextStep(
             twiml,
             `${target.pageId}:${target.blockId}`,
-            campaignId,
-            pageId,
-            baseUrl,
+            {
+              campaignId,
+              pageId,
+              currentBlockId: blockId,
+              baseUrl,
+              callSid,
+              responseReceivedAtMs,
+            },
           );
           return twimlResponse();
         }
@@ -201,7 +257,13 @@ export const action = defineAction({
               },
             },
           });
-          twiml.redirect(`${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`);
+          const responseReadyAtMs = Date.now();
+          twiml.redirect(
+            addIvrTransitionSource(
+              `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`,
+              { responseReadyAtMs, pageId, blockId },
+            ),
+          );
           return twimlResponse();
         }
         // replay without a store, or past the cap: fall through.
@@ -251,7 +313,14 @@ export const action = defineAction({
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
-    handleNextStep(twiml, nextStep, campaignId, pageId, baseUrl);
+    handleNextStep(twiml, nextStep, {
+      campaignId,
+      pageId,
+      currentBlockId: blockId,
+      baseUrl,
+      callSid,
+      responseReceivedAtMs,
+    });
   } catch (e) {
     // Never read raw internal error text aloud to the caller — log it and speak
     // a fixed generic message instead.

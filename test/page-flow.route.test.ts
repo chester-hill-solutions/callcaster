@@ -128,7 +128,10 @@ describe("IVR caller entry and page order (#2087)", () => {
   test.each(["out-response", "in-response"] as const)("%s uses the authored next page when no input is received", async (kind) => {
     const xml = await (await invoke(kind)).text();
     const prefix = kind === "out-response" ? "ivr/1" : "inbound-ivr/42";
-    expect(xml).toContain(`<Redirect>https://base.example/api/${prefix}/page_1/a/</Redirect>`);
+    expect(xml).toContain(`<Redirect>https://base.example/api/${prefix}/page_1/a/`);
+    if (kind === "in-response") {
+      expect(xml).toContain("/page_1/a/</Redirect>");
+    }
   });
   test.each(["out-response", "in-response"] as const)("%s ends at the last authored page", async (kind) => {
     const xml = await (await invoke(kind, {}, "tiny", "b")).text();

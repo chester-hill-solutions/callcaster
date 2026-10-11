@@ -9,6 +9,10 @@ import {
   isMachineAnswered,
 } from "@/lib/ivr-machine.server";
 import { renderIvrBlock, type IvrRenderScript } from "@/lib/ivr-block-render.server";
+import {
+  getIvrTransitionLogFields,
+  readIvrTransitionSource,
+} from "@/lib/ivr-transition-timing.server";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;
@@ -38,10 +42,21 @@ export async function renderCampaignIvrPage(args: {
   pageId?: string;
   callSid: string;
   answeredBy: string;
+  requestUrl: string;
+  requestReceivedAtMs: number;
 }): Promise<Response> {
+  const handlerStartedAtMs = Date.now();
   const baseUrl = env.BASE_URL();
   const twiml = createVoiceResponse();
-  const { pageId, campaignId, callSid, answeredBy } = args;
+  const { pageId, campaignId, callSid, answeredBy, requestUrl, requestReceivedAtMs } = args;
+  const transitionSource = readIvrTransitionSource(requestUrl, requestReceivedAtMs);
+  logger.info("ivr.transition.page_received", {
+    callSid,
+    campaignId,
+    pageId: pageId ?? null,
+    ...getIvrTransitionLogFields(transitionSource),
+    authMs: handlerStartedAtMs - requestReceivedAtMs,
+  });
 
   try {
     const callData = await getCallWithRetry(callSid);
@@ -81,6 +96,7 @@ export async function renderCampaignIvrPage(args: {
     // A Redirect cost an extra Twilio round-trip plus a second
     // call+campaign lookup before any audio played.
     if (firstBlock && firstBlockId && effectivePageId && callData.workspace) {
+      const blockRenderStartedAtMs = Date.now();
       await renderIvrBlock({
         twiml,
         block: firstBlock,
@@ -90,6 +106,15 @@ export async function renderCampaignIvrPage(args: {
         workspace: callData.workspace,
         buildActionUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}/response`,
         buildBlockUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}`,
+      });
+      logger.info("ivr.transition.page_rendered", {
+        callSid,
+        campaignId,
+        ...getIvrTransitionLogFields(transitionSource),
+        pageId: effectivePageId,
+        blockId: firstBlockId,
+        dataLoadMs: blockRenderStartedAtMs - handlerStartedAtMs,
+        renderMs: Date.now() - blockRenderStartedAtMs,
       });
     } else {
       twiml.say("There was an error in the IVR flow. Goodbye.");

@@ -21,7 +21,8 @@ async function readWebhookFormParams(request: Request): Promise<Record<string, s
 export async function requireTwilioSignatureForIvrPage(
   request: Request,
   routeIds: Array<string | undefined>,
-): Promise<Response | { callSid: string; answeredBy: string }> {
+): Promise<Response | { callSid: string; answeredBy: string; requestReceivedAtMs: number }> {
+  const requestReceivedAtMs = Date.now();
   const paramsObj = await readWebhookFormParams(request);
   const callSid = paramsObj.CallSid ?? null;
   // Synchronous AMD sends the verdict on the initial TwiML request; the page
@@ -33,14 +34,15 @@ export async function requireTwilioSignatureForIvrPage(
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid, answeredBy };
+  return forbidden ?? { callSid, answeredBy, requestReceivedAtMs };
 }
 
 /** Block routes: missing route params 400 first, then missing CallSid 400. */
 export async function requireTwilioSignatureForIvrBlock(
   request: Request,
   routeIds: Array<string | undefined>,
-): Promise<Response | { callSid: string }> {
+): Promise<Response | { callSid: string; requestReceivedAtMs: number }> {
+  const requestReceivedAtMs = Date.now();
   if (routeIds.some((id) => !id)) {
     return new Response("Missing required parameters", { status: 400 });
   }
@@ -53,7 +55,7 @@ export async function requireTwilioSignatureForIvrBlock(
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid };
+  return forbidden ?? { callSid, requestReceivedAtMs };
 }
 
 /** Response routes: block checks plus the Digits/SpeechResult input. */
@@ -64,7 +66,9 @@ export async function requireTwilioSignatureForIvrResponse(
   callSid: string;
   userInput: string | null;
   answer: IvrRecordedAnswer | null;
+  requestReceivedAtMs: number;
 }> {
+  const requestReceivedAtMs = Date.now();
   if (routeIds.some((id) => !id)) {
     return new Response("Missing required parameters", { status: 400 });
   }
@@ -106,5 +110,5 @@ export async function requireTwilioSignatureForIvrResponse(
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid, userInput, answer };
+  return forbidden ?? { callSid, userInput, answer, requestReceivedAtMs };
 }

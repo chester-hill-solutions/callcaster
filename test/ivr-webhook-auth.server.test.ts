@@ -29,11 +29,15 @@ describe("requireTwilioSignatureForIvrResponse", () => {
       Confidence: "0.87",
     });
 
-    await expect(
-      requireTwilioSignatureForIvrResponse(request, ["campaign", "page", "block"]),
-    ).resolves.toEqual({
+    const result = await requireTwilioSignatureForIvrResponse(request, [
+      "campaign",
+      "page",
+      "block",
+    ]);
+    expect(result).toMatchObject({
       callSid: "CA1",
       userInput: "  yes, please  ",
+      requestReceivedAtMs: expect.any(Number),
       answer: {
         value: "yes, please",
         raw: "  yes, please  ",

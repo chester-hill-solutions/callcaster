@@ -73,10 +73,10 @@ function makeDbClient(opts?: {
   return client;
 }
 
-function ivrBlockRequest(callSid = "CA123") {
+function ivrBlockRequest(callSid = "CA123", url = "http://x") {
   const fd = new FormData();
   fd.set("CallSid", callSid);
-  return new Request("http://x", {
+  return new Request(url, {
     method: "POST",
     headers: { "x-twilio-signature": "sig" },
     body: fd,
@@ -87,6 +87,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.logger.error.mockReset();
+    mocks.logger.info.mockReset();
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
     campaignIvrMocks.fetchCampaignWithScript.mockReset();
@@ -125,6 +126,51 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       } as any),
     );
     expect(res.status).toBe(400);
+  });
+
+  test("records response-to-next-block and render timings without caller input", async () => {
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: {
+        steps: {
+          pages: { page_1: { blocks: ["b1"] } },
+          blocks: { b1: { id: "b1", type: "say", content: "Prompt" } },
+        },
+      },
+    } as any);
+    const responseReadyAtMs = Date.now() - 25;
+    const url = new URL("http://x/api/ivr/1/page_1/b1");
+    url.searchParams.set("ivr_response_ready_at", String(responseReadyAtMs));
+    url.searchParams.set("ivr_source_page_id", "page_1");
+    url.searchParams.set("ivr_source_block_id", "previous");
+
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest("CA123", url.toString()),
+    } as any);
+
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.transition.block_received",
+      expect.objectContaining({
+        callSid: "CA123",
+        campaignId: "1",
+        sourcePageId: "page_1",
+        sourceBlockId: "previous",
+        responseToNextBlockMs: expect.any(Number),
+        authMs: expect.any(Number),
+      }),
+    );
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.transition.block_rendered",
+      expect.objectContaining({
+        callSid: "CA123",
+        pageId: "page_1",
+        blockId: "b1",
+        dataLoadMs: expect.any(Number),
+        renderMs: expect.any(Number),
+      }),
+    );
   });
 
   test("returns 400 when required params missing", async () => {

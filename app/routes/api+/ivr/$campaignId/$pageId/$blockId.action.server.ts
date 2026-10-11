@@ -6,6 +6,10 @@ import { requireTwilioSignatureForIvrBlock } from "@/lib/ivr-webhook-auth.server
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 import {
+  getIvrTransitionLogFields,
+  readIvrTransitionSource,
+} from "@/lib/ivr-transition-timing.server";
+import {
   renderIvrBlock,
   type IvrRenderScript,
 } from "@/lib/ivr-block-render.server";
@@ -14,7 +18,8 @@ export const action = defineAction({
   auth: ({ request, params }) =>
     requireTwilioSignatureForIvrBlock(request, [params.campaignId, params.pageId, params.blockId]),
   sideEffects: ["db-read", "external"],
-  handler: async ({ params, auth }) => {
+  handler: async ({ params, auth, request }) => {
+    const handlerStartedAtMs = Date.now();
     const baseUrl = env.BASE_URL();
     const twiml = createVoiceResponse();
     const { pageId, blockId, campaignId } = params as {
@@ -23,6 +28,19 @@ export const action = defineAction({
       campaignId: string;
     };
     const { callSid } = auth;
+    const requestReceivedAtMs = auth.requestReceivedAtMs;
+    const transitionSource = readIvrTransitionSource(
+      request.url,
+      requestReceivedAtMs,
+    );
+    logger.info("ivr.transition.block_received", {
+      callSid,
+      campaignId,
+      pageId,
+      blockId,
+      ...getIvrTransitionLogFields(transitionSource),
+      authMs: handlerStartedAtMs - requestReceivedAtMs,
+    });
 
     try {
       const call = await findCallBySid(callSid);
@@ -49,6 +67,7 @@ export const action = defineAction({
         : undefined;
 
       if (currentBlock) {
+        const blockRenderStartedAtMs = Date.now();
         await renderIvrBlock({
           twiml,
           block: currentBlock,
@@ -58,6 +77,15 @@ export const action = defineAction({
           workspace,
           buildActionUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}/response`,
           buildBlockUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}`,
+        });
+        logger.info("ivr.transition.block_rendered", {
+          callSid,
+          campaignId,
+          pageId,
+          blockId,
+          ...getIvrTransitionLogFields(transitionSource),
+          dataLoadMs: blockRenderStartedAtMs - handlerStartedAtMs,
+          renderMs: Date.now() - blockRenderStartedAtMs,
         });
       } else {
         twiml.say("There was an error in the IVR flow. Goodbye.");
