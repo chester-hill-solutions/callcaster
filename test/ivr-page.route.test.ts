@@ -48,6 +48,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.logger.error.mockReset();
+    mocks.logger.info.mockReset();
     vi.mocked(findCallWithCampaignScriptBySid).mockReset();
     vi.mocked(updateOutreachAttemptForWorkspace).mockReset();
     vi.mocked(updateOutreachAttemptForWorkspace).mockResolvedValue({} as never);
@@ -165,6 +166,56 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(text).not.toContain("<Redirect>");
     expect(text).toContain("first page");
     expect(text).not.toContain("There was an error in the IVR flow");
+  });
+
+  test("records response-to-next-page and first-block render timings", async () => {
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
+      workspace: "w1",
+      campaign_id: 1,
+      campaign: {
+        script: {
+          steps: {
+            pages: { page_2: { blocks: ["b2"] } },
+            blocks: { b2: { id: "b2", type: "say", audioFile: "next" } },
+          },
+        },
+      },
+    } as any);
+    const url = new URL("http://x/api/ivr/1/page_2");
+    url.searchParams.set("ivr_response_ready_at", String(Date.now() - 20));
+    url.searchParams.set("ivr_source_page_id", "page_1");
+    url.searchParams.set("ivr_source_block_id", "b1");
+
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_2" },
+      request: new Request(url, {
+        method: "POST",
+        headers: { "x-twilio-signature": "sig" },
+        body: fd,
+      }),
+    } as never);
+    expect(await res.text()).toContain("next");
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.transition.page_received",
+      expect.objectContaining({
+        callSid: "CA1",
+        sourcePageId: "page_1",
+        sourceBlockId: "b1",
+        responseToNextBlockMs: expect.any(Number),
+        authMs: expect.any(Number),
+      }),
+    );
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.transition.page_rendered",
+      expect.objectContaining({
+        blockId: "b2",
+        dataLoadMs: expect.any(Number),
+        renderMs: expect.any(Number),
+      }),
+    );
   });
 
   test("returns hangup when campaign_id does not match URL or call is missing", async () => {

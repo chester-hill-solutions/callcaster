@@ -135,6 +135,12 @@ function makeReq(fields: Record<string, any>, headers?: Record<string, string>) 
   });
 }
 
+function expectRedirectWithTiming(text: string, targetUrl: string) {
+  expect(text).toContain(`<Redirect>${targetUrl}?ivr_response_ready_at=`);
+  expect(text).toContain("ivr_source_page_id=page_1");
+  expect(text).toContain("ivr_source_block_id=");
+}
+
 describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", () => {
   beforeEach(() => {
     ivrTestState.campaignData = null;
@@ -147,6 +153,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     mocks.requireTwilioSignature.mockReset();
     mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.logger.error.mockReset();
+    mocks.logger.info.mockReset();
   });
 
   test("400s for missing params and missing CallSid", async () => {
@@ -201,7 +208,25 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_2/b2/");
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.gather.response_received",
+      expect.objectContaining({
+        callSid: "CA1",
+        hasInput: true,
+        inputType: "dtmf",
+        authMs: expect.any(Number),
+      }),
+    );
+    const responseLog = mocks.logger.info.mock.calls.find(
+      ([event]) => event === "ivr.gather.response_received",
+    )?.[1];
+    expect(responseLog).not.toHaveProperty("userInput");
+    expect(responseLog).not.toHaveProperty("answer");
+    expect(mocks.logger.info).toHaveBeenCalledWith(
+      "ivr.gather.response_routed",
+      expect.objectContaining({ callSid: "CA1", blockId: "b1", responseHandlingMs: expect.any(Number) }),
+    );
 
     // vx-any match (input length >2)
     mocks.createClient.mockReturnValueOnce(
@@ -221,7 +246,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "9" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_2/b2/");
   });
 
   test("treats next:'end' as terminal, hanging up instead of redirecting (#1884)", async () => {
@@ -270,7 +295,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     } as any);
     const text = await res.text();
     expect(text).not.toContain("page_9/bZ");
-    expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_1/bX/</Redirect>");
+    expectRedirectWithTiming(text, "https://base.example/api/ivr/1/page_1/bX/");
     expect(telephonyStubState.outreachUpdateCalls).toEqual([]);
   });
 
@@ -315,7 +340,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
 
     const firstResponse = await respondWithUnknownKey();
     expect(await firstResponse.text()).toContain(
-      "<Redirect>https://base.example/api/ivr/1/page_1/menu/</Redirect>",
+      "<Redirect>https://base.example/api/ivr/1/page_1/menu/?ivr_response_ready_at=",
     );
     expect(persistedResult).toEqual({
       __no_input_replays: { page_1: { menu: 1 } },
@@ -323,7 +348,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
 
     const responseAfterReplayLimit = await respondWithUnknownKey();
     expect(await responseAfterReplayLimit.text()).toContain(
-      "<Redirect>https://base.example/api/ivr/1/page_1/next/</Redirect>",
+      "<Redirect>https://base.example/api/ivr/1/page_1/next/?ivr_response_ready_at=",
     );
     expect(persistedResult).toEqual({
       __no_input_replays: { page_1: { menu: 1 } },
@@ -409,7 +434,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_2/");
 
     // call not found => say error message (Error branch)
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: null, campaignData }));
@@ -446,7 +471,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_1/bX/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_1/bX/");
 
     // currentPageIndex < ... => next page first block
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, outreachResult: {} }));
@@ -454,7 +479,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "bX" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_2/b2/");
 
     // last block of last page => findNextBlock null => hangup
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, outreachResult: {} }));
@@ -475,7 +500,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_1/block_2/</Redirect>");
+    expectRedirectWithTiming(await res.text(), "https://base.example/api/ivr/1/page_1/block_2/");
   });
 
   test("covers helper error branches, invalid script structure, missing block, and non-Error catch message", async () => {
@@ -665,7 +690,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "2" }),
     } as any);
     const text = await res.text();
-    expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+    expectRedirectWithTiming(text, "https://base.example/api/ivr/1/page_2/b2/");
     expect(text).not.toContain("Sorry, we ran into a problem.");
     expect(telephonyDbMocks.findOutreachAttemptById).not.toHaveBeenCalled();
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
