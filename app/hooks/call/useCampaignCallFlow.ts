@@ -346,12 +346,16 @@ export function useCampaignCallFlow({
       ? "var(--primary)"
       : displayState === "connected" || displayState === "dialing"
         ? "var(--success)"
-        : "var(--muted-foreground)";
+      : "var(--muted-foreground)";
+
+  const terminalCallSid =
+    providerStatus && isTerminalForOutcome(providerStatus) ? customerLegSid : null;
 
   return {
     displayState,
     displayColor,
     beginDial,
+    terminalCallSid,
     getDisplayState: (
       callStateValue: string,
       _statusValue: string | undefined,
