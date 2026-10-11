@@ -4,8 +4,9 @@
  *
  * Usage:
  *   DATABASE_URL=... node scripts/cull-report.mjs [--days 60] [--json]
- *     [--keep <id,id,id>]        absolute keep-list, wins over every cull rule
  *     [--exclude "test,blah,e2e"] name fragments to cull regardless of age
+ *
+ * The repository keep-list in scripts/cull-keep-list.mjs is always applied.
  *
  * Read-only by design. There is no delete path in this file and there should
  * not be one: release is a separate, reviewed step. The first run of this
@@ -40,6 +41,8 @@
  */
 
 import postgres from "postgres";
+import { DEV_CULL_KEEP_WORKSPACE_IDS } from "./cull-keep-list.mjs";
+import { workspaceCullVerdict } from "./cull-report-policy.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -49,20 +52,11 @@ const flag = (name, fallback) => {
 const asJson = args.includes("--json");
 
 const WINDOW_DAYS = Number(flag("days", "60"));
-const KEEP_LIST = (flag("keep", "") || "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-/**
- * A workspace named after a bare phone number is a leftover from testing a
- * number, not an organisation. `260804124`, `202607291957` and friends account
- * for a large share of the workspaces the activity window was protecting.
- *
- * The keep-list always wins over this: `2608141501` is both a phone number and
- * a workspace we are keeping, so the order of these rules matters.
- */
-const PHONE_NAMED = /^\+?[\d][\d\s().-]{5,}$/;
+if (args.includes("--keep")) {
+  throw new Error(
+    "--keep is no longer supported. Edit scripts/cull-keep-list.mjs instead.",
+  );
+}
 
 /**
  * Extra name fragments to cull regardless of age. Deliberately empty by
@@ -113,26 +107,6 @@ const rows = await sql.unsafe(`
   LEFT JOIN nums ON nums.workspace = w.id
   ORDER BY act.last_any DESC NULLS LAST, w.name
 `);
-
-const ageDays = (iso) =>
-  iso ? (Date.now() - new Date(iso).getTime()) / 86_400_000 : null;
-
-function verdict(row) {
-  // The keep-list is absolute: it outranks every cull rule below, including
-  // the phone-named rule that would otherwise catch `2608141501`.
-  if (KEEP_LIST.includes(row.id)) return { verdict: "KEEP", why: "keep-list", ageDays: ageDays(row.last_any) };
-
-  const junk = JUNK_FRAGMENTS.find((f) => (row.name ?? "").toLowerCase().includes(f));
-  if (junk) return { verdict: "CULL", why: `name matches "${junk}"`, ageDays: ageDays(row.last_any) };
-  if (PHONE_NAMED.test(row.name ?? ""))
-    return { verdict: "CULL", why: "named after a phone number", ageDays: ageDays(row.last_any) };
-
-  const age = ageDays(row.last_any);
-  if (age === null) return { verdict: "CULL", why: "no activity ever", ageDays: null };
-  if (age <= WINDOW_DAYS)
-    return { verdict: "KEEP", why: `active ${age.toFixed(0)}d ago`, ageDays: Math.round(age) };
-  return { verdict: "CULL", why: `last activity ${age.toFixed(0)}d ago`, ageDays: Math.round(age) };
-}
 
 /** Per-number reference check. Returns blockers and, separately, notes. */
 async function checkNumber(wsId, phone, numId) {
@@ -185,7 +159,10 @@ async function checkNumber(wsId, phone, numId) {
 
 const report = [];
 for (const row of rows) {
-  const v = verdict(row);
+  const v = workspaceCullVerdict(row, {
+    windowDays: WINDOW_DAYS,
+    junkFragments: JUNK_FRAGMENTS,
+  });
   const numbers = [];
   if (row.numbers_total > 0) {
     const ns = await sql.unsafe(
@@ -216,7 +193,7 @@ if (asJson) {
   };
   console.log(
     `\nCull report — ${report.length} workspaces, ${sum(report, "numbers_total")} numbers ` +
-    `(window ${WINDOW_DAYS}d${KEEP_LIST.length ? `, keep-list ${KEEP_LIST.length}` : ""}` +
+    `(window ${WINDOW_DAYS}d, keep-list ${DEV_CULL_KEEP_WORKSPACE_IDS.length}` +
     `${JUNK_FRAGMENTS.length ? `, exclude "${JUNK_FRAGMENTS.join(",")}"` : ""})\n`,
   );
   console.log(`  KEEP ${keeps.length} (${sum(keeps, "numbers_total")} numbers)   CULL ${culls.length} (${sum(culls, "numbers_total")} numbers)\n`);
