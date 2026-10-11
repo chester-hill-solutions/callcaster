@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: SMS campaign launch shows the large bulk-send warning and its split/override actions without repeating the sender warning or pacing estimate ([PR #2538](https://github.com/chester-hill-solutions/callcaster/pull/2538), [#2509](https://github.com/chester-hill-solutions/callcaster/issues/2509)).
 - Fixed: Chats now open with conversations that have replies, deduplicate large lists in linear time, and render only rows near the scroll position ([PR #2535](https://github.com/chester-hill-solutions/callcaster/pull/2535), [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512)).
 - Fixed: Campaign ringback stops when a call connects or reaches voicemail, so it does not overlap with call audio ([PR #2534](https://github.com/chester-hill-solutions/callcaster/pull/2534), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
 - Added: Completed message campaigns can generate a private PDF report and message CSVs. Only workspace owners and admins can create or download reports; test campaigns are excluded ([#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).

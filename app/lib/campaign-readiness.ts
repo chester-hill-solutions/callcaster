@@ -40,6 +40,9 @@ export type CampaignReadinessIssue = {
   message: string;
 };
 
+export const BULK_SENDER_MISALIGNED_MESSAGE =
+  "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.";
+
 export type CampaignReadiness = {
   issues: CampaignReadinessIssue[];
   warnings: CampaignSendWindowWarning[];
@@ -546,12 +549,7 @@ export function getCampaignReadiness(
     isBulkSmsSenderMisaligned(options.smsSenderClass, options.queueCount) &&
     !campaignData.allow_bulk_local_send
   ) {
-    commonIssues.push(
-      issue(
-        "bulk_sender_misaligned",
-        "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
-      ),
-    );
+    commonIssues.push(issue("bulk_sender_misaligned", BULK_SENDER_MISALIGNED_MESSAGE));
   }
 
   const contentIssue = getContentIssue(campaignData, details);
