@@ -311,6 +311,11 @@ Test missing users both with and without a stale membership row through each
 real route. Both must return a validation error before insert; keep a separate
 database-failure control so infrastructure failures do not become validation.
 
+For an owned temporary PostgreSQL fixture on macOS, initialize it with an
+explicit locale and encoding (`initdb --locale=C --encoding=UTF8`). Shell locale
+settings can be invalid for the installed server. Use a dedicated directory and
+loopback port, and stop only that owned cluster after its readers finish.
+
 For the full real-Postgres suite, set `DATABASE_URL`, `DATABASE_DIRECT_URL` and
 `INTEGRATION_DB_URL` to the owned fixture in the command environment. Some suites
 gate on the app URL or import its direct client. The integration override alone

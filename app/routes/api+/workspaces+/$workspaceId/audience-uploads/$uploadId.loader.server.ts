@@ -7,7 +7,7 @@ import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
   auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "uploadId"),
-  sideEffects: ["db-read"],
+  sideEffects: ["db-read", "db-write", "external"],
   handler: async ({ auth }) => {
     const result = await getAudienceUploadStatusApi(
       auth.workspaceId,
