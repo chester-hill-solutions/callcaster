@@ -272,7 +272,7 @@ export function useCallScreen() {
 
   const agentLegSid = getCallSid(activeCall) ?? null;
 
-  const { displayState, displayColor, beginDial } = useCampaignCallFlow({
+  const { displayState, displayColor, beginDial, terminalCallSid } = useCampaignCallFlow({
     callSid,
     agentLegSid,
     workspaceId,
@@ -315,6 +315,7 @@ export function useCallScreen() {
     displayState,
     callState,
     isPredictive: campaign?.dial_type === "predictive",
+    terminalCallSid,
     hangUp,
   });
 
