@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Page and external upload polling share database status and abandoned-processing checks, so stale storage cannot hide completion or a saved interruption ([#2541](https://github.com/chester-hill-solutions/callcaster/issues/2541)).
+- Fixed: Page and external upload polling share database status and abandoned-processing checks, so stale storage cannot hide completion or a saved interruption ([PR #2542](https://github.com/chester-hill-solutions/callcaster/pull/2542), [#2541](https://github.com/chester-hill-solutions/callcaster/issues/2541)).
 
 - Fixed: SMS campaign launch shows the large bulk-send warning and its split/override actions without repeating the sender warning or pacing estimate ([PR #2538](https://github.com/chester-hill-solutions/callcaster/pull/2538), [#2509](https://github.com/chester-hill-solutions/callcaster/issues/2509)).
 - Fixed: The manual call screen now releases the agent leg when the current contact ends, even when the status display already shows a completed attempt ([PR #2539](https://github.com/chester-hill-solutions/callcaster/pull/2539), [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
