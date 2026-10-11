@@ -1,6 +1,7 @@
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import {
   getConversationParticipantPhones,
+  getConversationPhoneKey,
   isInboundMessageDirection,
   normalizeConversationPhone,
   toConversationTimestamp,
@@ -13,18 +14,32 @@ export const ALL_CAMPAIGNS_VALUE = "all";
 export const phoneRegex =
   /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
+function getComparableConversationPhone(phone: string | null): string | null {
+  if (!phone) return null;
+  // phoneNumbersMatch treats two non-empty values with no digits as matches.
+  return getConversationPhoneKey(phone) ?? "";
+}
+
 export function mergeConversationPages(
   currentChats: ConversationSummary[],
   nextChats: ConversationSummary[],
 ): ConversationSummary[] {
   const mergedChats = [...currentChats];
+  const indexByPhone = new Map<string, number>();
+
+  currentChats.forEach((chat, index) => {
+    const phoneKey = getComparableConversationPhone(chat.contact_phone);
+    // Keep the first match, as phoneNumbersMatch/findIndex did before.
+    if (phoneKey !== null && !indexByPhone.has(phoneKey)) {
+      indexByPhone.set(phoneKey, index);
+    }
+  });
 
   for (const nextChat of nextChats) {
-    const existingIndex = mergedChats.findIndex((chat) =>
-      phoneNumbersMatch(chat.contact_phone, nextChat.contact_phone),
-    );
+    const phoneKey = getComparableConversationPhone(nextChat.contact_phone);
+    const existingIndex = phoneKey === null ? undefined : indexByPhone.get(phoneKey);
 
-    if (existingIndex >= 0) {
+    if (existingIndex !== undefined) {
       mergedChats[existingIndex] = {
         ...mergedChats[existingIndex],
         ...nextChat,
@@ -32,6 +47,7 @@ export function mergeConversationPages(
       continue;
     }
 
+    if (phoneKey !== null) indexByPhone.set(phoneKey, mergedChats.length);
     mergedChats.push(nextChat);
   }
 
@@ -84,8 +100,11 @@ export function upsertConversationFromMessage({
     phoneNumbersMatch(contactPhone, activeContactNumber ?? null);
   const unreadIncrement =
     isInbound && message.status === "received" && !isActiveConversation ? 1 : 0;
-  const existingConversationIndex = currentChats.findIndex((chat) =>
-    phoneNumbersMatch(chat.contact_phone, contactPhone),
+  const contactKey = getComparableConversationPhone(contactPhone);
+  const existingConversationIndex = currentChats.findIndex(
+    (chat) =>
+      contactKey !== null &&
+      getComparableConversationPhone(chat.contact_phone) === contactKey,
   );
 
   if (existingConversationIndex < 0) {
@@ -105,22 +124,21 @@ export function upsertConversationFromMessage({
     ];
   }
 
-  return currentChats.map((chat, index) => {
-    if (index !== existingConversationIndex) {
-      return chat;
-    }
+  const updatedChats = [...currentChats];
+  const existingConversation = currentChats[existingConversationIndex];
+  if (!existingConversation) return currentChats;
 
-    return {
-      ...chat,
-      user_phone: chat.user_phone || userPhone || "",
-      message_count: chat.message_count + 1,
-      unread_count: chat.unread_count + unreadIncrement,
-      conversation_last_update:
-        new Date(chat.conversation_last_update).getTime() >
-        new Date(nextTimestamp).getTime()
-          ? chat.conversation_last_update
-          : nextTimestamp,
-      has_replied: chat.has_replied === true || isInbound,
-    };
-  });
+  updatedChats[existingConversationIndex] = {
+    ...existingConversation,
+    user_phone: existingConversation.user_phone || userPhone || "",
+    message_count: existingConversation.message_count + 1,
+    unread_count: existingConversation.unread_count + unreadIncrement,
+    conversation_last_update:
+      new Date(existingConversation.conversation_last_update).getTime() >
+      new Date(nextTimestamp).getTime()
+        ? existingConversation.conversation_last_update
+        : nextTimestamp,
+    has_replied: existingConversation.has_replied === true || isInbound,
+  };
+  return updatedChats;
 }

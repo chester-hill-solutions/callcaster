@@ -87,12 +87,19 @@ export function getConversationParticipantPhones(
   };
 }
 
-export function getChatSortOption(value: string | null): ChatSortOption {
+export function getChatSortOption(
+  value: string | null,
+  defaultOption: ChatSortOption = "recent",
+): ChatSortOption {
   if (value === "hasReplied" || value === "hasUnreadReply") {
     return value;
   }
 
-  return "recent";
+  if (value === "recent") {
+    return value;
+  }
+
+  return defaultOption;
 }
 
 export function buildRepliedContactKeys(
