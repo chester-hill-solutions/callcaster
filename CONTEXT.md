@@ -18,6 +18,12 @@ _Avoid_: Flow, questionnaire (except for the legacy survey system)
 **Audience**: A collection of contacts targeted by a campaign. Uploaded via CSV import.
 _Avoid_: List (except "voter list"), contact group
 
+**Audience Upload**: A CSV import into an Audience. Its upload record identifies the file, progress, and errors; the original CSV is retained for review and recovery.
+_Avoid_: Upload job (the worker job is a separate execution record)
+
+**Audience Upload Status**: The current progress and outcome of an Audience Upload, with its database records as the source of truth and its storage status file as fallback metadata. Both page and Data Plane polling check for abandoned processing; queued jobs and live worker claims prevent an upload from being marked as interrupted.
+_Avoid_: Upload job status (worker execution status is a separate concern)
+
 **Contact**: A person with phone, email, address. Belongs to a workspace. Has `opt_out` flag (honors STOP/START SMS keywords). In v2, tracks voter list source and lifecycle.
 _Avoid_: Voter (use "voter" only when referring specifically to a registered elector on a voter list)
 

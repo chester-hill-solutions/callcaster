@@ -31,9 +31,11 @@ Legacy write routes remain: `POST/PATCH/DELETE /api/campaigns`, `/api/campaign_q
 | --- | --- | --- |
 | GET | `/api/workspaces/:workspaceId/audiences` | List |
 | GET | `/api/workspaces/:workspaceId/audiences/:audienceId` | Detail + contacts |
-| GET | `/api/workspaces/:workspaceId/audience-uploads/:uploadId` | Upload job status |
+| GET | `/api/workspaces/:workspaceId/audience-uploads/:uploadId` | Audience Upload status |
 
 Legacy: `GET/PATCH/DELETE /api/audiences`, `POST /api/audience-upload`.
+
+Audience Upload status uses database records for identity, status, counters, and terminal outcomes. Stored progress metadata cannot replace those fields. Missing or malformed status storage falls back to database data. Both this route and page polling check for processing abandoned for more than ten minutes, using the stored update timestamp. A queued retry or unexpired worker claim prevents interruption. A missing or invalid timestamp does not prove abandonment. If an interruption is saved to the database but its storage update fails, polling still reports the saved error. Existing response field names and authentication remain supported.
 
 ## Scripts & surveys
 

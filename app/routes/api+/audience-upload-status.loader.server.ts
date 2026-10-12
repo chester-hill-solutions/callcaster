@@ -1,33 +1,10 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { getAudienceImportProgress } from "@/lib/audience-import-report.server";
-import { findAudienceUploadById } from "@/lib/audience-upload-db.server";
-import { markAudienceUploadInterruptedIfStale } from "@/lib/audience-upload-process.server";
+import { loadAudienceUploadStatus } from "@/lib/audience-upload-status.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
-import { downloadObject } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
-import type { AudienceUploadServerSnapshot } from "@/components/audience/audience-upload-phase";
-
-function sidecarErrorMessage(
-  statusFileData: Record<string, unknown>,
-): string | null {
-  if (typeof statusFileData.error_message === "string") {
-    return statusFileData.error_message;
-  }
-  // Legacy blobs wrote `error` before the wire/API collision was fixed.
-  if (typeof statusFileData.error === "string") {
-    return statusFileData.error;
-  }
-  return null;
-}
-
-function defaultStage(dbStatus: string | null | undefined): string {
-  if (dbStatus === "completed") return "Upload completed";
-  if (dbStatus === "error") return "Upload failed";
-  return "Processing contacts";
-}
 
 export const loader = defineLoader({
   auth: ({ request }) => requireDualAuth(request),
@@ -59,77 +36,11 @@ export const loader = defineLoader({
     try {
       await requireWorkspaceAccess({ user, workspaceId });
 
-      let uploadData;
-      try {
-        uploadData = await findAudienceUploadById(workspaceId, uploadId);
-      } catch (error) {
-        logger.error("audience_upload.status.db_lookup_failed", {
-          workspaceId,
-          uploadId,
-          error,
-        });
-        throw error;
+      const status = await loadAudienceUploadStatus(workspaceId, uploadId);
+      if (!status) {
+        return routeData({ ok: false as const, error: "Upload not found" }, { status: 404 });
       }
-
-      if (!uploadData) {
-        return routeData(
-          { ok: false as const, error: "Upload not found" },
-          { status: 404 },
-        );
-      }
-
-      // Sidecar is best-effort progress metadata. DB row remains the source of
-      // truth so missing/broken object storage must not fail the poll.
-      let statusFileData: Record<string, unknown> = {};
-      try {
-        const statusBuffer = await downloadObject(
-          "audience-uploads",
-          `${workspaceId}/${uploadId}.json`,
-        );
-        statusFileData = JSON.parse(statusBuffer.toString()) as Record<
-          string,
-          unknown
-        >;
-      } catch (error) {
-        logger.debug("audience_upload.status.sidecar_unavailable", {
-          workspaceId,
-          uploadId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-
-      // Staleness watchdog: if progress hasn't been updated in 10 minutes,
-      // mark the upload failed (write-through on read).
-      try {
-        const watchdogResult = await markAudienceUploadInterruptedIfStale({
-          workspaceId,
-          uploadId,
-          dbStatus: uploadData.status,
-          statusFileData,
-        });
-        if (watchdogResult.interrupted) {
-          statusFileData = watchdogResult.statusFileData;
-          uploadData = {
-            ...uploadData,
-            status: "error",
-            error_message:
-              sidecarErrorMessage(statusFileData) ?? uploadData.error_message,
-          };
-        }
-      } catch (error) {
-        logger.error("audience_upload.status.watchdog_failed", {
-          workspaceId,
-          uploadId,
-          error,
-        });
-      }
-
-      const durable = uploadData.import_run_id
-        ? await getAudienceImportProgress(workspaceId, uploadData.import_run_id, uploadData.audience_id)
-        : null;
-      const snapshot = buildSnapshot(uploadData, statusFileData, durable);
-
-      return routeData({ ok: true as const, snapshot });
+      return routeData({ ok: true as const, snapshot: status.snapshot });
     } catch (error) {
       if (error instanceof AppError) {
         logger.error("audience_upload.status.access_or_app_error", {
@@ -158,34 +69,3 @@ export const loader = defineLoader({
     }
   },
 });
-
-function buildSnapshot(
-  uploadData: NonNullable<Awaited<ReturnType<typeof findAudienceUploadById>>>,
-  statusFileData: Record<string, unknown>,
-  durable: Awaited<ReturnType<typeof getAudienceImportProgress>> | null,
-): AudienceUploadServerSnapshot {
-  return {
-        uploadId: uploadData.id,
-        report_available: Boolean(durable),
-        audience_id: uploadData.audience_id,
-        status: uploadData.status,
-        file_name: uploadData.file_name,
-        file_size: uploadData.file_size,
-        total_contacts: uploadData.total_contacts,
-        processed_contacts: uploadData.processed_contacts,
-        error_message:
-          durable ? uploadData.error_message : uploadData.error_message ?? sidecarErrorMessage(statusFileData),
-        stage:
-          durable ? defaultStage(uploadData.status) : typeof statusFileData.stage === "string"
-            ? statusFileData.stage
-            : defaultStage(uploadData.status),
-        skipped_invalid_contacts:
-          durable ? durable.invalid : typeof statusFileData.skipped_invalid_contacts === "number"
-            ? statusFileData.skipped_invalid_contacts
-            : null,
-        skipped_duplicate_contacts:
-          durable ? durable.duplicates : typeof statusFileData.skipped_duplicate_contacts === "number"
-            ? statusFileData.skipped_duplicate_contacts
-            : null,
-      };
-}
