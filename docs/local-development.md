@@ -3,6 +3,7 @@
 ## Quick start
 
 ```bash
+make init         # start or repair local infrastructure
 make app          # terminal 1: web app → http://localhost:3000
 make tunnel       # terminal 2: public HTTPS URL for Twilio callbacks
 # Update BASE_URL, restart the app, then:
