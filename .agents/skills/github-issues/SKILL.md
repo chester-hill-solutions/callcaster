@@ -92,6 +92,9 @@ For an audit, update the existing enrichment records and regenerate `ISSUE_BOARD
 Before editing a record, read the strict schema in `scripts/issue-board-lib.mjs`
 and its existing fields. Merge only supported keys; preserve acceptance criteria
 and unrelated metadata. Unknown fields fail validation before board generation.
+Validate enrichment JSON before publishing an edit. JSON arrays cannot have a
+trailing comma after a removed entry. The pure local check needs no GitHub scope:
+`node --input-type=module -e 'import { loadEnrichment } from "./scripts/issue-board-lib.mjs"; loadEnrichment("scripts/issue-board-enrichment")'`.
 Preserve the enrichment files' UTF-8 characters and existing rendering. Review
 the diff for unrelated serialization changes before staging.
 For an atomic audit, render the selected issue with `buildBoard` and fresh native

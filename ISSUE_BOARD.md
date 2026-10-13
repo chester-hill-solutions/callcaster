@@ -3562,10 +3562,18 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Blocked by: [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355)
 
 ### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
-- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-11
+- The PDF/CSV report pipeline is implemented in #2530. Release review repaired timestamp decoding, send-window attribution, staff reply inclusion, multilingual text and access-denial handling in #2550. Report presentation, inbound daily volume and campaign-health acceptance remain open.
+- Current behavior: Owners and admins can export completed non-test SMS campaigns. Private artifacts include campaign messages and related conversation replies on the matching sender and send window.
+- Root cause: The original implementation treated raw driver timestamps as Date values and attributed replies by recipient alone. It also omitted staff replies and replaced non-Latin reply text.
+- Resolution: Keep the completed pipeline. Split the remaining format, inbound daily-volume and campaign-health work into scoped tasks; verify the finished report against the requested example before closing.
+- Look in: `app/lib/campaign-sms-report.server.ts`, `app/lib/campaign-sms-report-data.server.ts`, `app/lib/campaign-sms-report-pdf.server.ts`
+- Existing tests: test/integration-db/campaign-sms-report.test.ts: real PostgreSQL send windows, sender isolation, staff replies, STOP handling and font embedding; test/campaign-export.route.test.ts and test/campaign-export-status.test.ts: access denial statuses
+- Missing tests: Requested report-format comparison; Inbound daily volume and campaign-health acceptance
+- Done when: Finish the remaining requested report presentation, inbound daily-volume and campaign-health requirements in #1752; Compare the finished report with the requested example before closing #1752
+- Tracker: Keep open after release. The completed pipeline does not satisfy the remaining report-format and metric requirements.
+
+---
 
 ### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
 - Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
