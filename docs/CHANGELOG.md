@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
+- Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([PR #2558](https://github.com/chester-hill-solutions/callcaster/pull/2558), [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
 
 ## 2026-10-13 — release [#2553](https://github.com/chester-hill-solutions/callcaster/pull/2553)
 

@@ -81,15 +81,15 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-13
-- A local candidate separates explicit email validation from settings action errors and reserves the shared field feedback row. Six page regressions and six browser viewport/theme cases pass; publication and deployed acceptance remain.
+- Candidate PR #2558 separates explicit email validation from settings action errors and reserves the shared field feedback row. Six page regressions and six browser viewport/theme cases pass; merge and deployed acceptance remain.
 - Current behavior: Candidate on dev@f13b438d, 2026-10-13. Missing-email validation returns fieldErrors.username; the page renders only that field feedback and sends other failures once to the root toast. Six actual-page UI cases failed before the repair and now pass. The server metadata assertion fails when the field discriminator is removed. Existing settings utility and route RBAC cases pass. Six Chrome cases at 320/375/1280px in both themes preserve landmarks and scroll across 30 feedback transitions. Browser action responses are synthetic; no deployed acceptance is claimed.
 - Root cause: The route assigns failures from unrelated settings actions to the Email field.
 - Resolution: Identify actual email validation from explicit server field feedback, not action names or message text. Preserve the shared FormField accessible association and use its adopted anchored/reserved-area contract. Render other operation failures once through the root toast, preserve retry values and permission checks, and retain once-only action feedback during revalidation. Keep the member-name concern separate.
 - Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `app/routes/workspaces+/$id/settings.action.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/hooks/utils/useActionFeedback.ts`, `app/components/ui/form-field.tsx`, `docs/design-system.md`
 - Existing tests: test/ui/workspace-settings-feedback.test.tsx: actual page, FormField, useActionFeedback and root Toaster through a real memory router; duplicate prevention, permission/role errors, explicit email feedback, corrected retry and no replay; test/workspace-setting-utils.test.ts: missing-email metadata/status/headers and role/domain refusal controls; test/workspace-settings-rbac.test.ts: route permission floors; Owned Chrome fixture: six viewport/theme cases, 30 stable transitions including field error, revalidation, long operation error, dismissal and successful retry
-- Missing tests: Exact-head remote checks and preview acceptance remain before merge; deployed release acceptance remains before closure.
+- Missing tests: Authenticated preview and deployed release acceptance remain before closure.
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
-- Tracker: Keep Fix now while the candidate is unmerged. One focused PR into dev; retain the open issue for review and release acceptance. Parent #2300.
+- Tracker: Keep Fix now while PR #2558 is unmerged. Retain the open issue for review and release acceptance. Parent #2300.
 
 ### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
