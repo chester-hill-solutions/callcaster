@@ -546,6 +546,15 @@ function reqForm(url: string, fd: Record<string, string>) {
 }
 
 describe("api.campaign-export", () => {
+  test.each([403, 404])("SMS report creation keeps access status %s", async (status) => {
+    const { AppError } = await import("@/lib/errors.server");
+    requireWorkspaceAccess.mockRejectedValueOnce(new AppError("Access denied", status));
+    const { action } = await import("../app/routes/api+/campaign-export.action.server");
+    const response = await asRouteResponse(action({ request: reqForm("http://x", { campaignId: "1", workspaceId: "w1", exportType: "sms-report" }) } as any));
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ error: "Access denied" });
+  });
+
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     loggerError.mockClear();

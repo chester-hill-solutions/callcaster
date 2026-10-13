@@ -315,6 +315,9 @@ Raw SQL parameters bypass a column's value encoder. For a JavaScript Date
 inside a SQL expression, use the timestamp column encoder with `sql.param`.
 Verify capture, replacement and null input against real Postgres; mocked
 updates cannot prove driver serialization or first-write preservation.
+Raw `execute` results do not use Drizzle column decoders. Timestamp values
+can be strings even when a cast says Date. Prefer scoped relational reads, or
+decode each selected timestamp and prove it against the installed driver.
 
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
@@ -378,6 +381,10 @@ For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
+Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
+command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
+all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because
+they write the same ESLint cache.
 
 The raw pool from app/server/db.ts is also used by Drizzle, which replaces
 postgres.js JSON serializers. Bind JSON.stringify(value) with an explicit

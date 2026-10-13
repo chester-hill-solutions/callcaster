@@ -6,6 +6,7 @@ import {
   downloadObject,
   ObjectNotFoundError,
 } from "@/lib/object-storage.server";
+import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import {
   markCampaignExportInterruptedIfStale,
@@ -81,6 +82,7 @@ export const loader = defineLoader({
 
       return routeData(status);
     } catch (error) {
+      if (error instanceof Response || error instanceof AppError) throw error;
       logger.error("Status check error:", error);
       return routeData(
         {

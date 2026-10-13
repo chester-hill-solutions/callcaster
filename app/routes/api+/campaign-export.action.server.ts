@@ -9,6 +9,7 @@ import {
   processCallCampaignExport,
   processMessageCampaignExport,
 } from "@/lib/campaign-export.server";
+import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import { trackBackgroundFailure } from "@/lib/background-task.server";
 import { toUserMessage } from "@/lib/user-message";
@@ -148,6 +149,7 @@ export const action = defineAction({
         statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`,
       });
     } catch (error) {
+      if (error instanceof Response || error instanceof AppError) throw error;
       logger.error("Export request error:", error);
       return routeData(
         {

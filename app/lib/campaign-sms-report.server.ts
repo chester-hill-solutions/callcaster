@@ -1,11 +1,10 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
-import PDFDocument from "pdfkit";
 import {
-  campaign as campaignTable,
-  contact as contactTable,
-  message as messageTable,
-} from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
+  loadCampaignReportData,
+  type CampaignReportData,
+  type CampaignReportRow,
+  type ReportMessage,
+} from "@/lib/campaign-sms-report-data.server";
+import { reportPdf } from "@/lib/campaign-sms-report-pdf.server";
 
 const TWILIO_ERROR_DESCRIPTIONS: Record<number, string> = {
   30002: "Account suspended",
@@ -16,46 +15,11 @@ const TWILIO_ERROR_DESCRIPTIONS: Record<number, string> = {
   30034: "US A2P 10DLC - Message from an Unregistered Number",
 };
 
-type ReportMessage = {
-  sid: string;
-  status: string | null;
-  from: string | null;
-  to: string | null;
-  body: string | null;
-  direction?: string | null;
-  num_segments: string | null;
-  error_code: number | null;
-  date_created: Date | null;
-  date_sent: Date | null;
-  contact_id: number | null;
-  firstname?: string | null;
-  surname?: string | null;
-  phone?: string | null;
-};
-
-type CampaignReportRow = {
-  id: number;
-  title: string;
-  type: string | null;
-  status: string | null;
-  start_date: string | null;
-  caller_id: string | null;
-  body_text: string | null;
-  is_sample: boolean;
-};
-
 export type CampaignSmsReportFile = {
   filename: string;
   label: string;
   contentType: string;
   body: string | Uint8Array;
-};
-
-type CampaignReportData = {
-  campaign: CampaignReportRow;
-  outbound: ReportMessage[];
-  outboundWithContacts: ReportMessage[];
-  inboundWithContacts: ReportMessage[];
 };
 
 type CampaignReportSummary = {
@@ -109,96 +73,6 @@ const markdownCell = (value: unknown) =>
     .replace(/\|/g, "\\|")
     .replace(/\r?\n/g, " ");
 
-function reportPdf(markdown: string): Promise<Buffer> {
-  const document = new PDFDocument({
-    size: "LETTER",
-    margins: { top: 48, right: 48, bottom: 48, left: 48 },
-  });
-  const chunks: Buffer[] = [];
-  return new Promise((resolve, reject) => {
-    document.on("data", (chunk: Buffer) => chunks.push(chunk));
-    document.on("error", reject);
-    document.on("end", () => resolve(Buffer.concat(chunks)));
-    const plainText = (value: string) =>
-      Array.from(value, (character) => {
-        if (character === "—" || character === "–") return "-";
-        if (character === "“" || character === "”") return '"';
-        if (character === "‘" || character === "’") return "'";
-        const codePoint = character.codePointAt(0) ?? 0;
-        return codePoint === 9 || codePoint === 10 || codePoint === 13 ||
-          (codePoint >= 32 && codePoint <= 255)
-          ? character
-          : "?";
-      }).join("");
-
-    for (const rawLine of markdown.split("\n")) {
-      if (
-        rawLine.startsWith('<div style="page-break-before: always;"></div>')
-      ) {
-        document.addPage();
-        continue;
-      }
-      const line = rawLine.trim();
-      if (!line) {
-        document.moveDown(0.35);
-        continue;
-      }
-      if (/^\|[-| :]+\|$/.test(line)) continue;
-      if (line.startsWith("# ")) {
-        document
-          .font("Helvetica-Bold")
-          .fontSize(18)
-          .fillColor("#111827")
-          .text(plainText(line.slice(2)), { paragraphGap: 8 });
-      } else if (line.startsWith("## ")) {
-        document
-          .moveDown(0.4)
-          .font("Helvetica-Bold")
-          .fontSize(14)
-          .fillColor("#111827")
-          .text(plainText(line.slice(3)), { paragraphGap: 5 });
-      } else if (line.startsWith("### ")) {
-        document
-          .moveDown(0.25)
-          .font("Helvetica-Bold")
-          .fontSize(11)
-          .fillColor("#111827")
-          .text(plainText(line.slice(4)), { paragraphGap: 3 });
-      } else if (line.startsWith("|")) {
-        const cells = line
-          .split("|")
-          .slice(1, -1)
-          .map((cell) => cell.trim())
-          .filter(Boolean);
-        document
-          .font("Helvetica")
-          .fontSize(8)
-          .fillColor("#111827")
-          .text(plainText(cells.join("   |   ")), { paragraphGap: 2 });
-      } else if (line.startsWith("> ")) {
-        document
-          .font("Helvetica")
-          .fontSize(9)
-          .fillColor("#374151")
-          .text(plainText(line.slice(2)), { indent: 14, paragraphGap: 3 });
-      } else if (line.startsWith("- ")) {
-        document
-          .font("Helvetica")
-          .fontSize(9)
-          .fillColor("#111827")
-          .text(`• ${plainText(line.slice(2))}`, { paragraphGap: 3 });
-      } else {
-        document
-          .font("Helvetica")
-          .fontSize(9)
-          .fillColor("#111827")
-          .text(plainText(line), { paragraphGap: 3 });
-      }
-    }
-    document.end();
-  });
-}
-
 function replyTheme(body: string | null) {
   const text = (body ?? "").trim().toLowerCase();
   if (isStop(body)) return "Opt-out";
@@ -213,129 +87,6 @@ function replyTheme(body: string | null) {
   if (/\b(policy|candidate|party|election|campaign|politic)\b/.test(text))
     return "Political";
   return "Other";
-}
-
-function validateCampaign(campaign: CampaignReportRow | undefined) {
-  if (!campaign) throw new Error("Campaign not found");
-  if (campaign.type !== "message")
-    throw new Error("This report is for message campaigns");
-  if (campaign.status !== "complete")
-    throw new Error("The campaign must be complete before it can be exported");
-  if (
-    campaign.is_sample ||
-    /(^|[^a-z0-9])test([^a-z0-9]|$)/i.test(campaign.title)
-  ) {
-    throw new Error("Test campaigns cannot be exported");
-  }
-  return campaign;
-}
-
-async function getInboundMessages(
-  tdb: ReturnType<typeof createTenantDb>,
-  workspaceId: string,
-  campaign: CampaignReportRow,
-  outbound: ReportMessage[],
-) {
-  const recipientPhones = [
-    ...new Set(outbound.map((message) => digits(message.to)).filter(Boolean)),
-  ];
-  const campaignStart = campaign.start_date
-    ? new Date(campaign.start_date)
-    : new Date(0);
-  const since = Number.isNaN(campaignStart.getTime())
-    ? new Date(0)
-    : campaignStart;
-  const inbound: ReportMessage[] = [];
-
-  for (let offset = 0; offset < recipientPhones.length; offset += 500) {
-    const phoneBatch = recipientPhones.slice(offset, offset + 500);
-    const batch = (await tdb.execute(sql`
-      select m.sid, m.status, m."from", m."to", m.body, m.num_segments,
-             m.error_code, m.date_created, m.date_sent, m.contact_id,
-             c.firstname, c.surname, c.phone
-      from ${messageTable} as m
-      left join ${contactTable} as c
-        on c.id = m.contact_id and c.workspace = ${workspaceId}
-      where m.workspace = ${workspaceId}
-        and m.direction = 'inbound'
-        and m.date_created >= ${since}
-        and regexp_replace(coalesce(m."from", ''), '[^0-9]', '', 'g') in
-          (${sql.join(
-            phoneBatch.map((phone) => sql`${phone}`),
-            sql`, `,
-          )})
-      order by m.date_created, m.sid
-    `)) as ReportMessage[];
-    inbound.push(...batch);
-  }
-  return inbound;
-}
-
-async function loadCampaignReportData(
-  workspaceId: string,
-  campaignId: number,
-): Promise<CampaignReportData> {
-  const tdb = createTenantDb(workspaceId);
-  const campaign = validateCampaign(
-    (await tdb.campaign.findFirst({
-      where: eq(campaignTable.id, campaignId),
-      columns: {
-        id: true,
-        title: true,
-        type: true,
-        status: true,
-        start_date: true,
-        caller_id: true,
-        body_text: true,
-        is_sample: true,
-      },
-    })) as CampaignReportRow | undefined,
-  );
-  const messages = (await tdb.message.findMany({
-    where: eq(messageTable.campaign_id, campaignId),
-    orderBy: asc(messageTable.date_created),
-  })) as ReportMessage[];
-  const outbound = messages.filter((message) => message.direction !== "inbound");
-  const contactIds = [
-    ...new Set(
-      outbound.flatMap((message) =>
-        message.contact_id == null ? [] : [message.contact_id],
-      ),
-    ),
-  ];
-  const contacts = contactIds.length
-    ? await tdb.contact.findMany({
-        where: inArray(contactTable.id, contactIds),
-      })
-    : [];
-  const contactById = new Map(
-    contacts.map((contact) => [Number(contact.id), contact] as const),
-  );
-  const outboundWithContacts = outbound.map((message) => ({
-    ...message,
-    ...(contactById.get(Number(message.contact_id)) ?? {}),
-  }));
-  const inbound = await getInboundMessages(
-    tdb,
-    workspaceId,
-    campaign,
-    outbound,
-  );
-  const outboundNames = new Map<string, string>();
-  for (const message of outboundWithContacts) {
-    const phone = digits(message.to);
-    if (phone && !outboundNames.has(phone)) {
-      outboundNames.set(phone, contactName(message));
-    }
-  }
-  const inboundWithContacts = inbound.map((message) => {
-    if (message.firstname || message.surname) return message;
-    return {
-      ...message,
-      firstname: outboundNames.get(digits(message.from)) ?? "Unknown",
-    };
-  });
-  return { campaign, outbound, outboundWithContacts, inboundWithContacts };
 }
 
 function messageCsvRow(direction: string, message: ReportMessage) {
@@ -384,18 +135,25 @@ function createReportSummary(data: CampaignReportData): CampaignReportSummary {
   }
   const dailyVolume = new Map<string, number>();
   for (const message of [...outbound, ...inboundWithContacts]) {
-    if (!message.date_created) continue;
+    const timestamp =
+      message.direction === "inbound"
+        ? message.date_created
+        : (message.date_sent ?? message.date_created);
+    if (!timestamp) continue;
     const day = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Toronto",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
-    }).format(message.date_created);
+    }).format(timestamp);
     dailyVolume.set(day, (dailyVolume.get(day) ?? 0) + 1);
   }
   const allMessages = [
-    ...outboundWithContacts.map((message) => messageCsvRow("outbound", message)),
+    ...outboundWithContacts.map((message) =>
+      messageCsvRow("outbound", message),
+    ),
     ...inboundWithContacts.map((message) => messageCsvRow("inbound", message)),
+    ...data.staff.map((message) => messageCsvRow("staff", message)),
   ].sort((left, right) => String(left[6]).localeCompare(String(right[6])));
 
   return {
@@ -417,9 +175,15 @@ function summaryOutboundDate(
   summary: CampaignReportSummary,
   edge: "first" | "last",
 ) {
-  const outboundRows = summary.allMessages.filter((row) => row[0] === "outbound");
-  const row = outboundRows[edge === "first" ? 0 : outboundRows.length - 1];
-  return row?.[6] ? new Date(String(row[6])) : null;
+  const outboundRows = summary.allMessages.filter(
+    (row) => row[0] === "outbound",
+  );
+  const dates = outboundRows
+    .map((row) => row[7] || row[6])
+    .filter(Boolean)
+    .map((value) => new Date(String(value)))
+    .sort((left, right) => left.getTime() - right.getTime());
+  return dates[edge === "first" ? 0 : dates.length - 1] ?? null;
 }
 
 function appendReportOverview(
@@ -539,7 +303,9 @@ function appendHealthSection(lines: string[], summary: CampaignReportSummary) {
 function groupInboundThreads(messages: ReportMessage[]) {
   const threadGroups = new Map<string, ReportMessage[]>();
   for (const message of messages) {
-    const phone = digits(message.from);
+    const phone = digits(
+      message.direction === "inbound" ? message.from : message.to,
+    );
     const thread = threadGroups.get(phone) ?? [];
     thread.push(message);
     threadGroups.set(phone, thread);
@@ -549,13 +315,27 @@ function groupInboundThreads(messages: ReportMessage[]) {
 
 function appendThreadPageHeader(
   lines: string[],
-  firstMessage: ReportMessage,
+  messages: ReportMessage[],
   phone: string,
 ) {
+  const firstMessage = messages[0];
+  if (!firstMessage) return;
   lines.push(
     '<div style="page-break-before: always;"></div>',
     `### ${contactName(firstMessage)} — ${phone}`,
     "",
+  );
+}
+
+function isConversationThread(messages: ReportMessage[]) {
+  return messages.some(
+    (message) => message.direction === "inbound" && !isStop(message.body),
+  );
+}
+
+function hasOptOutReply(messages: ReportMessage[]) {
+  return messages.some(
+    (message) => message.direction === "inbound" && isStop(message.body),
   );
 }
 
@@ -565,26 +345,24 @@ function appendConversationAppendix(
   threadGroups: Map<string, ReportMessage[]>,
 ) {
   const replyThreads = [...threadGroups.values()].filter((messages) =>
-    messages.some((message) => !isStop(message.body)),
+    isConversationThread(messages),
   );
   lines.push(`## Appendix A — Conversations (${replyThreads.length})`, "");
   for (const [phone, messages] of threadGroups) {
-    if (messages.every((message) => isStop(message.body))) continue;
-    const firstMessage = messages[0];
-    if (!firstMessage) continue;
-    appendThreadPageHeader(lines, firstMessage, phone);
-    const sentMessage = data.outboundWithContacts.find(
+    if (!isConversationThread(messages)) continue;
+    appendThreadPageHeader(lines, messages, phone);
+    const sentMessages = data.outboundWithContacts.filter(
       (message) => digits(message.to) === phone,
     );
-    if (sentMessage) {
+    for (const sentMessage of sentMessages) {
       lines.push(
-        `> **Outbound** (${et(sentMessage.date_created)} ET) — ${markdownCell(sentMessage.body)}`,
+        `> **Outbound** (${et(sentMessage.date_sent ?? sentMessage.date_created)} ET) — ${markdownCell(sentMessage.body)}`,
         "",
       );
     }
     for (const message of messages) {
       lines.push(
-        `> **Reply** (${et(message.date_created)} ET) — ${markdownCell(message.body)}`,
+        `> **${message.direction === "inbound" ? "Reply" : "Staff reply"}** (${et(message.date_created)} ET) — ${markdownCell(message.body)}`,
         "",
       );
     }
@@ -595,15 +373,13 @@ function appendOptOutAppendix(
   lines: string[],
   threadGroups: Map<string, ReportMessage[]>,
 ) {
-  const optOutThreads = [...threadGroups.values()].filter((messages) =>
-    messages.every((message) => isStop(message.body)),
+  const optOutThreads = [...threadGroups.values()].filter(
+    (messages) => hasOptOutReply(messages) && !isConversationThread(messages),
   );
   lines.push(`## Appendix B — Opt-out threads (${optOutThreads.length})`, "");
   for (const [phone, messages] of threadGroups) {
-    if (messages.some((message) => !isStop(message.body))) continue;
-    const firstMessage = messages[0];
-    if (!firstMessage) continue;
-    appendThreadPageHeader(lines, firstMessage, phone);
+    if (!hasOptOutReply(messages) || isConversationThread(messages)) continue;
+    appendThreadPageHeader(lines, messages, phone);
     for (const message of messages) {
       lines.push(
         `> **${markdownCell(message.body)}** (${et(message.date_created)} ET)`,
@@ -620,9 +396,18 @@ function createReportMarkdown(
   const lines: string[] = [];
   appendReportOverview(lines, data.campaign, summary);
   appendOutboundSections(lines, data.campaign, summary);
-  appendInboundSections(lines, data.inboundWithContacts, summary);
+  appendInboundSections(
+    lines,
+    [...data.inboundWithContacts, ...data.staff],
+    summary,
+  );
   appendHealthSection(lines, summary);
-  const threads = groupInboundThreads(data.inboundWithContacts);
+  const threads = groupInboundThreads(
+    [...data.inboundWithContacts, ...data.staff].sort(
+      (a, b) =>
+        (a.date_created?.getTime() ?? 0) - (b.date_created?.getTime() ?? 0),
+    ),
+  );
   appendConversationAppendix(lines, data, threads);
   appendOptOutAppendix(lines, threads);
   return lines.join("\n");

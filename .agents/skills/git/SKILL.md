@@ -22,6 +22,9 @@ request.
 - Confirm the starting point with `git merge-base --is-ancestor origin/dev HEAD`.
 - After creating the branch, run `git rebase origin/dev`.
 - Review `git status`, `git diff --check`, and `git diff --stat` before committing.
+- After staging, also run `git diff --cached --check`. The unstaged check
+  misses new files. Normalize downloaded text line endings and trailing spaces
+  without changing license text, then stage it again and repeat the check.
 - Commit only the requested changes with a concise imperative message.
 - Push with `git push -u origin <branch>`.
 - After pushing, verify the remote branch and open a PR into `dev`.

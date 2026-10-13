@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: SMS completion reports keep replies within the matching sender and campaign window, include staff replies, and preserve access-denial statuses ([#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).
+
 - Added: Workspace members can now delete contacts from the Contacts table.
 
 - Added: Local Twilio development now uses per-developer named Cloudflare Tunnels with cross-platform `cloudflared` setup and startup commands.
