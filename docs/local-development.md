@@ -54,7 +54,7 @@ Tail an app process by running it in its own terminal; the compose services are 
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
-- Localtunnel (only for live Twilio calling)
+- Localtunnel (only for live Twilio calling; it is also available through `make tunnel`)
 - A Twilio account with:
   - an account SID and auth token
   - a TwiML App SID for Voice SDK/browser calling
@@ -78,6 +78,16 @@ cp .env.example .env
 ```
 
 2. Update the required values in `.env`.
+
+For local Twilio development, set a developer identity in `.env.local`:
+
+```env
+DEV_NAME=sai
+ENV=local
+```
+
+The local TwiML App is named `env:sai-local`. Use a different `DEV_NAME` for
+each developer so one local tunnel cannot repoint another developer's app.
 
 Notes:
 - The `DATABASE_URL` and `S3_*` defaults in `.env.example` match the compose dev stack as-is.
@@ -149,17 +159,13 @@ make worker
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Install Localtunnel if you do not already have it:
+1. Start Localtunnel from the repository:
 
 ```bash
-npm install -g localtunnel
+make tunnel
 ```
 
-2. Start Localtunnel against the local app:
-
-```bash
-lt --port 3000
-```
+   The command runs `lt --port 3000` through the checked-in development dependency.
 
 3. Copy the HTTPS forwarding URL from Localtunnel.
 
@@ -182,7 +188,17 @@ Localtunnel quickstart reference:
 
 ## Sync Twilio To The Current Tunnel
 
-This repo includes a helper script to update Twilio when your tunnel URL changes.
+This repo includes helpers to create the local environment TwiML App and update
+Twilio when your tunnel URL changes.
+
+Create or update the developer's environment TwiML App:
+
+```bash
+make twiml
+```
+
+The command creates or reuses `env:${DEV_NAME}-${ENV}`, points it at
+`${BASE_URL}/api/call`, and writes its SID to `.env` or `.env.local`.
 
 Sync one workspace:
 
@@ -201,6 +217,22 @@ Pass the current Localtunnel URL explicitly:
 ```bash
 npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
 ```
+
+The Make wrapper is equivalent for one workspace:
+
+```bash
+make calling:sync WORKSPACE_ID=<workspace-id>
+```
+
+To discover and sync every real-Twilio workspace in the local database:
+
+```bash
+make calling:sync-local
+```
+
+The local wrapper requires `ENV=local`, refuses Railway environments, ignores
+seeded fake credentials, and delegates callback updates to the existing sync
+script. It does not sync hosted workspaces.
 
 What the script updates:
 - the TwiML App referenced by `TWILIO_APP_SID` so browser/device calls keep using `${BASE_URL}/api/call`
@@ -276,10 +308,11 @@ Node 24+.
 
 1. Start services with `make up`
 2. Start the app with `make app` (and `make worker` in a second terminal when you need queued jobs to run)
-3. Start Localtunnel with `lt --port 3000`
-4. Update `BASE_URL` in `.env` if the tunnel changed
-5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
-6. Test the calling flow
+3. Start Localtunnel with `make tunnel`
+4. Update `BASE_URL` in `.env.local` if the tunnel changed
+5. Run `make twiml`
+6. Run `make calling:sync-local`
+7. Test the calling flow
 
 ## E2E tests (Playwright)
 
