@@ -1,19 +1,19 @@
 # Local Development
 
-This app runs as a React Router 8 app on `http://localhost:3000`, backed by Postgres (Drizzle ORM), an S3-compatible object store (Stow locally), and Better Auth. Local services run via Docker Compose. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
-
 ## Quick start
 
 ```bash
-npm install
-make init         # npm run setup — idempotent; re-run to repair a broken local environment
 make app          # terminal 1: web app → http://localhost:3000
-make worker       # terminal 2: background jobs, including list uploads
-# Optional, terminal 3: live dashboard audio, transcription, and coaching
+make tunnel       # terminal 2: public HTTPS URL for Twilio callbacks
+# Update BASE_URL, restart the app, then:
+make calling:sync-local
+make worker       # terminal 3: background jobs, including list uploads
+# Optional, terminal 4: live dashboard audio, transcription, and coaching
 make media-stream
 ```
 
-`make init` starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts).
+This is for returning developers with `.env.local`, `DEV_NAME`, and `ENV`
+already configured. For first-time setup, use [Environment Setup](#environment-setup).
 
 Verify the setup:
 
@@ -24,35 +24,18 @@ npm test            # vitest node + UI suites, plus bun server-runtime tests
 make e2e            # full Playwright run against compose Postgres + Stow
 ```
 
-## Service control
+## Environment Setup
 
-The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
-
-| Command | What it does |
-|---|---|
-| `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
-| `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
-| `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
-| `make postgres init` | Start Postgres and bootstrap the schema only |
-| `make ps` | Compose status |
-| `make app` | Run the React Router web app in the foreground |
-| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
-| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
-| `make help` | This list |
-
-Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
-
-## Prerequisites
+### Prerequisites
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
 - Localtunnel (only for live Twilio calling; it is also available through `make tunnel`)
 - A Twilio account with:
   - an account SID and auth token
-  - a TwiML App SID for Voice SDK/browser calling
   - at least one phone number if you want to test inbound or outbound calling
 
-## Local Services And Ports
+### Local Services And Ports
 
 The local stack uses these endpoints:
 
@@ -61,65 +44,50 @@ The local stack uses these endpoints:
 - Stow S3 API: `http://127.0.0.1:9000`
 - Inbucket email UI: `http://127.0.0.1:9002`
 
-## Environment Setup
+### Setup Steps
 
 Run the setup in this order:
 
 ```bash
 npm install                 # once after cloning, or after dependencies change
-make init                  # services, .env, schema, bucket, and seed data
 cp -n .env.example .env.local  # create the developer-specific override
-```
-
-`make init` creates the shared base `.env`. The copy command creates
-`.env.local` without replacing it if it already exists. Bun loads
-`.env.local` as the developer-specific override for the local app commands, so
-set your local values there. For the calling flow, set `DEV_NAME`, `ENV=local`,
-and the Twilio credentials described below. Set `BASE_URL` to a temporary local
-value such as `http://localhost:3000` until the tunnel is running.
-
-`make app` loads `.env.local` over `.env`. Vitest does not load either file as
-test configuration; it uses controlled test setup. Playwright uses
-`E2E_BASE_URL` and the compose E2E runner's explicit local environment, not the
-Twilio `BASE_URL`.
-
-Start the app after the basic environment values are set:
-
-```bash
-make app                   # terminal 1: start the web app
-make worker                # terminal 2: start background jobs when needed
-# Optional, terminal 3:
-make media-stream
-```
-
-For local Twilio development, set a developer identity in `.env.local` before
-running `make twiml`:
-
-```env
-DEV_NAME=sai
-ENV=local
 ```
 
 The local TwiML App is named `env:sai-local`. Use a different `DEV_NAME` for
 each developer so one local tunnel cannot repoint another developer's app.
+Set your local values in `.env.local`:
 
-Notes:
-- The `DATABASE_URL` and `S3_*` defaults in `.env.example` match the compose dev stack as-is.
-- `TWILIO_*` values must be real if you want actual calling, SMS, or Twilio webhook validation to work.
-- `STRIPE_SECRET_KEY` and `RESEND_API_KEY` are required by app startup, but placeholder values are fine until you test those integrations.
-- `OPENAI_API_KEY` is optional.
+```env
+DEV_NAME=sai
+ENV=local
+BASE_URL=http://localhost:3000
+TWILIO_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+15555550100
+# Required for startup; a placeholder is fine until billing is tested.
+STRIPE_SECRET_KEY=placeholder
+# Required for startup; a placeholder is fine until email is tested.
+RESEND_API_KEY=placeholder
+```
 
-### Calling Setup With Localtunnel
+`make init` creates the shared `.env` and does not read `.env.local`.
+
+Initialize the local services after setting the local environment values:
+
+```bash
+make init                  # services, .env, schema, bucket, and seed data
+make app                   # terminal 1
+```
+
+#### Calling Setup With Localtunnel
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Start Localtunnel from the repository:
+1. Start Localtunnel after the app is running:
 
 ```bash
 make tunnel
 ```
-
-   The command runs `lt --port 3000` through the checked-in development dependency.
 
 2. Copy the HTTPS forwarding URL from Localtunnel.
 
@@ -137,33 +105,32 @@ BASE_URL=https://your-subdomain.loca.lt
 
 4. Restart the app after changing `BASE_URL`.
 
-Localtunnel quickstart reference:
-- [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
-
-### Sync Twilio To The Current Tunnel
-
-This repo includes helpers to create the local environment TwiML App and update
-Twilio when your tunnel URL changes.
-
-Create or update the developer's environment TwiML App:
+Create the local TwiML App and sync local workspaces:
 
 ```bash
 make twiml
+make calling:sync-local
 ```
 
-The command creates or reuses `env:${DEV_NAME}-${ENV}`, points it at
-`${BASE_URL}/api/call`, and writes its SID to `.env` or `.env.local`.
+The worker and media-stream are optional and do not need the tunnel URL:
+
+```bash
+make worker                # terminal 2, when needed
+make media-stream          # optional, terminal 3
+```
+
+Localtunnel quickstart reference:
+- [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
+
+#### Sync Twilio To The Current Tunnel
+
+This repo includes helpers to create the local environment TwiML App and update
+Twilio when your tunnel URL changes.
 
 Sync one workspace:
 
 ```bash
 make calling:sync WORKSPACE_ID=<workspace-id>
-```
-
-Sync every workspace with stored Twilio credentials:
-
-```bash
-make calling:sync-local
 ```
 
 Pass the current Localtunnel URL explicitly:
@@ -193,13 +160,31 @@ The Make targets read `BASE_URL` from `.env.local` or `.env`. Because
 Localtunnel does not expose the same local tunnel API flow as ngrok, update
 that value after every tunnel rotation.
 
-### Why Resync Is Required
+#### Why Resync Is Required
 
 Twilio webhook validation uses the exact incoming request URL. If your Localtunnel hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
 
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
 - browser/device calls rely on `TWILIO_APP_SID`, which should point at `${BASE_URL}/api/call`
+
+## Service control
+
+The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
+
+| Command | What it does |
+|---|---|
+| `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
+| `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
+| `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
+| `make postgres init` | Start Postgres and bootstrap the schema only |
+| `make ps` | Compose status |
+| `make app` | Run the React Router web app in the foreground |
+| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
+| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
+| `make help` | This list |
+
+Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
 
 ## TwiML Apps In Deployed Environments
 
@@ -241,16 +226,6 @@ Node 24+.
 - Optional: `PROCESS_FATAL_ON_REJECTION=1` exits the process on unhandled promise rejections (default logs only).
 - HTTPS for the optional dev websocket server (`scripts/dev/websocket-server.js`) uses self-signed certs in `scripts/dev/certs/` (gitignored). Regenerate with:
   `openssl req -x509 -newkey rsa:2048 -nodes -keyout scripts/dev/certs/server.key -out scripts/dev/certs/server.cert -days 365 -subj "/CN=localhost"`
-
-## Suggested Daily Workflow
-
-1. Start services with `make up`
-2. Start the app with `make app` (and `make worker` in a second terminal when you need queued jobs to run)
-3. Start Localtunnel with `make tunnel`
-4. Update `BASE_URL` in `.env.local` if the tunnel changed
-5. Run `make twiml`
-6. Run `make calling:sync-local`
-7. Test the calling flow
 
 ## E2E tests (Playwright)
 
