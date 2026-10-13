@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Workspace members can now delete contacts from the Contacts table.
+
 - Added: Local Twilio development now uses per-developer named Cloudflare Tunnels with cross-platform `cloudflared` setup and startup commands.
 
 - Added: An opt-in `sim` browser suite can upload an allowlisted call list, buy only the credits required for a configured flow, and send a live SMS through Chats without running with normal E2E.
