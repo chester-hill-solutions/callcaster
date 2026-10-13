@@ -1,57 +1,57 @@
-# Graph Report - dev  (2026-10-07)
+# Graph Report - dev  (2026-10-13)
 
 ## Corpus Check
-- 2896 files · ~1,901,091 words
+- 2946 files · ~1,933,081 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 68 file(s) not represented in the graph (top: .otf 21, .ttf 19, (none) 14)
 
 ## Summary
-- 15359 nodes · 45231 edges · 587 communities (493 shown, 94 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 469 edges (avg confidence: 0.87)
+- 15689 nodes · 46105 edges · 571 communities (475 shown, 96 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 513 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `1a71ab1e`
+- Built from commit: `4a2d1b3f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- jsonError
-- ref_lucide_react
-- platform-data.server.ts
-- Button
+- env.server.ts
+- TableRow
+- workspace-client-projection.server.ts
+- ref_react_router
 - workspace.server.ts
 - FormField
 - ref_react
-- contact.server.ts
+- auto-dial.server.ts
 - db-types.ts
-- $roomId.action.server.ts
+- telephony-db.server.ts
 - asRouteResponse
-- $selected_id/settings.action.server.ts
+- Campaign
 - route-auth-mock.ts
-- auth.server.ts
-- Text
-- workspace-settings-rbac.test.ts
-- audio.server.ts
+- phone.ts
+- Button
+- contact.server.ts
+- object-storage.server.ts
 - scripts
 - cn
-- createWorkspaceTwilioInstance
+- Database
 - db.ts
 - platform-members.server.ts
-- QueueTable.tsx
-- ref_react_router
-- campaign-outbound-estimate.ts
+- Contact
+- ref_testing_library_react
+- workspace-twilio-config.server.ts
 - ref_node_fs
 - WorkspaceSelectedNewUtils.server.ts
 - twilio-client.server.ts
-- logger.server.ts
+- schema.ts
 - platform-rate-limit.server.ts
-- app/lib/utils.ts
-- platform-admin.server.ts
+- Heading
+- workspace-members-db.server.ts
 - a2p-profile-provider.ts
 - useCallScreen.ts
 - survey-utils.test.ts
-- platform-onboarding-handlers.server.ts
+- ref_postgres
 - handlers.server.ts
 - src/types.ts
 - messaging-onboarding.server.ts
@@ -61,54 +61,54 @@
 - shad-cc/src/index.ts
 - shared/pricing.ts
 - lib/types.ts
-- useCallHandling.ts
+- logger.client.ts
 - database/campaign.server.ts
-- survey-db.server.ts
+- platform-data.server.ts
 - useChatsPage.ts
 - call-recording-storage.server.ts
 - "node_modules/buffer-polyfill/index.js"
 - queue-status.ts
-- auto-dial/status.action.server.ts
+- voice-callback.ts
 - bootstrap-fresh-db.mjs
 - chat-composer-recovery.test.tsx
 - poll-jobs.server.ts
 - billing-reconciliation.ts
-- probe-surfaces.mjs
+- seed-data.mjs
 - ref_node_child_process
-- campaign-sms-dispatch-contract.test.ts
+- test/sms-recipient-identity.test.ts
 - acd-router.server.ts
 - auto-dial-status.test.ts
-- setup.ui.ts
+- $selected_id/queue.action.server.ts
 - dependencies
 - shad-cc/package.json
-- campaign-execution.server.ts
+- handlers/campaign.server.ts
 - src/lib/utils.ts
-- logger.client.ts
+- QueueItem
 - webhook-event-options.shared.ts
 - webhook-side-effects.server.ts
 - scriptkit-call-script-react/src/index.ts
-- handlers/campaign.server.ts
+- createTenantDb
 - field.tsx
 - number-rental-billing.server.ts
 - twilio-webhook.server.ts
 - useCampaignCallFlow.ts
 - devDependencies
-- check-queue-rpc-contract.mjs
+- queue-rpc-contract.mjs
 - Documentation index
 - campaign-dispatch-policy.ts
-- platform-billing.server.ts
+- elevenlabs-batch-transcribe.server.ts
 - schema-default-drift.test.ts
 - dev-local.mjs
 - email-vm.action.server.ts
 - number-purchase.server.ts
 - cn
 - types.gen.ts
-- NumberSummaryList.tsx
+- app/lib/utils.ts
 - twilio-call-status.server.ts
 - issue-board-lib.mjs
-- chat-sms.server.ts
+- ref_twilio
 - $numberId/$pageId/$blockId/response.action.server.ts
-- call-script-service.ts
+- Script
 - route-context-mock.ts
 - db-writer.ts
 - check-handlers.mjs
@@ -119,23 +119,23 @@
 - check-effects.mjs
 - Button
 - isObject
-- media-stream-transcription-billing.test.ts
-- app-db-objects.mjs
+- twilio-handler.ts
+- schema-enums.mjs
 - api-surface.ts
 - billing-activity-rollup.ts
-- capability-guard.server.ts
+- handler.server.ts
 - numbers-search.server.ts
-- common.ts
+- campaign-sms-report.mjs
 - AudienceUploader.tsx
 - auth-postgres/package.json
 - merge-workspace-twilio-data.server.ts
 - safe-outbound-url.server.ts
 - from
 - campaign-export.server.ts
-- inbound-handset-dial-end.action.server.ts
+- campaign-queue-search.server.ts
 - Design System Audit (Visual Asset Ledger)
 - CampaignResultDisplay.tsx
-- api-auth.server.ts
+- Live Telephony Verification Plan
 - csv-contacts.ts
 - cron.server.ts
 - package.old.json
@@ -143,7 +143,7 @@
 - getUserRole
 - campaign-setup-steps.ts
 - campaign-status-rail.ts
-- ref_twilio
+- onboardingFixture
 - Campaign
 - compilerOptions
 - number-release-recovery.test.ts
@@ -154,78 +154,78 @@
 - useCallCoaching.ts
 - openapi-build.ts
 - seed.ts
-- predictive-machine-operation.test.ts
+- admin-response-projection.test.ts
 - contact-import-headers.ts
 - inbound-routing-presets.ts
 - app/hooks/index.ts
-- workspace-conversations-sql-parity.test.ts
+- workspace-conversations.server.ts
 - ci-changes-lib.mjs
 - campaign-export.route.test.ts
 - runtime-postcss.test.ts
-- openapi.ts
+- check-api-surface-coverage.ts
 - campaign-readiness.ts
-- inbound.action.server.ts
-- handler.server.ts
+- caller-id-verification.server.ts
+- defineAction
 - Code Quality Roadmap
-- ref_node_url
-- createVoiceResponse
-- inbound-queue-entry.route.test.ts
+- start-stow.mjs
+- WebhookEditor.tsx
+- campaign-sms-report.server.ts
 - bootstrap-migrations.server.ts
-- @playwright/test
-- schema-enums.mjs
+- stripe-mocks.ts
+- inbound-sms.action.server.ts
 - platform-idempotency.server.ts
 - status
-- check-api-surface-coverage.ts
+- ErrorCode
 - websocket-server.js
 - scriptkit-call-script-react/package.json
 - Result.tsx
-- CampaignBasicInfo.Dates.tsx
+- callcaster.ts
 - Key Patterns
 - flash-telemetry.client.ts
 - coaching-events.shared.ts
 - cron-job-enqueue-route.server.ts
-- tts-voices.ts
+- contact-editor-save.test.ts
 - sync-calling-dev.mjs
 - csv.ts
 - Design System Usage
 - eslint.config.mjs
 - folderize-routes.mjs
-- WorkspaceStreamCapTracker
+- campaign-test-send.server.ts
 - auth-react-router/package.json
 - audit-event.server.ts
-- workspace-invitations.server.ts
+- probe-surfaces.mjs
 - dial.route.test.ts
 - source
 - bun.ts
-- elevenlabs-realtime-client.ts
+- MockWebSocket
 - src/components/ui/calendar.tsx
-- audience-upload.ts
+- audience-upload-process.server.ts
 - input-group.tsx
 - src/components/ui/command.tsx
 - entry.server.tsx
 - test-utils.tsx
-- ivr-wav.server.ts
+- gen-wav-sidecars.ts
 - components.json
 - Environment validation utility
 - Code Review: Improvement Report
 - Handoff: CallCaster architecture review + Phase 3 campaign dispatch
 - Multi-tenant platform safety plan
-- factories.ts
-- admin-portal.spec.ts
-- CallScreen.CallArea.tsx
+- WorkspacePage
+- SignInPage
+- platform-analytics.server.ts
 - compilerOptions
-- accept-invite.action.server.ts
+- redirect-route.server.ts
 - dependencies
 - Tenant-scoped data access
 - check-twilio-webhook-coverage.mjs
 - rename-route-modules.mjs
-- twilio-handler.ts
-- createTenantDb
+- platform-billing.server.ts
+- createWorkspaceTwilioInstance
 - openapi.test.ts
 - ivr-results.ts
-- schema-defaults.contract.ts
+- twilio-webhook.ts
 - media-namespace-migrate.server.ts
-- platform-membership-safety.test.ts
+- billing-activity.server.ts
 - ref_node_crypto
 - End-to-end (E2E) testing
 - CallCaster — Feature Inventory & DRY Report
@@ -233,28 +233,28 @@
 - cull-report.mjs
 - workspace-analytics.ts
 - datetime.tsx
-- call-session-types.ts
+- useCallAudioControls.ts
 - twilio-compliance-traffic/SKILL.md
 - Widget catalog
 - Handoff — Supabase-exit robustness plan (hardening)
 - twilio-sms-isv-setup/SKILL.md
-- sms-webhook.spec.ts
+- public-queue-order-contract.mjs
 - webhooks.ts
 - db-workspace.server.test.ts
 - chart.tsx
 - check-test-echo.mjs
 - consolidate-route-modules.mjs
 - route-read-role-floor.mjs
-- campaign-export-helpers.server.ts
-- media-stream-twiml.server.ts
+- audience-upload-csv.ts
+- coaching-schemas.ts
 - media-stream/index.ts
-- request-context.server.ts
+- job-registry.server.ts
 - twilio-ai-agent-architect/SKILL.md
 - stripe-webhook.signature.test.ts
-- CallScreenPage
+- check-queue-rpc-contract.mjs
 - fix-route-test-module-paths.mjs
 - use-workspace-event-subscription.test.tsx
-- services.tsx
+- service.ts
 - Conversation Orchestrator
 - flow.js
 - recording.js
@@ -262,22 +262,22 @@
 - devDependencies
 - Live Transcription and Coaching Plan
 - check-credit-write-paths.mjs
-- check-relative-redirects.mjs
+- twilio-studio-flows/SKILL.md
 - check-route-membership.mjs
 - check-type-safety.mjs
 - context-menu.tsx
 - compilerOptions
-- campaign-export-types.server.ts
-- workspaces+/index.loader.server.ts
-- send-workspace-invite-email.server.ts
-- $id/onboarding.action.server.ts
+- NumberPurchase.columns.tsx
+- env
+- workspace-reference-migrations.test.ts
+- platform-onboarding.server.ts
 - CallCaster Public API Overview
 - Handler strictness
 - ivr-script-validation.ts
 - reconcile-stuck-calls.ts
-- design-preview-a11y.spec.ts
+- check-redirect-targets.mjs
 - auth/package.json
-- check-app-file-size.mjs
+- twilio-send-message/SKILL.md
 - check-unscoped-db-imports.mjs
 - campaign-export-contract.test.ts
 - email-vm.route.test.ts
@@ -286,31 +286,31 @@
 - docs.tsx
 - campaign-readiness-expiry.test.ts
 - object-storage-config.ts
-- object-storage.server.ts
+- boot-checks.server.ts
 - type-safety-utils.ts
 - A2P 10DLC — Deep Dive
 - Migration Ledger Drift
 - twilio-rcs-messaging/SKILL.md
 - Migration Delivery Board
-- call-recording-repair.server.ts
+- vite.config.ts
 - theme-contrast.test.ts
 - src/components/ui/progress.tsx
 - devDependencies
 - exports
-- inbound-verification.action.server.ts
+- db
 - twilio-conversations-classic-api/SKILL.md
 - twilio-customer-support-architect/SKILL.md
-- platform-media.server.ts
+- csvRow
 - ops-alert.server.ts
 - twilio-agent-augmentation-architect/SKILL.md
-- number-rental-reconciliation.ts
+- CampaignExportButton.tsx
 - check-migration-ledger.mjs
-- platform-workspace-numbers.server.ts
+- inbound-script-attachment.test.ts
 - Key Patterns
-- workspace-members-rbac.test.ts
+- check-middleware-adoption.mjs
 - exports
-- env.server.ts
-- accept-invite.loader.server.ts
+- campaign-ivr-dispatch.test.ts
+- canvass.ts
 - twilio-marketing-promotions-advisor/SKILL.md
 - twilio-security-compliance-hipaa/SKILL.md
 - CI Load-Reduction Test Checklist
@@ -319,46 +319,46 @@
 - IVR Remix vs Edge Audit
 - overrides
 - services/tsconfig.json
-- audience-upload.route.test.ts
-- call-status.route.test.ts
+- check-route-server-leaks.mjs
+- queue-transitions-source.mjs
 - campaign-queue-db.claim.test.ts
 - Core Verbs
-- Key Patterns
+- hooks-queue-purity.test.tsx
 - audience-uploader.test.tsx
 - use-chats-page-pagination.test.tsx
 - scriptkit-call-script-react/tsconfig.json
 - campaign-list-order.ts
-- required-env-keys.mjs
+- validateRequiredEnv
 - twilio-conference-calls/SKILL.md
 - twilio-taskrouter-routing/SKILL.md
 - Dev Test Plan — next round (2026-07-16)
-- hooks-api.ts
-- job-registry.test.ts
-- media-stream/types.ts
+- workspace-loader-secrets.test.ts
+- useCreditReconciliation.ts
+- routing-preset-write.server.test.ts
 - Key Patterns
-- chats.action.server.ts
+- numbers-routing-preset-action.test.ts
 - b
 - twilio-numbers-senders/SKILL.md
 - scriptkit-call-script-core/tsconfig.json
 - tsconfig.types-test.json
 - context.tsx
 - Graphify Skill
-- $id/$.loader.server.ts
+- api-caller-id-status.route.test.ts
 - scripts
 - Effects strictness
-- api-client.ts
+- useSurveySubmission.ts
 - twilio-call-recordings/SKILL.md
-- twilio-messaging-services/SKILL.md
-- OnboardingPage
+- MessageCampaign
+- audience-import-report.test.ts
 - fix-route-tests-rr7.mjs
-- sms-status.route.test.ts
-- workspace-invitations.test.ts
+- workspace-setting-utils.test.ts
+- number-locality.ts
 - twilio-organizations-setup/SKILL.md
 - campaigns.ts
 - ivr.js
 - Campaign Dispatch and State Bugs
 - twilio-security-hardening/SKILL.md
-- checkSheetBodyContract
+- export-message-date-bounds.test.ts
 - twilio-identity-verification-advisor/SKILL.md
 - Interactive SMS/MMS — Build Orchestration & Tracking
 - twilio-notifications-alerts-advisor/SKILL.md
@@ -369,7 +369,7 @@
 - twilio-regulatory-compliance-bundles/SKILL.md
 - Key Patterns
 - twilio-verify-send-otp/SKILL.md
-- useSurveySubmission.ts
+- SurveyRespondentPage
 - Key Patterns
 - Key Patterns
 - twilio-migrate-messaging-to-verify/SKILL.md
@@ -383,14 +383,14 @@
 - Final v2 migration findings
 - CallCaster Design System
 - twilio-voice-outbound-calls/SKILL.md
-- call-actions.server.ts
+- global-setup.ts
 - Hook TypeScript Migration
 - DRY strictness
 - Twilio Link Shortening
 - Postgres Error-code Strictness
 - Public API Test Drift
 - survey-utils.ts
-- check-workspace-projection.mjs
+- campaign-sms-report.sh script
 - src/components/ui/dropdown-menu.tsx
 - sync-staging-vars.sh
 - twilio-email-deliverability-advisor/SKILL.md
@@ -415,11 +415,8 @@
 - twilio-lookup-phone-intelligence/SKILL.md
 - pricing.tsx
 - CallCaster changelog
-- sms-segments.ts
-- survey-answer-state.ts
 - doctor.mjs
 - Twilio parent-account operations
-- number-rental-billing.server.test.ts
 - engines
 - Shared CHS packages
 - clone-database.sh
@@ -492,7 +489,6 @@
 - CampaignSettings.Script.flow.ts
 - CallCaster Repository and Issue Review
 - Schema Defaults Drift
-- $fileName.edit.loader.server.ts
 - Type-safety strictness gate
 - Historical/reference archive
 - Native CLAUDE.md graphify integration
@@ -503,7 +499,6 @@
 - setup-githooks.sh
 - Call script core
 - Agent Capability Authoring
-- public-api.ts
 - Pull Request Template
 - End-to-End Workflow
 - Campaign Export Bugs
@@ -531,10 +526,6 @@
 - hangup.route.test.ts
 - Twilio Agent Connect
 - Audit-to-plan workflow
-- platform-data.ts
-- number-purchase-worker.test.ts
-- check-pg-error-codes.mjs
-- check-request-body-consumption.mjs
 - Twilio credential hardening
 - Conversation Intelligence
 - Toll-free verification send gate
@@ -552,9 +543,7 @@
 - Test mock replacement baseline
 - Integration Patterns
 - shad-cc design system
-- message-media.route.test.ts
 - route-dynamic-server-imports.mjs
-- check-dry.mjs
 - low-credit-notify.server.test.ts
 - empty.tsx
 - Gotchas
@@ -563,19 +552,14 @@
 - inbound-ivr-block.route.test.ts
 - audience-uploader-progress.test.tsx
 - Predictive machine callback recovery
-- campaign-schedule-sync.server.test.ts
-- audio-streamer.test.tsx
+- AudioStreamer.tsx
 - Best Practices
 - Common Use Cases
 - Key Features
 - Use Cases
 - Decision Frameworks
-- audience-upload-opt-out.test.ts
-- test/workspace-invitation-resend.test.ts
 - Advanced Features
 - Product Context
-- VoicemailEmailProvider
-- object-storage-not-found.test.ts
 - Cloud Platform Integrations
 - Configuration
 - Voice-Specific Features
@@ -583,32 +567,31 @@
 - Messaging-Specific Features
 - Quick Start
 - Rental reconciliation
-- number-release-recovery.md
 - extraction-spec.md
 
 ## God Nodes (most connected - your core abstractions)
-1. `createTenantDb()` - 353 edges
-2. `Button` - 331 edges
+1. `createTenantDb()` - 360 edges
+2. `Button` - 336 edges
 3. `cn()` - 279 edges
-4. `asRouteResponse()` - 253 edges
-5. `logger` - 214 edges
+4. `asRouteResponse()` - 259 edges
+5. `logger` - 215 edges
 6. `jsonError()` - 179 edges
 7. `defineAction()` - 161 edges
 8. `jsonResponse()` - 149 edges
 9. `requireWorkspaceAccess()` - 140 edges
-10. `defineLoader()` - 135 edges
+10. `defineLoader()` - 136 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Say/Play` --references--> `digits()`  [INFERRED]
+  .agents/skills/twilio/twilio-studio-flows/references/widgets.md → app/lib/campaign-sms-report.server.ts
 - `Runtime` --references--> `from()`  [INFERRED]
   .agents/skills/twilio/twilio-conversation-orchestrator/SKILL.md → public/buffer-polyfill.mjs
 - `Step 1: Detect Specificity and Decide Your Mode` --references--> `from()`  [INFERRED]
   .agents/skills/twilio/twilio-marketing-promotions-advisor/SKILL.md → public/buffer-polyfill.mjs
 - `CANNOT` --references--> `from()`  [INFERRED]
-  .agents/skills/twilio/twilio-messaging-services/SKILL.md → public/buffer-polyfill.mjs
-- `Message Scheduling` --references--> `from()`  [INFERRED]
-  .agents/skills/twilio/twilio-messaging-services/SKILL.md → public/buffer-polyfill.mjs
-- `Overview` --references--> `from()`  [INFERRED]
-  .agents/skills/twilio/twilio-messaging-services/SKILL.md → public/buffer-polyfill.mjs
+  .agents/skills/twilio/twilio-send-message/SKILL.md → public/buffer-polyfill.mjs
+- `Common Errors` --references--> `from()`  [INFERRED]
+  .agents/skills/twilio/twilio-send-message/SKILL.md → public/buffer-polyfill.mjs
 
 ## Import Cycles
 - 2-file cycle: `app/lib/survey-db.server.ts -> app/lib/survey-responses.server.ts -> app/lib/survey-db.server.ts`
@@ -649,135 +632,135 @@
 - **Onboarding, surface, and QA loop** — docs_remediation_business_onboarding_simplification_plan_2026_07_17_goal_scoped_onboarding, docs_remediation_component_surface_remediation_plan_2026_07_17_workspace_surface_composition, docs_release_test_2026_09_07_release_test_guide_2026_09_07_release_verification [INFERRED 0.75]
 - **Migration rehearsal and big-bang cutover** — docs_staging_rehearsal_runbook_staging_cutover_rehearsal, docs_supabase_postgres_migration_plan_big_bang_cutover, docs_remediation_wave0_cutover_manifest_2026_07_13_cutover_gate [INFERRED 0.85]
 
-## Communities (587 total, 94 thin omitted)
+## Communities (571 total, 96 thin omitted)
 
-### Community 0 - "jsonError"
-Cohesion: 0.03
-Nodes (151): requireJsonAuth(), formatZodError(), parseActionBody(), parseJsonBody(), parseJsonBodyOrResponse(), parseSearchParams(), thrownToJsonResponse(), validationErrorResponse() (+143 more)
+### Community 0 - "env.server.ts"
+Cohesion: 0.02
+Nodes (161): authUser, adminMiddleware(), UserRow, AuthUser, requireSessionUserId(), revokeSessionByToken(), SessionResult, signOut() (+153 more)
 
-### Community 1 - "ref_lucide_react"
+### Community 1 - "TableRow"
 Cohesion: 0.04
-Nodes (151): AdminDefinitionGrid(), AdminDefinitionGridProps, AdminDefinitionItem, columnClass, AdminTableOverflow(), AdminTableOverflowProps, AudienceTable(), AudienceUploadMapStep() (+143 more)
+Nodes (155): AdminDashboardPage(), AdminDefinitionGrid(), AdminDefinitionGridProps, AdminDefinitionItem, columnClass, AdminTableOverflow(), AdminTableOverflowProps, AudienceUploader() (+147 more)
 
-### Community 2 - "platform-data.server.ts"
-Cohesion: 0.02
-Nodes (159): audience, audience_upload, contact, contact_audience, outreach_attempt, workspace_audio, AUDIENCE_CONTACT_SORT_KEYS, audienceContactSortColumn() (+151 more)
+### Community 2 - "workspace-client-projection.server.ts"
+Cohesion: 0.06
+Nodes (47): loadCallLogPage(), findCampaignInWorkspace(), mapCampaignQueueItemForUi(), QueueSearchFilters, listWorkspaceCampaignOptions(), fetchBasicResults(), fetchIvrResponseResults(), listWorkspaceAudiencesApi() (+39 more)
 
-### Community 3 - "Button"
+### Community 3 - "ref_react_router"
 Cohesion: 0.02
-Nodes (180): CampaignDialogs(), PhoneKeypad(), PhoneKeypadProps, TopChrome(), Household(), CallScreenLayout(), ErrorBanner(), CallQuestionnaire() (+172 more)
+Nodes (211): CampaignDialogs(), CampaignDialogsProps, HeldCallsListProps, CampaignPlaceNav(), CampaignShellDirtyContext, CampaignShellDirtyContextValue, CampaignShellDirtyProvider(), currentIsSettings() (+203 more)
 
 ### Community 4 - "workspace.server.ts"
 Cohesion: 0.03
-Nodes (137): heartbeatAgentStatus(), ApiKeyAuthResult, BearerSessionAuthResult, getDualAuthUser(), requireDualAuth(), resolveDualAuthSession(), SessionAuthResult, DualAuthLike (+129 more)
+Nodes (160): heartbeatAgentStatus(), ApiKeyAuthResult, AuthErrorResult, BearerSessionAuthResult, extractBearerToken(), getDualAuthUser(), requireDualAuth(), requireJsonAuth() (+152 more)
 
 ### Community 5 - "FormField"
 Cohesion: 0.03
-Nodes (156): StatusBar(), MetricStat(), toDateInputValue(), WorkspaceAnalyticsPanel(), WorkspaceAnalyticsPanelProps, AudienceForm(), AudienceFormProps, AudienceTableProps (+148 more)
+Nodes (153): MetricStat(), toDateInputValue(), WorkspaceAnalyticsPanel(), WorkspaceAnalyticsPanelProps, AudienceFormProps, DispositionBar(), AudioDeviceSelect(), CallingDeviceField() (+145 more)
 
 ### Community 6 - "ref_react"
-Cohesion: 0.04
-Nodes (58): CampaignDetailedSelectScriptProps, MessageSettings(), CampaignSettingsScript(), CampaignSettingsScriptProps, SaveBar(), SaveBarProps, AudioUploadResult, uploadWorkspaceAudio() (+50 more)
+Cohesion: 0.05
+Nodes (57): CampaignDetails, getErrorMessage(), MessageMediaActionData, MessageSettings(), MessageSettingsProps, TEMPLATE_TAGS, EmailField(), ErrorAlert() (+49 more)
 
-### Community 7 - "contact.server.ts"
-Cohesion: 0.03
-Nodes (111): TemplatePreview(), households, AutoDialerTurnInput, AutoDialerTurnResult, buildCallRow(), completeAllConferences(), createOutreachAttempt(), createTwilioCall() (+103 more)
+### Community 7 - "auto-dial.server.ts"
+Cohesion: 0.04
+Nodes (78): AutoDialerTurnInput, AutoDialerTurnResult, buildCallRow(), completeAllConferences(), createOutreachAttempt(), createTwilioCall(), getNextAutoDialQueueContact(), normalizePhoneNumber (+70 more)
 
 ### Community 8 - "db-types.ts"
 Cohesion: 0.01
-Nodes (217): agent_state, agent_statusRelations, answered_by, audience_uploadRelations, audienceRelations, call_status, campaign_audienceRelations, campaign_queueRelations (+209 more)
+Nodes (163): Assert, _CampaignCreatedAt, _ContactCreatedAt, IsOptional, minimalCampaign, minimalSurvey, minimalWebhook, minimalWorkspaceInvite (+155 more)
 
-### Community 9 - "$roomId.action.server.ts"
-Cohesion: 0.09
-Nodes (37): fetchCampaignByIdForWorkspace(), fetchCampaignWithScript(), handleMachineAnswer(), isMachineAnswered(), IvrMachineCall, IvrMachineCampaign, machineAnswerDisposition(), machineAnswerResponse() (+29 more)
+### Community 9 - "telephony-db.server.ts"
+Cohesion: 0.07
+Nodes (28): canonicalDisposition(), canTransitionOutreachDisposition(), DEFAULT_DISPOSITION_OPTIONS, DISPOSITION_LABELS, DNC_DISPOSITION, formatDispositionLabel(), isDncDisposition(), normalizeDispositionOptions() (+20 more)
 
 ### Community 10 - "asRouteResponse"
 Cohesion: 0.02
-Nodes (85): mocks, mocks, mocks, mocks, routes, mocks, mocks, mocks (+77 more)
+Nodes (85): mocks, mocks, routes, mocks, mocks, authApiMocks, mocks, mocks (+77 more)
 
-### Community 11 - "$selected_id/settings.action.server.ts"
-Cohesion: 0.03
-Nodes (109): OutboundDialer(), OutboundDialerProps, CampaignsList(), CampaignPlaceNav(), CampaignQueueProgress(), CampaignQueueProgressCounts, CampaignQueueProgressProps, campaignQueueProgressTooltip() (+101 more)
+### Community 11 - "Campaign"
+Cohesion: 0.04
+Nodes (77): OutboundDialer(), OutboundDialerProps, CampaignEmptyState(), CampaignsList(), CampaignQueueProgress(), CampaignQueueProgressCounts, CampaignQueueProgressProps, campaignQueueProgressTooltip() (+69 more)
 
 ### Community 12 - "route-auth-mock.ts"
-Cohesion: 0.03
-Nodes (85): mocks, telephonyDbMocks, mocks, audienceExportMocks, requireWorkspaceAccess, downloadMode, downloadObjectMock, findAudienceUploadById (+77 more)
+Cohesion: 0.02
+Nodes (93): mocks, telephonyDbMocks, mocks, audienceExportMocks, requireWorkspaceAccess, dbMocks, enqueueJobMock, logger (+85 more)
 
-### Community 13 - "auth.server.ts"
+### Community 13 - "phone.ts"
+Cohesion: 0.16
+Nodes (14): ExistingConversation, useContactSearch(), UseContactSearchProps, usePhoneNumbers(), useClickOutside(), listAudiencePhones(), fetchContactsByPhone(), fetchLatestMessageForPhone() (+6 more)
+
+### Community 14 - "Button"
+Cohesion: 0.03
+Nodes (112): AgentDesktop(), AgentDesktopConnected(), AgentDesktopConnectedProps, AgentState, OutletContext, ReasonedAgentState, runDeviceCheck(), STATUS_OPTIONS (+104 more)
+
+### Community 15 - "contact.server.ts"
 Cohesion: 0.04
-Nodes (66): adminMiddleware(), UserRow, resolveJsonAuthSession(), AuthLayoutLoaderData, createAuthLayoutLoader(), CreateAuthLayoutLoaderOptions, createRequireSessionUserId(), AuthUser (+58 more)
+Nodes (56): audience, contact_audience, households, AUDIENCE_CONTACT_SORT_KEYS, audienceContactSortColumn(), AudienceContactSortKey, getAudienceDetailApi(), LatestUploadSummary (+48 more)
 
-### Community 14 - "Text"
+### Community 16 - "object-storage.server.ts"
 Cohesion: 0.03
-Nodes (117): AdminDashboardPage(), AgentDesktop(), AgentDesktopConnected(), AgentDesktopConnectedProps, AgentState, OutletContext, ReasonedAgentState, runDeviceCheck() (+109 more)
-
-### Community 15 - "workspace-settings-rbac.test.ts"
-Cohesion: 0.07
-Nodes (21): mocks, runAction(), response(), mocks, postManualCredit(), mocks, mocks, runLoader() (+13 more)
-
-### Community 16 - "audio.server.ts"
-Cohesion: 0.13
-Nodes (33): listMediaObjects(), baseNameOf(), CreateAudioClipInput, createWorkspaceAudioClip(), resolveTargetFileName(), ALLOWED_AUDIO_MIME_TYPES, assertValidAudioUpload(), formatSeconds() (+25 more)
+Nodes (126): getMediaObject(), getSignedMediaUrl(), getSignedMediaUrls(), listMediaObjects(), MediaBucket, MediaObjectMeta, MediaUploadOptions, putMediaObject() (+118 more)
 
 ### Community 17 - "scripts"
 Cohesion: 0.02
 Nodes (117): scripts, build, check:auth-rate-limits, check:bun-lock, check:changelog, check:client-bundle, check:credit-writes, check:db-rpcs (+109 more)
 
 ### Community 18 - "cn"
-Cohesion: 0.03
-Nodes (81): CallWorkbench(), CallWorkbenchProps, CampaignDetails, getErrorMessage(), MessageMediaActionData, MessageSettingsProps, TEMPLATE_TAGS, EmailField() (+73 more)
-
-### Community 19 - "createWorkspaceTwilioInstance"
 Cohesion: 0.04
-Nodes (102): reconcileWorkspaceBilling(), ReconcileWorkspaceBillingResult, loadBillingReconciliationReport(), persistWorkspaceBillingReconciliationSnapshot(), createWorkspaceTwilioInstance(), updateWorkspaceTwilioPortalConfig(), syncWorkspaceTwilioBootstrapStateSafely(), syncWorkspaceTwilioSnapshot() (+94 more)
+Nodes (59): AudienceForm(), AudienceTable(), AudienceTableProps, CampaignHeaderProps, creditBadgeClass, creditLabel, TopChrome(), TopChromeProps (+51 more)
+
+### Community 19 - "Database"
+Cohesion: 0.04
+Nodes (113): reconcileWorkspaceBilling(), ReconcileWorkspaceBillingResult, loadBillingEntityAudit(), loadBillingReconciliationReport(), DEFAULT_SNAPSHOT, getWorkspaceBillingReconciliationSnapshot(), persistWorkspaceBillingReconciliationSnapshot(), updateWorkspaceTwilioPortalConfig() (+105 more)
 
 ### Community 20 - "db.ts"
-Cohesion: 0.02
-Nodes (82): workspace_events, workspace_invitation, WORKSPACE_SCOPED_TABLES, WorkspaceScopedTableName, CALLER_ID_CAPABILITIES, startWorkspaceCallerIdVerification(), StartWorkspaceCallerIdVerificationResult, findWorkspaceIdByComplianceSid() (+74 more)
+Cohesion: 0.03
+Nodes (63): workspace_invitation, WorkspaceScopedTableName, RateLimitRpcRow, COMPLETED_JOB_RETENTION_DAYS, JOB_PRUNE_BATCH_SIZE, pruneCompletedJobs(), pruneWorkspaceEvents(), WORKSPACE_EVENT_RETENTION_DAYS (+55 more)
 
 ### Community 21 - "platform-members.server.ts"
+Cohesion: 0.04
+Nodes (95): API_KEY_PREFIX_LENGTH, hashApiKey(), hashApiKeyForStorage(), parseApiKeyScopesFromForm(), ALL_CAPABILITY_IDS, API_KEY_DEFAULT_TTL_DAYS, API_KEY_MAX_TTL_DAYS, CALLCASTER_ROLE_CAPABILITY_MATRIX (+87 more)
+
+### Community 22 - "Contact"
 Cohesion: 0.05
-Nodes (79): parseApiKeyScopesFromForm(), isMemberRole(), assertNoRoleEscalation(), assertScopesWithinActorRole(), cancelWorkspaceInvite(), createWorkspaceApiKey(), deleteWorkspaceApiKey(), generateApiKey() (+71 more)
+Nodes (56): QueueContactProps, ContactDetails, ContactDetailsHandle, ContactDetailsProps, ContactDetailsState, ContactUpdateData, ContactField, ContactFields() (+48 more)
 
-### Community 22 - "QueueTable.tsx"
+### Community 23 - "ref_testing_library_react"
 Cohesion: 0.03
-Nodes (88): QueueContactProps, CallAreaProps, CampaignDialogsProps, QueueListProps, ContactDetails, ContactDetailsHandle, ContactDetailsProps, ContactDetailsState (+80 more)
+Nodes (69): Toaster(), ComplianceStatusPanel(), statusLabel(), workspacePanelHeightClass, workspacePanelHeightLgClass, workspaceSidebarHeightClass, workspaceViewportHeightLgClass, WorkspaceToday() (+61 more)
 
-### Community 23 - "ref_react_router"
-Cohesion: 0.02
-Nodes (89): AudienceUploadHistoryProps, QueryParamBanner(), QueryParamBannerProps, QueryParamBannerVariant, ChatImages(), ChatImagesProps, SurveyForm(), Toaster() (+81 more)
-
-### Community 24 - "campaign-outbound-estimate.ts"
-Cohesion: 0.07
-Nodes (41): CampaignLaunchExtras(), countCapableNumbers(), findNumberByPhone(), formatCompletionTime(), formatRatePerMinute(), getEtaRange(), OutboundEstimateAlert(), OutboundEstimateInputs (+33 more)
+### Community 24 - "workspace-twilio-config.server.ts"
+Cohesion: 0.05
+Nodes (62): buildTwilioPortalAuditSummary(), DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG, DeriveWorkspaceThroughputResult, getEffectiveWorkspaceTwilioPortalConfig(), getEffectiveWorkspaceTwilioPortalConfigForWorkspace(), getWorkspaceTwilioPortalConfigFromTwilioData(), mapOnboardingStateToPortalStatus(), normalizeWorkspaceTwilioOpsConfig() (+54 more)
 
 ### Community 25 - "ref_node_fs"
 Cohesion: 0.02
-Nodes (57): SETTLED_SMS_STATUSES, BUILD_CLIENT, FORBIDDEN, FORBIDDEN_RUNTIME, FORBIDDEN_SPECIFIER, hits, walk(), offenders (+49 more)
+Nodes (72): allowlistViolations, BASELINE_ALLOWLIST, EXEMPT, missingAllowlisted, missingExempt, offenders, ROOT, seenAllowlisted (+64 more)
 
 ### Community 26 - "WorkspaceSelectedNewUtils.server.ts"
-Cohesion: 0.07
-Nodes (39): OtherDataFieldsProps, campaign_audience, ChatSortOption, getChatSortOption(), campaignTypesForLegacyTableKey(), fetchCampaignsByType(), bulkCreateContacts(), AggregatedConversationRow (+31 more)
+Cohesion: 0.11
+Nodes (23): OtherDataFieldsProps, buildWeekdayCallingSchedule(), getDefaultCampaignDates(), campaignTypesForLegacyTableKey(), fetchCampaignsByType(), dedupeContactsById(), fetchContactData(), Json (+15 more)
 
 ### Community 27 - "twilio-client.server.ts"
 Cohesion: 0.04
-Nodes (120): a2pBusinessProfileChanged(), resolveA2pPolicySid(), updateWorkspaceMessagingOnboardingState(), businessProfileFieldRequiredMessage(), Assignment, attributesMatch(), EndUser, ensureAssignments() (+112 more)
+Nodes (113): a2pBusinessProfileChanged(), resolveA2pPolicySid(), updateWorkspaceMessagingOnboardingState(), businessProfileFieldRequiredMessage(), Assignment, attributesMatch(), EndUser, ensureAssignments() (+105 more)
 
-### Community 28 - "logger.server.ts"
+### Community 28 - "schema.ts"
 Cohesion: 0.03
-Nodes (101): authAccount, authAccountRelations, authSession, authSessionRelations, authTwoFactor, authTwoFactorRelations, authUser, authUserRelations (+93 more)
+Nodes (116): agent_state, agent_statusRelations, answered_by, audience_import_row, audience_import_run, audience_upload, audience_uploadRelations, audienceRelations (+108 more)
 
 ### Community 29 - "platform-rate-limit.server.ts"
 Cohesion: 0.05
-Nodes (59): checkRateLimitPostgres(), checkRateLimit(), clientRateLimitKey(), getMemoryBackend(), rateLimitResponse(), resetRateLimitsForTests(), usesMemoryBackend(), checkRateLimitInMemory() (+51 more)
+Nodes (52): checkRateLimitPostgres(), checkRateLimit(), getMemoryBackend(), resetRateLimitsForTests(), usesMemoryBackend(), checkRateLimitInMemory(), nextRateLimitBucketState(), RateLimitBucketState (+44 more)
 
-### Community 30 - "app/lib/utils.ts"
-Cohesion: 0.05
-Nodes (50): CallLogTable(), CallLogTableProps, SortIndicator(), CampaignEmptyState(), ContactsPage(), formatOtherData(), OtherDataItem, mediaColumns (+42 more)
-
-### Community 31 - "platform-admin.server.ts"
+### Community 30 - "Heading"
 Cohesion: 0.04
-Nodes (83): DEAD_LETTER_JOB_STATUS, listRecentDeadLetteredJobs(), requeueDeadLetteredJob(), adminRouteAuth(), AdminRouteContext, getAdminRouteContext(), UserRow, requireSudo() (+75 more)
+Nodes (59): CallLogTable(), CallLogTableProps, SortIndicator(), ContactsPage(), formatOtherData(), OtherDataItem, mediaColumns, PeopleHubLayout() (+51 more)
+
+### Community 31 - "workspace-members-db.server.ts"
+Cohesion: 0.04
+Nodes (95): listRecentDeadLetteredJobs(), adminRouteAuth(), AdminRouteContext, getAdminRouteContext(), UserRow, requireSudo(), eqChsTextToUuid(), isMemberRole() (+87 more)
 
 ### Community 32 - "a2p-profile-provider.ts"
 Cohesion: 0.10
@@ -785,67 +768,67 @@ Nodes (26): adminDb, args, assignmentResponse(), boundaries, brandResponse(), ca
 
 ### Community 33 - "useCallScreen.ts"
 Cohesion: 0.04
-Nodes (54): CREDIT_RECONCILE_INTERVAL_MS, CREDIT_RECONCILE_WINDOW_MS, useCreditReconciliation(), UseCreditReconciliationOptions, MIC_MONITOR_MAX_MS, SPEAKER_TEST_TONE_HZ, SPEAKER_TEST_TONE_MS, useAudioDeviceTest() (+46 more)
+Nodes (59): MIC_MONITOR_MAX_MS, SPEAKER_TEST_TONE_HZ, SPEAKER_TEST_TONE_MS, useAudioDeviceTest(), UseAudioDeviceTestOptions, END_TONE_FREQUENCIES_HZ, LIVE_STATES, TERMINAL_STATES (+51 more)
 
 ### Community 34 - "survey-utils.test.ts"
 Cohesion: 0.21
 Nodes (5): ResultItem(), SurveyUtils, isArray(), safeNumber(), safeString()
 
-### Community 35 - "platform-onboarding-handlers.server.ts"
+### Community 35 - "ref_postgres"
 Cohesion: 0.05
-Nodes (80): CallerIdValidationRequest, getWorkspacePhoneNumbers(), getWorkspaceRecentOutboundMessageCount(), updateWorkspaceNumberCapabilitiesByPhone(), findWorkspaceIdByTwilioAccountSid(), channelsForOnboardingGoal(), isWorkspaceOnboardingGoal(), nextWizardStep() (+72 more)
+Nodes (32): authAccount, authAccountRelations, authSession, authSessionRelations, authTwoFactor, authTwoFactorRelations, authUserRelations, authVerification (+24 more)
 
 ### Community 36 - "handlers.server.ts"
-Cohesion: 0.06
-Nodes (63): EnqueueJobArgs, registrations, ADR-0007, audienceUploadParams, billingReconcileParams, callStatusSideEffectsParams, campaignDispatchParams, campaignExportParams (+55 more)
+Cohesion: 0.07
+Nodes (46): ensureSelfSchedulingJobsSeeded(), SCHEDULE_WATCHDOG_INTERVAL_MS, SelfSchedulingJobType, startScheduleWatchdog(), jobRegistry, PAGING_JOB_TYPES, registrations, SELF_SCHEDULING_JOB_TYPES (+38 more)
 
 ### Community 37 - "src/types.ts"
-Cohesion: 0.06
-Nodes (69): fixture, createId(), resetIdCounter(), applyMergeTags(), CALLCASTER_TYPE_MAP, callcasterWireBlockSchema, collectExtras(), DOC_TO_CALLCASTER_TYPE (+61 more)
+Cohesion: 0.12
+Nodes (31): baseBlockFields, CALLCASTER_BLOCK_TYPES, CallScriptServiceConfig, checkboxBlockSchema, choiceBlockSchema, CreateEmptyDocumentOptions, instructionBlockSchema, isIvrPlaybackType() (+23 more)
 
 ### Community 38 - "messaging-onboarding.server.ts"
 Cohesion: 0.03
-Nodes (113): CAMPAIGN_PRODUCT_GOAL_OPTIONS, CAMPAIGN_PRODUCT_GOAL_VALUES, CampaignProductGoalOption, campaignTypeForProductGoal(), productGoalForCampaignType(), productGoalForOnboardingGoal(), fetchWorkspaceCampaignQueueProgressMap(), buildDefaultWorkspaceTwilioPortalSnapshot() (+105 more)
+Nodes (134): fetchWorkspaceCampaignQueueProgressMap(), getWorkspaceUnreadConversationCount(), getWorkspaceInfoWithDetails(), notFoundError(), getWorkspaceRecentOutboundMessageCount(), getWorkspaceTwilioDataVersion(), DEFAULT_WORKSPACE_ONBOARDING_STEPS, WORKSPACE_MESSAGING_ONBOARDING_VERSION (+126 more)
 
 ### Community 39 - "ref_vitest"
 Cohesion: 0.02
-Nodes (49): @/lib/*.server, formatNumberLocality(), formatNumberLocation(), KNOWN_RATE_CENTRE_NAMES, sessionStorage, themeSessionResolver, databaseMocks, inboundMocks (+41 more)
+Nodes (46): @/lib/*.server, sessionStorage, themeSessionResolver, handsetState, loggerMocks, telephonyDbMocks, workspaceMocks, mocks (+38 more)
 
 ### Community 40 - "platform-telephony.server.ts"
-Cohesion: 0.05
-Nodes (59): getCallCoachingHydration(), getCallScreenData(), getInitialCallsList(), getInitialRecentAttempt(), getInitialRecentCall(), getMostRecentAttempt(), getNextRecipient(), getQueueByDialType() (+51 more)
+Cohesion: 0.06
+Nodes (52): getAgentStatus(), updateAgentStatus(), upsertAgentStatusRow(), getCallCoachingHydration(), CallScreenData, CampaignWithScript, getCallScreenData(), getInitialCallsList() (+44 more)
 
 ### Community 41 - "package.json"
 Cohesion: 0.02
-Nodes (85): @base-ui/react, better-auth, @chester-hill-solutions/auth, @chester-hill-solutions/scriptkit-call-script-core, class-variance-authority, clsx, dotenv, drizzle-orm (+77 more)
+Nodes (79): @base-ui/react, better-auth, @chester-hill-solutions/auth, @chester-hill-solutions/scriptkit-call-script-core, class-variance-authority, clsx, dotenv, drizzle-orm (+71 more)
 
 ### Community 42 - "shad-cc/src/index.ts"
 Cohesion: 0.04
 Nodes (66): input-otp, Accordion(), AccordionContent(), AccordionItem(), AccordionTrigger(), Alert(), AlertAction(), AlertDescription() (+58 more)
 
 ### Community 43 - "shared/pricing.ts"
-Cohesion: 0.10
-Nodes (40): CalculatorField(), estimateMonthlyCredits(), FieldProps, INITIAL_INPUTS, Inputs, nonNegative(), PricingCalculator(), voiceCreditsPerDial() (+32 more)
+Cohesion: 0.08
+Nodes (50): CalculatorField(), estimateMonthlyCredits(), FieldProps, INITIAL_INPUTS, Inputs, nonNegative(), PricingCalculator(), voiceCreditsPerDial() (+42 more)
 
 ### Community 44 - "lib/types.ts"
-Cohesion: 0.03
-Nodes (94): nextSuffix(), useSurveyForm(), buildTwilioPortalAuditSummary(), DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG, DeriveWorkspaceThroughputResult, getEffectiveWorkspaceTwilioPortalConfig(), getEffectiveWorkspaceTwilioPortalConfigForWorkspace(), getWorkspaceTwilioPortalConfigFromTwilioData() (+86 more)
+Cohesion: 0.02
+Nodes (102): SurveyFormProps, nextSuffix(), useSurveyForm(), CAMPAIGN_PRODUCT_GOAL_OPTIONS, CAMPAIGN_PRODUCT_GOAL_VALUES, CampaignProductGoalOption, campaignTypeForProductGoal(), productGoalForOnboardingGoal() (+94 more)
 
-### Community 45 - "useCallHandling.ts"
-Cohesion: 0.07
-Nodes (46): useCallDuration(), applyAgentLegMute(), CallConnectParams, suspendHeldCall(), useCallHandling(), UseCallHandlingOptions, UseCallHandlingReturn, CallAction (+38 more)
+### Community 45 - "logger.client.ts"
+Cohesion: 0.05
+Nodes (66): CallControls(), declineIncomingCall(), AgentState, UseAgentStatusOptions, UseAgentStatusReturn, useCallDuration(), applyAgentLegMute(), CallConnectParams (+58 more)
 
 ### Community 46 - "database/campaign.server.ts"
 Cohesion: 0.05
-Nodes (58): asOptionalString(), asOptionalStringArray(), buildUnifiedCampaignFields(), CampaignDetails, cleanObject(), coalesceCampaignText(), coalesceMessageMedia(), createCampaign() (+50 more)
+Nodes (59): claimIsLive(), SMS_CLAIM_LEASE_MS, asOptionalString(), asOptionalStringArray(), buildUnifiedCampaignFields(), CampaignData, CampaignDetails, cleanObject() (+51 more)
 
-### Community 47 - "survey-db.server.ts"
-Cohesion: 0.09
-Nodes (31): SurveyFormProps, question_option, response_answer, survey, survey_page, survey_question, survey_response, formatDateUtc() (+23 more)
+### Community 47 - "platform-data.server.ts"
+Cohesion: 0.04
+Nodes (76): contact, question_option, response_answer, survey, survey_page, survey_question, survey_response, VerifyApiKeyOrSessionResult (+68 more)
 
 ### Community 48 - "useChatsPage.ts"
-Cohesion: 0.05
-Nodes (78): ChatOptOutBanner(), ChatThreadView(), ChatThreadViewProps, ChatMessages(), ChatMessagesProps, Message, ScheduledMessageMeta(), WorkspaceNumberLabel (+70 more)
+Cohesion: 0.06
+Nodes (66): useChatsPage(), useImageHandling(), useUnreadConversationsCount(), ConversationSummary, matchesPendingMessage(), normalizePhoneForComparison(), phoneNumbersMatch(), reconcileLoaderMessages() (+58 more)
 
 ### Community 49 - "call-recording-storage.server.ts"
 Cohesion: 0.18
@@ -856,136 +839,140 @@ Cohesion: 0.07
 Nodes (42): "node_modules/buffer-polyfill/index.js"(), alloc(), allocUnsafe(), arrayIndexOf(), read(), asciiSlice(), asciiToBytes(), asciiWrite() (+34 more)
 
 ### Community 51 - "queue-status.ts"
-Cohesion: 0.08
-Nodes (45): planPredictiveRow(), QueueUpdatePlan, useQueue(), buildQueueStatusUpdatePayload(), buildAssignedQueueUpdate(), buildDequeuedQueueUpdate(), buildProviderStatusQueueUpdate(), buildQueuedQueueUpdate() (+37 more)
+Cohesion: 0.10
+Nodes (36): buildQueueStatusUpdatePayload(), buildAssignedQueueUpdate(), buildDequeuedQueueUpdate(), buildProviderStatusQueueUpdate(), buildQueuedQueueUpdate(), buildQueueEntryUpdate(), getAssignedUserId(), getProviderStatus() (+28 more)
 
-### Community 52 - "auto-dial/status.action.server.ts"
-Cohesion: 0.08
-Nodes (46): updateCampaignQueueByContactAndCampaign(), needsPredictiveTerminalContinuation(), findOutreachAttemptById(), updateCallRecordingUrlBySid(), CallStatusCallback, callStatusCallbackSchema, isParticipantHangup(), isParticipantJoin() (+38 more)
+### Community 52 - "voice-callback.ts"
+Cohesion: 0.05
+Nodes (47): DEFAULT_REPAIR_LIMIT, REPAIR_MAX_AGE_DAYS, REPAIR_MIN_AGE_MINUTES, repairIdempotencyKey(), RepairSweepResult, repairTwilioParams(), runRecordingRepairSweep(), updateCallRecordingUrlBySid() (+39 more)
 
 ### Community 53 - "bootstrap-fresh-db.mjs"
 Cohesion: 0.04
-Nodes (48): @aws-sdk/client-s3, allDrizzleFiles, allMigrationFiles, checkOnly, coveredByBaseline, coveredByLaterMigration, __dirname, drizzleWired (+40 more)
+Nodes (49): allDrizzleFiles, allMigrationFiles, assertFreshDatabase(), checkOnly, coveredByBaseline, coveredByLaterMigration, __dirname, drizzleWired (+41 more)
 
 ### Community 54 - "chat-composer-recovery.test.tsx"
-Cohesion: 0.04
-Nodes (42): addOptimisticMessage, Composer(), images, loader, markOptimisticMessageFailed, messageFetcher, mount(), paginationFetcher (+34 more)
+Cohesion: 0.03
+Nodes (72): ChatOptOutBanner(), ChatThreadView(), ChatThreadViewProps, ChatMessages(), ChatMessagesProps, Message, ScheduledMessageMeta(), WorkspaceNumberLabel (+64 more)
 
 ### Community 55 - "poll-jobs.server.ts"
-Cohesion: 0.13
-Nodes (24): runWithRequestContext(), affectedRowCount(), claimLost(), claimNextJob(), completeJob(), deadLetterExhaustedJobs(), failJob(), FailJobArgs (+16 more)
+Cohesion: 0.07
+Nodes (35): runWithRequestContext(), jobHandlers, affectedRowCount(), ClaimedJobRow, claimLost(), claimNextJob(), completeJob(), deadLetterExhaustedJobs() (+27 more)
 
 ### Community 56 - "billing-reconciliation.ts"
 Cohesion: 0.06
-Nodes (47): buildDriftEmail(), handleBillingReconciliationDrift(), sendBillingReconciliationDriftEmail(), BillingReconciliationDriftMarker, getBillingReconciliationDriftMarker(), shouldSendBillingReconciliationDriftEmail(), BILLING_RECONCILIATION_VARIANCE_THRESHOLD, BillingCategoryReconciliation (+39 more)
+Nodes (50): buildDriftEmail(), handleBillingReconciliationDrift(), sendBillingReconciliationDriftEmail(), escapeHtml(), buildEmail(), getLowCreditNotificationMarker(), LowCreditNotificationMarker, LowCreditNotifyResult (+42 more)
 
-### Community 57 - "probe-surfaces.mjs"
-Cohesion: 0.06
-Nodes (53): seedAuthUser(), ALWAYS_OPEN_SCHEDULE, API_KEY, AUDIENCE_ID, buildWeekdayCallingSchedule(), BUSINESS_HOURS_SCHEDULE, CALLER_PERMISSIONS, CAMPAIGNS (+45 more)
+### Community 57 - "seed-data.mjs"
+Cohesion: 0.10
+Nodes (31): seedAuthUser(), ALWAYS_OPEN_SCHEDULE, API_KEY, AUDIENCE_ID, buildWeekdayCallingSchedule(), BUSINESS_HOURS_SCHEDULE, CALLER_PERMISSIONS, CAMPAIGNS (+23 more)
 
 ### Community 58 - "ref_node_child_process"
 Cohesion: 0.03
-Nodes (36): root, PACKAGES, snapshot(), walk(), folderToFlat, PATH_MAP, pathMap, ROOT (+28 more)
+Nodes (42): root, BASELINE_PATH, DIMENSIONS, measured, METRICS, regressions, ROOT, scan() (+34 more)
 
-### Community 59 - "campaign-sms-dispatch-contract.test.ts"
-Cohesion: 0.05
-Nodes (40): basePortal, mocks, QueueMember, runHttpAdapter(), runWorkerAdapter(), Scenario, SCENARIOS, TWO_ELIGIBLE_ROWS (+32 more)
+### Community 59 - "test/sms-recipient-identity.test.ts"
+Cohesion: 0.04
+Nodes (43): basePortal, mocks, QueueMember, runHttpAdapter(), runWorkerAdapter(), Scenario, SCENARIOS, TWO_ELIGIBLE_ROWS (+35 more)
 
 ### Community 60 - "acd-router.server.ts"
 Cohesion: 0.06
-Nodes (55): queue_entry_state, AcdRouterPath, ACTIVE_ENTRY_STATES_SQL, buildValidationUrl(), claimAgentForQueue(), countInboundQueueOfferAttempts(), dialAgent(), findExistingInboundQueueEntry() (+47 more)
+Nodes (53): AcdRouterPath, ACTIVE_ENTRY_STATES_SQL, buildValidationUrl(), claimAgentForQueue(), countInboundQueueOfferAttempts(), dialAgent(), findExistingInboundQueueEntry(), getBaseUrl() (+45 more)
 
 ### Community 61 - "auto-dial-status.test.ts"
-Cohesion: 0.05
-Nodes (50): canonicalDisposition(), canTransitionOutreachDisposition(), DEFAULT_DISPOSITION_OPTIONS, DISPOSITION_LABELS, DNC_DISPOSITION, formatDispositionLabel(), isDncDisposition(), normalizeDispositionOptions() (+42 more)
+Cohesion: 0.06
+Nodes (40): createSignedObjectUrlMock, machineRequest(), mocks, predictiveResponseMock, roomCallRow, roomClientState, roomDbMocks, roomRpcState (+32 more)
+
+### Community 62 - "$selected_id/queue.action.server.ts"
+Cohesion: 0.10
+Nodes (36): campaignAndAudienceShareWorkspace(), deleteCampaignAudienceLink(), findCampaignAudienceLink(), insertCampaignAudienceLink(), listCampaignAudienceIds(), listContactIdsForAudience(), listContactIdsForAudiences(), duplicateCampaign() (+28 more)
 
 ### Community 63 - "dependencies"
 Cohesion: 0.03
-Nodes (60): dependencies, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner, @base-ui/react, better-auth, buffer-polyfill, @chester-hill-solutions/auth, @chester-hill-solutions/auth-postgres (+52 more)
+Nodes (61): dependencies, @aws-sdk/client-s3, @aws-sdk/s3-request-presigner, @base-ui/react, better-auth, buffer-polyfill, @chester-hill-solutions/auth, @chester-hill-solutions/auth-postgres (+53 more)
 
 ### Community 64 - "shad-cc/package.json"
 Cohesion: 0.03
 Nodes (61): react-resizable-panels, tsup, dependencies, @base-ui/react, class-variance-authority, clsx, embla-carousel-react, input-otp (+53 more)
 
-### Community 65 - "campaign-execution.server.ts"
+### Community 65 - "handlers/campaign.server.ts"
 Cohesion: 0.09
-Nodes (28): CampaignDetails, isMachineDispatchedVoiceCampaignType(), kickoffCampaign(), launchCampaign(), LaunchCampaignResult, MACHINE_DISPATCHED_VOICE_CAMPAIGN_TYPES, rescheduleDispatchAfterWindowEdit(), scriptRoutingIssue() (+20 more)
+Nodes (36): CampaignDetails, isMachineDispatchedVoiceCampaignType(), kickoffCampaign(), launchCampaign(), LaunchCampaignResult, MACHINE_DISPATCHED_VOICE_CAMPAIGN_TYPES, rescheduleDispatchAfterWindowEdit(), scriptRoutingIssue() (+28 more)
 
 ### Community 66 - "src/lib/utils.ts"
 Cohesion: 0.08
 Nodes (25): Badge(), badgeVariants, ButtonGroup(), ButtonGroupText(), buttonGroupVariants, Checkbox(), Kbd(), KbdGroup() (+17 more)
 
-### Community 67 - "logger.client.ts"
-Cohesion: 0.06
-Nodes (41): AudioStreamerProps, useCreditBalance(), PresenceUser, useCallRoom(), UseCallRoomParams, UseCallRoomReturn, useUnreadConversationsCount(), usePhoneNumbers() (+33 more)
+### Community 67 - "QueueItem"
+Cohesion: 0.05
+Nodes (48): QueueListProps, useCreditBalance(), PresenceUser, useCallRoom(), UseCallRoomParams, UseCallRoomReturn, usePredictiveCallSync(), UsePredictiveCallSyncOptions (+40 more)
 
 ### Community 68 - "webhook-event-options.shared.ts"
-Cohesion: 0.07
-Nodes (47): CatalogPickerCategorySection(), ApiKeyCapabilityPicker(), ApiKeyCapabilityPickerProps, CapabilityCategorySection(), CapabilityRow(), EventCategorySection(), EventKindRow(), WebhookEventPicker() (+39 more)
+Cohesion: 0.13
+Nodes (25): API_KEY_CAPABILITY_OPTIONS, ApiKeyCapabilityCategory, ApiKeyCapabilityOption, apiKeyCapabilitySelectionCoverage(), CAPABILITY_CATEGORIES, groupApiKeyCapabilityOptions(), CatalogPickerCategory, CatalogPickerItem (+17 more)
 
 ### Community 69 - "webhook-side-effects.server.ts"
-Cohesion: 0.03
-Nodes (118): DispatchPolicy, CampaignSmsSendWindowClosedError, createOutreachAttempt(), DUPLICATE_SMS_DEQUEUED_REASON, hasDuplicateCampaignSms(), LANDLINE_SMS_DEQUEUED_REASON, nextCampaignSmsWindowOpenAt(), OPTED_OUT_SMS_DEQUEUED_REASON (+110 more)
+Cohesion: 0.05
+Nodes (59): cancelCallAndUpdateDB(), cancelMessageAndUpdateDB(), cancelQueuedCalls(), cancelQueuedMessages(), cancelQueuedMessagesForCampaign(), fetchQueuedCalls(), fetchQueuedMessages(), processBatchCancellation() (+51 more)
 
 ### Community 70 - "scriptkit-call-script-react/src/index.ts"
 Cohesion: 0.05
 Nodes (23): BlockEditor(), BlockEditorProps, ScriptEditor(), ScriptEditorProps, blockLabel(), clearDanglingRouting(), createBlock(), moveWithin() (+15 more)
 
-### Community 71 - "handlers/campaign.server.ts"
-Cohesion: 0.06
-Nodes (56): AudienceRow, AudienceUploadRow, createAudienceForUpload(), createAudienceUploadRecord(), createEmptyAudience(), findAudienceInWorkspace(), findCampaignForAudienceUpload(), linkAudienceToCampaign() (+48 more)
+### Community 71 - "createTenantDb"
+Cohesion: 0.05
+Nodes (70): getAudienceImportProgress(), AudienceRow, AudienceUploadRow, createAudienceForUpload(), createAudienceUploadRecord(), findAudienceInWorkspace(), findAudienceUploadById(), findCampaignForAudienceUpload() (+62 more)
 
 ### Community 72 - "field.tsx"
 Cohesion: 0.09
 Nodes (26): ButtonGroupSeparator(), Field(), FieldContent(), FieldDescription(), FieldError(), FieldGroup(), FieldLabel(), FieldLegend() (+18 more)
 
 ### Community 73 - "number-rental-billing.server.ts"
-Cohesion: 0.13
-Nodes (24): removeWorkspacePhoneNumber(), escapeHtml(), applyRentalLifecycleAction(), billElapsedCycles(), buildReminderEmail(), daysBetween(), elapsedDueDates(), formatDueDate() (+16 more)
+Cohesion: 0.06
+Nodes (50): transaction_history, workspace_number_purchase, applyRentalLifecycleAction(), billElapsedCycles(), buildReminderEmail(), daysBetween(), elapsedDueDates(), formatDueDate() (+42 more)
 
 ### Community 74 - "twilio-webhook.server.ts"
-Cohesion: 0.05
-Nodes (49): sayHangupTwiml(), accountSidFromParams(), loadTwilioDataForWorkspaceId(), loadTwilioDataViaAccountSidFallback(), logWebhookAuthFailure(), parseTwilioWebhookParams(), requireTwilioEventsSinkSecret(), requireTwilioSignature() (+41 more)
+Cohesion: 0.04
+Nodes (92): handleAcdRouterRequest(), findActiveHandsetSession(), findActiveHandsetSessionClientIdentity(), findInboundIvrScriptSteps(), findWorkspaceNumberByPhoneNumber(), findWorkspaceNumberInboundFallbackByPhone(), upsertInboundCallRecord(), workspaceWebhookHasInboundCallInsert() (+84 more)
 
 ### Community 75 - "useCampaignCallFlow.ts"
-Cohesion: 0.05
-Nodes (52): CallScreenLayoutProps, CallStateMachineSend, FSM_TERMINAL, INITIAL_LIFECYCLE, isTerminalForOutcome(), normalizedToOutcome(), PredictiveState, StartCallArgs (+44 more)
+Cohesion: 0.07
+Nodes (42): CallStateMachineSend, FSM_TERMINAL, INITIAL_LIFECYCLE, isTerminalForOutcome(), normalizedToOutcome(), PredictiveState, StartCallArgs, TERMINAL_PHASES (+34 more)
 
 ### Community 76 - "devDependencies"
 Cohesion: 0.04
-Nodes (50): devDependencies, autoprefixer, @axe-core/playwright, drizzle-kit, eslint, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import (+42 more)
+Nodes (51): devDependencies, autoprefixer, @axe-core/playwright, drizzle-kit, eslint, eslint-import-resolver-typescript, @eslint/js, eslint-plugin-import (+43 more)
 
-### Community 77 - "check-queue-rpc-contract.mjs"
-Cohesion: 0.06
-Nodes (68): QUEUE_ENTRY_TRANSITIONS, { added, stale, carried }, apiSources(), baseline, BASELINE_FILE, full, label, orderViolations (+60 more)
+### Community 77 - "queue-rpc-contract.mjs"
+Cohesion: 0.13
+Nodes (25): analyze(), BOOKKEEPING_COLUMNS, collectCurrentFunctionDefinitions(), collectQueueAliases(), diffAgainstBaseline(), DROPPED_QUEUE_COLUMNS, findDroppedColumnReferences(), INSERT_ANY_RE (+17 more)
 
 ### Community 78 - "Documentation index"
 Cohesion: 0.04
 Nodes (45): Postgres 18 development service, Stow S3-compatible development bucket, Postgres LISTEN/NOTIFY wake mechanism, Bun worker process, Generalized job table, Supabase to Railway cutover, Bun Twilio webhook routes, Better Auth session authentication (+37 more)
 
 ### Community 79 - "campaign-dispatch-policy.ts"
-Cohesion: 0.07
-Nodes (53): DispatchTimeProjection, isDispatchAllowedAt(), ivrCallingPolicy(), IvrPolicySource, nextDispatchOpenAt(), parseCallingHours(), parseDateMs(), projectDispatchTime() (+45 more)
+Cohesion: 0.05
+Nodes (62): DispatchTimeProjection, ivrCallingPolicy(), IvrPolicySource, parseCallingHours(), parseDateMs(), projectDispatchTime(), SmsPolicySource, withinDateBounds() (+54 more)
 
-### Community 80 - "platform-billing.server.ts"
-Cohesion: 0.03
-Nodes (94): message, attributeLedgerCampaigns(), BILLING_ACTIVITY_ITEM_PAGE_SIZE, BillingActivityQuery, BillingActivityTotals, getWorkspaceBillingActivity(), LedgerActivityRow, LedgerTotalsRow (+86 more)
+### Community 80 - "elevenlabs-batch-transcribe.server.ts"
+Cohesion: 0.08
+Nodes (44): loadCampaignBillingSummary(), BillingEventSource, bucketToEventSource(), getBillingEventSource(), getBillingEventSourceLabel(), getTransactionDisplayDescription(), TransactionType, applyLedgerEntryViaDrizzle() (+36 more)
 
 ### Community 81 - "schema-default-drift.test.ts"
 Cohesion: 0.19
 Nodes (17): ColumnComparison, compareModelToDatabase(), driftKeys(), freshEntries(), ModelComparison, recordedKeys(), renderDrizzleDefault(), skipBanner() (+9 more)
 
 ### Community 82 - "dev-local.mjs"
-Cohesion: 0.07
-Nodes (25): twilio, bucketCheck, child, __dirname, env, rootDir, workerChild, child (+17 more)
+Cohesion: 0.06
+Nodes (35): hasObjectStorageEnv(), REQUIRED_ENV_KEYS, validateRequiredEnv(), OBJECT_STORAGE_GROUPS, RequiredEnvKey, REQUIRED_ENV_KEYS, validateObjectStorageEnv(), twilio (+27 more)
 
 ### Community 83 - "email-vm.action.server.ts"
-Cohesion: 0.22
-Nodes (17): VoicemailEmailPayload, findWorkspaceNumberVoicemailContextByPhone(), prepareVoicemailEmail(), action, EmailVmAuth, claimVoicemailDelivery(), completeVoicemailDelivery(), findVoicemailDelivery() (+9 more)
+Cohesion: 0.15
+Nodes (21): VoicemailEmailPayload, findWorkspaceNumberVoicemailContextByPhone(), NumberContext, prepareVoicemailEmail(), StoredCall, ADR-0011, VoicemailEmailProvider, action (+13 more)
 
 ### Community 84 - "number-purchase.server.ts"
 Cohesion: 0.09
-Nodes (43): deriveAndPersistWorkspaceThroughput(), isNanpTollFreeNumber(), compensateNumberPurchase(), isDefiniteNumberPurchaseRejection(), retainNumberPurchaseForRecovery(), runNumberPurchaseRecovery(), createProviderNumber(), PreparedPurchase (+35 more)
+Nodes (44): deriveAndPersistWorkspaceThroughput(), isNanpTollFreeNumber(), resolveAddressForRequirement(), compensateNumberPurchase(), isDefiniteNumberPurchaseRejection(), retainNumberPurchaseForRecovery(), runNumberPurchaseRecovery(), createProviderNumber() (+36 more)
 
 ### Community 85 - "cn"
 Cohesion: 0.06
@@ -995,41 +982,41 @@ Nodes (60): renderOpenTooltip(), Card(), CardAction(), CardContent(), CardDescri
 Cohesion: 0.06
 Nodes (37): client, CreateClientConfig, Options, CampaignSmsDeferred, CampaignSmsDispatched, CampaignSmsDispatchRequest, CampaignSmsDispatchResponse, ChatSmsRequest (+29 more)
 
-### Community 87 - "NumberSummaryList.tsx"
-Cohesion: 0.05
-Nodes (72): AddAudioSheet(), isUploadError(), isUploadSuccess(), UploadError, UploadResult, UploadSuccess, BulkLocalOverrideActiveNotice(), COPY_VARIATION_CHECKLIST (+64 more)
+### Community 87 - "app/lib/utils.ts"
+Cohesion: 0.03
+Nodes (117): callPanelBodyScrollClass, callPanelHeaderPrimaryClass, callPanelHeaderSecondaryClass, callPanelShellClass, ActiveCall, Attempt, Call, CallArea() (+109 more)
 
 ### Community 88 - "twilio-call-status.server.ts"
-Cohesion: 0.10
-Nodes (24): TablesInsert, findCampaignTypeByCampaignId(), billingUnitsFromCallDurationSeconds(), billTerminalCallStatus(), buildCallUpsertFromTwilioParams(), CallOutreachContext, CallStatusBillingResult, getNumber() (+16 more)
+Cohesion: 0.12
+Nodes (18): findCampaignTypeByCampaignId(), billingUnitsFromCallDurationSeconds(), billTerminalCallStatus(), buildCallUpsertFromTwilioParams(), CallOutreachContext, CallStatusBillingResult, getNumber(), getString() (+10 more)
 
 ### Community 89 - "issue-board-lib.mjs"
 Cohesion: 0.07
 Nodes (33): ENRICHMENT_DIR, fetchOpenIssues(), main(), OUTPUT, reviewedAt(), ROOT, runGhApi(), generateIssueBoard() (+25 more)
 
-### Community 90 - "chat-sms.server.ts"
-Cohesion: 0.10
-Nodes (24): CallerIdNotUsableError, cancelScheduledMessage(), sendMessage(), getWorkspaceTwilioPortalConfig(), MAX_SCHEDULE_LEAD_MS, MIN_SCHEDULE_LEAD_MS, resolveTwilioSmsMessagingServiceSid(), ScheduleValidationError (+16 more)
+### Community 90 - "ref_twilio"
+Cohesion: 0.06
+Nodes (32): createNewWorkspace(), NEW_WORKSPACE_WELCOME_CREDITS, twilioAccountToPersistableJson(), createKeys(), createSubaccount(), loadTwilioSdk(), rpcCreateNewWorkspace(), seedWorkspaceSampleData() (+24 more)
 
 ### Community 91 - "$numberId/$pageId/$blockId/response.action.server.ts"
-Cohesion: 0.07
-Nodes (53): ivrScriptStepsFromCampaign(), resolveCampaignScript(), bumpInboundNoInputReplay(), byCall, inboundNoInputReplayCount(), resetInboundNoInputReplays(), AudioBlock, renderAudio() (+45 more)
+Cohesion: 0.04
+Nodes (98): getCallWithRetry(), renderCampaignIvrPage(), sleep(), fetchCampaignWithScript(), ivrScriptStepsFromCampaign(), resolveCampaignScript(), endConferenceByUser(), findWorkspaceNumberById() (+90 more)
 
-### Community 92 - "call-script-service.ts"
-Cohesion: 0.23
-Nodes (11): documentToScript(), ensureBlockTitles(), inboundEditorDocument(), scriptToDocument(), validateScriptSteps(), FIXTURES, fixturesDir, newBlockWireType() (+3 more)
+### Community 92 - "Script"
+Cohesion: 0.12
+Nodes (22): CampaignDetailedSelectScriptProps, CampaignSettingsScript(), CampaignSettingsScriptProps, documentToScript(), ensureBlockTitles(), inboundEditorDocument(), scripts, scriptToDocument() (+14 more)
 
 ### Community 93 - "route-context-mock.ts"
-Cohesion: 0.04
-Nodes (57): safeRecordWorkspaceAuditEvent(), getDataPlaneRouteContext(), requireDataPlaneWorkspaceUser(), WORKSPACE_ROLE_RANK, methodNotAllowed(), getWorkspaceBilling(), DataPlaneAuthContext, getWorkspaceUnreadConversationCountApi() (+49 more)
+Cohesion: 0.02
+Nodes (112): AdminContextValue, SessionContextValue, WorkspaceContextValue, loader, mocks, runAction(), mocks, mocks (+104 more)
 
 ### Community 94 - "db-writer.ts"
-Cohesion: 0.11
-Nodes (37): CoachingSessionFinalEventPayload, insertWorkspaceEvent(), emitCue(), processUtterance(), finalizeCoachingSession(), cohereGenerate(), CohereGenerateResponse, generateCallSummary() (+29 more)
+Cohesion: 0.12
+Nodes (36): insertWorkspaceEvent(), emitCue(), processUtterance(), finalizeCoachingSession(), cohereGenerate(), CohereGenerateResponse, generateCallSummary(), generateLlmCue() (+28 more)
 
 ### Community 95 - "check-handlers.mjs"
 Cohesion: 0.08
-Nodes (26): APP_DIR, capability, CAPABILITY_BASELINE_PATH, capabilityViolations(), CREDIT_INVENTORY_PATH, CREDIT_WRITE_SIGNALS, creditRows, FACET_SIGNALS (+18 more)
+Nodes (27): APP_DIR, capability, CAPABILITY_BASELINE_PATH, capabilityViolations(), CREDIT_INVENTORY_PATH, CREDIT_WRITE_SIGNALS, creditRows, FACET_SIGNALS (+19 more)
 
 ### Community 96 - "scriptkit-call-script-core/package.json"
 Cohesion: 0.05
@@ -1041,11 +1028,11 @@ Nodes (14): buildLogEntry(), createLogger(), isPlainObject(), log(), LogFormat, 
 
 ### Community 98 - "campaign-queue-db.server.ts"
 Cohesion: 0.03
-Nodes (95): findCampaignAudienceLink(), insertCampaignAudienceLink(), listCampaignAudienceIds(), listContactIdsForAudience(), duplicateCampaign(), DuplicateCampaignResult, nextCopyTitle(), insertCampaignForWorkspace() (+87 more)
+Nodes (65): completeCampaignsDrainedByDequeue(), DequeuedRow, tryCompleteDrainedCampaigns(), CampaignQueueRow, ClaimedQueueContact, DeferredEmit, deleteCampaignQueueByCampaignAndContactIds(), dequeueCampaignQueueByContact() (+57 more)
 
 ### Community 99 - "campaign-sms-dispatch.server.ts"
 Cohesion: 0.03
-Nodes (89): CampaignDeferralCause, CampaignSmsBatchOutcome, CampaignSmsDispatchCounts, ContactDispatchResult, createPhoneClaim(), PhoneClaim, QueueMemberWithContact, selectEligibleCampaignQueueMembers() (+81 more)
+Nodes (136): assertCallerIdUsable(), CallerIdNotUsableError, CallerIdUsability, resolveCallerIdUsability(), CampaignDeferralCause, CampaignSmsBatchOutcome, CampaignSmsDispatchCounts, ContactDispatchResult (+128 more)
 
 ### Community 100 - "check-effects.mjs"
 Cohesion: 0.09
@@ -1056,84 +1043,84 @@ Cohesion: 0.07
 Nodes (36): embla-carousel-react, AlertDialog(), AlertDialogAction(), AlertDialogCancel(), AlertDialogContent(), AlertDialogDescription(), AlertDialogFooter(), AlertDialogHeader() (+28 more)
 
 ### Community 102 - "isObject"
-Cohesion: 0.11
-Nodes (44): A2P_COMPANY_TYPES, A2P_STOCK_EXCHANGES, A2pCompanyType, A2pStockExchange, parseA2pCompanyType(), parseA2pStockExchange(), brandEmail, getA2pMessagingProfileAttributes() (+36 more)
+Cohesion: 0.09
+Nodes (52): A2P_COMPANY_TYPES, A2P_STOCK_EXCHANGES, A2pCompanyType, A2pStockExchange, parseA2pCompanyType(), parseA2pStockExchange(), brandEmail, getA2pMessagingProfileAttributes() (+44 more)
 
-### Community 103 - "media-stream-transcription-billing.test.ts"
-Cohesion: 0.11
-Nodes (14): MediaStreamSocketData, coachingEngineMocks, dbWriterMocks, ledgerMocks, START_MESSAGE, sttMocks, transcriptionDebits(), workspaceConfigMocks (+6 more)
+### Community 103 - "twilio-handler.ts"
+Cohesion: 0.05
+Nodes (56): TranscriptSegmentInsert, writeTranscriptSegment(), buildElevenLabsRealtimeUrl(), ElevenLabsCommittedCallback, ElevenLabsRealtimeClientDeps, ElevenLabsRealtimeStream, HeaderCapableWebSocket, HeaderCapableWebSocketConstructor (+48 more)
 
-### Community 104 - "app-db-objects.mjs"
-Cohesion: 0.07
-Nodes (31): called, created, missing, ROOT, alive, allSql, called, files (+23 more)
+### Community 104 - "schema-enums.mjs"
+Cohesion: 0.05
+Nodes (50): called, created, missing, ROOT, alive, allSql, called, files (+42 more)
 
 ### Community 105 - "api-surface.ts"
-Cohesion: 0.11
-Nodes (30): API_SURFACE_ANNOTATIONS, API_SURFACE, API_SURFACE_BY_KEY, API_SURFACE_GUIDES, assemble(), bodyTypeFor(), API_SURFACE_CORE, isCompleteOnlySurface() (+22 more)
+Cohesion: 0.08
+Nodes (37): API_SURFACE_ANNOTATIONS, API_SURFACE, API_SURFACE_BY_KEY, API_SURFACE_GUIDES, assemble(), bodyTypeFor(), API_SURFACE_CORE, isCompleteOnlySurface() (+29 more)
 
 ### Community 106 - "billing-activity-rollup.ts"
-Cohesion: 0.10
-Nodes (27): BillingActivityFilter, BillingActivityProjection, BillingActivityRow, BillingReference, formatSignedCreditAmount(), getActivity(), parseBillingReference(), projectBillingActivity() (+19 more)
+Cohesion: 0.11
+Nodes (25): BillingActivityProjection, BillingActivityRow, BillingReference, formatSignedCreditAmount(), getActivity(), parseBillingReference(), projectBillingActivity(), safePart() (+17 more)
 
-### Community 107 - "capability-guard.server.ts"
-Cohesion: 0.04
-Nodes (58): ALL_CAPABILITY_IDS, API_KEY_DEFAULT_TTL_DAYS, API_KEY_MAX_TTL_DAYS, CALLCASTER_ROLE_CAPABILITY_MATRIX, capabilityIdsForRole(), isProductCapabilityId(), PRODUCT_CAPABILITIES, PRODUCT_ROLE_IDS (+50 more)
+### Community 107 - "handler.server.ts"
+Cohesion: 0.03
+Nodes (140): formatZodError(), parseActionBody(), parseJsonBody(), parseJsonBodyOrResponse(), parseSearchParams(), thrownToJsonResponse(), validationErrorResponse(), safeRecordWorkspaceAuditEvent() (+132 more)
 
 ### Community 108 - "numbers-search.server.ts"
-Cohesion: 0.07
-Nodes (33): ADDRESS_REQUIREMENTS, AddressRequirement, AddressRequirementResolution, addressRequirementUserMessage(), CandidateAddress, NANP_TOLL_FREE_AREA_CODES, normalizeAddressRequirement(), resolveAddressForRequirement() (+25 more)
+Cohesion: 0.14
+Nodes (19): ADDRESS_REQUIREMENTS, AddressRequirement, AddressRequirementResolution, addressRequirementUserMessage(), CandidateAddress, NANP_TOLL_FREE_AREA_CODES, AvailableNumberRecord, NumbersSearchResponse (+11 more)
 
-### Community 109 - "common.ts"
-Cohesion: 0.10
-Nodes (20): audienceDeleteBodySchema, audiencePatchBodySchema, autoDialBodySchema, autoDialDialerBodySchema, contactAudienceBulkDeleteSchema, contactAudienceDeleteSchema, dialBodySchema, hangupBodySchema (+12 more)
+### Community 109 - "campaign-sms-report.mjs"
+Cohesion: 0.06
+Nodes (31): allRows, argv, BALLOT, ballotByPick, ballotPick(), ballotReplies, bodyCounts, CAMPAIGN (+23 more)
 
 ### Community 110 - "AudienceUploader.tsx"
-Cohesion: 0.06
-Nodes (42): AudienceUploadDraft, AudienceUploadPhase, audienceUploadProgressLabel(), AudienceUploadProgressState, AudienceUploadProgressStatus, AudienceUploadServerSnapshot, AudienceUploadSidecar, AudienceUploadStatusFailure (+34 more)
+Cohesion: 0.04
+Nodes (68): AudienceUploadDraft, AudienceUploadPhase, audienceUploadProgressLabel(), AudienceUploadProgressState, AudienceUploadProgressStatus, AudienceUploadServerSnapshot, AudienceUploadSidecar, AudienceUploadStatusFailure (+60 more)
 
 ### Community 111 - "auth-postgres/package.json"
 Cohesion: 0.06
 Nodes (35): @better-auth/drizzle-adapter, dependencies, @chester-hill-solutions/auth, description, default, import, types, exports (+27 more)
 
 ### Community 112 - "merge-workspace-twilio-data.server.ts"
-Cohesion: 0.04
-Nodes (61): DEFAULT_SNAPSHOT, getWorkspaceBillingReconciliationSnapshot(), normalizeBillingReconciliationSnapshot(), CronFanoutFailure, CronFanoutSummary, runCronWorkspaceFanout(), buildEmail(), getLowCreditNotificationMarker() (+53 more)
+Cohesion: 0.05
+Nodes (49): CacheEntry, persistWorkspaceTwilioData(), stripOnboardingStepsForPersistence(), TwilioDataExecutor, WorkspaceTwilioData, workspaceTwilioDataCache, workspaceTwilioDataVersion, mocks (+41 more)
 
 ### Community 113 - "safe-outbound-url.server.ts"
-Cohesion: 0.10
-Nodes (19): BLOCKED_HOSTNAMES, embeddedIpv4(), isPrivateIpv4(), isPrivateIpv6(), isPrivateOrMetadataIp(), resolveSafeOutboundTarget(), safeOutboundFetch(), SafeOutboundFetchInit (+11 more)
+Cohesion: 0.08
+Nodes (22): BLOCKED_HOSTNAMES, embeddedIpv4(), isPrivateIpv4(), isPrivateIpv6(), isPrivateOrMetadataIp(), resolveSafeOutboundTarget(), safeOutboundFetch(), SafeOutboundFetchInit (+14 more)
 
 ### Community 114 - "from"
 Cohesion: 0.04
-Nodes (52): Authentication, Batch Sending, CANNOT, Error Codes, Liquid Personalization, Next Steps, Overview, Prerequisites (+44 more)
+Nodes (55): Authentication, Batch Sending, CANNOT, Error Codes, Liquid Personalization, Next Steps, Overview, Prerequisites (+47 more)
 
 ### Community 115 - "campaign-export.server.ts"
-Cohesion: 0.12
-Nodes (35): trackBackgroundFailure(), countExportCampaignMessages(), countExportOutreachAttempts(), findCampaignForMessageExport(), findCampaignWithScriptForExport(), findExportCallsByOutreachAttemptIds(), findExportContactsByIds(), listExportCampaignMessages() (+27 more)
+Cohesion: 0.10
+Nodes (41): countExportCampaignMessages(), countExportOutreachAttempts(), findCampaignForMessageExport(), findCampaignWithScriptForExport(), findExportCallsByOutreachAttemptIds(), findExportContactsByIds(), listExportCampaignMessages(), listExportOutreachAttempts() (+33 more)
 
-### Community 116 - "inbound-handset-dial-end.action.server.ts"
-Cohesion: 0.24
-Nodes (9): findWorkspaceNumberInboundFallbackByPhone(), appendInboundVoicemailTwiml(), resolveInboundVoicemailAudio(), action, DialEndAuth, renderTerminalTarget(), bindInboundVoicemailRecipient(), @aws-sdk/s3-request-presigner (+1 more)
+### Community 116 - "campaign-queue-search.server.ts"
+Cohesion: 0.12
+Nodes (35): attachContactsToQueueRows(), loadContactsByQueueRows(), QueueContactRow, requireContactForQueueRow(), buildCampaignQueueSearchWhere(), buildCompletedCampaignQueueWhere(), buildDialableCampaignQueueWhere(), CampaignQueueApiItem (+27 more)
 
 ### Community 117 - "Design System Audit (Visual Asset Ledger)"
 Cohesion: 0.06
 Nodes (33): Anti-pattern register (tokens/type), Brand mark, Committed (public/), Configuration, Design System Audit (Visual Asset Ledger), Executive Summary, External / runtime, Global chrome (+25 more)
 
 ### Community 118 - "CampaignResultDisplay.tsx"
-Cohesion: 0.10
-Nodes (29): CampaignExportButton(), CampaignExportButtonProps, aggregateDispositionResults(), CampaignCounts, CampaignResult, ErrorLoadingResults(), HIDDEN_DISPOSITIONS, normalizeDispositionLabel() (+21 more)
+Cohesion: 0.14
+Nodes (23): aggregateDispositionResults(), CampaignCounts, CampaignResult, HIDDEN_DISPOSITIONS, normalizeDispositionLabel(), ResultsDisplay(), MessageResultsScreen(), MessageResultsScreenProps (+15 more)
 
-### Community 119 - "api-auth.server.ts"
-Cohesion: 0.06
-Nodes (40): API_KEY_PREFIX_LENGTH, AuthErrorResult, extractBearerToken(), hashApiKey(), hashApiKeyForStorage(), resolveBearerSession(), resolveCookieSession(), verifyApiKeyOrSession() (+32 more)
+### Community 119 - "Live Telephony Verification Plan"
+Cohesion: 0.05
+Nodes (37): AI peer options, Assertions and evidence, Bare-minimum proof of concept, Decisions required before implementation, Deterministic scenarios, Deterministic voice and IVR peer, Environments and isolation, Existing CallCaster integration points (+29 more)
 
 ### Community 120 - "csv-contacts.ts"
-Cohesion: 0.22
-Nodes (13): CsvHeaderKey, headerMappings, matchHeader(), normaliseConsentValue(), OPT_IN_VALUES, parseCSV(), parseCSVData(), parseCSVHeaders() (+5 more)
+Cohesion: 0.19
+Nodes (15): CsvHeaderKey, headerMappings, matchHeader(), normaliseConsentValue(), OPT_IN_VALUES, OPT_OUT_VALUES, parseCSV(), parseCSVData() (+7 more)
 
 ### Community 121 - "cron.server.ts"
-Cohesion: 0.12
-Nodes (25): runCampaignScheduleSync(), pruneExpiredIdempotencyRecords(), pruneExpiredRateLimitBuckets(), RateLimitRpcRow, billingReconcileHandler(), campaignScheduleSyncHandler(), lowCreditNotifyHandler(), numberRentalBillingHandler() (+17 more)
+Cohesion: 0.14
+Nodes (21): runCampaignScheduleSync(), CronFanoutFailure, CronFanoutSummary, runCronWorkspaceFanout(), pruneExpiredIdempotencyRecords(), pruneExpiredRateLimitBuckets(), billingReconcileHandler(), campaignScheduleSyncHandler() (+13 more)
 
 ### Community 122 - "package.old.json"
 Cohesion: 0.06
@@ -1144,20 +1131,20 @@ Cohesion: 0.12
 Nodes (28): compare(), Core, loadCores(), main(), Op, OUT, q(), render() (+20 more)
 
 ### Community 124 - "getUserRole"
-Cohesion: 0.05
-Nodes (46): isProductRoleId(), ProductRoleId, acceptWorkspaceInvitations(), ErrorCode, AUTH_ERROR, CONFLICT, DATABASE_ERROR, EXTERNAL_SERVICE_ERROR (+38 more)
+Cohesion: 0.06
+Nodes (36): createDataPlaneMiddlewareWithMinRole(), dataPlaneMiddleware(), handleDatabaseError(), listWorkspaceScriptsApi(), resolveDataPlaneAuth(), DataPlaneActor, dataPlaneAuthContext, sessionContext (+28 more)
 
 ### Community 125 - "campaign-setup-steps.ts"
 Cohesion: 0.12
-Nodes (26): CampaignProductGoal, hasAnyCampaignReadinessCode(), isContentReadinessComplete(), isScheduleReadinessComplete(), buildContentStep(), buildPhoneNumberStep(), buildQueueStep(), buildWeekdayCallingSchedule() (+18 more)
+Nodes (24): CampaignProductGoal, hasAnyCampaignReadinessCode(), isContentReadinessComplete(), isScheduleReadinessComplete(), buildContentStep(), buildPhoneNumberStep(), buildQueueStep(), CampaignDetails (+16 more)
 
 ### Community 126 - "campaign-status-rail.ts"
 Cohesion: 0.09
-Nodes (29): CampaignReadinessIssue, buildCampaignStatusRail(), BuildCampaignStatusRailOptions, campaignBasePath(), CampaignDetails, CampaignPlaceNavLink, CampaignPlaceNavResult, CampaignRailCallStatus (+21 more)
+Nodes (28): CampaignReadinessIssue, buildCampaignStatusRail(), BuildCampaignStatusRailOptions, campaignBasePath(), CampaignDetails, CampaignPlaceNavLink, CampaignPlaceNavResult, CampaignRailCallStatus (+20 more)
 
-### Community 127 - "ref_twilio"
+### Community 127 - "onboardingFixture"
 Cohesion: 0.05
-Nodes (39): createNewWorkspace(), loadTwilioSdk(), createKeys(), createSubaccount(), loadTwilioSdk(), MAX_TWILIO_FRIENDLY_NAME_LENGTH, sanitize(), workspaceResourceName() (+31 more)
+Nodes (36): findWorkspaceIdByComplianceSid(), pickWebhookField(), action, EventStreamEvent, readSid(), toEventArray(), action, adminArgs (+28 more)
 
 ### Community 128 - "Campaign"
 Cohesion: 0.07
@@ -1168,8 +1155,8 @@ Cohesion: 0.06
 Nodes (30): compilerOptions, allowImportingTsExtensions, allowJs, baseUrl, esModuleInterop, exactOptionalPropertyTypes, forceConsistentCasingInFileNames, isolatedModules (+22 more)
 
 ### Community 130 - "number-release-recovery.test.ts"
-Cohesion: 0.09
-Nodes (44): invalidateWorkspaceTwilioData(), runNumberReleaseRecovery(), executeNumberRelease(), isResourceAbsent(), NumberReleaseIncompleteError, providerOperation(), releaseNumberForWorkspace(), releaseProviderResources() (+36 more)
+Cohesion: 0.07
+Nodes (57): invalidateWorkspaceTwilioData(), isNumberReleaseCredentialRejection(), keyClient(), mintReleaseKey(), recoverNumberReleaseClient(), RepairedCredentials, verifyRecoveredResources(), runNumberReleaseRecovery() (+49 more)
 
 ### Community 131 - "Contact Center Platform Plan (design only)"
 Cohesion: 0.04
@@ -1184,40 +1171,40 @@ Cohesion: 0.11
 Nodes (27): checkAll100(), coverageDir, formatStrictFailures(), isTrivialSourceFile(), lcovInputs, listSourceFiles(), loadMergedCoverageMap(), mergeCovMaps() (+19 more)
 
 ### Community 134 - "call-log.server.ts"
-Cohesion: 0.11
-Nodes (32): applyPhoneFilter(), buildCallLogOrderBy(), buildCallLogWhere(), CallLogLoaderResult, CallLogQueryRow, escapeLikePattern(), loadCallLogPage(), mapCallLogRow() (+24 more)
+Cohesion: 0.12
+Nodes (25): outreach_attempt, applyPhoneFilter(), buildCallLogOrderBy(), buildCallLogWhere(), CallLogLoaderResult, CallLogQueryRow, escapeLikePattern(), mapCallLogRow() (+17 more)
 
 ### Community 135 - "useCallCoaching.ts"
 Cohesion: 0.06
 Nodes (30): CallScreenTranscript(), highlightFillers(), CallCoachingHydration, CoachingCueView, CoachingMetricsView, CoachingSessionView, hydrationFor(), TranscriptSegmentView (+22 more)
 
 ### Community 136 - "openapi-build.ts"
-Cohesion: 0.12
-Nodes (23): broadObjectSchema, buildOpenApiSpec(), BuildOpenApiSpecOptions, contentTypeForBody(), errorResponse(), OWNER_AREA_TAGS, requestBodyForOperation(), responsesForEntry() (+15 more)
+Cohesion: 0.13
+Nodes (22): broadObjectSchema, buildOpenApiSpec(), BuildOpenApiSpecOptions, contentTypeForBody(), errorResponse(), OWNER_AREA_TAGS, requestBodyForOperation(), responsesForEntry() (+14 more)
 
 ### Community 137 - "seed.ts"
-Cohesion: 0.17
-Nodes (14): appendWorkspaceEvent(), E2E_API_KEY, E2E_AUDIENCE, E2E_CAMPAIGNS, E2E_IVR_SCRIPT, E2E_SCRIPT, E2E_USERS, E2E_WORKSPACES (+6 more)
+Cohesion: 0.03
+Nodes (55): AUTH_DIR, AUTH_PATHS, __dirname, E2ERole, signIn(), signInAs(), appendWorkspaceEvent(), clearCampaignQueue() (+47 more)
 
-### Community 138 - "predictive-machine-operation.test.ts"
-Cohesion: 0.06
-Nodes (37): Operation Tracking, Send a Simple Email, operationId(), mocks, adminDbMocks, loggerMocks, TwilioClientMock, twilioMocks (+29 more)
+### Community 138 - "admin-response-projection.test.ts"
+Cohesion: 0.05
+Nodes (43): Operation Tracking, Send a Simple Email, operationId(), loader, allowedWorkspaceKeys, boundary, noSecrets(), response() (+35 more)
 
 ### Community 139 - "contact-import-headers.ts"
-Cohesion: 0.14
-Nodes (25): CSVRecord, parseCSV(), parseCSVAsync(), parseCSVData(), parseCSVHeaders(), splitCsvLines(), VALID_HEADERS, yieldToMainThread() (+17 more)
+Cohesion: 0.17
+Nodes (19): ImportWarning, ImportedContact, mapAudienceImportRow(), prepareAudienceImport(), CONTACT_IMPORT_LABELS, CONTACT_IMPORT_TARGETS, ContactImportMappingIssue, ContactImportMappingIssueCode (+11 more)
 
 ### Community 140 - "inbound-routing-presets.ts"
-Cohesion: 0.13
-Nodes (24): parsePositiveId(), parseRoutingPresetApplication(), assertPositiveId(), buildInboundRoutingPresetPatch(), EffectiveInboundRoutingSummary, EMPTY_ROUTING_PATCH, INBOUND_ROUTING_PRESET_IDS, INBOUND_ROUTING_PRESETS (+16 more)
+Cohesion: 0.16
+Nodes (22): assertPositiveId(), buildInboundRoutingPresetPatch(), EffectiveInboundRoutingSummary, EMPTY_ROUTING_PATCH, INBOUND_ROUTING_PRESETS, INBOUND_ROUTING_RUNTIME_PRECEDENCE, InboundRoutingFields, InboundRoutingInference (+14 more)
 
 ### Community 141 - "app/hooks/index.ts"
 Cohesion: 0.17
 Nodes (15): AsyncState, useAsyncState(), UseAsyncStateOptions, useAsyncStates(), IntersectionObserverEntry, useInfiniteScroll(), useIntersectionObserver(), useIntersectionObserverMulti() (+7 more)
 
-### Community 142 - "workspace-conversations-sql-parity.test.ts"
-Cohesion: 0.36
-Nodes (7): rows(), getConversationPhoneKey(), isInbound(), jsReferenceAggregate(), normalizeConversationPhone(), participantPhones(), RawMessageFixture
+### Community 142 - "workspace-conversations.server.ts"
+Cohesion: 0.11
+Nodes (26): ChatSortOption, AggregatedConversationRow, buildConversationParticipantsCte(), buildConversationSummaryQuery(), buildSearchPredicate(), buildSortPredicate(), buildWorkspaceKeysArray(), buildWorkspaceUnreadCountQuery() (+18 more)
 
 ### Community 143 - "ci-changes-lib.mjs"
 Cohesion: 0.14
@@ -1228,64 +1215,60 @@ Cohesion: 0.07
 Nodes (15): authUser, campaignIvrMocks, createSignedObjectUrlMock, exportDbMocks, ExportPostgresConfig, loggerError, makeDbClient(), objectStorageUploads (+7 more)
 
 ### Community 145 - "runtime-postcss.test.ts"
-Cohesion: 0.04
-Nodes (34): postcss, Handler, cases, consumers, cssDirectory, directory, from, outside (+26 more)
+Cohesion: 0.05
+Nodes (28): postcss, Handler, cases, consumers, cssDirectory, directory, from, outside (+20 more)
 
-### Community 146 - "openapi.ts"
-Cohesion: 0.22
-Nodes (6): getCompleteOpenApiEntries(), completeOpenApiSpec, openApiSpec, loader, loader, serveSpec()
+### Community 146 - "check-api-surface-coverage.ts"
+Cohesion: 0.08
+Nodes (22): getCompleteOpenApiEntries(), getPublicOpenApiEntries(), toOpenApiPath(), completeOpenApiSpec, integratorOpenApiSpec, openApiSpec, loader, loader (+14 more)
 
 ### Community 147 - "campaign-readiness.ts"
-Cohesion: 0.10
-Nodes (27): CAMPAIGN_CONTENT_READINESS_CODES, CampaignDetails, CampaignQueueAudienceCounts, CampaignReadiness, CampaignReadinessOptions, CampaignSendWindowWarning, getCampaignContentReadinessIssues(), getCampaignReadiness() (+19 more)
+Cohesion: 0.11
+Nodes (26): BULK_SENDER_MISALIGNED_MESSAGE, CAMPAIGN_CONTENT_READINESS_CODES, CampaignDetails, CampaignQueueAudienceCounts, CampaignReadiness, CampaignReadinessOptions, CampaignSendWindowWarning, getCampaignContentReadinessIssues() (+18 more)
 
-### Community 148 - "inbound.action.server.ts"
-Cohesion: 0.07
-Nodes (41): findActiveHandsetSession(), findActiveHandsetSessionClientIdentity(), findInboundIvrScriptSteps(), findWorkspaceNumberByPhoneNumber(), workspaceWebhookHasInboundCallInsert(), findInboundQueueInWorkspace(), appendInboundQueueTwiml(), isPhoneNumber (+33 more)
+### Community 148 - "caller-id-verification.server.ts"
+Cohesion: 0.15
+Nodes (13): CALLER_ID_CAPABILITIES, startWorkspaceCallerIdVerification(), StartWorkspaceCallerIdVerificationResult, INBOUND_RING_COUNT_DEFAULT, INBOUND_RING_COUNT_MAX, INBOUND_RING_COUNT_MIN, INBOUND_RING_COUNT_OPTIONS, inboundRingCountToDialTimeoutSeconds() (+5 more)
 
-### Community 149 - "handler.server.ts"
+### Community 149 - "defineAction"
 Cohesion: 0.04
-Nodes (87): autoDialCreditsErrorResponse, findCampaignMessageMedia(), updateCampaignMessageMedia(), updateCampaignScriptId(), dataPlaneSessionMinRoleAuth(), listMedia(), ActionCtx, AuthFn (+79 more)
+Nodes (83): createEmptyAudience(), findCampaignMessageMedia(), updateCampaignMessageMedia(), fetchWorkspaceData(), getUserWorkspaces(), getWorkspacePhoneNumbers(), getWorkspaceUsers(), removeWorkspacePhoneNumber() (+75 more)
 
 ### Community 150 - "Code Quality Roadmap"
 Cohesion: 0.06
 Nodes (31): Drizzle Baseline, Audio Library Editing Clipping and On-Screen Recording Implementation Plan, Build Against Docs Execution Plan, ADR Conformance, Scoped Drizzle Client, CI Load-Reduction Next Steps, Code Quality Roadmap, Current Status (+23 more)
 
-### Community 151 - "ref_node_url"
-Cohesion: 0.09
-Nodes (26): BAD_AUDIO_FIXTURE, __dirname, GREETING_FIXTURE, RUN_ID, CACHE_DIR, CACHED_BIN, __dirname, downloadRelease() (+18 more)
+### Community 151 - "start-stow.mjs"
+Cohesion: 0.13
+Nodes (22): CACHE_DIR, CACHED_BIN, __dirname, downloadRelease(), isExecutable(), platformSuffix(), resolveStowBinary(), rootDir (+14 more)
 
-### Community 152 - "createVoiceResponse"
+### Community 152 - "WebhookEditor.tsx"
 Cohesion: 0.09
-Nodes (34): getCallWithRetry(), renderCampaignIvrPage(), sleep(), endConferenceByUser(), findWorkspaceNumberById(), loadInboundIvrBlockContext(), loadInboundIvrPageContext(), loadScriptSteps() (+26 more)
+Nodes (25): CatalogPickerCategorySection(), CatalogPickerCategorySectionProps, CatalogPickerShell(), CatalogPickerShellProps, ApiKeyCapabilityPicker(), ApiKeyCapabilityPickerProps, CapabilityCategorySection(), CapabilityRow() (+17 more)
 
-### Community 153 - "inbound-queue-entry.route.test.ts"
-Cohesion: 0.15
-Nodes (7): makeReq(), mocks, voicemailResponse(), mocks, response(), mocks, invoke()
+### Community 153 - "campaign-sms-report.server.ts"
+Cohesion: 0.13
+Nodes (36): appendConversationAppendix(), appendHealthSection(), appendInboundSections(), appendOptOutAppendix(), appendOutboundSections(), appendReportOverview(), appendThreadPageHeader(), buildCampaignSmsReport() (+28 more)
 
 ### Community 154 - "bootstrap-migrations.server.ts"
-Cohesion: 0.13
-Nodes (20): applyClientMigrations(), applyClientMigrationsOnBoot(), applyDrizzleBaseline(), BASELINE_DIRNAME, bootstrapEnabled(), BootstrapResult, BootstrapSql, decideSeed() (+12 more)
+Cohesion: 0.11
+Nodes (22): applyClientMigrations(), applyClientMigrationsOnBoot(), applyDrizzleBaseline(), BASELINE_DIRNAME, bootstrapEnabled(), BootstrapResult, BootstrapSql, decideSeed() (+14 more)
 
-### Community 155 - "@playwright/test"
-Cohesion: 0.08
-Nodes (15): AUTH_DIR, AUTH_PATHS, __dirname, E2ERole, signIn(), signInAs(), StripeMockSession, CreationCampaignType (+7 more)
-
-### Community 156 - "schema-enums.mjs"
-Cohesion: 0.16
-Nodes (19): { gaps, schemaEnums, sqlEnums }, ROOT, verbose, ADD_VALUE_RE, applyEnumDdl(), bareTypeName(), checkSchemaEnums(), collectSchemaEnums() (+11 more)
+### Community 156 - "inbound-sms.action.server.ts"
+Cohesion: 0.14
+Nodes (21): DEFAULT_OPT_OUT_KEYWORDS, isOptOutMessage(), mergeOptOutKeywords(), normalizeKeyword(), parseOptOutKeywords(), findMatchingContactIds(), findWorkspacesByMessagingServiceSid(), InboundWorkspaceContext (+13 more)
 
 ### Community 157 - "platform-idempotency.server.ts"
-Cohesion: 0.15
-Nodes (21): idempotency_record, getIdempotentResponse(), getMemoryBackend(), IdempotencyRecord, normalizeKey(), readIdempotencyKey(), releaseIdempotencyReservation(), replayResponse() (+13 more)
+Cohesion: 0.14
+Nodes (22): idempotency_record, getIdempotentResponse(), getMemoryBackend(), IdempotencyRecord, normalizeKey(), readIdempotencyKey(), releaseIdempotencyReservation(), replayResponse() (+14 more)
 
 ### Community 158 - "status"
-Cohesion: 0.06
-Nodes (32): Async Polling Pattern, CAN, CANNOT, Configuration, Gotchas, Observability, Runtime, Scope (+24 more)
+Cohesion: 0.10
+Nodes (20): CAN, CANNOT, Configuration, Gotchas, Observability, Runtime, Scope, Setup (+12 more)
 
-### Community 159 - "check-api-surface-coverage.ts"
-Cohesion: 0.18
-Nodes (11): getPublicOpenApiEntries(), toOpenApiPath(), ADR-0014, ADR-0018, DerivedCore, main(), REPORT, ROOT (+3 more)
+### Community 159 - "ErrorCode"
+Cohesion: 0.07
+Nodes (27): CANNOT, Common Webhook Parameters, Debugger Event Callback, Inbound SMS, Message Status Callback, Next Steps, Overview, Prerequisites (+19 more)
 
 ### Community 160 - "websocket-server.js"
 Cohesion: 0.12
@@ -1296,32 +1279,32 @@ Cohesion: 0.09
 Nodes (21): description, files, bun-types, @chester-hill-solutions/scriptkit-call-script-core, jsdom, react, react-dom, @testing-library/react (+13 more)
 
 ### Community 162 - "Result.tsx"
-Cohesion: 0.14
-Nodes (16): Capture Payments, Script, iconMapping, IconType, optionValue(), Result(), ResultOption, ResultProps (+8 more)
+Cohesion: 0.15
+Nodes (15): Script, iconMapping, IconType, optionValue(), Result(), ResultOption, ResultProps, ScriptBlock (+7 more)
 
-### Community 163 - "CampaignBasicInfo.Dates.tsx"
-Cohesion: 0.14
-Nodes (18): cleanScheduleForPersist(), Day, DayName, DAYS_OF_WEEK, getDefaultSchedule(), parseSchedule(), Schedule, SCHEDULE_COPY (+10 more)
+### Community 163 - "callcaster.ts"
+Cohesion: 0.11
+Nodes (18): params, createId(), resetIdCounter(), CALLCASTER_TYPE_MAP, collectExtras(), DOC_TO_CALLCASTER_TYPE, KNOWN_BLOCK_KEYS, KNOWN_OPTION_KEYS (+10 more)
 
 ### Community 164 - "Key Patterns"
-Cohesion: 0.06
-Nodes (29): Flow definition schema, How widget outputs work, Liquid templating, State (widget) object, Studio Widget Catalog Reference, Top-level keys, Transitions and events, Before you author: clarify the design (+21 more)
+Cohesion: 0.11
+Nodes (16): State (widget) object, Core widgets at a glance, Integrate custom logic (Functions, HTTP), Key Patterns, Liquid quick reference, List and fetch (round-trip editing), Publish, update, and the full-replace rule, Reading and fixing validation errors (+8 more)
 
 ### Community 165 - "flash-telemetry.client.ts"
-Cohesion: 0.18
-Nodes (12): alertAppeared(), breadcrumbs, captureFlash(), FlashBreadcrumb, FlashEvent, installFlashTelemetry(), messageText(), recentAlerts (+4 more)
+Cohesion: 0.13
+Nodes (14): alertAppeared(), breadcrumbs, captureFlash(), FlashBreadcrumb, FlashEvent, installFlashTelemetry(), messageText(), recentAlerts (+6 more)
 
 ### Community 166 - "coaching-events.shared.ts"
-Cohesion: 0.20
-Nodes (13): COACHING_EVENT_PAYLOAD_SCHEMAS, COACHING_EVENT_TYPES, CoachingCueEventPayload, CoachingEvent, CoachingEventParseResult, CoachingEventType, CoachingMetricsEventPayload, isCoachingEventType() (+5 more)
+Cohesion: 0.18
+Nodes (14): COACHING_EVENT_PAYLOAD_SCHEMAS, COACHING_EVENT_TYPES, CoachingCueEventPayload, CoachingEvent, CoachingEventParseResult, CoachingEventType, CoachingMetricsEventPayload, CoachingSessionFinalEventPayload (+6 more)
 
 ### Community 167 - "cron-job-enqueue-route.server.ts"
-Cohesion: 0.10
-Nodes (19): SideEffect, secureCompare(), createCronEnqueueAction(), parseCronWorkspaceId(), toEnqueueResponse(), verifyCronSecret(), action, action (+11 more)
+Cohesion: 0.16
+Nodes (11): SideEffect, secureCompare(), createCronEnqueueAction(), parseCronWorkspaceId(), toEnqueueResponse(), verifyCronSecret(), EnqueueJobResult, action (+3 more)
 
-### Community 168 - "tts-voices.ts"
-Cohesion: 0.52
-Nodes (5): DEFAULT_VOICE_ID, isKnownVoiceId(), resolveVoiceForBlock(), TTS_VOICES, TtsVoice
+### Community 168 - "contact-editor-save.test.ts"
+Cohesion: 0.09
+Nodes (20): Available Data Packages, pool, actorId, cleanup(), enqueue(), foreignWorkspaceId, nextOrder(), queues() (+12 more)
 
 ### Community 169 - "sync-calling-dev.mjs"
 Cohesion: 0.19
@@ -1329,7 +1312,7 @@ Nodes (20): asRecord(), assertReachable(), assertTwimlAppIsSafeToRepoint(), DEV_
 
 ### Community 170 - "csv.ts"
 Cohesion: 0.12
-Nodes (20): CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, CsvCell, CSVParseResult, csvResponse(), CsvScalar, CsvStringOptions, escapeCsvCell() (+12 more)
+Nodes (22): CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, CsvCell, CSVParseResult, CsvScalar, CsvSourceParseResult, CsvStringOptions, escapeCsvCell() (+14 more)
 
 ### Community 171 - "Design System Usage"
 Cohesion: 0.07
@@ -1343,9 +1326,9 @@ Nodes (9): JSX_FILES, ADR-0004, ADR-0031, RATCHET_RULES, TS_FILES, noUselessComm
 Cohesion: 0.15
 Nodes (15): folderizeOne(), loadFlatIds(), main(), parseArgs(), PATH_MAP, rewriteServerImports(), ROOT, ROUTES_DIR (+7 more)
 
-### Community 174 - "WorkspaceStreamCapTracker"
-Cohesion: 0.24
-Nodes (3): DEFAULT_MEDIA_STREAM_MAX_PER_WORKSPACE, parseMediaStreamMaxPerWorkspace(), WorkspaceStreamCapTracker
+### Community 174 - "campaign-test-send.server.ts"
+Cohesion: 0.13
+Nodes (20): TemplatePreview(), CampaignTestSendFailure, CampaignTestSendResult, failure(), FAILURE_MESSAGES, parseTestRecipient(), sendCampaignTestSms(), contactField() (+12 more)
 
 ### Community 175 - "auth-react-router/package.json"
 Cohesion: 0.10
@@ -1355,33 +1338,29 @@ Nodes (19): dependencies, @chester-hill-solutions/auth, description, exports, fi
 Cohesion: 0.20
 Nodes (15): AuditEventCursor, decodeAuditEventCursor(), encodeAuditEventCursor(), listWorkspaceAuditEvents(), parseAuditEventPageSize(), recordWorkspaceAuditEvent(), RecordWorkspaceAuditEventInput, redactAuditEventMetadata() (+7 more)
 
-### Community 177 - "workspace-invitations.server.ts"
-Cohesion: 0.24
-Nodes (16): inviteUserByEmail(), InviteUserByEmailResult, adminDbClient(), appRowToView(), createWorkspaceInvitation(), getPendingWorkspaceInvitationByEmail(), InvitationRole, listPendingInvitesForUsername() (+8 more)
+### Community 177 - "probe-surfaces.mjs"
+Cohesion: 0.12
+Nodes (22): APP_404_MARKERS, args, BASE_URL, buildRequestInit(), classifyPageRoute(), enumeratePageRoutes(), evaluateAuthContract(), expandPath() (+14 more)
 
 ### Community 178 - "dial.route.test.ts"
 Cohesion: 0.15
 Nodes (11): claim(), mocks, setPayloads, updateReturning, wherePayloads, autoDialState, creditsState, dbRpcState (+3 more)
 
 ### Community 179 - "source"
-Cohesion: 0.23
-Nodes (14): preservedVariables(), repository, source(), appVariables, databaseVariables, devResources(), workerVariables, appVariables (+6 more)
+Cohesion: 0.11
+Nodes (27): preservedVariables(), repository, source(), appVariables, databaseVariables, devResources(), workerVariables, appVariables (+19 more)
 
 ### Community 180 - "bun.ts"
 Cohesion: 0.06
-Nodes (47): captureException(), initializeSentry(), assertRequiredDbFunctions(), BANNED_FUNCTIONS, BANNED_TRIGGERS, DatabaseReadiness, pingDatabase(), probeDatabaseReadiness() (+39 more)
-
-### Community 181 - "elevenlabs-realtime-client.ts"
-Cohesion: 0.15
-Nodes (12): buildElevenLabsRealtimeUrl(), ElevenLabsCommittedCallback, ElevenLabsRealtimeClientDeps, HeaderCapableWebSocket, HeaderCapableWebSocketConstructor, isCommittedTranscriptEvent(), openElevenLabsRealtimeStream(), parseElevenLabsRealtimeMessage() (+4 more)
+Nodes (46): captureException(), initializeSentry(), assertRequiredDbFunctions(), BANNED_FUNCTIONS, BANNED_TRIGGERS, DatabaseReadiness, pingDatabase(), probeDatabaseReadiness() (+38 more)
 
 ### Community 182 - "src/components/ui/calendar.tsx"
 Cohesion: 0.25
 Nodes (17): Calendar(), CalendarInner(), cellVariants, MonthDropdown(), RangeCalendar(), YearDropdown(), Select(), SelectContent() (+9 more)
 
-### Community 183 - "audience-upload.ts"
-Cohesion: 0.22
-Nodes (10): AUDIENCE_UPLOAD_CHUNK_DELAY_MS, AUDIENCE_UPLOAD_CHUNK_SIZE, AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS, audienceUploadChunkDelayMs(), AudienceUploadContact, AudienceUploadRequestBody, audienceUploadShouldWriteStatus(), buildContactsFromRecords() (+2 more)
+### Community 183 - "audience-upload-process.server.ts"
+Cohesion: 0.08
+Nodes (32): asOptionalString(), chunkHouseholdPlan(), ChunkHouseholdPlanEntry, CSVContact, dedupeParsedContacts(), importSidecar(), processAudienceUpload(), VOTER_LIST_SOURCE_ALIASES (+24 more)
 
 ### Community 184 - "input-group.tsx"
 Cohesion: 0.24
@@ -1395,9 +1374,9 @@ Nodes (16): Command(), CommandDialog(), CommandEmpty(), CommandGroup(), CommandI
 Cohesion: 0.11
 Nodes (11): ABORT_DELAY, handleError(), streamTimeout, ErrorRateHandler, recordServerError(), resetErrorRateForTests(), setErrorRateHandler(), windowStartedAt (+3 more)
 
-### Community 188 - "ivr-wav.server.ts"
-Cohesion: 0.13
-Nodes (19): putMediaObject(), transcodeToWavBuffer(), isWavFileName(), ivrWavObjectKey(), resolveIvrPromptObjectKey(), writeIvrWavSidecar(), objectExists(), backfillWorkspaceWavs() (+11 more)
+### Community 188 - "gen-wav-sidecars.ts"
+Cohesion: 0.15
+Nodes (11): backfillWorkspaceWavs(), isPromptFile(), runWavBackfill(), WavBackfillDeps, WavBackfillOptions, WavBackfillResult, WavBackfillRunResult, apply (+3 more)
 
 ### Community 189 - "components.json"
 Cohesion: 0.12
@@ -1419,25 +1398,17 @@ Nodes (17): Architecture review summary (non-call zones), Authoritative SMS loop
 Cohesion: 0.09
 Nodes (25): Component browser verification matrix, Workspace surface composition, Multi-tenant platform safety plan, Review infrastructure follow-up, Browser nitpick remediation, E2E diagnosis corrections, Live media capabilities, Wave 0 API Parity Ledger (+17 more)
 
-### Community 194 - "factories.ts"
-Cohesion: 0.10
-Nodes (11): clearCampaignQueue(), expectTextPoll(), insertInboundMessage(), ReadinessGap, setCampaignReadinessGap(), setWorkspaceCredits(), expectCreditsBadgeUpdate(), adminTest (+3 more)
-
-### Community 195 - "admin-portal.spec.ts"
-Cohesion: 0.14
-Nodes (4): E2E_PASSWORD, sudoTest, AdminPage, SignInPage
-
-### Community 196 - "CallScreen.CallArea.tsx"
-Cohesion: 0.09
-Nodes (22): callPanelBodyScrollClass, callPanelHeaderPrimaryClass, callPanelHeaderSecondaryClass, callPanelShellClass, ActiveCall, Attempt, Call, CallArea() (+14 more)
+### Community 196 - "platform-analytics.server.ts"
+Cohesion: 0.18
+Nodes (15): trackBackgroundFailure(), generateCampaignExportId(), findCampaignExportMeta(), csvResponse(), buildSurveyResponsesCsv(), exportSurveyResponsesApi(), SerializedExportItem, startCampaignExportApi() (+7 more)
 
 ### Community 197 - "compilerOptions"
 Cohesion: 0.12
 Nodes (16): compilerOptions, declaration, declarationMap, esModuleInterop, jsx, lib, module, moduleResolution (+8 more)
 
-### Community 198 - "accept-invite.action.server.ts"
-Cohesion: 0.23
-Nodes (14): appendInvitationAcceptedFlash(), getWorkspaceInvitationById(), PendingUserInvitation, redeemWorkspaceInvitation(), action, ActionContext, invalidSubmission(), redeemInvitationAction() (+6 more)
+### Community 198 - "redirect-route.server.ts"
+Cohesion: 0.14
+Nodes (10): redirectTo(), retiredEndpoint(), loader, action, loader, action, action, loader (+2 more)
 
 ### Community 199 - "dependencies"
 Cohesion: 0.12
@@ -1455,37 +1426,37 @@ Nodes (13): actionFiles, API_DIR, collectActionFiles(), EXCLUDED_SUFFIXES, expec
 Cohesion: 0.18
 Nodes (13): findRouteModules(), walk(), hasChildRouteDirs(), HYBRID_ROOTS, isHybridDirectChild(), isHybridRootLayout(), isTopLevel(), opts (+5 more)
 
-### Community 203 - "twilio-handler.ts"
-Cohesion: 0.24
-Nodes (14): publishTranscriptSegmentEvent(), writeTranscriptSegment(), averageWordConfidence(), buildTranscriptSegment(), countFillerWords(), DEFAULT_FILLER_WORDS, getOrInitTwilioState(), handleCommittedTranscript() (+6 more)
+### Community 203 - "platform-billing.server.ts"
+Cohesion: 0.14
+Nodes (17): billingPricing, BillingSessionPollStatus, confirmStripeCheckoutSessionForRedirect(), createBillingCheckoutSession(), createStripeClient(), ensureStripeCustomer(), getPurchaseReceiptUrl(), pollBillingCheckoutSession() (+9 more)
 
-### Community 204 - "createTenantDb"
-Cohesion: 0.08
-Nodes (67): call, campaign, campaign_queue, job, predictive_machine_operation, upsertInboundCallRecord(), TERMINAL_OUTREACH_DISPOSITIONS_LIST, deferUnsentContinuation() (+59 more)
+### Community 204 - "createWorkspaceTwilioInstance"
+Cohesion: 0.07
+Nodes (69): job, predictive_machine_operation, updateCampaignQueueByContactAndCampaign(), createWorkspaceTwilioInstance(), loadTwilioSdk(), parseTwilioDataColumn(), deferUnsentContinuation(), headers (+61 more)
 
 ### Community 205 - "openapi.test.ts"
-Cohesion: 0.08
-Nodes (26): zCampaignSmsDeferred, zCampaignSmsDispatched, zCampaignSmsDispatchRequest, zCampaignSmsDispatchResponse, zChatSmsRequest, zChatSmsResponse, zConversationSummaryMode, zCreateCampaignWithScriptRequest (+18 more)
+Cohesion: 0.05
+Nodes (46): zCampaignSmsDeferred, zCampaignSmsDispatched, zCampaignSmsDispatchRequest, zCampaignSmsDispatchResponse, zChatSmsRequest, zChatSmsResponse, zConversationSummaryMode, zCreateCampaignWithScriptRequest (+38 more)
 
 ### Community 206 - "ivr-results.ts"
-Cohesion: 0.27
-Nodes (12): aggregateIvrResponses(), currentBlockTitles(), IVR_RESULT_CAMPAIGN_TYPES, IvrOptionShape, IvrRecordedAnswer, IvrResponseOption, IvrScriptShape, normalizeIvrAnswerValue() (+4 more)
+Cohesion: 0.12
+Nodes (30): humanizeHint(), ivrGatherAttributes, ivrSingleKeyDigits(), ivrSpeechHints(), ivrStepGathersSpeech(), findIvrMatchedOption(), ivrOptionLabel(), ivrOptionValue() (+22 more)
 
-### Community 207 - "schema-defaults.contract.ts"
-Cohesion: 0.06
-Nodes (30): Assert, _CampaignCreatedAt, _ContactCreatedAt, IsOptional, minimalCampaign, minimalSurvey, minimalWebhook, minimalWorkspaceInvite (+22 more)
+### Community 207 - "twilio-webhook.ts"
+Cohesion: 0.13
+Nodes (17): getTwilioWebhookModule(), buildTwilioWebhookParams(), handleTwilioWebhookRequest(), isTwilioWebhookPath(), TWILIO_WEBHOOK_EXACT_PATH_SET, TWILIO_WEBHOOK_EXACT_PATHS, TWILIO_WEBHOOK_EXCLUDED_PATHS, TWILIO_WEBHOOK_PATH_PREFIXES (+9 more)
 
 ### Community 208 - "media-namespace-migrate.server.ts"
-Cohesion: 0.19
-Nodes (9): CALL_RECORDINGS_OBJECT_PREFIX, MediaNamespaceMigrateDeps, MediaNamespaceMigrateResult, MediaNamespaceMigrateWorkspaceResult, mediaNamespaceTarget(), migrateWorkspaceMediaNamespaces(), runMediaNamespaceMigrate(), apply (+1 more)
+Cohesion: 0.23
+Nodes (11): CALL_RECORDINGS_OBJECT_PREFIX, MediaNamespaceMigrateDeps, MediaNamespaceMigrateResult, MediaNamespaceMigrateWorkspaceResult, mediaNamespaceTarget(), migrateWorkspaceMediaNamespaces(), runMediaNamespaceMigrate(), isLegacyVoicemailObjectName() (+3 more)
 
-### Community 209 - "platform-membership-safety.test.ts"
-Cohesion: 0.07
-Nodes (22): add(), Fixture, session, callback(), foreignWorkspace, provider, request(), route() (+14 more)
+### Community 209 - "billing-activity.server.ts"
+Cohesion: 0.15
+Nodes (18): attributeLedgerCampaigns(), BILLING_ACTIVITY_ITEM_PAGE_SIZE, BillingActivityQuery, BillingActivityTotals, getWorkspaceBillingActivity(), LedgerActivityRow, LedgerTotalsRow, ledgerWhereFor() (+10 more)
 
 ### Community 210 - "ref_node_crypto"
-Cohesion: 0.02
-Nodes (76): Available Data Packages, directPool, pool, assertFreshDatabase(), main(), checkNumberReleaseFinalWrite(), databaseUrl(), actorId (+68 more)
+Cohesion: 0.03
+Nodes (72): checkNumberReleaseFinalWrite(), databaseUrl(), actorId, foreignId, load(), outsiderId, session, workspaceId (+64 more)
 
 ### Community 211 - "End-to-end (E2E) testing"
 Cohesion: 0.11
@@ -1500,28 +1471,28 @@ Cohesion: 0.13
 Nodes (11): CREDENTIAL_HELPERS, CREDENTIAL_METHODS, EXEMPTIONS, LIMITER_PATH, ROOT, routesIdx, rows, scopes (+3 more)
 
 ### Community 214 - "cull-report.mjs"
-Cohesion: 0.14
-Nodes (12): ageDays(), args, asJson, culls, flag(), JUNK_FRAGMENTS, KEEP_LIST, keeps (+4 more)
+Cohesion: 0.16
+Nodes (11): DEV_CULL_KEEP_WORKSPACE_IDS, args, asJson, culls, JUNK_FRAGMENTS, keeps, ageDays(), workspaceCullVerdict() (+3 more)
 
 ### Community 215 - "workspace-analytics.ts"
-Cohesion: 0.23
-Nodes (13): aggregateAttemptMetrics(), AnalyticsAttemptInput, buildShifts(), buildWorkspaceAnalytics(), formatAnalyticsDuration(), isConnectedAttempt(), NON_CONNECT_DISPOSITIONS, parseCallDurationSeconds() (+5 more)
+Cohesion: 0.25
+Nodes (12): aggregateAttemptMetrics(), AnalyticsAttemptInput, buildShifts(), buildWorkspaceAnalytics(), isConnectedAttempt(), NON_CONNECT_DISPOSITIONS, parseCallDurationSeconds(), secondsBetween() (+4 more)
 
 ### Community 216 - "datetime.tsx"
-Cohesion: 0.08
-Nodes (43): CalendarProps, convert12HourTo24Hour(), DateCalendar(), DateTimePicker, DateTimePickerProps, DateTimePickerRef, display12HourValue(), genMonths() (+35 more)
+Cohesion: 0.04
+Nodes (67): AudienceUploadHistory(), AudienceUploadHistoryProps, cleanScheduleForPersist(), Day, DayName, DAYS_OF_WEEK, getDefaultSchedule(), parseSchedule() (+59 more)
 
-### Community 217 - "call-session-types.ts"
-Cohesion: 0.13
-Nodes (20): getUsableAudioDevices(), reconcileAudioDeviceId(), useCallAudioControls(), UseCallAudioControlsOptions, useSoftphoneAudioDevices(), UseSoftphoneAudioDevicesOptions, playTone(), CALL_SESSION_PHASES (+12 more)
+### Community 217 - "useCallAudioControls.ts"
+Cohesion: 0.32
+Nodes (9): getUsableAudioDevices(), reconcileAudioDeviceId(), useCallAudioControls(), UseCallAudioControlsOptions, useSoftphoneAudioDevices(), UseSoftphoneAudioDevicesOptions, playTone(), MicCoordinator (+1 more)
 
 ### Community 218 - "twilio-compliance-traffic/SKILL.md"
 Cohesion: 0.07
 Nodes (29): Attestation Levels, Call Recording Consent, CAN-SPAM (Email), CANNOT, Consent for Communications, Consent Management Pattern, Consent Requirements, Do Not Call (+21 more)
 
 ### Community 219 - "Widget catalog"
-Cohesion: 0.08
-Nodes (30): Connect Call To, Connect Virtual Agent (v2), Enqueue Call, Fork Stream, Gather Input On Call, HTTP Request, Make Outgoing Call, Record Voicemail (+22 more)
+Cohesion: 0.07
+Nodes (39): 6. Status Callback Monitoring, Monitoring Checklist, Call Recording, Capture Payments, Connect Call To, Connect Virtual Agent (v2), Enqueue Call, Fork Stream (+31 more)
 
 ### Community 220 - "Handoff — Supabase-exit robustness plan (hardening)"
 Cohesion: 0.14
@@ -1531,9 +1502,9 @@ Nodes (14): Acceptance checks, Clipboard topics to read, Current baseline, Done,
 Cohesion: 0.07
 Nodes (27): 1. Sharing Campaigns Across Customers, 2. Building Before Registering, 3. Missing Mandatory Registration Fields, 4. Storing Credentials Insecurely, API Key Isolation, Are You an ISV?, Common ISV Pitfalls, Constraints (+19 more)
 
-### Community 222 - "sms-webhook.spec.ts"
-Cohesion: 0.19
-Nodes (4): E2E_CONTACTS, E2E_SURVEY, ChatsPage, SurveyPublicPage
+### Community 222 - "public-queue-order-contract.mjs"
+Cohesion: 0.28
+Nodes (19): analyzePublicQueueOrder(), visit(), binds(), enqueueOptions(), explicitFields(), imported(), imports(), localBinding() (+11 more)
 
 ### Community 223 - "webhooks.ts"
 Cohesion: 0.27
@@ -1559,21 +1530,21 @@ Nodes (12): consolidatePair(), dedupeImports(), findPairs(), walk(), isRouteServ
 Cohesion: 0.12
 Nodes (22): CALLER_OPEN, DIR, offenders, reads, ROOT, walk(), actions(), bindNames() (+14 more)
 
-### Community 229 - "campaign-export-helpers.server.ts"
-Cohesion: 0.23
-Nodes (7): CampaignExportStatus, markCampaignExportInterruptedIfStale(), ScriptQuestion, isProcessingStale(), PROCESSING_INTERRUPTED_MESSAGE, PROCESSING_STALE_MS, BlockFixture
+### Community 229 - "audience-upload-csv.ts"
+Cohesion: 0.20
+Nodes (13): CSVRecord, parseCSV(), parseCSVAsync(), parseCSVData(), parseCSVHeaders(), splitCsvLines(), VALID_HEADERS, yieldToMainThread() (+5 more)
 
-### Community 230 - "media-stream-twiml.server.ts"
-Cohesion: 0.16
-Nodes (18): CoachingConfig, CoachingEventPayload, DEFAULT_COACHING_CONFIG, TranscriptMetadata, ADR-0027, WorkspaceFeatureFlags, hasFeatureFlag(), liveMediaCapabilities (+10 more)
+### Community 230 - "coaching-schemas.ts"
+Cohesion: 0.31
+Nodes (10): CoachingConfig, CoachingEventPayload, DEFAULT_COACHING_CONFIG, TranscriptMetadata, ADR-0027, WorkspaceFeatureFlags, hasFeatureFlag(), liveMediaCapabilities (+2 more)
 
 ### Community 231 - "media-stream/index.ts"
-Cohesion: 0.16
-Nodes (15): createMediaStreamToken(), CreateMediaStreamTokenInput, MediaStreamTokenPayload, verifyMediaStreamToken(), log(), maxPerWorkspace, PORT, server (+7 more)
+Cohesion: 0.10
+Nodes (18): createMediaStreamToken(), CreateMediaStreamTokenInput, MediaStreamTokenPayload, verifyMediaStreamToken(), log(), maxPerWorkspace, PORT, server (+10 more)
 
-### Community 232 - "request-context.server.ts"
-Cohesion: 0.33
-Nodes (6): addRequestIdToJobParams(), getRequestContext(), getRequestId(), RequestContext, requestContextStorage, RequestIdGlobal
+### Community 232 - "job-registry.server.ts"
+Cohesion: 0.06
+Nodes (47): addRequestIdToJobParams(), getRequestContext(), getRequestId(), RequestContext, requestContextStorage, RequestIdGlobal, EnqueueDedupe, EnqueueJobArgs (+39 more)
 
 ### Community 233 - "twilio-ai-agent-architect/SKILL.md"
 Cohesion: 0.08
@@ -1583,9 +1554,9 @@ Nodes (25): Architectural Warnings, Cloud Platform Selection (TAC SDK), Conversa
 Cohesion: 0.17
 Nodes (7): envState, stripeMock, transactionHistoryMock, loadWorkerStripe(), postWebhook(), transactionHistoryMock, WORKER_BUILD
 
-### Community 235 - "CallScreenPage"
-Cohesion: 0.22
-Nodes (4): enableTwilioMocks(), TwilioMockOptions, TwilioMocks, CallScreenPage
+### Community 235 - "check-queue-rpc-contract.mjs"
+Cohesion: 0.12
+Nodes (15): { added, stale, carried }, apiSources(), baseline, BASELINE_FILE, full, label, orderViolations, partial (+7 more)
 
 ### Community 236 - "fix-route-test-module-paths.mjs"
 Cohesion: 0.19
@@ -1595,9 +1566,9 @@ Nodes (11): demangle(), fixImportSpecifier(), flatIds, normalizeRel(), PATH_MAP,
 Cohesion: 0.17
 Nodes (6): eventSourceCtor, FakeEventSource, instances, listeners, loggerMock, SseHandler
 
-### Community 238 - "services.tsx"
-Cohesion: 0.26
-Nodes (9): ServiceCard(), ServiceCardProps, OtherServices(), SectionText(), SectionTextProps, SectionTitle(), SectionTitleProps, services (+1 more)
+### Community 238 - "service.ts"
+Cohesion: 0.21
+Nodes (12): applyMergeTags(), createEmptyDocument(), parseDocument(), validateDocument(), evaluateRouting(), createCallScriptService(), CallScriptService, RoutingAnswer (+4 more)
 
 ### Community 239 - "Conversation Orchestrator"
 Cohesion: 0.08
@@ -1624,16 +1595,16 @@ Cohesion: 0.16
 Nodes (21): Unidirectional Media Streams, Live coaching, Golden post-call transcript, Media-stream Bun service, Rule-based and Cohere coaching engine, Cohere Transcribe batch transcription, Deepgram Nova-3 live transcription, Live Transcription and Coaching Plan (+13 more)
 
 ### Community 245 - "check-credit-write-paths.mjs"
-Cohesion: 0.10
-Nodes (15): APPROVED_FILES, RATE_CARD_FILES, ROOT, SCAN_DIRS, SKIP_DIR_NAMES, SKIP_FILE_PATTERNS, VIOLATION_PATTERNS, violations (+7 more)
+Cohesion: 0.17
+Nodes (9): APPROVED_FILES, RATE_CARD_FILES, ROOT, SCAN_DIRS, SKIP_DIR_NAMES, SKIP_FILE_PATTERNS, VIOLATION_PATTERNS, violations (+1 more)
 
-### Community 246 - "check-relative-redirects.mjs"
-Cohesion: 0.18
-Nodes (10): BASELINE_PATH, collect(), current, RFC-3986, regressions, remainingAllowed, rootOption, SCAN_ROOT (+2 more)
+### Community 246 - "twilio-studio-flows/SKILL.md"
+Cohesion: 0.13
+Nodes (13): Flow definition schema, How widget outputs work, Liquid templating, Studio Widget Catalog Reference, Top-level keys, Transitions and events, Before you author: clarify the design, CANNOT (+5 more)
 
 ### Community 247 - "check-route-membership.mjs"
-Cohesion: 0.08
-Nodes (30): @/lib/foo.server, fixtureFlag, result, root, callSitesOnly(), functionBody(), isNonUserSurface(), offenders (+22 more)
+Cohesion: 0.06
+Nodes (39): @/lib/foo.server, BASELINE_PATH, collect(), current, RFC-3986, regressions, remainingAllowed, rootOption (+31 more)
 
 ### Community 248 - "check-type-safety.mjs"
 Cohesion: 0.17
@@ -1647,21 +1618,21 @@ Nodes (11): ContextMenu(), ContextMenuGroup(), ContextMenuItem(), contextMenuIte
 Cohesion: 0.17
 Nodes (11): compilerOptions, declaration, esModuleInterop, forceConsistentCasingInFileNames, jsx, lib, module, moduleResolution (+3 more)
 
-### Community 251 - "campaign-export-types.server.ts"
-Cohesion: 0.24
-Nodes (10): ExportAttemptWithDetails, ExportCall, ExportCampaign, ExportContact, ExportContactWithPhonePatterns, ExportMessage, ExportMessageWithContact, ExportOutreachAttempt (+2 more)
+### Community 251 - "NumberPurchase.columns.tsx"
+Cohesion: 0.23
+Nodes (11): buildNumberPurchaseColumns(), CAPABILITY_ORDER, capabilityBadges(), SEARCH_DESCRIPTIONS, SEARCH_MODE_LABELS, SEARCH_PLACEHOLDERS, addressRequirementLabel(), AvailableNumber (+3 more)
 
-### Community 252 - "workspaces+/index.loader.server.ts"
-Cohesion: 0.12
-Nodes (15): consumeInvitationFlash(), invitationCookie(), InvitationFlash, invitationFlashSchema, authLayoutLoader, loader, withClearedFlash(), WorkspaceListItem (+7 more)
+### Community 252 - "env"
+Cohesion: 0.04
+Nodes (72): AuthLayoutLoaderData, createAuthLayoutLoader(), CreateAuthLayoutLoaderOptions, createRequireSessionUserId(), env, appendInvitationAcceptedFlash(), consumeInvitationFlash(), invitationCookie() (+64 more)
 
-### Community 253 - "send-workspace-invite-email.server.ts"
-Cohesion: 0.22
-Nodes (7): sendResetPasswordEmail(), sendWorkspaceInviteEmail(), sendTransactionalEmail(), mocks, loggerMocks, Resend, resendMocks
+### Community 253 - "workspace-reference-migrations.test.ts"
+Cohesion: 0.21
+Nodes (9): column(), fixture(), insert(), Migration, migrations, reference(), rows(), basicMap (+1 more)
 
-### Community 254 - "$id/onboarding.action.server.ts"
-Cohesion: 0.13
-Nodes (14): isOnboardingActionName(), mapOnboardingHandlerResult(), requireOnboardingAdmin(), runOnboardingAction(), onboardingActionBodySchema, action, action, redirectToOnboardingStep() (+6 more)
+### Community 254 - "platform-onboarding.server.ts"
+Cohesion: 0.14
+Nodes (16): isOnboardingActionName(), OnboardingActionData, getWorkspaceOnboardingDetail(), mapOnboardingHandlerResult(), MappedOnboardingResult, patchWorkspaceOnboarding(), requireOnboardingAdmin(), runOnboardingAction() (+8 more)
 
 ### Community 255 - "CallCaster Public API Overview"
 Cohesion: 0.06
@@ -1679,17 +1650,17 @@ Nodes (16): rawBlockErrors(), rawNoInputErrors(), rawPageErrors(), rawRoutingInp
 Cohesion: 0.18
 Nodes (7): apply, limit, maxRounds, minAgeMinutes, OPEN_CALL_STATUSES, StuckRow, workspaces
 
-### Community 259 - "design-preview-a11y.spec.ts"
-Cohesion: 0.18
-Nodes (3): SCAN_TAGS, TOAST_TONES, @axe-core/playwright
+### Community 259 - "check-redirect-targets.mjs"
+Cohesion: 0.22
+Nodes (11): fixtureFlag, result, root, checkRedirectTargets(), visit(), frameworkImport(), isRedirectCall(), REDIRECT_EXPORTS (+3 more)
 
 ### Community 260 - "auth/package.json"
 Cohesion: 0.18
 Nodes (10): cookie, description, files, postgres, license, name, publishConfig, registry (+2 more)
 
-### Community 261 - "check-app-file-size.mjs"
-Cohesion: 0.18
-Nodes (10): allowlistViolations, BASELINE_ALLOWLIST, EXEMPT, missingAllowlisted, missingExempt, offenders, ROOT, seenAllowlisted (+2 more)
+### Community 261 - "twilio-send-message/SKILL.md"
+Cohesion: 0.17
+Nodes (11): CANNOT, Common Errors, Configure RCS→SMS fallback, Key Patterns, Next Steps, Overview, Prerequisites, Quickstart (+3 more)
 
 ### Community 262 - "check-unscoped-db-imports.mjs"
 Cohesion: 0.25
@@ -1723,9 +1694,9 @@ Nodes (16): CAMPAIGN_READINESS_ACTIONS, CAMPAIGN_READINESS_ROUTE_TEMPLATES, Camp
 Cohesion: 0.36
 Nodes (8): ENV_ALIASES, hasObjectStorageEnv(), OBJECT_STORAGE_GROUPS, ObjectStorageSetting, objectStorageUsesPathStyle(), resolveObjectStorageEnv(), resolveObjectStorageEnvRequired(), validateObjectStorageEnv()
 
-### Community 270 - "object-storage.server.ts"
-Cohesion: 0.10
-Nodes (30): listExportableCampaignsInWorkspace(), basenameFromKey(), BUCKET_ENV_VARS, ConfiguredBucket, copyObject(), dedicatedBucketFor(), downloadObject(), getS3Client() (+22 more)
+### Community 270 - "boot-checks.server.ts"
+Cohesion: 0.36
+Nodes (8): listConfiguredBuckets(), checkS3Buckets(), checkTwilioCredentials(), log(), LogLevel, runBootSmokeChecks(), twilio, mocks
 
 ### Community 271 - "type-safety-utils.ts"
 Cohesion: 0.16
@@ -1747,9 +1718,9 @@ Nodes (21): CANNOT, Common Errors, Compliance Onboarding (US), Device Support, I
 Cohesion: 0.07
 Nodes (36): Migration Delivery Board, Fresh v2 production database, Migration delivery board, G0-G6 migration gates, Railway review stack, Squashed Drizzle baseline, Migration Ledger Audit, Supabase migration ledger (+28 more)
 
-### Community 276 - "call-recording-repair.server.ts"
-Cohesion: 0.12
-Nodes (13): DEFAULT_REPAIR_LIMIT, REPAIR_MAX_AGE_DAYS, REPAIR_MIN_AGE_MINUTES, repairIdempotencyKey(), RepairSweepResult, repairTwilioParams(), runRecordingRepairSweep(), jobRegistry (+5 more)
+### Community 276 - "vite.config.ts"
+Cohesion: 0.17
+Nodes (7): @react-router/dev, @react-router/remix-routes-option-adapter, remix-flat-routes, @tailwindcss/vite, vite, vite-tsconfig-paths, appDir
 
 ### Community 277 - "theme-contrast.test.ts"
 Cohesion: 0.24
@@ -1767,9 +1738,9 @@ Nodes (10): devDependencies, bun-types, jsdom, react, react-dom, @testing-librar
 Cohesion: 0.20
 Nodes (10): exports, ./hooks, ./routing, ./styles/call-script-tokens.css, default, import, types, default (+2 more)
 
-### Community 281 - "inbound-verification.action.server.ts"
-Cohesion: 0.50
-Nodes (6): verification_session, appendVerifiedAudioNumber(), findPendingVerificationSession(), getUserVerifiedAudioNumbers(), markVerificationSessionVerified(), action
+### Community 281 - "db"
+Cohesion: 0.04
+Nodes (53): user, verification_session, webhook, workspace, workspace_member, DEAD_LETTER_JOB_STATUS, requeueDeadLetteredJob(), RequeueResult (+45 more)
 
 ### Community 282 - "twilio-conversations-classic-api/SKILL.md"
 Cohesion: 0.10
@@ -1779,49 +1750,49 @@ Nodes (20): Add Multiple Participants, Add Participants by Channel, Advanced Con
 Cohesion: 0.10
 Nodes (20): Conference Patterns, CRM Integration, Decision Rules, Existing Infrastructure, Level 1: Self-Service Automation, Level 2: AI-Powered Self-Service, Level 3: Contact Center, Level 4: Intelligent Contact Center (+12 more)
 
-### Community 284 - "platform-media.server.ts"
-Cohesion: 0.17
-Nodes (16): getMediaObject(), getSignedMediaUrl(), getSignedMediaUrls(), MediaBucket, MediaObjectMeta, MediaUploadOptions, createSignedObjectUrls(), StoredObjectMeta (+8 more)
+### Community 284 - "csvRow"
+Cohesion: 0.33
+Nodes (7): downloadAudienceImportReport(), escapeImportReportCell(), Report, reportLines(), getAudienceImportReport(), csvRow(), loader
 
 ### Community 285 - "ops-alert.server.ts"
-Cohesion: 0.14
-Nodes (15): buildBody(), emailsEnabled(), inMemoryDeduped(), notifyOps(), OpsAlertInput, OpsAlertResult, OpsAlertSeverity, recentAlerts (+7 more)
+Cohesion: 0.13
+Nodes (16): buildBody(), emailsEnabled(), inMemoryDeduped(), notifyOps(), OpsAlertInput, OpsAlertResult, OpsAlertSeverity, recentAlerts (+8 more)
 
 ### Community 286 - "twilio-agent-augmentation-architect/SKILL.md"
 Cohesion: 0.10
 Nodes (19): Architectural Warnings, Conversation Intelligence Operator Selection, Customer Profile, Decision Rules, Existing Infrastructure, GA Constraints (May 2026), Level 1: Listen — Transcription & Recording, Level 2: Coach — Real-Time Intelligence (+11 more)
 
-### Community 287 - "number-rental-reconciliation.ts"
-Cohesion: 0.19
-Nodes (17): NUMBER_RENTAL_ROLLOUT_CUTOFF_DATE, numberRentalDueDate(), numberRentalReconciliationPeriod(), buildNumberRentalReconciliation(), historyCycles(), NON_RENTAL_CATEGORIES, NumberRentalHistory, NumberRentalReconciliationInput (+9 more)
+### Community 287 - "CampaignExportButton.tsx"
+Cohesion: 0.33
+Nodes (6): CampaignExportButton(), CampaignExportButtonProps, CampaignExportDownload, useCampaignExport(), UseCampaignExportArgs, toastMock
 
 ### Community 288 - "check-migration-ledger.mjs"
 Cohesion: 0.36
 Nodes (8): GRANDFATHERED_DUPLICATE_VERSIONS, loadDbVersions(), loadRepoVersions(), main(), MIGRATIONS_DIR, reportDiff(), ROOT, versionFromFilename()
 
-### Community 289 - "platform-workspace-numbers.server.ts"
-Cohesion: 0.12
-Nodes (22): updateCallerId(), updateWorkspacePhoneNumber(), applyWorkspaceNumberRoutingPreset(), deleteWorkspaceNumber(), PatchNumberInput, patchWorkspaceNumber(), requireNumbersManager(), verifyWorkspaceCallerId() (+14 more)
+### Community 289 - "inbound-script-attachment.test.ts"
+Cohesion: 0.18
+Nodes (6): actorId, attach(), foreignWorkspaceId, script(), steps(), workspaceId
 
 ### Community 290 - "Key Patterns"
-Cohesion: 0.11
-Nodes (18): 10. CLI Debugging, 1. Systematic Debugging Workflow, 2. Console Debugger, 3. Monitor Alerts API, 4. Monitor Events API, 6. Status Callback Monitoring, 7. Debugging Webhooks, 8. Common Error Codes (+10 more)
+Cohesion: 0.08
+Nodes (25): 10. CLI Debugging, 1. Systematic Debugging Workflow, 2. Console Debugger, 3. Monitor Alerts API, 4. Monitor Events API, 5. Event Streams for Error Log Streaming, 7. Debugging Webhooks, 8. Common Error Codes (+17 more)
 
-### Community 291 - "workspace-members-rbac.test.ts"
-Cohesion: 0.22
-Nodes (7): accessMocks, dbMock, inviteMocks, membersDbMocks, tenantDbMock, twoFactorMocks, txDb
+### Community 291 - "check-middleware-adoption.mjs"
+Cohesion: 0.20
+Nodes (6): ADR-0031, ROOT, ROUTES, TREES, violations, walk()
 
 ### Community 292 - "exports"
 Cohesion: 0.22
 Nodes (9): exports, ./package.json, ./sidebar, ./theme.css, ./toggle-group, import, types, import (+1 more)
 
-### Community 293 - "env.server.ts"
-Cohesion: 0.09
-Nodes (22): addOriginList(), addUrlOrigin(), headersFromTrustedOriginsInput(), resolveAuthTrustedOrigins(), resolveStaticAuthTrustedOrigins(), EnvConfig, getStripeKeyMode(), isProduction() (+14 more)
+### Community 293 - "campaign-ivr-dispatch.test.ts"
+Cohesion: 0.60
+Nodes (4): defaultMocks(), mocks, queuedRow(), runningCampaign()
 
-### Community 294 - "accept-invite.loader.server.ts"
-Cohesion: 0.38
-Nodes (6): WorkspaceInvitationAppRow, findUserIdByUsername(), InviteLinkResolution, loader, resolveInviteLink(), LoaderData
+### Community 294 - "canvass.ts"
+Cohesion: 0.27
+Nodes (8): callcasterWireBlockSchema, CANVASS_TYPES, CanvassBlockType, isCanvassBlockType(), migrateFromQuickCanvassBlocks(), serializeToQuickCanvassBlocks(), CANVASS_BLOCK_TYPES, QuickCanvassBlock
 
 ### Community 295 - "twilio-marketing-promotions-advisor/SKILL.md"
 Cohesion: 0.11
@@ -1848,20 +1819,20 @@ Cohesion: 0.19
 Nodes (13): IVR Remix vs Edge Audit, Supabase Edge IVR runtime, Remix IVR runtime, TWILIO_IVR_RUNTIME feature flag, Twilio webhook runtime audit, Canonical callback targets, IVR runtime classification, Twilio callback map (+5 more)
 
 ### Community 301 - "overrides"
-Cohesion: 0.13
-Nodes (15): overrides, @ai-sdk/provider-utils, axios, esbuild, form-data, handlebars, js-yaml, jsonwebtoken (+7 more)
+Cohesion: 0.12
+Nodes (17): overrides, @ai-sdk/provider-utils, axios, esbuild, form-data, handlebars, js-yaml, jsonwebtoken (+9 more)
 
 ### Community 302 - "services/tsconfig.json"
 Cohesion: 0.25
 Nodes (7): compilerOptions, jsx, lib, types, extends, include, ../tsconfig.json
 
-### Community 303 - "audience-upload.route.test.ts"
+### Community 303 - "check-route-server-leaks.mjs"
 Cohesion: 0.25
-Nodes (7): dbMocks, enqueueJobMock, logger, objectStorageMocks, processDbMocks, processTdbMocks, requireWorkspaceAccessMock
+Nodes (6): hasServerLeak(), hits, ROOT, ROUTES, stripAllowedServerImports(), walk()
 
-### Community 304 - "call-status.route.test.ts"
-Cohesion: 0.25
-Nodes (4): enqueueJobMock, mocks, telephonyDbMocks, twilioWebhookMocks
+### Community 304 - "queue-transitions-source.mjs"
+Cohesion: 0.36
+Nodes (8): collectArrayConstants(), collectStringConstants(), loadQueueEntryTransitions(), parseQueueEntryTransitions(), sliceBraced(), splitEntries(), TRANSITIONS_EXPORT, TRANSITIONS_SOURCE_FILE
 
 ### Community 305 - "campaign-queue-db.claim.test.ts"
 Cohesion: 0.29
@@ -1871,9 +1842,9 @@ Nodes (5): dbMocks, emitQueueEventMock, installDbMockImplementations(), selectRe
 Cohesion: 0.11
 Nodes (18): CANNOT, Conference — Multi-party calls, Core Verbs, Dial — Connect to another number, Gather — Collect keypad input or speech, Monitoring, Next Steps, Overview (+10 more)
 
-### Community 307 - "Key Patterns"
-Cohesion: 0.07
-Nodes (30): 5. Event Streams for Error Log Streaming, Send Message, Transitions and output context, 1. Webhook Types Across Products, 2. Signature Validation, 3. Status Callback Handling, 4. Connection Overrides (Retry and Timeout Tuning), 5. Configure Webhook URLs via API (+22 more)
+### Community 307 - "hooks-queue-purity.test.tsx"
+Cohesion: 0.08
+Nodes (27): Response Fields, Send Message, Transitions and output context, Response Fields, 3. Status Callback Handling, CANNOT, Common Errors, Key Patterns (+19 more)
 
 ### Community 308 - "audience-uploader.test.tsx"
 Cohesion: 0.32
@@ -1891,9 +1862,9 @@ Nodes (7): compilerOptions, jsx, outDir, rootDir, extends, include, ../../tsconf
 Cohesion: 0.43
 Nodes (5): CAMPAIGN_STATUS_PRIORITY, CampaignListItem, createdAtTimestamp(), sortCampaignsForList(), statusPriority()
 
-### Community 312 - "required-env-keys.mjs"
-Cohesion: 0.15
-Nodes (13): hasObjectStorageEnv(), REQUIRED_ENV_KEYS, validateRequiredEnv(), OBJECT_STORAGE_GROUPS, RequiredEnvKey, REQUIRED_ENV_KEYS, validateRequiredEnv(), validateObjectStorageEnv() (+5 more)
+### Community 312 - "validateRequiredEnv"
+Cohesion: 0.32
+Nodes (5): revalidateEnv(), validateEnv(), validateRequiredEnv(), validateWorkerEnv(), key()
 
 ### Community 313 - "twilio-conference-calls/SKILL.md"
 Cohesion: 0.11
@@ -1907,25 +1878,25 @@ Nodes (17): 1. Hyphens in Attribute Names Break Silently, 2. HAS Operator on Non
 Cohesion: 0.29
 Nodes (7): Automated coverage to add (so the above stays tested), Dev Test Plan — next round (2026-07-16), Standing environment rules (so results are trustworthy), Tier 1 — Post-merge regression gate (local compose; blocks everything else), Tier 2 — Local-closable gaps (never driven; all runnable on the compose stack), Tier 3 — Requires the deployed dev/staging environment (real providers), Tier 4 — Breadth (schedule after Tiers 1–3 are green)
 
-### Community 316 - "hooks-api.ts"
-Cohesion: 0.16
-Nodes (14): StartConferenceOptions, useStartConferenceAndDial(), CONFERENCE_START_MESSAGES, conferenceStartError(), conferenceStartResult(), HangupCallParams, HangupCallResponse, startConferenceAndDial() (+6 more)
+### Community 316 - "workspace-loader-secrets.test.ts"
+Cohesion: 0.22
+Nodes (6): dbMocks, FORBIDDEN_KEYS, platformMocks, routeMocks, tdbMocks, ADR-0011
 
-### Community 317 - "job-registry.test.ts"
-Cohesion: 0.14
-Nodes (13): ensureSelfSchedulingJobsSeeded(), SCHEDULE_WATCHDOG_INTERVAL_MS, SelfSchedulingJobType, startScheduleWatchdog(), PAGING_JOB_TYPES, SELF_SCHEDULING_JOB_TYPES, SELF_SCHEDULING_SEED_PARAMS, jobParamsRegistry (+5 more)
+### Community 317 - "useCreditReconciliation.ts"
+Cohesion: 0.39
+Nodes (6): CREDIT_RECONCILE_INTERVAL_MS, CREDIT_RECONCILE_WINDOW_MS, useCreditReconciliation(), UseCreditReconciliationOptions, HookProps, renderReconciliation()
 
-### Community 318 - "media-stream/types.ts"
-Cohesion: 0.12
-Nodes (17): ElevenLabsRealtimeStream, ElevenLabsErrorMessage, ElevenLabsPartialTranscriptMessage, ElevenLabsSessionStartedMessage, TwilioConnectedMessage, TwilioMarkMessage, TwilioMediaFormat, TwilioMediaMessage (+9 more)
+### Community 318 - "routing-preset-write.server.test.ts"
+Cohesion: 0.25
+Nodes (7): applyRoutingPresetWithTenantDb(), isVerifiedCallerIdCapabilities(), numberFindFirst, numberUpdate, queueFindFirst, scriptFindFirst, tdb
 
 ### Community 319 - "Key Patterns"
 Cohesion: 0.12
 Nodes (16): Accounts and Subaccounts, CANNOT, Enable Specific Products, Initialize the Client, Key Patterns, Next Steps, Overview, Quickstart (+8 more)
 
-### Community 320 - "chats.action.server.ts"
-Cohesion: 0.05
-Nodes (31): outboundCreditsBlockedResponse(), action, parseMediaList(), mocks, pageArgs(), campaignIvrMocks, mocks, testSendMocks (+23 more)
+### Community 320 - "numbers-routing-preset-action.test.ts"
+Cohesion: 0.32
+Nodes (5): parsePositiveId(), parseRoutingPresetApplication(), INBOUND_ROUTING_PRESET_IDS, InboundRoutingPresetId, mocks
 
 ### Community 322 - "twilio-numbers-senders/SKILL.md"
 Cohesion: 0.12
@@ -1947,9 +1918,9 @@ Nodes (4): CallScriptUiComponents, CallScriptUiContext, defaultComponents, Scrip
 Cohesion: 0.33
 Nodes (5): Graphify Skill, Knowledge Graph, Semantic Extraction, Graphify Add and Watch, Graphify Extra Exports
 
-### Community 327 - "$id/$.loader.server.ts"
-Cohesion: 0.33
-Nodes (3): loader, mocks, runLoader()
+### Community 327 - "api-caller-id-status.route.test.ts"
+Cohesion: 0.25
+Nodes (5): databaseMocks, inboundMocks, mergeMocks, onboardingMocks, twilioMocks
 
 ### Community 328 - "scripts"
 Cohesion: 0.33
@@ -1959,29 +1930,33 @@ Nodes (6): scripts, build, dev, lint, start, typecheck
 Cohesion: 0.33
 Nodes (6): Effects inventory, Effects strictness, Enforcement (ratchet), Pre-commit enforcement, Status, The annotation
 
-### Community 331 - "api-client.ts"
-Cohesion: 0.18
-Nodes (7): apiClient, ApiClientConfig, ApiResponse, parseResponseBody(), RequestOptions, submitForm(), AppErrorShape
+### Community 331 - "useSurveySubmission.ts"
+Cohesion: 0.14
+Nodes (10): AnswerStatus, PendingAnswer, SurveyIdentity, apiClient, ApiClientConfig, ApiResponse, parseResponseBody(), RequestOptions (+2 more)
 
 ### Community 332 - "twilio-call-recordings/SKILL.md"
 Cohesion: 0.12
 Nodes (15): Accessing Recordings, CANNOT, Common Errors, Conference Recording, ConversationRelay Recording, Handle the Recording Status Callback, Key Patterns, Mid-Call Pause for PCI Compliance (+7 more)
 
-### Community 333 - "twilio-messaging-services/SKILL.md"
-Cohesion: 0.12
-Nodes (15): CANNOT, Compliance Toolkit (US SMS, Public Beta), Create Service with Webhooks and Features, Intelligent Alerts, Key Patterns, Link Shortening & Click Tracking, List Services and Numbers, Message Scheduling (+7 more)
+### Community 333 - "MessageCampaign"
+Cohesion: 0.29
+Nodes (6): MessageCampaign, campaign, details, options, valid, schedule()
+
+### Community 334 - "audience-import-report.test.ts"
+Cohesion: 0.33
+Nodes (6): resolveRouteResult(), actor, foreign, request(), session, workspace
 
 ### Community 336 - "fix-route-tests-rr7.mjs"
 Cohesion: 0.40
 Nodes (4): closeCallParen(), TEST_DIR, walk(), wrapRouteCalls()
 
-### Community 337 - "sms-status.route.test.ts"
+### Community 337 - "workspace-setting-utils.test.ts"
 Cohesion: 0.33
-Nodes (4): enqueueJobMock, markContactLineTypeMock, mocks, twilioCtor
+Nodes (4): getWorkspaceUsers, inviteMocks, membersDbMocks, safeOutboundMocks
 
-### Community 338 - "workspace-invitations.test.ts"
-Cohesion: 0.33
-Nodes (4): dbMocks, emailMocks, pendingRow, pkgMocks
+### Community 338 - "number-locality.ts"
+Cohesion: 0.70
+Nodes (3): formatNumberLocality(), formatNumberLocation(), KNOWN_RATE_CENTRE_NAMES
 
 ### Community 339 - "twilio-organizations-setup/SKILL.md"
 Cohesion: 0.12
@@ -2003,9 +1978,9 @@ Nodes (5): Campaign Dispatch and State Bugs, Focused Regression Assertions, Cano
 Cohesion: 0.12
 Nodes (15): Account-Level Compliance, API Keys vs Auth Tokens, Best Practices, Common Mistakes, Credential Management, Credential Rotation (Zero-Downtime), Fraud Prevention, Geo-Permissions (+7 more)
 
-### Community 344 - "checkSheetBodyContract"
-Cohesion: 0.22
-Nodes (13): failures, scan(), bodyPaddingOverrides(), checkSheetBodyContract(), checkBody(), visit(), checkContent(), child() (+5 more)
+### Community 344 - "export-message-date-bounds.test.ts"
+Cohesion: 0.83
+Nodes (3): db(), newWorkspace(), seed()
 
 ### Community 345 - "twilio-identity-verification-advisor/SKILL.md"
 Cohesion: 0.13
@@ -2040,20 +2015,20 @@ Cohesion: 0.14
 Nodes (13): CANNOT, ISV / Multi-Account Pattern, Key Concepts, Next Steps, Overview, Quickstart: Provision a Number with a Bundle, Step 1 — Query the Regulation, Step 2 — Create an End-User (+5 more)
 
 ### Community 353 - "Key Patterns"
-Cohesion: 0.14
-Nodes (13): 1. Exponential Backoff with Jitter, 2. Per-Number Throughput Limits, 3. Bulk Send Pattern, 4. StatusCallback Resilience, 5. Fallback Chains, 6. Voice Concurrency Limits, 7. Webhook Timeout Handling, CANNOT (+5 more)
+Cohesion: 0.13
+Nodes (14): 1. Exponential Backoff with Jitter, 2. Per-Number Throughput Limits, 3. Bulk Send Pattern, 4. StatusCallback Resilience, 5. Fallback Chains, 6. Voice Concurrency Limits, 7. Webhook Timeout Handling, CANNOT (+6 more)
 
 ### Community 354 - "twilio-verify-send-otp/SKILL.md"
 Cohesion: 0.14
 Nodes (13): CANNOT, Common Errors, Debugging, Key Patterns, Next Steps, Overview, Prerequisites, Quickstart (+5 more)
 
-### Community 355 - "useSurveySubmission.ts"
-Cohesion: 0.31
-Nodes (13): AnswerStatus, PendingAnswer, SurveyIdentity, useSurveySubmission(), clearTimer(), drain(), flushPending(), identityForm() (+5 more)
+### Community 355 - "SurveyRespondentPage"
+Cohesion: 0.44
+Nodes (12): useSurveySubmission(), clearTimer(), drain(), flushPending(), identityForm(), post(), queueAnswer(), savePage() (+4 more)
 
 ### Community 356 - "Key Patterns"
-Cohesion: 0.15
-Nodes (12): Automatic Extraction (Orchestrator Integration), CANNOT, Key Patterns, Lookup by Identifier, Next Steps, Overview, Prerequisites, Profile Resolution (+4 more)
+Cohesion: 0.14
+Nodes (13): Async Polling Pattern, Automatic Extraction (Orchestrator Integration), CANNOT, Key Patterns, Lookup by Identifier, Next Steps, Overview, Prerequisites (+5 more)
 
 ### Community 357 - "Key Patterns"
 Cohesion: 0.15
@@ -2095,10 +2070,6 @@ Nodes (3): Semantic design tokens, StatusBadge, UI primitives
 Cohesion: 0.17
 Nodes (11): CANNOT, Common Errors, Key Patterns, Next Steps, Overview, Prerequisites, Quickstart, Record a Call (+3 more)
 
-### Community 369 - "call-actions.server.ts"
-Cohesion: 0.30
-Nodes (11): cancelCallAndUpdateDB(), cancelMessageAndUpdateDB(), cancelQueuedCalls(), cancelQueuedMessages(), cancelQueuedMessagesForCampaign(), fetchQueuedCalls(), fetchQueuedMessages(), processBatchCancellation() (+3 more)
-
 ### Community 370 - "Hook TypeScript Migration"
 Cohesion: 0.50
 Nodes (3): Hook TypeScript Migration, Type Safety Utilities, Hooks Quality Improvement Checklist
@@ -2122,10 +2093,6 @@ Nodes (4): Public API authentication drift, Public API Test Drift, OpenAPI surfa
 ### Community 375 - "survey-utils.ts"
 Cohesion: 0.17
 Nodes (10): SurveyAnswerData, SurveyData, SurveyError, SurveyPageData, SurveyQuestionData, SurveyQuestionType, SurveyResponseData, SurveyValidationResult (+2 more)
-
-### Community 376 - "check-workspace-projection.mjs"
-Cohesion: 0.20
-Nodes (10): clientFields, hits, importedNames(), inspect(), visit(), isSafePick(), overview, rawAdminReaders (+2 more)
 
 ### Community 377 - "src/components/ui/dropdown-menu.tsx"
 Cohesion: 0.20
@@ -2223,14 +2190,6 @@ Nodes (8): PublicPricingRow, action, loader, Pricing(), PricingCard(), SectionTi
 Cohesion: 0.29
 Nodes (5): CallCaster changelog, Credit billing and reconciliation, Workspace capability and webhook security hardening, Release verification guide, Green-gate blind spots audit
 
-### Community 401 - "sms-segments.ts"
-Cohesion: 0.27
-Nodes (9): estimateSegments(), getCharacterCount(), getGsm7Units(), getSmsSegmentInfo(), GSM_7_BASIC_CHARACTERS, GSM_7_EXTENSION_CHARACTERS, SegmentEstimate, SmsEncoding (+1 more)
-
-### Community 402 - "survey-answer-state.ts"
-Cohesion: 0.25
-Nodes (9): isWriteIn(), Option, Page, Question, SurveyAnswerValue, surveyOptionForAnswer(), withSurveyWriteIn(), hasRequiredSurveyAnswer() (+1 more)
-
 ### Community 403 - "doctor.mjs"
 Cohesion: 0.18
 Nodes (6): args, asJson, findings, report, sql, workspaceId
@@ -2238,10 +2197,6 @@ Nodes (6): args, asJson, findings, report, sql, workspaceId
 ### Community 404 - "Twilio parent-account operations"
 Cohesion: 0.67
 Nodes (3): Twilio parent-account operations, Primary Customer Profile, Scheduled Twilio webhook audit
-
-### Community 405 - "number-rental-billing.server.test.ts"
-Cohesion: 0.18
-Nodes (8): creditsMocks, lifecycleMocks, opsMocks, Resend, resendMocks, tdbMocks, transactionHistoryMocks, workspaceMembersMocks
 
 ### Community 406 - "engines"
 Cohesion: 0.67
@@ -2467,14 +2422,6 @@ Nodes (9): CANNOT, Key Patterns, Next Steps, Overview, Prerequisites, Quickstart
 Cohesion: 0.24
 Nodes (7): createEmptyFlow(), DEFAULT_SECTION_TITLES, getFlowType(), normalizeFlow(), ScriptData, Flow, IVRBlock
 
-### Community 480 - "$fileName.edit.loader.server.ts"
-Cohesion: 0.29
-Nodes (7): isSafeObjectName(), collectScriptAudioNames(), findAudioUsage(), getScriptAudioReferences(), getAudioMetadata(), loader, loader
-
-### Community 494 - "public-api.ts"
-Cohesion: 0.20
-Nodes (8): INTEGRATOR_API_PATHS, INTEGRATOR_API_TAG, IntegratorApiPath, PUBLIC_API_PATHS, PUBLIC_API_TAG, PublicApiPath, USER_FACING_AUTH_CLASSES, UserFacingAuthClass
-
 ### Community 502 - ""node_modules/base64-js/index.js""
 Cohesion: 0.29
 Nodes (8): "node_modules/base64-js/index.js"(), byteLength(), encodeChunk(), fromByteArray(), getLens(), toByteArray(), tripletToBase64(), base64Slice()
@@ -2487,22 +2434,6 @@ Nodes (3): mocks, tenantDbMocks, Recorder
 Cohesion: 0.22
 Nodes (8): Common Issues, Documentation Links, License, Overview, Setup Wizard, Troubleshooting, Twilio Agent Connect, Version Requirements
 
-### Community 528 - "platform-data.ts"
-Cohesion: 0.25
-Nodes (7): CampaignStatusBody, campaignStatusBodySchema, campaignStatusSchema, PatchCampaignQueueBody, patchCampaignQueueBodySchema, queueFiltersSchema, queueSelectionFields
-
-### Community 529 - "number-purchase-worker.test.ts"
-Cohesion: 0.22
-Nodes (5): jobHandlers, boundary, job, boundary, job
-
-### Community 530 - "check-pg-error-codes.mjs"
-Cohesion: 0.22
-Nodes (8): ALLOWED, PATTERNS, ROOT, SCAN_DIRS, SKIP_DIR, SKIP_FILE, violations, walk()
-
-### Community 531 - "check-request-body-consumption.mjs"
-Cohesion: 0.22
-Nodes (5): findings, ROOT, SCAN_DIRS, SKIP, walk()
-
 ### Community 533 - "Conversation Intelligence"
 Cohesion: 0.25
 Nodes (7): CAN, CANNOT, Conversation Intelligence, How It Works, Quick Decision, Related Resources, Scope
@@ -2511,17 +2442,9 @@ Nodes (7): CAN, CANNOT, Conversation Intelligence, How It Works, Quick Decision,
 Cohesion: 0.25
 Nodes (8): Authentication Helper, Consume Operator Results, Create a Custom Operator with Training Examples and Parameters, Create Intelligence Configuration with Rules, Enable Customer Memory and Enterprise Knowledge on a Rule, Integration Patterns, Link to Conversation Orchestrator Conversation Configuration, Paginate Through Results
 
-### Community 554 - "message-media.route.test.ts"
-Cohesion: 0.29
-Nodes (5): deleteObject(), campaignMocks, makeDbClient(), mocks, postgresServerMocks
-
 ### Community 555 - "route-dynamic-server-imports.mjs"
 Cohesion: 0.36
 Nodes (6): injectIntoExports(), parseNamedImports(), patchFile(), ROUTES, splitClientServer(), walk()
-
-### Community 556 - "check-dry.mjs"
-Cohesion: 0.29
-Nodes (7): BASELINE_PATH, DIMENSIONS, measured, METRICS, regressions, ROOT, scan()
 
 ### Community 557 - "low-credit-notify.server.test.ts"
 Cohesion: 0.25
@@ -2555,13 +2478,9 @@ Nodes (4): goToReview(), mocks, selectCsvFile(), startUpload()
 Cohesion: 0.33
 Nodes (5): Evidence and billing, Predictive machine callback recovery, Verification scope, Verified successor adoption, Worker failure and operator recovery
 
-### Community 565 - "campaign-schedule-sync.server.test.ts"
-Cohesion: 0.33
-Nodes (4): CLOSED_WEDNESDAY, mocks, NOW, OPEN_WEDNESDAY
-
-### Community 566 - "audio-streamer.test.tsx"
-Cohesion: 0.33
-Nodes (3): MockMediaRecorder, mocks, MockWebSocket
+### Community 566 - "AudioStreamer.tsx"
+Cohesion: 0.22
+Nodes (4): AudioStreamerProps, MockMediaRecorder, mocks, MockWebSocket
 
 ### Community 567 - "Best Practices"
 Cohesion: 0.40
@@ -2582,14 +2501,6 @@ Nodes (5): Contact Center QA, Real-time Agent Assist, Real-time Workflow Automat
 ### Community 571 - "Decision Frameworks"
 Cohesion: 0.40
 Nodes (5): Custom Operator Output Formats, Decision Frameworks, Operator Version Lifecycle, Twilio-Authored Operator Reference, v2 (Voice Intelligence) vs v3 (Conversation Intelligence)
-
-### Community 572 - "audience-upload-opt-out.test.ts"
-Cohesion: 0.40
-Nodes (3): mapping, upload(), writes
-
-### Community 573 - "test/workspace-invitation-resend.test.ts"
-Cohesion: 0.40
-Nodes (4): row(), invitation, mocks, resend()
 
 ### Community 574 - "Advanced Features"
 Cohesion: 0.50
@@ -2624,24 +2535,24 @@ Cohesion: 0.67
 Nodes (3): Multi-Channel Agent with OpenAI (Python), Multi-Channel Agent with OpenAI (TypeScript), Quick Start
 
 ## Knowledge Gaps
-- **5329 isolated node(s):** `repository`, `appVariables`, `workerVariables`, `databaseVariables`, `appVariables` (+5324 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 6321 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **94 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5430 isolated node(s):** `argv`, `positional`, `CAMPAIGN`, `OUTDIR`, `REPO` (+5425 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 6458 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **96 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `createTenantDb()` connect `createTenantDb` to `jsonError`, `platform-data.server.ts`, `number-release-recovery.test.ts`, `workspace.server.ts`, `call-log.server.ts`, `contact.server.ts`, `db-types.ts`, `$roomId.action.server.ts`, `$selected_id/settings.action.server.ts`, `auth.server.ts`, `object-storage.server.ts`, `createWorkspaceTwilioInstance`, `db.ts`, `handler.server.ts`, `inbound.action.server.ts`, `platform-members.server.ts`, `createVoiceResponse`, `WorkspaceSelectedNewUtils.server.ts`, `logger.server.ts`, `platform-workspace-numbers.server.ts`, `platform-onboarding-handlers.server.ts`, `handlers.server.ts`, `platform-telephony.server.ts`, `lib/types.ts`, `database/campaign.server.ts`, `survey-db.server.ts`, `auto-dial/status.action.server.ts`, `campaign-execution.server.ts`, `webhook-side-effects.server.ts`, `handlers/campaign.server.ts`, `number-rental-billing.server.ts`, `platform-billing.server.ts`, `platform-membership-safety.test.ts`, `email-vm.action.server.ts`, `number-purchase.server.ts`, `twilio-call-status.server.ts`, `$numberId/$pageId/$blockId/response.action.server.ts`, `route-context-mock.ts`, `campaign-queue-db.server.ts`, `campaign-sms-dispatch.server.ts`, `capability-guard.server.ts`, `campaign-export.server.ts`, `inbound-handset-dial-end.action.server.ts`, `api-auth.server.ts`, `getUserRole`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `status()` connect `status` to `campaign-execution.server.ts`, `useCallScreen.ts`, `workspace.server.ts`, `webhook-side-effects.server.ts`, `twilio-migrate-messaging-to-verify/SKILL.md`, `$roomId.action.server.ts`, `asRouteResponse`, `predictive-machine-operation.test.ts`, `numbers-search.server.ts`, `useCampaignCallFlow.ts`, `Text`, `from`, `cn`, `db.ts`, `Conversation Intelligence`, `chat-composer-recovery.test.tsx`, `ref_react_router`, `hooks-api.ts`?**
-  _High betweenness centrality (0.023) - this node is a cross-community bridge._
-- **Why does `from()` connect `from` to `twilio-marketing-promotions-advisor/SKILL.md`, `fix-route-test-module-paths.mjs`, `twilio-messaging-services/SKILL.md`, `twilio-voice-outbound-calls/SKILL.md`, `"node_modules/buffer-polyfill/index.js"`, `Key Patterns`, `ref_node_fs`, `Widget catalog`, `status`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
-- **What connects `repository`, `appVariables`, `workerVariables` to the rest of the system?**
-  _5329 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `jsonError` be split into smaller, more focused modules?**
-  _Cohesion score 0.025745548165629694 - nodes in this community are weakly interconnected._
-- **Should `ref_lucide_react` be split into smaller, more focused modules?**
-  _Cohesion score 0.03636211302417159 - nodes in this community are weakly interconnected._
-- **Should `platform-data.server.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.024045261669024046 - nodes in this community are weakly interconnected._
+- **Why does `createTenantDb()` connect `createTenantDb` to `env.server.ts`, `workspace-client-projection.server.ts`, `number-release-recovery.test.ts`, `workspace.server.ts`, `call-log.server.ts`, `auto-dial.server.ts`, `telephony-db.server.ts`, `workspace-conversations.server.ts`, `contact.server.ts`, `object-storage.server.ts`, `Database`, `caller-id-verification.server.ts`, `defineAction`, `platform-members.server.ts`, `db.ts`, `workspace-twilio-config.server.ts`, `campaign-sms-report.server.ts`, `WorkspaceSelectedNewUtils.server.ts`, `db`, `schema.ts`, `csvRow`, `inbound-sms.action.server.ts`, `workspace-members-db.server.ts`, `messaging-onboarding.server.ts`, `platform-telephony.server.ts`, `database/campaign.server.ts`, `platform-data.server.ts`, `useChatsPage.ts`, `campaign-test-send.server.ts`, `audience-upload-process.server.ts`, `$selected_id/queue.action.server.ts`, `handlers/campaign.server.ts`, `platform-analytics.server.ts`, `webhook-side-effects.server.ts`, `number-rental-billing.server.ts`, `twilio-webhook.server.ts`, `platform-billing.server.ts`, `createWorkspaceTwilioInstance`, `elevenlabs-batch-transcribe.server.ts`, `billing-activity.server.ts`, `email-vm.action.server.ts`, `number-purchase.server.ts`, `twilio-call-status.server.ts`, `export-message-date-bounds.test.ts`, `ref_twilio`, `$numberId/$pageId/$blockId/response.action.server.ts`, `route-context-mock.ts`, `campaign-queue-db.server.ts`, `campaign-sms-dispatch.server.ts`, `handler.server.ts`, `campaign-export.server.ts`, `campaign-queue-search.server.ts`, `getUserRole`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `logger` connect `workspace.server.ts` to `env.server.ts`, `number-release-recovery.test.ts`, `workspace-client-projection.server.ts`, `auto-dial.server.ts`, `telephony-db.server.ts`, `route-auth-mock.ts`, `workspace-conversations.server.ts`, `contact.server.ts`, `object-storage.server.ts`, `Database`, `platform-members.server.ts`, `defineAction`, `workspace-twilio-config.server.ts`, `db`, `WorkspaceSelectedNewUtils.server.ts`, `twilio-client.server.ts`, `schema.ts`, `inbound-sms.action.server.ts`, `ops-alert.server.ts`, `platform-idempotency.server.ts`, `workspace-members-db.server.ts`, `bootstrap-migrations.server.ts`, `ref_postgres`, `handlers.server.ts`, `messaging-onboarding.server.ts`, `platform-telephony.server.ts`, `campaign-test-send.server.ts`, `database/campaign.server.ts`, `audit-event.server.ts`, `call-recording-storage.server.ts`, `useChatsPage.ts`, `platform-data.server.ts`, `voice-callback.ts`, `audience-upload-process.server.ts`, `billing-reconciliation.ts`, `poll-jobs.server.ts`, `entry.server.tsx`, `acd-router.server.ts`, `$selected_id/queue.action.server.ts`, `handlers/campaign.server.ts`, `platform-analytics.server.ts`, `webhook-side-effects.server.ts`, `createTenantDb`, `number-rental-billing.server.ts`, `twilio-webhook.server.ts`, `platform-billing.server.ts`, `createWorkspaceTwilioInstance`, `twilio-webhook.ts`, `elevenlabs-batch-transcribe.server.ts`, `workspace-setting-utils.test.ts`, `email-vm.action.server.ts`, `number-purchase.server.ts`, `twilio-call-status.server.ts`, `ref_twilio`, `$numberId/$pageId/$blockId/response.action.server.ts`, `campaign-queue-db.server.ts`, `campaign-sms-dispatch.server.ts`, `job-registry.server.ts`, `handler.server.ts`, `getUserRole`, `safe-outbound-url.server.ts`, `campaign-export.server.ts`, `cron.server.ts`, `env`, `onboardingFixture`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `@supabase/supabase-js` connect `ivr.js` to `flow.js`, `recording.js`, `status.js`, `package.old.json`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
+- **What connects `argv`, `positional`, `CAMPAIGN` to the rest of the system?**
+  _5430 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `env.server.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.021601360228765746 - nodes in this community are weakly interconnected._
+- **Should `TableRow` be split into smaller, more focused modules?**
+  _Cohesion score 0.03545039435450394 - nodes in this community are weakly interconnected._
+- **Should `workspace-client-projection.server.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.05794556628621598 - nodes in this community are weakly interconnected._
