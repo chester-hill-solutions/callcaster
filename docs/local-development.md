@@ -13,7 +13,7 @@ make worker       # terminal 2: background jobs, including list uploads
 make media-stream
 ```
 
-`make init` (`npm run setup`) starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
+`make init` starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts).
 
 Verify the setup:
 
@@ -32,8 +32,8 @@ The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scri
 |---|---|
 | `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
 | `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
-| `make storage up` / `make storage down` | Start or stop the Stow S3-compatible object store |
-| `make postgres init` | Start Postgres and bootstrap the schema only (`make storage init` creates the bucket) |
+| `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
+| `make postgres init` | Start Postgres and bootstrap the schema only |
 | `make ps` | Compose status |
 | `make app` | Run the React Router web app in the foreground |
 | `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
@@ -63,15 +63,37 @@ The local stack uses these endpoints:
 
 ## Environment Setup
 
-1. Copy the template and fill in your values:
+Run the setup in this order:
 
 ```bash
-cp .env.example .env
+npm install                 # once after cloning, or after dependencies change
+make init                  # services, .env, schema, bucket, and seed data
+cp -n .env.example .env.local  # create the developer-specific override
 ```
 
-2. Update the required values in `.env`.
+`make init` creates the shared base `.env`. The copy command creates
+`.env.local` without replacing it if it already exists. Bun loads
+`.env.local` as the developer-specific override for the local app commands, so
+set your local values there. For the calling flow, set `DEV_NAME`, `ENV=local`,
+and the Twilio credentials described below. Set `BASE_URL` to a temporary local
+value such as `http://localhost:3000` until the tunnel is running.
 
-For local Twilio development, set a developer identity in `.env.local`:
+`make app` loads `.env.local` over `.env`. Vitest does not load either file as
+test configuration; it uses controlled test setup. Playwright uses
+`E2E_BASE_URL` and the compose E2E runner's explicit local environment, not the
+Twilio `BASE_URL`.
+
+Start the app after the basic environment values are set:
+
+```bash
+make app                   # terminal 1: start the web app
+make worker                # terminal 2: start background jobs when needed
+# Optional, terminal 3:
+make media-stream
+```
+
+For local Twilio development, set a developer identity in `.env.local` before
+running `make twiml`:
 
 ```env
 DEV_NAME=sai
@@ -87,67 +109,7 @@ Notes:
 - `STRIPE_SECRET_KEY` and `RESEND_API_KEY` are required by app startup, but placeholder values are fine until you test those integrations.
 - `OPENAI_API_KEY` is optional.
 
-## What `make init` does, step by step
-
-Use these when you want to run one step by hand (for example after `make postgres down` and a volume wipe). `make init` runs all of them.
-
-1. Install dependencies:
-
-```bash
-npm install
-```
-
-2. Start the local services:
-
-```bash
-docker compose -f docker-compose.dev.yml up -d
-```
-
-3. Bootstrap the database schema (fresh Postgres only):
-
-```bash
-node scripts/e2e/bootstrap-compose-db.mjs
-```
-
-4. Create the object-storage bucket (stow runs as a local binary, not a container):
-
-```bash
-node scripts/e2e/start-stow.mjs --start
-node scripts/e2e/ensure-bucket.mjs
-```
-
-5. Start the media-stream Bun service when you need dashboard audio, live transcription, or coaching (optional):
-
-```bash
-make media-stream
-```
-
-The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
-
-Transcription and coaching need two optional API keys (both are skipped when unset, so local demos run without them):
-
-- `ELEVENLABS_API_KEY` — live speech-to-text (`scribe_v2_realtime`) and the post-call `elevenlabs_batch_transcribe` worker job (`scribe_v2`). If unset, live STT is skipped and the batch job throws and dead-letters roughly every 15 minutes, so set it wherever the worker runs.
-- `COHERE_API_KEY` — live coaching cues (`api.cohere.com`). If unset, coaching cues are skipped.
-
-6. Start the app in a separate terminal:
-
-```bash
-make app
-```
-
-7. Confirm the local services are up:
-   - app at `http://localhost:3000`
-   - media-stream at `http://localhost:3001/healthz`
-   - Stow S3 API at `http://127.0.0.1:9000`
-   - Inbucket at `http://127.0.0.1:9002`
-
-8. Start the worker in another terminal when you need background jobs such as list uploads:
-
-```bash
-make worker
-```
-
-## Calling Setup With Localtunnel
+### Calling Setup With Localtunnel
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
@@ -159,13 +121,13 @@ make tunnel
 
    The command runs `lt --port 3000` through the checked-in development dependency.
 
-3. Copy the HTTPS forwarding URL from Localtunnel.
+2. Copy the HTTPS forwarding URL from Localtunnel.
 
-4. Set `BASE_URL` in `.env` to that HTTPS URL.
+3. Set `BASE_URL` in `.env.local` to that HTTPS URL.
 
-   If `.env.local` exists, update or remove its `BASE_URL` too. Bun loads
-   `.env.local` as an override, so its localhost value takes precedence over
-   the tunnel URL in `.env`.
+   Keep only one active `BASE_URL` value. The local app commands load
+   `.env.local` as an override, so an old localhost value there takes
+   precedence over the tunnel URL in `.env`.
 
 Example:
 
@@ -173,12 +135,12 @@ Example:
 BASE_URL=https://your-subdomain.loca.lt
 ```
 
-5. Restart the app after changing `.env`.
+4. Restart the app after changing `BASE_URL`.
 
 Localtunnel quickstart reference:
 - [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
 
-## Sync Twilio To The Current Tunnel
+### Sync Twilio To The Current Tunnel
 
 This repo includes helpers to create the local environment TwiML App and update
 Twilio when your tunnel URL changes.
@@ -195,31 +157,19 @@ The command creates or reuses `env:${DEV_NAME}-${ENV}`, points it at
 Sync one workspace:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id>
+make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
 Sync every workspace with stored Twilio credentials:
 
 ```bash
-npm run dev:calling:sync -- --all-workspaces
+make calling:sync-local
 ```
 
 Pass the current Localtunnel URL explicitly:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
-```
-
-The Make wrapper is equivalent for one workspace:
-
-```bash
-make calling:sync WORKSPACE_ID=<workspace-id>
-```
-
-To discover and sync every real-Twilio workspace in the local database:
-
-```bash
-make calling:sync-local
+BASE_URL=https://your-subdomain.loca.lt make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
 The local wrapper requires `ENV=local`, refuses Railway environments, ignores
@@ -237,17 +187,13 @@ What the script updates:
 > Twilio only ever saying "an unexpected error has occurred" (error 11200).
 > Create a personal TwiML App in the
 > [Twilio console](https://console.twilio.com/us1/develop/voice/manage/twiml-apps)
-> and point your `.env` `TWILIO_APP_SID` at it before running this script.
+> and use its credentials in `.env.local` before running these commands.
 
-The script reads the public URL in this order:
-- `--base-url`
-- `BASE_URL` from the environment
+The Make targets read `BASE_URL` from `.env.local` or `.env`. Because
+Localtunnel does not expose the same local tunnel API flow as ngrok, update
+that value after every tunnel rotation.
 
-Because Localtunnel does not expose the same local tunnel API flow as ngrok, prefer either:
-- setting `BASE_URL` in `.env`
-- passing `--base-url` directly to the sync command
-
-## Why Resync Is Required
+### Why Resync Is Required
 
 Twilio webhook validation uses the exact incoming request URL. If your Localtunnel hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
 
@@ -315,6 +261,41 @@ npm run test:e2e:compose   # compose-first: starts services, bootstraps, seeds, 
 ```
 
 E2E uses mocked Twilio/Stripe and runs in CI on main/nightly only.
+
+## What `make init` does
+
+`make init` is the complete first-time or repair setup. It is idempotent, so
+run it again after a broken setup or a local database reset. It does not
+install dependencies or start the app, worker, or media-stream process.
+
+It runs these steps:
+
+1. Create `.env` from `.env.example` if `.env` does not exist. Existing `.env`
+   files are left unchanged.
+2. Start the Postgres and Inbucket Compose services.
+3. Start Stow as a local process and wait for its S3 endpoint.
+4. Wait for Postgres to accept connections.
+5. Apply the local database schema.
+6. Ensure the Stow bucket exists.
+7. Seed test users, workspaces, and campaigns.
+
+The Make targets for the common individual service operations are listed in
+[Service control](#service-control). In particular, use `make up` for Compose
+services, `make storage` for Stow and its bucket, and `make postgres init` for
+the Postgres bootstrap. For a full repair, use `make init` instead of running
+the underlying Node scripts by hand.
+
+The optional media-stream service listens on `MEDIA_STREAM_PORT` (default
+`3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you
+need to change its defaults.
+
+Transcription and coaching use optional API keys:
+
+- `ELEVENLABS_API_KEY` enables live speech-to-text and the post-call batch
+  transcription job. Without it, live STT is skipped and the batch job can
+  dead-letter.
+- `COHERE_API_KEY` enables live coaching cues. Without it, coaching cues are
+  skipped.
 
 ## Troubleshooting
 
