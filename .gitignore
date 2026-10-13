@@ -23,6 +23,7 @@ pnpm-debug.log*
 
 # Local generated files
 /public/exports/
+.local/
 .repl/
 /graphify-out/cost.json
 /graphify-out/cache/

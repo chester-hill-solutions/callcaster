@@ -4,11 +4,11 @@
 
 ```bash
 make init         # start or repair local infrastructure
-make app          # terminal 1: web app → http://localhost:3000
-make tunnel       # terminal 2: named Cloudflare Tunnel
+make app          # starts in background; logs: make app-logs
+make tunnel       # starts in background; logs: make tunnel-logs
 make calling:sync-local
-make worker       # terminal 3: background jobs, including list uploads
-# Optional, terminal 4: live dashboard audio, transcription, and coaching
+make worker       # starts in background; logs: make worker-logs
+# Optional: live dashboard audio, transcription, and coaching
 make media-stream
 ```
 
@@ -138,11 +138,27 @@ Set the stable public URL in `.env.local`:
 BASE_URL=https://sai-local.callcaster.ca
 ```
 
-Start the app before starting the tunnel:
+Start the app before starting the tunnel. Both commands return immediately:
 
 ```bash
-make app       # terminal 1
-make tunnel    # terminal 2
+make app
+make tunnel
+make local-status
+```
+
+Follow process logs when needed:
+
+```bash
+make app-logs
+make worker-logs
+make tunnel-logs
+make local-logs   # follow all local process logs
+```
+
+Stop the local processes with:
+
+```bash
+make local-stop
 ```
 
 Verify the public route from another terminal:
@@ -173,8 +189,8 @@ make calling:sync-local
 The worker and media-stream are optional and do not need the tunnel URL:
 
 ```bash
-make worker                # terminal 2, when needed
-make media-stream          # optional, terminal 3
+make worker                # background process, when needed
+make media-stream          # optional background process
 ```
 
 #### Sync Twilio To The Current Tunnel
