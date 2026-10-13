@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: An opt-in `sim` browser suite can upload an allowlisted call list, buy only the credits required for a configured flow, and send a live SMS through Chats without running with normal E2E.
+
 - Fixed: Page and external upload polling share database status and abandoned-processing checks, so stale storage cannot hide completion or a saved interruption ([PR #2542](https://github.com/chester-hill-solutions/callcaster/pull/2542), [#2541](https://github.com/chester-hill-solutions/callcaster/issues/2541)).
 
 - Fixed: SMS campaign launch shows the large bulk-send warning and its split/override actions without repeating the sender warning or pacing estimate ([PR #2538](https://github.com/chester-hill-solutions/callcaster/pull/2538), [#2509](https://github.com/chester-hill-solutions/callcaster/issues/2509)).

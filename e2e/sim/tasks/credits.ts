@@ -1,0 +1,44 @@
+import { expect, type Page } from "@playwright/test";
+import { estimateMessageCredits, MIN_CREDITS } from "../../../shared/pricing";
+
+type StripeTestCard = { cardNumber: string; expiry: string; cvc: string };
+
+function parseCreditBalance(text: string): number {
+  const match = text.match(/([\d,]+) credits/);
+  if (!match) throw new Error(`Could not read credit balance from "${text}".`);
+  return Number(match[1].replaceAll(",", ""));
+}
+
+async function readBalance(page: Page): Promise<number> {
+  const currentBalance = page.getByText("Current Balance").locator("..");
+  return parseCreditBalance(await currentBalance.getByText(/^[\d,]+ credits$/).innerText());
+}
+
+export function smsCreditsRequired(body: string): number {
+  return estimateMessageCredits({ body, hasMedia: false }).credits;
+}
+
+export async function ensureSmsCredits(args: {
+  page: Page;
+  workspaceId: string;
+  message: string;
+  stripe: StripeTestCard;
+}): Promise<void> {
+  const { page, workspaceId, message, stripe } = args;
+  const required = smsCreditsRequired(message);
+  await page.goto(`/workspaces/${workspaceId}/billing`);
+  await expect(page.getByText("Stripe is in test mode")).toBeVisible();
+  const balance = await readBalance(page);
+  if (balance >= required) return;
+
+  const purchase = Math.max(MIN_CREDITS, required - balance);
+  await page.getByPlaceholder("Enter credits").fill(String(purchase));
+  await page.getByRole("button", { name: "Purchase Credits" }).click();
+  await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+  await page.getByLabel("Card number").fill(stripe.cardNumber);
+  await page.getByLabel(/expiration date/i).fill(stripe.expiry);
+  await page.getByLabel(/security code/i).fill(stripe.cvc);
+  await page.getByRole("button", { name: /pay/i }).click();
+  await expect(page.getByText("Payment successful")).toBeVisible({ timeout: 60_000 });
+  await expect.poll(() => readBalance(page)).toBeGreaterThanOrEqual(required);
+}
