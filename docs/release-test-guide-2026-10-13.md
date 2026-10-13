@@ -8,7 +8,7 @@ Use a test workspace and test contacts. Check these flows after promotion. Keep 
 | Report access | Request the same export and download links as a member, then from another workspace. | Member receives 403. Non-member receives 404. No private download link is returned. |
 | Report window | Use a campaign whose messages were queued before their send time. | The active window uses send time. An unsent later campaign does not cut off replies. |
 | Upload polling | Open a completed call-list upload and poll it through the workspace API. | Both paths show the saved completion and row counts. |
-| Chats | Open a large list, scroll, choose Recent activity, and send a reply. | The list stays responsive. The chosen sort stays active. One saved message bubble replaces the pending message. Two staff sessions sending identical text retain both saved messages. |
+| Chats | Open a large list, scroll, choose Recent activity, and send a reply. | The list stays responsive. The chosen sort stays active. One saved message bubble replaces the pending message. Two staff sessions sending identical text retain both saved messages. Page refreshes before or after live events do not restore a pending entry. |
 | Contacts | As a member, delete one test contact. Repeat as a caller. | Member can delete the contact. Caller cannot use the write action. |
 | Manual calling | Use two callers and a household of 11 contacts. | The household stays with one caller. The next caller receives different contacts. |
 | Call audio | Connect a test call, reach voicemail, and leave the call page. | Ringback stops. Leaving waits for hangup and stops microphone tracks. |

@@ -29,6 +29,10 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 9. For branch and commit work, load the `git` skill in addition to this skill.
 10. When an error reveals missing reusable guidance, update the relevant skill in the same task. Do not create one-off incident logs.
 
+In zsh, quote the full array field argument for GraphQL, such as
+`-f "prIds[]=$pr_id"`. Unquoted brackets are filename patterns and can reject
+the command before `gh` runs.
+
 ## Rate Limits And REST Fallback
 
 `gh` uses GraphQL for `pr create`, `pr view`, `pr checks --watch`, `issue create`, most `project` commands, and repo navigation. Its GraphQL bucket exhausts much faster than the REST bucket during long automation sessions — a queue of PRs (create, watch checks, move project items, merge) can hit `API rate limit already exceeded` mid-flight and stall the pipeline.
