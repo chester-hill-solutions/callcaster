@@ -15,9 +15,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-primary/80 active:shadow-none",
+          "bg-primary text-primary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.2)] hover:bg-primary/80 dark:bg-primary/90 dark:text-primary-foreground dark:hover:bg-primary/80 active:shadow-none",
         outline:
-          "border-border bg-background hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-pressed:bg-secondary aria-pressed:font-semibold aria-pressed:text-secondary-foreground aria-pressed:shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)] dark:bg-transparent dark:hover:bg-accent",
+          "border-border bg-background hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground aria-pressed:bg-secondary aria-pressed:font-semibold aria-pressed:text-secondary-foreground aria-pressed:shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)] dark:bg-transparent dark:hover:bg-accent dark:aria-pressed:bg-secondary dark:aria-pressed:text-secondary-foreground",
         secondary:
           "bg-secondary text-secondary-foreground shadow-[inset_0_-1.5px_0_0_rgb(0_0_0/0.08)] hover:bg-secondary/80 active:shadow-none aria-expanded:bg-secondary aria-expanded:text-secondary-foreground aria-pressed:bg-secondary aria-pressed:font-semibold aria-pressed:shadow-[inset_0_1.5px_2px_0_rgb(0_0_0/0.1)]",
         ghost:

@@ -30,6 +30,27 @@ describe("Button", () => {
     expect(button.className).not.toContain("hover:bg-primary/90");
   });
 
+  test("#1832: default variant keeps readable dark-mode surface contrast", () => {
+    render(<Button>Continue</Button>);
+    const button = screen.getByRole("button", { name: "Continue" });
+
+    expect(button.className).toContain("dark:bg-primary/90");
+    expect(button.className).toContain("dark:text-primary-foreground");
+    expect(button.className).toContain("dark:hover:bg-primary/80");
+  });
+
+  test("#1832: selected outline buttons keep readable dark-mode contrast", () => {
+    render(
+      <Button variant="outline" aria-pressed>
+        Continue with Local Number
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Continue with Local Number" });
+
+    expect(button.className).toContain("dark:aria-pressed:bg-secondary");
+    expect(button.className).toContain("dark:aria-pressed:text-secondary-foreground");
+  });
+
   // upstream shad-cc destructive variant hovers to a lightened
   // red while keeping near-white text — reads as low-contrast on the
   // "Leave Campaign" / "Delete" buttons the design team flagged. The
