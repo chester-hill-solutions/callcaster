@@ -685,3 +685,10 @@ For live chat send reconciliation, server `pending:` rows are separate durable
 intents. Preserve `client_ref` when provider fields replace the SID. Match server
 updates by that identity; limit content matching to one browser optimistic row.
 Test identical concurrent sends with reversed completion order.
+
+Loader revalidation can beat SSE delivery. Reconcile durable chat intents by
+client reference on loader reads, late INSERT events and exact-SID UPDATE events.
+Test this with a real router fetcher action, including delayed event delivery.
+A stale loader can also arrive after SSE resolution: discard incoming intents
+whose identity is already resolved. Historical rows without a client reference
+must never consume a server intent through content matching.
