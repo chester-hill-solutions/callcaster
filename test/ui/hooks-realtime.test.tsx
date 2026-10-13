@@ -187,6 +187,7 @@ describe("realtime hooks", () => {
         table: "message",
         new: {
           sid: "pending:server-intent",
+          client_ref: "server-intent",
           body: "test",
           from: "+15551111111",
           to: "+15552222222",
@@ -205,6 +206,7 @@ describe("realtime hooks", () => {
         table: "message",
         new: {
           sid: "SM-test",
+          client_ref: "server-intent",
           body: "test",
           from: "+15551111111",
           to: "+15552222222",
@@ -238,6 +240,50 @@ describe("realtime hooks", () => {
       emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-a", client_ref: "staff-a", status: "sent" }, old: null });
     });
     expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a", "SM-b"]);
+  });
+
+  test("ignores a late intent INSERT after the saved identity was loaded (#2551)", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const row = { body: "Thank you", from: "+15551111111", to: "+15552222222", workspace: "ws" };
+    const initial = [{ ...row, sid: "SM-a", client_ref: "staff-a", status: "sent" }, { ...row, sid: "pending:staff-b", client_ref: "staff-b", status: "queued" }] as import("@/lib/types").Message[];
+    const { result } = renderHook(() => useChatRealTime({ initial, workspace: "ws" }));
+    act(() => emitWorkspaceEvent({ eventType: "INSERT", table: "message", new: { ...row, sid: "pending:staff-a", client_ref: "staff-a", status: "queued" }, old: null }));
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a", "pending:staff-b"]);
+  });
+
+  test("an exact saved UPDATE removes only its matching retained intent (#2551)", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const row = { body: "Thank you", from: "+15551111111", to: "+15552222222", workspace: "ws" };
+    const initial = [{ ...row, sid: "SM-a", client_ref: "staff-a", status: "sent" }, { ...row, sid: "pending:staff-a", client_ref: "staff-a", status: "queued" }, { ...row, sid: "pending:staff-b", client_ref: "staff-b", status: "queued" }] as import("@/lib/types").Message[];
+    const { result } = renderHook(() => useChatRealTime({ initial, workspace: "ws" }));
+    act(() => emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-a", client_ref: "staff-a", status: "delivered" }, old: null }));
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a", "pending:staff-b"]);
+    expect(result.current.messages[0]?.status).toBe("delivered");
+  });
+
+  test("a stale pending loader page cannot restore a resolved intent (#2551)", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const row = { body: "Thank you", from: "+15551111111", to: "+15552222222", workspace: "ws", date_created: "2026-10-13T12:00:00Z" };
+    const pending = { ...row, sid: "pending:staff-a", client_ref: "staff-a", status: "queued" };
+    const initial = [pending] as import("@/lib/types").Message[];
+    const { result, rerender } = renderHook(({ initial }) => useChatRealTime({ initial, workspace: "ws" }), { initialProps: { initial } });
+    act(() => emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-a", client_ref: "staff-a", status: "sent" }, old: pending }));
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a"]);
+    rerender({ initial: [...initial] });
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a"]);
+  });
+
+  test("a historical UPDATE without a reference cannot consume a server intent (#2551)", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const row = { body: "Thank you", from: "+15551111111", to: "+15552222222", workspace: "ws" };
+    const initial = [{ ...row, sid: "pending:staff-a", client_ref: "staff-a", status: "queued" }] as import("@/lib/types").Message[];
+    const { result } = renderHook(() => useChatRealTime({ initial, workspace: "ws" }));
+    act(() => emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-historical", client_ref: null, status: "delivered" }, old: null }));
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["pending:staff-a"]);
   });
 
   test("useChatRealTime keeps failed INSERT events instead of dropping them", async () => {

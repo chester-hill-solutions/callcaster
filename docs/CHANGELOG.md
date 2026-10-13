@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Saved chat replies replace their matching server intents when loader refreshes and live events arrive in a different order ([#2551](https://github.com/chester-hill-solutions/callcaster/issues/2551)).
+
 ## 2026-10-13 — release [#2553](https://github.com/chester-hill-solutions/callcaster/pull/2553)
 
 - Added: Workspace members can now delete contacts from the Contacts table ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).
