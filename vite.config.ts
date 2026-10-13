@@ -47,6 +47,7 @@ function clientExcludePostgres(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  const baseUrlHost = getBaseUrlHost(process.env.BASE_URL);
 
   return {
     plugins: [
@@ -60,6 +61,17 @@ export default defineConfig(({ mode }) => {
     server: {
       host: env.VITE_DEV_HOST || "127.0.0.1",
       port: Number(process.env.PORT ?? 3000),
+      allowedHosts: baseUrlHost ? [baseUrlHost] : undefined,
     },
   };
 });
+
+function getBaseUrlHost(baseUrl: string | undefined): string | undefined {
+  if (!baseUrl) return undefined;
+
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}

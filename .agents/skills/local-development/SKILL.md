@@ -14,6 +14,28 @@ installing dependencies. If Homebrew Node fails with a missing shared library,
 use an installed NVM Node 22 version for this task instead of changing global
 libraries or using a different Node major.
 
+## Check cadence
+
+Do not run `npm run ci:local` after each edit. During implementation, run the
+smallest check that proves the changed behavior, plus `git diff --check`:
+
+- documentation or Makefile text: `make -n <target>` when a target changed;
+- Node or Bun script: syntax check and focused test;
+- TypeScript or Vite config: focused lint and `npm run typecheck`;
+- route or service behavior: the affected focused Vitest file.
+
+Run the complete `npm run ci:local` once on the final clean commit before a
+push or pull request. The full gate remains required before publication. If a
+later commit changes source, dependencies, configuration, tests, migrations, or
+CI, rerun the full gate. For a documentation-only correction after a passing
+full gate, run `git diff --check` and the relevant link or command check; the
+remote workflow ignores documentation-only pull requests.
+
+Before a full gate, confirm the installed dependency tree matches the lockfile
+with `npm ci --ignore-scripts --no-audit --no-fund` when dependencies were
+changed or tools report versions that differ from the lockfile. A stale install
+can produce false lint-ratchet failures.
+
 For temporary Playwright configuration under `node_modules`, use JavaScript
 (`.mjs`) rather than TypeScript. Node 22 refuses TypeScript stripping in that
 directory before tests collect. Keep local-only browser/channel overrides out

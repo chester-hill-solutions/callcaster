@@ -15,7 +15,7 @@
  *   DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster \
  *     npm run test:e2e:seed
  */
-import "dotenv/config";
+import dotenv from "dotenv";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
@@ -25,6 +25,11 @@ import { validateRequiredEnv } from "../../app/lib/required-env-keys.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
 const thisFile = fileURLToPath(import.meta.url);
+
+// Load developer overrides first. The base .env fills any missing values and
+// existing shell variables remain authoritative.
+dotenv.config({ path: path.join(rootDir, ".env.local") });
+dotenv.config({ path: path.join(rootDir, ".env") });
 
 function preferNode22() {
   const major = Number(process.versions.node.split(".")[0]);

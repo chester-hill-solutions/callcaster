@@ -1,19 +1,20 @@
 # Local Development
 
-This app runs as a React Router 8 app on `http://localhost:3000`, backed by Postgres (Drizzle ORM), an S3-compatible object store (Stow locally), and Better Auth. Local services run via Docker Compose. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
-
 ## Quick start
 
 ```bash
-npm install
-make init         # npm run setup — idempotent; re-run to repair a broken local environment
+make init         # start or repair local infrastructure
 make app          # terminal 1: web app → http://localhost:3000
-make worker       # terminal 2: background jobs, including list uploads
-# Optional, terminal 3: live dashboard audio, transcription, and coaching
+make tunnel       # terminal 2: public HTTPS URL for Twilio callbacks
+# Update BASE_URL, restart the app, then:
+make calling:sync-local
+make worker       # terminal 3: background jobs, including list uploads
+# Optional, terminal 4: live dashboard audio, transcription, and coaching
 make media-stream
 ```
 
-`make init` (`npm run setup`) starts Postgres, Stow object storage, and mail, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. It does not start the app, worker, or media-stream process. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
+This is for returning developers with `.env.local`, `DEV_NAME`, and `ENV`
+already configured. For first-time setup, use [Environment Setup](#environment-setup).
 
 Verify the setup:
 
@@ -24,43 +25,18 @@ npm test            # vitest node + UI suites, plus bun server-runtime tests
 make e2e            # full Playwright run against compose Postgres + Stow
 ```
 
-## Redirect target checks
+## Environment Setup
 
-`npm run check:redirect-targets` compares literal local redirects with the actual registered JSON route tree. It composes parent, pathless, index, parameter and wildcard routes through React Router's matcher. Query strings and hashes do not change the target page. All registered modules are scanned, including the root. Static imports and re-exports are followed within `app/routes/` and for direct `app/` siblings such as the root loader; directory index modules are resolved too. Imported assets are excluded from script discovery. Named `redirect`/`redirectDocument` imports, aliases, namespace imports, multiline calls and literal templates are supported. Lexical bindings keep shadowed names, comments and string examples out of the check.
-
-The gate does not validate runtime-computed arguments, interpolated templates, dynamic imports or helpers outside those source boundaries. External URLs and other non-absolute references remain unchecked. An auth wildcard proves route registration, not whether Better Auth accepts that endpoint. Keep runtime and end-to-end checks for those cases. The existing relative-redirect gate remains separate. Both gates run in full local CI and the quality workflow; absent literal targets fail without a suppression baseline.
-
-The CLI's `--routes-json <file>` option supplies a registered tree for isolated fixtures. Normal CI always reads the current tree from `react-router routes --json` and fails on empty output or a missing registered source file.
-
-## Service control
-
-The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
-
-| Command | What it does |
-|---|---|
-| `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
-| `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
-| `make storage up` / `make storage down` | Start or stop the Stow S3-compatible object store |
-| `make postgres init` | Start Postgres and bootstrap the schema only (`make storage init` creates the bucket) |
-| `make ps` | Compose status |
-| `make app` | Run the React Router web app in the foreground |
-| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
-| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
-| `make help` | This list |
-
-Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
-
-## Prerequisites
+### Prerequisites
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
-- Localtunnel (only for live Twilio calling)
+- Localtunnel (only for live Twilio calling; it is also available through `make tunnel`)
 - A Twilio account with:
   - an account SID and auth token
-  - a TwiML App SID for Voice SDK/browser calling
   - at least one phone number if you want to test inbound or outbound calling
 
-## Local Services And Ports
+### Local Services And Ports
 
 The local stack uses these endpoints:
 
@@ -69,105 +45,58 @@ The local stack uses these endpoints:
 - Stow S3 API: `http://127.0.0.1:9000`
 - Inbucket email UI: `http://127.0.0.1:9002`
 
-## Environment Setup
+### Setup Steps
 
-1. Copy the template and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-2. Update the required values in `.env`.
-
-Notes:
-- The `DATABASE_URL` and `S3_*` defaults in `.env.example` match the compose dev stack as-is.
-- `TWILIO_*` values must be real if you want actual calling, SMS, or Twilio webhook validation to work.
-- `STRIPE_SECRET_KEY` and `RESEND_API_KEY` are required by app startup, but placeholder values are fine until you test those integrations.
-- `OPENAI_API_KEY` is optional.
-
-## What `make init` does, step by step
-
-Use these when you want to run one step by hand (for example after `make postgres down` and a volume wipe). `make init` runs all of them.
-
-1. Install dependencies:
+Run the setup in this order:
 
 ```bash
-npm install
+npm install                 # once after cloning, or after dependencies change
+cp -n .env.example .env.local  # create the developer-specific override
 ```
 
-2. Start the local services:
+The local TwiML App is named `env:sai-local`. Use a different `DEV_NAME` for
+each developer so one local tunnel cannot repoint another developer's app.
+Set your local values in `.env.local`:
+
+```env
+DEV_NAME=sai
+ENV=local
+BASE_URL=http://localhost:3000
+TWILIO_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+15555550100
+# Required for startup; a placeholder is fine until billing is tested.
+STRIPE_SECRET_KEY=placeholder
+# Required for startup; a placeholder is fine until email is tested.
+RESEND_API_KEY=placeholder
+```
+
+`make init` creates the shared `.env` and does not read `.env.local`.
+
+Initialize the local services after setting the local environment values:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+make init                  # services, .env, schema, bucket, and seed data
+make app                   # terminal 1
 ```
 
-3. Bootstrap the database schema (fresh Postgres only):
-
-```bash
-node scripts/e2e/bootstrap-compose-db.mjs
-```
-
-4. Create the object-storage bucket (stow runs as a local binary, not a container):
-
-```bash
-node scripts/e2e/start-stow.mjs --start
-node scripts/e2e/ensure-bucket.mjs
-```
-
-5. Start the media-stream Bun service when you need dashboard audio, live transcription, or coaching (optional):
-
-```bash
-make media-stream
-```
-
-The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
-
-Transcription and coaching need two optional API keys (both are skipped when unset, so local demos run without them):
-
-- `ELEVENLABS_API_KEY` — live speech-to-text (`scribe_v2_realtime`) and the post-call `elevenlabs_batch_transcribe` worker job (`scribe_v2`). If unset, live STT is skipped and the batch job throws and dead-letters roughly every 15 minutes, so set it wherever the worker runs.
-- `COHERE_API_KEY` — live coaching cues (`api.cohere.com`). If unset, coaching cues are skipped.
-
-6. Start the app in a separate terminal:
-
-```bash
-make app
-```
-
-7. Confirm the local services are up:
-   - app at `http://localhost:3000`
-   - media-stream at `http://localhost:3001/healthz`
-   - Stow S3 API at `http://127.0.0.1:9000`
-   - Inbucket at `http://127.0.0.1:9002`
-
-8. Start the worker in another terminal when you need background jobs such as list uploads:
-
-```bash
-make worker
-```
-
-## Calling Setup With Localtunnel
+#### Calling Setup With Localtunnel
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Install Localtunnel if you do not already have it:
+1. Start Localtunnel after the app is running:
 
 ```bash
-npm install -g localtunnel
+make tunnel
 ```
 
-2. Start Localtunnel against the local app:
+2. Copy the HTTPS forwarding URL from Localtunnel.
 
-```bash
-lt --port 3000
-```
+3. Set `BASE_URL` in `.env.local` to that HTTPS URL.
 
-3. Copy the HTTPS forwarding URL from Localtunnel.
-
-4. Set `BASE_URL` in `.env` to that HTTPS URL.
-
-   If `.env.local` exists, update or remove its `BASE_URL` too. Bun loads
-   `.env.local` as an override, so its localhost value takes precedence over
-   the tunnel URL in `.env`.
+   Keep only one active `BASE_URL` value. The local app commands load
+   `.env.local` as an override, so an old localhost value there takes
+   precedence over the tunnel URL in `.env`.
 
 Example:
 
@@ -175,32 +104,45 @@ Example:
 BASE_URL=https://your-subdomain.loca.lt
 ```
 
-5. Restart the app after changing `.env`.
+4. Restart the app after changing `BASE_URL`.
+
+Create the local TwiML App and sync local workspaces:
+
+```bash
+make twiml
+make calling:sync-local
+```
+
+The worker and media-stream are optional and do not need the tunnel URL:
+
+```bash
+make worker                # terminal 2, when needed
+make media-stream          # optional, terminal 3
+```
 
 Localtunnel quickstart reference:
 - [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
 
-## Sync Twilio To The Current Tunnel
+#### Sync Twilio To The Current Tunnel
 
-This repo includes a helper script to update Twilio when your tunnel URL changes.
+This repo includes helpers to create the local environment TwiML App and update
+Twilio when your tunnel URL changes.
 
 Sync one workspace:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id>
-```
-
-Sync every workspace with stored Twilio credentials:
-
-```bash
-npm run dev:calling:sync -- --all-workspaces
+make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
 Pass the current Localtunnel URL explicitly:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
+BASE_URL=https://your-subdomain.loca.lt make calling:sync WORKSPACE_ID=<workspace-id>
 ```
+
+The local wrapper requires `ENV=local`, refuses Railway environments, ignores
+seeded fake credentials, and delegates callback updates to the existing sync
+script. It does not sync hosted workspaces.
 
 What the script updates:
 - the TwiML App referenced by `TWILIO_APP_SID` so browser/device calls keep using `${BASE_URL}/api/call`
@@ -213,23 +155,37 @@ What the script updates:
 > Twilio only ever saying "an unexpected error has occurred" (error 11200).
 > Create a personal TwiML App in the
 > [Twilio console](https://console.twilio.com/us1/develop/voice/manage/twiml-apps)
-> and point your `.env` `TWILIO_APP_SID` at it before running this script.
+> and use its credentials in `.env.local` before running these commands.
 
-The script reads the public URL in this order:
-- `--base-url`
-- `BASE_URL` from the environment
+The Make targets read `BASE_URL` from `.env.local` or `.env`. Because
+Localtunnel does not expose the same local tunnel API flow as ngrok, update
+that value after every tunnel rotation.
 
-Because Localtunnel does not expose the same local tunnel API flow as ngrok, prefer either:
-- setting `BASE_URL` in `.env`
-- passing `--base-url` directly to the sync command
-
-## Why Resync Is Required
+#### Why Resync Is Required
 
 Twilio webhook validation uses the exact incoming request URL. If your Localtunnel hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
 
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
 - browser/device calls rely on `TWILIO_APP_SID`, which should point at `${BASE_URL}/api/call`
+
+## Service control
+
+The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
+
+| Command | What it does |
+|---|---|
+| `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
+| `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
+| `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
+| `make postgres init` | Start Postgres and bootstrap the schema only |
+| `make ps` | Compose status |
+| `make app` | Run the React Router web app in the foreground |
+| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
+| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
+| `make help` | This list |
+
+Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
 
 ## TwiML Apps In Deployed Environments
 
@@ -272,15 +228,6 @@ Node 24+.
 - HTTPS for the optional dev websocket server (`scripts/dev/websocket-server.js`) uses self-signed certs in `scripts/dev/certs/` (gitignored). Regenerate with:
   `openssl req -x509 -newkey rsa:2048 -nodes -keyout scripts/dev/certs/server.key -out scripts/dev/certs/server.cert -days 365 -subj "/CN=localhost"`
 
-## Suggested Daily Workflow
-
-1. Start services with `make up`
-2. Start the app with `make app` (and `make worker` in a second terminal when you need queued jobs to run)
-3. Start Localtunnel with `lt --port 3000`
-4. Update `BASE_URL` in `.env` if the tunnel changed
-5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
-6. Test the calling flow
-
 ## E2E tests (Playwright)
 
 For browser end-to-end tests without Twilio tunneling, see **[e2e-testing.md](e2e-testing.md)**. Summary:
@@ -290,6 +237,41 @@ npm run test:e2e:compose   # compose-first: starts services, bootstraps, seeds, 
 ```
 
 E2E uses mocked Twilio/Stripe and runs in CI on main/nightly only.
+
+## What `make init` does
+
+`make init` is the complete first-time or repair setup. It is idempotent, so
+run it again after a broken setup or a local database reset. It does not
+install dependencies or start the app, worker, or media-stream process.
+
+It runs these steps:
+
+1. Create `.env` from `.env.example` if `.env` does not exist. Existing `.env`
+   files are left unchanged.
+2. Start the Postgres and Inbucket Compose services.
+3. Start Stow as a local process and wait for its S3 endpoint.
+4. Wait for Postgres to accept connections.
+5. Apply the local database schema.
+6. Ensure the Stow bucket exists.
+7. Seed test users, workspaces, and campaigns.
+
+The Make targets for the common individual service operations are listed in
+[Service control](#service-control). In particular, use `make up` for Compose
+services, `make storage` for Stow and its bucket, and `make postgres init` for
+the Postgres bootstrap. For a full repair, use `make init` instead of running
+the underlying Node scripts by hand.
+
+The optional media-stream service listens on `MEDIA_STREAM_PORT` (default
+`3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you
+need to change its defaults.
+
+Transcription and coaching use optional API keys:
+
+- `ELEVENLABS_API_KEY` enables live speech-to-text and the post-call batch
+  transcription job. Without it, live STT is skipped and the batch job can
+  dead-letter.
+- `COHERE_API_KEY` enables live coaching cues. Without it, coaching cues are
+  skipped.
 
 ## Troubleshooting
 
