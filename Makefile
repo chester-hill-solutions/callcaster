@@ -31,7 +31,7 @@ TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init up down logs ps app worker media-stream tunnel-setup tunnel local-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage minio $(SERVICES)
+.PHONY: help init up down logs ps app app-down worker worker-down media-stream media-stream-down tunnel-setup tunnel tunnel-down local-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage storage-down minio minio-down postgres-down inbucket-down $(SERVICES)
 
 help:
 	@sed -n '3,13p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -53,17 +53,29 @@ endif
 storage:
 	@$(if $(filter down,$(MAKECMDGOALS)),node scripts/e2e/start-stow.mjs --stop,node scripts/e2e/start-stow.mjs --start && node scripts/e2e/ensure-bucket.mjs --keep-objects)
 
+storage-down:
+	@node scripts/e2e/start-stow.mjs --stop
+
 minio: storage
+
+minio-down: storage-down
 
 up:
 	$(COMPOSE) up -d $(TARGET_SERVICES)
 
-down:
 ifeq ($(REQUESTED),)
-	$(COMPOSE) down
+down: tunnel-down media-stream-down worker-down app-down storage-down inbucket-down postgres-down
+	@:
 else
-	$(COMPOSE) stop $(REQUESTED)
+down:
+	@$(COMPOSE) stop $(REQUESTED)
 endif
+
+postgres-down:
+	@$(COMPOSE) stop postgres
+
+inbucket-down:
+	@$(COMPOSE) stop inbucket
 
 logs:
 	$(COMPOSE) logs -f --tail=200 $(TARGET_SERVICES)
@@ -74,17 +86,29 @@ ps:
 app:
 	node scripts/local/run-headless.mjs start app -- npm run dev
 
+app-down:
+	@node scripts/local/run-headless.mjs stop app
+
 worker:
 	node scripts/local/run-headless.mjs start worker -- npm run worker
 
+worker-down:
+	@node scripts/local/run-headless.mjs stop worker
+
 media-stream:
 	node scripts/local/run-headless.mjs start media-stream -- bun run services/media-stream/index.ts
+
+media-stream-down:
+	@node scripts/local/run-headless.mjs stop media-stream
 
 tunnel-setup:
 	node scripts/local/setup-cloudflare-tunnel.mjs
 
 tunnel:
 	node scripts/local/run-headless.mjs start tunnel -- node scripts/local/start-cloudflare-tunnel.mjs
+
+tunnel-down:
+	@node scripts/local/run-headless.mjs stop tunnel
 
 local-status:
 	@for name in app worker media-stream tunnel; do node scripts/local/run-headless.mjs status "$$name"; done
