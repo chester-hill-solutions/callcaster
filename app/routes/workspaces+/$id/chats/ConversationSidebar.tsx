@@ -170,11 +170,10 @@ export function ConversationSidebar({
               updateFilters((nextParams) => {
                 const nextSort = getChatSortOption(value);
 
-                if (nextSort === "recent") {
-                  nextParams.delete("sort");
-                } else {
-                  nextParams.set("sort", nextSort);
-                }
+                // The loader defaults an omitted sort to "hasReplied".
+                // Keep "recent" explicit so selecting it does not immediately
+                // resolve back to the default after the URL changes.
+                nextParams.set("sort", nextSort);
 
                 return nextParams;
               });
