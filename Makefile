@@ -77,7 +77,7 @@ media-stream:
 	bun run services/media-stream/index.ts
 
 tunnel:
-	node scripts/local/start-tunnel.mjs
+	npx --no-install lt --port 3000
 
 twiml:
 	bun scripts/local/provision-local-twiml-app.mjs

@@ -90,8 +90,7 @@ Twilio cannot call back into `localhost`, so calling features need a public HTTP
 make tunnel
 ```
 
-2. Copy the HTTPS forwarding URL from Localtunnel. `make tunnel` restarts the
-   client if it exits; a restart can produce a new URL.
+2. Copy the HTTPS forwarding URL from Localtunnel.
 
 3. Set `BASE_URL` in `.env.local` to that HTTPS URL.
 
