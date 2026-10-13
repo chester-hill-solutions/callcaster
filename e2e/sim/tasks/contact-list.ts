@@ -1,5 +1,5 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 type SimContact = { name: string; phone: string };
@@ -17,6 +17,7 @@ async function createContactCsv(testInfo: TestInfo, contact: SimContact): Promis
       .map(csvEscape)
       .join(","),
   ].join("\n");
+  await mkdir(testInfo.outputDir, { recursive: true });
   await writeFile(filePath, content, "utf8");
   await testInfo.attach("sim-contact.csv", {
     body: content,
