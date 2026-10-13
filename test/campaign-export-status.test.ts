@@ -58,6 +58,16 @@ vi.mock("@/lib/auth.server", () => ({
 }));
 
 describe("api.campaign-export-status error handling", () => {
+  test.each([403, 404])("SMS report downloads keep access status %s", async (status) => {
+    const { AppError } = await import("@/lib/errors.server");
+    statusJsonText = JSON.stringify({ status: "completed", exportType: "sms-report", downloadUrl: "private-link" });
+    requireWorkspaceAccess.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AppError("Access denied", status));
+    const { loader } = await import("../app/routes/api+/campaign-export-status.loader.server");
+    const response = await asRouteResponse(loader(withRouteUrl({ request: new Request("http://x/api/campaign-export-status?exportId=e1&workspaceId=w1") } as any)));
+    expect(response.status).toBe(status);
+    expect(await response.json()).toMatchObject({ error: "Access denied" });
+  });
+
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     downloadObjectMock.mockReset();
