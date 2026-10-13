@@ -10,8 +10,9 @@ function parseCreditBalance(text: string): number {
 }
 
 async function readBalance(page: Page): Promise<number> {
-  const currentBalance = page.getByText("Current Balance").locator("..");
-  return parseCreditBalance(await currentBalance.getByText(/^[\d,]+ credits$/).innerText());
+  return parseCreditBalance(
+    await page.getByTestId("workspace-credit-balance").innerText(),
+  );
 }
 
 export function smsCreditsRequired(body: string): number {
