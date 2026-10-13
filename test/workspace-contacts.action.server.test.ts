@@ -6,7 +6,8 @@ const mocks = vi.hoisted(() => ({
   deleteContactApi: vi.fn(),
 }));
 
-vi.mock("@/lib/platform-data.server", () => ({
+vi.mock("@/lib/platform-data.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/platform-data.server")>()),
   deleteContactApi: (...args: unknown[]) => mocks.deleteContactApi(...args),
 }));
 
