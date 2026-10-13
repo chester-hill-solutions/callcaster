@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**126** documented / **128** total effects (2 grandfathered, ratcheting to 0).
+**125** documented / **127** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -20,7 +20,6 @@
 | `app/components/campaign/home/CampaignStatusRail.tsx` | Keep the active place tab scrolled into view in the horizontal rail. | location.pathname, location.hash, items (active slot changes with route/hash) | dom (tablist scrollLeft/scrollTo) | Scroll position is viewport chrome, not request data. |
 | `app/components/campaign/settings/AddAudioSheet.tsx` | Clear form state when the sheet closes so the next open starts blank. | open | local form reset | Sheet open state is client-only UI chrome. |
 | `app/components/campaign/settings/useCampaignSettingsController.ts` | Mirror local draft dirty state into CampaignShellDirty for rail navigation guards. | isChanged (draft vs saved), setIsDirty from shell context | context setter; clears dirty on unmount | Dirty state is client edit chrome shared across sibling routes. |
-| `app/components/contacts/ContactsPage.tsx` | Show the result of a completed contact deletion and close its confirmation dialog on success. | deleteFetcher.data, deleteFetcher.state (the action lifecycle) | toast notification + dialog state update | A fetcher action settles after the user confirms a destructive action; its UI feedback cannot be derived during initial loading. |
 | `app/components/file-assets/AudioClipEditor.tsx` | Load the waveform for `src` and create the single clip region that | src (a new signed URL means a new file: the old instance is destroyed and a fresh one is built) + syncRangeFromRegion (stable callback) | dom (dynamic import of wavesurfer, canvas render into | wavesurfer touches `window` at import time and renders |
 | `app/components/file-assets/AudioClipEditor.tsx` | Re-resolve the waveform colors when the theme class flips, since the | none (the observer reads the tokens fresh on every mutation, so it never closes over a stale color) | subscription (MutationObserver on the documentElement | Dark mode is a class on `<html>`; the resolved token |
 | `app/components/file-assets/AudioRecorder.tsx` | On mount, enumerate the available microphones and subscribe to the | refreshDevices (stable callback; selection is reconciled with a functional update so the listener always sees the current choice) | subscription (mediaDevices "devicechange" listener, | Browser hardware enumeration is a client-only device |
