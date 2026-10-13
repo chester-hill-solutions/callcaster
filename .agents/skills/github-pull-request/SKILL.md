@@ -30,6 +30,12 @@ verify their actual deployments. Require the current PR head, tested source,
 base and clean merge state immediately before merging. A deployment from a
 previous PR head cannot clear the current head.
 
+Release ledger checks can run before the new app applies startup migrations.
+If the failure only lists new tracked migrations, verify the startup migration
+flag and exact release deployment first. Wait for the new app to be ready, then
+rerun failed ledger/schema checks and require green results. Do not edit ledger
+rows to clear this deployment timing failure.
+
 ## Structural review declaration
 
 Read `.github/pull_request_template.md` and `review-coverage.yml` before creating
