@@ -47,6 +47,9 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
 
 function matchesPendingMessage(pending: Message, saved: Message): boolean {
   const pendingSid = pending?.sid;
+  if (pendingSid?.startsWith("pending:") && saved?.client_ref) {
+    return pendingSid === `pending:${saved.client_ref}`;
+  }
   return Boolean(
     isLocalPendingSid(pendingSid) && saved?.sid &&
     pendingSid !== saved.sid && pending?.body === saved.body &&
@@ -185,7 +188,12 @@ export const useChatRealTime = ({
         // Messaging Service optimistic messages have no fabricated From value,
         // so reconcile those by body/to while retaining From matching for
         // phone-number sends.
-        const withoutMatchingPending = curr.filter(m => !matchesPendingMessage(m, newMessage));
+        // A server intent is an independent send. Content matching can only
+        // replace one browser optimistic row, never another server intent.
+        const pendingIndex = curr.findIndex(m =>
+          m?.sid.startsWith("pending-") && matchesPendingMessage(m, newMessage),
+        );
+        const withoutMatchingPending = curr.filter((_, index) => index !== pendingIndex);
         return [...withoutMatchingPending, newMessage];
       });
     } else if (payload.eventType === "UPDATE" && newRow?.sid) {

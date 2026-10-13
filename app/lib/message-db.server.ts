@@ -379,7 +379,7 @@ export async function resolveMessageByClientRef(
   options?: { tdb?: TenantDb },
 ): Promise<MessageRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
-  const set = withTerminalStatusGuard(update);
+  const set = withTerminalStatusGuard({ ...update, client_ref: clientRef });
   const [row] = await tdb.message.update({
     set,
     where: eq(messageTable.client_ref, clientRef),
