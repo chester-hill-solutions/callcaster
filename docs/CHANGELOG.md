@@ -4,6 +4,28 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-10-13 — release [#2553](https://github.com/chester-hill-solutions/callcaster/pull/2553)
+
+- Added: Workspace members can now delete contacts from the Contacts table ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).
+- Added: Local Twilio development now uses per-developer named Cloudflare Tunnels with cross-platform `cloudflared` setup and startup commands ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).
+- Added: An opt-in `sim` browser suite can upload an allowlisted call list, buy credits only when needed, subject to the minimum purchase, and send a live SMS through Chats without running with normal E2E ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).
+- Fixed: Page and external upload polling share database status and abandoned-processing checks, so stale storage cannot hide completion or a saved interruption ([PR #2542](https://github.com/chester-hill-solutions/callcaster/pull/2542), [#2541](https://github.com/chester-hill-solutions/callcaster/issues/2541)).
+- Fixed: SMS campaign launch shows the large bulk-send warning and its split/override actions without repeating the sender warning or pacing estimate ([PR #2538](https://github.com/chester-hill-solutions/callcaster/pull/2538), [#2509](https://github.com/chester-hill-solutions/callcaster/issues/2509)).
+- Fixed: The manual call screen now releases the agent leg when the current contact ends, even when the status display already shows a completed attempt ([PR #2539](https://github.com/chester-hill-solutions/callcaster/pull/2539), [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
+- Observability: IVR responses now record response handling, response-to-next-block delay, and block rendering time without logging caller input ([PR #2540](https://github.com/chester-hill-solutions/callcaster/pull/2540), [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857)).
+- Fixed: Chats now open with conversations that have replies, deduplicate large lists in linear time, and render only rows near the scroll position ([PR #2535](https://github.com/chester-hill-solutions/callcaster/pull/2535), [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512)).
+- Fixed: Campaign ringback stops when a call connects or reaches voicemail, so it does not overlap with call audio ([PR #2534](https://github.com/chester-hill-solutions/callcaster/pull/2534), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
+- Added: Completed message campaigns can generate a private PDF report and message CSVs. Only workspace owners and admins can create reports and obtain private download links; test campaigns are excluded ([#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).
+- Fixed: Campaign results count each call attempt once across parent and child calls, and name the disposition units ([#2034](https://github.com/chester-hill-solutions/callcaster/issues/2034)).
+- Fixed: Campaign script text keeps its authored line breaks in the caller view ([#2522](https://github.com/chester-hill-solutions/callcaster/issues/2522)).
+- Fixed: Manual callers receive 10-contact batches, expanded when needed to keep a household together ([PR #2525](https://github.com/chester-hill-solutions/callcaster/pull/2525), [#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523)).
+- Fixed: Leaving the call screen stops microphone tracks, including streams that finish opening after navigation, and waits for an active call to hang up before the screen closes ([#2524](https://github.com/chester-hill-solutions/callcaster/issues/2524)).
+- Fixed: Chat replies keep one saved bubble after a send, and the selected Recent activity sort remains active ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).
+- Fixed: Shared onboarding button styles include dark-mode contrast for default and selected actions ([PR #2548](https://github.com/chester-hill-solutions/callcaster/pull/2548), [#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832)).
+- Fixed: SMS report queries use decoded timestamps, keep replies on the matching send window, include staff replies and retain access-denial statuses ([PR #2550](https://github.com/chester-hill-solutions/callcaster/pull/2550), [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).
+- Fixed: Identical replies from concurrent staff sessions remain separate in live Chats ([PR #2552](https://github.com/chester-hill-solutions/callcaster/pull/2552), [#2551](https://github.com/chester-hill-solutions/callcaster/issues/2551)).
+- Fixed: Saved chat replies replace their matching server intents when loader refreshes and live events arrive in a different order ([PR #2555](https://github.com/chester-hill-solutions/callcaster/pull/2555), [#2551](https://github.com/chester-hill-solutions/callcaster/issues/2551)).
+
 ## 2026-10-08 — release #2500
 
 - Fixed: Workspace setup notices keep a direct link to voice setup while a complete service address awaits validation or voice remains incomplete ([PR #2499](https://github.com/chester-hill-solutions/callcaster/pull/2499), [#2498](https://github.com/chester-hill-solutions/callcaster/issues/2498)).

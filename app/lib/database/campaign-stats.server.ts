@@ -1,11 +1,10 @@
 /**
- * Campaign stats and aggregated reads (tenant-db for scoped tables; Postgres for RPC only).
+ * Campaign result stats use workspace-scoped Drizzle queries.
  */
-import { and, eq, isNotNull, ne } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db-types";
 import { Script } from "../types";
 import { logger } from "../logger.server";
-import { rpcGetCampaignStats } from "@/lib/db-rpc.server";
 import {
   aggregateIvrResponses,
   campaignTypeCollectsIvrResponses,
@@ -23,6 +22,8 @@ import {
 import {
   campaign as campaignTable,
   campaign_audience as campaignAudienceTable,
+  call as callTable,
+  campaign_queue as campaignQueueTable,
   message as messageTable,
   outreach_attempt as outreachAttemptTable,
   script as scriptTable,
@@ -40,43 +41,30 @@ export async function fetchBasicResults({
   tdb?: TenantDb;
 }) {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
-
-  let data: Awaited<ReturnType<typeof rpcGetCampaignStats>> | null = null;
+  const campaignIdNum = Number(campaignId);
+  let campaign: { type: string | null; dial_ratio: number } | undefined;
   try {
-    data = await rpcGetCampaignStats(db, campaignId);
-  } catch (error) {
-    logger.error("Error fetching basic results:", error);
-  }
-  const baseResults =
-    (data as
-      | {
-          disposition: string;
-          count: number;
-          average_call_duration: string;
-          average_wait_time: string;
-          expected_total: number;
-        }[]
-      | null) ?? [];
-
-  let campaignType: string | null | undefined;
-  try {
-    const campaign = await tdb.campaign.findFirst({
-      where: eq(campaignTable.id, Number(campaignId)),
-      columns: { type: true },
+    campaign = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, campaignIdNum),
+      columns: { type: true, dial_ratio: true },
     });
-    campaignType = campaign?.type;
+    if (campaign && campaign.type !== "message") {
+      return await fetchCallResults({
+        workspaceId,
+        campaignId: campaignIdNum,
+        dialRatio: campaign.dial_ratio,
+        tdb,
+      });
+    }
   } catch (campaignError) {
     logger.error(
       "Error fetching campaign type for basic results:",
       campaignError,
     );
+    return [];
   }
 
-  if (campaignType !== "message") {
-    return baseResults;
-  }
-
-  const campaignIdNum = Number(campaignId);
+  if (!campaign) return [];
   const [queueCounts, messageStatuses, attemptDispositions] = await Promise.all(
     [
       fetchQueueCounts({ workspaceId, campaignId }),
@@ -137,8 +125,7 @@ export async function fetchBasicResults({
     groupedAttemptDispositions: attemptDispositionCounts,
   });
 
-  const expectedTotal =
-    queueCounts.fullCount ?? Number(baseResults[0]?.expected_total ?? 0);
+  const expectedTotal = queueCounts.fullCount ?? 0;
   const messageResults = Object.entries(dispositionCounts).map(
     ([disposition, count]) => ({
       disposition,
@@ -149,7 +136,92 @@ export async function fetchBasicResults({
     }),
   );
 
-  return messageResults.length > 0 ? messageResults : baseResults;
+  return messageResults;
+}
+
+// Keep the count and average-wait aggregates on outreach_attempt rows. Call
+// legs join separately for duration so a parent and child leg cannot multiply
+// attempts or weight their wait time more than once.
+async function fetchCallResults({
+  workspaceId,
+  campaignId,
+  dialRatio,
+  tdb,
+}: {
+  workspaceId: string;
+  campaignId: number;
+  dialRatio: number;
+  tdb: TenantDb;
+}) {
+  const attemptFilter = and(
+    eq(outreachAttemptTable.workspace, workspaceId),
+    eq(outreachAttemptTable.campaign_id, campaignId),
+    isNotNull(outreachAttemptTable.disposition),
+    ne(outreachAttemptTable.disposition, ""),
+  );
+
+  const durationSeconds = sql`CASE
+    WHEN ${callTable.duration} IS NOT NULL
+      AND ${callTable.duration} != ''
+      AND ${callTable.duration} != '0'
+      AND ${callTable.duration} ~ '^[0-9]+$'
+    THEN ${callTable.duration}::numeric
+    ELSE NULL
+  END`;
+
+  const [queueCount, attempts, durations] = await Promise.all([
+    tdb.campaign_queue.count({
+      where: eq(campaignQueueTable.campaign_id, campaignId),
+    }),
+    db
+      .select({
+        disposition: outreachAttemptTable.disposition,
+        count: sql<number>`count(*)::integer`,
+        average_wait_time: sql<string>`COALESCE(
+          AVG(CASE
+            WHEN ${outreachAttemptTable.answered_at} IS NOT NULL
+              AND ${outreachAttemptTable.created_at} IS NOT NULL
+              AND ${outreachAttemptTable.answered_at}::timestamptz > ${outreachAttemptTable.created_at}::timestamptz
+            THEN ${outreachAttemptTable.answered_at}::timestamptz - ${outreachAttemptTable.created_at}::timestamptz
+            ELSE NULL::interval
+          END),
+          interval '0 seconds'
+        )`,
+      })
+      .from(outreachAttemptTable)
+      .where(attemptFilter)
+      .groupBy(outreachAttemptTable.disposition),
+    db
+      .select({
+        disposition: outreachAttemptTable.disposition,
+        average_call_duration: sql<string>`COALESCE(
+          make_interval(secs => AVG(${durationSeconds})::double precision),
+          interval '0 seconds'
+        )`,
+      })
+      .from(outreachAttemptTable)
+      .leftJoin(
+        callTable,
+        eq(callTable.outreach_attempt_id, outreachAttemptTable.id),
+      )
+      .where(attemptFilter)
+      .groupBy(outreachAttemptTable.disposition),
+  ]);
+
+  const durationsByDisposition = new Map(
+    durations.map((row) => [row.disposition, row.average_call_duration]),
+  );
+  const expectedTotal = queueCount * dialRatio;
+  return attempts
+    .map((row) => ({
+      disposition: row.disposition ?? "Unknown",
+      count: row.count,
+      average_call_duration:
+        durationsByDisposition.get(row.disposition) ?? "00:00:00",
+      average_wait_time: row.average_wait_time ?? "00:00:00",
+      expected_total: expectedTotal,
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /**

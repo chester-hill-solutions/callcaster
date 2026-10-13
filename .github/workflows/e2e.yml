@@ -8,6 +8,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - docs/**
       - .github/projects.yaml
       - .gitignore
   # The app server runs under Bun in production; PR-level CI otherwise never
@@ -19,6 +20,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - docs/**
       - .github/projects.yaml
       - .gitignore
   schedule:

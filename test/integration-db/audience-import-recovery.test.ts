@@ -5,9 +5,10 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
-const storage = vi.hoisted(() => ({ mode: "ok", statuses: [] as Array<Record<string, unknown>> }));
+const storage = vi.hoisted(() => ({ mode: "ok", statuses: [] as Array<Record<string, unknown>>, readStatus: {} as Record<string, unknown> }));
 vi.mock("@/lib/object-storage.server", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/object-storage.server")>(),
+  downloadObject: vi.fn(async () => Buffer.from(JSON.stringify(storage.readStatus))),
   uploadObject: vi.fn(async (_bucket: string, _path: string, content: string) => {
     const status = JSON.parse(content);
     if (storage.mode === "always" || (storage.mode === "final" && status.status === "completed") ||
@@ -48,7 +49,7 @@ suite("audience import durable source recovery (#2479)", () => {
     expect((await pools.pool`select current_schema() as schema`)[0].schema).toBe(schema);
   });
   beforeEach(async () => {
-    storage.mode = "ok"; storage.statuses.length = 0;
+    storage.mode = "ok"; storage.statuses.length = 0; storage.readStatus = {};
     const [a] = await native`insert into audience (workspace, name, status) values (${workspace}::uuid, 'Recovery audience', 'processing') returning id`;
     audience = Number(a.id); upload = await newUpload(audience); job = await newJob(upload, audience);
   });
@@ -369,4 +370,42 @@ suite("audience import durable source recovery (#2479)", () => {
     storage.mode="ok";await client`update job set status='queued',attempt_count=0 where id=${job}`;await runUntil("completed");
     expect((await evidence()).contacts).toHaveLength(1);expect((await client`select result from job where id=${job}`)[0].result).toMatchObject({ok:true,imported:1});
   });
+  test.each([
+    { name: "queued retry", status: "queued", expires: "-1 minute", attempts: 1, expected: "processing" },
+    { name: "live running claim", status: "running", expires: "5 minutes", attempts: 1, expected: "processing" },
+    { name: "expired running claim", status: "running", expires: "-1 minute", attempts: 1, expected: "error" },
+    { name: "exhausted queued job", status: "queued", expires: "-1 minute", attempts: 3, expected: "error" },
+  ])("status reader honors $name through real SQL", async ({ status, expires, attempts, expected }) => {
+    await native`update audience_upload set status='processing',total_contacts=10,processed_contacts=4 where id=${upload}`;
+    await client`update job set status=${status},attempt_count=${attempts},max_attempts=3,claimed_until=now()+${expires}::interval where id=${job}`;
+    storage.readStatus = { status: "processing", updated_at: new Date(Date.now() - 11 * 60 * 1000).toISOString() };
+    const { loadAudienceUploadStatus } = await import("@/lib/audience-upload-status.server");
+    const result = await loadAudienceUploadStatus(workspace, upload);
+    expect(result?.snapshot).toMatchObject({ status: expected, processed_contacts: 4 });
+    expect(result?.upload).toMatchObject({ status: expected, upload_id: upload, workspaceId: workspace });
+    expect((await native`select status from audience_upload where id=${upload}`)[0].status).toBe(expected);
+    expect(storage.statuses).toHaveLength(expected === "error" ? 1 : 0);
+  });
+
+  test("status reader returns persisted interruption when storage write fails", async () => {
+    await native`update audience_upload set status='processing',total_contacts=10,processed_contacts=4 where id=${upload}`;
+    await client`update job set claimed_until=now()-interval '1 minute' where id=${job}`;
+    storage.mode = "always";
+    storage.readStatus = { updated_at: new Date(Date.now() - 11 * 60 * 1000).toISOString() };
+    const { loadAudienceUploadStatus } = await import("@/lib/audience-upload-status.server");
+    const result = await loadAudienceUploadStatus(workspace, upload);
+    expect(result?.snapshot).toMatchObject({ status: "error", error_message: "Processing interrupted — please retry", stage: "Upload failed" });
+    expect(result?.upload).toMatchObject({ status: "error", error_message: "Processing interrupted — please retry" });
+    expect((await native`select status from audience_upload where id=${upload}`)[0].status).toBe("error");
+  });
+
+  test("status reader cannot read or interrupt another workspace's upload", async () => {
+    await native`update audience_upload set status='processing' where id=${upload}`;
+    storage.readStatus = { updated_at: new Date(Date.now() - 11 * 60 * 1000).toISOString() };
+    const { loadAudienceUploadStatus } = await import("@/lib/audience-upload-status.server");
+    expect(await loadAudienceUploadStatus(foreign, upload)).toBeNull();
+    expect((await native`select status from audience_upload where id=${upload}`)[0].status).toBe("processing");
+    expect(storage.statuses).toHaveLength(0);
+  });
+
 });

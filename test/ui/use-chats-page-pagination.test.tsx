@@ -78,6 +78,7 @@ type Summary = {
   contact_phone: string;
   unread_count: number;
   conversation_last_update: string;
+  has_replied: boolean;
 };
 
 function summary(phone: string, unread: number, updated: string): Summary {
@@ -85,6 +86,7 @@ function summary(phone: string, unread: number, updated: string): Summary {
     contact_phone: phone,
     unread_count: unread,
     conversation_last_update: updated,
+    has_replied: true,
   } as unknown as ConversationSummary;
 }
 
@@ -134,7 +136,7 @@ function setFetcher(
     }
     if (data) {
       routerMocks.fetcherData.set(
-        `${PAGINATION_KEY_PREFIX}ws-1-all:recent:`,
+        `${PAGINATION_KEY_PREFIX}ws-1-all:hasReplied:`,
         data,
       );
     }
@@ -178,6 +180,22 @@ describe("useChatsPage — accumulated pages survive a loader revalidation (#215
       expect(hook.result.current.sidebarProps.chats).toContainEqual(rows[104]);
       expect(hook.result.current.sidebarProps.paginationState.page).toBe(5);
     }
+  });
+
+  test("defaults to conversations with a reply", () => {
+    const replied = summary("+15551110002", 0, "2026-09-02T00:00:00Z");
+    routerMocks.loaderData = loaderResponse(
+      [
+        { ...summary("+15551110001", 0, "2026-09-03T00:00:00Z"), has_replied: false },
+        replied,
+      ],
+      1,
+      false,
+    );
+    const hook = rendered();
+
+    expect(hook.result.current.sidebarProps.sortBy).toBe("hasReplied");
+    expect(hook.result.current.sidebarProps.chats).toEqual([replied]);
   });
 
   test("applies a fresh page-1 response after pages 2-4 were loaded", () => {

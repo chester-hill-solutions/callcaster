@@ -2,7 +2,11 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import { downloadObject, ObjectNotFoundError } from "@/lib/object-storage.server";
+import {
+  downloadObject,
+  ObjectNotFoundError,
+} from "@/lib/object-storage.server";
+import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import {
   markCampaignExportInterruptedIfStale,
@@ -23,7 +27,10 @@ export const loader = defineLoader({
       const workspaceId = url.searchParams.get("workspaceId");
 
       if (!exportId || !workspaceId) {
-        return routeData({ error: "Missing required parameters" }, { status: 400 });
+        return routeData(
+          { error: "Missing required parameters" },
+          { status: 400 },
+        );
       }
 
       // Defense-in-depth: ensure the requesting user can access the workspace whose
@@ -47,6 +54,13 @@ export const loader = defineLoader({
       // Read and parse the status data
       let status = JSON.parse(statusBuffer.toString()) as CampaignExportStatus;
 
+      // SMS reports include contact names, phone numbers and message text.
+      // Keep their status and signed download links behind the same admin gate
+      // as the report creation action.
+      if (status.exportType === "sms-report") {
+        await requireWorkspaceAccess({ user, workspaceId, minRole: "admin" });
+      }
+
       // Staleness watchdog: write-through on read. If the export was left
       // "processing" by a process that restarted mid-run, mark it failed
       // rather than leaving the client to poll forever.
@@ -60,15 +74,22 @@ export const loader = defineLoader({
           status = watchdogResult.statusData;
         }
       } catch (error) {
-        logger.error("Error running campaign export staleness watchdog:", error);
+        logger.error(
+          "Error running campaign export staleness watchdog:",
+          error,
+        );
       }
 
       return routeData(status);
     } catch (error) {
+      if (error instanceof Response || error instanceof AppError) throw error;
       logger.error("Status check error:", error);
-      return routeData({
-        error: error instanceof Error ? error.message : "Unknown error"
-      }, { status: 500 });
+      return routeData(
+        {
+          error: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 },
+      );
     }
   },
 });

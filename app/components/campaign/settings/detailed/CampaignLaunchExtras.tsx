@@ -9,12 +9,10 @@ import {
 } from "@/lib/types";
 import {
   estimateIvrCampaignOutbound,
-  estimateMessageCampaignOutbound,
   estimateOutboundCompletion,
 } from "@/lib/campaign-outbound-estimate";
 import {
   ivrCallingPolicy,
-  smsSendPolicy,
   type DispatchPolicy,
 } from "@/lib/campaign-dispatch-policy";
 
@@ -41,16 +39,6 @@ function countCapableNumbers(
     const caps = toCapabilities(number?.capabilities);
     return caps?.[capability] === true ? count + 1 : count;
   }, 0);
-}
-
-function findNumberByPhone(
-  numbers: WorkspaceNumbers[],
-  phoneNumber: string | null | undefined,
-) {
-  if (!phoneNumber) {
-    return null;
-  }
-  return numbers.find((number) => number?.phone_number === phoneNumber) ?? null;
 }
 
 function formatRatePerMinute(ratePerSecond: number): string {
@@ -138,40 +126,16 @@ export function CampaignLaunchExtras({
     campaignData.type === "robocall" ||
     campaignData.type === "simple_ivr" ||
     campaignData.type === "complex_ivr";
-  const selectedCallerNumber = findNumberByPhone(phoneNumbers, campaignData.caller_id);
+  const selectedCallerNumber = phoneNumbers.find(
+    (number) => number?.phone_number === campaignData.caller_id,
+  );
   const selectedCallerCaps = toCapabilities(selectedCallerNumber?.capabilities);
-  const selectedCallerSmsCapable = selectedCallerCaps?.sms === true;
   const selectedCallerVoiceCapable = selectedCallerCaps?.voice === true;
-  const selectedMessagingServiceSid =
-    campaignData.type === "message"
-      ? campaignData.sms_send_mode === "messaging_service"
-        ? (campaignData.sms_messaging_service_sid ??
-            outboundEstimateInputs.portalConfig.messagingServiceSid)
-        : campaignData.sms_send_mode === "from_number"
-          ? null
-          : outboundEstimateInputs.portalConfig.sendMode === "messaging_service"
-            ? outboundEstimateInputs.portalConfig.messagingServiceSid
-            : null
-      : null;
-
-  const messageEstimate = estimateMessageCampaignOutbound({
-    portalConfig: outboundEstimateInputs.portalConfig,
-    syncSnapshot: outboundEstimateInputs.syncSnapshot,
-    smsCapableLocalNumbers: countCapableNumbers(phoneNumbers, "sms"),
-    selectedCallerId: campaignData.caller_id,
-    selectedCallerIdSmsCapable: selectedCallerSmsCapable,
-    selectedMessagingServiceSid,
-  });
   const ivrEstimate = estimateIvrCampaignOutbound({
     portalConfig: outboundEstimateInputs.portalConfig,
     voiceCapableLocalNumbers: countCapableNumbers(phoneNumbers, "voice"),
     selectedCallerId: campaignData.caller_id,
     selectedCallerIdVoiceCapable: selectedCallerVoiceCapable,
-  });
-  const smsEtaRange = getEtaRange({
-    queueCount,
-    ratePerSecond: messageEstimate.effectiveMessagesPerSecond,
-    policy: smsSendPolicy(campaignData),
   });
   const ivrEtaRange = isIvrCampaign
     ? getEtaRange({
@@ -181,13 +145,6 @@ export function CampaignLaunchExtras({
       })
     : null;
 
-  const messageTooltipLines = [
-    `Estimated effective send rate: ${formatRatePerMinute(messageEstimate.effectiveMessagesPerSecond)} (segments/sec).`,
-    smsEtaRange
-      ? `If sent now, queue completion is estimated around ${smsEtaRange}.`
-      : "Queue completion ETA appears after contacts are queued.",
-    ...messageEstimate.warnings,
-  ];
   const ivrTooltipLines = [
     `Estimated completion rate: ${formatRatePerMinute(
       ivrEstimate.effectiveCompletionPerSecond,
@@ -202,27 +159,21 @@ export function CampaignLaunchExtras({
     ...ivrEstimate.warnings,
   ];
 
-  const showEstimates = campaignData.type === "message" || isIvrCampaign;
+  const isMessageCampaign = campaignData.type === "message";
 
-  if (!showEstimates) {
+  if (!isMessageCampaign && !isIvrCampaign) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      {campaignData.type === "message" ? (
-        <>
-          <OutboundEstimateAlert
-            title="Outbound SMS pacing estimate"
-            lines={messageTooltipLines}
-          />
-          <SplitCampaignPrompt
-            queueCount={queueCount}
-            senderClass={outboundEstimateInputs.portalConfig.smsSenderClass}
-            disabled={isBusy}
-            overrideActive={Boolean(campaignData.allow_bulk_local_send)}
-          />
-        </>
+      {isMessageCampaign ? (
+        <SplitCampaignPrompt
+          queueCount={queueCount}
+          senderClass={outboundEstimateInputs.portalConfig.smsSenderClass}
+          disabled={isBusy}
+          overrideActive={Boolean(campaignData.allow_bulk_local_send)}
+        />
       ) : null}
 
       {isIvrCampaign ? (

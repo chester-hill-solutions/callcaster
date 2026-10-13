@@ -1,4 +1,12 @@
-import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
@@ -72,7 +80,10 @@ export type ConfiguredBucket = {
  * verify each configured bucket is reachable.
  */
 export function listConfiguredBuckets(): ConfiguredBucket[] {
-  const resolvers: Record<(typeof BUCKET_ENV_VARS)[number], () => string | undefined> = {
+  const resolvers: Record<
+    (typeof BUCKET_ENV_VARS)[number],
+    () => string | undefined
+  > = {
     S3_BUCKET: () => env.S3_BUCKET(),
     S3_BUCKET_AUDIO: () => env.S3_BUCKET_AUDIO(),
     S3_BUCKET_MEDIA: () => env.S3_BUCKET_MEDIA(),
@@ -89,7 +100,9 @@ export function listConfiguredBuckets(): ConfiguredBucket[] {
   return buckets;
 }
 
-function dedicatedBucketFor(logicalBucket: ObjectStorageBucket): string | undefined {
+function dedicatedBucketFor(
+  logicalBucket: ObjectStorageBucket,
+): string | undefined {
   switch (logicalBucket) {
     case "workspaceAudio":
     case "audio":
@@ -197,7 +210,10 @@ export async function uploadObject(
   // just a lost file, so check existence explicitly first and let the
   // conditional write remain only as the race backstop for two writers that
   // pass this check together.
-  if (options.upsert === false && (await objectExists(logicalBucket, objectPath))) {
+  if (
+    options.upsert === false &&
+    (await objectExists(logicalBucket, objectPath))
+  ) {
     throw new ObjectExistsError(objectPath);
   }
 
@@ -309,7 +325,10 @@ export async function copyObject(
   sourcePath: string,
   targetPath: string,
 ): Promise<void> {
-  const { bucketName, key: sourceKey } = resolveLocation(logicalBucket, sourcePath);
+  const { bucketName, key: sourceKey } = resolveLocation(
+    logicalBucket,
+    sourcePath,
+  );
   const { key: targetKey } = resolveLocation(logicalBucket, targetPath);
   const copySource = `${bucketName}/${sourceKey
     .split("/")
@@ -349,16 +368,20 @@ export async function createSignedObjectUrl(
   logicalBucket: ObjectStorageBucket,
   objectPath: string,
   expiresInSeconds: number,
+  downloadFilename?: string,
 ): Promise<string> {
   // Clamp rather than let the signer throw: an over-long TTL silently killed
   // every voicemail email for months because the failure surfaced
   // only at send time, deep inside a webhook handler.
   let expiresIn = expiresInSeconds;
   if (expiresIn > MAX_SIGNED_URL_TTL_SECONDS) {
-    logger.warn("createSignedObjectUrl: TTL exceeds the SigV4 7-day cap; clamping", {
-      requested: expiresInSeconds,
-      objectPath,
-    });
+    logger.warn(
+      "createSignedObjectUrl: TTL exceeds the SigV4 7-day cap; clamping",
+      {
+        requested: expiresInSeconds,
+        objectPath,
+      },
+    );
     expiresIn = MAX_SIGNED_URL_TTL_SECONDS;
   }
   const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
@@ -367,6 +390,11 @@ export async function createSignedObjectUrl(
     new GetObjectCommand({
       Bucket: bucketName,
       Key: key,
+      ...(downloadFilename
+        ? {
+            ResponseContentDisposition: `attachment; filename="${downloadFilename.replace(/[^A-Za-z0-9._-]/g, "_")}"`,
+          }
+        : {}),
     }),
     { expiresIn },
   );
@@ -376,7 +404,9 @@ export async function createSignedObjectUrls(
   logicalBucket: ObjectStorageBucket,
   objectPaths: string[],
   expiresInSeconds: number,
-): Promise<Array<{ path: string; signedUrl: string | null; error: string | null }>> {
+): Promise<
+  Array<{ path: string; signedUrl: string | null; error: string | null }>
+> {
   return Promise.all(
     objectPaths.map(async (objectPath) => {
       try {
@@ -387,7 +417,8 @@ export async function createSignedObjectUrls(
         );
         return { path: objectPath, signedUrl, error: null };
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Signed URL failed";
+        const message =
+          error instanceof Error ? error.message : "Signed URL failed";
         return { path: objectPath, signedUrl: null, error: message };
       }
     }),
@@ -425,7 +456,8 @@ export async function listObjects(
       }
 
       const name = basenameFromKey(item.Key, listPrefix);
-      const timestamp = item.LastModified?.toISOString() ?? new Date().toISOString();
+      const timestamp =
+        item.LastModified?.toISOString() ?? new Date().toISOString();
       objects.push({
         name,
         id: name,

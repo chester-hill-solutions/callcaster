@@ -5,6 +5,7 @@ import { useDialRingback } from "@/hooks/call/useDialRingback";
 
 function makeFakeAudioContext() {
   const oscillators: Array<{ start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }> = [];
+  const tracks = [{ stop: vi.fn() }];
   const gainParam = {
     value: 0,
     cancelScheduledValues: vi.fn(),
@@ -17,7 +18,7 @@ function makeFakeAudioContext() {
       return { gain: gainParam, connect: vi.fn() };
     }
     createMediaStreamDestination() {
-      return { stream: {} as MediaStream };
+      return { stream: { getTracks: () => tracks } as unknown as MediaStream };
     }
     createOscillator() {
       const oscillator = {
@@ -32,7 +33,7 @@ function makeFakeAudioContext() {
     }
     close = close;
   }
-  return { FakeAudioContext, oscillators, gainParam, close };
+  return { FakeAudioContext, oscillators, gainParam, close, tracks };
 }
 
 describe("useDialRingback (#1341)", () => {
@@ -76,6 +77,7 @@ describe("useDialRingback (#1341)", () => {
     // and no further bursts fire.
     rerender({ active: false });
     expect(fake.oscillators.every((o) => o.stop.mock.calls.length === 1)).toBe(true);
+    expect(fake.tracks[0].stop).toHaveBeenCalledOnce();
     expect(fake.close).toHaveBeenCalled();
     const burstsAfterStop = fake.gainParam.setValueAtTime.mock.calls.length;
     vi.advanceTimersByTime(12000);

@@ -25,11 +25,13 @@ describe("audio device lifecycle", () => {
   const setInputDevice = vi.fn().mockResolvedValue(undefined);
   const setSpeakerDevice = vi.fn().mockResolvedValue(undefined);
   const setMicMuted = vi.fn();
+  let stopMicrophoneTrack: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     setInputDevice.mockResolvedValue(undefined);
     setSpeakerDevice.mockResolvedValue(undefined);
+    stopMicrophoneTrack = vi.fn();
     deviceChange = undefined;
     devices = [
       audioDevice("audioinput", "default", "Default microphone"),
@@ -42,7 +44,7 @@ describe("audio device lifecycle", () => {
       value: {
         enumerateDevices: vi.fn(async () => devices),
         getUserMedia: vi.fn(async () => ({
-          getTracks: () => [{ stop: vi.fn() }],
+          getTracks: () => [{ stop: stopMicrophoneTrack }],
         })),
         addEventListener: vi.fn((_event: string, listener: () => void) => {
           deviceChange = listener;
@@ -135,5 +137,58 @@ describe("audio device lifecycle", () => {
     expect(setInputDevice).toHaveBeenLastCalledWith("default");
     expect(result.current.isMicrophoneMuted).toBe(true);
     expect(setMicMuted).not.toHaveBeenCalled();
+  });
+
+  test("campaign controls stop microphone tracks when the call screen unmounts", async () => {
+    const { unmount } = renderHook(() =>
+      useCallAudioControls({
+        device: null,
+        activeCall: null,
+        micCoordinator: { isMicMuted: false, setMicMuted },
+      }),
+    );
+
+    await waitFor(() =>
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1),
+    );
+    unmount();
+
+    expect(stopMicrophoneTrack).toHaveBeenCalledTimes(1);
+  });
+
+  test("campaign controls stop a microphone stream that resolves after unmount", async () => {
+    let resolveMicrophoneStream!: (stream: MediaStream) => void;
+    const getUserMedia = vi.fn(
+      () =>
+        new Promise<MediaStream>((resolve) => {
+          resolveMicrophoneStream = resolve;
+        }),
+    );
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        enumerateDevices: vi.fn(async () => devices),
+        getUserMedia,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+    const stream = {
+      getTracks: () => [{ stop: stopMicrophoneTrack }],
+    } as unknown as MediaStream;
+
+    const { unmount } = renderHook(() =>
+      useCallAudioControls({
+        device: null,
+        activeCall: null,
+        micCoordinator: { isMicMuted: false, setMicMuted },
+      }),
+    );
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(1));
+    unmount();
+
+    await act(async () => resolveMicrophoneStream(stream));
+
+    expect(stopMicrophoneTrack).toHaveBeenCalledTimes(1);
   });
 });

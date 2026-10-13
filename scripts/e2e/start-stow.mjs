@@ -13,6 +13,7 @@
  * Usage:
  *   node scripts/e2e/start-stow.mjs --start    # launch detached, wait ready
  *   node scripts/e2e/start-stow.mjs --stop     # kill the recorded pid
+ *   node scripts/e2e/start-stow.mjs --status   # show the recorded pid state
  *   node scripts/e2e/start-stow.mjs --foreground  # keep attached (Makefile)
  *   STOW_LAUNCH=disable node scripts/e2e/start-stow.mjs --start  # external bucket
  */
@@ -166,15 +167,30 @@ function stop() {
   rmSync(PID_FILE, { force: true });
 }
 
+function status() {
+  if (!existsSync(PID_FILE)) {
+    console.log("[start-stow] stopped (no pidfile)");
+    return;
+  }
+  const pid = Number(readFileSync(PID_FILE, "utf8").trim());
+  try {
+    process.kill(pid, 0);
+    console.log(`[start-stow] running (pid ${pid})`);
+  } catch {
+    console.log(`[start-stow] stopped (stale pidfile ${pid})`);
+  }
+}
+
 async function main() {
   if (process.env.STOW_LAUNCH === "disable") {
     console.log("[start-stow] STOW_LAUNCH=disable — using an external bucket service");
     return;
   }
   if (args.includes("--stop")) return stop();
+  if (args.includes("--status")) return status();
   if (args.includes("--foreground")) return startForeground();
   if (args.includes("--start")) return startDetached();
-  throw new Error("usage: start-stow.mjs --start | --stop | --foreground");
+  throw new Error("usage: start-stow.mjs --start | --stop | --status | --foreground");
 }
 
 main().catch((e) => {

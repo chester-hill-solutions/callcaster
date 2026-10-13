@@ -72,7 +72,6 @@ export function CallScreenLayout({
   hasAccess,
   verifiedNumbers,
   navigate,
-  device,
   currentState,
   creditsError,
   deviceError,
@@ -197,8 +196,7 @@ export function CallScreenLayout({
       if (campaign.dial_type === "predictive") {
         if (!(await endPredictiveConference())) return;
       }
-      hangUp();
-      device?.destroy();
+      if (activeCall) await hangUp();
       if (campaign.dial_type !== "predictive") requeueContacts();
       navigate(-1);
     } finally {

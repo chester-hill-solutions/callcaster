@@ -24,6 +24,52 @@ export function environmentTwimlAppName(environmentName: string): string {
   return `${ENVIRONMENT_APP_PREFIX}${environmentName}`;
 }
 
+export function localEnvironmentName(devName: string, environment: string): string {
+  const normalizedDevName = devName.trim();
+  const normalizedEnvironment = environment.trim();
+
+  if (!normalizedDevName || !normalizedEnvironment) {
+    throw new Error("DEV_NAME and ENV must both be set for local TwiML App provisioning.");
+  }
+
+  return `${normalizedDevName}-${normalizedEnvironment}`;
+}
+
+export function normalizeEnvironmentBaseUrl(value: string): string {
+  const url = new URL(value);
+  url.pathname = "";
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/$/, "");
+}
+
+export async function provisionEnvironmentTwimlApp({
+  accountSid,
+  authToken,
+  environmentName,
+  baseUrl,
+}: {
+  accountSid: string;
+  authToken: string;
+  environmentName: string;
+  baseUrl: string;
+}): Promise<{ sid: string; friendlyName: string; voiceUrl: string; created: boolean }> {
+  const friendlyName = environmentTwimlAppName(environmentName);
+  const voiceUrl = `${normalizeEnvironmentBaseUrl(baseUrl)}/api/call`;
+  const client = twilio(accountSid, authToken);
+  const [existing] = await client.applications.list({ friendlyName, limit: 1 });
+  const application = existing
+    ? await client.applications(existing.sid).update({ voiceUrl, voiceMethod: "POST" })
+    : await client.applications.create({ friendlyName, voiceUrl, voiceMethod: "POST" });
+
+  return {
+    sid: application.sid,
+    friendlyName,
+    voiceUrl,
+    created: !existing,
+  };
+}
+
 /** Production owns its app explicitly; every other Railway environment is managed here. */
 export function isManagedEnvironment(env: NodeJS.ProcessEnv): boolean {
   const name = env.RAILWAY_ENVIRONMENT_NAME?.trim();
@@ -66,30 +112,27 @@ export async function ensureEnvironmentTwimlApp(
     return { status: "skipped", reason: "Twilio credentials or BASE_URL not configured" };
   }
 
-  const friendlyName = environmentTwimlAppName(environmentName);
-  const voiceUrl = `${baseUrl}/api/call`;
-  const client = twilio(accountSid, authToken);
-
   try {
-    const [existing] = await client.applications.list({ friendlyName, limit: 1 });
-
-    const application = existing
-      ? await client.applications(existing.sid).update({ voiceUrl, voiceMethod: "POST" })
-      : await client.applications.create({ friendlyName, voiceUrl, voiceMethod: "POST" });
+    const application = await provisionEnvironmentTwimlApp({
+      accountSid,
+      authToken,
+      environmentName,
+      baseUrl,
+    });
 
     env.TWILIO_APP_SID = application.sid;
 
     return {
       status: "provisioned",
       sid: application.sid,
-      friendlyName,
-      voiceUrl,
-      created: !existing,
+      friendlyName: application.friendlyName,
+      voiceUrl: application.voiceUrl,
+      created: application.created,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `Failed to provision TwiML App "${friendlyName}" for environment ` +
+      `Failed to provision TwiML App "${environmentTwimlAppName(environmentName)}" for environment ` +
         `"${environmentName}": ${message}. Refusing to boot with the inherited ` +
         `TWILIO_APP_SID, which would route this environment's calls through production.`,
     );

@@ -2,22 +2,10 @@
 
 CallCaster is a contact-center platform for calling and SMS campaigns: campaign scripts and IVR, live power dialing, surveys, audiences/contacts, billing by credits, and a public integrator API. Built with React Router 8, a Bun production server, Railway Postgres (Drizzle ORM), S3-compatible object storage, Twilio, Stripe, and Resend.
 
-## Quickstart
+Local development:
 
-Prerequisites: **Node 22.x** (the repo pins it and CI uses it; other majors
-produce test failures that don't reproduce in CI), **Bun >= 1.2.15**, and
-**Docker**.
-
-```bash
-npm install
-make init         # npm run setup: services, .env, database schema, storage bucket, seed data
-make app          # npm run dev → http://localhost:3000
-```
-
-Everything else about running the app locally — what `setup` does and how to
-repair it, per-service `make <service> up|down|logs`, seeded sign-ins, Twilio
-calling through a tunnel, and the verification commands — lives in one place:
-[docs/local-development.md](./docs/local-development.md).
+- Returning developers: [Quick start](./docs/local-development.md#quick-start)
+- Initial setup: [Environment Setup](./docs/local-development.md#environment-setup)
 
 Production entry points: `npm start` (Bun server, `server/bun.ts`) and `npm run worker` (job worker, `worker/index.ts`); images build from `Dockerfile` and `Dockerfile.worker`.
 

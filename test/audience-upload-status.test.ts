@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 
+import { RouterContextProvider } from "react-router";
+import { withDataPlaneRouteArgs } from "./helpers/route-context-mock";
+
 import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import {
   queueDualAuthSession,
@@ -55,7 +58,8 @@ vi.mock("@/lib/audience-import-report.server", async importOriginal => ({
   getAudienceImportProgress: durableProgressMock,
 }));
 
-vi.mock("@/lib/audience-upload-db.server", () => ({
+vi.mock("@/lib/audience-upload-db.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/audience-upload-db.server")>(),
   findAudienceUploadById: (...args: unknown[]) => findAudienceUploadById(...args),
 }));
 
@@ -80,7 +84,8 @@ function buildMockDb() {
 const downloadObjectMock = vi.hoisted(() => vi.fn());
 const uploadObjectMock = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("@/lib/object-storage.server", () => ({
+vi.mock("@/lib/object-storage.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/object-storage.server")>(),
   downloadObject: downloadObjectMock,
   uploadObject: uploadObjectMock,
 }));
@@ -91,16 +96,18 @@ const tenantAudienceUploadUpdateMock = vi.hoisted(() =>
 
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
-    audience_upload: { update: tenantAudienceUploadUpdateMock },
+    audience_upload: { update: tenantAudienceUploadUpdateMock, findFirst: () => findAudienceUploadById("w1", 1) },
   }),
 }));
 
-vi.mock("@/lib/database/workspace.server", () => ({
+vi.mock("@/lib/database/workspace.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/database/workspace.server")>(),
   requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 
-vi.mock("@/lib/logger.server", () => {
+vi.mock("@/lib/logger.server", async importOriginal => {
   return {
+    ...await importOriginal<typeof import("@/lib/logger.server")>(),
     logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
@@ -125,7 +132,12 @@ describe("api.audience-upload-status loader", () => {
     };
     downloadObjectMock.mockReset();
     uploadObjectMock.mockClear();
-    tenantAudienceUploadUpdateMock.mockClear();
+    tenantAudienceUploadUpdateMock.mockReset().mockImplementation(async ({ set }) => {
+      if (uploadMode.kind !== "ok") return [];
+      uploadMode.row = { ...uploadMode.row, ...set };
+      return [uploadMode.row];
+    });
+    findAudienceUploadById.mockClear();
     downloadObjectMock.mockImplementation(async () => {
       if (downloadMode.kind === "throw") throw downloadMode.value;
       if (downloadMode.kind === "error")
@@ -512,4 +524,122 @@ describe("api.audience-upload-status loader", () => {
       expect(uploadObjectMock).not.toHaveBeenCalled();
     });
   });
+  async function poll(adapter: string, overrides = {}) {
+    if (adapter === "page") {
+      const { loader } = await import("../app/routes/api+/audience-upload-status");
+      const request = new Request("http://localhost/api/audience-upload-status?uploadId=1&workspaceId=w1");
+      return asRouteResponse(loader(withRouteUrl({ request, params: {}, context: new RouterContextProvider() })));
+    }
+    const { loader } = await import("../app/routes/api+/workspaces+/$workspaceId/audience-uploads/$uploadId.loader.server");
+    const request = new Request("http://localhost/api/workspaces/w1/audience-uploads/1");
+    const args = await withDataPlaneRouteArgs({ request, params: { workspaceId: "w1", uploadId: "1" } }, {
+      workspaceId: "w1", userId: null, apiKey: { keyId: "status-reader", scopes: ["campaigns.read"] }, ...overrides,
+    });
+    return asRouteResponse(loader(args));
+  }
+
+  function processingUpload() {
+    uploadMode = { kind: "ok", row: { id: 1, audience_id: 2, status: "processing",
+      file_name: "owned.csv", file_size: 20, total_contacts: 10, processed_contacts: 4, error_message: null } };
+    downloadMode = { kind: "ok", statusJson: { status: "processing", updated_at: new Date(Date.now() - 11 * 60 * 1000).toISOString() } };
+  }
+
+  test.each(["page", "dataPlane"])("%s uses completed database status and durable skip counts despite conflicting storage", async adapter => {
+    uploadMode = { kind: "ok", row: { id: 1, audience_id: 2, import_run_id: "run", status: "completed",
+      file_name: "owned.csv", file_size: 20, total_contacts: 4, processed_contacts: 4, error_message: null } };
+    durableProgressMock.mockResolvedValue({ invalid: 1, duplicates: 2 });
+    downloadMode = { kind: "ok", statusJson: { upload_id: 999, uploadId: 999, audience_id: 888, audienceId: 888,
+      workspaceId: "foreign", file_name: "foreign.csv", status: "error", total_contacts: 99, processed_contacts: 0,
+      error_message: "old error", error: "old error", stage: "Upload failed", skipped_invalid_contacts: 99, skipped_duplicate_contacts: 98 } };
+    const response = await poll(adapter);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const status = adapter === "page" ? body.snapshot : body;
+    expect(status).toMatchObject({ status: "completed", audience_id: 2, file_name: "owned.csv", total_contacts: 4,
+      processed_contacts: 4, error_message: null, stage: "Upload completed", skipped_invalid_contacts: 1, skipped_duplicate_contacts: 2 });
+    expect(status[adapter === "page" ? "uploadId" : "upload_id"]).toBe(1);
+    expect(status.error).toBeUndefined();
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["page", "dataPlane"])("%s returns persisted interruption after status-file write fails", async adapter => {
+    processingUpload();
+    uploadObjectMock.mockRejectedValueOnce(new Error("storage unavailable after SQL write"));
+    const response = await poll(adapter);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "error",
+      error_message: "Processing interrupted — please retry", stage: "Upload failed", processed_contacts: 4 });
+    expect(tenantAudienceUploadUpdateMock).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(["page", "dataPlane"])("%s returns interruption for abandoned processing", async adapter => {
+    processingUpload();
+    const response = await poll(adapter);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "error", stage: "Upload failed" });
+    expect(uploadObjectMock).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(["page", "dataPlane"])("%s observes completion that wins the watchdog update", async adapter => {
+    processingUpload();
+    tenantAudienceUploadUpdateMock.mockImplementationOnce(async () => {
+      if (uploadMode.kind === "ok") uploadMode.row = { ...uploadMode.row, status: "completed", processed_contacts: 10 };
+      return [];
+    });
+    const response = await poll(adapter);
+    const body = await response.json();
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "completed", processed_contacts: 10, stage: "Upload completed" });
+    expect(uploadObjectMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["page", "dataPlane"])("%s does not infer abandonment without a valid timestamp", async adapter => {
+    processingUpload(); downloadMode = { kind: "ok", statusJson: { updated_at: "not-a-date" } };
+    const response = await poll(adapter); const body = await response.json();
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "processing" });
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["page", "dataPlane"])("%s ignores a malformed storage object", async adapter => {
+    downloadMode = { kind: "ok", statusJson: null };
+    const response = await poll(adapter); const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "pending", processed_contacts: 1 });
+  });
+
+  test("Data Plane capability denial performs no status read or interruption write", async () => {
+    processingUpload();
+    const response = await poll("dataPlane", { apiKey: { keyId: "denied", scopes: [] } });
+    expect(response.status).toBe(403);
+    expect(findAudienceUploadById).not.toHaveBeenCalled();
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+    expect(downloadObjectMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["page", "dataPlane"])("%s returns 404 before storage or writes for a missing upload", async adapter => {
+    uploadMode = { kind: "missing" };
+    const response = await poll(adapter);
+    expect(response.status).toBe(404);
+    expect(downloadObjectMock).not.toHaveBeenCalled();
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+  });
+
+  test.each(["page", "dataPlane"])("%s falls back to database fields when status storage is unavailable", async adapter => {
+    downloadMode = { kind: "error", message: "status object missing" };
+    const response = await poll(adapter); const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(adapter === "page" ? body.snapshot : body).toMatchObject({ status: "pending", total_contacts: 2, processed_contacts: 1 });
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+  });
+
+  test("Data Plane workspace-context mismatch performs no status read or write", async () => {
+    processingUpload();
+    const response = await poll("dataPlane", { workspaceId: "foreign" });
+    expect(response.status).toBe(404);
+    expect(findAudienceUploadById).not.toHaveBeenCalled();
+    expect(downloadObjectMock).not.toHaveBeenCalled();
+    expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+  });
+
 });

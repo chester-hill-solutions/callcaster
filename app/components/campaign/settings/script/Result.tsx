@@ -231,7 +231,9 @@ const Result = ({
   return (
     <div className="flex flex-col gap-2">
       <div>
-        <p className="">{questions.type !== "boolean" && questions.content}</p>
+        <p className="whitespace-pre-wrap">
+          {questions.type !== "boolean" && questions.content}
+        </p>
       </div>
       <div className="flex max-w-[500px] flex-auto flex-wrap gap-2">
         {renderQuestionContent()}

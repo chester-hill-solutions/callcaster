@@ -5,6 +5,7 @@ import { useCallEndTone } from "@/hooks/call/useCallEndTone";
 
 function makeFakeAudioContext() {
   const oscillators: Array<{ start: ReturnType<typeof vi.fn>; stop: ReturnType<typeof vi.fn> }> = [];
+  const tracks = [{ stop: vi.fn() }];
   const gainParam = {
     value: 0,
     cancelScheduledValues: vi.fn(),
@@ -21,7 +22,7 @@ function makeFakeAudioContext() {
       return { gain: gainParam, connect: vi.fn() };
     }
     createMediaStreamDestination() {
-      return { stream: {} as MediaStream };
+      return { stream: { getTracks: () => tracks } as unknown as MediaStream };
     }
     createOscillator() {
       const oscillator = {
@@ -36,7 +37,7 @@ function makeFakeAudioContext() {
     }
     close = close;
   }
-  return { FakeAudioContext, oscillators, gainParam, close, createdCount: () => created };
+  return { FakeAudioContext, oscillators, gainParam, close, tracks, createdCount: () => created };
 }
 
 describe("useCallEndTone (#1363)", () => {
@@ -68,8 +69,9 @@ describe("useCallEndTone (#1363)", () => {
     rerender({ displayState: "completed" });
     expect(fake.createdCount()).toBe(1);
     vi.advanceTimersByTime(1200);
-    // Two bursts (each = one on + one off setValueAtTime pair), then closed.
-    expect(fake.gainParam.setValueAtTime.mock.calls.length).toBe(4);
+    // Two bursts plus the immediate stop mute, then closed.
+    expect(fake.gainParam.setValueAtTime.mock.calls.length).toBe(5);
+    expect(fake.tracks[0].stop).toHaveBeenCalledOnce();
     expect(fake.close).toHaveBeenCalled();
   });
 

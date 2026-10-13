@@ -40,7 +40,10 @@ import { productGoalForCampaignType } from "@/lib/campaign-goals";
 import type { CampaignType } from "@/lib/db-types";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { getCampaignSendWindowWarning } from "@/lib/campaign-readiness";
+import {
+  BULK_SENDER_MISALIGNED_MESSAGE,
+  getCampaignSendWindowWarning,
+} from "@/lib/campaign-readiness";
 
 function launchActionLabel(type: Campaign["type"] | null | undefined): string {
   if (!type) return "Start campaign";
@@ -145,6 +148,9 @@ export const CampaignLaunch = ({
   const [testSendOpen, setTestSendOpen] = useState(false);
   const testKind = campaignTestKind(campaignData.type);
   const canSendTest = testKind !== null && Boolean(handleTestSendButton);
+  const visibleReadinessIssues = readinessIssues.filter(
+    (issue) => issue !== BULK_SENDER_MISALIGNED_MESSAGE,
+  );
 
   const confirmActionLabel =
     confirmStatus === "play"
@@ -287,20 +293,20 @@ export const CampaignLaunch = ({
           <AlertDescription>{sendWindowWarning.message}</AlertDescription>
         </Alert>
       ) : null}
-      {readinessIssues.length > 0 ? (
+      {visibleReadinessIssues.length > 0 ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
           <p className="text-sm font-medium text-destructive-text">Complete before launch</p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive-text">
-            {readinessIssues.map((issue) => (
+            {visibleReadinessIssues.map((issue) => (
               <li key={issue}>{issue}</li>
             ))}
           </ul>
         </div>
-      ) : (
+      ) : readinessIssues.length === 0 ? (
         <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
           Ready to launch.
         </p>
-      )}
+      ) : null}
     </div>
   );
 
@@ -431,10 +437,7 @@ export const CampaignLaunch = ({
                   onSend={(phone) => handleTestSendButton?.(phone)}
                 />
               ) : null}
-              {startDisabledReason ? (
-                <p className="text-sm text-muted-foreground">{startDisabledReason}</p>
-              ) : null}
-              {readinessIssues.length > 0 ? (
+              {visibleReadinessIssues.length > 0 ? (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive-text">
                   <div className="mb-2 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
@@ -443,7 +446,7 @@ export const CampaignLaunch = ({
                     </span>
                   </div>
                   <ul className="list-disc space-y-1 pl-5">
-                    {readinessIssues.map((issue) => (
+                    {visibleReadinessIssues.map((issue) => (
                       <li key={issue}>{issue}</li>
                     ))}
                   </ul>

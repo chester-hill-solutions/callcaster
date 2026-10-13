@@ -60,7 +60,7 @@ export function ConversationSidebar({
   onHideStopChange,
   updateFilters,
 }: ConversationSidebarProps) {
-  const [scrollRoot, setScrollRoot] = useState<Element | null>(null);
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const selectedCampaignId = searchParams.get("campaign_id");
   const campaignFilterValue = selectedCampaignId ?? ALL_CAMPAIGNS_VALUE;
 
@@ -170,11 +170,10 @@ export function ConversationSidebar({
               updateFilters((nextParams) => {
                 const nextSort = getChatSortOption(value);
 
-                if (nextSort === "recent") {
-                  nextParams.delete("sort");
-                } else {
-                  nextParams.set("sort", nextSort);
-                }
+                // The loader defaults an omitted sort to "hasReplied".
+                // Keep "recent" explicit so selecting it does not immediately
+                // resolve back to the default after the URL changes.
+                nextParams.set("sort", nextSort);
 
                 return nextParams;
               });
@@ -228,6 +227,7 @@ export function ConversationSidebar({
         ) : null}
         <ConversationList
           chats={chats}
+          scrollRoot={scrollRoot}
           contactNumber={contactNumber}
           handleExistingConversationClick={handleExistingConversationClick}
           formatDate={formatDate}

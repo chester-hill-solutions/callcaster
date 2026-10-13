@@ -55,4 +55,21 @@ describe("atomic manual-dial-claims SQL harness", () => {
     expect(sql).toContain("c.status::text IN");
     expect(sql).not.toMatch(/COALESCE\(c\.status/);
   });
+
+  test("manual claims include a whole household when it crosses the batch limit", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { resolve } = await import("node:path");
+    const sql = await readFile(
+      resolve(
+        process.cwd(),
+        "client/migrations/20261009120000_keep_manual_households_together.sql",
+      ),
+      "utf8",
+    );
+
+    // A household that starts within the 10-contact window must not be rejected
+    // only because the complete household would make this batch larger than 10.
+    expect(sql).toContain("ag.first_rank <= p_initial_limit");
+    expect(sql).not.toContain("running_total");
+  });
 });

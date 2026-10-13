@@ -53,7 +53,6 @@ import {
 } from "@/lib/survey-db.server";
 import {
   audience as audienceTable,
-  audience_upload as audienceUploadTable,
   campaign as campaignTable,
   contact as contactTable,
   contact_audience as contactAudienceTable,
@@ -70,7 +69,7 @@ import { db } from "@/server/db";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { resolveContactsOwnedByWorkspace } from "@/lib/contacts/tenant-scope.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { downloadObject } from "@/lib/object-storage.server";
+import { loadAudienceUploadStatus } from "@/lib/audience-upload-status.server";
 
 export { getAudienceDetailApi } from "./audience-detail.server";
 
@@ -912,55 +911,15 @@ export async function getAudienceUploadStatusApi(
     return { ok: false as const, error: "Invalid upload ID", status: 400 };
   }
 
-  const tdb = createTenantDb(workspaceId);
-  let uploadData;
   try {
-    uploadData = await tdb.audience_upload.findFirst({
-      where: eq(audienceUploadTable.id, parsedUploadId),
-    });
+    const result = await loadAudienceUploadStatus(workspaceId, parsedUploadId);
+    return result
+      ? { ok: true as const, upload: result.upload }
+      : { ok: false as const, error: "Upload not found", status: 404 };
   } catch (error) {
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : "Upload not found",
-      status: 500,
-    };
+    logger.error("audience_upload.status.fetch_failed", { workspaceId, uploadId: parsedUploadId, error });
+    return { ok: false as const, error: "Upload status could not be loaded", status: 500 };
   }
-
-  if (!uploadData) {
-    return { ok: false as const, error: "Upload not found", status: 404 };
-  }
-
-  let statusFileData: Record<string, unknown> = {};
-  try {
-    const statusData = await downloadObject("audience-uploads", `${workspaceId}/${parsedUploadId}.json`);
-    statusFileData = JSON.parse(statusData.toString("utf-8")) as Record<string, unknown>;
-  } catch (error) {
-    // Object may not exist; that's okay
-    logger.error("getAudienceUploadStatusApi download status file", error);
-  }
-
-  return {
-    ok: true as const,
-    upload: {
-      upload_id: uploadData.id,
-      audience_id: uploadData.audience_id,
-      status: uploadData.status,
-      file_name: uploadData.file_name,
-      file_size: uploadData.file_size,
-      total_contacts: uploadData.total_contacts,
-      processed_contacts: uploadData.processed_contacts,
-      error_message: uploadData.error_message,
-      stage:
-        typeof statusFileData.stage === "string"
-          ? statusFileData.stage
-          : uploadData.status === "completed"
-            ? "Upload completed"
-            : uploadData.status === "error"
-              ? "Upload failed"
-              : "Processing contacts",
-      ...statusFileData,
-    },
-  };
 }
 
 export { emptyQueueFilters };

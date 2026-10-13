@@ -264,16 +264,30 @@
   {
     "issueNumber": 1752,
     "verdict": "blocked-epic",
-    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
+    "summary": "The PDF/CSV report pipeline is implemented in #2530. Release review repaired timestamp decoding, send-window attribution, staff reply inclusion, multilingual text and access-denial handling in #2550. Report presentation, inbound daily volume and campaign-health acceptance remain open.",
+    "lookIn": [
+      "app/lib/campaign-sms-report.server.ts",
+      "app/lib/campaign-sms-report-data.server.ts",
+      "app/lib/campaign-sms-report-pdf.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-sms-report.test.ts: real PostgreSQL send windows, sender isolation, staff replies, STOP handling and font embedding",
+      "test/campaign-export.route.test.ts and test/campaign-export-status.test.ts: access denial statuses"
+    ],
+    "missingTests": [
+      "Requested report-format comparison",
+      "Inbound daily volume and campaign-health acceptance"
+    ],
     "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
+      "Finish the remaining requested report presentation, inbound daily-volume and campaign-health requirements in #1752",
+      "Compare the finished report with the requested example before closing #1752"
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Keep open after release. The completed pipeline does not satisfy the remaining report-format and metric requirements.",
+    "currentBehavior": "Owners and admins can export completed non-test SMS campaigns. Private artifacts include campaign messages and related conversation replies on the matching sender and send window.",
+    "rootCause": "The original implementation treated raw driver timestamps as Date values and attributed replies by recipient alone. It also omitted staff replies and replaced non-Latin reply text.",
+    "resolution": "Keep the completed pipeline. Split the remaining format, inbound daily-volume and campaign-health work into scoped tasks; verify the finished report against the requested example before closing."
   },
   {
     "issueNumber": 1802,
@@ -933,10 +947,10 @@
     "issueNumber": 2168,
     "verdict": "blocked-epic",
     "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
-    "summary": "The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
+    "summary": "The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.",
+    "currentBehavior": "Source audit: dev@7f2c2f9a, 2026-10-11. The cull report reads the checked-in three-workspace keep-list before phone-name and activity rules. PR #2536 passed full CI, E2E, schema checks, and both Railway preview deployments; issue #2168 is on-dev. Name backfill, repeat policy, and live cleanup remain separate.",
     "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
-    "resolution": "Report tool and the historical number cull are complete. Split durable keep-list configuration, name backfill and repeat policy into separate work. Workspace-row deletion was deferred in the issue discussion. Recheck current ownership before any new live cleanup.",
+    "resolution": "The durable keep-list slice is complete in PR #2536, merged to dev. The phone-named workspace 2608141501 wins before cull rules. Keep the follow-up split: backfill existing Twilio subaccount names with an idempotent operation, decide whether cleanup repeats, and keep workspace-row deletion deferred. Recheck current ownership before any new live cleanup.",
     "lookIn": [
       "scripts/cull-report.mjs:1",
       "app/lib/twilio-resource-name.ts:1",
@@ -945,10 +959,11 @@
       "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
     ],
     "existingTests": [
-      "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings"
+      "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings",
+      "test/cull-report-policy.test.ts confirms the three recorded workspace IDs and proves 2608141501 survives the phone-name cull rule"
     ],
     "missingTests": [
-      "Keep-list lookup must protect an explicitly kept phone-named workspace; name backfill must be idempotent."
+      "Name backfill must be idempotent."
     ],
     "acceptanceCriteria": [
       "Subaccount display names are backfilled to the #2167 format",
@@ -961,7 +976,7 @@
     ],
     "size": "S-M",
     "risk": "low",
-    "trackerRecommendation": "Blocked / split first: keep-list/repeat policy and external name writes are separate concerns. Related PR evidence: #2171, #2167. A PR reference alone does not prove deployed behavior."
+    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
   },
   {
     "issueNumber": 2213,

@@ -129,6 +129,28 @@ describe("useCampaignCallFlow displayState", () => {
       expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
     });
 
+    test("exposes the current terminal contact SID so a stale completion label cannot hide hangup", () => {
+      const { result } = renderFlow({
+        state: "idle",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        activeCall: {} as any,
+        recentAttemptDisposition: "completed",
+      });
+
+      act(() => {
+        mocks.onCallRowChange?.({
+          new: { sid: "CA-child", parent_call_sid: "CA-parent", status: "completed" },
+        });
+      });
+
+      expect(result.current.displayState).toBe("completed");
+      expect(result.current.terminalCallSid).toBe("CA-child");
+
+      act(() => result.current.beginDial());
+      expect(result.current.terminalCallSid).toBeNull();
+    });
+
     test("parent in-progress does NOT show connected when child exists", () => {
       // If the parent SDK call is in-progress but we're already tracking
       // the child leg, parent events must be ignored.

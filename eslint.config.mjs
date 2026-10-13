@@ -54,6 +54,7 @@ export default [
       // Imported graph data and its generated viewer are not application source.
       "graphify-out/**",
       "e2e/playwright-report/**",
+      "e2e/sim-playwright-report/**",
       "test-results/**",
       ".opencode/**",
       ".agents/**",

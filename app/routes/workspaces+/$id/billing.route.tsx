@@ -167,7 +167,10 @@ export default function Credits() {
 
       <Section variant="flat">
         <SectionHeader branded={false} compact title="Current Balance" />
-        <div className="text-primary text-4xl font-bold">
+        <div
+          className="text-primary text-4xl font-bold"
+          data-testid="workspace-credit-balance"
+        >
           {credits.balance} credits
         </div>
         <Accordion type="single" collapsible className="w-full max-w-lg">

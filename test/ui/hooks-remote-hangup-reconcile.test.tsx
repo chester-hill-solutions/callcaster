@@ -6,6 +6,7 @@ type Props = {
   displayState: string;
   callState: string;
   isPredictive: boolean;
+  terminalCallSid: string | null;
 };
 
 function setup(initial: Props) {
@@ -23,17 +24,18 @@ describe("app/hooks/call/useRemoteHangupReconcile.ts", () => {
       displayState: "connected",
       callState: "connected",
       isPredictive: false,
+      terminalCallSid: null,
     });
     expect(hangUp).not.toHaveBeenCalled();
 
     // Contact hangs up: provider marks the customer leg complete, the SDK
     // still says connected.
-    rerender({ displayState: "completed", callState: "connected", isPredictive: false });
+    rerender({ displayState: "completed", callState: "connected", isPredictive: false, terminalCallSid: null });
     expect(hangUp).toHaveBeenCalledTimes(1);
 
     // Later renders in the same terminal state must not hang up again.
-    rerender({ displayState: "completed", callState: "connected", isPredictive: false });
-    rerender({ displayState: "completed", callState: "completed", isPredictive: false });
+    rerender({ displayState: "completed", callState: "connected", isPredictive: false, terminalCallSid: null });
+    rerender({ displayState: "completed", callState: "completed", isPredictive: false, terminalCallSid: null });
     expect(hangUp).toHaveBeenCalledTimes(1);
   });
 
@@ -42,8 +44,9 @@ describe("app/hooks/call/useRemoteHangupReconcile.ts", () => {
       displayState: "connected",
       callState: "connected",
       isPredictive: false,
+      terminalCallSid: null,
     });
-    rerender({ displayState: "completed", callState: "completed", isPredictive: false });
+    rerender({ displayState: "completed", callState: "completed", isPredictive: false, terminalCallSid: null });
     expect(hangUp).not.toHaveBeenCalled();
   });
 
@@ -65,8 +68,9 @@ describe("app/hooks/call/useRemoteHangupReconcile.ts", () => {
       displayState: "connected",
       callState: "connected",
       isPredictive: true,
+      terminalCallSid: null,
     });
-    rerender({ displayState: "completed", callState: "connected", isPredictive: true });
+    rerender({ displayState: "completed", callState: "connected", isPredictive: true, terminalCallSid: null });
     expect(hangUp).not.toHaveBeenCalled();
   });
 
@@ -76,9 +80,58 @@ describe("app/hooks/call/useRemoteHangupReconcile.ts", () => {
         displayState: "dialing",
         callState: "dialing",
         isPredictive: false,
+        terminalCallSid: null,
       });
-      rerender({ displayState: terminal, callState: "dialing", isPredictive: false });
+      rerender({ displayState: terminal, callState: "dialing", isPredictive: false, terminalCallSid: null });
       expect(hangUp, terminal).toHaveBeenCalledTimes(1);
     }
+  });
+
+  test("hangs up the current call when its terminal event arrives after the display is already completed", () => {
+    const { hangUp, rerender } = setup({
+      // The previous attempt's disposition already drives this display label.
+      // The current provider event must still end the connected agent leg.
+      displayState: "completed",
+      callState: "connected",
+      isPredictive: false,
+      terminalCallSid: null,
+    });
+
+    expect(hangUp).not.toHaveBeenCalled();
+
+    rerender({
+      displayState: "completed",
+      callState: "connected",
+      isPredictive: false,
+      terminalCallSid: "CA-current",
+    });
+    expect(hangUp).toHaveBeenCalledTimes(1);
+
+    rerender({
+      displayState: "completed",
+      callState: "connected",
+      isPredictive: false,
+      terminalCallSid: "CA-current",
+    });
+    expect(hangUp).toHaveBeenCalledTimes(1);
+  });
+
+  test("waits for the current call to become live before handling its terminal event", () => {
+    const { hangUp, rerender } = setup({
+      displayState: "completed",
+      callState: "idle",
+      isPredictive: false,
+      terminalCallSid: "CA-current",
+    });
+
+    expect(hangUp).not.toHaveBeenCalled();
+
+    rerender({
+      displayState: "completed",
+      callState: "connected",
+      isPredictive: false,
+      terminalCallSid: "CA-current",
+    });
+    expect(hangUp).toHaveBeenCalledTimes(1);
   });
 });

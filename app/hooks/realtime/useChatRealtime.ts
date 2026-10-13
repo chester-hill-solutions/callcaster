@@ -45,20 +45,48 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
   return normalized1 === normalized2;
 }
 
+function getServerIntentRef(message: Message): string | null {
+  return message?.sid.startsWith("pending:") ? message.sid.slice("pending:".length) : null;
+}
+
+function getResolvedClientRef(message: Message): string | null {
+  return message?.client_ref && !isLocalPendingSid(message.sid) ? message.client_ref : null;
+}
+
+function matchesResolvedServerIntent(pending: Message, saved: Message): boolean {
+  const reference = getServerIntentRef(pending);
+  return Boolean(reference && reference === getResolvedClientRef(saved));
+}
+
 function matchesPendingMessage(pending: Message, saved: Message): boolean {
+  const pendingSid = pending?.sid;
+  if (pendingSid?.startsWith("pending:")) {
+    return matchesResolvedServerIntent(pending, saved);
+  }
   return Boolean(
-    pending?.sid?.startsWith("pending-") && saved?.sid &&
-    !saved.sid.startsWith("pending-") && pending.body === saved.body &&
-    (!pending.from || phoneNumbersMatch(pending.from, saved.from)) &&
-    phoneNumbersMatch(pending.to, saved.to)
+    isLocalPendingSid(pendingSid) && saved?.sid &&
+    pendingSid !== saved.sid && pending?.body === saved.body &&
+    (!pending?.from || phoneNumbersMatch(pending?.from ?? null, saved.from)) &&
+    phoneNumbersMatch(pending?.to ?? null, saved.to)
   );
+}
+
+function isLocalPendingSid(sid: string | null | undefined): boolean {
+  return Boolean(sid?.startsWith("pending-") || sid?.startsWith("pending:"));
 }
 
 function reconcileLoaderMessages(current: Message[], initial: Message[]): Message[] {
   const incoming = new Map(initial.flatMap(msg => msg?.sid ? [[msg.sid, msg] as const] : []));
+  const resolvedRefs = new Set([...current, ...incoming.values()].map(getResolvedClientRef).filter(Boolean));
+  for (const [sid, row] of incoming) {
+    const intentRef = getServerIntentRef(row);
+    if (intentRef && resolvedRefs.has(intentRef)) incoming.delete(sid);
+  }
   const currentIds = new Set(current.map(msg => msg?.sid));
   const newSavedRows = [...incoming.values()].filter(saved => !currentIds.has(saved.sid));
   const retained = current.filter(pending => {
+    const intentRef = getServerIntentRef(pending);
+    if (intentRef) return !resolvedRefs.has(intentRef);
     if (!pending?.sid.startsWith("pending-")) return true;
     const pendingCreated = toConversationTimestamp(pending.date_created);
     return !newSavedRows.some(saved => {
@@ -177,18 +205,38 @@ export const useChatRealTime = ({
         if (!newMessage?.sid || curr.some(msg => msg?.sid === newMessage.sid)) {
           return curr;
         }
+        if (curr.some(saved => matchesResolvedServerIntent(newMessage, saved))) return curr;
         // Messaging Service optimistic messages have no fabricated From value,
         // so reconcile those by body/to while retaining From matching for
         // phone-number sends.
-        const withoutMatchingPending = curr.filter(m => !matchesPendingMessage(m, newMessage));
+        // A server intent is an independent send. Content matching can only
+        // replace one browser optimistic row, never another server intent.
+        const pendingIndex = curr.findIndex(m =>
+          m?.sid.startsWith("pending-") && matchesPendingMessage(m, newMessage),
+        );
+        const withoutMatchingPending = curr.filter((_, index) => index !== pendingIndex);
         return [...withoutMatchingPending, newMessage];
       });
     } else if (payload.eventType === "UPDATE" && newRow?.sid) {
-      setMessages((curr) =>
-        curr.map((m) =>
-          m?.sid === newRow?.sid ? (newRow as Message) : m
-        )
-      );
+      setMessages((curr) => {
+        const exactIndex = curr.findIndex((m) => m?.sid === newRow.sid);
+        if (exactIndex >= 0) {
+          return curr
+            .filter(pending => !matchesResolvedServerIntent(pending, newRow as Message))
+            .map(message => message?.sid === newRow.sid ? (newRow as Message) : message);
+        }
+
+        // The server first emits an INSERT for its pending intent SID and then
+        // an UPDATE when Twilio returns the real SID. Replace that intent row
+        // instead of appending a second bubble.
+        const pendingIndex = curr.findIndex((m) =>
+          matchesPendingMessage(m, newRow as Message),
+        );
+        if (pendingIndex < 0) return curr;
+        return curr.map((m, index) =>
+          index === pendingIndex ? (newRow as Message) : m,
+        );
+      });
     }
   }, [workspace]);
 

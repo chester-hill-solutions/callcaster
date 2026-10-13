@@ -1,6 +1,7 @@
-import { Link, NavLink, useLoaderData, useSearchParams } from "react-router";
+import { Link, NavLink, useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { MdEdit } from "react-icons/md";
-import { Search, X } from "lucide-react";
+import { Search, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
@@ -8,8 +9,18 @@ import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceRes
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
+import type { ContactListRow, ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type OtherDataItem =
   | { key: string; value: unknown }
@@ -56,10 +67,31 @@ function formatOtherData(data: unknown[]) {
 }
 
 export default function ContactsPage() {
-  const { contacts, error, pagination } =
+  const { contacts, error, pagination, userRole } =
     useLoaderData<ContactsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [contactToDelete, setContactToDelete] = useState<
+    { id: number; name: string } | null
+  >(null);
+  const deleteFetcher = useFetcher<{
+    success?: boolean;
+    error?: string;
+    contact_id?: number;
+  }>({
+    key: contactToDelete ? `delete-contact-${contactToDelete.id}` : "delete-contact",
+  });
   const searchTerm = searchParams.get("q") ?? "";
+  const canDelete = hasMinRole(userRole ?? undefined, MemberRole.Member);
+  const isDeleting = deleteFetcher.state !== "idle";
+  const deleteSucceeded = deleteFetcher.data?.success === true;
+
+  const deleteContact = () => {
+    if (!contactToDelete) return;
+    deleteFetcher.submit(
+      { intent: "delete_contact", contact_id: String(contactToDelete.id) },
+      { method: "post" },
+    );
+  };
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -274,6 +306,30 @@ export default function ContactsPage() {
                       );
                     },
                   },
+                  ...(canDelete
+                    ? [{
+                        header: "Delete",
+                        cell: ({ row }: { row: { original: ContactListRow } }) => {
+                          const contactName = [row.original.firstname, row.original.surname]
+                            .filter(Boolean)
+                            .join(" ");
+                          return (
+                            <Button
+                              variant="ghost"
+                              aria-label={contactName ? `Delete ${contactName}` : "Delete contact"}
+                              onClick={() =>
+                                setContactToDelete({
+                                  id: row.original.id,
+                                  name: contactName || `contact ${row.original.id}`,
+                                })
+                              }
+                            >
+                              <Trash2 aria-hidden="true" />
+                            </Button>
+                          );
+                        },
+                      }]
+                    : []),
                 ]}
               />
 
@@ -288,6 +344,34 @@ export default function ContactsPage() {
           )}
         </>
       )}
+      <Dialog
+        open={contactToDelete !== null && !deleteSucceeded}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setContactToDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {contactToDelete?.name}?</DialogTitle>
+            <DialogDescription>
+              This permanently removes the contact from this workspace.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteFetcher.data?.error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteFetcher.data.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isDeleting}>Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={deleteContact} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Delete contact"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

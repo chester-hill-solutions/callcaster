@@ -302,6 +302,7 @@ export async function countCompletedCampaignQueueRows(campaignId: number): Promi
 export async function fetchActiveCampaignQueueWithContacts(args: {
   campaignId: number;
   limit: number;
+  assignedToUserId?: string;
 }) {
   const queueRows = await db
     .select()
@@ -310,6 +311,9 @@ export async function fetchActiveCampaignQueueWithContacts(args: {
       and(
         eq(campaignQueueTable.campaign_id, args.campaignId),
         isNull(campaignQueueTable.dequeued_at),
+        args.assignedToUserId
+          ? eq(campaignQueueTable.assigned_to_user_id, args.assignedToUserId)
+          : undefined,
       ),
     )
     .orderBy(asc(campaignQueueTable.attempts), asc(campaignQueueTable.queue_order))

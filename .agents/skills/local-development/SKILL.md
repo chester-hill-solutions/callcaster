@@ -14,6 +14,28 @@ installing dependencies. If Homebrew Node fails with a missing shared library,
 use an installed NVM Node 22 version for this task instead of changing global
 libraries or using a different Node major.
 
+## Check cadence
+
+Do not run `npm run ci:local` after each edit. During implementation, run the
+smallest check that proves the changed behavior, plus `git diff --check`:
+
+- documentation or Makefile text: `make -n <target>` when a target changed;
+- Node or Bun script: syntax check and focused test;
+- TypeScript or Vite config: focused lint and `npm run typecheck`;
+- route or service behavior: the affected focused Vitest file.
+
+Run the complete `npm run ci:local` once on the final clean commit before a
+push or pull request. The full gate remains required before publication. If a
+later commit changes source, dependencies, configuration, tests, migrations, or
+CI, rerun the full gate. For a documentation-only correction after a passing
+full gate, run `git diff --check` and the relevant link or command check; the
+remote workflow ignores documentation-only pull requests.
+
+Before a full gate, confirm the installed dependency tree matches the lockfile
+with `npm ci --ignore-scripts --no-audit --no-fund` when dependencies were
+changed or tools report versions that differ from the lockfile. A stale install
+can produce false lint-ratchet failures.
+
 For temporary Playwright configuration under `node_modules`, use JavaScript
 (`.mjs`) rather than TypeScript. Node 22 refuses TypeScript stripping in that
 directory before tests collect. Keep local-only browser/channel overrides out
@@ -293,6 +315,9 @@ Raw SQL parameters bypass a column's value encoder. For a JavaScript Date
 inside a SQL expression, use the timestamp column encoder with `sql.param`.
 Verify capture, replacement and null input against real Postgres; mocked
 updates cannot prove driver serialization or first-write preservation.
+Raw `execute` results do not use Drizzle column decoders. Timestamp values
+can be strings even when a cast says Date. Prefer scoped relational reads, or
+decode each selected timestamp and prove it against the installed driver.
 
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
@@ -310,6 +335,11 @@ exists. Canonical `workspace_member` keys are text and have no global-user FK.
 Test missing users both with and without a stale membership row through each
 real route. Both must return a validation error before insert; keep a separate
 database-failure control so infrastructure failures do not become validation.
+
+For an owned temporary PostgreSQL fixture on macOS, initialize it with an
+explicit locale and encoding (`initdb --locale=C --encoding=UTF8`). Shell locale
+settings can be invalid for the installed server. Use a dedicated directory and
+loopback port, and stop only that owned cluster after its readers finish.
 
 For the full real-Postgres suite, set `DATABASE_URL`, `DATABASE_DIRECT_URL` and
 `INTEGRATION_DB_URL` to the owned fixture in the command environment. Some suites
@@ -351,6 +381,10 @@ For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
+Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
+command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
+all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because
+they write the same ESLint cache.
 
 The raw pool from app/server/db.ts is also used by Drizzle, which replaces
 postgres.js JSON serializers. Bind JSON.stringify(value) with an explicit
@@ -646,3 +680,15 @@ For exact-file import identity and coordinates, test the real multipart upload
 boundary through its queued worker bytes. A decoder/encoder round trip can strip
 a UTF-8 BOM or replace invalid bytes while direct parser tests stay green. Keep
 worker and stored-original bytes equal, and reject invalid UTF-8 before writes.
+
+For live chat send reconciliation, server `pending:` rows are separate durable
+intents. Preserve `client_ref` when provider fields replace the SID. Match server
+updates by that identity; limit content matching to one browser optimistic row.
+Test identical concurrent sends with reversed completion order.
+
+Loader revalidation can beat SSE delivery. Reconcile durable chat intents by
+client reference on loader reads, late INSERT events and exact-SID UPDATE events.
+Test this with a real router fetcher action, including delayed event delivery.
+A stale loader can also arrive after SSE resolution: discard incoming intents
+whose identity is already resolved. Historical rows without a client reference
+must never consume a server intent through content matching.

@@ -62,10 +62,6 @@ test/audience-export.test.ts::@/lib/database/workspace.server#1
 test/audience-export.test.ts::@/lib/env.server#1
 test/audience-upload-dedupe.test.ts::@/lib/audience-upload-db.server#1
 test/audience-upload-dedupe.test.ts::@/lib/object-storage.server#1
-test/audience-upload-status.test.ts::@/lib/audience-upload-db.server#1
-test/audience-upload-status.test.ts::@/lib/database/workspace.server#1
-test/audience-upload-status.test.ts::@/lib/logger.server#1
-test/audience-upload-status.test.ts::@/lib/object-storage.server#1
 test/audience-upload.route.test.ts::@/lib/database/workspace.server#1
 test/audience-upload.route.test.ts::@/lib/logger.server#1
 test/audience-upload.route.test.ts::@/lib/object-storage.server#1
