@@ -46,12 +46,17 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
 }
 
 function matchesPendingMessage(pending: Message, saved: Message): boolean {
+  const pendingSid = pending?.sid;
   return Boolean(
-    pending?.sid?.startsWith("pending-") && saved?.sid &&
-    !saved.sid.startsWith("pending-") && pending.body === saved.body &&
-    (!pending.from || phoneNumbersMatch(pending.from, saved.from)) &&
-    phoneNumbersMatch(pending.to, saved.to)
+    isLocalPendingSid(pendingSid) && saved?.sid &&
+    pendingSid !== saved.sid && pending?.body === saved.body &&
+    (!pending?.from || phoneNumbersMatch(pending?.from ?? null, saved.from)) &&
+    phoneNumbersMatch(pending?.to ?? null, saved.to)
   );
+}
+
+function isLocalPendingSid(sid: string | null | undefined): boolean {
+  return Boolean(sid?.startsWith("pending-") || sid?.startsWith("pending:"));
 }
 
 function reconcileLoaderMessages(current: Message[], initial: Message[]): Message[] {
@@ -184,11 +189,25 @@ export const useChatRealTime = ({
         return [...withoutMatchingPending, newMessage];
       });
     } else if (payload.eventType === "UPDATE" && newRow?.sid) {
-      setMessages((curr) =>
-        curr.map((m) =>
-          m?.sid === newRow?.sid ? (newRow as Message) : m
-        )
-      );
+      setMessages((curr) => {
+        const exactIndex = curr.findIndex((m) => m?.sid === newRow.sid);
+        if (exactIndex >= 0) {
+          return curr.map((m, index) =>
+            index === exactIndex ? (newRow as Message) : m,
+          );
+        }
+
+        // The server first emits an INSERT for its pending intent SID and then
+        // an UPDATE when Twilio returns the real SID. Replace that intent row
+        // instead of appending a second bubble.
+        const pendingIndex = curr.findIndex((m) =>
+          matchesPendingMessage(m, newRow as Message),
+        );
+        if (pendingIndex < 0) return curr;
+        return curr.map((m, index) =>
+          index === pendingIndex ? (newRow as Message) : m,
+        );
+      });
     }
   }, [workspace]);
 

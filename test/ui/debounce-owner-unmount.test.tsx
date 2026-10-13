@@ -22,6 +22,21 @@ function sidebar() {
   return { ...view, filters };
 }
 
+function sidebarWithSortCapture() {
+  let selectedSort: string | null = null;
+  const view = render(<MemoryRouter><ConversationSidebar
+    campaigns={[]} chats={[]} chatsError={null} formatDate={value => value}
+    handleExistingConversationClick={() => {}} onLoadMore={() => {}}
+    paginationState={{ hasMore: false, page: 1, pageSize: 20 }}
+    paginationFetcherState="idle" searchParams={new URLSearchParams()} sortBy="hasReplied"
+    hideStopConversations={false} onHideStopChange={() => {}}
+    updateFilters={update => {
+      selectedSort = update(new URLSearchParams()).get("sort");
+    }}
+  /></MemoryRouter>);
+  return { ...view, getSelectedSort: () => selectedSort };
+}
+
 describe("debounce owner lifetime (#2108)", () => {
   test("a pending callback is canceled on true hook unmount", () => {
     const called = vi.fn();
@@ -59,5 +74,12 @@ describe("debounce owner lifetime (#2108)", () => {
     unmount();
     act(() => { vi.advanceTimersByTime(1000); });
     expect(filters).toEqual([]);
+  });
+
+  test("keeps recent activity explicit in the URL filters", () => {
+    const { getSelectedSort } = sidebarWithSortCapture();
+    fireEvent.click(screen.getByRole("combobox", { name: "Sort chats" }));
+    fireEvent.click(screen.getByRole("option", { name: "Recent activity" }));
+    expect(getSelectedSort()).toBe("recent");
   });
 });

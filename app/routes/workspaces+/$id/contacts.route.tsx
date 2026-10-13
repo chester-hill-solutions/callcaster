@@ -1,4 +1,5 @@
 export { loader } from "./contacts.loader.server";
+export { action } from "./contacts.action.server";
 
 import { Outlet, useOutlet } from "react-router";
 import type { MetaFunction } from "react-router";

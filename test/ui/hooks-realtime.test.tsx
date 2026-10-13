@@ -160,6 +160,64 @@ describe("realtime hooks", () => {
     expect(result.current.messages.length).toBeGreaterThan(0);
   });
 
+  test("replaces the optimistic bubble through the server intent and real SID", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const { result } = renderHook(() =>
+      useChatRealTime({
+        client: {} as any,
+        initial: [],
+        workspace: "ws",
+        contact_number: "+15552222222",
+      }),
+    );
+
+    act(() => {
+      result.current.addOptimisticMessage({
+        body: "test",
+        from: "+15551111111",
+        to: "+15552222222",
+        sid: "pending-browser",
+      });
+    });
+
+    act(() => {
+      emitWorkspaceEvent({
+        eventType: "INSERT",
+        table: "message",
+        new: {
+          sid: "pending:server-intent",
+          body: "test",
+          from: "+15551111111",
+          to: "+15552222222",
+          workspace: "ws",
+          status: "queued",
+        },
+        old: null,
+      });
+    });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.sid).toBe("pending:server-intent");
+
+    act(() => {
+      emitWorkspaceEvent({
+        eventType: "UPDATE",
+        table: "message",
+        new: {
+          sid: "SM-test",
+          body: "test",
+          from: "+15551111111",
+          to: "+15552222222",
+          workspace: "ws",
+          status: "sent",
+        },
+        old: null,
+      });
+    });
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0]?.sid).toBe("SM-test");
+  });
+
   test("useChatRealTime keeps failed INSERT events instead of dropping them", async () => {
     const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
     const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();

@@ -5,8 +5,12 @@
 #   make postgres up          one service; any subset works: make postgres logs
 #   make storage up|down      object storage (the stow binary, not a container)
 #   make postgres init        start that service and run only its bootstrap step
-#   make app | worker | media-stream   run a process in the foreground
-#   make tunnel               start the local HTTPS Twilio tunnel
+#   make app | worker | media-stream   start a process in the background
+#   make local-status                  show local process status
+#   make local-logs                    follow local process logs
+#   make local-stop                    stop local background processes
+#   make tunnel-setup         create or verify the named Cloudflare Tunnel
+#   make tunnel               start the named Cloudflare Tunnel
 #   make twiml                create or update the local TwiML App
 #   make calling:sync         sync one workspace to the tunnel URL
 #   make calling:sync-local   sync Twilio-enabled local workspaces
@@ -27,7 +31,7 @@ TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init up down logs ps app worker media-stream tunnel twiml calling\:sync calling\:sync-local e2e storage minio $(SERVICES)
+.PHONY: help init up down logs ps app worker media-stream tunnel-setup tunnel local-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage minio $(SERVICES)
 
 help:
 	@sed -n '3,13p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -68,16 +72,40 @@ ps:
 	$(COMPOSE) ps
 
 app:
-	npm run dev
+	node scripts/local/run-headless.mjs start app -- npm run dev
 
 worker:
-	npm run worker
+	node scripts/local/run-headless.mjs start worker -- npm run worker
 
 media-stream:
-	bun run services/media-stream/index.ts
+	node scripts/local/run-headless.mjs start media-stream -- bun run services/media-stream/index.ts
+
+tunnel-setup:
+	node scripts/local/setup-cloudflare-tunnel.mjs
 
 tunnel:
-	npx --no-install lt --port 3000
+	node scripts/local/run-headless.mjs start tunnel -- node scripts/local/start-cloudflare-tunnel.mjs
+
+local-status:
+	@for name in app worker media-stream tunnel; do node scripts/local/run-headless.mjs status "$$name"; done
+
+local-logs:
+	tail -f .local/logs/app.log .local/logs/worker.log .local/logs/media-stream.log .local/logs/tunnel.log
+
+app-logs:
+	tail -f .local/logs/app.log
+
+worker-logs:
+	tail -f .local/logs/worker.log
+
+media-stream-logs:
+	tail -f .local/logs/media-stream.log
+
+tunnel-logs:
+	tail -f .local/logs/tunnel.log
+
+local-stop:
+	@for name in app worker media-stream tunnel; do node scripts/local/run-headless.mjs stop "$$name"; done
 
 twiml:
 	bun scripts/local/provision-local-twiml-app.mjs

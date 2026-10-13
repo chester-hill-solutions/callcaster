@@ -1,4 +1,4 @@
-import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
@@ -9,9 +9,13 @@ import { defineLoader } from "@/lib/handler.server";
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
 
+function emptyPagination(currentPage: number, pageSize: number): ContactsPagination {
+  return { currentPage, totalPages: 0, totalCount: 0, pageSize };
+}
+
 import type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
 export type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
-import { MemberRole } from "@/lib/member-role";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 
 function errorPayload(
   partial: Omit<ContactsLoaderData, "pagination"> & {
@@ -37,11 +41,21 @@ function errorPayload(
 }
 
 export const loader = defineLoader({
+  auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
-  handler: async ({ context, url }) => {
+  handler: async ({ auth, url }) => {
+  const { headers, user, workspaceId, userRole: roleStr, tdb } = auth;
+
+  if (!hasMinRole(auth.userRole as MemberRole, MemberRole.Member)) {
+    throw new Response("You don't have permission to view contacts.", {
+      headers,
+      status: 403,
+    });
+  }
+
+  const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
+
   try {
-    const { headers, user, workspaceId, userRole: roleStr, tdb } = getWorkspaceRouteContext(context);
-    const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
     if (!workspaceId) {
       return routeData(
@@ -107,12 +121,7 @@ export const loader = defineLoader({
             userRole: null,
             flags: null,
             campaigns: [],
-            pagination: {
-              currentPage: page,
-              totalPages: 0,
-              totalCount: 0,
-              pageSize,
-            },
+            pagination: emptyPagination(page, pageSize),
           },
           pageSize,
         ),
@@ -130,12 +139,7 @@ export const loader = defineLoader({
             userRole,
             flags: null,
             campaigns: [],
-            pagination: {
-              currentPage: page,
-              totalPages: 0,
-              totalCount: 0,
-              pageSize,
-            },
+            pagination: emptyPagination(page, pageSize),
           },
           pageSize,
         ),
@@ -154,12 +158,7 @@ export const loader = defineLoader({
             userRole,
             flags: null,
             campaigns,
-            pagination: {
-              currentPage: page,
-              totalPages: 0,
-              totalCount: 0,
-              pageSize,
-            },
+            pagination: emptyPagination(page, pageSize),
           },
           pageSize,
         ),
