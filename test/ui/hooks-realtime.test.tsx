@@ -218,6 +218,28 @@ describe("realtime hooks", () => {
     expect(result.current.messages[0]?.sid).toBe("SM-test");
   });
 
+  test("keeps identical server intents through reversed completion order (#2551)", async () => {
+    const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
+    const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();
+    const initial: import("@/lib/types").Message[] = [];
+    const { result } = renderHook(() => useChatRealTime({ initial, workspace: "ws" }));
+    const row = { body: "Thank you", from: "+15551111111", to: "+15552222222", workspace: "ws" };
+    act(() => {
+      for (const ref of ["staff-a", "staff-b"]) {
+        emitWorkspaceEvent({ eventType: "INSERT", table: "message", new: { ...row, sid: `pending:${ref}`, client_ref: ref, status: "queued" }, old: null });
+      }
+    });
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["pending:staff-a", "pending:staff-b"]);
+    act(() => {
+      emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-b", client_ref: "staff-b", status: "sent" }, old: null });
+    });
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["pending:staff-a", "SM-b"]);
+    act(() => {
+      emitWorkspaceEvent({ eventType: "UPDATE", table: "message", new: { ...row, sid: "SM-a", client_ref: "staff-a", status: "sent" }, old: null });
+    });
+    expect(result.current.messages.map(message => message?.sid)).toEqual(["SM-a", "SM-b"]);
+  });
+
   test("useChatRealTime keeps failed INSERT events instead of dropping them", async () => {
     const { useChatRealTime } = await import("@/hooks/realtime/useChatRealtime");
     const { emitWorkspaceEvent } = createWorkspaceEventSourceMock();

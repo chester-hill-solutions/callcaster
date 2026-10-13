@@ -680,3 +680,8 @@ For exact-file import identity and coordinates, test the real multipart upload
 boundary through its queued worker bytes. A decoder/encoder round trip can strip
 a UTF-8 BOM or replace invalid bytes while direct parser tests stay green. Keep
 worker and stored-original bytes equal, and reject invalid UTF-8 before writes.
+
+For live chat send reconciliation, server `pending:` rows are separate durable
+intents. Preserve `client_ref` when provider fields replace the SID. Match server
+updates by that identity; limit content matching to one browser optimistic row.
+Test identical concurrent sends with reversed completion order.

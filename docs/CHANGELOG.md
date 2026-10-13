@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: SMS completion reports keep replies within the matching sender and campaign window, include staff replies, and preserve access-denial statuses ([#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752)).
 
+- Fixed: Concurrent identical staff replies keep separate live chat rows through provider completion ([#2551](https://github.com/chester-hill-solutions/callcaster/issues/2551)).
+
 - Added: Workspace members can now delete contacts from the Contacts table.
 
 - Added: Local Twilio development now uses per-developer named Cloudflare Tunnels with cross-platform `cloudflared` setup and startup commands.

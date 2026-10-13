@@ -39,6 +39,17 @@ suite("provider send-time writes against real Postgres (#2049)", () => {
     }
   });
 
+  test("intent resolution preserves identity despite a null provider client reference (#2551)", async () => {
+    const { resolveMessageByClientRef } = await import("@/lib/message-db.server");
+    await fixture(async (tdb) => {
+      await tdb.message.update({ set: { sid: "pending:staff-a", client_ref: "staff-a" } });
+      const row = await resolveMessageByClientRef(workspaceId, "staff-a", { sid: "SM-staff-a", client_ref: null }, { tdb });
+      expect(row?.sid).toBe("SM-staff-a");
+      expect(row?.client_ref).toBe("staff-a");
+      expect((await tdb.message.findFirst())?.client_ref).toBe("staff-a");
+    });
+  });
+
   test("captures the actual provider Date rather than request time", async () => {
     const { updateMessageBySid } = await import("@/lib/message-db.server");
     await fixture(async (tdb) => {
