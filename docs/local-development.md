@@ -5,16 +5,16 @@
 ```bash
 make init         # start or repair local infrastructure
 make app          # terminal 1: web app → http://localhost:3000
-make tunnel       # terminal 2: public HTTPS URL for Twilio callbacks
-# Update BASE_URL, restart the app, then:
+make tunnel       # terminal 2: named Cloudflare Tunnel
 make calling:sync-local
 make worker       # terminal 3: background jobs, including list uploads
 # Optional, terminal 4: live dashboard audio, transcription, and coaching
 make media-stream
 ```
 
-This is for returning developers with `.env.local`, `DEV_NAME`, and `ENV`
-already configured. For first-time setup, use [Environment Setup](#environment-setup).
+This is for returning developers with `.env.local`, `DEV_NAME`, `ENV`, and an
+already-created named Cloudflare Tunnel configured. For first-time setup, use
+[Environment Setup](#environment-setup).
 
 Verify the setup:
 
@@ -31,10 +31,44 @@ make e2e            # full Playwright run against compose Postgres + Stow
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
-- Localtunnel (only for live Twilio calling; it is also available through `make tunnel`)
+- `cloudflared` for the named Cloudflare Tunnel workflow
 - A Twilio account with:
   - an account SID and auth token
   - at least one phone number if you want to test inbound or outbound calling
+
+#### WSL2: install `cloudflared`
+
+You can use either a native Windows installation or a Linux installation inside
+WSL2. WSL2 can run `cloudflared.exe` through Windows interop when the Windows
+PATH is inherited. This is often the simplest option when `cloudflared` is
+already installed on Windows.
+
+From WSL2, verify the Windows executable:
+
+```bash
+cloudflared.exe --version
+```
+
+If the Windows PATH is not available, or if you want the tunnel process to run
+fully inside WSL2, install the Linux package instead:
+
+```bash
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+  | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+  | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt-get update
+sudo apt-get install cloudflared
+cloudflared --version
+```
+
+The `make tunnel` launcher supports the executable available in
+the developer's environment, either `cloudflared` or `cloudflared.exe`.
+Regardless of which binary is used, keep the app and tunnel origin reachable
+from the same machine. If the app runs in WSL2, test
+`http://127.0.0.1:3000` from the shell that starts the tunnel. Docker Desktop
+must have WSL integration enabled for the distribution that runs `make init`.
 
 ### Local Services And Ports
 
@@ -61,7 +95,7 @@ Set your local values in `.env.local`:
 ```env
 DEV_NAME=sai
 ENV=local
-BASE_URL=http://localhost:3000
+BASE_URL=https://sai-local.callcaster.ca
 TWILIO_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_PHONE_NUMBER=+15555550100
@@ -73,38 +107,61 @@ RESEND_API_KEY=placeholder
 
 `make init` creates the shared `.env` and does not read `.env.local`.
 
+#### Create and verify the named Cloudflare Tunnel
+
+The development domain is already managed by Cloudflare. Each developer gets
+one named tunnel and hostname based on `DEV_NAME` and `ENV`:
+
+```text
+DEV_NAME=sai, ENV=local
+Tunnel:   sai-local
+Hostname: sai-local.callcaster.ca
+Origin:   http://127.0.0.1:3000
+```
+
+Run this once from the environment where `cloudflared` will run. Sign in to
+Cloudflare first; the browser flow lets you select the managed domain:
+
+```bash
+cloudflared tunnel login
+```
+
+Then run the repository setup command:
+
+```bash
+make tunnel-setup
+```
+
+Set the stable public URL in `.env.local`:
+
+```env
+BASE_URL=https://sai-local.callcaster.ca
+```
+
+Start the app before starting the tunnel:
+
+```bash
+make app       # terminal 1
+make tunnel    # terminal 2
+```
+
+Verify the public route from another terminal:
+
+```bash
+curl -I https://sai-local.callcaster.ca/
+```
+
+The hostname must remain `sai-local.callcaster.ca` for this developer. Do not
+create a second tunnel for the same developer and hostname. A Cloudflare
+connector reconnect does not change the hostname or require Twilio callback
+resynchronization.
+
 Initialize the local services after setting the local environment values:
 
 ```bash
 make init                  # services, .env, schema, bucket, and seed data
 make app                   # terminal 1
 ```
-
-#### Calling Setup With Localtunnel
-
-Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
-
-1. Start Localtunnel after the app is running:
-
-```bash
-make tunnel
-```
-
-2. Copy the HTTPS forwarding URL from Localtunnel.
-
-3. Set `BASE_URL` in `.env.local` to that HTTPS URL.
-
-   Keep only one active `BASE_URL` value. The local app commands load
-   `.env.local` as an override, so an old localhost value there takes
-   precedence over the tunnel URL in `.env`.
-
-Example:
-
-```bash
-BASE_URL=https://your-subdomain.loca.lt
-```
-
-4. Restart the app after changing `BASE_URL`.
 
 Create the local TwiML App and sync local workspaces:
 
@@ -120,13 +177,10 @@ make worker                # terminal 2, when needed
 make media-stream          # optional, terminal 3
 ```
 
-Localtunnel quickstart reference:
-- [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
-
 #### Sync Twilio To The Current Tunnel
 
 This repo includes helpers to create the local environment TwiML App and update
-Twilio when your tunnel URL changes.
+Twilio when callback configuration changes.
 
 Sync one workspace:
 
@@ -134,10 +188,10 @@ Sync one workspace:
 make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
-Pass the current Localtunnel URL explicitly:
+Pass the stable Cloudflare URL explicitly when needed:
 
 ```bash
-BASE_URL=https://your-subdomain.loca.lt make calling:sync WORKSPACE_ID=<workspace-id>
+BASE_URL=https://sai-local.callcaster.ca make calling:sync WORKSPACE_ID=<workspace-id>
 ```
 
 The local wrapper requires `ENV=local`, refuses Railway environments, ignores
@@ -157,13 +211,16 @@ What the script updates:
 > [Twilio console](https://console.twilio.com/us1/develop/voice/manage/twiml-apps)
 > and use its credentials in `.env.local` before running these commands.
 
-The Make targets read `BASE_URL` from `.env.local` or `.env`. Because
-Localtunnel does not expose the same local tunnel API flow as ngrok, update
-that value after every tunnel rotation.
+The Make targets read `BASE_URL` from `.env.local` or `.env`. A named Cloudflare
+Tunnel keeps the same hostname after connector reconnects, so callback sync is
+not needed after every tunnel restart.
 
 #### Why Resync Is Required
 
-Twilio webhook validation uses the exact incoming request URL. If your Localtunnel hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
+Twilio webhook validation uses the exact incoming request URL. If the public
+hostname or callback configuration changes, webhook validation will fail until
+the callbacks are updated. A Cloudflare connector reconnect does not change the
+hostname.
 
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
@@ -280,12 +337,12 @@ Transcription and coaching use optional API keys:
 - Restart the app after changing `.env`
 
 `Invalid Twilio signature`
-- Make sure `BASE_URL` exactly matches the current Localtunnel URL
-- Re-run the sync script after every tunnel rotation
+- Make sure `BASE_URL` is `https://<DEV_NAME>-<ENV>.callcaster.ca`
+- Re-run `make calling:sync-local` after changing the hostname or callback path
 - Confirm the Twilio auth token in `.env` matches the account being used
 
 Calling loads but webhooks do not fire
-- Verify Localtunnel is forwarding to port `3000`
+- Verify `cloudflared` is forwarding the named hostname to port `3000`
 - Check that the script updated the right workspace or all workspaces
 - Confirm the relevant number exists in the workspace and in Twilio
 

@@ -6,7 +6,8 @@
 #   make storage up|down      object storage (the stow binary, not a container)
 #   make postgres init        start that service and run only its bootstrap step
 #   make app | worker | media-stream   run a process in the foreground
-#   make tunnel               start the local HTTPS Twilio tunnel
+#   make tunnel-setup         create or verify the named Cloudflare Tunnel
+#   make tunnel               start the named Cloudflare Tunnel
 #   make twiml                create or update the local TwiML App
 #   make calling:sync         sync one workspace to the tunnel URL
 #   make calling:sync-local   sync Twilio-enabled local workspaces
@@ -27,7 +28,7 @@ TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init up down logs ps app worker media-stream tunnel twiml calling\:sync calling\:sync-local e2e storage minio $(SERVICES)
+.PHONY: help init up down logs ps app worker media-stream tunnel-setup tunnel twiml calling\:sync calling\:sync-local e2e storage minio $(SERVICES)
 
 help:
 	@sed -n '3,13p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -76,8 +77,11 @@ worker:
 media-stream:
 	bun run services/media-stream/index.ts
 
+tunnel-setup:
+	node scripts/local/setup-cloudflare-tunnel.mjs
+
 tunnel:
-	npx --no-install lt --port 3000
+	node scripts/local/start-cloudflare-tunnel.mjs
 
 twiml:
 	bun scripts/local/provision-local-twiml-app.mjs

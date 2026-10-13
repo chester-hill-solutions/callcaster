@@ -7,7 +7,6 @@ import postgres from "postgres";
 import Twilio from "twilio";
 
 const LOCAL_APP_URL = process.env.LOCAL_APP_URL ?? "http://127.0.0.1:3000";
-const NGROK_API_URL = process.env.NGROK_API_URL ?? "http://127.0.0.1:4040/api/tunnels";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -100,14 +99,15 @@ function printHelp() {
 Usage:
   npm run dev:calling:sync -- --workspace-id <workspace-id>
   npm run dev:calling:sync -- --all-workspaces
-  npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
+  npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://sai-local.callcaster.ca
 
 The script resolves the public base URL in this order:
   1. --base-url
   2. BASE_URL from the environment
-  3. ngrok local API at ${NGROK_API_URL} (fallback only)
+  3. No dynamic tunnel discovery; set BASE_URL or pass --base-url.
 
-For Localtunnel, set BASE_URL in .env or pass --base-url explicitly.
+Named Cloudflare Tunnel hostnames are stable values. Set BASE_URL in .env.local
+or pass --base-url explicitly.
 
 Flags:
   --allow-shared-app  Repoint the TwiML App even when its current voice URL is
@@ -128,8 +128,9 @@ async function resolveBaseUrl(cliBaseUrl) {
     }
   }
 
-  const discoveredNgrokUrl = await discoverNgrokUrl();
-  return normalizeBaseUrl(discoveredNgrokUrl);
+  throw new Error(
+    "Set BASE_URL or pass --base-url. Named Cloudflare Tunnel URLs are not discovered dynamically.",
+  );
 }
 
 function normalizeOptionalBaseUrl(value) {
@@ -143,8 +144,6 @@ function normalizeOptionalBaseUrl(value) {
   }
 
   if (
-    trimmed.includes("your-ngrok-subdomain") ||
-    trimmed.includes("your-subdomain.loca.lt") ||
     trimmed.includes("your-subdomain") ||
     trimmed.includes("placeholder")
   ) {
@@ -174,27 +173,6 @@ function normalizeBaseUrl(value) {
   parsedUrl.hash = "";
 
   return parsedUrl.toString().replace(/\/$/, "");
-}
-
-async function discoverNgrokUrl() {
-  const response = await fetch(NGROK_API_URL);
-  if (!response.ok) {
-    throw new Error(
-      `Could not reach ngrok local API at ${NGROK_API_URL}. If you are using Localtunnel, pass --base-url or set BASE_URL.`,
-    );
-  }
-
-  const body = await response.json();
-  const tunnels = Array.isArray(body.tunnels) ? body.tunnels : [];
-  const httpsTunnel = tunnels.find((tunnel) => tunnel.public_url?.startsWith("https://"));
-
-  if (!httpsTunnel?.public_url) {
-    throw new Error(
-      `No HTTPS ngrok tunnel found at ${NGROK_API_URL}. If you are using Localtunnel, pass --base-url or set BASE_URL.`,
-    );
-  }
-
-  return httpsTunnel.public_url;
 }
 
 async function assertReachable({ label, url }) {
@@ -233,12 +211,8 @@ function requireEnv(name) {
 const DEV_TUNNEL_HOST_PATTERNS = [
   /^localhost$/i,
   /^127\.0\.0\.1$/,
-  /\.loca\.lt$/i,
-  /\.ngrok\.io$/i,
-  /\.ngrok\.app$/i,
-  /\.ngrok-free\.app$/i,
+  /\.callcaster\.ca$/i,
   /\.trycloudflare\.com$/i,
-  /\.serveo\.net$/i,
 ];
 
 function isDevTunnelUrl(value) {
