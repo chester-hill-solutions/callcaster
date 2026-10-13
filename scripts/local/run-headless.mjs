@@ -64,7 +64,11 @@ function stop(processName) {
     return;
   }
 
-  process.kill(pid, "SIGTERM");
+  // Detached children create their own process group. Signal the whole group
+  // so wrappers such as npm/bun do not leave the actual app process behind.
+  // Windows does not support negative process-group ids, so keep the direct
+  // signal there.
+  process.kill(process.platform === "win32" ? pid : -pid, "SIGTERM");
   fs.rmSync(pidPath, { force: true });
   console.log(`Stopped ${processName} (pid ${pid}).`);
 }
