@@ -11,6 +11,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Changed: SMS campaign setup no longer repeats guidance that the message body is edited under Content ([PR #2583](https://github.com/chester-hill-solutions/callcaster/pull/2583), [#2505](https://github.com/chester-hill-solutions/callcaster/issues/2505)).
 - Added: Admins can open workspace details by selecting a workspace name in the admin workspace table ([PR #2582](https://github.com/chester-hill-solutions/callcaster/pull/2582), [#2508](https://github.com/chester-hill-solutions/callcaster/issues/2508)).
 - Changed: Customer-facing campaign and billing copy uses IVR terminology again, while technical identifiers remain unchanged ([PR #2581](https://github.com/chester-hill-solutions/callcaster/pull/2581), [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347)).
+- Changed: SMS campaign setup places Send using beside Outbound number ([PR #2577](https://github.com/chester-hill-solutions/callcaster/pull/2577), [#2504](https://github.com/chester-hill-solutions/callcaster/issues/2504)).
 
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 
