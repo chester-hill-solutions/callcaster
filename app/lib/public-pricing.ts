@@ -93,14 +93,13 @@ export function buildPublicPricingContent(): PublicPricingContent {
       ],
     },
     {
-      service: "Automated phone menus",
+      service: "IVRs",
       type: "Interactive voice response",
       rates: [
         {
           name: "First minute",
           price: `${ivrFirstCredits} / dial`,
-          description:
-            "Covers the first minute of each billable automated phone menu call.",
+          description: "Covers the first minute of each billable IVR call.",
         },
         {
           name: "Additional minutes",

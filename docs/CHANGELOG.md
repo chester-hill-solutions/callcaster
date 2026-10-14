@@ -12,7 +12,6 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Added: Admins can open workspace details by selecting a workspace name in the admin workspace table ([PR #2582](https://github.com/chester-hill-solutions/callcaster/pull/2582), [#2508](https://github.com/chester-hill-solutions/callcaster/issues/2508)).
 
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
-- Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
 
 ## 2026-10-14 — release [#2568](https://github.com/chester-hill-solutions/callcaster/pull/2568)
 

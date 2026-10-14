@@ -183,7 +183,7 @@ export default function Credits() {
                 <div>SMS: 2 credits per segment ($0.04)</div>
                 <div>MMS: 4 credits per message ($0.08)</div>
                 <div>
-                  Automated phone menu calls: 2 credits for the first minute ($0.04), then 3 credits
+                  IVR calls: 2 credits for the first minute ($0.04), then 3 credits
                   per additional started minute ($0.06)
                 </div>
                 <div>
