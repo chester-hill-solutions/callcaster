@@ -409,6 +409,9 @@ For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
+If different router-mount cases time out under memory pressure but pass alone,
+run the full gate with `VITEST_MAX_WORKERS=1`. This Vitest environment setting
+overrides both suites' worker limits. Keep assertions and timeouts unchanged.
 Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
 command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
 all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because
