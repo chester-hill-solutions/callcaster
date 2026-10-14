@@ -1,5 +1,5 @@
-export { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle, DialogTrigger } from '../../chunk-A33IINYN.js';
-import '../../chunk-C6TALT53.js';
+export { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle, DialogTrigger } from '../../chunk-PEG5ACQA.js';
+import '../../chunk-IFW6QGQN.js';
 import '../../chunk-DN2AEEA2.js';
 //# sourceMappingURL=dialog.js.map
 //# sourceMappingURL=dialog.js.map

@@ -19,7 +19,7 @@ type OperationalGuidancePanelProps = Pick<
 function getRecommendationAlertVariant(severity: TwilioPageData["portalSnapshot"]["recommendations"][number]["severity"]) {
     switch (severity) {
         case "warning":
-            return "destructive" as const;
+            return "warning" as const;
         case "info":
             return "default" as const;
         default: {
