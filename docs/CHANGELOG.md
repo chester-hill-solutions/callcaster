@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: SMS report export history exposes report details and private download links only to workspace owners and admins; ordinary exports remain available to workspace members ([#2559](https://github.com/chester-hill-solutions/callcaster/issues/2559)).
+
 - Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([PR #2558](https://github.com/chester-hill-solutions/callcaster/pull/2558), [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
 
 ## 2026-10-13 — release [#2553](https://github.com/chester-hill-solutions/callcaster/pull/2553)
