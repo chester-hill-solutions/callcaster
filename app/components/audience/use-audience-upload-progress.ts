@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
@@ -68,15 +67,6 @@ export function useAudienceUploadProgress({
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
     const audienceId = progress.audienceId;
-    if (workspaceId && progress.uploadId != null && progress.reportAvailable) {
-      const reportUrl = audienceImportReportUrl(workspaceId, progress.uploadId);
-      toast.success("Call-list upload completed", {
-        id: `audience-import-report-${workspaceId}-${progress.uploadId}`,
-        description: "Download the row report to review imported, skipped and consent-warning rows.",
-        duration: Infinity,
-        action: { label: "Download row report", onClick: () => window.location.assign(reportUrl) },
-      });
-    }
     if (onUploadCompleteRef.current) {
       onUploadCompleteRef.current(audienceId);
     } else if (onStandaloneCompleteRef.current) {
