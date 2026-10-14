@@ -13,9 +13,10 @@ request.
 1. Start every work branch from `dev`. Do not branch from `master`, `main`, or an unrelated feature branch.
 2. Before creating or updating a work branch, run `git fetch origin`.
 3. Create the branch from the current `origin/dev`, then rebase it on `origin/dev` before committing or pushing.
-4. Name branches as `type/issueNumber-some-description`.
-5. Allowed types are `chore`, `bug`, `task`, `feature`, `epic`, and `test`. Use lowercase kebab-case for the description.
-6. Use the actual issue number when one exists. User-authorized repository maintenance without a product issue can use `chore/<description>` and must add the `no-issue` PR label. For product work, create or update its issue before branching; do not invent an issue number.
+4. Use one dedicated worktree for each issue or atomic concern. Never combine two issue branches in one worktree.
+5. For product work, read and verify the issue's native GitHub Type before branching. Map the Type to the branch prefix: `Bug` → `bug/`, `Feature` → `feature/`, `Task` → `task/`, `Epic` → `epic/`, and `User Story` → `user-story/`.
+6. Name product branches as `<type>/<issueNumber>-some-description`. Use lowercase kebab-case for the description and name the worktree after the branch with `/` replaced by `-`.
+7. Use `chore/<description>` only for issue-free repository maintenance. Such a PR must use the `no-issue` label. Do not use a label as a substitute for the native issue Type, and do not guess a missing or unsupported Type.
 
 ## Required Checks
 
