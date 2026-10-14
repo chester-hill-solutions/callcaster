@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-env node */
 /**
  * Vendor source/dist drift check (roadmap E7.1).
  *
@@ -19,14 +18,10 @@ import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
-// shad-cc runs in warn-only mode: one local run once produced a different
-// chunk hash from identical source, but twelve later builds across three
-// configurations were byte-identical (#1615). Warn-only gathers CI evidence
-// without failing unrelated builds; flip `enforce` once it stays quiet.
 const PACKAGES = [
-  { dir: "vendor/scriptkit/scriptkit-call-script-core", enforce: true },
-  { dir: "vendor/scriptkit/scriptkit-call-script-react", enforce: true },
-  { dir: "vendor/chester-hill-solutions/shad-cc", enforce: false },
+  "vendor/scriptkit/scriptkit-call-script-core",
+  "vendor/scriptkit/scriptkit-call-script-react",
+  "vendor/chester-hill-solutions/shad-cc",
 ];
 
 function walk(dir, out = []) {
@@ -58,36 +53,30 @@ function diffSnapshots(before, after) {
 }
 
 let failed = false;
-for (const { dir: pkg, enforce } of PACKAGES) {
+for (const pkg of PACKAGES) {
   const pkgDir = join(ROOT, pkg);
   const distDir = join(pkgDir, "dist");
   const before = snapshot(distDir);
   const build = spawnSync("npm", ["--prefix", pkgDir, "run", "build"], { cwd: ROOT, encoding: "utf8" });
   if (build.status !== 0) {
     console.error(`check-vendor-dist: build failed for ${pkg}\n${build.stderr || build.stdout}`);
-    failed = failed || enforce;
+    failed = true;
     continue;
   }
   const changed = diffSnapshots(before, snapshot(distDir));
   if (changed.length > 0) {
-    const label = enforce ? "check-vendor-dist" : "check-vendor-dist (warn-only, #1615)";
-    failed = failed || enforce;
-    console.error(`${label}: ${pkg}/dist is not what its source builds (${changed.length} file(s)):`);
+    failed = true;
+    console.error(`check-vendor-dist: ${pkg}/dist is not what its source builds (${changed.length} file(s)):`);
     for (const line of changed.slice(0, 20)) console.error(`  ${line}`);
     if (changed.length > 20) console.error(`  … and ${changed.length - 20} more`);
-    if (!enforce) {
-      // Leave the tree as it was found so a warn-only rebuild never dirties a checkout.
-      spawnSync("git", ["checkout", "--", `${pkg}/dist`], { cwd: ROOT });
-      spawnSync("git", ["clean", "-fdq", `${pkg}/dist`], { cwd: ROOT });
-    }
   } else {
-    console.log(`check-vendor-dist: ${pkg} — dist matches source (${before.size} files)${enforce ? "" : " [warn-only]"}`);
+    console.log(`check-vendor-dist: ${pkg} — dist matches source (${before.size} files)`);
   }
 }
 
 if (failed) {
   console.error(
-    "\nRebuild with `npm run vendor:build` and commit the dist alongside the source change. Never edit dist/ by hand.",
+    "\nRebuild the named package with `npm --prefix <package> run build` and commit dist alongside its source. Never edit dist/ by hand.",
   );
   process.exit(1);
 }

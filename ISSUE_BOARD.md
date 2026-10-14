@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 9
+## Fix now — 10
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -137,6 +137,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Classes alone do not prove computed cursor behavior. Disabled and aria-disabled cursor browser checks and the raw-button prevention guard are missing.
 - Done when: Interactive shared buttons show the pointer cursor by default; Disabled buttons show the default cursor; The reported onboarding save/continue instance is fixed; A guard prevents recurrence
 - Tracker: Partial fix in PR #1963. Keep remaining inventory/guard work visible; the old unmerged-branch claim is stale. Related PR evidence: #1963. A PR reference alone does not prove deployed behavior.
+
+### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Enforce the vendored UI source/output drift check**
+- The historical chunk flip did not recur: three consecutive configured builds match all 263 committed files. A focused candidate makes UI drift and build failures blocking; nine actual CLI cases pass. Full local CI and remote acceptance remain.
+- Current behavior: Candidate based on dev@5b46c996. Three unchanged-source builds produce the same 263-file byte snapshot, hash 8f7d8288e45946e708593b50bd03caa512e170bf986e48d722c20f7d6c68ea48. The configured builder and all generated output are unchanged. The guard now blocks stale bytes, failed builds and added/removed output in each of the three packages; its obsolete warning mode and Git reset/clean fallback are removed.
+- Root cause: Warn-only enforcement allowed stale or failed UI builds to exit successfully. Four desired failure cases reproduce that false success; five nominal/Scriptkit controls pass.
+- Resolution: Land one enforcement PR after full local CI and exact-head remote gates pass. No bundler configuration change is needed for the current reproducible build. Keep deployed/default-branch promotion separate from source completion.
+- Look in: `scripts/check-vendor-dist-drift.mjs`
+- Existing tests: test/vendor-dist-drift.test.ts: nine actual CLI cases, four fail on the old guard with five controls passing; Three consecutive configured UI builds match all 263 committed output files byte for byte; The fully enforced guard passes on all three real vendored packages; Linux quality run 38510107827 on dev source 92b68c41 reports all 263 UI files matching with no drift diagnostics
+- Missing tests: Full local CI, exact-head remote checks and applicable preview deployments before merge
+- Done when: Three consecutive unchanged-source builds produce identical UI dist; All three vendored packages are blocking entries in the drift guard; Development documentation states the UI check is enforced
+- Tracker: One focused enforcement candidate implements #1615. Its historical nondeterminism claim is not current reproduction evidence. Require green gates before merging.
 
 ---
 
@@ -2508,7 +2521,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 15
+## Needs reproduction — 14
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -2613,12 +2626,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Missing tests: component render for the step
 - Done when: Each defect recorded with steps; Unrelated defects split; Regression test per defect
 - Tracker: Reproduce and split; overlaps #1205/#1113/#1318.
-
-### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
-- Verdict: **Needs reproduction** · Labels: none · Assignee: none · Updated: 2026-09-25
-- PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.
-- Resolution: Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.
-- Look in: `scripts/check-vendor-dist-drift.mjs`
 
 ### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-09-24
