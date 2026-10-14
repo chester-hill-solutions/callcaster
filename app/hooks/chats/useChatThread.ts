@@ -169,12 +169,6 @@ export function useChatThread({
           ),
         );
 
-        window.dispatchEvent(
-          new CustomEvent("messages-read", {
-            detail: { contactNumber: contact_number },
-          }),
-        );
-
         hasMarkedAsReadRef.current = true;
       } catch (err) {
         logger.error("Error in markMessagesAsRead:", err);
@@ -198,12 +192,6 @@ export function useChatThread({
         prevMessages.map((msg) =>
           msg?.sid === messageId ? { ...msg, status: "delivered" } : msg,
         ),
-      );
-
-      window.dispatchEvent(
-        new CustomEvent("message-read", {
-          detail: { messageId, contactNumber: contact_number },
-        }),
       );
     } catch (error) {
       logger.error("Error updating message status:", error);
