@@ -1,8 +1,7 @@
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
-import { FormField } from "@/components/ui/form-field";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CampaignSmsSendMode } from "../CampaignSmsSendMode";
 import { Campaign, Flags, WorkspaceNumbers } from "@/lib/types";
 
 interface CampaignBasicInfoProps {
@@ -60,46 +59,12 @@ export const CampaignBasicInfo = ({
             </p>
           ) : null}
           {campaignData.type === "message" ? (
-            <FormField
-              label="Send using"
-              description={
-                smsSendContext && !smsSendContext.messagingServiceReady
-                  ? "Messaging Service needs a configured SID and at least one sender. Finish onboarding or choose Phone number."
-                  : campaignData.sms_send_mode === "messaging_service"
-                    ? "Twilio sends from your Messaging Service pool."
-                    : "Choose the From number above."
-              }
-            >
-              <Select
-                value={campaignData.sms_send_mode ?? "from_number"}
-                onValueChange={(value) => {
-                  if (value === "messaging_service") {
-                    handleInputChange(
-                      "sms_messaging_service_sid",
-                      smsSendContext?.defaultMessagingServiceSid ?? "",
-                    );
-                    handleInputChange("sms_send_mode", "messaging_service");
-                  } else {
-                    handleInputChange("sms_send_mode", "from_number");
-                    handleInputChange("sms_messaging_service_sid", null);
-                  }
-                }}
-                disabled={isBusy}
-              >
-                <SelectTrigger id="sms_send_mode" className="max-w-md">
-                  <SelectValue placeholder="Delivery mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    value="messaging_service"
-                    disabled={!smsSendContext?.messagingServiceReady}
-                  >
-                    Messaging Service
-                  </SelectItem>
-                  <SelectItem value="from_number">Phone number</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
+            <CampaignSmsSendMode
+              value={campaignData.sms_send_mode}
+              onChange={handleInputChange}
+              isBusy={isBusy}
+              smsSendContext={smsSendContext}
+            />
           ) : null}
         </div>
       </div>
