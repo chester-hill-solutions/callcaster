@@ -1,13 +1,9 @@
-import * as React from 'react';
-import { ModalOverlayProps, Modal, Heading, DialogTriggerProps } from 'react-aria-components';
-export { DialogProps as SheetPrimitiveProps, DialogTriggerProps as SheetTriggerPrimitiveProps } from 'react-aria-components';
-import { Button } from './button.js';
-import 'class-variance-authority/types';
-import 'class-variance-authority';
-
-declare function SheetTrigger({ ...props }: DialogTriggerProps): React.JSX.Element;
+import * as React from "react";
+import { Heading, Modal as ModalPrimitive, type ModalOverlayProps as ModalOverlayPrimitiveProps, type DialogProps as SheetPrimitiveProps, type DialogTriggerProps as SheetTriggerPrimitiveProps } from "react-aria-components";
+import { Button } from "./button";
+declare function SheetTrigger({ ...props }: SheetTriggerPrimitiveProps): React.JSX.Element;
 declare function SheetClose({ className, variant, size, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
-declare function Sheet({ className, children, side, showCloseButton, ...props }: Omit<ModalOverlayProps, "className" | "children"> & Pick<React.ComponentProps<typeof Modal>, "isDismissable"> & {
+declare function Sheet({ className, children, side, showCloseButton, ...props }: Omit<ModalOverlayPrimitiveProps, "className" | "children"> & Pick<React.ComponentProps<typeof ModalPrimitive>, "isDismissable"> & {
     className?: string;
     children: React.ReactNode;
     side?: "top" | "right" | "bottom" | "left";
@@ -21,5 +17,4 @@ declare function SheetHeader({ className, ...props }: React.ComponentProps<"div"
 declare function SheetFooter({ className, ...props }: React.ComponentProps<"div">): React.JSX.Element;
 declare function SheetTitle({ className, ...props }: Omit<React.ComponentProps<typeof Heading>, "slot">): React.JSX.Element;
 declare function SheetDescription({ className, ...props }: Omit<React.ComponentProps<"div">, "slot">): React.JSX.Element;
-
-export { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger };
+export { type SheetPrimitiveProps, type SheetTriggerPrimitiveProps, Sheet, SheetTrigger, SheetClose, SheetContent, SheetHeader, SheetFooter, SheetTitle, SheetDescription, };

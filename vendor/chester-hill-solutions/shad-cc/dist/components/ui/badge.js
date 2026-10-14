@@ -1,4 +1,10 @@
-export { Badge, badgeVariants } from '../../chunk-AAXVUWXE.js';
-import '../../chunk-DN2AEEA2.js';
-//# sourceMappingURL=badge.js.map
+import {
+  Badge,
+  badgeVariants
+} from "../../chunk-AAXVUWXE.js";
+import "../../chunk-DN2AEEA2.js";
+export {
+  Badge,
+  badgeVariants
+};
 //# sourceMappingURL=badge.js.map

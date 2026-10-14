@@ -1,13 +1,21 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { Slider as Slider$1, SliderTrack, SliderFill, SliderThumb } from 'react-aria-components';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/slider.tsx
+import {
+  SliderFill,
+  Slider as SliderPrimitive,
+  SliderThumb,
+  SliderTrack
+} from "react-aria-components";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function Slider({
   className,
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Slider$1,
+    SliderPrimitive,
     {
       className: cn(
         "group relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
@@ -46,6 +54,7 @@ function Slider({
   );
 }
 
-export { Slider };
-//# sourceMappingURL=chunk-7PK5GR5N.js.map
+export {
+  Slider
+};
 //# sourceMappingURL=chunk-7PK5GR5N.js.map

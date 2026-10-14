@@ -1,3 +1,7 @@
-export { useIsMobile } from '../chunk-YNROVYNC.js';
-//# sourceMappingURL=use-mobile.js.map
+import {
+  useIsMobile
+} from "../chunk-YNROVYNC.js";
+export {
+  useIsMobile
+};
 //# sourceMappingURL=use-mobile.js.map

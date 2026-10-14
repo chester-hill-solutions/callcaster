@@ -1,13 +1,16 @@
-import { Disclosure, Button, DisclosurePanel } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
-
 // src/components/ui/collapsible.tsx
+import {
+  DisclosurePanel as CollapsibleContentPrimitive,
+  Disclosure as CollapsiblePrimitive,
+  Button as CollapsibleTriggerPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Collapsible({ ...props }) {
-  return /* @__PURE__ */ jsx(Disclosure, { "data-slot": "collapsible", ...props });
+  return /* @__PURE__ */ jsx(CollapsiblePrimitive, { "data-slot": "collapsible", ...props });
 }
 function CollapsibleTrigger({ ...props }) {
   return /* @__PURE__ */ jsx(
-    Button,
+    CollapsibleTriggerPrimitive,
     {
       slot: "trigger",
       "data-slot": "collapsible-trigger",
@@ -16,9 +19,12 @@ function CollapsibleTrigger({ ...props }) {
   );
 }
 function CollapsibleContent({ ...props }) {
-  return /* @__PURE__ */ jsx(DisclosurePanel, { "data-slot": "collapsible-content", ...props });
+  return /* @__PURE__ */ jsx(CollapsibleContentPrimitive, { "data-slot": "collapsible-content", ...props });
 }
 
-export { Collapsible, CollapsibleContent, CollapsibleTrigger };
-//# sourceMappingURL=chunk-5LXYQVKF.js.map
+export {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent
+};
 //# sourceMappingURL=chunk-5LXYQVKF.js.map

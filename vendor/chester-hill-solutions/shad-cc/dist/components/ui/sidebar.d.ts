@@ -1,12 +1,10 @@
-import * as class_variance_authority_types from 'class-variance-authority/types';
-import * as React from 'react';
-import { VariantProps } from 'class-variance-authority';
-import { ButtonProps, LinkProps } from 'react-aria-components';
-import { Button } from './button.js';
-import { Input } from './input.js';
-import { Separator } from './separator.js';
-import { Tooltip } from './tooltip.js';
-
+import * as React from "react";
+import { type VariantProps } from "class-variance-authority";
+import { type ButtonProps, type LinkProps } from "react-aria-components";
+import { Button } from "./button";
+import { Input } from "./input";
+import { Separator } from "./separator";
+import { Tooltip } from "./tooltip";
 type SidebarContextProps = {
     state: "expanded" | "collapsed";
     open: boolean;
@@ -51,7 +49,7 @@ declare function SidebarMenuItem({ className, ...props }: React.ComponentProps<"
 declare const sidebarMenuButtonVariants: (props?: ({
     variant?: "default" | "outline" | null | undefined;
     size?: "default" | "sm" | "lg" | null | undefined;
-} & class_variance_authority_types.ClassProp) | undefined) => string;
+} & import("class-variance-authority/types").ClassProp) | undefined) => string;
 declare function SidebarMenuButton({ isActive, variant, size, tooltip, className, ...props }: SidebarButtonProps & {
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof Tooltip>;
@@ -69,5 +67,4 @@ declare function SidebarMenuSubButton({ size, isActive, className, ...props }: S
     size?: "sm" | "md";
     isActive?: boolean;
 }): React.JSX.Element;
-
-export { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger, useSidebar };
+export { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger, useSidebar, };

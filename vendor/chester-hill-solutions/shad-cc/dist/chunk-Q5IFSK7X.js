@@ -1,6 +1,9 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/skeleton.tsx
+import { jsx } from "react/jsx-runtime";
 function Skeleton({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "div",
@@ -12,6 +15,7 @@ function Skeleton({ className, ...props }) {
   );
 }
 
-export { Skeleton };
-//# sourceMappingURL=chunk-Q5IFSK7X.js.map
+export {
+  Skeleton
+};
 //# sourceMappingURL=chunk-Q5IFSK7X.js.map

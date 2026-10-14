@@ -1,11 +1,25 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { cva } from 'class-variance-authority';
-import { Popover, Menu, MenuTrigger, PopoverContext, MenuSection, Header, MenuItem, composeRenderProps, SubmenuTrigger, Separator } from 'react-aria-components';
-import { createPortal } from 'react-dom';
-import { CheckIcon, ChevronRightIcon } from 'lucide-react';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/context-menu.tsx
+import * as React from "react";
+import { cva } from "class-variance-authority";
+import {
+  composeRenderProps,
+  Header as HeaderPrimitive,
+  MenuItem as MenuItemPrimitive,
+  Menu as MenuPrimitive,
+  MenuSection as MenuSectionPrimitive,
+  MenuTrigger as MenuTriggerPrimitive,
+  PopoverContext,
+  Popover as PopoverPrimitive,
+  Separator as SeparatorPrimitive,
+  SubmenuTrigger as SubmenuTriggerPrimitive
+} from "react-aria-components";
+import { createPortal } from "react-dom";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function ContextMenu({
   "data-slot": dataSlot = "context-menu-content",
   placement = "bottom start",
@@ -16,7 +30,7 @@ function ContextMenu({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Popover,
+    PopoverPrimitive,
     {
       "data-slot": dataSlot,
       placement,
@@ -24,7 +38,7 @@ function ContextMenu({
       crossOffset,
       className: cn("z-50 w-(--trigger-width) min-w-36 origin-(--trigger-anchor-point) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-[0_2px_0_0_var(--border)] duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:overflow-hidden data-exiting:fade-out-0 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:data-focused:bg-foreground/10 ", className),
       children: /* @__PURE__ */ jsx(
-        Menu,
+        MenuPrimitive,
         {
           className: "max-h-[inherit] overflow-x-hidden overflow-y-auto outline-hidden",
           ...props,
@@ -43,7 +57,7 @@ function ContextMenuTrigger({
   const [position, setPosition] = React.useState(null);
   const positionRef = React.useRef(null);
   return /* @__PURE__ */ jsxs(
-    MenuTrigger,
+    MenuTriggerPrimitive,
     {
       "data-slot": "context-menu",
       ...props,
@@ -108,7 +122,7 @@ function ContextMenuTrigger({
 function ContextMenuGroup({
   ...props
 }) {
-  return /* @__PURE__ */ jsx(MenuSection, { "data-slot": "context-menu-group", ...props });
+  return /* @__PURE__ */ jsx(MenuSectionPrimitive, { "data-slot": "context-menu-group", ...props });
 }
 function ContextMenuLabel({
   className,
@@ -116,7 +130,7 @@ function ContextMenuLabel({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Header,
+    HeaderPrimitive,
     {
       "data-slot": "context-menu-label",
       "data-inset": inset,
@@ -148,7 +162,7 @@ function ContextMenuItem({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    MenuItem,
+    MenuItemPrimitive,
     {
       "data-slot": "context-menu-item",
       "data-inset": inset,
@@ -182,7 +196,7 @@ function ContextMenuItem({
 function ContextMenuSub({
   ...props
 }) {
-  return /* @__PURE__ */ jsx(SubmenuTrigger, { "data-slot": "context-menu-sub", ...props });
+  return /* @__PURE__ */ jsx(SubmenuTriggerPrimitive, { "data-slot": "context-menu-sub", ...props });
 }
 function ContextMenuSubTrigger({
   className,
@@ -191,7 +205,7 @@ function ContextMenuSubTrigger({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    MenuItem,
+    MenuItemPrimitive,
     {
       "data-slot": "context-menu-sub-trigger",
       "data-inset": inset,
@@ -232,7 +246,7 @@ function ContextMenuSeparator({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Separator,
+    SeparatorPrimitive,
     {
       "data-slot": "context-menu-separator",
       className: cn("-mx-1 my-1 h-px bg-border/50", className),
@@ -257,6 +271,16 @@ function ContextMenuShortcut({
   );
 }
 
-export { ContextMenu, ContextMenuGroup, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger };
-//# sourceMappingURL=chunk-XZSVXOQW.js.map
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuGroup,
+  ContextMenuLabel,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+  ContextMenuSeparator,
+  ContextMenuShortcut
+};
 //# sourceMappingURL=chunk-XZSVXOQW.js.map

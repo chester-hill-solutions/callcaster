@@ -1,10 +1,15 @@
-import { Button } from './chunk-IFW6QGQN.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import useEmblaCarousel from 'embla-carousel-react';
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  Button
+} from "./chunk-IFW6QGQN.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/carousel.tsx
+import * as React from "react";
+import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 var CarouselContext = React.createContext(null);
 function useCarousel() {
   const context = React.useContext(CarouselContext);
@@ -191,6 +196,12 @@ function CarouselNext({
   );
 }
 
-export { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, useCarousel };
-//# sourceMappingURL=chunk-2HDGWSD6.js.map
+export {
+  useCarousel,
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext
+};
 //# sourceMappingURL=chunk-2HDGWSD6.js.map

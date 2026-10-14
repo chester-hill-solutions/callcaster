@@ -1,12 +1,23 @@
-import { Button } from './chunk-IFW6QGQN.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { DialogTrigger as DialogTrigger$1, ModalOverlay, Modal, Dialog as Dialog$1, Heading } from 'react-aria-components';
-import { XIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  Button
+} from "./chunk-IFW6QGQN.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/dialog.tsx
+import "react";
+import {
+  Dialog as DialogPrimitive,
+  DialogTrigger as DialogTriggerPrimitive,
+  Heading,
+  ModalOverlay as ModalOverlayPrimitive,
+  Modal as ModalPrimitive
+} from "react-aria-components";
+import { XIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 function DialogTrigger({ ...props }) {
-  return /* @__PURE__ */ jsx(DialogTrigger$1, { "data-slot": "dialog-trigger", ...props });
+  return /* @__PURE__ */ jsx(DialogTriggerPrimitive, { "data-slot": "dialog-trigger", ...props });
 }
 function DialogClose({
   className,
@@ -32,7 +43,7 @@ function DialogOverlay({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ModalOverlay,
+    ModalOverlayPrimitive,
     {
       "data-slot": "dialog-overlay",
       className: cn(
@@ -52,7 +63,7 @@ function Dialog({
   ...props
 }) {
   return /* @__PURE__ */ jsx(DialogOverlay, { isDismissable, ...props, children: /* @__PURE__ */ jsx(
-    Modal,
+    ModalPrimitive,
     {
       "data-slot": "dialog-content",
       className: cn(
@@ -60,7 +71,7 @@ function Dialog({
         className
       ),
       children: /* @__PURE__ */ jsxs(
-        Dialog$1,
+        DialogPrimitive,
         {
           "data-slot": "dialog",
           className: "[display:inherit] [gap:inherit] outline-none",
@@ -148,6 +159,14 @@ function DialogDescription({
   );
 }
 
-export { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle, DialogTrigger };
-//# sourceMappingURL=chunk-PEG5ACQA.js.map
+export {
+  DialogTrigger,
+  DialogClose,
+  DialogOverlay,
+  Dialog,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription
+};
 //# sourceMappingURL=chunk-PEG5ACQA.js.map

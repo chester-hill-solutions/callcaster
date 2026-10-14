@@ -1,7 +1,6 @@
-import * as React from 'react';
-import { ProgressBarProps, LabelProps } from 'react-aria-components';
-
-declare function Progress({ className, children, ...props }: Omit<ProgressBarProps, "children" | "className"> & {
+import * as React from "react";
+import { type LabelProps, type ProgressBarProps as ProgressPrimitiveProps } from "react-aria-components";
+declare function Progress({ className, children, ...props }: Omit<ProgressPrimitiveProps, "children" | "className"> & {
     children?: React.ReactNode;
     className?: string;
 }): React.JSX.Element;
@@ -11,5 +10,4 @@ declare function ProgressLabel({ className, ...props }: LabelProps): React.JSX.E
 declare function ProgressValue({ className, children, ...props }: Omit<React.ComponentProps<"span">, "children"> & {
     children?: (value: string) => React.ReactNode;
 }): React.JSX.Element;
-
-export { Progress, ProgressIndicator, ProgressLabel, ProgressTrack, ProgressValue };
+export { Progress, ProgressTrack, ProgressIndicator, ProgressLabel, ProgressValue, };

@@ -1,6 +1,5 @@
-import * as React from 'react';
-
 // src/hooks/use-mobile.ts
+import * as React from "react";
 var MOBILE_BREAKPOINT = 768;
 function getIsMobile() {
   if (typeof window === "undefined") {
@@ -21,6 +20,7 @@ function useIsMobile() {
   return !!isMobile;
 }
 
-export { useIsMobile };
-//# sourceMappingURL=chunk-YNROVYNC.js.map
+export {
+  useIsMobile
+};
 //# sourceMappingURL=chunk-YNROVYNC.js.map

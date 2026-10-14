@@ -77,10 +77,15 @@ carry that test URL into ci:local and then claim its ledger failure is code drif
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
 
-Full `ci:local` must run where the vendor guard can restore its generated
-files through Git and Bun can write its temporary files. A permission failure
-is not lockfile drift: retain the dependency files, restore only the owned
-generated output, then rerun the full gate with the required permissions.
+Full `ci:local` must run where Bun can write its temporary files. A permission
+failure is not lockfile drift: retain the dependency files and rerun the full
+gate with the required permissions. The vendor guard leaves rebuilt output for
+review; it does not reset or clean files. Record a clean starting tree before
+testing build reproducibility. Save a failing diff, then restore only generated
+files proved to come from that owned build. Check repeated unchanged-source
+builds for import/chunk and declaration-union ordering before calling drift a
+source defect. A quiet run alone does not prove a previously variable builder is
+stable; fix its ordering and require complete repeated byte snapshots.
 
 For process checks on macOS, use PID/parent-ID fields and an exact `lsof`
 working-directory check. Do not use `pgrep -fl`: it can print environment

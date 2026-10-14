@@ -1,6 +1,9 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/aspect-ratio.tsx
+import { jsx } from "react/jsx-runtime";
 function AspectRatio({
   ratio,
   className,
@@ -19,6 +22,7 @@ function AspectRatio({
   );
 }
 
-export { AspectRatio };
-//# sourceMappingURL=chunk-BNHI4USE.js.map
+export {
+  AspectRatio
+};
 //# sourceMappingURL=chunk-BNHI4USE.js.map

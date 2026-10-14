@@ -1,9 +1,14 @@
-import { LinkButton } from './chunk-IFW6QGQN.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  LinkButton
+} from "./chunk-IFW6QGQN.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/pagination.tsx
+import "react";
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 function Pagination({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "nav",
@@ -114,6 +119,13 @@ function PaginationEllipsis({
   );
 }
 
-export { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious };
-//# sourceMappingURL=chunk-FDTYDCMW.js.map
+export {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationEllipsis
+};
 //# sourceMappingURL=chunk-FDTYDCMW.js.map
