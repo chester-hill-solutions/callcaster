@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 334 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 335 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 12
+## Fix now — 13
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -176,6 +176,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Full local CI, exact-head remote gates and both preview services before merge; release acceptance before closure
 - Done when: Successful conversation and single-message reads refresh the current user navigation count before the next poll; Repeated and overlapping reads cannot double-decrement or leave a stale count request as the final total; Failed reads and count failures preserve the last known total and later polling recovers; Workspace navigation and listener cleanup prevent foreign read notices from changing the displayed badge; No additional server broadcast or count stream is introduced
 - Tracker: PR #2566 into dev implements #2511. Verify its native state before new code work. Require green final-head gates before merge; retain the open issue for default promotion and release acceptance.
+
+### [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532) Ring audio overlaps with call audio when picked up or voicemail
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Remove generated campaign ringback**
+- PR #2567 removes the browser-generated ringing loop after the user reported overlap on master following PR #2534. Full local CI passes at 4b63b0bc; final dev-base, remote and preview checks and release remain.
+- Current behavior: Candidate removes the call-screen ringback wiring and deletes its generator and obsolete playback test. Available call media and the visible dialing state remain. Two real call-screen cases cover computer and verified-handset dialing through twelve seconds of delayed call updates, with no generated oscillator. An explicit speaker test remains a working audio control. Existing end-of-call feedback and cleanup tests pass.
+- Root cause: Master@0f4ebde2 still enables the app-generated loop from useCallScreen while its display state is dialing. PR #2534 improved tone-player teardown but retained that generator and its dependency on UI state. The user reports that overlap persists on master; no live-call timing trace is claimed.
+- Resolution: Remove the generated progress-ringing loop instead of adding another teardown condition or fallback tone. Preserve existing call media, device routing, mute, DTMF and cleanup. Some call paths can be quiet while connecting because network early media is optional.
+- Look in: `app/hooks/call/useCallScreen.ts`, `app/hooks/call/useDialRingback.ts (deleted)`, `app/lib/call-tone-player.client.ts`, `test/ui/hooks-call-screen.test.tsx`, `test/ui/use-call-end-tone.test.tsx`
+- Existing tests: Twelve focused UI cases pass with both borrowed and fresh locked dependencies; two new cases exercise the real call-screen hook for computer and verified handset; Pinned original dev@cc7e8559 fails both new cases on actual oscillator creation, with ten controls passing; restored source passes all twelve; New cases retain the selected handset, enter the actual dialing state, advance twelve seconds without ringing, and verify that an explicit speaker test still creates working test audio; Full npm run ci:local at 4b63b0bc: 5,488 server tests pass (11 skipped), 34 runtime tests pass, 1,389 UI tests pass; all guards, builds, client bundle and codegen verification pass; Independent standards and specification reviews of the pinned release changes found no actionable issues
+- Missing tests: Full local CI after the final dev rebase and PR-linked release note, exact-head remote gates and both preview services before merge; Release to master and live call acceptance after reloading the call page
+- Done when: Campaign dialing creates no app-generated ringback audio or cadence timer; Answered calls and voicemail have no app-generated ringing loop layered over their media; Computer and handset dialing retain device selection, call routing, mute, DTMF and cleanup; Regression tests fail with the old ringback wiring; normal speaker testing and end-of-call feedback remain
+- Tracker: The prior fix is already released; do not treat closed PR #2534 as resolution of this reopened report. One focused removal implements #2532. Keep dev merge, master promotion and live acceptance separate.
 
 ---
 
