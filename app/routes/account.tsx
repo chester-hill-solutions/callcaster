@@ -248,7 +248,7 @@ export default function Account() {
 
           {editingMfa && showingMfaVerification ? (
             <div className="space-y-4">
-              <Alert className="border-warning/50 bg-warning/10">
+              <Alert variant="warning">
                 <AlertTitle>Connect your authenticator app</AlertTitle>
                 <AlertDescription>
                   Copy this setup code into Google Authenticator, Microsoft Authenticator,

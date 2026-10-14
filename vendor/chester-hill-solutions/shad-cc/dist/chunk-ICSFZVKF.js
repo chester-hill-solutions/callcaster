@@ -13,7 +13,7 @@ var alertVariants = cva(
         // bg-destructive/12) fails WCAG contrast in dark themes, so the body
         // stays foreground-based like the `default` variant while the icon
         // and surfaces signal the tone.
-        default: "border-brand-tertiary bg-brand-wash text-foreground *:data-[slot=alert-description]:text-muted-foreground",
+        default: "bg-card text-card-foreground border-border *:data-[slot=alert-description]:text-muted-foreground",
         destructive: "border-destructive/40 bg-destructive/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-destructive",
         success: "border-success/40 bg-success/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-success",
         warning: "border-warning/45 bg-warning/15 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-warning",
@@ -84,5 +84,5 @@ function AlertAction({ className, ...props }) {
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle, alertVariants };
-//# sourceMappingURL=chunk-OUYGBYJO.js.map
-//# sourceMappingURL=chunk-OUYGBYJO.js.map
+//# sourceMappingURL=chunk-ICSFZVKF.js.map
+//# sourceMappingURL=chunk-ICSFZVKF.js.map

@@ -45,6 +45,14 @@ completed browser run before claiming geometry acceptance.
 Put standalone Vite JSX fixtures outside `node_modules`, and load the app's
 `public/buffer-polyfill.mjs` before app imports. The utils barrel loads CSV code
 that reads Buffer at startup. A fixture startup failure is not geometry proof.
+Give concurrent baseline/candidate Vite fixtures separate cache directories.
+Render panels with nested Forms or fetchers through a real data router, even
+when the assertion only concerns a notice. Keep their actions isolated.
+Trace conditional notice tones to their data producer before choosing fixtures;
+a boolean type alone does not prove that a proposed warning state is reachable.
+For `shadcn/no-unknown-classes` false positives on domain `*Class` props,
+allow only the known domain values in an exact-file ESLint override with a reason.
+Do not add fake Tailwind utilities or hide the prop values from the rule.
 Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.

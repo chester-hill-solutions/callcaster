@@ -14,7 +14,7 @@ const alertVariants = cva(
         // stays foreground-based like the `default` variant while the icon
         // and surfaces signal the tone.
         default:
-          "border-brand-tertiary bg-brand-wash text-foreground *:data-[slot=alert-description]:text-muted-foreground",
+          "bg-card text-card-foreground border-border *:data-[slot=alert-description]:text-muted-foreground",
         destructive:
           "border-destructive/40 bg-destructive/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-destructive",
         success:
