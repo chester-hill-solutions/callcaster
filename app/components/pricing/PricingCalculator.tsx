@@ -71,7 +71,7 @@ export function estimateMonthlyCredits(inputs: Inputs): {
       label: "Calls placed by your agents",
       credits: agentCredits,
     },
-    { key: "ivr", label: "IVR calls", credits: ivrCredits },
+    { key: "ivr", label: "Automated phone menu calls", credits: ivrCredits },
     { key: "numbers", label: "Phone number rentals", credits: numberCredits },
   ];
   const total = breakdown.reduce((sum, row) => sum + row.credits, 0);
@@ -192,16 +192,16 @@ export function PricingCalculator() {
               }
             />
             <CalculatorField
-              label="IVR calls / month"
-              hint="Count IVR calls with a billable duration; zero-duration calls are excluded."
+              label="Automated phone menu calls / month"
+              hint="Count automated phone menu calls with a billable duration; zero-duration calls are excluded."
               value={inputs.ivrDials}
               onChange={(ivrDials) =>
                 setInputs((prev) => ({ ...prev, ivrDials }))
               }
             />
             <CalculatorField
-              label="Average minutes per IVR call"
-              hint="Each additional started minute uses the IVR rate."
+              label="Average minutes per automated phone menu call"
+              hint="Each additional started minute uses the automated phone menu rate."
               value={inputs.ivrAverageMinutesPerDial}
               min={0}
               step={0.5}

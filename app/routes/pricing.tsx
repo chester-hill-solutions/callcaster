@@ -31,7 +31,7 @@ const SERVICE_ICONS: Record<string, ReactNode> = {
   Credits: <MdOutlinePayments size="24px" />,
   Texting: <BsChatLeftText size="24px" />,
   Calling: <PiPhoneCallFill size="24px" />,
-  IVRs: <FaPhoneVolume size="24px" />,
+  "Automated phone menus": <FaPhoneVolume size="24px" />,
   "Phone numbers": <FaSimCard size="24px" />,
 };
 
