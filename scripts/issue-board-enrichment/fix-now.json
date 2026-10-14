@@ -311,5 +311,35 @@
       "Candidate full-app notice/request/write counts, repeat Owner action, sole-owner refusal and phone/desktop landmarks await role-test approval. Local test/ui/admin-access-result-notices.test.tsx has six passing Router cases but is not on dev."
     ],
     "trackerRecommendation": "Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain."
+  },
+  {
+    "issueNumber": 1615,
+    "verdict": "fix-now",
+    "summary": "The historical chunk flip did not recur: three consecutive configured builds match all 263 committed files. A focused candidate makes UI drift and build failures blocking; nine actual CLI cases pass. Full local CI and remote acceptance remain.",
+    "resolution": "Land one enforcement PR after full local CI and exact-head remote gates pass. No bundler configuration change is needed for the current reproducible build. Keep deployed/default-branch promotion separate from source completion.",
+    "lookIn": [
+      "scripts/check-vendor-dist-drift.mjs"
+    ],
+    "blockedBy": [],
+    "recommendedTitle": "Enforce the vendored UI source/output drift check",
+    "currentBehavior": "Candidate based on dev@5b46c996. Three unchanged-source builds produce the same 263-file byte snapshot, hash 8f7d8288e45946e708593b50bd03caa512e170bf986e48d722c20f7d6c68ea48. The configured builder and all generated output are unchanged. The guard now blocks stale bytes, failed builds and added/removed output in each of the three packages; its obsolete warning mode and Git reset/clean fallback are removed.",
+    "rootCause": "Warn-only enforcement allowed stale or failed UI builds to exit successfully. Four desired failure cases reproduce that false success; five nominal/Scriptkit controls pass.",
+    "existingTests": [
+      "test/vendor-dist-drift.test.ts: nine actual CLI cases, four fail on the old guard with five controls passing",
+      "Three consecutive configured UI builds match all 263 committed output files byte for byte",
+      "The fully enforced guard passes on all three real vendored packages",
+      "Linux quality run 38510107827 on dev source 92b68c41 reports all 263 UI files matching with no drift diagnostics"
+    ],
+    "missingTests": [
+      "Full local CI, exact-head remote checks and applicable preview deployments before merge"
+    ],
+    "acceptanceCriteria": [
+      "Three consecutive unchanged-source builds produce identical UI dist",
+      "All three vendored packages are blocking entries in the drift guard",
+      "Development documentation states the UI check is enforced"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "One focused enforcement candidate implements #1615. Its historical nondeterminism claim is not current reproduction evidence. Require green gates before merging."
   }
 ]

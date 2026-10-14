@@ -27,16 +27,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1615,
-    "verdict": "needs-repro",
-    "summary": "PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.",
-    "resolution": "Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.",
-    "lookIn": [
-      "scripts/check-vendor-dist-drift.mjs"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1670,
     "verdict": "needs-repro",
     "summary": "Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.",
