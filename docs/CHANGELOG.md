@@ -9,6 +9,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Changed: Call device test and mute controls no longer show redundant button icons ([PR #2578](https://github.com/chester-hill-solutions/callcaster/pull/2578), [#2517](https://github.com/chester-hill-solutions/callcaster/issues/2517)).
 - Changed: Campaign creation no longer repeats its breadcrumb as a page header ([PR #2579](https://github.com/chester-hill-solutions/callcaster/pull/2579), [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503)).
 - Changed: SMS campaign setup no longer repeats guidance that the message body is edited under Content ([PR #2583](https://github.com/chester-hill-solutions/callcaster/pull/2583), [#2505](https://github.com/chester-hill-solutions/callcaster/issues/2505)).
+- Added: Admins can open workspace details by selecting a workspace name in the admin workspace table ([PR #2582](https://github.com/chester-hill-solutions/callcaster/pull/2582), [#2508](https://github.com/chester-hill-solutions/callcaster/issues/2508)).
 
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 - Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
