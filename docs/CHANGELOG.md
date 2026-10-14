@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Selecting a calling device or another dropdown option keeps its settings dialog open; Escape closes the dropdown before the dialog ([#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518)).
+- Fixed: Selecting a calling device or another dropdown option keeps its settings dialog open; Escape closes the dropdown before the dialog ([PR #2565](https://github.com/chester-hill-solutions/callcaster/pull/2565), [#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518)).
 
 - Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([PR #2562](https://github.com/chester-hill-solutions/callcaster/pull/2562), [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
 
