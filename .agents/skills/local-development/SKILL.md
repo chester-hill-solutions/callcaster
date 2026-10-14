@@ -16,6 +16,10 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+Before `ci:local`, check `node --version` and `bun --version` in the same
+command-scoped PATH. A missing Bun executable can be reported as lockfile
+drift; verify tool availability before changing either lockfile.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
