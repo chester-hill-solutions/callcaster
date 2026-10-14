@@ -1,8 +1,14 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { ProgressBar, Label } from 'react-aria-components';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/progress.tsx
+import * as React from "react";
+import {
+  Label as LabelPrimitive,
+  ProgressBar as ProgressPrimitive
+} from "react-aria-components";
+import { jsx, jsxs } from "react/jsx-runtime";
 var ProgressContext = React.createContext(null);
 function useProgress() {
   const context = React.useContext(ProgressContext);
@@ -32,7 +38,7 @@ function Progress({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ProgressBar,
+    ProgressPrimitive,
     {
       "data-slot": "progress",
       className: cn("flex flex-wrap gap-3", className),
@@ -83,7 +89,7 @@ function ProgressIndicator({
 }
 function ProgressLabel({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Label,
+    LabelPrimitive,
     {
       className: cn("text-sm font-medium", className),
       "data-slot": "progress-label",
@@ -111,6 +117,11 @@ function ProgressValue({
   );
 }
 
-export { Progress, ProgressIndicator, ProgressLabel, ProgressTrack, ProgressValue };
-//# sourceMappingURL=chunk-C6TS27RO.js.map
+export {
+  Progress,
+  ProgressTrack,
+  ProgressIndicator,
+  ProgressLabel,
+  ProgressValue
+};
 //# sourceMappingURL=chunk-C6TS27RO.js.map

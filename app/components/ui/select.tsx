@@ -68,7 +68,7 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(({ className, children, position = "popper", onEscapeKeyDown, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -80,6 +80,13 @@ const SelectContent = React.forwardRef<
       )}
       position={position}
       {...props}
+      // The portal is part of the active React Aria overlay, not an outside click.
+      data-react-aria-top-layer=""
+      onEscapeKeyDown={(event) => {
+        onEscapeKeyDown?.(event)
+        // Close this list first; do not let the parent modal handle the same key.
+        event.stopPropagation()
+      }}
     >
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport

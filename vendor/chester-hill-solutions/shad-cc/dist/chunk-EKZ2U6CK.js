@@ -1,7 +1,10 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { cva } from 'class-variance-authority';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/empty.tsx
+import { cva } from "class-variance-authority";
+import { jsx } from "react/jsx-runtime";
 function Empty({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "div",
@@ -94,6 +97,12 @@ function EmptyContent({ className, ...props }) {
   );
 }
 
-export { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle };
-//# sourceMappingURL=chunk-EKZ2U6CK.js.map
+export {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent
+};
 //# sourceMappingURL=chunk-EKZ2U6CK.js.map

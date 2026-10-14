@@ -1,8 +1,11 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { Drawer as Drawer$1 } from '@base-ui/react/drawer';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/drawer.tsx
+import * as React from "react";
+import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
+import { jsx, jsxs } from "react/jsx-runtime";
 var DrawerContext = React.createContext(null);
 function useDrawer() {
   const context = React.useContext(DrawerContext);
@@ -24,7 +27,7 @@ function Drawer({
     [hasSnapPoints, modal, showSwipeHandle, swipeDirection]
   );
   return /* @__PURE__ */ jsx(DrawerContext.Provider, { value: contextValue, children: /* @__PURE__ */ jsx(
-    Drawer$1.Root,
+    DrawerPrimitive.Root,
     {
       "data-slot": "drawer",
       modal,
@@ -35,20 +38,20 @@ function Drawer({
   ) });
 }
 function DrawerTrigger({ ...props }) {
-  return /* @__PURE__ */ jsx(Drawer$1.Trigger, { "data-slot": "drawer-trigger", ...props });
+  return /* @__PURE__ */ jsx(DrawerPrimitive.Trigger, { "data-slot": "drawer-trigger", ...props });
 }
 function DrawerPortal({ ...props }) {
-  return /* @__PURE__ */ jsx(Drawer$1.Portal, { "data-slot": "drawer-portal", ...props });
+  return /* @__PURE__ */ jsx(DrawerPrimitive.Portal, { "data-slot": "drawer-portal", ...props });
 }
 function DrawerClose({ ...props }) {
-  return /* @__PURE__ */ jsx(Drawer$1.Close, { "data-slot": "drawer-close", ...props });
+  return /* @__PURE__ */ jsx(DrawerPrimitive.Close, { "data-slot": "drawer-close", ...props });
 }
 function DrawerOverlay({
   className,
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Drawer$1.Backdrop,
+    DrawerPrimitive.Backdrop,
     {
       "data-slot": "drawer-overlay",
       className: cn(
@@ -86,13 +89,13 @@ function DrawerContent({
   return /* @__PURE__ */ jsxs(DrawerPortal, { "data-slot": "drawer-portal", children: [
     modal === true && /* @__PURE__ */ jsx(DrawerOverlay, { "data-snap-points": hasSnapPoints ? "" : void 0 }),
     /* @__PURE__ */ jsx(
-      Drawer$1.Viewport,
+      DrawerPrimitive.Viewport,
       {
         "data-slot": "drawer-viewport",
         "data-modal": modal,
         className: "pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto",
         children: /* @__PURE__ */ jsxs(
-          Drawer$1.Popup,
+          DrawerPrimitive.Popup,
           {
             "data-slot": "drawer-popup",
             "data-swipe-axis": swipeAxis,
@@ -128,7 +131,7 @@ function DrawerContent({
             children: [
               showSwipeHandle && /* @__PURE__ */ jsx(DrawerSwipeHandle, {}),
               /* @__PURE__ */ jsx(
-                Drawer$1.Content,
+                DrawerPrimitive.Content,
                 {
                   "data-slot": "drawer-content",
                   className: cn(
@@ -169,7 +172,7 @@ function DrawerFooter({ className, ...props }) {
 }
 function DrawerTitle({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Drawer$1.Title,
+    DrawerPrimitive.Title,
     {
       "data-slot": "drawer-title",
       className: cn(
@@ -185,7 +188,7 @@ function DrawerDescription({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Drawer$1.Description,
+    DrawerPrimitive.Description,
     {
       "data-slot": "drawer-description",
       className: cn("text-sm text-balance text-muted-foreground", className),
@@ -194,6 +197,17 @@ function DrawerDescription({
   );
 }
 
-export { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerFooter, DrawerHeader, DrawerOverlay, DrawerPortal, DrawerSwipeHandle, DrawerTitle, DrawerTrigger };
-//# sourceMappingURL=chunk-QKOCJNA2.js.map
+export {
+  Drawer,
+  DrawerTrigger,
+  DrawerPortal,
+  DrawerClose,
+  DrawerOverlay,
+  DrawerSwipeHandle,
+  DrawerContent,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+  DrawerDescription
+};
 //# sourceMappingURL=chunk-QKOCJNA2.js.map

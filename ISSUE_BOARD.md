@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 332 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 335 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 9
+## Fix now — 13
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -80,16 +80,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain.
 
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-05
-- Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
-- Current behavior: Source audit dev@efb3bb54, 2026-10-05. The same actionData.error goes to the shared root feedback hook and the invite Email FormField. Permission, role, member, webhook and API key errors can become email field errors. Responses lack an explicit field discriminator. An addUser form name alone does not prove email validation. The current FormField error paragraph is in document flow. Actual-page UI reproduction ran four cases: the unrelated-field and duplicate-result desired assertions failed; the email-description and no-replay controls passed. Server action responses were isolated; no authorization or browser geometry proof is claimed.
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-13
+- Candidate PR #2558 separates explicit email validation from settings action errors and reserves the shared field feedback row. Six page regressions and six browser viewport/theme cases pass; merge and deployed acceptance remain.
+- Current behavior: Candidate on dev@f13b438d, 2026-10-13. Missing-email validation returns fieldErrors.username; the page renders only that field feedback and sends other failures once to the root toast. Six actual-page UI cases failed before the repair and now pass. The server metadata assertion fails when the field discriminator is removed. Existing settings utility and route RBAC cases pass. Six Chrome cases at 320/375/1280px in both themes preserve landmarks and scroll across 30 feedback transitions. Browser action responses are synthetic; no deployed acceptance is claimed.
 - Root cause: The route assigns failures from unrelated settings actions to the Email field.
 - Resolution: Identify actual email validation from explicit server field feedback, not action names or message text. Preserve the shared FormField accessible association and use its adopted anchored/reserved-area contract. Render other operation failures once through the root toast, preserve retry values and permission checks, and retain once-only action feedback during revalidation. Keep the member-name concern separate.
 - Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `app/routes/workspaces+/$id/settings.action.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/hooks/utils/useActionFeedback.ts`, `app/components/ui/form-field.tsx`, `docs/design-system.md`
-- Existing tests: Actual WorkspaceSettings page, shared FormField, useActionFeedback and root Toaster with a real memory router: four isolated-response cases ran, two desired defect assertions failed and two controls passed. Four presentation source blobs matched the audited dev commit. The temporary fixture was removed; product source stayed clean.
-- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Existing tests: test/ui/workspace-settings-feedback.test.tsx: actual page, FormField, useActionFeedback and root Toaster through a real memory router; duplicate prevention, permission/role errors, explicit email feedback, corrected retry and no replay; test/workspace-setting-utils.test.ts: missing-email metadata/status/headers and role/domain refusal controls; test/workspace-settings-rbac.test.ts: route permission floors; Owned Chrome fixture: six viewport/theme cases, 30 stable transitions including field error, revalidation, long operation error, dismissal and successful retry
+- Missing tests: Authenticated preview and deployed release acceptance remain before closure.
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
-- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
+- Tracker: Keep Fix now while PR #2558 is unmerged. Retain the open issue for review and release acceptance. Parent #2300.
 
 ### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-10-07
@@ -103,27 +103,28 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Keep source and live configuration acceptance distinct. PR #2466 remains draft until the live cleanup decision is resolved; it is not merged or release-ready.
 
 ### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-05
-- Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. All observed alerts become severity-free alert-banner events; workspace-scoped successes can become warning logs. The /workspaces invite banner only logs locally, without a stack or network beacon.
-- Root cause: The telemetry keys on the ARIA role rather than on the severity the component is actually communicating. `role="alert"` is an accessibility announcement mechanism, not a severity signal, and a neutral `Alert` uses it too.
-- Resolution: Make severity explicit through primitive, client payload and sink schema. Do not infer severity from role alone.
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
+- Candidate PR #2562 adopts the merged shared severity contract and records explicit notice meaning. Strict review, full local CI, real-component regressions, bounded/authenticated sink cases, 112 browser comparisons and eight semantic updates pass. Final metadata checks, remote gates, previews and merge remain.
+- Current behavior: Candidate based on dev@f9b9670c adopts canonical metadata from shared PR #141, merged as a538c35f. The primitive owns data-severity independently of ARIA role. The observer captures inserted notices, semantic and text updates, ignores unclassified role-only DOM announcements and excludes Sonner descendants. Deduplication includes workspace, severity and bounded text. The client and sink share schema caps and log levels: neutral/info/success at info, warning at warn and error at error. Legacy toast kinds retain their meaning; legacy severity-free banners remain unclassified at info. Four plain error producers and two campaign feedback producers supply explicit metadata without visual or role changes. Both transport fallback and existing toast stacks/breadcrumbs remain. Geometry proof covers matching original/candidate states and eight actual same-node success-to-error updates; it does not claim all pre-existing notice lifecycles have no shift.
+- Root cause: The old consumer primitive exposes only announcement roles; its observer watches added role=alert nodes and deduplicates by text, while its sink logs all events at warn.
+- Resolution: Merge the reviewed consumer adoption and telemetry change after full local CI, exact-head remote gates and app/worker previews pass. Retain shared ownership, payload limits, auth and existing visual/announcement contracts.
 - Look in: `app/lib/flash-telemetry.client.ts:125`, `app/lib/flash-telemetry.client.ts:58`, `app/routes/api+/workspaces+/$workspaceId/client-flash.action.server.ts:29`, `app/lib/flash-telemetry.client.ts`, `app/components/shared/QueryParamBanner.tsx (the Alert inside it)`, `app/routes/api+/workspaces+/$workspaceId/client-flash`
-- Existing tests: test/ui/flash-telemetry.test.tsx (error-toast and alert-banner capture; no semantic severity mapping)
-- Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
+- Existing tests: test/ui/flash-telemetry.test.tsx: 20 cases for real primitive tones, unclassified roles, same-node changes, text updates, overlays, errors, deduplication expiry/workspaces and transports; test/client-flash.route.test.ts: 22 cases for explicit/legacy severity, retained stacks, authentication, conflicting values, malformed JSON and payload limits; 36 focused UI cases pass including existing Alert-tone and audio-upload controls; final original-source transform fails 17 cases with eight controls passing; Owned Chrome: 112 matching original/candidate states across four widths and both themes, minimum text contrast 6.147:1; eight real semantic updates preserve draft, roles and geometry; Configured vendor rebuild and 53-entry runtime comparison: no change except canonical severity metadata; Full ci:local on b968fe0e: 5477 node tests, 34 runtime tests and 1374 UI tests pass; production build, client bundle, codegen and structural guards pass
+- Missing tests: Full local check after final metadata; exact-head remote checks and both preview deployments before merge; authenticated deployed release acceptance before closure.
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+- Tracker: Shared prerequisite #121 is complete in chester-hill-solutions/chester-hill-solutions PR #141. Consumer PR #2562 implements #2062. Require green gates before merge; keep deployed acceptance and default promotion separate.
 
 ### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
-- Option B is recorded: make the default Alert neutral and require explicit semantic tones. CallCaster has not adopted that contract.
-- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. The app vendor default still uses border-brand-tertiary and bg-brand-wash. The issue now records a neutral default contract, without changing global brand tokens. Shared workbench ownership is confirmed; app adoption and rendered acceptance remain.
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
+- Candidate PR #2561 adopts the canonical neutral Alert default and explicit warning tones. All 78 app uses are inventoried; strict structural review, full local CI, focused regressions and 112 old/new browser comparisons pass. Remote checks, preview deployment and merge remain.
+- Current behavior: Candidate based on dev@a7a6a0f1. The shared default adopts bg-card/text-card-foreground/border-border from canonical ui-kit commit 524f515e. Existing geometry, typography, ARIA behavior and theme tokens remain. Authenticator setup, bulk-send safeguards, outbound estimates, recorded config drift and typed provider warnings select warning explicitly. Default and conditional-neutral uses are classified in docs/feedback-inventory.md. Eleven real-component/router cases pass; original source fails ten with one rental-error control passing. The rebuilt 53 public vendor entries are code-equivalent to a control build except for the one neutral color literal. Browser comparisons cover 112 matching states at 320/375/1280/1920px in both themes, with matching landmark rectangles/scroll and minimum measured text contrast 6.147:1. Existing notice placement is unchanged; this is not a claim that every original notice lifecycle has no layout shift.
 - Root cause: The app still consumes the older brand-styled default Alert; the selected neutral contract has not been adopted.
 - Resolution: Adopt the reviewed canonical ui-kit Alert snapshot as a separate consumer change. Keep existing geometry and theme. Classify unvarianted and style-only warning sites, give conditions explicit tones, and verify light/dark contrast and no page movement. Do not change global brand-wash or brand-tertiary.
 - Look in: `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23`, `app/components/ui/alert.tsx:1`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx`, `app/components/ui/alert.tsx`
-- Missing tests: Actual light/dark rendered tone and contrast, including default/explicit warning sites; browser geometry for any migrated dynamic notices.
+- Existing tests: test/ui/alert-tones.test.tsx: actual shared primitive, rental-error control, import mapping gate, bulk safeguards, provider warnings, drift and MFA fetcher form; Existing split-campaign consent/pending cases, campaign warning and account-security cases: 23 focused cases pass; Owned Chrome baseline/candidate comparison: 112 states across four widths and both themes; actual rendered text contrast and landmark/scroll equality; Configured vendor rebuild and 53-entry runtime graph comparison against original-source control build; Full ci:local on candidate 1f93fdc3: 5460 node tests, 34 runtime tests and 1360 UI tests pass; build, bundle, generated-code and structural guards pass
+- Missing tests: Full local gate after final PR metadata; exact-head remote gates and app/worker preview deployments before merge; authenticated release acceptance before closure.
 - Done when: Record the token change, explicit tone, or combined decision.; Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.; List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.; If shared tokens change, check their other consumers in light and dark themes.; Test the selected Alert tone contract and verify the rendered result.
-- Tracker: Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished.
+- Tracker: Candidate PR #2561 into dev implements #2061. Shared severity metadata remains separate in chester-hill-solutions/chester-hill-solutions#121 and CallCaster #2062. Require green checks before merge and release acceptance before closure.
 
 ### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Finish the raw-button cursor migration and prevention guard
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02
@@ -136,6 +137,58 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Classes alone do not prove computed cursor behavior. Disabled and aria-disabled cursor browser checks and the raw-button prevention guard are missing.
 - Done when: Interactive shared buttons show the pointer cursor by default; Disabled buttons show the default cursor; The reported onboarding save/continue instance is fixed; A guard prevents recurrence
 - Tracker: Partial fix in PR #1963. Keep remaining inventory/guard work visible; the old unmerged-branch claim is stale. Related PR evidence: #1963. A PR reference alone does not prove deployed behavior.
+
+### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Stabilize vendored UI entry and declaration emission order**
+- The blocking guard landed in PR #2563. Later unchanged-source builds reproduced declaration-union and JavaScript import/chunk ordering differences. A separate builder candidate produces five identical 263-file snapshots and preserves all 53 public runtime/type entries. Full gates and merge remain.
+- Current behavior: Candidate based on dev@e97f189b, 2026-10-14. The UI builder uses sorted named entries, esbuild bundling and one native TypeScript declaration emit. Five configured builds have identical 263-file snapshots, SHA-256 dddb8d785709c5cb2a965245cd72eb606e453901baad875bcf219e68b0b62883. All 53 public entries retain runtime export names/value kinds, and old/new module types are assignable both ways. The byte guard remains blocking for all three packages.
+- Root cause: The previous builder expanded array globs asynchronously and used extra Rollup passes for JavaScript and per-file declarations. Two later full-gate attempts changed union-member order or import order/chunk names without source edits. Three earlier matching builds and a quiet Linux run did not prove lasting reproducibility.
+- Resolution: Land a separate build-order repair with regenerated output. Preserve the public export/type contract, complete byte comparisons and final consumer bundle checks. Resume the saved #2518 dropdown change only after the prerequisite passes and merges.
+- Look in: `scripts/check-vendor-dist-drift.mjs`
+- Existing tests: Five consecutive configured builds match all 263 generated files byte for byte; All 53 public entry modules preserve runtime exports and bidirectional TypeScript compatibility against the committed control; test/vendor-ui-entry-order.test.ts: two directory orders yield the same named public entries and exclude tests/non-TSX files; test/vendor-dist-drift.test.ts: nine actual CLI guard cases still cover stale bytes, failed builds and missing/obsolete output
+- Missing tests: Full local CI, exact-head Linux checks and both actual preview deployments before merge; repeat the #2518 gate after adopting the prerequisite
+- Done when: Three consecutive unchanged-source builds produce identical UI dist; All three vendored packages are blocking entries in the drift guard; Development documentation states the UI check is enforced
+- Tracker: Keep #1615 open: guard enforcement is merged, but current reproduction requires this separate builder repair before source completion. Preserve the failed generated-only diffs and distinguish repeated-build proof from release acceptance.
+
+### [#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518) call settings: When I use the dropdown for calling device the modal closes
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Keep settings open when selecting a dropdown option**
+- Candidate PR #2565 fixes shared Select interactions in Sheet and Dialog. Fourteen real-component cases, 27 focused cases, six Chrome cases with the merged package and full local CI pass. Final metadata gates, remote acceptance and merge remain.
+- Current behavior: Candidate based on dev@3ced52f9 after the vendor-build prerequisite merged, 2026-10-14. The shared Select marks its portalled content as a React Aria top layer and stops Escape propagation after preserving the caller callback. Mouse, touch and keyboard selection retain the edited draft and unchanged overlay geometry. Escape closes the list before the parent, focus returns to each trigger, and a later outside click still dismisses the parent.
+- Root cause: Radix Select portals its list outside the React Aria parent overlay. The unmarked list becomes inert; a real Chrome option click is treated as outside and closes the parent. Escape also reaches the parent unless the child list contains the event.
+- Resolution: Land one shared Select adapter fix for all callers. Retain normal parent Escape/outside dismissal, background isolation and caller preventDefault behavior. Do not add exceptions to the calling-device form or change shared package output.
+- Look in: `app/components/ui/select.tsx`, `app/components/call/CallScreen.DeviceSettings.tsx`, `app/components/ui/dialog.tsx`, `app/components/ui/sheet.tsx`
+- Existing tests: test/ui/select-overlay-interaction.test.tsx: fourteen real Select/Sheet/Dialog cases; existing call-header and audio-lifecycle controls bring the focused total to 27; Owned Chrome fixture using actual CallingDeviceField and shared components: two original-source coordinate clicks reproduce inert output and parent dismissal; Six Chrome cases across Sheet/Dialog and mouse/touch/keyboard preserve choice, edited draft and overlay geometry, verify Escape order, focus restoration and subsequent outside dismissal; Full ci:local on faadbf41: 5,488 server tests (11 skipped), 34 Bun tests, 1,388 UI tests, all structural guards, production build, final bundle and codegen verification pass
+- Missing tests: Full local gate after verified PR-link metadata; exact-head remote checks and both actual preview services before merge; release acceptance before closure
+- Done when: Selecting a calling-device or other shared Select option keeps its containing Sheet or Dialog open; Mouse, touch and keyboard selection work and retain draft input; The first Escape closes the dropdown; the next Escape closes the parent and restores focus; Normal outside-click dismissal and background isolation remain; caller Escape prevention is honored
+- Tracker: Candidate PR #2565 into dev implements #2518. The separate vendor-build prerequisite is merged in PR #2564. Require green final-head gates before merge and retain the open issue for release acceptance.
+
+### [#2511](https://github.com/chester-hill-solutions/callcaster/issues/2511) SMS Notification message count should go down instantly once messages are opened
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Refresh the SMS navigation count after a successful local read**
+- The source repair is published in PR #2566. All fifteen badge cases, original-source/fault controls and full local CI pass. Check the live PR state before changing code; final-head remote acceptance and release verification are separate.
+- Current behavior: Candidate based on dev@cc7e8559, 2026-10-14. The canonical browser messaging client emits one workspace-scoped local notice after a successful read request. The badge refreshes its authoritative total. Reads during an active count request coalesce into one follow-up, and an obsolete snapshot cannot replace the refreshed total. Repeated reads do not subtract twice; failed reads retain the badge; foreign and late old-workspace notices are ignored. Existing polling and inbound subscriptions remain; no extra server broadcast or count stream is added.
+- Root cause: The persistent navigation count listens to inbound inserts and a 30-second poll, but neither existing local read event. Three callers dispatch unscoped notices independently, so other callers cannot notify the badge consistently.
+- Resolution: Publish local read completion from the existing browser messaging client, consume only the current workspace notices, and refresh the full total without waiting for the poll. Retain a pending local read across an in-flight count query.
+- Look in: `app/hooks/chats/useUnreadConversationsCount.ts`, `app/lib/chats/messaging-client.ts`, `app/hooks/chats/useChatsPage.ts`, `app/hooks/chats/useChatThread.ts`
+- Existing tests: test/ui/workspace-unread-count.test.tsx: 15 real-client/hook cases, including 11 new local-read, overlap, failure, navigation and cleanup controls; Pinned original cc7e8559 fails five cases with ten controls passing; disabling queued refresh fails two cases with thirteen controls passing; restored candidate passes all fifteen; Initial focused chat-hook run passes 37 cases before the additional late-navigation case; Full ci:local at 12420bee: 5,488 server tests (11 skipped), 34 runtime tests and 1,399 UI tests pass, with all guards, production build, bundle and codegen verification
+- Missing tests: Full local CI, exact-head remote gates and both preview services before merge; release acceptance before closure
+- Done when: Successful conversation and single-message reads refresh the current user navigation count before the next poll; Repeated and overlapping reads cannot double-decrement or leave a stale count request as the final total; Failed reads and count failures preserve the last known total and later polling recovers; Workspace navigation and listener cleanup prevent foreign read notices from changing the displayed badge; No additional server broadcast or count stream is introduced
+- Tracker: PR #2566 into dev implements #2511. Verify its native state before new code work. Require green final-head gates before merge; retain the open issue for default promotion and release acceptance.
+
+### [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532) Ring audio overlaps with call audio when picked up or voicemail
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Remove generated campaign ringback**
+- PR #2567 removes the browser-generated ringing loop after the user reported overlap on master following PR #2534. Full local CI passes at 4b63b0bc; final dev-base, remote and preview checks and release remain.
+- Current behavior: Candidate removes the call-screen ringback wiring and deletes its generator and obsolete playback test. Available call media and the visible dialing state remain. Two real call-screen cases cover computer and verified-handset dialing through twelve seconds of delayed call updates, with no generated oscillator. An explicit speaker test remains a working audio control. Existing end-of-call feedback and cleanup tests pass.
+- Root cause: Master@0f4ebde2 still enables the app-generated loop from useCallScreen while its display state is dialing. PR #2534 improved tone-player teardown but retained that generator and its dependency on UI state. The user reports that overlap persists on master; no live-call timing trace is claimed.
+- Resolution: Remove the generated progress-ringing loop instead of adding another teardown condition or fallback tone. Preserve existing call media, device routing, mute, DTMF and cleanup. Some call paths can be quiet while connecting because network early media is optional.
+- Look in: `app/hooks/call/useCallScreen.ts`, `app/hooks/call/useDialRingback.ts (deleted)`, `app/lib/call-tone-player.client.ts`, `test/ui/hooks-call-screen.test.tsx`, `test/ui/use-call-end-tone.test.tsx`
+- Existing tests: Twelve focused UI cases pass with both borrowed and fresh locked dependencies; two new cases exercise the real call-screen hook for computer and verified handset; Pinned original dev@cc7e8559 fails both new cases on actual oscillator creation, with ten controls passing; restored source passes all twelve; New cases retain the selected handset, enter the actual dialing state, advance twelve seconds without ringing, and verify that an explicit speaker test still creates working test audio; Full npm run ci:local at 4b63b0bc: 5,488 server tests pass (11 skipped), 34 runtime tests pass, 1,389 UI tests pass; all guards, builds, client bundle and codegen verification pass; Independent standards and specification reviews of the pinned release changes found no actionable issues
+- Missing tests: Full local CI after the final dev rebase and PR-linked release note, exact-head remote gates and both preview services before merge; Release to master and live call acceptance after reloading the call page
+- Done when: Campaign dialing creates no app-generated ringback audio or cadence timer; Answered calls and voicemail have no app-generated ringing loop layered over their media; Computer and handset dialing retain device selection, call routing, mute, DTMF and cleanup; Regression tests fail with the old ringback wiring; normal speaker testing and end-of-call feedback remain
+- Tracker: The prior fix is already released; do not treat closed PR #2534 as resolution of this reopened report. One focused removal implements #2532. Keep dev merge, master promotion and live acceptance separate.
 
 ---
 
@@ -2507,7 +2560,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 15
+## Needs reproduction — 14
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -2612,12 +2665,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Missing tests: component render for the step
 - Done when: Each defect recorded with steps; Unrelated defects split; Regression test per defect
 - Tracker: Reproduce and split; overlaps #1205/#1113/#1318.
-
-### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
-- Verdict: **Needs reproduction** · Labels: none · Assignee: none · Updated: 2026-09-25
-- PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.
-- Resolution: Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.
-- Look in: `scripts/check-vendor-dist-drift.mjs`
 
 ### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-09-24

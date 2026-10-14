@@ -1,4 +1,9 @@
-export { Separator } from '../../chunk-RDPOVP7H.js';
-import '../../chunk-DN2AEEA2.js';
-//# sourceMappingURL=separator.js.map
+"use client";
+import {
+  Separator
+} from "../../chunk-RDPOVP7H.js";
+import "../../chunk-DN2AEEA2.js";
+export {
+  Separator
+};
 //# sourceMappingURL=separator.js.map

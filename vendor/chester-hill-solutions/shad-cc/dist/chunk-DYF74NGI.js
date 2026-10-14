@@ -1,8 +1,13 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { cva } from 'class-variance-authority';
-import { ToggleButton } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/toggle.tsx
+import { cva } from "class-variance-authority";
+import {
+  ToggleButton as TogglePrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 var toggleVariants = cva(
   "group/toggle inline-flex items-center justify-center gap-1 rounded-md font-heading text-sm font-semibold whitespace-nowrap transition-colors outline-none hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-secondary aria-pressed:text-secondary-foreground dark:aria-invalid:ring-destructive/40 data-selected:bg-secondary data-selected:text-secondary-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
@@ -30,7 +35,7 @@ function Toggle({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ToggleButton,
+    TogglePrimitive,
     {
       "data-slot": "toggle",
       className: cn(toggleVariants({ variant, size, className })),
@@ -39,6 +44,8 @@ function Toggle({
   );
 }
 
-export { Toggle, toggleVariants };
-//# sourceMappingURL=chunk-DYF74NGI.js.map
+export {
+  toggleVariants,
+  Toggle
+};
 //# sourceMappingURL=chunk-DYF74NGI.js.map

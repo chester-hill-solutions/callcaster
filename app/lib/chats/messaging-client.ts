@@ -56,6 +56,11 @@ export async function markConversationRead(
     },
   );
   await parseJsonResponse<{ ok: boolean }>(response);
+  window.dispatchEvent(
+    new CustomEvent(options?.messageSid ? "message-read" : "messages-read", {
+      detail: { workspaceId, contactNumber, messageId: options?.messageSid },
+    }),
+  );
 }
 
 export async function fetchWorkspaceUnreadCount(workspaceId: string): Promise<number> {

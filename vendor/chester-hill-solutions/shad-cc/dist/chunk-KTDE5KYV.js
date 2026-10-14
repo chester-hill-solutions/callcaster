@@ -1,7 +1,10 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/avatar.tsx
+import * as React from "react";
+import { jsx } from "react/jsx-runtime";
 function Avatar({
   className,
   size = "default",
@@ -99,6 +102,12 @@ function AvatarGroupCount({
   );
 }
 
-export { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage };
-//# sourceMappingURL=chunk-KTDE5KYV.js.map
+export {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  AvatarBadge,
+  AvatarGroup,
+  AvatarGroupCount
+};
 //# sourceMappingURL=chunk-KTDE5KYV.js.map

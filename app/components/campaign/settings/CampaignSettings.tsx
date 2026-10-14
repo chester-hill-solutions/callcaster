@@ -77,6 +77,7 @@ export const CampaignSettings = ({
               : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
           }`}
           role={feedbackTone === "error" ? "alert" : "status"}
+          data-severity={feedbackTone ?? "neutral"}
         >
           {feedbackMessage}
         </div>

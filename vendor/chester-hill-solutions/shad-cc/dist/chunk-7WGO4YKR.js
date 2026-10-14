@@ -1,7 +1,13 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { Switch as Switch$1, composeRenderProps } from 'react-aria-components';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/switch.tsx
+import {
+  composeRenderProps,
+  Switch as SwitchPrimitive
+} from "react-aria-components";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function Switch({
   className,
   size = "default",
@@ -9,7 +15,7 @@ function Switch({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Switch$1,
+    SwitchPrimitive,
     {
       "data-slot": "switch",
       "data-size": size,
@@ -49,6 +55,7 @@ function Switch({
   );
 }
 
-export { Switch };
-//# sourceMappingURL=chunk-7WGO4YKR.js.map
+export {
+  Switch
+};
 //# sourceMappingURL=chunk-7WGO4YKR.js.map

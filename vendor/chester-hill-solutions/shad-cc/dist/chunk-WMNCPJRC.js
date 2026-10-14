@@ -1,11 +1,17 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { Checkbox as Checkbox$1, composeRenderProps } from 'react-aria-components';
-import { CheckIcon } from 'lucide-react';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/checkbox.tsx
+import {
+  Checkbox as CheckboxPrimitive,
+  composeRenderProps
+} from "react-aria-components";
+import { CheckIcon } from "lucide-react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function Checkbox({ className, children, ...props }) {
   return /* @__PURE__ */ jsx(
-    Checkbox$1,
+    CheckboxPrimitive,
     {
       "data-slot": "checkbox",
       className: cn(
@@ -34,6 +40,7 @@ function Checkbox({ className, children, ...props }) {
   );
 }
 
-export { Checkbox };
-//# sourceMappingURL=chunk-WMNCPJRC.js.map
+export {
+  Checkbox
+};
 //# sourceMappingURL=chunk-WMNCPJRC.js.map

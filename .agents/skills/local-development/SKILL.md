@@ -16,6 +16,10 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+Before `ci:local`, check `node --version` and `bun --version` in the same
+command-scoped PATH. A missing Bun executable can be reported as lockfile
+drift; verify tool availability before changing either lockfile.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
@@ -45,6 +49,17 @@ completed browser run before claiming geometry acceptance.
 Put standalone Vite JSX fixtures outside `node_modules`, and load the app's
 `public/buffer-polyfill.mjs` before app imports. The utils barrel loads CSV code
 that reads Buffer at startup. A fixture startup failure is not geometry proof.
+Give concurrent baseline/candidate Vite fixtures separate cache directories.
+Create fixture source with file tools or a saved script. Nested JavaScript quotes
+inside an inline shell argument can silently corrupt the fixture. Inspect the
+rendered scene and require the intended controls before accepting browser proof.
+Render panels with nested Forms or fetchers through a real data router, even
+when the assertion only concerns a notice. Keep their actions isolated.
+Trace conditional notice tones to their data producer before choosing fixtures;
+a boolean type alone does not prove that a proposed warning state is reachable.
+For `shadcn/no-unknown-classes` false positives on domain `*Class` props,
+allow only the known domain values in an exact-file ESLint override with a reason.
+Do not add fake Tailwind utilities or hide the prop values from the rule.
 Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.
@@ -66,10 +81,15 @@ carry that test URL into ci:local and then claim its ledger failure is code drif
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
 
-Full `ci:local` must run where the vendor guard can restore its generated
-files through Git and Bun can write its temporary files. A permission failure
-is not lockfile drift: retain the dependency files, restore only the owned
-generated output, then rerun the full gate with the required permissions.
+Full `ci:local` must run where Bun can write its temporary files. A permission
+failure is not lockfile drift: retain the dependency files and rerun the full
+gate with the required permissions. The vendor guard leaves rebuilt output for
+review; it does not reset or clean files. Record a clean starting tree before
+testing build reproducibility. Save a failing diff, then restore only generated
+files proved to come from that owned build. Check repeated unchanged-source
+builds for import/chunk and declaration-union ordering before calling drift a
+source defect. A quiet run alone does not prove a previously variable builder is
+stable; fix its ordering and require complete repeated byte snapshots.
 
 For process checks on macOS, use PID/parent-ID fields and an exact `lsof`
 working-directory check. Do not use `pgrep -fl`: it can print environment
@@ -213,6 +233,10 @@ before trusting a guard's floor result.
 
 ## API and form response adapters
 
+If a guarded action's inferred result is `unknown`, give `useActionData` an
+explicit form response contract and test its server metadata and page handling.
+Do not replace the missing boundary with `any` or classify errors by message text.
+
 `asRouteResponse` normalizes thrown Responses. To verify that an auth redirect
 stays thrown, call the raw loader or action and inspect its rejected Response.
 Normalize a middleware result only once, outside its `next` callback. A nested
@@ -261,6 +285,14 @@ Match the Docker source context, including its excluded `.gitignore`. Tailwind
 source discovery can otherwise hide a server/client asset disagreement.
 
 ## UI fixture contracts
+
+When mixing Radix portals and React Aria overlays, test real selection, focus,
+background isolation and Escape order. A role query can hide a parent while the
+child list is active; check retained DOM separately and wait for exit animation
+and focus return before reading the final role. Bound negative browser waits and
+run an original-source focus-conflict probe in an owned child with a deadline:
+competing focus traps can recurse without reaching a test timeout. Stop only its
+verified owned process if it loops, then use a completed browser reproduction.
 
 For a focused temporary Vitest config, replace `test.include` explicitly after
 loading the base config. `mergeConfig` appends arrays, which can run the full
@@ -381,6 +413,9 @@ For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
+If different router-mount cases time out under memory pressure but pass alone,
+run the full gate with `VITEST_MAX_WORKERS=1`. This Vitest environment setting
+overrides both suites' worker limits. Keep assertions and timeouts unchanged.
 Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
 command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
 all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because
@@ -669,6 +704,12 @@ drift without its matching reviewed source change.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.
 - Load the `github-cli` and `github-issues` skills for `gh` specifics.
+
+Before production release checks, resolve app and worker service IDs from that
+environment's service instances. A PR preview can use a different app service.
+An empty deployment list for a copied preview service ID is unknown, not a
+production failure. Require both actual production deployments at the release
+commit.
 
 Route modules must export only route-facing handlers and components. Import
 server helpers directly in their tests. A helper re-export from a route can

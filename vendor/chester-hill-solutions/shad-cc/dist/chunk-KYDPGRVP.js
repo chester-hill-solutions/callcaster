@@ -1,7 +1,10 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as ResizablePrimitive from 'react-resizable-panels';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/resizable.tsx
+import * as ResizablePrimitive from "react-resizable-panels";
+import { jsx } from "react/jsx-runtime";
 function ResizablePanelGroup({
   className,
   ...props
@@ -40,6 +43,9 @@ function ResizableHandle({
   );
 }
 
-export { ResizableHandle, ResizablePanel, ResizablePanelGroup };
-//# sourceMappingURL=chunk-KYDPGRVP.js.map
+export {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle
+};
 //# sourceMappingURL=chunk-KYDPGRVP.js.map

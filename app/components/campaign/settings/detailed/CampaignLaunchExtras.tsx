@@ -87,8 +87,8 @@ function OutboundEstimateAlert({
   lines: string[];
 }) {
   return (
-    <Alert className="border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
-      <AlertCircle className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+    <Alert variant="warning">
+      <AlertCircle className="h-4 w-4" />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription className="space-y-1.5">
         {lines.map((line) => (

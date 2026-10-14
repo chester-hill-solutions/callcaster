@@ -1,17 +1,13 @@
-import * as React from 'react';
-import { ModalOverlayProps, Modal, Heading, DialogTriggerProps } from 'react-aria-components';
-export { DialogProps as DialogPrimitiveProps, DialogTriggerProps as DialogTriggerPrimitiveProps } from 'react-aria-components';
-import { Button } from './button.js';
-import 'class-variance-authority/types';
-import 'class-variance-authority';
-
-declare function DialogTrigger({ ...props }: DialogTriggerProps): React.JSX.Element;
+import * as React from "react";
+import { Heading, Modal as ModalPrimitive, type DialogProps as DialogPrimitiveProps, type DialogTriggerProps as DialogTriggerPrimitiveProps, type ModalOverlayProps as ModalOverlayPrimitiveProps } from "react-aria-components";
+import { Button } from "./button";
+declare function DialogTrigger({ ...props }: DialogTriggerPrimitiveProps): React.JSX.Element;
 declare function DialogClose({ className, variant, size, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
-declare function DialogOverlay({ className, children, ...props }: Omit<ModalOverlayProps, "className" | "children"> & {
+declare function DialogOverlay({ className, children, ...props }: Omit<ModalOverlayPrimitiveProps, "className" | "children"> & {
     className?: string;
     children: React.ReactNode;
 }): React.JSX.Element;
-declare function Dialog({ className, children, showCloseButton, isDismissable, ...props }: Omit<ModalOverlayProps, "className" | "children"> & Pick<React.ComponentProps<typeof Modal>, "isDismissable"> & {
+declare function Dialog({ className, children, showCloseButton, isDismissable, ...props }: Omit<ModalOverlayPrimitiveProps, "className" | "children"> & Pick<React.ComponentProps<typeof ModalPrimitive>, "isDismissable"> & {
     className?: string;
     children: React.ReactNode;
     showCloseButton?: boolean;
@@ -22,5 +18,4 @@ declare function DialogFooter({ className, showCloseButton, children, ...props }
 }): React.JSX.Element;
 declare function DialogTitle({ className, ...props }: Omit<React.ComponentProps<typeof Heading>, "slot">): React.JSX.Element;
 declare function DialogDescription({ className, ...props }: Omit<React.ComponentProps<"div">, "slot">): React.JSX.Element;
-
-export { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle, DialogTrigger };
+export { type DialogPrimitiveProps, type DialogTriggerPrimitiveProps, Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle, DialogTrigger, };

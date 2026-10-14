@@ -232,7 +232,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc --declaration --declarationMap false --emitDeclarationOnly --noEmit false --outDir dist",
     "typecheck": "tsc --noEmit",
     "test": "echo \"shad-cc: component tests run in componentLiib/shad-cc workbench\"",
     "dev": "tsup --watch",

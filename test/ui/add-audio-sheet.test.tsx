@@ -157,6 +157,7 @@ describe("AddAudioSheet", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(
       "An audio file with that name already exists. Choose a different name.",
     );
+    expect(screen.getByRole("alert")).toHaveAttribute("data-severity", "error");
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(mocks.revalidate).not.toHaveBeenCalled();
   });

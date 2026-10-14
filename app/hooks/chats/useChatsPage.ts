@@ -512,14 +512,7 @@ export function useChatsPage() {
     (number: string) => {
       clearUnreadCount(number);
 
-      void markConversationRead(workspace.id, number).then(
-        () => {
-          window.dispatchEvent(
-            new CustomEvent("messages-read", {
-              detail: { contactNumber: number },
-            }),
-          );
-        },
+      void markConversationRead(workspace.id, number).catch(
         (err: unknown) => logger.error("Error marking messages as read:", err),
       );
     },
@@ -559,14 +552,15 @@ export function useChatsPage() {
   );
 
   /**
-   * @effect Subscribe to the cross-hook "message-read"/"messages-read" window events (dispatched by useChatThread when it marks messages read) so the sidebar's unread badges clear immediately.
-   * @effect-deps clearUnreadCount (stable useCallback; re-subscribes only if it changes identity)
+   * @effect Subscribe to local read events from messaging-client so the sidebar's unread badges clear after a successful read.
+   * @effect-deps clearUnreadCount, workspace.id (keep reads scoped to the displayed workspace)
    * @effect-side-effects subscription (window.addEventListener for two custom event names; removed on cleanup)
    * @effect-why-not-loader This listens for an imperative cross-hook notification (useChatThread and useChatsPage are siblings under a route Outlet with no direct prop path), not data fetching or derivable state.
    */
   useEffect(() => {
     const handleMessageRead = (event: Event) => {
-      const customEvent = event as CustomEvent<{ contactNumber?: string }>;
+      const customEvent = event as CustomEvent<{ workspaceId?: string; contactNumber?: string }>;
+      if (customEvent.detail?.workspaceId !== workspace.id) return;
       const readContactNumber = customEvent.detail?.contactNumber;
 
       if (!readContactNumber) {
@@ -583,7 +577,7 @@ export function useChatsPage() {
       window.removeEventListener("message-read", handleMessageRead);
       window.removeEventListener("messages-read", handleMessageRead);
     };
-  }, [clearUnreadCount]);
+  }, [clearUnreadCount, workspace.id]);
 
   const updateFilters = useCallback(
     (updater: (params: URLSearchParams) => URLSearchParams) => {

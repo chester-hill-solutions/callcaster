@@ -1,10 +1,13 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { Keyboard } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/kbd.tsx
+import { Keyboard as KbdPrimitive } from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Kbd({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Keyboard,
+    KbdPrimitive,
     {
       "data-slot": "kbd",
       className: cn(
@@ -17,7 +20,7 @@ function Kbd({ className, ...props }) {
 }
 function KbdGroup({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Keyboard,
+    KbdPrimitive,
     {
       "data-slot": "kbd-group",
       className: cn("inline-flex items-center gap-1", className),
@@ -26,6 +29,8 @@ function KbdGroup({ className, ...props }) {
   );
 }
 
-export { Kbd, KbdGroup };
-//# sourceMappingURL=chunk-RTPASLQJ.js.map
+export {
+  Kbd,
+  KbdGroup
+};
 //# sourceMappingURL=chunk-RTPASLQJ.js.map

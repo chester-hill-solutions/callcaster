@@ -1,8 +1,16 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { TooltipTrigger as TooltipTrigger$1, Focusable, Tooltip as Tooltip$1, OverlayArrow } from 'react-aria-components';
-import { jsxs, jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/tooltip.tsx
+import * as React from "react";
+import {
+  Focusable,
+  OverlayArrow,
+  Tooltip as TooltipPrimitive,
+  TooltipTrigger as TooltipTriggerPrimitive
+} from "react-aria-components";
+import { jsx, jsxs } from "react/jsx-runtime";
 function TooltipTrigger({
   delay = 0,
   children,
@@ -10,7 +18,7 @@ function TooltipTrigger({
 }) {
   const [trigger, tooltip] = React.Children.toArray(children);
   return /* @__PURE__ */ jsxs(
-    TooltipTrigger$1,
+    TooltipTriggerPrimitive,
     {
       "data-slot": "tooltip-trigger",
       delay,
@@ -31,7 +39,7 @@ function Tooltip({
   ...props
 }) {
   return /* @__PURE__ */ jsxs(
-    Tooltip$1,
+    TooltipPrimitive,
     {
       "data-slot": "tooltip-content",
       placement,
@@ -61,6 +69,8 @@ function Tooltip({
   );
 }
 
-export { Tooltip, TooltipTrigger };
-//# sourceMappingURL=chunk-6REUFSVH.js.map
+export {
+  TooltipTrigger,
+  Tooltip
+};
 //# sourceMappingURL=chunk-6REUFSVH.js.map

@@ -1,7 +1,10 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/scroll-area.tsx
+import "react";
+import { jsx } from "react/jsx-runtime";
 function ScrollArea({
   className,
   children,
@@ -21,6 +24,7 @@ function ScrollArea({
   );
 }
 
-export { ScrollArea };
-//# sourceMappingURL=chunk-BKHPAPT6.js.map
+export {
+  ScrollArea
+};
 //# sourceMappingURL=chunk-BKHPAPT6.js.map

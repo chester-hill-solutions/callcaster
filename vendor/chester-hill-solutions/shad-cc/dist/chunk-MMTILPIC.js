@@ -1,12 +1,21 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { DisclosureGroup, Disclosure, Heading, Button, DisclosurePanel } from 'react-aria-components';
-import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/accordion.tsx
+import "react";
+import {
+  DisclosurePanel as AccordionContentPrimitive,
+  Heading as AccordionHeaderPrimitive,
+  Disclosure as AccordionItemPrimitive,
+  DisclosureGroup as AccordionPrimitive,
+  Button as AccordionTriggerPrimitive
+} from "react-aria-components";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 function Accordion({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    DisclosureGroup,
+    AccordionPrimitive,
     {
       "data-slot": "accordion",
       className: cn(
@@ -19,7 +28,7 @@ function Accordion({ className, ...props }) {
 }
 function AccordionItem({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Disclosure,
+    AccordionItemPrimitive,
     {
       "data-slot": "accordion-item",
       className: cn("not-last:border-b data-open:bg-brand-wash/50", className),
@@ -32,8 +41,8 @@ function AccordionTrigger({
   children,
   ...props
 }) {
-  return /* @__PURE__ */ jsx(Heading, { className: "flex", children: /* @__PURE__ */ jsxs(
-    Button,
+  return /* @__PURE__ */ jsx(AccordionHeaderPrimitive, { className: "flex", children: /* @__PURE__ */ jsxs(
+    AccordionTriggerPrimitive,
     {
       slot: "trigger",
       "data-slot": "accordion-trigger",
@@ -56,7 +65,7 @@ function AccordionContent({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    DisclosurePanel,
+    AccordionContentPrimitive,
     {
       "data-slot": "accordion-content",
       className: "h-(--disclosure-panel-height) overflow-clip px-4 text-sm transition-[height] data-open:animate-accordion-down data-closed:animate-accordion-up",
@@ -75,6 +84,10 @@ function AccordionContent({
   );
 }
 
-export { Accordion, AccordionContent, AccordionItem, AccordionTrigger };
-//# sourceMappingURL=chunk-MMTILPIC.js.map
+export {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent
+};
 //# sourceMappingURL=chunk-MMTILPIC.js.map

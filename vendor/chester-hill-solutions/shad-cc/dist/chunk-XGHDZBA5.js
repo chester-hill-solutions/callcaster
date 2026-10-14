@@ -1,8 +1,11 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { cva } from 'class-variance-authority';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/alert.tsx
+import "react";
+import { cva } from "class-variance-authority";
+import { jsx } from "react/jsx-runtime";
 var alertVariants = cva(
   "group/alert relative grid w-full gap-0.5 rounded-md border px-4 py-3 text-left text-sm has-data-[slot=alert-action]:relative has-data-[slot=alert-action]:pr-18 has-[>svg]:grid-cols-[auto_1fr] has-[>svg]:gap-x-2.5 *:[svg]:row-span-2 *:[svg]:translate-y-0.5 *:[svg]:text-current *:[svg:not([class*='size-'])]:size-4",
   {
@@ -13,7 +16,7 @@ var alertVariants = cva(
         // bg-destructive/12) fails WCAG contrast in dark themes, so the body
         // stays foreground-based like the `default` variant while the icon
         // and surfaces signal the tone.
-        default: "border-brand-tertiary bg-brand-wash text-foreground *:data-[slot=alert-description]:text-muted-foreground",
+        default: "bg-card text-card-foreground border-border *:data-[slot=alert-description]:text-muted-foreground",
         destructive: "border-destructive/40 bg-destructive/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-destructive",
         success: "border-success/40 bg-success/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-success",
         warning: "border-warning/45 bg-warning/15 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-warning",
@@ -28,6 +31,13 @@ var alertVariants = cva(
     }
   }
 );
+var alertSeverities = {
+  default: "neutral",
+  destructive: "error",
+  success: "success",
+  warning: "warning",
+  info: "info"
+};
 function Alert({
   className,
   variant,
@@ -39,7 +49,8 @@ function Alert({
       "data-slot": "alert",
       role: "alert",
       className: cn(alertVariants({ variant }), className),
-      ...props
+      ...props,
+      "data-severity": alertSeverities[variant ?? "default"]
     }
   );
 }
@@ -83,6 +94,11 @@ function AlertAction({ className, ...props }) {
   );
 }
 
-export { Alert, AlertAction, AlertDescription, AlertTitle, alertVariants };
-//# sourceMappingURL=chunk-OUYGBYJO.js.map
-//# sourceMappingURL=chunk-OUYGBYJO.js.map
+export {
+  alertVariants,
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction
+};
+//# sourceMappingURL=chunk-XGHDZBA5.js.map

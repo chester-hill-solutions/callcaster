@@ -1,10 +1,15 @@
-import { Separator } from './chunk-RDPOVP7H.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { cva } from 'class-variance-authority';
-import { Link } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  Separator
+} from "./chunk-RDPOVP7H.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/item.tsx
+import "react";
+import { cva } from "class-variance-authority";
+import { Link as LinkPrimitive } from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function ItemGroup({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "div",
@@ -60,7 +65,7 @@ function Item({
   size = "default",
   ...props
 }) {
-  const Element = "href" in props ? Link : "div";
+  const Element = "href" in props ? LinkPrimitive : "div";
   return /* @__PURE__ */ jsx(
     Element,
     {
@@ -178,6 +183,16 @@ function ItemFooter({ className, ...props }) {
   );
 }
 
-export { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemHeader, ItemMedia, ItemSeparator, ItemTitle };
-//# sourceMappingURL=chunk-FRUYJOAF.js.map
+export {
+  ItemGroup,
+  ItemSeparator,
+  Item,
+  ItemMedia,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  ItemActions,
+  ItemHeader,
+  ItemFooter
+};
 //# sourceMappingURL=chunk-FRUYJOAF.js.map

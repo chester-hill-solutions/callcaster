@@ -1,8 +1,11 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import * as RechartsPrimitive from 'recharts';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/chart.tsx
+import * as React from "react";
+import * as RechartsPrimitive from "recharts";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var THEMES = { light: "", dark: ".dark" };
 var INITIAL_DIMENSION = { width: 320, height: 200 };
 var ChartContext = React.createContext(null);
@@ -242,6 +245,12 @@ function getPayloadConfigFromPayload(config, payload, key) {
   return configLabelKey in config ? config[configLabelKey] : config[key];
 }
 
-export { ChartContainer, ChartLegend, ChartLegendContent, ChartStyle, ChartTooltip, ChartTooltipContent };
-//# sourceMappingURL=chunk-D2E5N3HT.js.map
+export {
+  ChartContainer,
+  ChartStyle,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent
+};
 //# sourceMappingURL=chunk-D2E5N3HT.js.map

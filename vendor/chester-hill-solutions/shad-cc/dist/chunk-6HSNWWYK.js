@@ -1,15 +1,21 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { Input as Input$1, composeRenderProps } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/input.tsx
+import "react";
+import {
+  composeRenderProps,
+  Input as InputPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Input({
   className,
   type,
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Input$1,
+    InputPrimitive,
     {
       type,
       "data-slot": "input",
@@ -25,6 +31,7 @@ function Input({
   );
 }
 
-export { Input };
-//# sourceMappingURL=chunk-6HSNWWYK.js.map
+export {
+  Input
+};
 //# sourceMappingURL=chunk-6HSNWWYK.js.map

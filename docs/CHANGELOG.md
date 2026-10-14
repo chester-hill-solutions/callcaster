@@ -4,6 +4,20 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-10-14 — release [#2568](https://github.com/chester-hill-solutions/callcaster/pull/2568)
+
+- Removed: The app-generated ringing loop during campaign dialing, which could overlap answered calls or voicemail ([PR #2567](https://github.com/chester-hill-solutions/callcaster/pull/2567), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
+
+- Fixed: The SMS navigation count updates after you read messages, without waiting for the next poll ([PR #2566](https://github.com/chester-hill-solutions/callcaster/pull/2566), [#2511](https://github.com/chester-hill-solutions/callcaster/issues/2511)).
+
+- Fixed: Selecting a calling device or another dropdown option keeps its settings dialog open; Escape closes the dropdown before the dialog ([PR #2565](https://github.com/chester-hill-solutions/callcaster/pull/2565), [#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518)).
+
+- Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([PR #2562](https://github.com/chester-hill-solutions/callcaster/pull/2562), [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
+
+- Fixed: Neutral notices use the shared card style in both themes, and campaign safeguards, authenticator setup, and Twilio warnings use explicit warning tones ([PR #2561](https://github.com/chester-hill-solutions/callcaster/pull/2561), [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061)).
+
+- Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([PR #2558](https://github.com/chester-hill-solutions/callcaster/pull/2558), [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
+
 ## 2026-10-13 — release [#2553](https://github.com/chester-hill-solutions/callcaster/pull/2553)
 
 - Added: Workspace members can now delete contacts from the Contacts table ([PR #2547](https://github.com/chester-hill-solutions/callcaster/pull/2547)).

@@ -54,4 +54,26 @@ bun run --cwd packages/shad-cc typecheck
 
 ## Source / workbench
 
-Canonical design iteration (catalog, axe tests, docs app) lives in the `componentLiib/shad-cc` workbench. This package is the publishable extract for consumers.
+Canonical shared component work starts in the CHS `apps/ui-kit-docs` workbench and its synced `packages/ui-kit/templates`. This vendored package is CallCaster’s compatibility consumer.
+
+### Neutral Alert adoption
+
+The Alert default color contract is adopted from the canonical CHS
+[workbench](https://github.com/chester-hill-solutions/chester-hill-solutions/blob/524f515e93b7f279c70b963c3f62cf07a15738d7/apps/ui-kit-docs/packages/ui/src/components/ui/alert.tsx)
+and [synced template](https://github.com/chester-hill-solutions/chester-hill-solutions/blob/524f515e93b7f279c70b963c3f62cf07a15738d7/packages/ui-kit/templates/components/ui/alert.tsx).
+Both have blob `e965f26e8b43af94afe444579acb4fb29a3cc76f` at that commit.
+The adopted default is `bg-card text-card-foreground border-border`.
+CallCaster retains its existing description contrast, typography, geometry,
+ARIA behavior and other semantic variants. The app theme tokens stay unchanged.
+See [the source contract](https://github.com/chester-hill-solutions/chester-hill-solutions/blob/524f515e93b7f279c70b963c3f62cf07a15738d7/packages/ui-kit/SOURCE.md)
+for workbench ownership and template synchronization.
+
+### Semantic Alert metadata
+
+The `data-severity` mapping is adopted from the canonical workbench and synced
+template in [shared PR #141](https://github.com/chester-hill-solutions/chester-hill-solutions/pull/141)
+at commit `a538c35f6dab65c896f4d856b664e0b6f6009b2a`.
+Default/omitted is neutral, destructive is error, and info, warning and success
+retain their meanings. The variant owns the value after caller props; ARIA roles
+do not determine it. CallCaster keeps its existing visual classes and role
+override behavior. The compatibility bundle is rebuilt from source.

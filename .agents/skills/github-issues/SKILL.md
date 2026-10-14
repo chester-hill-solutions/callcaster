@@ -98,7 +98,8 @@ trailing comma after a removed entry. The pure local check needs no GitHub scope
 Preserve the enrichment files' UTF-8 characters and existing rendering. Review
 the diff for unrelated serialization changes before staging.
 For an atomic audit, render the selected issue with `buildBoard` and fresh native
-metadata, then replace only its complete section. Require the generated cause
+metadata, then replace only its complete section. `buildBoard` returns
+`{ md, counts }`; use `md` as the rendered text. Require the generated cause
 and test fields before writing. A multiline `$` can match the heading line,
 so use an explicit next-section or end-of-input boundary.
 Trace the affected route or worker to its actual helper before moving an issue to

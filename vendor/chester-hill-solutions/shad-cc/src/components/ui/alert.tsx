@@ -14,7 +14,7 @@ const alertVariants = cva(
         // stays foreground-based like the `default` variant while the icon
         // and surfaces signal the tone.
         default:
-          "border-brand-tertiary bg-brand-wash text-foreground *:data-[slot=alert-description]:text-muted-foreground",
+          "bg-card text-card-foreground border-border *:data-[slot=alert-description]:text-muted-foreground",
         destructive:
           "border-destructive/40 bg-destructive/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-destructive",
         success:
@@ -33,6 +33,14 @@ const alertVariants = cva(
   }
 )
 
+const alertSeverities = {
+  default: "neutral",
+  destructive: "error",
+  success: "success",
+  warning: "warning",
+  info: "info",
+} as const
+
 function Alert({
   className,
   variant,
@@ -44,6 +52,7 @@ function Alert({
       role="alert"
       className={cn(alertVariants({ variant }), className)}
       {...props}
+      data-severity={alertSeverities[variant ?? "default"]}
     />
   )
 }

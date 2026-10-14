@@ -1,12 +1,23 @@
-import { Button } from './chunk-C6TALT53.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { DialogTrigger, Modal, Dialog, Heading, ModalOverlay } from 'react-aria-components';
-import { XIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  Button
+} from "./chunk-IFW6QGQN.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/sheet.tsx
+import "react";
+import {
+  Heading,
+  ModalOverlay as ModalOverlayPrimitive,
+  Modal as ModalPrimitive,
+  Dialog as SheetPrimitive,
+  DialogTrigger as SheetTriggerPrimitive
+} from "react-aria-components";
+import { XIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 function SheetTrigger({ ...props }) {
-  return /* @__PURE__ */ jsx(DialogTrigger, { "data-slot": "sheet-trigger", ...props });
+  return /* @__PURE__ */ jsx(SheetTriggerPrimitive, { "data-slot": "sheet-trigger", ...props });
 }
 function SheetClose({
   className,
@@ -32,7 +43,7 @@ function SheetOverlay({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ModalOverlay,
+    ModalOverlayPrimitive,
     {
       "data-slot": "sheet-overlay",
       isDismissable: true,
@@ -53,7 +64,7 @@ function Sheet({
   ...props
 }) {
   return /* @__PURE__ */ jsx(SheetOverlay, { ...props, children: /* @__PURE__ */ jsx(
-    Modal,
+    ModalPrimitive,
     {
       "data-slot": "sheet-content",
       "data-side": side,
@@ -62,7 +73,7 @@ function Sheet({
         className
       ),
       children: /* @__PURE__ */ jsxs(
-        Dialog,
+        SheetPrimitive,
         {
           "data-slot": "sheet",
           className: "[display:inherit] h-full max-h-[inherit] [flex-direction:inherit] [gap:inherit] outline-none",
@@ -153,6 +164,14 @@ function SheetDescription({
   );
 }
 
-export { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger };
-//# sourceMappingURL=chunk-LU7B5AF4.js.map
-//# sourceMappingURL=chunk-LU7B5AF4.js.map
+export {
+  SheetTrigger,
+  SheetClose,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription
+};
+//# sourceMappingURL=chunk-E24HHID5.js.map

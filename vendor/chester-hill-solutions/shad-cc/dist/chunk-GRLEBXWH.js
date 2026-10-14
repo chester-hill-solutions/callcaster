@@ -1,17 +1,41 @@
-import { TooltipTrigger, Tooltip } from './chunk-6REUFSVH.js';
-import { Sheet, SheetHeader, SheetTitle, SheetDescription } from './chunk-LU7B5AF4.js';
-import { Skeleton } from './chunk-Q5IFSK7X.js';
-import { Separator } from './chunk-RDPOVP7H.js';
-import { Input } from './chunk-6HSNWWYK.js';
-import { useIsMobile } from './chunk-YNROVYNC.js';
-import { Button } from './chunk-C6TALT53.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { cva } from 'class-variance-authority';
-import { Link, Button as Button$1 } from 'react-aria-components';
-import { PanelLeftIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  Tooltip,
+  TooltipTrigger
+} from "./chunk-6REUFSVH.js";
+import {
+  useIsMobile
+} from "./chunk-YNROVYNC.js";
+import {
+  Sheet,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle
+} from "./chunk-E24HHID5.js";
+import {
+  Skeleton
+} from "./chunk-Q5IFSK7X.js";
+import {
+  Input
+} from "./chunk-6HSNWWYK.js";
+import {
+  Button
+} from "./chunk-IFW6QGQN.js";
+import {
+  Separator
+} from "./chunk-RDPOVP7H.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/sidebar.tsx
+import * as React from "react";
+import { cva } from "class-variance-authority";
+import {
+  Button as ButtonPrimitive,
+  Link as LinkPrimitive
+} from "react-aria-components";
+import { PanelLeftIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 var SIDEBAR_COOKIE_NAME = "sidebar_state";
 var SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 var SIDEBAR_WIDTH = "16rem";
@@ -436,7 +460,7 @@ function SidebarMenuButton({
 }) {
   const { isMobile, state } = useSidebar();
   const comp = props.href !== void 0 ? /* @__PURE__ */ jsx(
-    Link,
+    LinkPrimitive,
     {
       "data-slot": "sidebar-menu-button",
       "data-sidebar": "menu-button",
@@ -446,7 +470,7 @@ function SidebarMenuButton({
       ...props
     }
   ) : /* @__PURE__ */ jsx(
-    Button$1,
+    ButtonPrimitive,
     {
       "data-slot": "sidebar-menu-button",
       "data-sidebar": "menu-button",
@@ -475,7 +499,7 @@ function SidebarMenuAction({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Button$1,
+    ButtonPrimitive,
     {
       "data-slot": "sidebar-menu-action",
       "data-sidebar": "menu-action",
@@ -577,7 +601,7 @@ function SidebarMenuSubButton({
   ...props
 }) {
   return props.href !== void 0 ? /* @__PURE__ */ jsx(
-    Link,
+    LinkPrimitive,
     {
       "data-slot": "sidebar-menu-sub-button",
       "data-sidebar": "menu-sub-button",
@@ -590,7 +614,7 @@ function SidebarMenuSubButton({
       ...props
     }
   ) : /* @__PURE__ */ jsx(
-    Button$1,
+    ButtonPrimitive,
     {
       "data-slot": "sidebar-menu-sub-button",
       "data-sidebar": "menu-sub-button",
@@ -605,6 +629,30 @@ function SidebarMenuSubButton({
   );
 }
 
-export { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupAction, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInput, SidebarInset, SidebarMenu, SidebarMenuAction, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem, SidebarProvider, SidebarRail, SidebarSeparator, SidebarTrigger, useSidebar };
-//# sourceMappingURL=chunk-7WDHISGF.js.map
-//# sourceMappingURL=chunk-7WDHISGF.js.map
+export {
+  useSidebar,
+  SidebarProvider,
+  Sidebar,
+  SidebarTrigger,
+  SidebarRail,
+  SidebarInset,
+  SidebarInput,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarSeparator,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuAction,
+  SidebarMenuBadge,
+  SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton
+};
+//# sourceMappingURL=chunk-GRLEBXWH.js.map
