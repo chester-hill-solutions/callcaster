@@ -242,3 +242,40 @@ These are source-confirmed duplicates, not measured browser events. The invite U
 4. In a real browser, record stable page landmark rectangles and scroll position before appearance, after appearance, after update and after dismissal. Include narrow and desktop viewports, light/dark, long messages, multiple notices, keyboard actions and no hidden required action. A jsdom class assertion is not layout proof.
 5. Preserve field ARIA associations, hard send/credit/consent gates, recovery actions and pending-action locks. Exactly-once notices must survive rerender/revalidation without replay.
 6. Run full local CI before every CallCaster push. Merge and recoverably clean only after required remote checks and both deployments are green. Source completion does not establish deployed verification.
+
+## Alert tone adoption — #2061
+
+Adoption starts from `dev@a7a6a0f1`. The AST inventory finds 78 Alert uses
+imported through the app adapter. The following table covers every omitted or
+potentially neutral/default use, including warnings previously expressed only
+through color overrides. The remaining uses already select semantic variants.
+The default uses the canonical shared card surface. App theme tokens, fonts,
+spacing, announcement roles, actions and gates retain their existing contracts.
+Provenance is recorded in the vendored package README.
+
+| Existing use | Tone decision |
+| --- | --- |
+| `AudienceUploadMapStep`: phone-skipping guidance | Deliberately neutral guidance. |
+| `AudienceUploadMapStep`: opt-out mapping guidance | Deliberately neutral guidance; keep opt-out handling. |
+| `AudienceUploadMapStep`: mapping issues | The current producer marks all issues blocking, so they retain the destructive tone and disabled Continue gate. The unused nonblocking fallback remains neutral; no new warning state is invented. |
+| `IncomingCallPanel`: incoming call and answer/decline controls | Deliberately neutral call state; caller currently supplies no tone override. |
+| `NumberRentalCreditsAlert`: sufficient credits | Deliberately neutral balance information; insufficient credits remain destructive with the billing remedy. |
+| `QueryParamBanner`: optional caller variant | Neutral when omitted; caller-supplied variants remain explicit. There are no current app call sites for this wrapper. |
+| `account.security`: pending enrollment message | Deliberately neutral setup information. |
+| Admin Twilio `MessagingSignalsPanel`: detection explanation | Deliberately neutral information. |
+| Admin Twilio `OnboardingPanel`: no warnings | Deliberately neutral readiness summary. |
+| Admin Twilio `OperationalGuidancePanel`: recommendations | Informational recommendations remain neutral; typed warning recommendations now select warning instead of destructive. |
+| Admin Twilio `OperationalGuidancePanel`: no active warnings | Deliberately neutral summary. |
+| Admin Twilio `SendingSetupPanel`: workspace summary | Deliberately neutral summary. |
+| Workspace design gallery: default Alert example | Deliberately neutral component example. |
+| `OnboardingFirstNumberStep`: messaging preparation | Deliberately neutral preparation state; bootstrap failure remains destructive. |
+| `account`: authenticator setup instructions | Warning variant replaces local warning colors; enrollment and verification requirements remain. |
+| Admin Twilio `HealthPanel`: recorded webhook/config drift | Explicit warning with the existing audit/repair controls. |
+| `CampaignLaunchExtras`: outbound IVR estimate | Warning variant replaces local amber colors; estimate and launch rules remain. |
+| `SplitCampaignPrompt`: large local-number send | Warning variant replaces local amber colors; splitting, consent and pending locks remain. |
+| `BulkLocalOverrideActiveNotice`: accepted override | Warning variant replaces local amber colors; removal and pending locks remain. |
+
+This is a tone adoption. Existing notice-placement and lifetime work stays in
+its own tracked tasks. Browser acceptance compares matching old/new rendered
+states and exercises the existing controls; it does not claim that every
+existing notice workflow is free of layout shifts.

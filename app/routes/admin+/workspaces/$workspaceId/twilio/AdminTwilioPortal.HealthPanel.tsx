@@ -96,7 +96,7 @@ export function HealthPanel({ onboarding, syncSnapshot }: HealthPanelProps) {
         ) : null}
 
         {drift.length > 0 ? (
-          <Alert>
+          <Alert variant="warning">
             <AlertTitle>Webhook / config drift ({drift.length})</AlertTitle>
             <AlertDescription>
               <ul className="mt-2 list-disc space-y-1 pl-5">

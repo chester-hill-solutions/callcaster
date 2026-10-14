@@ -77,8 +77,8 @@ function BulkLocalOverrideActiveNotice({
   onRemove: () => void;
 }) {
   return (
-    <Alert className="border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
-      <AlertCircle className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+    <Alert variant="warning">
+      <AlertCircle className="h-4 w-4" />
       <AlertTitle>Bulk-send safeguard overridden</AlertTitle>
       <AlertDescription className="space-y-2">
         <p>
@@ -230,8 +230,8 @@ export function SplitCampaignPrompt({
   const perSegment = Math.ceil(queueCount / Math.max(2, segmentCount));
 
   return (
-    <Alert className="border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20">
-      <AlertCircle className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+    <Alert variant="warning">
+      <AlertCircle className="h-4 w-4" />
       <AlertTitle>Large bulk send on a local number</AlertTitle>
       <AlertDescription className="space-y-2">
         <p>

@@ -1,4 +1,4 @@
-import { LinkButton } from './chunk-C6TALT53.js';
+import { LinkButton } from './chunk-IFW6QGQN.js';
 import { cn } from './chunk-DN2AEEA2.js';
 import 'react';
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from 'lucide-react';
@@ -115,5 +115,5 @@ function PaginationEllipsis({
 }
 
 export { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious };
-//# sourceMappingURL=chunk-IUNUFKR6.js.map
-//# sourceMappingURL=chunk-IUNUFKR6.js.map
+//# sourceMappingURL=chunk-FDTYDCMW.js.map
+//# sourceMappingURL=chunk-FDTYDCMW.js.map
