@@ -253,7 +253,12 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                 paginatedRows.map((workspace) => (
                                     <TableRow key={workspace.id}>
                                         <TableCell>
-                                            <div className="font-medium">{workspace.name}</div>
+                                            <NavLink
+                                                to={`/admin/workspaces/${workspace.id}`}
+                                                className="font-medium hover:underline"
+                                            >
+                                                {workspace.name}
+                                            </NavLink>
                                             <div className="font-mono text-xs text-muted-foreground">{workspace.id}</div>
                                         </TableCell>
                                         <TableCell>{workspace.ownerUsername}</TableCell>
