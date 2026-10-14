@@ -28,7 +28,7 @@ export type CreateCampaignWithScriptRequest = {
      */
     title: string;
     /**
-     * Campaign type (script-based). Use robocall for an automated phone menu.
+     * Campaign type (script-based). Use robocall for an IVR.
      */
     type: 'live_call' | 'robocall';
     /**

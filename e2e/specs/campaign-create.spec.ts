@@ -6,7 +6,7 @@ ownerTest.describe("Campaign create @authenticated", () => {
   for (const [type, label] of [
     ["live_call", "Live calling"],
     ["message", "Text campaign"],
-    ["robocall", "Automated phone menu"],
+    ["robocall", "IVR"],
   ] as const) {
     ownerTest(`CAM-0${type}: create ${type} campaign`, async ({ page }) => {
       const uniqueName = `E2E New ${label} ${Date.now()}`;
