@@ -375,5 +375,39 @@
       "Normal outside-click dismissal and background isolation remain; caller Escape prevention is honored"
     ],
     "trackerRecommendation": "Candidate PR #2565 into dev implements #2518. The separate vendor-build prerequisite is merged in PR #2564. Require green final-head gates before merge and retain the open issue for release acceptance."
+  },
+  {
+    "issueNumber": 2511,
+    "verdict": "fix-now",
+    "recommendedTitle": "Refresh the SMS navigation count after a successful local read",
+    "size": "S",
+    "risk": "low",
+    "blockedBy": [],
+    "summary": "The navigation badge ignores local read completion and can retain an old total until its 30-second poll. A focused candidate refreshes the complete total after successful local reads; regression and fault controls pass. Full gates and merge remain.",
+    "currentBehavior": "Candidate based on dev@cc7e8559, 2026-10-14. The canonical browser messaging client emits one workspace-scoped local notice after a successful read request. The badge refreshes its authoritative total. Reads during an active count request coalesce into one follow-up, and an obsolete snapshot cannot replace the refreshed total. Repeated reads do not subtract twice; failed reads retain the badge; foreign and late old-workspace notices are ignored. Existing polling and inbound subscriptions remain; no extra server broadcast or count stream is added.",
+    "rootCause": "The persistent navigation count listens to inbound inserts and a 30-second poll, but neither existing local read event. Three callers dispatch unscoped notices independently, so other callers cannot notify the badge consistently.",
+    "resolution": "Publish local read completion from the existing browser messaging client, consume only the current workspace notices, and refresh the full total without waiting for the poll. Retain a pending local read across an in-flight count query.",
+    "lookIn": [
+      "app/hooks/chats/useUnreadConversationsCount.ts",
+      "app/lib/chats/messaging-client.ts",
+      "app/hooks/chats/useChatsPage.ts",
+      "app/hooks/chats/useChatThread.ts"
+    ],
+    "existingTests": [
+      "test/ui/workspace-unread-count.test.tsx: 15 real-client/hook cases, including 11 new local-read, overlap, failure, navigation and cleanup controls",
+      "Pinned original cc7e8559 fails five cases with ten controls passing; disabling queued refresh fails two cases with thirteen controls passing; restored candidate passes all fifteen",
+      "Initial focused chat-hook run passes 37 cases before the additional late-navigation case"
+    ],
+    "missingTests": [
+      "Full local CI, exact-head remote gates and both preview services before merge; release acceptance before closure"
+    ],
+    "acceptanceCriteria": [
+      "Successful conversation and single-message reads refresh the current user navigation count before the next poll",
+      "Repeated and overlapping reads cannot double-decrement or leave a stale count request as the final total",
+      "Failed reads and count failures preserve the last known total and later polling recovers",
+      "Workspace navigation and listener cleanup prevent foreign read notices from changing the displayed badge",
+      "No additional server broadcast or count stream is introduced"
+    ],
+    "trackerRecommendation": "One focused candidate implements #2511. Keep source proof separate from default-branch promotion and deployed acceptance."
   }
 ]

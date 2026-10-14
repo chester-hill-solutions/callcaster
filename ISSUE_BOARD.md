@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 333 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 334 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 11
+## Fix now — 12
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -163,6 +163,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Full local gate after verified PR-link metadata; exact-head remote checks and both actual preview services before merge; release acceptance before closure
 - Done when: Selecting a calling-device or other shared Select option keeps its containing Sheet or Dialog open; Mouse, touch and keyboard selection work and retain draft input; The first Escape closes the dropdown; the next Escape closes the parent and restores focus; Normal outside-click dismissal and background isolation remain; caller Escape prevention is honored
 - Tracker: Candidate PR #2565 into dev implements #2518. The separate vendor-build prerequisite is merged in PR #2564. Require green final-head gates before merge and retain the open issue for release acceptance.
+
+### [#2511](https://github.com/chester-hill-solutions/callcaster/issues/2511) SMS Notification message count should go down instantly once messages are opened
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Refresh the SMS navigation count after a successful local read**
+- The navigation badge ignores local read completion and can retain an old total until its 30-second poll. A focused candidate refreshes the complete total after successful local reads; regression and fault controls pass. Full gates and merge remain.
+- Current behavior: Candidate based on dev@cc7e8559, 2026-10-14. The canonical browser messaging client emits one workspace-scoped local notice after a successful read request. The badge refreshes its authoritative total. Reads during an active count request coalesce into one follow-up, and an obsolete snapshot cannot replace the refreshed total. Repeated reads do not subtract twice; failed reads retain the badge; foreign and late old-workspace notices are ignored. Existing polling and inbound subscriptions remain; no extra server broadcast or count stream is added.
+- Root cause: The persistent navigation count listens to inbound inserts and a 30-second poll, but neither existing local read event. Three callers dispatch unscoped notices independently, so other callers cannot notify the badge consistently.
+- Resolution: Publish local read completion from the existing browser messaging client, consume only the current workspace notices, and refresh the full total without waiting for the poll. Retain a pending local read across an in-flight count query.
+- Look in: `app/hooks/chats/useUnreadConversationsCount.ts`, `app/lib/chats/messaging-client.ts`, `app/hooks/chats/useChatsPage.ts`, `app/hooks/chats/useChatThread.ts`
+- Existing tests: test/ui/workspace-unread-count.test.tsx: 15 real-client/hook cases, including 11 new local-read, overlap, failure, navigation and cleanup controls; Pinned original cc7e8559 fails five cases with ten controls passing; disabling queued refresh fails two cases with thirteen controls passing; restored candidate passes all fifteen; Initial focused chat-hook run passes 37 cases before the additional late-navigation case
+- Missing tests: Full local CI, exact-head remote gates and both preview services before merge; release acceptance before closure
+- Done when: Successful conversation and single-message reads refresh the current user navigation count before the next poll; Repeated and overlapping reads cannot double-decrement or leave a stale count request as the final total; Failed reads and count failures preserve the last known total and later polling recovers; Workspace navigation and listener cleanup prevent foreign read notices from changing the displayed badge; No additional server broadcast or count stream is introduced
+- Tracker: One focused candidate implements #2511. Keep source proof separate from default-branch promotion and deployed acceptance.
 
 ---
 
