@@ -418,7 +418,7 @@
     "size": "S",
     "risk": "low",
     "blockedBy": [],
-    "summary": "Reopened after the user reported the overlap on master following PR #2534. The selected decision is to remove the browser-generated ringing loop. The isolated removal and twelve focused cases pass; full gates and merge remain.",
+    "summary": "PR #2567 removes the browser-generated ringing loop after the user reported overlap on master following PR #2534. Full local CI passes at 4b63b0bc; final dev-base, remote and preview checks and release remain.",
     "currentBehavior": "Candidate removes the call-screen ringback wiring and deletes its generator and obsolete playback test. Available call media and the visible dialing state remain. Two real call-screen cases cover computer and verified-handset dialing through twelve seconds of delayed call updates, with no generated oscillator. An explicit speaker test remains a working audio control. Existing end-of-call feedback and cleanup tests pass.",
     "rootCause": "Master@0f4ebde2 still enables the app-generated loop from useCallScreen while its display state is dialing. PR #2534 improved tone-player teardown but retained that generator and its dependency on UI state. The user reports that overlap persists on master; no live-call timing trace is claimed.",
     "resolution": "Remove the generated progress-ringing loop instead of adding another teardown condition or fallback tone. Preserve existing call media, device routing, mute, DTMF and cleanup. Some call paths can be quiet while connecting because network early media is optional.",
@@ -432,10 +432,12 @@
     "existingTests": [
       "Twelve focused UI cases pass with both borrowed and fresh locked dependencies; two new cases exercise the real call-screen hook for computer and verified handset",
       "Pinned original dev@cc7e8559 fails both new cases on actual oscillator creation, with ten controls passing; restored source passes all twelve",
-      "New cases retain the selected handset, enter the actual dialing state, advance twelve seconds without ringing, and verify that an explicit speaker test still creates working test audio"
+      "New cases retain the selected handset, enter the actual dialing state, advance twelve seconds without ringing, and verify that an explicit speaker test still creates working test audio",
+      "Full npm run ci:local at 4b63b0bc: 5,488 server tests pass (11 skipped), 34 runtime tests pass, 1,389 UI tests pass; all guards, builds, client bundle and codegen verification pass",
+      "Independent standards and specification reviews of the pinned release changes found no actionable issues"
     ],
     "missingTests": [
-      "Full local CI on the final dev base, exact-head remote gates and both preview services before merge",
+      "Full local CI after the final dev rebase and PR-linked release note, exact-head remote gates and both preview services before merge",
       "Release to master and live call acceptance after reloading the call page"
     ],
     "acceptanceCriteria": [

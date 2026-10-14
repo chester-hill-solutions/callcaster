@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Removed: The app-generated ringing loop during campaign dialing, which could overlap answered calls or voicemail ([#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
+- Removed: The app-generated ringing loop during campaign dialing, which could overlap answered calls or voicemail ([PR #2567](https://github.com/chester-hill-solutions/callcaster/pull/2567), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
 
 - Fixed: The SMS navigation count updates after you read messages, without waiting for the next poll ([PR #2566](https://github.com/chester-hill-solutions/callcaster/pull/2566), [#2511](https://github.com/chester-hill-solutions/callcaster/issues/2511)).
 
