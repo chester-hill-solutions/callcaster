@@ -1,8 +1,19 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { Table as Table$1, TableHeader as TableHeader$1, TableBody as TableBody$1, TableFooter as TableFooter$1, Row, Column, Cell } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/table.tsx
+import "react";
+import {
+  Cell as CellPrimitive,
+  Column as ColumnPrimitive,
+  Row as RowPrimitive,
+  TableBody as TableBodyPrimitive,
+  TableFooter as TableFooterPrimitive,
+  TableHeader as TableHeaderPrimitive,
+  Table as TablePrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Table({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "div",
@@ -10,7 +21,7 @@ function Table({ className, ...props }) {
       "data-slot": "table-container",
       className: "relative w-full overflow-x-auto",
       children: /* @__PURE__ */ jsx(
-        Table$1,
+        TablePrimitive,
         {
           "data-slot": "table",
           className: cn("w-full caption-bottom text-sm", className),
@@ -22,7 +33,7 @@ function Table({ className, ...props }) {
 }
 function TableHeader({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    TableHeader$1,
+    TableHeaderPrimitive,
     {
       "data-slot": "table-header",
       className: cn("[&_tr]:border-b", className),
@@ -32,7 +43,7 @@ function TableHeader({ className, ...props }) {
 }
 function TableBody({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    TableBody$1,
+    TableBodyPrimitive,
     {
       "data-slot": "table-body",
       className: cn(
@@ -45,7 +56,7 @@ function TableBody({ className, ...props }) {
 }
 function TableFooter({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    TableFooter$1,
+    TableFooterPrimitive,
     {
       "data-slot": "table-footer",
       className: cn(
@@ -58,7 +69,7 @@ function TableFooter({ className, ...props }) {
 }
 function TableRow({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Row,
+    RowPrimitive,
     {
       "data-slot": "table-row",
       className: cn(
@@ -71,7 +82,7 @@ function TableRow({ className, ...props }) {
 }
 function TableHead({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Column,
+    ColumnPrimitive,
     {
       "data-slot": "table-head",
       className: cn(
@@ -84,7 +95,7 @@ function TableHead({ className, ...props }) {
 }
 function TableCell({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    Cell,
+    CellPrimitive,
     {
       "data-slot": "table-cell",
       className: cn(
@@ -112,6 +123,14 @@ function TableCaption({
   );
 }
 
-export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow };
-//# sourceMappingURL=chunk-IAUPWKMM.js.map
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption
+};
 //# sourceMappingURL=chunk-IAUPWKMM.js.map

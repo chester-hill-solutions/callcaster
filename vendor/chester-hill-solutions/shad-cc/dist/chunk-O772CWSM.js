@@ -1,14 +1,20 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { TextArea, composeRenderProps } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/textarea.tsx
+import "react";
+import {
+  composeRenderProps,
+  TextArea as TextareaPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Textarea({
   className,
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    TextArea,
+    TextareaPrimitive,
     {
       "data-slot": "textarea",
       className: composeRenderProps(
@@ -23,6 +29,7 @@ function Textarea({
   );
 }
 
-export { Textarea };
-//# sourceMappingURL=chunk-O772CWSM.js.map
+export {
+  Textarea
+};
 //# sourceMappingURL=chunk-O772CWSM.js.map

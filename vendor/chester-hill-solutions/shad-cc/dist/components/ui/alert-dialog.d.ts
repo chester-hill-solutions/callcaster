@@ -1,15 +1,12 @@
-import * as React from 'react';
-import { ModalOverlayProps, Modal, Heading, DialogTriggerProps } from 'react-aria-components';
-import { Button } from './button.js';
-import 'class-variance-authority/types';
-import 'class-variance-authority';
-
-declare function AlertDialogTrigger({ ...props }: DialogTriggerProps): React.JSX.Element;
-declare function AlertDialogOverlay({ className, children, ...props }: Omit<ModalOverlayProps, "className" | "children"> & {
+import * as React from "react";
+import { Heading, Modal as ModalPrimitive, type DialogTriggerProps as AlertDialogTriggerPrimitiveProps, type ModalOverlayProps as ModalOverlayPrimitiveProps } from "react-aria-components";
+import { Button } from "./button";
+declare function AlertDialogTrigger({ ...props }: AlertDialogTriggerPrimitiveProps): React.JSX.Element;
+declare function AlertDialogOverlay({ className, children, ...props }: Omit<ModalOverlayPrimitiveProps, "className" | "children"> & {
     className?: string;
     children: React.ReactNode;
 }): React.JSX.Element;
-declare function AlertDialog({ className, size, children, ...props }: Omit<ModalOverlayProps, "className" | "children"> & Pick<React.ComponentProps<typeof Modal>, "isDismissable"> & {
+declare function AlertDialog({ className, size, children, ...props }: Omit<ModalOverlayPrimitiveProps, "className" | "children"> & Pick<React.ComponentProps<typeof ModalPrimitive>, "isDismissable"> & {
     className?: string;
     size?: "default" | "sm";
     children: React.ReactNode;
@@ -22,5 +19,4 @@ declare function AlertDialogTitle({ className, ...props }: Omit<React.ComponentP
 declare function AlertDialogDescription({ className, ...props }: Omit<React.ComponentProps<"div">, "slot">): React.JSX.Element;
 declare function AlertDialogAction({ className, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
 declare function AlertDialogCancel({ className, variant, size, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
-
-export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogOverlay, AlertDialogTitle, AlertDialogTrigger };
+export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogOverlay, AlertDialogTitle, AlertDialogTrigger, };

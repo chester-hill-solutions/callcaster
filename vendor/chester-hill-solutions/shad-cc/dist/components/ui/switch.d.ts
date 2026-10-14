@@ -1,8 +1,5 @@
-import * as React from 'react';
-import { SwitchProps } from 'react-aria-components';
-
-declare function Switch({ className, size, children, ...props }: SwitchProps & {
+import { type SwitchProps as SwitchPrimitiveProps } from "react-aria-components";
+declare function Switch({ className, size, children, ...props }: SwitchPrimitiveProps & {
     size?: "sm" | "default";
-}): React.JSX.Element;
-
+}): import("react").JSX.Element;
 export { Switch };

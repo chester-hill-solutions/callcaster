@@ -77,10 +77,15 @@ carry that test URL into ci:local and then claim its ledger failure is code drif
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
 
-Full `ci:local` must run where the vendor guard can restore its generated
-files through Git and Bun can write its temporary files. A permission failure
-is not lockfile drift: retain the dependency files, restore only the owned
-generated output, then rerun the full gate with the required permissions.
+Full `ci:local` must run where Bun can write its temporary files. A permission
+failure is not lockfile drift: retain the dependency files and rerun the full
+gate with the required permissions. The vendor guard leaves rebuilt output for
+review; it does not reset or clean files. Record a clean starting tree before
+testing build reproducibility. Save a failing diff, then restore only generated
+files proved to come from that owned build. Check repeated unchanged-source
+builds for import/chunk and declaration-union ordering before calling drift a
+source defect. A quiet run alone does not prove a previously variable builder is
+stable; fix its ordering and require complete repeated byte snapshots.
 
 For process checks on macOS, use PID/parent-ID fields and an exact `lsof`
 working-directory check. Do not use `pgrep -fl`: it can print environment
@@ -277,6 +282,14 @@ source discovery can otherwise hide a server/client asset disagreement.
 
 ## UI fixture contracts
 
+When mixing Radix portals and React Aria overlays, test real selection, focus,
+background isolation and Escape order. A role query can hide a parent while the
+child list is active; check retained DOM separately and wait for exit animation
+and focus return before reading the final role. Bound negative browser waits and
+run an original-source focus-conflict probe in an owned child with a deadline:
+competing focus traps can recurse without reaching a test timeout. Stop only its
+verified owned process if it loops, then use a completed browser reproduction.
+
 For a focused temporary Vitest config, replace `test.include` explicitly after
 loading the base config. `mergeConfig` appends arrays, which can run the full
 suite alongside the intended fixture. Check the collected test count before
@@ -396,6 +409,9 @@ For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
 or raise a baseline to treat a timeout as green.
+If different router-mount cases time out under memory pressure but pass alone,
+run the full gate with `VITEST_MAX_WORKERS=1`. This Vitest environment setting
+overrides both suites' worker limits. Keep assertions and timeouts unchanged.
 Vitest 4 supports `VITEST_MAX_WORKERS`. On a busy local machine, use a
 command-scoped limit such as `VITEST_MAX_WORKERS=2 npm run ci:local`; retain
 all cases and timeouts. Keep `lint` and `check:lint-ratchet` sequential because

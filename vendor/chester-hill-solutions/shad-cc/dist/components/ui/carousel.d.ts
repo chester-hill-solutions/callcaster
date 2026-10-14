@@ -1,10 +1,6 @@
-import * as React from 'react';
-import useEmblaCarousel, { UseEmblaCarouselType } from 'embla-carousel-react';
-import { Button } from './button.js';
-import 'class-variance-authority/types';
-import 'class-variance-authority';
-import 'react-aria-components';
-
+import * as React from "react";
+import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react";
+import { Button } from "./button";
 type CarouselApi = UseEmblaCarouselType[1];
 type UseCarouselParameters = Parameters<typeof useEmblaCarousel>;
 type CarouselOptions = UseCarouselParameters[0];
@@ -29,5 +25,4 @@ declare function CarouselContent({ className, ...props }: React.ComponentProps<"
 declare function CarouselItem({ className, ...props }: React.ComponentProps<"div">): React.JSX.Element;
 declare function CarouselPrevious({ className, variant, size, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
 declare function CarouselNext({ className, variant, size, ...props }: React.ComponentProps<typeof Button>): React.JSX.Element;
-
-export { Carousel, type CarouselApi, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, useCarousel };
+export { type CarouselApi, Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, useCarousel, };

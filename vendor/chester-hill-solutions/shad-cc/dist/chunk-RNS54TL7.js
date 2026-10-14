@@ -1,13 +1,18 @@
-import { useTheme } from 'next-themes';
-import { Toaster as Toaster$1 } from 'sonner';
-import { Loader2Icon, OctagonXIcon, TriangleAlertIcon, InfoIcon, CircleCheckIcon } from 'lucide-react';
-import { jsx } from 'react/jsx-runtime';
-
 // src/components/ui/sonner.tsx
+import { useTheme } from "next-themes";
+import { Toaster as Sonner } from "sonner";
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  TriangleAlertIcon,
+  OctagonXIcon,
+  Loader2Icon
+} from "lucide-react";
+import { jsx } from "react/jsx-runtime";
 var Toaster = ({ ...props }) => {
   const { theme = "system" } = useTheme();
   return /* @__PURE__ */ jsx(
-    Toaster$1,
+    Sonner,
     {
       theme,
       className: "toaster group",
@@ -49,6 +54,7 @@ var Toaster = ({ ...props }) => {
   );
 };
 
-export { Toaster };
-//# sourceMappingURL=chunk-RNS54TL7.js.map
+export {
+  Toaster
+};
 //# sourceMappingURL=chunk-RNS54TL7.js.map

@@ -1,10 +1,7 @@
-import * as React from 'react';
-import { SliderProps as SliderProps$1 } from 'react-aria-components';
-
+import { type SliderProps as SliderPrimitiveProps } from "react-aria-components";
 type SliderValue = number | number[];
-type SliderProps<T extends SliderValue = SliderValue> = Omit<SliderProps$1<T>, "className"> & {
+type SliderProps<T extends SliderValue = SliderValue> = Omit<SliderPrimitiveProps<T>, "className"> & {
     className?: string;
 };
-declare function Slider<T extends SliderValue = SliderValue>({ className, ...props }: SliderProps<T>): React.JSX.Element;
-
+declare function Slider<T extends SliderValue = SliderValue>({ className, ...props }: SliderProps<T>): import("react").JSX.Element;
 export { Slider };

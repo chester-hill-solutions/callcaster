@@ -1,10 +1,17 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { RadioGroup as RadioGroup$1, Radio, composeRenderProps } from 'react-aria-components';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/radio-group.tsx
+import {
+  composeRenderProps,
+  RadioGroup as RadioGroupPrimitive,
+  Radio as RadioPrimitive
+} from "react-aria-components";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function RadioGroup({ className, ...props }) {
   return /* @__PURE__ */ jsx(
-    RadioGroup$1,
+    RadioGroupPrimitive,
     {
       "data-slot": "radio-group",
       className: cn("grid w-full gap-3", className),
@@ -14,7 +21,7 @@ function RadioGroup({ className, ...props }) {
 }
 function RadioGroupItem({ className, children, ...props }) {
   return /* @__PURE__ */ jsx(
-    Radio,
+    RadioPrimitive,
     {
       "data-slot": "radio-group-item",
       className: cn(
@@ -37,6 +44,8 @@ function RadioGroupItem({ className, children, ...props }) {
   );
 }
 
-export { RadioGroup, RadioGroupItem };
-//# sourceMappingURL=chunk-3VVWWHQ5.js.map
+export {
+  RadioGroup,
+  RadioGroupItem
+};
 //# sourceMappingURL=chunk-3VVWWHQ5.js.map

@@ -1,9 +1,6 @@
-import * as React from 'react';
-import { DateValue, CalendarProps, CalendarCellRenderProps, RangeCalendarProps } from 'react-aria-components';
-import { Button } from './button.js';
-import 'class-variance-authority/types';
-import 'class-variance-authority';
-
+import * as React from "react";
+import { type CalendarCellRenderProps, type CalendarProps, type DateValue, type RangeCalendarProps } from "react-aria-components";
+import { Button } from "./button";
 declare function Calendar<T extends DateValue, M extends "single" | "multiple" = "single">(props: Omit<CalendarProps<T, M>, "visibleDuration"> & {
     buttonVariant?: React.ComponentProps<typeof Button>["variant"];
     captionLayout?: "label" | "dropdown";
@@ -24,5 +21,4 @@ declare function RangeCalendar<T extends DateValue>(props: RangeCalendarProps<T>
         defaultChildren: React.ReactNode;
     }) => React.ReactNode;
 }): React.JSX.Element;
-
 export { Calendar, RangeCalendar };

@@ -1,11 +1,17 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { Label as Label$1, LabelContext } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/label.tsx
+import "react";
+import {
+  LabelContext,
+  Label as LabelPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Label({ className, htmlFor, slot, ...props }) {
   const label = /* @__PURE__ */ jsx(
-    Label$1,
+    LabelPrimitive,
     {
       "data-slot": "label",
       className: cn(
@@ -23,6 +29,7 @@ function Label({ className, htmlFor, slot, ...props }) {
   return label;
 }
 
-export { Label };
-//# sourceMappingURL=chunk-2ZECQN6W.js.map
+export {
+  Label
+};
 //# sourceMappingURL=chunk-2ZECQN6W.js.map

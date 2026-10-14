@@ -1,7 +1,5 @@
-import * as React from 'react';
-import { TagProps, TagListProps, GroupProps, InputProps, Popover, ListBoxSectionProps, ListBoxItemProps, HeaderProps, ListBoxProps, SeparatorProps, ButtonProps, ComboBoxValueProps } from 'react-aria-components';
-export { ComboBox as Combobox, Collection as ComboboxCollection } from 'react-aria-components';
-
+import * as React from "react";
+import { Collection, ComboBox as ComboBoxPrimitive, Popover as PopoverPrimitive, type ButtonProps, type ComboBoxValueProps, type GroupProps, type HeaderProps, type InputProps, type ListBoxItemProps, type ListBoxProps, type ListBoxSectionProps, type SeparatorProps, type TagListProps, type TagProps } from "react-aria-components";
 declare function ComboboxValue<T>({ ...props }: ComboBoxValueProps<T>): React.JSX.Element;
 declare function ComboboxTrigger({ className, children, ...props }: Omit<ButtonProps, "children"> & {
     children?: React.ReactNode;
@@ -10,7 +8,7 @@ declare function ComboboxInput({ className, children, disabled, showTrigger, sho
     showTrigger?: boolean;
     showClear?: boolean;
 }): React.JSX.Element;
-declare function ComboboxContent({ className, placement, offset, crossOffset, anchor, ...props }: Omit<React.ComponentProps<typeof Popover>, "className" | "children"> & {
+declare function ComboboxContent({ className, placement, offset, crossOffset, anchor, ...props }: Omit<React.ComponentProps<typeof PopoverPrimitive>, "className" | "children"> & {
     className?: string;
     children?: React.ReactNode;
     anchor?: React.RefObject<HTMLDivElement | null>;
@@ -31,5 +29,4 @@ declare function ComboboxChip({ className, children, showRemove, ...props }: Omi
 }): React.JSX.Element;
 declare function ComboboxChipsInput({ className, ...props }: InputProps): React.JSX.Element;
 declare function useComboboxAnchor(): React.RefObject<HTMLDivElement | null>;
-
-export { ComboboxChip, ComboboxChipList, ComboboxChips, ComboboxChipsInput, ComboboxContent, ComboboxEmpty, ComboboxGroup, ComboboxInput, ComboboxItem, ComboboxLabel, ComboboxList, ComboboxSeparator, ComboboxTrigger, ComboboxValue, useComboboxAnchor };
+export { ComboBoxPrimitive as Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxGroup, ComboboxLabel, Collection as ComboboxCollection, ComboboxEmpty, ComboboxSeparator, ComboboxChips, ComboboxChip, ComboboxChipList, ComboboxChipsInput, ComboboxTrigger, ComboboxValue, useComboboxAnchor, };

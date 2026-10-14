@@ -1,9 +1,17 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { Breadcrumbs, Breadcrumb as Breadcrumb$1, composeRenderProps, Link } from 'react-aria-components';
-import { ChevronRightIcon, MoreHorizontalIcon } from 'lucide-react';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/breadcrumb.tsx
+import "react";
+import {
+  Breadcrumb as BreadcrumbPrimitive,
+  Breadcrumbs as BreadcrumbsPrimitive,
+  composeRenderProps,
+  Link as LinkPrimitive
+} from "react-aria-components";
+import { ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function Breadcrumb({ className, ...props }) {
   return /* @__PURE__ */ jsx(
     "nav",
@@ -20,7 +28,7 @@ function BreadcrumbList({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Breadcrumbs,
+    BreadcrumbsPrimitive,
     {
       "data-slot": "breadcrumb-list",
       className: cn(
@@ -38,7 +46,7 @@ function BreadcrumbItem({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Breadcrumb$1,
+    BreadcrumbPrimitive,
     {
       "data-slot": "breadcrumb-item",
       className: cn("inline-flex items-center gap-1.5", className),
@@ -61,7 +69,7 @@ function BreadcrumbItem({
 }
 function BreadcrumbLink({ className, render, ...props }) {
   return /* @__PURE__ */ jsx(
-    Link,
+    LinkPrimitive,
     {
       "data-slot": "breadcrumb-link",
       className: cn("transition-colors hover:text-foreground", className),
@@ -109,6 +117,12 @@ function BreadcrumbEllipsis({
   );
 }
 
-export { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage };
-//# sourceMappingURL=chunk-YE5JXA2L.js.map
+export {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbEllipsis
+};
 //# sourceMappingURL=chunk-YE5JXA2L.js.map

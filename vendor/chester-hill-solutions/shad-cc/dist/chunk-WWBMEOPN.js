@@ -1,11 +1,22 @@
-import { Button } from './chunk-IFW6QGQN.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { DialogTrigger, ModalOverlay, Modal, Dialog, Heading } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  Button
+} from "./chunk-IFW6QGQN.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/alert-dialog.tsx
+import "react";
+import {
+  Dialog as AlertDialogPrimitive,
+  DialogTrigger as AlertDialogTriggerPrimitive,
+  Heading,
+  ModalOverlay as ModalOverlayPrimitive,
+  Modal as ModalPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function AlertDialogTrigger({ ...props }) {
-  return /* @__PURE__ */ jsx(DialogTrigger, { "data-slot": "alert-dialog-trigger", ...props });
+  return /* @__PURE__ */ jsx(AlertDialogTriggerPrimitive, { "data-slot": "alert-dialog-trigger", ...props });
 }
 function AlertDialogOverlay({
   className,
@@ -13,7 +24,7 @@ function AlertDialogOverlay({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ModalOverlay,
+    ModalOverlayPrimitive,
     {
       "data-slot": "alert-dialog-overlay",
       className: cn(
@@ -32,7 +43,7 @@ function AlertDialog({
   ...props
 }) {
   return /* @__PURE__ */ jsx(AlertDialogOverlay, { ...props, children: /* @__PURE__ */ jsx(
-    Modal,
+    ModalPrimitive,
     {
       "data-slot": "alert-dialog-content",
       "data-size": size,
@@ -41,7 +52,7 @@ function AlertDialog({
         className
       ),
       children: /* @__PURE__ */ jsx(
-        Dialog,
+        AlertDialogPrimitive,
         {
           "data-slot": "alert-dialog",
           role: "alertdialog",
@@ -174,6 +185,17 @@ function AlertDialogCancel({
   );
 }
 
-export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogOverlay, AlertDialogTitle, AlertDialogTrigger };
-//# sourceMappingURL=chunk-WWBMEOPN.js.map
+export {
+  AlertDialogTrigger,
+  AlertDialogOverlay,
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel
+};
 //# sourceMappingURL=chunk-WWBMEOPN.js.map
