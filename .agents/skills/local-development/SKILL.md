@@ -16,6 +16,10 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+Before `ci:local`, check `node --version` and `bun --version` in the same
+command-scoped PATH. A missing Bun executable can be reported as lockfile
+drift; verify tool availability before changing either lockfile.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
@@ -700,6 +704,12 @@ drift without its matching reviewed source change.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.
 - Load the `github-cli` and `github-issues` skills for `gh` specifics.
+
+Before production release checks, resolve app and worker service IDs from that
+environment's service instances. A PR preview can use a different app service.
+An empty deployment list for a copied preview service ID is unknown, not a
+production failure. Require both actual production deployments at the release
+commit.
 
 Route modules must export only route-facing handlers and components. Import
 server helpers directly in their tests. A helper re-export from a route can
