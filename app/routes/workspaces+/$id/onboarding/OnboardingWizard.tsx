@@ -411,7 +411,7 @@ export function OnboardingWizard({
           description={
             goal === "sms_blast"
               ? "Create the message content your SMS campaign will send."
-              : "Create the IVR or call script your campaign will use."
+              : "Create the automated phone menu or call script your campaign will use."
           }
           complete={scripts.length > 0}
           completeLabel={`You have ${scripts.length} script${scripts.length === 1 ? "" : "s"} ready.`}

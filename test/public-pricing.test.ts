@@ -24,12 +24,12 @@ describe("public-pricing", () => {
 
   test("buildPublicPricingContent lays out three service cards for the pricing page (#1392)", () => {
     // Sai's first checklist point: "should be 3 cards in a row … for texting,
-    // calling, IVRs". The content shape is what the pricing route grids over.
+    // calling, automated phone menus". The content shape is what the pricing route grids over.
     const { services } = buildPublicPricingContent();
     expect(services.map((row) => row.service)).toEqual([
       "Texting",
       "Calling",
-      "IVRs",
+      "Automated phone menus",
     ]);
   });
 
@@ -60,7 +60,7 @@ describe("public-pricing", () => {
 
   test.each([
     { service: "Calling", kind: "staffed", first: 4, additional: 5 },
-    { service: "IVRs", kind: "ivr", first: 2, additional: 3 },
+    { service: "Automated phone menus", kind: "ivr", first: 2, additional: 3 },
   ] as const)(
     "$service publishes its own billing rate",
     ({ service, kind, first, additional }) => {
