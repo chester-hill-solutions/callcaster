@@ -5,6 +5,7 @@ import { redirect, Form, NavLink, useActionData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { AuthPage } from "@/components/shared/AuthPage";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -26,8 +27,8 @@ export default function SignIn() {
   });
 
   return (
-    <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-8 text-foreground sm:px-6 lg:px-8">
-      <div className="z-10 flex w-full justify-center">
+    <AuthPage>
+      <div className="relative z-10 flex w-full justify-center">
         <AuthCard
           title="Login"
           description="Sign in to manage your workspaces, calls, and messaging."
@@ -82,12 +83,7 @@ export default function SignIn() {
           </div>
         </AuthCard>
       </div>
-      <img
-        alt="background"
-        src="/Hero-1.png"
-        className="absolute left-0 top-2.5 z-[-1] h-screen overflow-hidden object-cover opacity-10"
-      />
-    </main>
+    </AuthPage>
   );
 }
 

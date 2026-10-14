@@ -13,6 +13,7 @@ import type { MetaFunction } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { AuthPage } from "@/components/shared/AuthPage";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ export default function SignUp() {
   });
 
   return (
-    <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-8 text-foreground sm:px-6 lg:px-8">
+    <AuthPage>
       {signupOpen ? (
         <RegistrationForm isBusy={state !== "idle"} />
       ) : (
@@ -64,12 +65,7 @@ export default function SignUp() {
           fetcher={fetcher}
         />
       )}
-      <img
-        alt="background"
-        src="/Hero-1.png"
-        className="absolute left-0 top-2.5 z-[-1] h-screen overflow-hidden object-cover opacity-10"
-      />
-    </main>
+    </AuthPage>
   );
 }
 
@@ -78,7 +74,7 @@ interface RegistrationFormProps {
 }
 
 const RegistrationForm = ({ isBusy }: RegistrationFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-xl font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 w-full max-w-xl font-Zilla-Slab">
     <AuthCard
       title="Sign Up"
       description="Sign up to create a workspace and start calling."
@@ -152,7 +148,7 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-xl font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 w-full max-w-xl font-Zilla-Slab">
     <AuthCard
       title="Request Access"
       description="Registration is currently available by invitation. Contact us to let us know you're interested."
