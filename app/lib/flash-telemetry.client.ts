@@ -41,9 +41,7 @@ function ship(event: FlashEvent): void {
 
     const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/client-flash`;
     const body = JSON.stringify({ events: [event] });
-    // sendBeacon survives imminent navigation; text/plain sidesteps the
-    // CORS-preflight restriction on beacon content types (same-origin here,
-    // but keepalive fetch is the fallback either way).
+    // Both transports must survive navigation; fetch handles rejected beacons.
     const sent =
       typeof navigator.sendBeacon === "function" &&
       navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));

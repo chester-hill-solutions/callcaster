@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
+- Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([PR #2562](https://github.com/chester-hill-solutions/callcaster/pull/2562), [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
 
 - Fixed: Neutral notices use the shared card style in both themes, and campaign safeguards, authenticator setup, and Twilio warnings use explicit warning tones ([PR #2561](https://github.com/chester-hill-solutions/callcaster/pull/2561), [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061)).
 
