@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: The SMS bulk confirmation checkbox now aligns before its wrapped confirmation text ([PR #2575](https://github.com/chester-hill-solutions/callcaster/pull/2575), [#2510](https://github.com/chester-hill-solutions/callcaster/issues/2510)).
+
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 - Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
 
