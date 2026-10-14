@@ -213,6 +213,10 @@ before trusting a guard's floor result.
 
 ## API and form response adapters
 
+If a guarded action's inferred result is `unknown`, give `useActionData` an
+explicit form response contract and test its server metadata and page handling.
+Do not replace the missing boundary with `any` or classify errors by message text.
+
 `asRouteResponse` normalizes thrown Responses. To verify that an auth redirect
 stays thrown, call the raw loader or action and inspect its rejected Response.
 Normalize a middleware result only once, outside its `next` callback. A nested

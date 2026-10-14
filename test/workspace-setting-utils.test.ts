@@ -119,18 +119,25 @@ describe("WorkspaceSettingUtils", () => {
 
   test("handleAddUser rejects a missing email and an unknown role before inviting", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
-    const headers = new Headers();
+    const headers = new Headers({ "X-Settings-Test": "retained" });
 
     const fdMissing = new FormData();
+    fdMissing.set("new_user_workspace_role", "caller");
     const resMissing = await asRouteResponse(mod.handleAddUser(fdMissing, "w1", headers, memberActor));
     expect(resMissing.status).toBe(400);
+    expect(resMissing.headers.get("X-Settings-Test")).toBe("retained");
+    expect(await resMissing.json()).toEqual({
+      user: null,
+      error: "Email is required.",
+      fieldErrors: { username: "Email is required." },
+    });
 
     const fdBadRole = new FormData();
     fdBadRole.set("username", "a@b.com");
     fdBadRole.set("new_user_workspace_role", "superuser");
     const resBadRole = await asRouteResponse(mod.handleAddUser(fdBadRole, "w1", headers, memberActor));
     expect(resBadRole.status).toBe(400);
-    expect(await resBadRole.json()).toMatchObject({ error: "Invalid workspace role" });
+    expect(await resBadRole.json()).toEqual({ user: null, error: "Invalid workspace role" });
 
     expect(membersDbMocks.inviteWorkspaceMember).not.toHaveBeenCalled();
     expect(membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin).not.toHaveBeenCalled();
@@ -151,7 +158,7 @@ describe("WorkspaceSettingUtils", () => {
     });
     const resDenied = await asRouteResponse(mod.handleAddUser(fd, "w1", headers, memberActor));
     expect(resDenied.status).toBe(403);
-    expect(await resDenied.json()).toMatchObject({
+    expect(await resDenied.json()).toEqual({
       user: null,
       error: "You cannot grant a role higher than your own.",
     });

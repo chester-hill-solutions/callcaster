@@ -53,6 +53,13 @@ type LoaderData = {
   }[];
 }
 
+type ActionData = {
+  error?: unknown;
+  fieldErrors?: { username: string };
+  data?: unknown;
+  success?: boolean;
+};
+
 export default function WorkspaceSettings() {
   const outlet = useOutlet();
   const {
@@ -74,7 +81,8 @@ export default function WorkspaceSettings() {
     workspace: WorkspaceData;
   }>();
   const { workspace: outletWorkspace } = outletContext;
-  const actionData = useActionData();
+  const actionData = useActionData<ActionData>();
+  const emailError = actionData?.fieldErrors?.username;
   const canManageWebhook =
     hasAccess &&
     outletWorkspace != null &&
@@ -93,7 +101,7 @@ export default function WorkspaceSettings() {
     (pendingInvites ?? []).some(Boolean);
   const formRef = useRef<HTMLFormElement | null>(null);
   useActionFeedback(actionData, {
-    getError: (data) => data?.error,
+    getError: (data) => data.fieldErrors?.username ? undefined : data.error,
     getSuccess: (data) =>
       Boolean(
         data &&
@@ -112,7 +120,8 @@ export default function WorkspaceSettings() {
           htmlFor="username"
           label="Email"
           className="w-full"
-          error={actionData?.error}
+          error={emailError}
+          feedback=""
         >
           <FormFieldControl>
             <Input

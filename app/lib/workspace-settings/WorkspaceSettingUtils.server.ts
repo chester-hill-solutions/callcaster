@@ -31,7 +31,11 @@ export async function handleAddUser(
   const username = formData.get("username") as string;
   const requestedRole = formData.get("new_user_workspace_role");
   if (!username) {
-    return routeData({ user: null, error: "Must provide an email address" }, 400);
+    const error = "Email is required.";
+    return routeData(
+      { user: null, error, fieldErrors: { username: error } },
+      { headers, status: 400 },
+    );
   }
   if (!isMemberRole(requestedRole)) {
     return routeData({ user: null, error: "Invalid workspace role" }, 400);
