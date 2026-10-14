@@ -180,7 +180,7 @@
     "issueNumber": 2061,
     "verdict": "fix-now",
     "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
-    "summary": "A local candidate adopts the canonical neutral Alert default and explicit warning tones. All 78 app uses are inventoried; focused regressions and 112 old/new browser comparisons pass. Review and publication remain.",
+    "summary": "Candidate PR #2561 adopts the canonical neutral Alert default and explicit warning tones. All 78 app uses are inventoried; strict structural review, full local CI, focused regressions and 112 old/new browser comparisons pass. Remote checks, preview deployment and merge remain.",
     "currentBehavior": "Candidate based on dev@a7a6a0f1. The shared default adopts bg-card/text-card-foreground/border-border from canonical ui-kit commit 524f515e. Existing geometry, typography, ARIA behavior and theme tokens remain. Authenticator setup, bulk-send safeguards, outbound estimates, recorded config drift and typed provider warnings select warning explicitly. Default and conditional-neutral uses are classified in docs/feedback-inventory.md. Eleven real-component/router cases pass; original source fails ten with one rental-error control passing. The rebuilt 53 public vendor entries are code-equivalent to a control build except for the one neutral color literal. Browser comparisons cover 112 matching states at 320/375/1280/1920px in both themes, with matching landmark rectangles/scroll and minimum measured text contrast 6.147:1. Existing notice placement is unchanged; this is not a claim that every original notice lifecycle has no layout shift.",
     "rootCause": "The app still consumes the older brand-styled default Alert; the selected neutral contract has not been adopted.",
     "resolution": "Adopt the reviewed canonical ui-kit Alert snapshot as a separate consumer change. Keep existing geometry and theme. Classify unvarianted and style-only warning sites, give conditions explicit tones, and verify light/dark contrast and no page movement. Do not change global brand-wash or brand-tertiary.",
@@ -196,10 +196,11 @@
       "test/ui/alert-tones.test.tsx: actual shared primitive, rental-error control, import mapping gate, bulk safeguards, provider warnings, drift and MFA fetcher form",
       "Existing split-campaign consent/pending cases, campaign warning and account-security cases: 23 focused cases pass",
       "Owned Chrome baseline/candidate comparison: 112 states across four widths and both themes; actual rendered text contrast and landmark/scroll equality",
-      "Configured vendor rebuild and 53-entry runtime graph comparison against original-source control build"
+      "Configured vendor rebuild and 53-entry runtime graph comparison against original-source control build",
+      "Full ci:local on candidate 1f93fdc3: 5460 node tests, 34 runtime tests and 1360 UI tests pass; build, bundle, generated-code and structural guards pass"
     ],
     "missingTests": [
-      "Exact-head review, full local and remote gates, and preview deployment checks before merge; authenticated release acceptance before closure."
+      "Full local gate after final PR metadata; exact-head remote gates and app/worker preview deployments before merge; authenticated release acceptance before closure."
     ],
     "acceptanceCriteria": [
       "Record the token change, explicit tone, or combined decision.",
@@ -211,7 +212,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "One focused PR into dev under #2061. Shared severity metadata remains separate in chester-hill-solutions/chester-hill-solutions#121 and CallCaster #2062. Require green checks before merge and release acceptance before closure."
+    "trackerRecommendation": "Candidate PR #2561 into dev implements #2061. Shared severity metadata remains separate in chester-hill-solutions/chester-hill-solutions#121 and CallCaster #2062. Require green checks before merge and release acceptance before closure."
   },
   {
     "issueNumber": 2306,
