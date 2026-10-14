@@ -1,10 +1,18 @@
-import { toggleVariants } from './chunk-DYF74NGI.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import 'class-variance-authority';
-import { ToggleButtonGroup, ToggleButton } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  toggleVariants
+} from "./chunk-DYF74NGI.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/toggle-group.tsx
+import * as React from "react";
+import "class-variance-authority";
+import {
+  ToggleButtonGroup as ToggleGroupPrimitive,
+  ToggleButton as TogglePrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 var ToggleGroupContext = React.createContext({
   size: "default",
   variant: "default",
@@ -21,7 +29,7 @@ function ToggleGroup({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    ToggleButtonGroup,
+    ToggleGroupPrimitive,
     {
       "data-slot": "toggle-group",
       "data-variant": variant,
@@ -53,7 +61,7 @@ function ToggleGroupItem({
 }) {
   const context = React.useContext(ToggleGroupContext);
   return /* @__PURE__ */ jsx(
-    ToggleButton,
+    TogglePrimitive,
     {
       "data-slot": "toggle-group-item",
       "data-variant": context.variant || variant,
@@ -73,6 +81,8 @@ function ToggleGroupItem({
   );
 }
 
-export { ToggleGroup, ToggleGroupItem };
-//# sourceMappingURL=chunk-2LLZJAAF.js.map
+export {
+  ToggleGroup,
+  ToggleGroupItem
+};
 //# sourceMappingURL=chunk-2LLZJAAF.js.map

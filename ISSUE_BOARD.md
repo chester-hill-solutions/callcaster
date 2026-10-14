@@ -139,17 +139,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Partial fix in PR #1963. Keep remaining inventory/guard work visible; the old unmerged-branch claim is stale. Related PR evidence: #1963. A PR reference alone does not prove deployed behavior.
 
 ### [#1615](https://github.com/chester-hill-solutions/callcaster/issues/1615) shad-cc tsup build is not deterministic, so its vendored dist cannot be drift-checked
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
-- Recommended title: **Enforce the vendored UI source/output drift check**
-- The historical chunk flip did not recur: three consecutive configured builds match all 263 committed files. A focused candidate makes UI drift and build failures blocking; nine actual CLI cases pass. Full local CI and remote acceptance remain.
-- Current behavior: Candidate based on dev@5b46c996. Three unchanged-source builds produce the same 263-file byte snapshot, hash 8f7d8288e45946e708593b50bd03caa512e170bf986e48d722c20f7d6c68ea48. The configured builder and all generated output are unchanged. The guard now blocks stale bytes, failed builds and added/removed output in each of the three packages; its obsolete warning mode and Git reset/clean fallback are removed.
-- Root cause: Warn-only enforcement allowed stale or failed UI builds to exit successfully. Four desired failure cases reproduce that false success; five nominal/Scriptkit controls pass.
-- Resolution: Land one enforcement PR after full local CI and exact-head remote gates pass. No bundler configuration change is needed for the current reproducible build. Keep deployed/default-branch promotion separate from source completion.
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Stabilize vendored UI entry and declaration emission order**
+- The blocking guard landed in PR #2563. Later unchanged-source builds reproduced declaration-union and JavaScript import/chunk ordering differences. A separate builder candidate produces five identical 263-file snapshots and preserves all 53 public runtime/type entries. Full gates and merge remain.
+- Current behavior: Candidate based on dev@e97f189b, 2026-10-14. The UI builder uses sorted named entries, esbuild bundling and one native TypeScript declaration emit. Five configured builds have identical 263-file snapshots, SHA-256 dddb8d785709c5cb2a965245cd72eb606e453901baad875bcf219e68b0b62883. All 53 public entries retain runtime export names/value kinds, and old/new module types are assignable both ways. The byte guard remains blocking for all three packages.
+- Root cause: The previous builder expanded array globs asynchronously and used extra Rollup passes for JavaScript and per-file declarations. Two later full-gate attempts changed union-member order or import order/chunk names without source edits. Three earlier matching builds and a quiet Linux run did not prove lasting reproducibility.
+- Resolution: Land a separate build-order repair with regenerated output. Preserve the public export/type contract, complete byte comparisons and final consumer bundle checks. Resume the saved #2518 dropdown change only after the prerequisite passes and merges.
 - Look in: `scripts/check-vendor-dist-drift.mjs`
-- Existing tests: test/vendor-dist-drift.test.ts: nine actual CLI cases, four fail on the old guard with five controls passing; Three consecutive configured UI builds match all 263 committed output files byte for byte; The fully enforced guard passes on all three real vendored packages; Linux quality run 38510107827 on dev source 92b68c41 reports all 263 UI files matching with no drift diagnostics
-- Missing tests: Full local CI, exact-head remote checks and applicable preview deployments before merge
+- Existing tests: Five consecutive configured builds match all 263 generated files byte for byte; All 53 public entry modules preserve runtime exports and bidirectional TypeScript compatibility against the committed control; test/vendor-ui-entry-order.test.ts: two directory orders yield the same named public entries and exclude tests/non-TSX files; test/vendor-dist-drift.test.ts: nine actual CLI guard cases still cover stale bytes, failed builds and missing/obsolete output
+- Missing tests: Full local CI, exact-head Linux checks and both actual preview deployments before merge; repeat the #2518 gate after adopting the prerequisite
 - Done when: Three consecutive unchanged-source builds produce identical UI dist; All three vendored packages are blocking entries in the drift guard; Development documentation states the UI check is enforced
-- Tracker: One focused enforcement candidate implements #1615. Its historical nondeterminism claim is not current reproduction evidence. Require green gates before merging.
+- Tracker: Keep #1615 open: guard enforcement is merged, but current reproduction requires this separate builder repair before source completion. Preserve the failed generated-only diffs and distinguish repeated-build proof from release acceptance.
 
 ---
 

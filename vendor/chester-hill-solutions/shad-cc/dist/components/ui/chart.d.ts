@@ -1,7 +1,6 @@
-import * as React from 'react';
-import * as RechartsPrimitive from 'recharts';
-import { TooltipValueType } from 'recharts';
-
+import * as React from "react";
+import * as RechartsPrimitive from "recharts";
+import type { TooltipValueType } from "recharts";
 declare const THEMES: {
     readonly light: "";
     readonly dark: ".dark";
@@ -42,5 +41,4 @@ declare function ChartLegendContent({ className, hideIcon, payload, verticalAlig
     hideIcon?: boolean;
     nameKey?: string;
 } & RechartsPrimitive.DefaultLegendContentProps): React.JSX.Element | null;
-
-export { type ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartStyle, ChartTooltip, ChartTooltipContent };
+export { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, ChartStyle, };

@@ -1,8 +1,13 @@
-import { Separator } from './chunk-RDPOVP7H.js';
-import { cn } from './chunk-DN2AEEA2.js';
-import { cva } from 'class-variance-authority';
-import { jsx } from 'react/jsx-runtime';
+import {
+  Separator
+} from "./chunk-RDPOVP7H.js";
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/button-group.tsx
+import { cva } from "class-variance-authority";
+import { jsx } from "react/jsx-runtime";
 var buttonGroupVariants = cva(
   "flex w-fit items-stretch *:focus-visible:relative *:focus-visible:z-10 has-[>[data-slot=button-group]]:gap-2 has-[>[data-variant=outline]]:*:data-[slot=input-group]:border-border has-[>[data-variant=outline]]:*:data-[slot=select-trigger]:border-border has-[>[data-variant=outline]]:[&>[data-slot=input-group]:has(:focus-visible)]:border-ring has-[>[data-variant=outline]]:[&>[data-slot=select-trigger]:focus-visible]:border-ring has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1 has-[>[data-variant=outline]]:[&>input]:border-border has-[>[data-variant=outline]]:[&>input:focus-visible]:border-ring",
   {
@@ -80,6 +85,10 @@ function ButtonGroupSeparator({
   );
 }
 
-export { ButtonGroup, ButtonGroupSeparator, ButtonGroupText, buttonGroupVariants };
-//# sourceMappingURL=chunk-65Y5TTPJ.js.map
+export {
+  buttonGroupVariants,
+  ButtonGroup,
+  ButtonGroupText,
+  ButtonGroupSeparator
+};
 //# sourceMappingURL=chunk-65Y5TTPJ.js.map

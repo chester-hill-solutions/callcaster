@@ -1,3 +1,1 @@
-declare function useIsMobile(): boolean;
-
-export { useIsMobile };
+export declare function useIsMobile(): boolean;

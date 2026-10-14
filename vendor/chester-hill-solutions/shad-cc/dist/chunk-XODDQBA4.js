@@ -1,8 +1,15 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { DialogTrigger, Popover as Popover$1, Heading } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/popover.tsx
+import "react";
+import {
+  DialogTrigger,
+  Heading,
+  Popover as PopoverPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function PopoverTrigger({ children, ...props }) {
   return /* @__PURE__ */ jsx(DialogTrigger, { "data-slot": "popover-trigger", ...props, children });
 }
@@ -14,7 +21,7 @@ function Popover({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Popover$1,
+    PopoverPrimitive,
     {
       "data-slot": "popover-content",
       placement,
@@ -65,6 +72,11 @@ function PopoverDescription({
   );
 }
 
-export { Popover, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger };
-//# sourceMappingURL=chunk-XODDQBA4.js.map
+export {
+  PopoverTrigger,
+  Popover,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverDescription
+};
 //# sourceMappingURL=chunk-XODDQBA4.js.map

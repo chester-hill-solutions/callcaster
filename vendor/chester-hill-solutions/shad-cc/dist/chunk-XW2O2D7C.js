@@ -1,9 +1,12 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import * as React from 'react';
-import { OTPInput, OTPInputContext } from 'input-otp';
-import { MinusIcon } from 'lucide-react';
-import { jsx, jsxs } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/input-otp.tsx
+import * as React from "react";
+import { OTPInput, OTPInputContext } from "input-otp";
+import { MinusIcon } from "lucide-react";
+import { jsx, jsxs } from "react/jsx-runtime";
 function InputOTP({
   className,
   containerClassName,
@@ -76,6 +79,10 @@ function InputOTPSeparator({ ...props }) {
   );
 }
 
-export { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot };
-//# sourceMappingURL=chunk-XW2O2D7C.js.map
+export {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+  InputOTPSeparator
+};
 //# sourceMappingURL=chunk-XW2O2D7C.js.map

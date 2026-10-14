@@ -1,8 +1,14 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { cva } from 'class-variance-authority';
-import { Button as Button$1, Link } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/button.tsx
+import { cva } from "class-variance-authority";
+import {
+  Button as ButtonPrimitive,
+  Link as LinkPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 var buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding font-heading text-sm font-semibold whitespace-nowrap transition-colors duration-150 outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
@@ -39,7 +45,7 @@ function Button({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Button$1,
+    ButtonPrimitive,
     {
       "data-slot": "button",
       "data-variant": variant,
@@ -56,7 +62,7 @@ function LinkButton({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Link,
+    LinkPrimitive,
     {
       "data-slot": "button",
       "data-variant": variant,
@@ -67,6 +73,9 @@ function LinkButton({
   );
 }
 
-export { Button, LinkButton, buttonVariants };
-//# sourceMappingURL=chunk-IFW6QGQN.js.map
+export {
+  buttonVariants,
+  Button,
+  LinkButton
+};
 //# sourceMappingURL=chunk-IFW6QGQN.js.map

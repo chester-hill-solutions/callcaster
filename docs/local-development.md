@@ -287,7 +287,7 @@ Node 24+.
 
 ## Vendored packages
 
-`vendor/` carries generated `dist/` output for `shad-cc` and the two `scriptkit` packages, and the app imports that dist. Editing a package's `src/` does nothing until you rebuild (`npm run vendor:build` for scriptkit; `npm --prefix vendor/chester-hill-solutions/shad-cc run build` for shad-cc) and commit the rebuilt `dist/` with it; never edit `dist/` by hand. `npm run check:vendor-dist` (first step of `ci:local`, and a CI quality step) rebuilds all three packages. A failed build or any byte difference fails the check and names the affected package and files. Review and commit the rebuild with the source change. The guard does not reset files or clean Git changes.
+`vendor/` carries generated `dist/` output for `shad-cc` and the two `scriptkit` packages, and the app imports that dist. Editing a package's `src/` does nothing until you rebuild (`npm run vendor:build` for scriptkit; `npm --prefix vendor/chester-hill-solutions/shad-cc run build` for shad-cc) and commit the rebuilt `dist/` with it; never edit `dist/` by hand. `npm run check:vendor-dist` (first step of `ci:local`, and a CI quality step) rebuilds all three packages. A failed build or any byte difference fails the check and names the affected package and files. Review and commit the rebuild with the source change. The guard does not reset files or clean Git changes. The UI build uses sorted named entries, esbuild bundling and one native TypeScript declaration emit. Final consumer builds perform tree shaking; do not restore tsup's extra per-file Rollup passes, which changed import and union-member order from unchanged source.
 
 ## Build, Typegen, And Production Server
 

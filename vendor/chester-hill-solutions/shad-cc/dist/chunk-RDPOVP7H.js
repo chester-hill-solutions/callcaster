@@ -1,14 +1,17 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import { Separator as Separator$1 } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/separator.tsx
+import { Separator as SeparatorPrimitive } from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Separator({
   className,
   orientation = "horizontal",
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Separator$1,
+    SeparatorPrimitive,
     {
       "data-slot": "separator",
       orientation,
@@ -21,6 +24,7 @@ function Separator({
   );
 }
 
-export { Separator };
-//# sourceMappingURL=chunk-RDPOVP7H.js.map
+export {
+  Separator
+};
 //# sourceMappingURL=chunk-RDPOVP7H.js.map

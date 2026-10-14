@@ -1,15 +1,23 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { cva } from 'class-variance-authority';
-import { Tabs as Tabs$1, TabList, Tab, TabPanel } from 'react-aria-components';
-import { jsx } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/tabs.tsx
+import "react";
+import { cva } from "class-variance-authority";
+import {
+  TabList as TabListPrimitive,
+  TabPanel as TabPanelPrimitive,
+  Tab as TabPrimitive,
+  Tabs as TabsPrimitive
+} from "react-aria-components";
+import { jsx } from "react/jsx-runtime";
 function Tabs({
   className,
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Tabs$1,
+    TabsPrimitive,
     {
       "data-slot": "tabs",
       className: cn(
@@ -40,7 +48,7 @@ function TabsList({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    TabList,
+    TabListPrimitive,
     {
       "data-slot": "tabs-list",
       "data-variant": variant,
@@ -54,7 +62,7 @@ function TabsTrigger({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Tab,
+    TabPrimitive,
     {
       "data-slot": "tabs-trigger",
       className: cn(
@@ -73,7 +81,7 @@ function TabsContent({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    TabPanel,
+    TabPanelPrimitive,
     {
       "data-slot": "tabs-content",
       className: cn("flex-1 text-sm outline-none", className),
@@ -82,6 +90,11 @@ function TabsContent({
   );
 }
 
-export { Tabs, TabsContent, TabsList, TabsTrigger, tabsListVariants };
-//# sourceMappingURL=chunk-NFYZJZRB.js.map
+export {
+  Tabs,
+  tabsListVariants,
+  TabsList,
+  TabsTrigger,
+  TabsContent
+};
 //# sourceMappingURL=chunk-NFYZJZRB.js.map

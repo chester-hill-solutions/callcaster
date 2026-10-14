@@ -1,14 +1,27 @@
-import { cn } from './chunk-DN2AEEA2.js';
-import 'react';
-import { cva } from 'class-variance-authority';
-import { MenuTrigger, Popover, Menu, MenuSection, Header, MenuItem, composeRenderProps, SubmenuTrigger, Separator } from 'react-aria-components';
-import { CheckIcon, ChevronRightIcon } from 'lucide-react';
-import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
+import {
+  cn
+} from "./chunk-DN2AEEA2.js";
 
+// src/components/ui/dropdown-menu.tsx
+import "react";
+import { cva } from "class-variance-authority";
+import {
+  composeRenderProps,
+  Header as HeaderPrimitive,
+  MenuItem as MenuItemPrimitive,
+  Menu as MenuPrimitive,
+  MenuSection as MenuSectionPrimitive,
+  MenuTrigger as MenuTriggerPrimitive,
+  Popover as PopoverPrimitive,
+  Separator as SeparatorPrimitive,
+  SubmenuTrigger as SubmenuTriggerPrimitive
+} from "react-aria-components";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 function DropdownMenuTrigger({
   ...props
 }) {
-  return /* @__PURE__ */ jsx(MenuTrigger, { "data-slot": "dropdown-menu-trigger", ...props });
+  return /* @__PURE__ */ jsx(MenuTriggerPrimitive, { "data-slot": "dropdown-menu-trigger", ...props });
 }
 function DropdownMenu({
   "data-slot": dataSlot = "dropdown-menu-content",
@@ -20,7 +33,7 @@ function DropdownMenu({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Popover,
+    PopoverPrimitive,
     {
       "data-slot": dataSlot,
       placement,
@@ -28,7 +41,7 @@ function DropdownMenu({
       crossOffset,
       className: cn("z-50 w-(--trigger-width) min-w-32 origin-(--trigger-anchor-point) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-[0_2px_0_0_var(--border)] duration-100 outline-none data-entering:animate-in data-entering:fade-in-0 data-entering:zoom-in-95 data-exiting:animate-out data-exiting:overflow-hidden data-exiting:fade-out-0 data-exiting:zoom-out-95 data-[placement=bottom]:slide-in-from-top-2 data-[placement=left]:slide-in-from-right-2 data-[placement=right]:slide-in-from-left-2 data-[placement=top]:slide-in-from-bottom-2 **:data-[slot$=-item]:data-focused:bg-foreground/10 ", className),
       children: /* @__PURE__ */ jsx(
-        Menu,
+        MenuPrimitive,
         {
           className: "max-h-[inherit] overflow-x-hidden overflow-y-auto outline-hidden",
           ...props,
@@ -41,7 +54,7 @@ function DropdownMenu({
 function DropdownMenuGroup({
   ...props
 }) {
-  return /* @__PURE__ */ jsx(MenuSection, { "data-slot": "dropdown-menu-group", ...props });
+  return /* @__PURE__ */ jsx(MenuSectionPrimitive, { "data-slot": "dropdown-menu-group", ...props });
 }
 function DropdownMenuLabel({
   className,
@@ -49,7 +62,7 @@ function DropdownMenuLabel({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Header,
+    HeaderPrimitive,
     {
       "data-slot": "dropdown-menu-label",
       "data-inset": inset,
@@ -81,7 +94,7 @@ function DropdownMenuItem({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    MenuItem,
+    MenuItemPrimitive,
     {
       "data-slot": "dropdown-menu-item",
       "data-inset": inset,
@@ -115,7 +128,7 @@ function DropdownMenuItem({
 function DropdownMenuSub({
   ...props
 }) {
-  return /* @__PURE__ */ jsx(SubmenuTrigger, { "data-slot": "dropdown-menu-sub", ...props });
+  return /* @__PURE__ */ jsx(SubmenuTriggerPrimitive, { "data-slot": "dropdown-menu-sub", ...props });
 }
 function DropdownMenuSubTrigger({
   className,
@@ -124,7 +137,7 @@ function DropdownMenuSubTrigger({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    MenuItem,
+    MenuItemPrimitive,
     {
       "data-slot": "dropdown-menu-sub-trigger",
       "data-inset": inset,
@@ -165,7 +178,7 @@ function DropdownMenuSeparator({
   ...props
 }) {
   return /* @__PURE__ */ jsx(
-    Separator,
+    SeparatorPrimitive,
     {
       "data-slot": "dropdown-menu-separator",
       className: cn("-mx-1 my-1 h-px bg-border/50", className),
@@ -190,6 +203,16 @@ function DropdownMenuShortcut({
   );
 }
 
-export { DropdownMenu, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger };
-//# sourceMappingURL=chunk-UJ357NXV.js.map
+export {
+  DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut
+};
 //# sourceMappingURL=chunk-UJ357NXV.js.map
