@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -7,7 +6,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormField } from "@/components/ui/form-field";
-import { NavLink } from "react-router";
 import { Campaign } from "@/lib/types";
 
 type SmsSendContext = {
@@ -79,12 +77,6 @@ export const CampaignTypeSpecificSettings = ({
           </SelectContent>
         </Select>
       </FormField>
-      <p className="text-sm text-muted-foreground">
-        Message body is edited under Content.{" "}
-        <Button variant="link" className="h-auto px-0" asChild>
-          <NavLink to="../script/edit">Edit content →</NavLink>
-        </Button>
-      </p>
     </div>
   );
 };
