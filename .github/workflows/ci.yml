@@ -63,7 +63,10 @@ jobs:
         if: github.event_name == 'pull_request' && github.base_ref == 'master'
         run: node scripts/check-changelog.mjs --base "${{ github.event.pull_request.base.sha }}"
 
-  quality:
+  # These jobs intentionally repeat checkout/install. GitHub-hosted runners do
+  # not share node_modules, and the parallel critical path is shorter than one
+  # serial quality wrapper. Keep the expensive test suites independent.
+  typecheck:
     needs: changes
     runs-on: ubuntu-latest
     steps:
@@ -72,33 +75,77 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      # test:node shells out to `bun test`, and the media-stream service tests
-      # spawn `bun run services/media-stream/index.ts`.
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - run: npm run typecheck
+
+  lint:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - run: npm run lint
+      - run: npm run check:lint-ratchet
+
+  test-node:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
-      # The app imports committed dist, so source edits alone ship stale code.
-      # Rebuild all three vendored packages and block failed builds or byte drift.
-      - run: npm run check:vendor-dist
-      # npm (package-lock.json) and bun (bun.lock, Railway Docker build) must
-      # move together — a dep added with npm alone fails the Railway image
-      # build minutes after push, far from the cause.
-      - run: npm run check:bun-lock
-      - run: npm run typecheck
-      - run: npm run lint
-      # Strictness rules (complexity, depth, function size, console, cycles,
-      # non-null assertions) as a ratchet: growth over the baseline fails.
-      - run: npm run check:lint-ratchet
       - run: npm run test:node
         env:
-          # The bun-test step imports server/bun.ts, which eagerly constructs
-          # the parent Twilio client at module scope. Tests never hit Twilio.
           TWILIO_SID: AC_ci_test_placeholder
           TWILIO_AUTH_TOKEN: ci_test_placeholder
+
+  test-ui:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run test:ui
+
+  static-checks:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - run: npm run check:vendor-dist
+      - run: npm run check:bun-lock
       - run: npm run tools:routes:verify
       - run: npm run tools:api:surface:check
       - run: npm run check:route-server-leaks
@@ -106,78 +153,29 @@ jobs:
       - run: npm run check:request-body-consumption
       - run: npm run check:middleware
       - run: npm run check:credit-writes
-      # requireDualAuth admits API keys, which carry no user — so
-      # requireWorkspaceAccess cannot check them. One route was declared
-      # session-only and authed dual, leaving key callers entirely unguarded.
       - run: npm run check:dual-auth
-      # A route that consumes an unauthenticated credential must declare an
-      # `auth:` rate-limited scope. The HTML signup and reset-password forms
-      # shipped without one while their JSON twins had one, and nothing
-      # enforced the choice — so the next auth action copied from a neighbour
-      # would ship unthrottled too. Surfaces are derived from call sites, not
-      # a filename list, so a brand-new auth route is covered the moment it
-      # exists (#2220).
       - run: npm run check:auth-rate-limits
-      # Security gates. These previously ran ONLY in `ci:local`, so a regression
-      # in workspace write authorization, or a loader leaking twilio_data /
-      # stripe_id to the client, could merge unnoticed.
       - run: npm run check:route-authz
-      # Companion to the above: route-authz asks whether a workspaces+ WRITE
-      # enforces a ROLE. This asks whether ANY tenant-data route proves
-      # MEMBERSHIP — the question the api+ surface was never asked, and where
-      # three cross-tenant IDORs lived. Follows imports into the specific
-      # service functions a route calls, because this codebase checks there.
       - run: npm run check:route-membership
       - run: npm run check:workspace-projection
       - run: npm run check:unscoped-db-imports
       - run: npm run check:effects
       - run: npm run check:type-safety
-      # A relative `redirect("../…")` in a loader/action resolves against
-      # `request.url` per RFC 3986. Refactors that move a file up or down
-      # the URL tree silently reroute it — the "successful upload → 404"
-      # flow in #1396. Ratchet the current allowlist so no new one lands.
       - run: npm run check:relative-redirects
       - run: npm run check:redirect-targets
       - run: npm run check:sheet-bodies
-      # Drizzle nests the Postgres SQLSTATE on error.cause; inline
-      # `.code === "23505"` checks miss it, which is how duplicate campaign
-      # names shipped a generic "Unexpected Server Error" behind green CI.
       - run: npm run check:pg-errors
       - run: npm run check:dry
       - run: npm run check:handlers
-      # A replacing vi.mock factory hard-codes a shared server module's export
-      # surface; when the module gains an export, route tests fail with the
-      # route's catch-all error and nobody connects the two. New factories
-      # must spread importOriginal (ratchet baseline keeps existing ones).
       - run: npm run check:test-mocks
-      # A test expectation whose value is an identifier imported from the SUT
-      # itself (expect(x).toBe(SUT_CONSTANT)) passes for any value the SUT
-      # chooses (#1931). The check flags those; the baseline only ratchets
-      # down.
       - run: npm run check:test-echo
       - run: npm run check:db-rpcs
-      # check:db-rpcs only asks whether a function EXISTS — its header says it
-      # cannot see inside one. This reads the body: the queue RPCs must write
-      # the campaign_queue columns QUEUE_ENTRY_TRANSITIONS says they write, and
-      # must not reference the dropped `status` column that cost four separate
-      # repair migrations, each found in production rather than here.
       - run: npm run check:queue-rpc-contract
       - run: npm run db:ledger:check
-      # The production install path. Its drift guard sat below a DATABASE_URL
-      # exit and no workflow invoked it, so a migration wired into the compose
-      # list but not the fresh-DB list was green here and produced a prod schema
-      # missing that migration.
       - run: npm run db:bootstrap:check
-      # Enum VALUES. Every other DB gate looks at functions and tables; a value
-      # added to a schema.ts pgEnum with no ADD VALUE migration was green here
-      # while campaign_schedule_sync dead-lettered every minute in prod (#1476).
       - run: npm run db:enums:check
       - run: npm run db:orphans:check
-      # Ratchet (#1048): fail on new >800-line app files or growth of allowlisted offenders.
       - run: npm run tools:check-file-size
-      # Codegen drift. Split out of `ci:local` because it requires a clean tree,
-      # which made the canonical pre-PR command unusable during the work it
-      # gates. Run it yourself before pushing: `npm run ci:codegen:verify`.
       - run: npm run ci:codegen:verify
 
   bundle-guard:
