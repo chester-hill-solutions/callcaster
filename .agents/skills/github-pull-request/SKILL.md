@@ -54,6 +54,9 @@ The input is one issue and a list of PRs; the payload returns `issue`, not
 `pullRequest`. Verify `closingIssuesReferences` afterward. Keep the issue open
 until the fix reaches the default branch and its required verification is done.
 
+Build the mutation input from the verified issue and PR responses. Assert their
+numbers before sending; do not copy a node ID from memory or another issue.
+
 ## Context-only issue references
 
 The `issue-on-dev` workflow also matches singular `issue #N` in body prose,

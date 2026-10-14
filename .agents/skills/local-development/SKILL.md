@@ -701,6 +701,12 @@ drift without its matching reviewed source change.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.
 - Load the `github-cli` and `github-issues` skills for `gh` specifics.
 
+Before production release checks, resolve app and worker service IDs from that
+environment's service instances. A PR preview can use a different app service.
+An empty deployment list for a copied preview service ID is unknown, not a
+production failure. Require both actual production deployments at the release
+commit.
+
 Route modules must export only route-facing handlers and components. Import
 server helpers directly in their tests. A helper re-export from a route can
 retain its server dependency graph in the browser build, even with a `.server`
