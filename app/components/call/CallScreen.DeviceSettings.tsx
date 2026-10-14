@@ -123,7 +123,6 @@ export function MicrophoneField({
             aria-pressed={isMicMonitoring}
             className="flex items-center gap-2"
           >
-            <Mic size={16} />
             {isMicMonitoring ? "Stop test" : "Test microphone"}
           </Button>
         ) : null}
@@ -134,7 +133,6 @@ export function MicrophoneField({
           onClick={handleMuteMicrophone}
           className="flex items-center gap-2"
         >
-          {isMicrophoneMuted ? <MicOff size={16} /> : <Mic size={16} />}
           {isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone"}
         </Button>
       </div>
@@ -205,7 +203,6 @@ export function SpeakerField({
             disabled={isSpeakerPlaying}
             className="flex items-center gap-2"
           >
-            <Headphones size={16} />
             {isSpeakerPlaying ? "Playing tone…" : "Test speaker"}
           </Button>
         </div>
