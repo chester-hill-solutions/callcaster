@@ -14,7 +14,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -126,15 +125,20 @@ function BulkLocalOverrideDialog({
             before starting.
           </DialogDescription>
         </DialogHeader>
-        <FormField htmlFor={acknowledgementId} label={OVERRIDE_ACKNOWLEDGEMENT}>
+        <label
+          htmlFor={acknowledgementId}
+          className="flex items-start gap-2 text-sm leading-5"
+        >
           <Checkbox
             id={acknowledgementId}
             aria-label={OVERRIDE_ACKNOWLEDGEMENT}
             disabled={isSubmitting}
             checked={acknowledged}
             onCheckedChange={(checked) => onAcknowledgedChange(checked === true)}
+            className="mt-0.5 shrink-0"
           />
-        </FormField>
+          <span>{OVERRIDE_ACKNOWLEDGEMENT}</span>
+        </label>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
