@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: SMS conversation search no longer loads unrelated additional pages while results update ([PR #2580](https://github.com/chester-hill-solutions/callcaster/pull/2580), [#2513](https://github.com/chester-hill-solutions/callcaster/issues/2513)).
+
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 - Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
 
