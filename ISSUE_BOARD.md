@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 332 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd9a3e22d16f3114c00e8069556cfab70c155eb8; merged repairs and native issue evidence (2026-10-07 UTC)` · 333 listed open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from dev@8cb8c0f7 through the prior board at dev@4b0322c4; they are not current verification results. Issue state, labels and assignees come from the complete REST issue snapshot read at 2026-10-07T13:19:57.253419+00:00. Source descriptions distinguish merged dev fixes from deployed acceptance. Fix now lane counts do not classify release blockers; eligible work excludes issues assigned or co-assigned to other developers. Project markers remain cached; no current project-status result is claimed.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 10
+## Fix now — 11
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -150,6 +150,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Full local CI, exact-head Linux checks and both actual preview deployments before merge; repeat the #2518 gate after adopting the prerequisite
 - Done when: Three consecutive unchanged-source builds produce identical UI dist; All three vendored packages are blocking entries in the drift guard; Development documentation states the UI check is enforced
 - Tracker: Keep #1615 open: guard enforcement is merged, but current reproduction requires this separate builder repair before source completion. Preserve the failed generated-only diffs and distinguish repeated-build proof from release acceptance.
+
+### [#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518) call settings: When I use the dropdown for calling device the modal closes
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-14
+- Recommended title: **Keep settings open when selecting a dropdown option**
+- Candidate PR #2565 fixes shared Select interactions in Sheet and Dialog. Fourteen real-component cases, 27 focused cases, six Chrome cases with the merged package and full local CI pass. Final metadata gates, remote acceptance and merge remain.
+- Current behavior: Candidate based on dev@3ced52f9 after the vendor-build prerequisite merged, 2026-10-14. The shared Select marks its portalled content as a React Aria top layer and stops Escape propagation after preserving the caller callback. Mouse, touch and keyboard selection retain the edited draft and unchanged overlay geometry. Escape closes the list before the parent, focus returns to each trigger, and a later outside click still dismisses the parent.
+- Root cause: Radix Select portals its list outside the React Aria parent overlay. The unmarked list becomes inert; a real Chrome option click is treated as outside and closes the parent. Escape also reaches the parent unless the child list contains the event.
+- Resolution: Land one shared Select adapter fix for all callers. Retain normal parent Escape/outside dismissal, background isolation and caller preventDefault behavior. Do not add exceptions to the calling-device form or change shared package output.
+- Look in: `app/components/ui/select.tsx`, `app/components/call/CallScreen.DeviceSettings.tsx`, `app/components/ui/dialog.tsx`, `app/components/ui/sheet.tsx`
+- Existing tests: test/ui/select-overlay-interaction.test.tsx: fourteen real Select/Sheet/Dialog cases; existing call-header and audio-lifecycle controls bring the focused total to 27; Owned Chrome fixture using actual CallingDeviceField and shared components: two original-source coordinate clicks reproduce inert output and parent dismissal; Six Chrome cases across Sheet/Dialog and mouse/touch/keyboard preserve choice, edited draft and overlay geometry, verify Escape order, focus restoration and subsequent outside dismissal; Full ci:local on faadbf41: 5,488 server tests (11 skipped), 34 Bun tests, 1,388 UI tests, all structural guards, production build, final bundle and codegen verification pass
+- Missing tests: Full local gate after verified PR-link metadata; exact-head remote checks and both actual preview services before merge; release acceptance before closure
+- Done when: Selecting a calling-device or other shared Select option keeps its containing Sheet or Dialog open; Mouse, touch and keyboard selection work and retain draft input; The first Escape closes the dropdown; the next Escape closes the parent and restores focus; Normal outside-click dismissal and background isolation remain; caller Escape prevention is honored
+- Tracker: Candidate PR #2565 into dev implements #2518. The separate vendor-build prerequisite is merged in PR #2564. Require green final-head gates before merge and retain the open issue for release acceptance.
 
 ---
 
