@@ -8,9 +8,9 @@ export type TonePlayer = {
 };
 
 /**
- * Shared Web Audio plumbing for call-feedback tones (#1341 ringback, #1363
- * hang-up tone): a set of sine oscillators through one gain node, routed via
- * MediaStreamAudioDestinationNode + a detached <audio> element so setSinkId
+ * Web Audio plumbing for the end-of-call tone (#1363): sine oscillators
+ * through one gain node, routed via MediaStreamAudioDestinationNode and a
+ * detached <audio> element so setSinkId
  * can steer the sound at the agent's chosen speaker (same technique as
  * useAudioDeviceTest). Returns null when Web Audio is unavailable.
  */

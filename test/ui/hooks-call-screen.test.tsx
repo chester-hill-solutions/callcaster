@@ -63,8 +63,10 @@ const queueItem = {
 
 let dialType = "call";
 let callerId = "+15550000001";
+let verifiedNumbers: string[] = [];
 let workspaceAccess = true;
 const navigate = vi.fn();
+const createOscillator = vi.fn();
 let fetcherCall = 0;
 const routeFetchers = [verifyFetcher, fetcher, queueFetcher, saveFetcher];
 
@@ -104,7 +106,7 @@ vi.mock("react-router", async () => {
       completed: 0,
       isActive: true,
       hasAccess: workspaceAccess,
-      verifiedNumbers: [],
+      verifiedNumbers,
     }),
   };
 });
@@ -114,6 +116,7 @@ describe("useCallScreen", () => {
     fetcherCall = 0;
     dialType = "call";
     callerId = "+15550000001";
+    verifiedNumbers = [];
     workspaceAccess = true;
     vi.clearAllMocks();
     vi.stubGlobal("alert", vi.fn());
@@ -154,8 +157,6 @@ describe("useCallScreen", () => {
       configurable: true,
     });
 
-    // Full enough for both useAudioDeviceTest and useDialRingback (#1341),
-    // which builds oscillators → gain → MediaStreamDestination on dial.
     class MockAudioContext {
       currentTime = 0;
       createGain() {
@@ -169,10 +170,11 @@ describe("useCallScreen", () => {
         };
       }
       createOscillator() {
+        createOscillator();
         return {
           type: "sine",
           frequency: { value: 0 },
-          connect: vi.fn(),
+          connect: vi.fn().mockReturnValue({ connect: vi.fn() }),
           start: vi.fn(),
           stop: vi.fn(),
         };
@@ -187,6 +189,43 @@ describe("useCallScreen", () => {
     vi.stubGlobal("AudioContext", MockAudioContext);
     vi.stubGlobal("webkitAudioContext", MockAudioContext);
   });
+
+  test.each(["computer", "+15555550100"])(
+    "campaign dialing on %s creates no generated ringing, including delayed call updates",
+    async (selectedDevice) => {
+      const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+      vi.useFakeTimers();
+      const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+      const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
+      verifiedNumbers = selectedDevice === "computer" ? [] : [selectedDevice];
+      const { result, unmount } = renderHook(() => useCallScreen());
+      try {
+        act(() => result.current.phoneVerification.setSelectedDevice(selectedDevice));
+        expect(result.current.phoneVerification.selectedDevice).toBe(selectedDevice);
+        act(() => result.current.callControls.handleDialButton());
+        expect(result.current.callControls.displayState).toBe("dialing");
+        expect(fetcher.submit).toHaveBeenCalledWith(
+          expect.any(FormData),
+          { action: "/api/dial", method: "POST" },
+        );
+        expect(createOscillator).not.toHaveBeenCalled();
+        await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+        expect(result.current.callControls.displayState).toBe("dialing");
+        expect(createOscillator).not.toHaveBeenCalled();
+
+        // The speaker test proves this fixture still detects generated audio.
+        await act(async () => { await result.current.audioControls.audioTest.onTestSpeaker(); });
+        expect(createOscillator).toHaveBeenCalledOnce();
+        expect(result.current.audioControls.audioTest.isSpeakerPlaying).toBe(true);
+        expect(result.current.audioControls.audioTest.audioTestError).toBeNull();
+      } finally {
+        unmount();
+        pause.mockRestore();
+        play.mockRestore();
+        vi.useRealTimers();
+      }
+    },
+  );
 
   test("exposes call screen handlers and runs key flows", async () => {
     const { useCallScreen } = await import("@/hooks/call/useCallScreen");
