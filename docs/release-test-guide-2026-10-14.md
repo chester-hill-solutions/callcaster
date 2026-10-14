@@ -1,5 +1,7 @@
 # Release checks — 2026-10-14
 
+Release: [#2568](https://github.com/chester-hill-solutions/callcaster/pull/2568).
+
 Use a fresh page load after deployment. Record the environment and deployed commit with each result. Automated tests and code review do not replace the live checks below.
 
 ## Campaign call audio — #2532
