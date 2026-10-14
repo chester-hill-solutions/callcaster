@@ -28,6 +28,13 @@ var alertVariants = cva(
     }
   }
 );
+var alertSeverities = {
+  default: "neutral",
+  destructive: "error",
+  success: "success",
+  warning: "warning",
+  info: "info"
+};
 function Alert({
   className,
   variant,
@@ -39,7 +46,8 @@ function Alert({
       "data-slot": "alert",
       role: "alert",
       className: cn(alertVariants({ variant }), className),
-      ...props
+      ...props,
+      "data-severity": alertSeverities[variant ?? "default"]
     }
   );
 }
@@ -84,5 +92,5 @@ function AlertAction({ className, ...props }) {
 }
 
 export { Alert, AlertAction, AlertDescription, AlertTitle, alertVariants };
-//# sourceMappingURL=chunk-ICSFZVKF.js.map
-//# sourceMappingURL=chunk-ICSFZVKF.js.map
+//# sourceMappingURL=chunk-XGHDZBA5.js.map
+//# sourceMappingURL=chunk-XGHDZBA5.js.map

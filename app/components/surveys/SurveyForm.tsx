@@ -345,7 +345,7 @@ export function SurveyForm({
       ))}
 
       {error && (
-        <p role="alert" className="text-sm text-destructive-text mb-4">
+        <p role="alert" data-severity="error" className="text-sm text-destructive-text mb-4">
           {error}
         </p>
       )}

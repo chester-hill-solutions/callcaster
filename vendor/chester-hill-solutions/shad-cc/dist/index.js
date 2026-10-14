@@ -46,7 +46,7 @@ export { useIsMobile } from './chunk-YNROVYNC.js';
 export { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './chunk-MMTILPIC.js';
 export { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogMedia, AlertDialogOverlay, AlertDialogTitle, AlertDialogTrigger } from './chunk-WWBMEOPN.js';
 export { Button, LinkButton, buttonVariants } from './chunk-IFW6QGQN.js';
-export { Alert, AlertAction, AlertDescription, AlertTitle, alertVariants } from './chunk-ICSFZVKF.js';
+export { Alert, AlertAction, AlertDescription, AlertTitle, alertVariants } from './chunk-XGHDZBA5.js';
 export { AspectRatio } from './chunk-BNHI4USE.js';
 export { Avatar, AvatarBadge, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from './chunk-KTDE5KYV.js';
 export { cn } from './chunk-DN2AEEA2.js';

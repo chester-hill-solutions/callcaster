@@ -67,3 +67,13 @@ CallCaster retains its existing description contrast, typography, geometry,
 ARIA behavior and other semantic variants. The app theme tokens stay unchanged.
 See [the source contract](https://github.com/chester-hill-solutions/chester-hill-solutions/blob/524f515e93b7f279c70b963c3f62cf07a15738d7/packages/ui-kit/SOURCE.md)
 for workbench ownership and template synchronization.
+
+### Semantic Alert metadata
+
+The `data-severity` mapping is adopted from the canonical workbench and synced
+template in [shared PR #141](https://github.com/chester-hill-solutions/chester-hill-solutions/pull/141)
+at commit `a538c35f6dab65c896f4d856b664e0b6f6009b2a`.
+Default/omitted is neutral, destructive is error, and info, warning and success
+retain their meanings. The variant owns the value after caller props; ARIA roles
+do not determine it. CallCaster keeps its existing visual classes and role
+override behavior. The compatibility bundle is rebuilt from source.

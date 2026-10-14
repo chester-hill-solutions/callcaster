@@ -17,8 +17,12 @@ const loggerMock = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
 }));
-vi.mock("@/lib/logger.server", () => ({ logger: loggerMock }));
-vi.mock("@/server/db", () => ({ db: {}, directPool: {} }));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()), logger: loggerMock,
+}));
+vi.mock("@/server/db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/db")>()), db: {}, directPool: {},
+}));
 
 import { action } from "../app/routes/api+/workspaces+/$workspaceId/client-flash.action.server";
 import { asRouteResponse } from "./helpers/route-result";
@@ -64,16 +68,18 @@ describe("POST /api/workspaces/:workspaceId/client-flash", () => {
     vi.clearAllMocks();
   });
 
-  test("logs one warn per event and answers ok", async () => {
-    const response = await post({ events: [flashEvent(), flashEvent({ kind: "alert-banner", stack: undefined })] });
+  test("retains legacy error-toast stacks and breadcrumbs at error level", async () => {
+    const response = await post({ events: [flashEvent()] });
 
     expect(response.status).toBe(200);
-    expect(loggerMock.warn).toHaveBeenCalledTimes(2);
-    expect(loggerMock.warn).toHaveBeenCalledWith(
+    expect(loggerMock.error).toHaveBeenCalledTimes(1);
+    expect(loggerMock.error).toHaveBeenCalledWith(
       "Client flash captured",
       expect.objectContaining({
         workspaceId: WORKSPACE,
         kind: "toast-error",
+        severity: "error",
+        stack: "Error\n  at showError (app.js:1:1)",
         flashMessage: "This contact already has a call in progress.",
         breadcrumbs: expect.arrayContaining([
           expect.objectContaining({ kind: "dial-press" }),
@@ -82,10 +88,45 @@ describe("POST /api/workspaces/:workspaceId/client-flash", () => {
     );
   });
 
+  test.each([
+    ["neutral", "info"], ["info", "info"], ["success", "info"],
+    ["warning", "warn"], ["error", "error"],
+  ] as const)("records explicit %s banner severity at %s level", async (severity, level) => {
+    const response = await post({ events: [flashEvent({ kind: "alert-banner", severity, stack: undefined })] });
+    expect(response.status).toBe(200);
+    expect(loggerMock[level]).toHaveBeenCalledWith("Client flash captured", expect.objectContaining({ workspaceId: WORKSPACE, severity }));
+    expect(loggerMock[level]).toHaveBeenCalledTimes(1);
+    if (level === "info") {
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(loggerMock.error).not.toHaveBeenCalled();
+    }
+  });
+
+  test("retains unclassified legacy banners without inventing warning or error severity", async () => {
+    const response = await post({ events: [flashEvent({ kind: "alert-banner", stack: undefined })] });
+    expect(response.status).toBe(200);
+    expect(loggerMock.info).toHaveBeenCalledWith("Client flash captured", expect.objectContaining({ severity: undefined }));
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { kind: "alert-banner", severity: "alert" },
+    { kind: "toast-error", severity: "success" },
+    { kind: "toast-warning", severity: "error" },
+  ])("rejects an invalid or conflicting severity: %j", async (fields) => {
+    const response = await post({ events: [flashEvent(fields)] });
+    expect(response.status).toBe(400);
+    expect(loggerMock.info).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+  });
+
   test("rejects an unauthenticated (no session user) request with 401", async () => {
     const response = await post({ events: [flashEvent()] }, { userId: null });
     expect(response.status).toBe(401);
     expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 
   test("rejects an oversized message instead of logging it", async () => {
@@ -102,6 +143,33 @@ describe("POST /api/workspaces/:workspaceId/client-flash", () => {
     });
     expect(response.status).toBe(400);
     expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { stack: "x".repeat(4101) },
+    { breadcrumbs: Array.from({ length: 51 }, () => ({ t: 0, kind: "dial", detail: "test" })) },
+    { breadcrumbs: [{ t: 0, kind: "x".repeat(61), detail: "test" }] },
+    { breadcrumbs: [{ t: 0, kind: "dial", detail: "x".repeat(221) }] },
+    { breadcrumbs: [{ t: null, kind: "dial", detail: "test" }] },
+    { url: "x".repeat(321) },
+    { ts: "x".repeat(41) },
+  ])("retains the bounded payload contract: %j", async (fields) => {
+    const response = await post({ events: [flashEvent(fields)] });
+    expect(response.status).toBe(400);
+    expect(loggerMock.info).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.error).not.toHaveBeenCalled();
+  });
+
+  test("rejects malformed JSON before logging", async () => {
+    const args = await withDataPlaneRouteArgs({ request: new Request(`http://localhost/api/workspaces/${WORKSPACE}/client-flash`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{broken",
+    }), params: { workspaceId: WORKSPACE } }, { workspaceId: WORKSPACE });
+    const response = await asRouteResponse(await action(args));
+    expect(response.status).toBe(400);
+    expect(loggerMock.error).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+    expect(loggerMock.info).not.toHaveBeenCalled();
   });
 
   test("rejects non-POST methods", async () => {
