@@ -282,6 +282,14 @@ source discovery can otherwise hide a server/client asset disagreement.
 
 ## UI fixture contracts
 
+When mixing Radix portals and React Aria overlays, test real selection, focus,
+background isolation and Escape order. A role query can hide a parent while the
+child list is active; check retained DOM separately and wait for exit animation
+and focus return before reading the final role. Bound negative browser waits and
+run an original-source focus-conflict probe in an owned child with a deadline:
+competing focus traps can recurse without reaching a test timeout. Stop only its
+verified owned process if it loops, then use a completed browser reproduction.
+
 For a focused temporary Vitest config, replace `test.include` explicitly after
 loading the base config. `mergeConfig` appends arrays, which can run the full
 suite alongside the intended fixture. Check the collected test count before

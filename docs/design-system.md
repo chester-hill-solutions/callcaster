@@ -19,6 +19,10 @@ The app still imports `@chester-hill-solutions/shad-cc/theme.css` from [app/tail
 - **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired. Legacy classes `font-Zilla-Slab` / `font-Tabac-Slab` still resolve via `@theme` aliases to `font-heading` / `font-brand`.
 - **Loading:** Use `Skeleton` from [app/components/ui/skeleton.tsx](app/components/ui/skeleton.tsx) for table rows, cards, and form placeholders while data loads.
 
+### Select menus inside overlays
+
+Select menus use the local `ui/select` adapter. Its portalled content carries React Aria's `data-react-aria-top-layer` marker so options remain active and do not dismiss a containing Dialog or Sheet. The list handles Escape before the parent overlay and preserves the caller's `onEscapeKeyDown` callback. Keep this contract in the adapter instead of adding exceptions to individual forms. Tests cover selection, background isolation, focus return and normal parent dismissal.
+
 ### Sheet body spacing
 
 Use `SheetBody` from the local sheet adapter for content between `SheetHeader` and `SheetFooter`. It applies the same horizontal inset as the shared header/footer. Keep those slots outside the body, including inside a form, to prevent doubled padding.
