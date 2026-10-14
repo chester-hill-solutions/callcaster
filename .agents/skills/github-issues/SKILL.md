@@ -14,25 +14,33 @@ editing or publishing work. Use the assignee field, not the author or cached
 board. Skip issues owned by someone the user excluded, including co-assigned
 issues; do not reassign an issue to make it eligible.
 
-## Issue Types
+## Issue Types And Branch Naming
 
 Use a GitHub issue type for primary work classification. Do not use a label such as `bug` as a substitute for the `Bug` type. Labels remain appropriate for orthogonal metadata, such as component, priority, status, or team ownership.
 
-`Effort` is an organization-level GitHub Issue field, not an issue label or a GitHub Project field. `gh issue view --json` does not expose it. Resolve its field and option IDs with the GraphQL query in `github-cli`, then use `repository.issues(filterBy: { issueFieldValues: [...] })` to select issues by effort.
+The native Type is also the branch naming convention. Use `Bug` → `bug/`,
+`Feature` → `feature/`, `Task` → `task/`, `Epic` → `epic/`, and `User Story` →
+`user-story/`. Use the real issue number and lowercase kebab-case description.
+Use `chore/<description>` only for issue-free repository maintenance. Do not
+use labels as Type substitutes. Stop when the Type is missing or unsupported.
 
-The following enabled organization types were verified for `chester-hill-solutions/callcaster` on **2026-08-08** using `gh 2.85.0` (closed-reason commands re-verified **2026-08-27** on `gh 2.96.0`):
+`Effort` and other custom fields are organization-level GitHub Issue fields, not
+labels or GitHub Project fields. `gh issue view --json` does not expose them.
+Resolve current field and option IDs with GraphQL before filtering or reporting
+them.
+
+The supported CallCaster issue types are:
 
 | Type | Use for |
 | --- | --- |
-| `Task` | A specific piece of work |
 | `Bug` | An unexpected problem or behavior |
 | `Feature` | A request, idea, or new functionality |
-| `User Story` | A user goal |
+| `Task` | A specific piece of work |
 | `Epic` | A large body of related work |
-| `Change Request` | A requested change |
-| `User Log` | A record of actions or experience details |
+| `User Story` | A user goal |
 
-This inventory expires after **2026-09-07** (30 days). Recheck it before choosing a type when the date has passed, the target organization changes, or `gh` rejects a type:
+Recheck the live inventory before choosing a type when the target organization
+changes or `gh` rejects a type:
 
 ```bash
 gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueTypes(first: 100) { nodes { id name isEnabled description } } } }'
@@ -49,6 +57,36 @@ link an existing child via `POST repos/OWNER/REPO/issues/PARENT/sub_issues` with
 `sub_issue_id` set to the child's numeric issue ID. Verify the returned type and
 `GET repos/OWNER/REPO/issues/CHILD/parent`. Do not replace issue types with labels
 or create duplicate issues to repair a missing relationship.
+
+## Required Deep Issue Inspection
+
+Every issue investigation must include the issue's relationships, organization
+fields, and Project context. Do not report only the title, body, labels, and
+state.
+
+1. Confirm the repository and authentication, then read the issue with:
+   `gh issue view <number> --repo chester-hill-solutions/callcaster --json number,title,body,state,stateReason,issueType,author,assignees,labels,milestone,parent,subIssues,blockedBy,blocking,closedByPullRequestsReferences,projectItems,url`.
+2. Read the full issue comments and timeline. Include cross-referenced and
+   linked PRs, reopen/close events, and commits.
+3. Query organization issue fields and their current options:
+
+```bash
+gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueFields(first: 100) { nodes { ... on IssueFieldSingleSelect { id name options { id name } } ... on IssueFieldText { id name } ... on IssueFieldNumber { id name } } } } }'
+```
+
+4. Query the target issue's field values with the current field IDs. Record the
+   field name and option name, not only opaque IDs. This includes `Effort`.
+5. Read `.github/projects.yaml` before Project inspection. Refresh it if it is
+   missing or stale, as described by `github-projects`.
+6. Resolve live Project fields with `gh project field-list 9 --owner
+   chester-hill-solutions --format json`, then locate the issue with
+   `gh project item-list 9 --owner chester-hill-solutions --format json`.
+   Record the matching Project item ID, Status, and relevant custom fields.
+7. Never infer Project Status from labels, issue state, PR state, or comments.
+
+The investigation output must state the native Type, custom field values,
+Project Status, relationships, linked PRs, and any mismatch between source
+state and board state. Load `github-projects` for this work.
 
 ## Closed Reasons
 
