@@ -399,6 +399,14 @@ export default [
     },
   },
 
+  {
+    // These *Class props classify Twilio traffic, not CSS classes.
+    files: ["test/ui/alert-tones.test.tsx"],
+    rules: {
+      "shadcn/no-unknown-classes": ["warn", { allow: ["ca_local", "unknown"] }],
+    },
+  },
+
   // Node globals for config files, scripts, server, worker, and e2e.
   {
     files: [
