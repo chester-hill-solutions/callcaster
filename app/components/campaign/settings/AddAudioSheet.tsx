@@ -171,7 +171,7 @@ export function AddAudioSheet({
               </label>
             </FormField>
             {localError ? (
-              <p className="text-destructive-text text-sm" role="alert">
+              <p className="text-destructive-text text-sm" role="alert" data-severity="error">
                 {localError}
               </p>
             ) : null}

@@ -46,6 +46,9 @@ Put standalone Vite JSX fixtures outside `node_modules`, and load the app's
 `public/buffer-polyfill.mjs` before app imports. The utils barrel loads CSV code
 that reads Buffer at startup. A fixture startup failure is not geometry proof.
 Give concurrent baseline/candidate Vite fixtures separate cache directories.
+Create fixture source with file tools or a saved script. Nested JavaScript quotes
+inside an inline shell argument can silently corrupt the fixture. Inspect the
+rendered scene and require the intended controls before accepting browser proof.
 Render panels with nested Forms or fetchers through a real data router, even
 when the assertion only concerns a notice. Keep their actions isolated.
 Trace conditional notice tones to their data producer before choosing fixtures;

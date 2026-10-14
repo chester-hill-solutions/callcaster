@@ -312,7 +312,6 @@ test/chats-action.server.test.ts::@/lib/database/chat-contact-link.server#1
 test/chats-action.server.test.ts::@/lib/database/workspace.server#1
 test/chats-action.server.test.ts::@/lib/twilio-lookup.server#1
 test/chats-action.server.test.ts::@/lib/workspace-credits.server#1
-test/client-flash.route.test.ts::@/lib/logger.server#1
 test/coaching-billing.test.ts::@/lib/transaction-history.server#1
 test/confirm-payment.route.test.ts::@/lib/auth.server#1
 test/confirm-payment.route.test.ts::@/lib/env.server#1

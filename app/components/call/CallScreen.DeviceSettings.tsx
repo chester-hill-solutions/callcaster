@@ -379,7 +379,7 @@ export function DeviceSettingsPanel({
       </div>
 
       {audioTestError ? (
-        <p role="alert" className="text-sm text-destructive-text" data-testid="audio-test-error">
+        <p role="alert" data-severity="error" className="text-sm text-destructive-text" data-testid="audio-test-error">
           {audioTestError}
         </p>
       ) : null}

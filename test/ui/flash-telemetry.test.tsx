@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { Alert } from "@/components/ui/alert";
 
 /**
  * Flash telemetry (#1293): every error surface APPEARANCE — error/warning
- * toast, [role="alert"] banner — ships to the workspace endpoint with a
+ * toast, explicitly classified notice — ships to the workspace endpoint with a
  * call-site stack and recent breadcrumbs. Capture must be observation-only:
  * the wrapped toast still fires, and a broken beacon never throws.
  */
@@ -85,6 +87,7 @@ describe("flash telemetry", () => {
     const payload = await beaconPayload(beacons[0]!.blob as Blob);
     expect(payload.events[0]).toMatchObject({
       kind: "toast-error",
+      severity: "error",
       message: "This contact already has a call in progress.",
     });
     expect(payload.events[0].stack).toContain("Error");
@@ -95,9 +98,10 @@ describe("flash telemetry", () => {
     );
   });
 
-  test("an appearing role=alert banner beacons its text", async () => {
+  test("an explicitly marked error banner beacons its text", async () => {
     const banner = document.createElement("div");
     banner.setAttribute("role", "alert");
+    banner.setAttribute("data-severity", "error");
     banner.textContent = "Phone connection error RateExceededError (31206)";
     document.body.appendChild(banner);
 
@@ -109,6 +113,7 @@ describe("flash telemetry", () => {
     const payload = await beaconPayload(beacons[0]!.blob as Blob);
     expect(payload.events[0]).toMatchObject({
       kind: "alert-banner",
+      severity: "error",
       message: "Phone connection error RateExceededError (31206)",
     });
   });
@@ -117,6 +122,7 @@ describe("flash telemetry", () => {
     for (let i = 0; i < 3; i++) {
       const banner = document.createElement("div");
       banner.setAttribute("role", "alert");
+      banner.setAttribute("data-severity", "error");
       banner.textContent = "Same repeated banner";
       document.body.appendChild(banner);
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -148,9 +154,120 @@ describe("flash telemetry", () => {
       sentBeacons(beacon)[0]!.blob as Blob,
     );
     expect(payload.events[0].kind).toBe("toast-warning");
+    expect(payload.events[0].severity).toBe("warning");
     expect(payload.events[0].breadcrumbs.length).toBeLessThanOrEqual(40);
     expect(
       payload.events[0].breadcrumbs.at(-1).detail,
     ).toBe("step-59");
+  });
+
+  test.each([
+    [undefined, "neutral", "info"],
+    ["info", "info", "info"],
+    ["success", "success", "info"],
+    ["warning", "warning", "warn"],
+    ["destructive", "error", "error"],
+  ] as const)("real Alert variant %s ships its meaning at %s level", async (variant, severity, level) => {
+    render(<Alert variant={variant}>{`Result for ${severity}`}</Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).toHaveBeenCalledTimes(1);
+    const payload = await beaconPayload(beacon.mock.calls[0][1]);
+    expect(payload.events[0]).toMatchObject({ kind: "alert-banner", severity, message: `Result for ${severity}` });
+    expect(loggerMock[level]).toHaveBeenCalledTimes(1);
+    if (level === "info") {
+      expect(loggerMock.warn).not.toHaveBeenCalled();
+      expect(loggerMock.error).not.toHaveBeenCalled();
+    }
+  });
+
+  test("an unclassified role=alert announcement is not a severity signal", async () => {
+    const node = document.createElement("div");
+    node.role = "alert";
+    node.textContent = "Plain announcement";
+    document.body.append(node);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).not.toHaveBeenCalled();
+    expect(loggerMock.warn).not.toHaveBeenCalled();
+  });
+
+  test("a same-text success becomes an error on the same node without deduplication loss", async () => {
+    const { rerender } = render(<Alert variant="success" role="status">Updated result</Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    rerender(<Alert variant="destructive" role="status">Updated result</Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).toHaveBeenCalledTimes(2);
+    const payloads = await Promise.all(beacon.mock.calls.map(([, blob]) => beaconPayload(blob)));
+    expect(payloads.map(p => p.events[0].severity)).toEqual(["success", "error"]);
+    expect(screen.getByRole("status")).toHaveTextContent("Updated result");
+  });
+
+  test("dynamically inserted overlay notices can omit a role", async () => {
+    render(<div><Alert variant="warning" role={undefined}>Overlay warning</Alert></div>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).toHaveBeenCalledTimes(1);
+    const payload = await beaconPayload(beacon.mock.calls[0][1]);
+    expect(payload.events[0]).toMatchObject({ severity: "warning", message: "Overlay warning" });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  test("text updates within an existing semantic notice are captured once", async () => {
+    const { rerender } = render(<Alert variant="destructive"><span>First error detail</span></Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    rerender(<Alert variant="destructive"><span>Changed error detail</span></Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).toHaveBeenCalledTimes(2);
+    const payload = await beaconPayload(beacon.mock.calls[1][1]);
+    expect(payload.events[0]).toMatchObject({ severity: "error", message: "Changed error detail" });
+  });
+
+  test("sonner descendants are excluded because toast calls already carry their stacks", async () => {
+    render(<div data-sonner-toaster><Alert variant="destructive">Toast DOM duplicate</Alert></div>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).not.toHaveBeenCalled();
+  });
+
+  test("a rejected beacon uses the keepalive fetch fallback", async () => {
+    beacon.mockReturnValue(false);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      toastMock.error("Fallback error");
+      expect(fetchMock).toHaveBeenCalledWith(`/api/workspaces/${WORKSPACE}/client-flash`, expect.objectContaining({ method: "POST", keepalive: true }));
+      const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(payload.events[0]).toMatchObject({ kind: "toast-error", severity: "error", message: "Fallback error" });
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  test("an unchanged severity is not recaptured when only the announcement role changes", async () => {
+    const { rerender } = render(<Alert variant="warning">Role change control</Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    rerender(<Alert variant="warning" role="status">Role change control</Alert>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status")).toHaveAttribute("data-severity", "warning");
+  });
+
+  test("error deduplication expires and never crosses workspace attribution", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(100_000);
+    try {
+      const { rerender } = render(<Alert variant="destructive">Dedupe attribution error</Alert>);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      rerender(<div />);
+      clock.mockReturnValue(106_000);
+      rerender(<Alert variant="destructive">Dedupe attribution error</Alert>);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      window.history.replaceState(null, "", "/workspaces/22222222-2222-4222-8222-222222222222/call");
+      rerender(<div />);
+      rerender(<Alert variant="destructive">Dedupe attribution error</Alert>);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(beacon).toHaveBeenCalledTimes(3);
+      expect(beacon.mock.calls[2][0]).toBe("/api/workspaces/22222222-2222-4222-8222-222222222222/client-flash");
+    } finally { clock.mockRestore(); }
+  });
+
+  test("invalid semantic metadata is not inferred from an alert role", async () => {
+    render(<div role="alert" data-severity="destructive">Invalid marker</div>);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(beacon).not.toHaveBeenCalled();
   });
 });
