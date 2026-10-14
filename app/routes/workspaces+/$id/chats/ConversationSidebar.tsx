@@ -65,6 +65,7 @@ export function ConversationSidebar({
   const campaignFilterValue = selectedCampaignId ?? ALL_CAMPAIGNS_VALUE;
 
   const searchTerm = searchParams.get("search") ?? "";
+  const isSearching = searchTerm.trim().length > 0;
   const [searchInput, setSearchInput] = useState(searchTerm);
 
   // Keep the input in sync when the URL search param changes from outside
@@ -94,7 +95,7 @@ export function ConversationSidebar({
 
   const [loadMoreRef] = useInfiniteScroll({
     root: scrollRoot,
-    hasMore: !contactNumber && paginationState.hasMore,
+    hasMore: !contactNumber && !isSearching && paginationState.hasMore,
     loading: paginationFetcherState !== "idle",
     onLoadMore,
     rootMargin: "120px",
@@ -235,7 +236,7 @@ export function ConversationSidebar({
         {paginationError ? (
           <p className="px-4 py-2 text-sm text-red-500">{paginationError}</p>
         ) : null}
-        {paginationState.hasMore ? (
+        {!isSearching && paginationState.hasMore ? (
           <div
             ref={loadMoreRef}
             className="flex items-center justify-center gap-2 px-4 py-3 text-center text-sm text-muted-foreground"
