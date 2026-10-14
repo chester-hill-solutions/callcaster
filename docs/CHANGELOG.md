@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Changed: CSV audience uploads no longer show a persistent completion toast with a row-report action ([PR #2576](https://github.com/chester-hill-solutions/callcaster/pull/2576), [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507)).
+
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 - Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
 
