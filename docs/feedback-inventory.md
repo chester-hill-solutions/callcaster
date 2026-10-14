@@ -279,3 +279,31 @@ This is a tone adoption. Existing notice-placement and lifetime work stays in
 its own tracked tasks. Browser acceptance compares matching old/new rendered
 states and exercises the existing controls; it does not claim that every
 existing notice workflow is free of layout shifts.
+
+## Semantic notice telemetry — #2062
+
+The shared Alert owns `data-severity`, using the canonical contract from
+chester-hill-solutions/chester-hill-solutions#121. The client validates this
+metadata; roles, colors and message text do not select severity. Neutral, info
+and success log at info, warning at warn, and error at error. All five explicit
+meanings remain in the payload for workspace attribution.
+
+The observer captures added notices, severity changes and text updates,
+including overlays with `role="status"` or an omitted role. Sonner descendants
+are excluded because intercepted error/warning calls already carry stacks.
+Deduplication uses workspace, severity and bounded message text for five seconds;
+the existing 50-entry cap remains. A success cannot consume a later same-text
+error. Observation does not change classes, roles, controls or geometry.
+
+Plain audio-test, webhook-selection, survey-form and audio-upload errors now
+declare error metadata. Campaign settings and launch feedback declare their
+existing success/error tone, with neutral when no tone is supplied. The call
+screen ErrorBanner already uses a destructive shared Alert.
+
+The client and authenticated sink use `shared/flash-telemetry.ts` for their
+bounded payload contract and log levels. Older toast payloads remain valid:
+their explicit kind supplies error or warning. Older banner payloads without
+severity remain unclassified at info; the server does not invent an error from
+their kind. Conflicting toast severity and unknown severity values are rejected.
+Stacks, breadcrumbs, workspace/user attribution, beacon/fetch fallback and
+request/event caps remain. Unclassified role-only DOM announcements are ignored.

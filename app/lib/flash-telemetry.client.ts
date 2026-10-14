@@ -1,44 +1,14 @@
 import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
+import { flashLogLevel, flashSeveritySchema, type FlashBreadcrumb, type FlashEvent, type FlashSeverity } from "../../shared/flash-telemetry";
+export type { FlashBreadcrumb, FlashEvent } from "../../shared/flash-telemetry";
 
 /**
- * Flash telemetry: make transient error UI attributable after the fact.
- *
- * "An error flashed and disappeared" reports are unanswerable from server
- * logs when every request in the window is a 200 (issue: flash-telemetry).
- * This module captures the moment any error surface APPEARS — a sonner
- * `toast.error`/`toast.warning`, or any element with `role="alert"` entering
- * the DOM (the call screen's ErrorBanner among them) — and beacons it to
- * `POST /api/workspaces/:id/client-flash` together with a stack for the
- * toast call site and the most recent client breadcrumbs (dial presses, FSM
- * transitions, provider statuses). The server logs each event, so the next
- * flash is readable from the deployment's logs: exact message, exact code
- * path, and the state sequence that led to it.
- *
- * Design constraints:
- * - Zero UI change: observation only, errors here must never surface.
- * - Beacons only from inside a `/workspaces/:id/` URL — the endpoint is
- *   workspace-scoped (dataPlaneSessionAuth); flashes elsewhere still log to
- *   the console but have no workspace to attribute to.
- * - `navigator.sendBeacon` (fetch keepalive fallback) so a flash right
- *   before a navigation still ships.
+ * Record explicit notice severity and toast call-site evidence so transient
+ * failures remain attributable after navigation. ARIA roles do not define
+ * severity. Observation and transport failures must not alter the UI.
+ * Beacons are restricted to workspace URLs; other paths only log locally.
  */
-
-export type FlashBreadcrumb = {
-  /** ms since page load, for cheap ordering without clock skew concerns. */
-  t: number;
-  kind: string;
-  detail: string;
-};
-
-export type FlashEvent = {
-  kind: "toast-error" | "toast-warning" | "alert-banner";
-  message: string;
-  stack?: string;
-  breadcrumbs: FlashBreadcrumb[];
-  url: string;
-  ts: string;
-};
 
 const BREADCRUMB_LIMIT = 40;
 const breadcrumbs: FlashBreadcrumb[] = [];
@@ -66,14 +36,12 @@ function ship(event: FlashEvent): void {
   try {
     const workspaceId = workspaceIdFromUrl();
     // Always visible locally, even outside a workspace URL.
-    logger.warn(`[flash] ${event.kind}: ${event.message}`);
+    logger[flashLogLevel(event.severity)](`[flash] ${event.kind}: ${event.message}`);
     if (!workspaceId) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/client-flash`;
     const body = JSON.stringify({ events: [event] });
-    // sendBeacon survives imminent navigation; text/plain sidesteps the
-    // CORS-preflight restriction on beacon content types (same-origin here,
-    // but keepalive fetch is the fallback either way).
+    // Both transports must survive navigation; fetch handles rejected beacons.
     const sent =
       typeof navigator.sendBeacon === "function" &&
       navigator.sendBeacon(url, new Blob([body], { type: "application/json" }));
@@ -94,10 +62,12 @@ function ship(event: FlashEvent): void {
 function captureFlash(
   kind: FlashEvent["kind"],
   message: string,
+  severity: FlashSeverity,
   stack?: string,
 ): void {
   ship({
     kind,
+    severity,
     message: message.slice(0, 500),
     stack: stack?.slice(0, 4000),
     breadcrumbs: [...breadcrumbs],
@@ -117,23 +87,27 @@ function messageText(input: unknown): string {
   }
 }
 
-// Recently captured alert texts, to avoid re-shipping the same banner when a
+// Recently captured notice identities, to avoid re-shipping a banner when a
 // re-render replaces the node without the user seeing anything new.
 const recentAlerts = new Map<string, number>();
 const ALERT_DEDUPE_MS = 5_000;
 
 function alertAppeared(node: Element): void {
-  const text = (node.textContent ?? "").trim();
+  if (!node.isConnected || node.closest("[data-sonner-toaster]")) return;
+  const severity = flashSeveritySchema.safeParse(node.getAttribute("data-severity"));
+  if (!severity.success) return;
+  const text = (node.textContent ?? "").trim().slice(0, 500);
   if (!text) return;
   const now = Date.now();
-  const last = recentAlerts.get(text);
+  const key = JSON.stringify([workspaceIdFromUrl(), severity.data, text]);
+  const last = recentAlerts.get(key);
   if (last != null && now - last < ALERT_DEDUPE_MS) return;
-  recentAlerts.set(text, now);
+  recentAlerts.set(key, now);
   if (recentAlerts.size > 50) {
     const oldest = [...recentAlerts.entries()].sort((a, b) => a[1] - b[1])[0];
     if (oldest) recentAlerts.delete(oldest[0]);
   }
-  captureFlash("alert-banner", text);
+  captureFlash("alert-banner", text, severity.data);
 }
 
 let installed = false;
@@ -152,31 +126,30 @@ export function installFlashTelemetry(): void {
   const originalError = toast.error.bind(toast);
   const originalWarning = toast.warning.bind(toast);
   toast.error = ((message: unknown, options?: unknown) => {
-    captureFlash("toast-error", messageText(message), new Error().stack);
+    captureFlash("toast-error", messageText(message), "error", new Error().stack);
     return originalError(message as never, options as never);
   }) as typeof toast.error;
   toast.warning = ((message: unknown, options?: unknown) => {
-    captureFlash("toast-warning", messageText(message), new Error().stack);
+    captureFlash("toast-warning", messageText(message), "warning", new Error().stack);
     return originalWarning(message as never, options as never);
   }) as typeof toast.warning;
 
-  // 2) Any [role="alert"] APPEARING covers error UI that isn't a toast
-  //    (ErrorBanner and friends) with zero changes to components. Appearance
-  //    is the flash signal; sonner's own toasts are excluded (captured above
-  //    with better fidelity).
   const observer = new MutationObserver((mutations) => {
+    const notices = new Set<Element>();
     for (const mutation of mutations) {
+      const target = mutation.target instanceof Element ? mutation.target : mutation.target.parentElement;
+      const enclosing = target?.closest("[data-severity]");
+      if (enclosing) notices.add(enclosing);
       for (const added of mutation.addedNodes) {
         if (!(added instanceof Element)) continue;
-        if (added.closest?.("[data-sonner-toaster]")) continue;
-        if (added.matches?.('[role="alert"]')) alertAppeared(added);
-        added
-          .querySelectorAll?.('[role="alert"]')
-          .forEach((el) => {
-            if (!el.closest("[data-sonner-toaster]")) alertAppeared(el);
-          });
+        if (added.matches("[data-severity]")) notices.add(added);
+        added.querySelectorAll("[data-severity]").forEach(el => notices.add(el));
       }
     }
+    notices.forEach(alertAppeared);
   });
-  observer.observe(document.body, { subtree: true, childList: true });
+  observer.observe(document.body, {
+    subtree: true, childList: true, characterData: true,
+    attributes: true, attributeFilter: ["data-severity"],
+  });
 }

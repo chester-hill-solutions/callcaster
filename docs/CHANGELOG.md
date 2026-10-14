@@ -4,9 +4,11 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Security: SMS report export history exposes report details and private download links only to workspace owners and admins; ordinary exports remain available to workspace members ([PR #2560](https://github.com/chester-hill-solutions/callcaster/pull/2560), [#2559](https://github.com/chester-hill-solutions/callcaster/issues/2559)).
+- Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([PR #2562](https://github.com/chester-hill-solutions/callcaster/pull/2562), [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
 
 - Fixed: Neutral notices use the shared card style in both themes, and campaign safeguards, authenticator setup, and Twilio warnings use explicit warning tones ([PR #2561](https://github.com/chester-hill-solutions/callcaster/pull/2561), [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061)).
+
+- Security: SMS report export history exposes report details and private download links only to workspace owners and admins; ordinary exports remain available to workspace members ([PR #2560](https://github.com/chester-hill-solutions/callcaster/pull/2560), [#2559](https://github.com/chester-hill-solutions/callcaster/issues/2559)).
 
 - Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([PR #2558](https://github.com/chester-hill-solutions/callcaster/pull/2558), [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
 

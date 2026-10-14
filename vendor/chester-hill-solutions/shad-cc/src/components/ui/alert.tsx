@@ -33,6 +33,14 @@ const alertVariants = cva(
   }
 )
 
+const alertSeverities = {
+  default: "neutral",
+  destructive: "error",
+  success: "success",
+  warning: "warning",
+  info: "info",
+} as const
+
 function Alert({
   className,
   variant,
@@ -44,6 +52,7 @@ function Alert({
       role="alert"
       className={cn(alertVariants({ variant }), className)}
       {...props}
+      data-severity={alertSeverities[variant ?? "default"]}
     />
   )
 }
