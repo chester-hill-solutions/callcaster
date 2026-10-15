@@ -117,7 +117,7 @@ function getGuideCopy(goal: CampaignProductGoal | null): {
       };
     case "automated_phone_menu":
       return {
-        guideTitle: "Set up your automated phone menu",
+        guideTitle: "Set up your IVR",
         launchActionLabel: "Start phone menu",
       };
     case null:

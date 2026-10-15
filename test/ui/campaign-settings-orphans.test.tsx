@@ -23,14 +23,14 @@ describe("campaign settings orphan values", () => {
     expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
   });
 
-  test("shows a legacy simple/complex IVR campaign as the automated phone menu (#1741)", () => {
+  test("shows a legacy simple/complex IVR campaign as the IVR (#1741)", () => {
     const { rerender } = render(
       <SelectType
         campaignData={{ type: "complex_ivr" } as never}
         handleInputChange={vi.fn()}
       />,
     );
-    expect(document.querySelector("#type")).toHaveTextContent("Automated phone menu");
+    expect(document.querySelector("#type")).toHaveTextContent("IVR");
 
     rerender(
       <SelectType
@@ -38,7 +38,7 @@ describe("campaign settings orphan values", () => {
         handleInputChange={vi.fn()}
       />,
     );
-    expect(document.querySelector("#type")).toHaveTextContent("Automated phone menu");
+    expect(document.querySelector("#type")).toHaveTextContent("IVR");
   });
 
   test("never offers Advanced IVR, for any campaign type (#1741)", () => {
