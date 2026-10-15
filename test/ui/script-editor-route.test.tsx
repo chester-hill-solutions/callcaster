@@ -81,6 +81,18 @@ describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
   });
 
+  test("edits and saves the script title", async () => {
+    await renderScriptEditor();
+    await screen.findByRole("heading", { name: "Voter ID script" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit script title" }));
+    await userEvent.clear(screen.getByLabelText("script title"));
+    await userEvent.type(screen.getByLabelText("script title"), "Updated script");
+    await userEvent.click(screen.getByRole("button", { name: "Save script title" }));
+
+    expect(screen.getByRole("heading", { name: "Updated script" })).toBeInTheDocument();
+  });
+
   // The header deliberately does NOT mirror a Save button: two controls whose
   // accessible names differ only by a suffix ("Save" vs "Save changes") are
   // ambiguous to anyone resolving by name — a screen-reader user, or

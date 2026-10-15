@@ -13,6 +13,7 @@ export type EditableTitleProps = {
   ariaLabel: string;
   placeholder?: string;
   className?: string;
+  as?: "div" | "span";
 };
 
 export function EditableTitle({
@@ -24,6 +25,7 @@ export function EditableTitle({
   ariaLabel,
   placeholder = "Untitled",
   className,
+  as = "div",
 }: EditableTitleProps) {
   const [editing, setEditing] = useState(autoEdit && !readOnly);
   const [draft, setDraft] = useState(value);
@@ -82,8 +84,10 @@ export function EditableTitle({
     );
   }
 
+  const TitleContainer = as;
+
   return (
-    <div className={cn("flex min-w-0 items-center gap-1", className)}>
+    <TitleContainer className={cn("flex min-w-0 items-center gap-1", className)}>
       {editing ? (
         <Input
           ref={inputRef}
@@ -123,6 +127,6 @@ export function EditableTitle({
           <X className="h-4 w-4" aria-hidden />
         </Button>
       )}
-    </div>
+    </TitleContainer>
   );
 }

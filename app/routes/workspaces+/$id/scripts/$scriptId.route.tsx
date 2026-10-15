@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLoaderData } from "react-router";
 import { toast } from "sonner";
+import { EditableTitle } from "@/components/ui/editable-title";
 import { Heading } from "@/components/ui/typography";
 import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
 import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
@@ -88,7 +89,15 @@ export default function ScriptEditor() {
       */}
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         <Heading level={4} as="h1" className="min-w-0 truncate">
-          {script?.name || "Untitled script"}
+          <EditableTitle
+            as="span"
+            value={script?.name || ""}
+            ariaLabel="script title"
+            className="min-w-0"
+            onSave={(name) =>
+              setScript((current) => (current ? { ...current, name } : current))
+            }
+          />
         </Heading>
         <SaveBar
           isChanged={isChanged}
