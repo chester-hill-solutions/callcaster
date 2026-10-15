@@ -52,7 +52,7 @@ export function ScriptOptionRow({
       : IVR_RESPONSE_KEYS;
 
   return (
-    <div className="grid items-end gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+    <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_auto] items-end gap-2 overflow-x-auto rounded-md border border-border bg-muted/30 p-3">
       <FormField
         label={mode === "ivr" ? "Answer label" : "Option label"}
         htmlFor={labelId}
