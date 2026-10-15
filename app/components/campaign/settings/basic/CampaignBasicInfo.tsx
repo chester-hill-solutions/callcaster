@@ -14,6 +14,7 @@ interface CampaignBasicInfoProps {
   smsSendContext?: {
     messagingServiceReady: boolean;
     defaultMessagingServiceSid: string | null;
+    attachedSenderPhoneNumbers?: string[];
   };
 }
 
@@ -29,8 +30,10 @@ export const CampaignBasicInfo = ({
 }: CampaignBasicInfoProps) => {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-4">
-        <div className="min-w-[250px] flex-1">
+      <div
+        className={`grid gap-4 ${campaignData.type === "message" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+      >
+        <div className="min-w-0">
           <SelectType
             campaignData={campaignData}
             handleInputChange={(name, value) =>
@@ -45,7 +48,17 @@ export const CampaignBasicInfo = ({
             }
           />
         </div>
-        <div id="campaign-setup-number" className="min-w-[250px] flex-1 space-y-1">
+        {campaignData.type === "message" ? (
+          <div className="min-w-0">
+            <CampaignSmsSendMode
+              value={campaignData.sms_send_mode}
+              onChange={handleInputChange}
+              isBusy={isBusy}
+              smsSendContext={smsSendContext}
+            />
+          </div>
+        ) : null}
+        <div id="campaign-setup-number" className="min-w-0 space-y-1">
           <SelectNumber
             campaignData={{ caller_id: campaignData.caller_id ?? undefined }}
             handleInputChange={(name, value) => handleInputChange(name, value)}
@@ -57,14 +70,6 @@ export const CampaignBasicInfo = ({
               Outbound number is optional when sending via Messaging Service
               (Twilio uses the service&apos;s sender pool).
             </p>
-          ) : null}
-          {campaignData.type === "message" ? (
-            <CampaignSmsSendMode
-              value={campaignData.sms_send_mode}
-              onChange={handleInputChange}
-              isBusy={isBusy}
-              smsSendContext={smsSendContext}
-            />
           ) : null}
         </div>
       </div>

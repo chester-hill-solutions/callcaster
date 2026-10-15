@@ -34,7 +34,7 @@ export function CampaignSmsSendMode({
           ? "Messaging Service needs a configured SID and at least one sender. Finish onboarding or choose Phone number."
           : sendMode === "messaging_service"
             ? "Twilio sends from your Messaging Service pool."
-            : "Choose the From number above."
+            : "Choose the Phone number beside this field."
       }
     >
       <Select
