@@ -77,6 +77,19 @@ describe("script editor — renders through the real design-system primitives", 
     expect(screen.getByLabelText("Add block")).toBeTruthy();
   });
 
+  test("edits and saves the active page title", () => {
+    const { onChange } = renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
+    fireEvent.change(screen.getByLabelText("page title"), {
+      target: { value: "Opening" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save page title" }));
+
+    const saved = onChange.mock.calls.at(-1)?.[0] as Script;
+    expect(saved.steps.pages.page_1.title).toBe("Opening");
+  });
+
   test("marks the start page", () => {
     renderEditor();
 

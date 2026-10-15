@@ -105,6 +105,18 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     ).toBeInTheDocument();
   });
 
+  test("edits and saves the block title", () => {
+    const { onChange } = renderStep({ block: legacyTextBlock() });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit block title" }));
+    fireEvent.change(screen.getByLabelText("block title"), {
+      target: { value: "Welcome" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save block title" }));
+
+    expect(onChange).toHaveBeenCalledWith({ title: "Welcome" });
+  });
+
   test("the unspoken prompt can be promoted to speech text in one click, pinning the playback type", () => {
     const { onChange } = renderStep({ block: legacyTextBlock() });
 
