@@ -91,9 +91,13 @@ export function ScriptBlockEditor({
     </div>
   );
 
-  const blockIdentifier = !isIvrStepBlock(block, audioFlow) && (
+  const blockIdentifier = (
     <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-      {block.type}
+      {isIvrStepBlock(block, audioFlow)
+        ? getIvrPlaybackMode(block) === "recorded"
+          ? "Recording step"
+          : "Spoken step"
+        : block.type}
     </p>
   );
 
@@ -119,11 +123,6 @@ export function ScriptBlockEditor({
     return (
       <div className="grid gap-3">
         {header}
-        <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-          {getIvrPlaybackMode(block) === "recorded"
-            ? "Recording step"
-            : "Spoken step"}
-        </p>
         <IvrStepFields
           block={block}
           readOnly={readOnly}
