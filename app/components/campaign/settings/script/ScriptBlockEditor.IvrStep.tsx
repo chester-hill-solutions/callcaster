@@ -7,7 +7,6 @@ import {
 } from "react";
 import type { ScriptBlock } from "@chester-hill-solutions/scriptkit-call-script-core";
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
-import { Mic, Volume2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -132,30 +131,6 @@ export function IvrStepFields({
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="shrink-0 text-sm font-semibold">What the recipient hears</span>
           {playbackWarning}
-        </div>
-        <div role="group" aria-label="Playback mode" className="flex gap-1">
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "synthetic" ? "default" : "outline"}
-            aria-pressed={mode === "synthetic"}
-            disabled={readOnly}
-            onClick={() => onChange(playbackModePatch(block, "synthetic"))}
-          >
-            <Volume2 className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Speak text
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "recorded" ? "default" : "outline"}
-            aria-pressed={mode === "recorded"}
-            disabled={readOnly}
-            onClick={() => onChange(playbackModePatch(block, "recorded"))}
-          >
-            <Mic className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Play a recording
-          </Button>
         </div>
       </div>
 

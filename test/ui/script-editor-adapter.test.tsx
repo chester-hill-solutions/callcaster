@@ -100,6 +100,26 @@ describe("script editor — renders through the real design-system primitives", 
     expect(screen.getByRole("combobox", { name: "Add a script block" })).toBeInTheDocument();
   });
 
+  test("changes block types without losing the prompt or options", () => {
+    render(<ControlledEditor initialScript={makeScript()} />);
+
+    const typeSelect = screen.getByRole("combobox", { name: "Block type" });
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
+
+    fireEvent.click(typeSelect);
+    fireEvent.click(screen.getByRole("option", { name: "Text area" }));
+
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Block type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Select" }));
+
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
+  });
+
   test("marks the start page", () => {
     renderEditor();
 

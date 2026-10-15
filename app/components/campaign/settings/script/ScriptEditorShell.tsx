@@ -19,6 +19,7 @@ import {
   createIvrResponseOption,
   createIvrStepBlock,
   nextIvrStepTitle,
+  playbackModePatch,
   type IvrPlaybackMode,
 } from "@/lib/ivr-script-editor";
 import { validateIvrRouting } from "@/lib/ivr-script-validation";
@@ -346,6 +347,20 @@ export function ScriptEditorShell({
                           onMoveDown={() =>
                             editor.moveBlock(blockId, index + 1)
                           }
+                          blockTypes={editor.blockTypes}
+                          onTypeChange={(type) => {
+                            if (isIvrStepBlock(block, audioFlow)) {
+                              editor.updateBlock(
+                                blockId,
+                                playbackModePatch(block, type as IvrPlaybackMode),
+                              );
+                            } else {
+                              editor.changeBlockType(
+                                blockId,
+                                type as ScriptBlock["type"],
+                              );
+                            }
+                          }}
                           autoEditTitle={newBlockId === blockId}
                           onAutoEditTitleConsumed={() => setNewBlockId(null)}
                           onOptionAdd={() => addResponse(blockId, block)}

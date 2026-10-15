@@ -96,7 +96,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
   test("a text-only block in an audio script is edited as a silent spoken step, with its prompt hidden", () => {
     renderStep({ block: legacyTextBlock() });
 
-    expect(screen.getByText("Spoken step")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
     expect(screen.getByText("Greeting")).toBeInTheDocument();
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
     expect(screen.getByPlaceholderText("Text to speech script...")).toBeInTheDocument();
@@ -150,14 +150,14 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
 
     expect(screen.queryByText(/Callers hear nothing/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Voice")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Speak text" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Play a recording" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
   });
 
   test("switching to a recording writes the wire type, and mirrors the legacy speechType when present", () => {
     const { onChange } = renderStep({ block: spokenBlock({ speechType: "synthetic" }) });
 
-    fireEvent.click(screen.getByRole("button", { name: "Play a recording" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Block type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Recording" }));
 
     expect(onChange).toHaveBeenCalledWith({
       callcasterType: "recorded",
@@ -172,7 +172,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       audioPreviewUrl: (name) => `/preview/${name}`,
     });
 
-    expect(screen.getByText("Recording step")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Recording");
     const player = screen.getByLabelText("Preview greeting.mp3");
     expect(player.tagName).toBe("AUDIO");
     expect(player).toHaveAttribute("src", "/preview/greeting.mp3");
@@ -240,13 +240,13 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(screen.queryByRole("button", { name: "Add response" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove option" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove block" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Play a recording" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toBeDisabled();
   });
 
   test("outside an audio script, a playback-typed block still gets the audio editor", () => {
     renderStep({ block: spokenBlock(), audioFlow: false });
 
-    expect(screen.getByText("Spoken step")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
     expect(screen.getByLabelText("Speech text")).toHaveValue("Press 1 for yes.");
   });
 

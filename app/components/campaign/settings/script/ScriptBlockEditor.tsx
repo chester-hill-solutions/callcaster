@@ -6,9 +6,16 @@ import {
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
 import { Button } from "@/components/ui/button";
 import { EditableTitle } from "@/components/ui/editable-title";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { getIvrPlaybackMode } from "@/lib/ivr-script-editor";
+import { getIvrPlaybackMode, playbackModePatch } from "@/lib/ivr-script-editor";
 import { IvrResponsesEditor } from "./ScriptBlockEditor.IvrResponses";
 import { IvrStepFields, NoInputFields } from "./ScriptBlockEditor.IvrStep";
 import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
@@ -35,6 +42,8 @@ export type ScriptBlockEditorProps = {
   onDuplicate: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  blockTypes?: readonly ScriptBlock["type"][];
+  onTypeChange?: (type: string) => void;
   autoEditTitle?: boolean;
   onAutoEditTitleConsumed?: () => void;
   onOptionAdd: () => void;
@@ -66,6 +75,8 @@ export function ScriptBlockEditor({
   onDuplicate,
   onMoveUp,
   onMoveDown,
+  blockTypes = ["instruction", "textarea", "select", "radio", "checkbox"],
+  onTypeChange,
   autoEditTitle = false,
   onAutoEditTitleConsumed,
   onOptionAdd,
@@ -91,15 +102,33 @@ export function ScriptBlockEditor({
     </div>
   );
 
-  const blockIdentifier = (
-    <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-      {isIvrStepBlock(block, audioFlow)
-        ? getIvrPlaybackMode(block) === "recorded"
-          ? "Recording step"
-          : "Spoken step"
-        : block.type}
-    </p>
-  );
+  const ivrBlock = isIvrStepBlock(block, audioFlow);
+  const blockType = ivrBlock ? getIvrPlaybackMode(block) : block.type;
+  const blockTypeOptions = ivrBlock
+    ? [
+        { value: "synthetic", label: "Spoken text" },
+        { value: "recorded", label: "Recording" },
+      ]
+    : blockTypes.map((type) => ({
+        value: type,
+        label:
+          ({
+            instruction: "Instruction",
+            textarea: "Text area",
+            select: "Select",
+            radio: "Radio",
+            checkbox: "Checkbox",
+          } as Record<string, string>)[type] ?? type,
+      }));
+  const handleTypeChange = (type: string) => {
+    if (onTypeChange) {
+      onTypeChange(type);
+    } else if (ivrBlock) {
+      onChange(playbackModePatch(block, type as "recorded" | "synthetic"));
+    } else {
+      onChange({ type } as Partial<ScriptBlock>);
+    }
+  };
 
   const header = (
     <div className="flex min-w-0 items-start justify-between gap-2">
@@ -113,13 +142,28 @@ export function ScriptBlockEditor({
         onSave={(title) => onChange({ title } as Partial<ScriptBlock>)}
       />
       <div className="flex shrink-0 items-center gap-2">
-        {blockIdentifier}
+        <Select
+          value={blockType}
+          disabled={readOnly}
+          onValueChange={handleTypeChange}
+        >
+          <SelectTrigger aria-label="Block type" className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {blockTypeOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {actions}
       </div>
     </div>
   );
 
-  if (isIvrStepBlock(block, audioFlow)) {
+  if (ivrBlock) {
     return (
       <div className="grid gap-3">
         {header}
@@ -178,7 +222,7 @@ export function ScriptBlockEditor({
         </Label>
       )}
       {block.type !== "instruction" && "prompt" in block && (
-        <Label className="grid gap-2 font-normal" aria-label="Question">
+        <Label className="grid gap-2 font-normal">
           <Textarea
             value={prompt}
             readOnly={readOnly}
