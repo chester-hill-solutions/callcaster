@@ -106,6 +106,7 @@ export default function ScriptEditor() {
           onReset={handleReset}
           showMessage={false}
           embedded
+          className="ml-auto"
         />
         </div>
       <div className="h-full flex-grow p-4">
