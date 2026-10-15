@@ -91,6 +91,12 @@ export function ScriptBlockEditor({
     </div>
   );
 
+  const blockIdentifier = !isIvrStepBlock(block, audioFlow) && (
+    <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+      {block.type}
+    </p>
+  );
+
   const header = (
     <div className="flex min-w-0 items-start justify-between gap-2">
       <EditableTitle
@@ -102,7 +108,10 @@ export function ScriptBlockEditor({
         className="min-w-0 flex-1"
         onSave={(title) => onChange({ title } as Partial<ScriptBlock>)}
       />
-      {actions}
+      <div className="flex shrink-0 items-center gap-2">
+        {blockIdentifier}
+        {actions}
+      </div>
     </div>
   );
 
@@ -149,9 +158,6 @@ export function ScriptBlockEditor({
   return (
     <div className="grid gap-3">
       {header}
-      <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-        {block.type}
-      </p>
       {block.type === "instruction" && (
         <Label className="grid gap-2 font-normal">
           <span className="font-medium">Body</span>
