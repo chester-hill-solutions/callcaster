@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { Link, useLoaderData } from "react-router";
-import { ArrowLeft } from "lucide-react";
+import { useLoaderData } from "react-router";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Heading, Text } from "@/components/ui/typography";
+import { Heading } from "@/components/ui/typography";
 import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
 import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
 import { workspaceAudioPreviewPath } from "@/lib/ivr-script-editor";
@@ -84,39 +82,23 @@ export default function ScriptEditor() {
 
   return (
     <div className="relative flex h-full flex-col overflow-visible">
-      <SaveBar
-        isChanged={isChanged}
-        isSaving={isSaving}
-        onSave={handleSaveUpdate}
-        onReset={handleReset}
-      />
       {/*
-        Persistent editor header: the SaveBar above only appears once the form is
-        dirty, so without this there is no title and no way back to the script
-        list on a pristine script.
-
-        Saving deliberately stays with the SaveBar rather than being mirrored
-        here. It already owns Cmd/Ctrl+S and Reset, and a second "Save" is both
-        redundant and ambiguous once the form is dirty — two buttons whose
-        accessible names differ only by a suffix.
+        The title and save controls stay together so the editor has one clear
+        page header. SaveBar keeps the Cmd/Ctrl+S shortcut in embedded mode.
       */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" aria-label="Back to scripts" asChild>
-            <Link to=".." relative="path">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <Heading level={4} as="h1" className="truncate">
-              {script?.name || "Untitled script"}
-            </Heading>
-            <Text variant="small">
-              {isChanged ? "Unsaved changes" : "All changes saved"}
-            </Text>
-          </div>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <Heading level={4} as="h1" className="min-w-0 truncate">
+          {script?.name || "Untitled script"}
+        </Heading>
+        <SaveBar
+          isChanged={isChanged}
+          isSaving={isSaving}
+          onSave={handleSaveUpdate}
+          onReset={handleReset}
+          showMessage={false}
+          embedded
+        />
         </div>
-      </div>
       <div className="h-full flex-grow p-4">
         {script ? (
           <CampaignSettingsScript

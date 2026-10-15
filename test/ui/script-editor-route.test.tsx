@@ -68,14 +68,13 @@ async function renderScriptEditor() {
 }
 
 describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
-  test("shows title and back link on a pristine script", async () => {
+  test("shows the title without saved-state or back-link text", async () => {
     await renderScriptEditor();
 
-    // Regression: the SaveBar only mounts once the form is dirty, so a pristine
-    // script previously had no title and no way back to the script list.
     expect(await screen.findByRole("heading", { name: "Voter ID script" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Back to scripts")).toBeInTheDocument();
-    expect(screen.getByText("All changes saved")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Back to scripts")).not.toBeInTheDocument();
+    expect(screen.queryByText("All changes saved")).not.toBeInTheDocument();
+    expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
 
     // Saving belongs to the SaveBar alone, which is dirty-only — so a pristine
     // script has no save control at all. There is nothing to save.
