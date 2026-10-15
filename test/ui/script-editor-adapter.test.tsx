@@ -73,7 +73,7 @@ describe("script editor — renders through the real design-system primitives", 
     renderEditor();
 
     expect(screen.getByLabelText("Script pages")).toBeTruthy();
-    expect(screen.getByLabelText("Page title")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit page title" })).toBeTruthy();
     expect(screen.getByLabelText("Add block")).toBeTruthy();
   });
 

@@ -97,7 +97,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     renderStep({ block: legacyTextBlock() });
 
     expect(screen.getByText("Spoken step")).toBeInTheDocument();
-    expect(screen.getByLabelText("Step name")).toHaveValue("Greeting");
+    expect(screen.getByText("Greeting")).toBeInTheDocument();
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
     expect(

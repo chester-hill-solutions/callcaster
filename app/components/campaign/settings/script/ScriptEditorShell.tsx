@@ -7,7 +7,6 @@ import { useScriptEditorState } from "@chester-hill-solutions/scriptkit-call-scr
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -26,6 +25,7 @@ import { validateIvrRouting } from "@/lib/ivr-script-validation";
 import { scripts } from "@/lib/call-script-service";
 import { validateInboundScriptSteps } from "@/lib/inbound-script-validation";
 import { cn } from "@/lib/utils";
+import { EditableTitle } from "@/components/ui/editable-title";
 import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
 import { ScriptValidationDetails } from "./ScriptValidationDetails";
 
@@ -213,10 +213,11 @@ export function ScriptEditorShell({
             <>
               <div className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <LabelledPageTitle
+                  <EditableTitle
                     value={editor.activePage.title}
                     readOnly={readOnly}
-                    onChange={(title) =>
+                    ariaLabel="page title"
+                    onSave={(title) =>
                       editor.renamePage(editor.activePageId, title)
                     }
                   />
@@ -230,7 +231,7 @@ export function ScriptEditorShell({
                           variant="secondary"
                           className="sm:hidden"
                           onClick={() => editor.addPage()}
-                        >
+                          >
                           Add page
                         </Button>
                         <Button
@@ -238,6 +239,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Move page up"
+                          title="Move page up"
                           disabled={activePageIndex <= 0}
                           onClick={() =>
                             editor.movePage(
@@ -253,6 +255,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Move page down"
+                          title="Move page down"
                           disabled={
                             activePageIndex < 0 ||
                             activePageIndex >= pageCount - 1
@@ -282,6 +285,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Remove page"
+                          title="Remove page"
                           disabled={pageCount <= 1}
                           onClick={() =>
                             editor.removePage(editor.activePageId)
@@ -415,31 +419,5 @@ export function ScriptEditorShell({
       </div>
 
     </div>
-  );
-}
-
-function LabelledPageTitle({
-  value,
-  readOnly,
-  onChange,
-}: {
-  value: string;
-  readOnly: boolean;
-  onChange: (value: string) => void;
-}) {
-  const inputId = useId();
-  return (
-    <FormField
-      label="Page title"
-      htmlFor={inputId}
-      className="min-w-[12rem] flex-1"
-    >
-      <Input
-        id={inputId}
-        value={value}
-        readOnly={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </FormField>
   );
 }

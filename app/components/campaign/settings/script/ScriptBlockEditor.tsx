@@ -1,4 +1,3 @@
-import { useId } from "react";
 import {
   isIvrPlaybackType,
   type ScriptBlock,
@@ -6,6 +5,7 @@ import {
 } from "@chester-hill-solutions/scriptkit-call-script-core";
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
 import { Button } from "@/components/ui/button";
+import { EditableTitle } from "@/components/ui/editable-title";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,6 +21,7 @@ import { getIvrPlaybackMode } from "@/lib/ivr-script-editor";
 import { IvrResponsesEditor } from "./ScriptBlockEditor.IvrResponses";
 import { IvrStepFields } from "./ScriptBlockEditor.IvrStep";
 import { NO_ROUTING_TARGET, routingOptionsFor } from "./ScriptBlockEditor.routing";
+import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
 
 export type ScriptBlockEditorProps = {
   block: ScriptBlock;
@@ -76,48 +77,47 @@ export function ScriptBlockEditor({
   onOptionChange,
   onOptionRemove,
 }: ScriptBlockEditorProps) {
-  const titleId = useId();
   const options = "options" in block && block.options ? block.options : [];
 
   const actions = !readOnly && (
-    <div className="flex flex-wrap gap-2">
-      <Button type="button" size="sm" variant="outline" onClick={onMoveUp}>
-        Move up
+    <div className="flex shrink-0 gap-1">
+      <Button type="button" size="icon" variant="outline" aria-label="Move block up" title="Move block up" onClick={onMoveUp}>
+        <ChevronUp className="h-3.5 w-3.5" aria-hidden />
       </Button>
-      <Button type="button" size="sm" variant="outline" onClick={onMoveDown}>
-        Move down
+      <Button type="button" size="icon" variant="outline" aria-label="Move block down" title="Move block down" onClick={onMoveDown}>
+        <ChevronDown className="h-3.5 w-3.5" aria-hidden />
       </Button>
-      <Button type="button" size="sm" variant="outline" onClick={onDuplicate}>
-        Duplicate block
+      <Button type="button" size="icon" variant="outline" aria-label="Duplicate block" title="Duplicate block" onClick={onDuplicate}>
+        <Copy className="h-3.5 w-3.5" aria-hidden />
       </Button>
-      <Button type="button" size="sm" variant="outline" onClick={onRemove}>
-        Remove block
+      <Button type="button" size="icon" variant="outline" aria-label="Remove block" title="Remove block" onClick={onRemove}>
+        <Trash2 className="h-3.5 w-3.5" aria-hidden />
       </Button>
+    </div>
+  );
+
+  const header = (
+    <div className="flex min-w-0 items-start justify-between gap-2">
+      <EditableTitle
+        value={block.title ?? ""}
+        readOnly={readOnly}
+        ariaLabel="block title"
+        className="min-w-0 flex-1"
+        onSave={(title) => onChange({ title } as Partial<ScriptBlock>)}
+      />
+      {actions}
     </div>
   );
 
   if (isIvrStepBlock(block, audioFlow)) {
     return (
       <div className="grid gap-3">
+        {header}
         <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
           {getIvrPlaybackMode(block) === "recorded"
             ? "Recording step"
             : "Spoken step"}
         </p>
-        <FormField
-          label="Step name"
-          htmlFor={titleId}
-          description="Names this step in results and exports."
-        >
-          <Input
-            id={titleId}
-            value={block.title ?? ""}
-            readOnly={readOnly}
-            onChange={(event) =>
-              onChange({ title: event.target.value } as Partial<ScriptBlock>)
-            }
-          />
-        </FormField>
         <IvrStepFields
           block={block}
           readOnly={readOnly}
@@ -137,7 +137,6 @@ export function ScriptBlockEditor({
           onOptionChange={onOptionChange}
           onOptionRemove={onOptionRemove}
         />
-        {actions}
       </div>
     );
   }
@@ -154,21 +153,10 @@ export function ScriptBlockEditor({
 
   return (
     <div className="grid gap-3">
+      {header}
       <p className="text-[0.65rem] font-medium tracking-[0.16em] text-muted-foreground uppercase">
         {block.type}
       </p>
-      {block.title !== undefined && (
-        <Label className="grid gap-2 font-normal">
-          <span className="font-medium">Title</span>
-          <Input
-            value={block.title}
-            readOnly={readOnly}
-            onChange={(event) =>
-              onChange({ title: event.target.value } as Partial<ScriptBlock>)
-            }
-          />
-        </Label>
-      )}
       {block.type === "instruction" && (
         <Label className="grid gap-2 font-normal">
           <span className="font-medium">Body</span>
@@ -278,7 +266,6 @@ export function ScriptBlockEditor({
           )}
         </div>
       )}
-      {actions}
     </div>
   );
 }
