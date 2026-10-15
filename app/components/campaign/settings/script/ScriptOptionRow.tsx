@@ -51,7 +51,7 @@ export function ScriptOptionRow({
       : IVR_RESPONSE_KEYS;
 
   return (
-    <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_auto] items-end gap-2 overflow-x-auto rounded-md border border-border bg-muted/30 p-3">
+    <div className="grid grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(8rem,1fr)_auto] items-end gap-2 overflow-x-auto py-1">
       <div className="grid gap-1">
         <Input
           id={labelId}
