@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
 import { Textarea } from "@/components/ui/textarea";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { CREDIT_PRICE_CAD, SMS_SEGMENT_CREDITS } from "@/lib/pricing";
@@ -136,28 +137,27 @@ export function MessageSegmentCalculator() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <label className="sr-only" htmlFor="message-segment-input">
-                Message text
-              </label>
-              <Textarea
-                id="message-segment-input"
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Type or paste your message…"
-                rows={5}
-                className="min-h-32 resize-y"
-              />
+              <FormField label="Message text" htmlFor="message-segment-input">
+                <Textarea
+                  id="message-segment-input"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  placeholder="Type or paste your message…"
+                  rows={5}
+                  className="min-h-32 resize-y"
+                />
+              </FormField>
               <p className="text-muted-foreground text-sm" aria-live="polite">
                 Characters typed:{" "}
                 <span className="text-foreground font-semibold">
                   {result.characterCount}
                 </span>
               </p>
-              <label
-                className="block max-w-sm space-y-1.5 text-sm font-medium"
+              <FormField
+                className="max-w-sm"
+                label="SMS encoding"
                 htmlFor="sms-encoding-choice"
               >
-                SMS encoding
                 <select
                   id="sms-encoding-choice"
                   value={encodingChoice}
@@ -170,7 +170,7 @@ export function MessageSegmentCalculator() {
                   <option value="GSM-7">GSM-7</option>
                   <option value="UCS-2">UCS-2</option>
                 </select>
-              </label>
+              </FormField>
             </div>
           </CardContent>
         </Card>
@@ -205,7 +205,7 @@ export function MessageSegmentCalculator() {
                 <div className="text-muted-foreground flex items-center justify-between text-xs">
                   <span>Current segment</span>
                   <span>
-                    {result.totalUnits} of {result.segmentCapacity} units
+                    {result.usedInCurrentSegment} of {result.segmentCapacity} units
                   </span>
                 </div>
                 <div

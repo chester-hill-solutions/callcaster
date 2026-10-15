@@ -1,5 +1,5 @@
 import type { MetaFunction } from "react-router";
-import { MessageSegmentCalculator } from "@/components/MessageSegmentCalculator";
+import { MessageSegmentCalculator } from "@/components/message-segment-calculator";
 
 export const meta: MetaFunction = () => [
   { title: "Message Segment Calculator — CallCaster" },
