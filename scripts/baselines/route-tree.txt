@@ -147,6 +147,7 @@ invite
 launch
 listening
 members
+message-segment-calculator
 new
 numbers
 onboarding
