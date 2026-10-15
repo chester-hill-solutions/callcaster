@@ -357,23 +357,29 @@ function SpokenStepFields({
 
   return (
     <>
-      <FormField
-        label="Speech text"
-        htmlFor={textId}
-        description="Read aloud to the recipient in the selected voice."
-      >
+      {isSilent && (
+        <Alert variant="warning">
+          <AlertDescription>
+            Recipients hear nothing at this step yet. Enter the text to speak, or
+            switch to a recording.
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="grid gap-1">
         <Textarea
           id={textId}
           value={text}
           readOnly={readOnly}
+          aria-label="Speech text"
+          placeholder="Text to speech script..."
           onChange={(event) =>
             onChange({
               audioFile: event.target.value,
               ...ensurePlaybackTypePatch(block),
-            } as Partial<ScriptBlock>)
-          }
-        />
-      </FormField>
+              } as Partial<ScriptBlock>)
+            }
+          />
+      </div>
       {canUsePrompt && (
         <div className="grid gap-1">
           <p className="text-xs text-muted-foreground">
@@ -417,14 +423,6 @@ function SpokenStepFields({
           </SelectContent>
         </Select>
       </FormField>
-      {isSilent && (
-        <Alert variant="warning">
-          <AlertDescription>
-            Recipients hear nothing at this step yet. Enter the text to speak, or
-            switch to a recording.
-          </AlertDescription>
-        </Alert>
-      )}
     </>
   );
 }

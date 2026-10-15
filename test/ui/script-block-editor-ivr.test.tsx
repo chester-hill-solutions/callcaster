@@ -99,6 +99,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(screen.getByText("Spoken step")).toBeInTheDocument();
     expect(screen.getByText("Greeting")).toBeInTheDocument();
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Text to speech script...")).toBeInTheDocument();
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
     expect(
       screen.getByText(/Recipients hear nothing at this step/),
