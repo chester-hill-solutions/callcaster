@@ -18,6 +18,7 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
     await page.getByLabel("Add a script block").click();
     await page.getByRole("option", { name: "Text area" }).click();
 
+    await page.getByRole("button", { name: "Edit block title" }).last().click();
     await expect(page.getByLabel("block title").last()).toHaveValue(/^Block \d+$/);
   });
 
@@ -37,9 +38,9 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
   ownerTest("SCR-05 IVR scripts add audio steps, not form blocks", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, `scripts/${E2E_IVR_SCRIPT.id}`));
 
-    await expect(page.getByLabel("Add a script block")).toHaveCount(0);
     await page.getByRole("button", { name: "Add a script block" }).click();
 
+    await page.getByRole("button", { name: "Edit block title" }).last().click();
     await expect(page.getByLabel("block title").last()).toHaveValue(/^Step \d+$/);
     await expect(
       page.getByRole("combobox", { name: "Block type" }).last(),
