@@ -71,6 +71,24 @@ export function AudienceTable({
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") ?? "");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const selectionScope = JSON.stringify([
+    audience_id ?? "",
+    searchParams.get("page") ?? "",
+    pagination.currentPage,
+    searchParams.get("pageSize") ?? "",
+    pagination.pageSize,
+    searchParams.get("q") ?? "",
+    searchParams.get("sortKey") ?? "",
+    searchParams.get("sortDirection") ?? "",
+    sorting.sortKey,
+    sorting.sortDirection,
+  ]);
+  const [previousSelectionScope, setPreviousSelectionScope] = useState(selectionScope);
+
+  if (previousSelectionScope !== selectionScope) {
+    setPreviousSelectionScope(selectionScope);
+    setSelectedContacts([]);
+  }
 
   const removeFetcher = useFetcher<{ error?: string }>();
   const { saveSnapshot } = useOptimisticCollection({
@@ -87,15 +105,19 @@ export function AudienceTable({
     // `transformedContacts` is already recomputed for the new `initialContacts`
     // in this same render pass (useMemo above), so reuse it instead of re-mapping.
     setContacts(transformedContacts);
+    const refreshedIds = new Set(transformedContacts.map((contact) => contact.id.toString()));
+    setSelectedContacts((selected) => selected.filter((id) => refreshedIds.has(id)));
   }
 
   const handlePageChange = (newPage: number) => {
+    setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", newPage.toString());
     setSearchParams(newParams);
   };
 
   const handlePageSizeChange = (newSize: string) => {
+    setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", "1");
     newParams.set("pageSize", newSize);
@@ -104,6 +126,7 @@ export function AudienceTable({
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
     const query = searchTerm.trim();
     if (query) newParams.set("q", query);
@@ -114,6 +137,7 @@ export function AudienceTable({
 
   const clearSearch = () => {
     setSearchTerm("");
+    setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("q");
     newParams.set("page", "1");
@@ -147,12 +171,15 @@ export function AudienceTable({
   };
 
   const handleRemoveSelected = () => {
-    const selectedIds = selectedContacts.map((id) => parseInt(id, 10));
+    const visibleIds = new Set(filteredContacts.map((contact) => contact.id.toString()));
+    const selectedIds = selectedContacts.filter((id) => visibleIds.has(id));
+    if (selectedIds.length === 0) return;
+
     saveSnapshot();
-    setContacts((curr) => curr.filter((contact) => !selectedIds.includes(contact.id)));
-    setSelectedContacts([]);
+    const selectedNumericIds = new Set(selectedIds.map((id) => parseInt(id, 10)));
+    setContacts((curr) => curr.filter((contact) => !selectedNumericIds.has(contact.id)));
     const formData = new FormData();
-    selectedContacts.forEach((id) => {
+    selectedIds.forEach((id) => {
       formData.append("contact_ids[]", id);
     });
     formData.append("audience_id", audience_id || "");
@@ -182,6 +209,7 @@ export function AudienceTable({
   };
 
   const handleSort = (key: string) => {
+    setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
 
     // If already sorting by this key, toggle direction
@@ -213,7 +241,7 @@ export function AudienceTable({
   const handleSelectContact = (id: number, checked: boolean) => {
     const idStr = id.toString();
     if (checked) {
-      setSelectedContacts(prev => [...prev, idStr]);
+      setSelectedContacts(prev => prev.includes(idStr) ? prev : [...prev, idStr]);
     } else {
       setSelectedContacts(prev => prev.filter(contactId => contactId !== idStr));
     }
@@ -235,6 +263,11 @@ export function AudienceTable({
         );
       }),
     [contacts, searchTerm],
+  );
+
+  const selectedVisibleCount = filteredContacts.reduce(
+    (count, contact) => count + (selectedContacts.includes(contact.id.toString()) ? 1 : 0),
+    0,
   );
 
   const totalPages = Math.ceil((pagination.totalCount || 0) / pagination.pageSize);
@@ -279,7 +312,10 @@ export function AudienceTable({
           <Input
             placeholder="Search contacts..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setSelectedContacts([]);
+            }}
             className="pl-10"
           />
           {searchTerm && (
@@ -320,9 +356,9 @@ export function AudienceTable({
             Export CSV
           </Button>
 
-          {selectedContacts.length > 0 && (
+          {selectedVisibleCount > 0 && (
             <Button variant="destructive" size="sm" onClick={handleRemoveSelected}>
-              Remove Selected ({selectedContacts.length})
+              Remove Selected ({selectedVisibleCount})
             </Button>
           )}
         </div>
@@ -335,8 +371,11 @@ export function AudienceTable({
               <TableHead className="w-[50px]">
                 <Checkbox
                   checked={
-                    selectedContacts.length === filteredContacts.length &&
-                    filteredContacts.length > 0
+                    filteredContacts.length === 0 || selectedVisibleCount === 0
+                      ? false
+                      : selectedVisibleCount === filteredContacts.length
+                        ? true
+                        : "indeterminate"
                   }
                   onCheckedChange={handleSelectAll}
                 />
@@ -416,4 +455,4 @@ export function AudienceTable({
       </div>
     </div>
   );
-} 
+}

@@ -5,27 +5,26 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const submit = vi.fn();
   const setSearchParams = vi.fn();
-  const saveSnapshot = vi.fn();
   const loggerError = vi.fn();
-  return { submit, setSearchParams, saveSnapshot, loggerError };
+  let fetcherState = "idle";
+  let fetcherData: { error?: string } | undefined;
+  return {
+    submit,
+    setSearchParams,
+    loggerError,
+    get fetcherState() { return fetcherState; },
+    set fetcherState(value: string) { fetcherState = value; },
+    get fetcherData() { return fetcherData; },
+    set fetcherData(value: { error?: string } | undefined) { fetcherData = value; },
+  };
 });
 
 vi.mock("react-router", () => ({
-  useFetcher: () => ({ submit: mocks.submit }),
+  useFetcher: () => ({ submit: mocks.submit, state: mocks.fetcherState, data: mocks.fetcherData }),
   useSearchParams: () => [new URLSearchParams("page=2&pageSize=10"), mocks.setSearchParams],
 }));
 
-vi.mock("@/hooks/utils/useOptimisticMutation", () => ({
-  useOptimisticCollection: (opts: any) => {
-    // exercise isError predicate branches for coverage
-    opts?.isError?.(null);
-    opts?.isError?.("nope");
-    opts?.isError?.({});
-    opts?.isError?.({ error: "" });
-    opts?.isError?.({ error: "boom" });
-    return { saveSnapshot: mocks.saveSnapshot };
-  },
-}));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 vi.mock("@/components/audience/AudienceForm", () => ({
   AudienceForm: ({ name, handleSaveAudience }: any) => (
@@ -49,7 +48,7 @@ vi.mock("@/components/shared/TablePagination", () => ({
 }));
 
 vi.mock("@/lib/logger.client", () => ({
-  logger: { error: (...args: any[]) => mocks.loggerError(...args) , info: vi.fn(), debug: vi.fn()},
+  logger: { error: (...args: any[]) => mocks.loggerError(...args), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 vi.mock("lucide-react", () => ({
@@ -134,12 +133,21 @@ function makeContact(id: number, overrides: Partial<any> = {}) {
   } as any;
 }
 
+function lastRecordedCall<T>(calls: T[]): T {
+  const call = calls[calls.length - 1];
+  if (call === undefined) {
+    throw new Error("Expected at least one recorded call");
+  }
+  return call;
+}
+
 describe("app/components/audience/AudienceTable.tsx", () => {
   beforeEach(() => {
     mocks.submit.mockReset();
     mocks.setSearchParams.mockReset();
-    mocks.saveSnapshot.mockReset();
     mocks.loggerError.mockReset();
+    mocks.fetcherState = "idle";
+    mocks.fetcherData = undefined;
     vi.unstubAllGlobals();
   });
 
@@ -220,7 +228,6 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     );
 
     fireEvent.click(screen.getAllByText("Remove from Audience")[0]);
-    expect(mocks.saveSnapshot).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("First")).toBeNull();
     expect(screen.getByText("Second")).toBeInTheDocument();
 
@@ -297,6 +304,95 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     expect(screen.queryByText("Remove Selected (2)")).toBeNull();
   });
 
+  test("loader refresh with the same row count reconciles selected IDs before bulk removal", async () => {
+    const { AudienceTable } = await import("@/components/audience/AudienceTable");
+    const baseProps = {
+      contacts: [{ contact: makeContact(1) }, { contact: makeContact(2) }],
+      workspace_id: "w1",
+      selected_id: "a1",
+      name: "Audience A",
+      onNameChange: () => {},
+      pagination: { currentPage: 1, pageSize: 10, totalCount: 20 },
+      sorting: { sortKey: "id", sortDirection: "asc" as const },
+    };
+
+    const { rerender } = render(<AudienceTable {...baseProps} />);
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
+    expect(screen.getByRole("button", { name: "Remove Selected (1)" })).toBeInTheDocument();
+
+    rerender(
+      <AudienceTable
+        {...baseProps}
+        contacts={[{ contact: makeContact(3) }, { contact: makeContact(4) }]}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
+    const refreshedCheckboxes = screen.getAllByLabelText("checkbox");
+    expect(refreshedCheckboxes[0]).not.toBeChecked();
+    expect(refreshedCheckboxes[1]).not.toBeChecked();
+
+    fireEvent.click(refreshedCheckboxes[2]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Selected (1)" }));
+    const [formData] = lastRecordedCall(mocks.submit.mock.calls);
+    expect(formData.getAll("contact_ids[]")).toEqual(["4"]);
+  });
+
+  test("page change clears selection even before the loader supplies new rows", async () => {
+    const { AudienceTable } = await import("@/components/audience/AudienceTable");
+    const baseProps = {
+      contacts: [{ contact: makeContact(1) }, { contact: makeContact(2) }],
+      workspace_id: "w1",
+      selected_id: "a1",
+      name: "Audience A",
+      onNameChange: () => {},
+      pagination: { currentPage: 1, pageSize: 10, totalCount: 20 },
+      sorting: { sortKey: "id", sortDirection: "asc" as const },
+    };
+
+    const { rerender } = render(<AudienceTable {...baseProps} />);
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
+    expect(screen.getByRole("button", { name: "Remove Selected (1)" })).toBeInTheDocument();
+
+    rerender(
+      <AudienceTable
+        {...baseProps}
+        pagination={{ ...baseProps.pagination, currentPage: 2 }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
+  });
+
+  test("failed bulk removal restores the selected rows so the user can retry", async () => {
+    const { AudienceTable } = await import("@/components/audience/AudienceTable");
+    const contacts = [{ contact: makeContact(1) }, { contact: makeContact(2) }];
+    const props = {
+      contacts,
+      workspace_id: "w1",
+      selected_id: "a1",
+      name: "Audience A",
+      onNameChange: () => {},
+      pagination: { currentPage: 1, pageSize: 10, totalCount: 2 },
+      sorting: { sortKey: "id", sortDirection: "asc" as const },
+    };
+
+    const { rerender } = render(<AudienceTable {...props} />);
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Remove Selected (1)" }));
+    expect(screen.getAllByText("Ada")).toHaveLength(1);
+
+    mocks.fetcherData = { error: "The contact could not be removed" };
+    rerender(<AudienceTable {...props} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Ada")).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "Remove Selected (1)" })).toBeInTheDocument();
+    });
+    const [formData] = lastRecordedCall(mocks.submit.mock.calls);
+    expect(formData.getAll("contact_ids[]")).toEqual(["1"]);
+  });
+
   test("select-all after searching selects only the filtered rows, not hidden ones", async () => {
     const { AudienceTable } = await import("@/components/audience/AudienceTable");
     render(
@@ -325,6 +421,36 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     fireEvent.click(checkboxes[0]);
     expect(screen.getByRole("button", { name: "Remove Selected (2)" })).toBeInTheDocument();
     expect(screen.queryByText("Remove Selected (3)")).toBeNull();
+  });
+
+  test("typing a new search clears selected IDs so hidden contacts cannot reappear selected", async () => {
+    const { AudienceTable } = await import("@/components/audience/AudienceTable");
+    render(
+      <AudienceTable
+        contacts={[
+          { contact: makeContact(1, { firstname: "Ada" }) },
+          { contact: makeContact(2, { firstname: "Bob" }) },
+        ]}
+        workspace_id="w1"
+        selected_id="a1"
+        name="Audience A"
+        onNameChange={() => {}}
+        pagination={{ currentPage: 1, pageSize: 10, totalCount: 2 }}
+        sorting={{ sortKey: "id", sortDirection: "asc" }}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
+    expect(screen.getByRole("button", { name: "Remove Selected (1)" })).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search contacts..."), {
+      target: { value: "ada" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Search contacts..."), {
+      target: { value: "" },
+    });
+
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
+    expect(screen.getAllByLabelText("checkbox")[2]).not.toBeChecked();
   });
 
   test("row checkbox toggles selectedContacts and select-all can be unchecked", async () => {
@@ -415,12 +541,17 @@ describe("app/components/audience/AudienceTable.tsx", () => {
       />,
     );
 
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
+    expect(screen.getByRole("button", { name: "Remove Selected (1)" })).toBeInTheDocument();
     fireEvent.click(screen.getByText(/^ID/));
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
     let params = mocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
     expect(params.get("sortDirection")).toBe("desc");
     expect(params.get("page")).toBe("1");
 
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
     fireEvent.click(screen.getByText(/^First Name/));
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
     params = mocks.setSearchParams.mock.calls.at(-1)![0] as URLSearchParams;
     expect(params.get("sortKey")).toBe("firstname");
     expect(params.get("sortDirection")).toBe("asc");
@@ -505,11 +636,15 @@ describe("app/components/audience/AudienceTable.tsx", () => {
       />,
     );
 
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
     fireEvent.click(screen.getByRole("button", { name: "NextPage" }));
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
     const pageParams = mocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
     expect(pageParams.get("page")).toBe("3");
 
+    fireEvent.click(screen.getAllByLabelText("checkbox")[1]);
     fireEvent.click(screen.getByRole("button", { name: "set-25" }));
+    expect(screen.queryByRole("button", { name: /remove selected/i })).toBeNull();
     const sizeParams = mocks.setSearchParams.mock.calls.at(-1)![0] as URLSearchParams;
     expect(sizeParams.get("page")).toBe("1");
     expect(sizeParams.get("pageSize")).toBe("25");
