@@ -1,6 +1,7 @@
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
+import { CampaignSmsSendMode } from "../CampaignSmsSendMode";
 import { Campaign, Flags, WorkspaceNumbers } from "@/lib/types";
 
 interface CampaignBasicInfoProps {
@@ -9,6 +10,11 @@ interface CampaignBasicInfoProps {
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
   callerIdOptional?: boolean;
+  isBusy?: boolean;
+  smsSendContext?: {
+    messagingServiceReady: boolean;
+    defaultMessagingServiceSid: string | null;
+  };
 }
 
 /** Setup fields only: type, number, schedule. Launch controls live on /launch. */
@@ -18,6 +24,8 @@ export const CampaignBasicInfo = ({
   phoneNumbers,
   flags: _flags,
   callerIdOptional = false,
+  isBusy = false,
+  smsSendContext,
 }: CampaignBasicInfoProps) => {
   return (
     <div className="space-y-4">
@@ -49,6 +57,14 @@ export const CampaignBasicInfo = ({
               Outbound number is optional when sending via Messaging Service
               (Twilio uses the service&apos;s sender pool).
             </p>
+          ) : null}
+          {campaignData.type === "message" ? (
+            <CampaignSmsSendMode
+              value={campaignData.sms_send_mode}
+              onChange={handleInputChange}
+              isBusy={isBusy}
+              smsSendContext={smsSendContext}
+            />
           ) : null}
         </div>
       </div>
