@@ -92,16 +92,15 @@ describe("ScriptBlockEditor audio upload (#1346)", () => {
     expect(screen.queryByRole("button", { name: "Upload audio" })).not.toBeInTheDocument();
   });
 
-  test("in recording mode the upload control sits with the recording field, before the empty-recording warning (#1701)", () => {
+  test("in recording mode the empty-recording warning appears in the playback header", () => {
     renderEditor({ onUploadAudio: vi.fn() });
 
     const upload = screen.getByRole("button", { name: "Upload audio" });
     const warning = screen.getByText(/Choose or upload a recording/);
 
-    // The warning rendered between the recording Select and the upload button
-    // before #1701; the button now groups with the field it belongs to.
+    // The warning is shown in the playback header before the recording controls.
     expect(
-      upload.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING,
+      warning.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 

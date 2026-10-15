@@ -64,6 +64,21 @@ export function IvrStepFields({
   const fileId = useId();
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const playbackWarning =
+    mode === "synthetic" && audioFile.trim().length === 0 ? (
+      <Alert variant="warning" className="min-w-0 py-2">
+        <AlertDescription>
+          Recipients hear nothing at this step yet. Enter the text to speak, or
+          switch to a recording.
+        </AlertDescription>
+      </Alert>
+    ) : mode === "recorded" && audioFile.length === 0 ? (
+      <Alert variant="warning" className="min-w-0 py-2">
+        <AlertDescription>
+          Choose or upload a recording, or recipients hear nothing at this step.
+        </AlertDescription>
+      </Alert>
+    ) : null;
 
   const handleAudioFileSelected = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -115,7 +130,10 @@ export function IvrStepFields({
   return (
     <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">What the recipient hears</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-sm font-semibold">What the recipient hears</span>
+          {playbackWarning}
+        </div>
         <div role="group" aria-label="Playback mode" className="flex gap-1">
           <Button
             type="button"
@@ -340,14 +358,6 @@ function SpokenStepFields({
 
   return (
     <>
-      {isSilent && (
-        <Alert variant="warning">
-          <AlertDescription>
-            Recipients hear nothing at this step yet. Enter the text to speak, or
-            switch to a recording.
-          </AlertDescription>
-        </Alert>
-      )}
       <div className="grid gap-1">
         <Textarea
           id={textId}
@@ -482,13 +492,6 @@ function RecordingStepFields({
         >
           <track kind="captions" />
         </audio>
-      )}
-      {fileName.length === 0 && (
-        <Alert variant="warning">
-          <AlertDescription>
-            Choose or upload a recording, or recipients hear nothing at this step.
-          </AlertDescription>
-        </Alert>
       )}
     </>
   );

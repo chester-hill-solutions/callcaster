@@ -104,6 +104,11 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(
       screen.getByText(/Recipients hear nothing at this step/),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Recipients hear nothing at this step/).compareDocumentPosition(
+        screen.getByLabelText("Speech text"),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   test("edits and saves the block title", () => {
