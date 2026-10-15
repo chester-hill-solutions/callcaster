@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Fixed: SMS conversation search no longer loads unrelated additional pages while results update ([PR #2580](https://github.com/chester-hill-solutions/callcaster/pull/2580), [#2513](https://github.com/chester-hill-solutions/callcaster/issues/2513)).
 - Fixed: The SMS bulk confirmation checkbox now aligns before its wrapped confirmation text ([PR #2575](https://github.com/chester-hill-solutions/callcaster/pull/2575), [#2510](https://github.com/chester-hill-solutions/callcaster/issues/2510)).
 - Changed: Call device test and mute controls no longer show redundant button icons ([PR #2578](https://github.com/chester-hill-solutions/callcaster/pull/2578), [#2517](https://github.com/chester-hill-solutions/callcaster/issues/2517)).
+- Changed: Campaign creation no longer repeats its breadcrumb as a page header ([PR #2579](https://github.com/chester-hill-solutions/callcaster/pull/2579), [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503)).
 
 - Fixed unnecessary auth-page overflow by sharing bounded page geometry between sign-in and sign-up.
 - Changed customer-facing IVR campaign copy to use “Automated phone menu” consistently.
