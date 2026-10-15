@@ -90,6 +90,15 @@ describe("script editor — renders through the real design-system primitives", 
     expect(saved.steps.pages.page_1.title).toBe("Opening");
   });
 
+  test("focuses the title when a new block is added", () => {
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Add block" }));
+    fireEvent.click(screen.getByRole("option", { name: "Text area" }));
+
+    expect(screen.getByLabelText("block title")).toHaveFocus();
+  });
+
   test("marks the start page", () => {
     renderEditor();
 

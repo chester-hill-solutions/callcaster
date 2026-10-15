@@ -64,6 +64,7 @@ export function ScriptEditorShell({
   const jumpSelectId = useId();
   const addBlockSelectId = useId();
   const [addBlockKey, setAddBlockKey] = useState(0);
+  const [newBlockId, setNewBlockId] = useState<string | null>(null);
 
   const editor = useScriptEditorState({
     initialDocument: document,
@@ -127,6 +128,7 @@ export function ScriptEditorShell({
       blocks: { ...editor.document.blocks, [blockId]: block },
     });
     editor.setActiveBlockId(blockId);
+    setNewBlockId(blockId);
   };
 
   // A step migrated from an older editor may have no `options` key at all,
@@ -327,7 +329,8 @@ export function ScriptEditorShell({
                     <Select
                       key={addBlockKey}
                       onValueChange={(type) => {
-                        editor.addBlock(type as ScriptBlock["type"]);
+                        const blockId = editor.addBlock(type as ScriptBlock["type"]);
+                        setNewBlockId(blockId);
                         setAddBlockKey((key) => key + 1);
                       }}
                     >
@@ -392,6 +395,8 @@ export function ScriptEditorShell({
                           onMoveDown={() =>
                             editor.moveBlock(blockId, index + 1)
                           }
+                          autoEditTitle={newBlockId === blockId}
+                          onAutoEditTitleConsumed={() => setNewBlockId(null)}
                           onOptionAdd={() => addResponse(blockId, block)}
                           onOptionChange={(optionId, patch) =>
                             editor.updateOption(blockId, optionId, patch)

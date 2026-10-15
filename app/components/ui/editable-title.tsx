@@ -8,6 +8,8 @@ export type EditableTitleProps = {
   value: string;
   onSave: (value: string) => void;
   readOnly?: boolean;
+  autoEdit?: boolean;
+  onAutoEditConsumed?: () => void;
   ariaLabel: string;
   placeholder?: string;
   className?: string;
@@ -17,13 +19,16 @@ export function EditableTitle({
   value,
   onSave,
   readOnly = false,
+  autoEdit = false,
+  onAutoEditConsumed,
   ariaLabel,
   placeholder = "Untitled",
   className,
 }: EditableTitleProps) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(autoEdit && !readOnly);
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoEditConsumedRef = useRef(false);
 
   /**
    * @effect Keep the draft aligned with external title changes while not editing.
@@ -39,7 +44,7 @@ export function EditableTitle({
 
   /**
    * @effect Focus and select the title input when edit mode starts.
-   * @effect-deps editing
+   * @effect-deps autoEdit, editing, onAutoEditConsumed
    * @effect-side-effects dom focus and text selection only
    * @effect-why-not-loader This is client-only focus behavior.
    */
@@ -47,8 +52,12 @@ export function EditableTitle({
     if (editing) {
       inputRef.current?.focus();
       inputRef.current?.select();
+      if (autoEdit && !autoEditConsumedRef.current) {
+        autoEditConsumedRef.current = true;
+        onAutoEditConsumed?.();
+      }
     }
-  }, [editing]);
+  }, [autoEdit, editing, onAutoEditConsumed]);
 
   const startEditing = () => {
     setDraft(value);

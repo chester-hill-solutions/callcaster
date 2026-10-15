@@ -104,6 +104,7 @@ describe("script editor shell — audio scripts", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add spoken step" }));
 
+    expect(screen.getByLabelText("block title")).toHaveFocus();
     const steps = lastSteps();
     expect(steps.pages.page_1?.blocks).toHaveLength(2);
     expect(blockOnPage(steps, 1)).toMatchObject({

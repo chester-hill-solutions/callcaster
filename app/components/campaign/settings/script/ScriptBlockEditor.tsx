@@ -35,6 +35,8 @@ export type ScriptBlockEditorProps = {
   onDuplicate: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  autoEditTitle?: boolean;
+  onAutoEditTitleConsumed?: () => void;
   onOptionAdd: () => void;
   onOptionChange: (optionId: string, patch: Partial<ScriptOption>) => void;
   onOptionRemove: (optionId: string) => void;
@@ -64,6 +66,8 @@ export function ScriptBlockEditor({
   onDuplicate,
   onMoveUp,
   onMoveDown,
+  autoEditTitle = false,
+  onAutoEditTitleConsumed,
   onOptionAdd,
   onOptionChange,
   onOptionRemove,
@@ -92,6 +96,8 @@ export function ScriptBlockEditor({
       <EditableTitle
         value={block.title ?? ""}
         readOnly={readOnly}
+        autoEdit={autoEditTitle}
+        onAutoEditConsumed={onAutoEditTitleConsumed}
         ariaLabel="block title"
         className="min-w-0 flex-1"
         onSave={(title) => onChange({ title } as Partial<ScriptBlock>)}
