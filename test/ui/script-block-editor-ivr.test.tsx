@@ -250,7 +250,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     renderStep({ block: legacyTextBlock(), audioFlow: false });
 
     expect(screen.queryByText("Spoken step")).not.toBeInTheDocument();
-    expect(screen.getByText("Prompt")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Write your question here...")).toBeInTheDocument();
   });
 
   test("the IVR no-input panel writes gatherTimeoutSeconds and noInput on edits (#1883)", () => {

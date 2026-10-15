@@ -174,11 +174,12 @@ export function ScriptBlockEditor({
         </Label>
       )}
       {block.type !== "instruction" && "prompt" in block && (
-        <Label className="grid gap-2 font-normal">
-          <span className="font-medium">Prompt</span>
+        <Label className="grid gap-2 font-normal" aria-label="Question">
           <Textarea
             value={prompt}
             readOnly={readOnly}
+            aria-label="Question"
+            placeholder="Write your question here..."
             onChange={(event) =>
               onChange({
                 prompt: event.target.value,
