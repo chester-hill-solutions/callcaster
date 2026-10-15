@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign media previews and SMS/MMS estimates update after media uploads and removals ([PR #2666](https://github.com/chester-hill-solutions/callcaster/pull/2666), [#2655](https://github.com/chester-hill-solutions/callcaster/issues/2655)).
 - Added: Users can estimate SMS encoding, segment count, and credit cost before they send a message ([PR #2664](https://github.com/chester-hill-solutions/callcaster/pull/2664), [#2663](https://github.com/chester-hill-solutions/callcaster/issues/2663)).
 - Fixed: Call-list selections follow the visible page, and failed removals keep the selected contacts available to retry ([PR #2665](https://github.com/chester-hill-solutions/callcaster/pull/2665), [#2634](https://github.com/chester-hill-solutions/callcaster/issues/2634)).
 - Fixed: A successful password reset now opens Sign In and keeps the password-updated confirmation visible ([PR #2606](https://github.com/chester-hill-solutions/callcaster/pull/2606), [#2605](https://github.com/chester-hill-solutions/callcaster/issues/2605)).
