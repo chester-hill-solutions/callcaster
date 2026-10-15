@@ -20,7 +20,7 @@ export function CampaignSmsSendMode({
   smsSendContext,
 }: {
   value: string | null | undefined;
-  onChange: (name: string, value: unknown) => void;
+  onChange: (name: string, value: string | number | null) => void;
   isBusy: boolean;
   smsSendContext?: SmsSendContext;
 }) {
