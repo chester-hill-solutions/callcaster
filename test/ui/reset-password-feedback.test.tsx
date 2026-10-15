@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { toast } from "sonner";
 import ResetPassword from "../../app/routes/reset-password";
+import SignIn from "../../app/routes/signin";
 import { Toaster } from "../../app/components/ui/sonner";
 
 vi.mock("../../app/routes/reset-password.action.server", () => ({
@@ -19,6 +20,9 @@ vi.mock("../../app/routes/reset-password.action.server", () => ({
 vi.mock("../../app/routes/reset-password.loader.server", () => ({
   loader: vi.fn(),
 }));
+
+vi.mock("../../app/routes/signin.action.server", () => ({ action: vi.fn() }));
+vi.mock("../../app/routes/signin.loader.server", () => ({ loader: vi.fn() }));
 
 afterEach(async () => {
   toast.dismiss();
@@ -34,10 +38,15 @@ afterEach(async () => {
 });
 
 function showReset(
-  action: () => { success: boolean | null; error: { message: string } | null },
+  action: () =>
+    | { success: boolean | null; error: { message: string } | null }
+    | Promise<{ success: boolean | null; error: { message: string } | null }>,
 ) {
   const router = createMemoryRouter(
-    [{ path: "/reset-password", Component: ResetPassword, action }],
+    [
+      { path: "/reset-password", Component: ResetPassword, action },
+      { path: "/signin", Component: SignIn },
+    ],
     { initialEntries: ["/reset-password?token=issued-token"] },
   );
   render(
@@ -80,6 +89,7 @@ describe("reset password feedback", () => {
       expect(within(main).queryByText(message)).not.toBeInTheDocument();
       expect(field).toBe(screen.getByLabelText("New Password"));
       expect(field).toHaveValue("keep-my-password");
+      expect(router.state.location.pathname).toBe("/reset-password");
       expect(screen.getByLabelText("Confirm New Password")).toHaveValue(
         "keep-my-password",
       );
@@ -92,17 +102,21 @@ describe("reset password feedback", () => {
     },
   );
 
-  test("keeps failed values for a retry and reports success only after acceptance", async () => {
+  test("keeps failures for retry, then replaces the reset route with Sign In after acceptance", async () => {
     const user = userEvent.setup();
     const success = vi.spyOn(toast, "success");
+    let acceptReset: (() => void) | undefined;
+    const accepted = new Promise<{ success: true; error: null }>((resolve) => {
+      acceptReset = () => resolve({ success: true, error: null });
+    });
     const action = vi
       .fn()
       .mockReturnValueOnce({
         success: null,
         error: { message: "Try again later" },
       })
-      .mockReturnValueOnce({ success: true, error: null });
-    showReset(action);
+      .mockReturnValueOnce(accepted);
+    const router = showReset(action);
     await user.type(screen.getByLabelText("New Password"), "retry-password");
     await user.type(
       screen.getByLabelText("Confirm New Password"),
@@ -113,12 +127,26 @@ describe("reset password feedback", () => {
     expect(success).not.toHaveBeenCalled();
     expect(screen.getByLabelText("New Password")).toHaveValue("retry-password");
     await user.click(screen.getByRole("button", { name: "Reset Password" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    expect(router.state.location.pathname).toBe("/reset-password");
+    expect(success).not.toHaveBeenCalled();
+    await act(async () => acceptReset?.());
+    await screen.findByRole("heading", { name: "Login", exact: true });
     await waitFor(() =>
       expect(success).toHaveBeenCalledWith(
         "Password updated. You can now sign in.",
       ),
     );
     expect(action).toHaveBeenCalledTimes(2);
+    expect(router.state.location.pathname).toBe("/signin");
+    expect(router.state.location.search).toBe("");
+    expect(router.state.historyAction).toBe("REPLACE");
+    expect(screen.queryByLabelText("New Password")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Password updated. You can now sign in.")).toHaveLength(1);
+    expect(success).toHaveBeenCalledTimes(1);
+    await act(async () => { router.revalidate(); });
+    await waitFor(() => expect(router.state.revalidation).toBe("idle"));
+    expect(success).toHaveBeenCalledTimes(1);
     expect(
       within(screen.getByRole("main")).queryByText("Try again later"),
     ).not.toBeInTheDocument();

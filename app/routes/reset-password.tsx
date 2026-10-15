@@ -1,7 +1,7 @@
 export { loader } from "./reset-password.loader.server";
 export { action } from "./reset-password.action.server";
 
-import { Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
+import { Form, useActionData, useNavigate, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
@@ -10,11 +10,13 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 export default function ResetPassword() {
   const actionData = useActionData();
+  const navigate = useNavigate();
 
   useActionFeedback(actionData, {
     getError: (data) => data?.error?.message,
     getSuccess: (data) => data?.success === true,
     successMessage: "Password updated. You can now sign in.",
+    onSuccess: () => navigate("/signin", { replace: true }),
   });
 
   return (
