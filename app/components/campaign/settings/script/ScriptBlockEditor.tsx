@@ -6,22 +6,13 @@ import {
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
 import { Button } from "@/components/ui/button";
 import { EditableTitle } from "@/components/ui/editable-title";
-import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { getIvrPlaybackMode } from "@/lib/ivr-script-editor";
 import { IvrResponsesEditor } from "./ScriptBlockEditor.IvrResponses";
 import { IvrStepFields } from "./ScriptBlockEditor.IvrStep";
-import { NO_ROUTING_TARGET, routingOptionsFor } from "./ScriptBlockEditor.routing";
 import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
+import { ScriptOptionRow } from "./ScriptOptionRow";
 
 export type ScriptBlockEditorProps = {
   block: ScriptBlock;
@@ -149,8 +140,6 @@ export function ScriptBlockEditor({
     block.type === "radio" ||
     block.type === "checkbox" ||
     options.length > 0;
-  const routingOptions = routingOptionsFor(routingTargets);
-
   return (
     <div className="grid gap-3">
       {header}
@@ -190,74 +179,15 @@ export function ScriptBlockEditor({
       {takesOptions && (
         <div className="grid gap-3">
           {options.map((option, index) => (
-            <div
+            <ScriptOptionRow
               key={option.id ?? index}
-              className="grid gap-2 rounded-md border border-border bg-muted/30 p-3"
-            >
-              <Label className="grid gap-2 font-normal">
-                <span className="font-medium">Option value</span>
-                <Input
-                  value={option.value}
-                  readOnly={readOnly}
-                  onChange={(event) =>
-                    onOptionChange(option.id ?? "", {
-                      value: event.target.value,
-                    })
-                  }
-                />
-              </Label>
-              <Label className="grid gap-2 font-normal">
-                <span className="font-medium">Option label</span>
-                <Input
-                  value={option.label}
-                  readOnly={readOnly}
-                  onChange={(event) =>
-                    onOptionChange(option.id ?? "", {
-                      label: event.target.value,
-                      content: event.target.value,
-                    })
-                  }
-                />
-              </Label>
-              <FormField
-                label="Next target"
-                htmlFor={`next-target-${option.id ?? index}`}
-              >
-                <Select
-                  value={option.next || NO_ROUTING_TARGET}
-                  disabled={readOnly}
-                  onValueChange={(next) =>
-                    onOptionChange(option.id ?? "", {
-                      next: next === NO_ROUTING_TARGET ? undefined : next,
-                    })
-                  }
-                >
-                  <SelectTrigger id={`next-target-${option.id ?? index}`}>
-                    <SelectValue placeholder="Select…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {routingOptions.map((routingOption) => (
-                      <SelectItem
-                        key={routingOption.value}
-                        value={routingOption.value}
-                      >
-                        {routingOption.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormField>
-              {!readOnly && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOptionRemove(option.id ?? "")}
-                >
-                  Remove option
-                </Button>
-              )}
-            </div>
+              mode="live"
+              option={option}
+              readOnly={readOnly}
+              routingTargets={routingTargets}
+              onChange={(patch) => onOptionChange(option.id ?? "", patch)}
+              onRemove={() => onOptionRemove(option.id ?? "")}
+            />
           ))}
           {!readOnly && (
             <Button type="button" size="sm" variant="outline" onClick={onOptionAdd}>

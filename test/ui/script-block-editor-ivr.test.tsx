@@ -200,7 +200,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       content: "Yes please",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove response" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove option" }));
     expect(onOptionRemove).toHaveBeenCalledWith("o1");
 
     fireEvent.click(screen.getByRole("button", { name: "Add response" }));
@@ -222,7 +222,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Add response" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove response" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove option" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove block" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Play a recording" })).toBeDisabled();
   });
