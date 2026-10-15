@@ -51,7 +51,7 @@ test("the independent job bootstraps its own database before the full tier", () 
   const job = workflow().jobs.guards;
   expect(job.if).toBeUndefined();
   const bootstrap = job.steps.findIndex(
-    (step) => step.run === "node scripts/e2e/bootstrap-compose-db.mjs",
+    (step) => step.run?.includes("node scripts/e2e/bootstrap-compose-db.mjs"),
   );
   const tier = job.steps.findIndex(
     (step) => step.run === "npm run test:integration-db",

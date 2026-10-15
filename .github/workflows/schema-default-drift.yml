@@ -84,6 +84,35 @@ jobs:
           docker logs drift-postgres >&2
           exit 1
 
+      # pg_isready runs inside the container. Verify the host-mapped path used
+      # by the bootstrap too, and require several stable successful queries so
+      # the first driver connection does not race Postgres startup.
+      - name: Verify host-side Postgres readiness
+        env:
+          DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
+        run: |
+          for attempt in $(seq 1 30); do
+            ready=0
+            for stable in $(seq 1 3); do
+              if node --input-type=module -e 'import { isDatabaseReady } from "./scripts/lib/apply-sql-steps.mjs"; process.exit((await isDatabaseReady(process.env.DATABASE_URL)) ? 0 : 1)'; then
+                ready=$((ready + 1))
+              else
+                ready=0
+                break
+              fi
+              sleep 1
+            done
+            if [ "$ready" -eq 3 ]; then
+              echo "host-side postgres ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "host-side postgres did not become stable" >&2
+          docker logs drift-postgres >&2
+          exit 1
+
       # The repo's own bootstrap, not `drizzle-kit push` and not an `psql -f`
       # loop (#2227 removed the psql dependency from the e2e path for exactly
       # this reason). Applying client/migrations is what makes the guards
@@ -92,7 +121,18 @@ jobs:
       - name: Bootstrap the database
         env:
           DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
-        run: node scripts/e2e/bootstrap-compose-db.mjs
+        run: |
+          for attempt in 1 2 3; do
+            if node scripts/e2e/bootstrap-compose-db.mjs; then
+              exit 0
+            fi
+            echo "database bootstrap attempt $attempt failed; retrying" >&2
+            sleep $((attempt * 2))
+          done
+
+          echo "database bootstrap failed after retries" >&2
+          docker logs drift-postgres >&2
+          exit 1
 
       # Leave failures visible on this job; do not suppress its exit status.
       - name: Real-Postgres integration tier
