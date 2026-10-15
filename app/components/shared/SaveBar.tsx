@@ -58,7 +58,7 @@ export const SaveBar = ({
 
   return (
     <div
-      className={`${stick} z-50 flex items-center ${showMessage ? 'justify-between' : 'justify-start'} gap-3 ${embedded ? 'p-0' : 'bg-background px-4 py-2'}`}
+      className={`${stick} z-50 flex items-center ${showMessage ? 'justify-between' : 'justify-end'} gap-3 ${embedded ? 'p-0' : 'bg-background px-4 py-2'}`}
       data-placement={placement}
     >
       {showMessage && <span className="text-sm">{message}</span>}
