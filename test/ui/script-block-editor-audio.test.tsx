@@ -87,30 +87,9 @@ describe("ScriptBlockEditor audio upload (#1346)", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  test("the upload button is visible on a 'say' block so users don't have to flip the block type first (#1325)", () => {
+  test("the upload button is hidden on a 'say' block", () => {
     renderEditor({ block: sayBlock(), onUploadAudio: vi.fn() });
-    expect(screen.getByRole("button", { name: "Upload audio" })).toBeInTheDocument();
-    // The non-recorded types get an inline hint about the side effect of
-    // uploading — the previous UX silently changed the block behavior.
-    expect(
-      screen.getByText("Uploading switches this step to a recording."),
-    ).toBeInTheDocument();
-  });
-
-  test("uploading from a 'say' block also switches callcasterType to 'recorded' so the audio actually plays at runtime (#1325)", async () => {
-    const onUploadAudio = vi.fn().mockResolvedValue("uploaded.mp3");
-    const { onChange, fileInput } = renderEditor({
-      block: sayBlock(),
-      onUploadAudio,
-    });
-
-    fireEvent.change(fileInput(), { target: { files: [new File(["x"], "m.mp3")] } });
-
-    await screen.findByRole("button", { name: "Upload audio" });
-    expect(onChange).toHaveBeenCalledWith({
-      audioFile: "uploaded.mp3",
-      callcasterType: "recorded",
-    });
+    expect(screen.queryByRole("button", { name: "Upload audio" })).not.toBeInTheDocument();
   });
 
   test("in recording mode the upload control sits with the recording field, before the empty-recording warning (#1701)", () => {

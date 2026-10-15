@@ -94,7 +94,7 @@ export function IvrStepFields({
 
   const canUploadAudio = !readOnly && Boolean(onUploadAudio);
 
-  const renderUploadControl = (showModeHint: boolean) =>
+  const renderUploadControl = () =>
     canUploadAudio ? (
       <div className="grid gap-1">
         <input
@@ -114,11 +114,6 @@ export function IvrStepFields({
         >
           {isUploadingAudio ? "Uploading…" : "Upload audio"}
         </Button>
-        {showModeHint && (
-          <p className="text-xs text-muted-foreground">
-            Uploading switches this step to a recording.
-          </p>
-        )}
       </div>
     ) : null;
 
@@ -163,7 +158,6 @@ export function IvrStepFields({
             voiceId={voiceId}
             onChange={onChange}
           />
-          {renderUploadControl(true)}
         </>
       ) : (
         <RecordingStepFields
@@ -174,7 +168,7 @@ export function IvrStepFields({
           fileId={fileId}
           audioPreviewUrl={audioPreviewUrl}
           onChange={onChange}
-          uploadControl={renderUploadControl(false)}
+           uploadControl={renderUploadControl()}
         />
       )}
 
