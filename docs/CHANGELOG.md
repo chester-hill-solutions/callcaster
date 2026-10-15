@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: A successful password reset now opens Sign In and keeps the password-updated confirmation visible ([#2605](https://github.com/chester-hill-solutions/callcaster/issues/2605)).
+- Fixed: A successful password reset now opens Sign In and keeps the password-updated confirmation visible ([PR #2606](https://github.com/chester-hill-solutions/callcaster/pull/2606), [#2605](https://github.com/chester-hill-solutions/callcaster/issues/2605)).
 
 - Fixed: Campaign call controls return to Dial after the recipient disconnects, even when local phone cleanup reports an error ([PR #2604](https://github.com/chester-hill-solutions/callcaster/pull/2604), [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
 
