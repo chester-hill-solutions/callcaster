@@ -1,5 +1,15 @@
 # syntax=docker/dockerfile:1
 
+# ─── Production dependency stage ─────────────────────────────────────
+FROM oven/bun:1.3.5 AS production-deps
+
+WORKDIR /app
+
+# Install only runtime dependencies for the final image.
+COPY package.json bun.lock ./
+COPY vendor ./vendor
+RUN bun install --frozen-lockfile --production
+
 # ─── Build stage ──────────────────────────────────────────────────────
 FROM oven/bun:1.3.5 AS builder
 
@@ -17,10 +27,6 @@ COPY . .
 
 # Build the application
 RUN bun run build
-
-# Prune devDependencies so the production stage ships runtime deps only
-RUN rm -rf node_modules
-RUN bun install --frozen-lockfile --production
 
 # ─── Production stage ─────────────────────────────────────────────────
 FROM oven/bun:1.3.5-slim AS production
@@ -51,7 +57,7 @@ COPY --from=builder --chown=bun:bun /app/client/migrations ./client/migrations
 # schema) and the E2E fixture seed (scripts/e2e, optional E2E_SEED_ON_BOOT).
 COPY --from=builder --chown=bun:bun /app/drizzle ./drizzle
 COPY --from=builder --chown=bun:bun /app/scripts/e2e ./scripts/e2e
-COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=production-deps --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=builder --chown=bun:bun /app/package.json ./package.json
 # Bun resolves the "@/*" import alias from tsconfig paths at runtime
 COPY --from=builder --chown=bun:bun /app/tsconfig.json ./tsconfig.json
