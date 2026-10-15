@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Users can estimate SMS encoding, segment count, and credit cost before they send a message ([PR #2664](https://github.com/chester-hill-solutions/callcaster/pull/2664), [#2663](https://github.com/chester-hill-solutions/callcaster/issues/2663)).
+
 - Fixed: A successful password reset now opens Sign In and keeps the password-updated confirmation visible ([PR #2606](https://github.com/chester-hill-solutions/callcaster/pull/2606), [#2605](https://github.com/chester-hill-solutions/callcaster/issues/2605)).
 
 - Fixed: Campaign call controls return to Dial after the recipient disconnects, even when local phone cleanup reports an error ([PR #2604](https://github.com/chester-hill-solutions/callcaster/pull/2604), [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
