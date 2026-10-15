@@ -96,7 +96,7 @@ describe("ScriptBlockEditor audio upload (#1346)", () => {
     renderEditor({ onUploadAudio: vi.fn() });
 
     const upload = screen.getByRole("button", { name: "Upload audio" });
-    const warning = screen.getByText(/Choose or upload a recording/);
+    const warning = screen.getByText("Recipients hear nothing at this step.");
 
     // The warning is shown in the playback header before the recording controls.
     expect(

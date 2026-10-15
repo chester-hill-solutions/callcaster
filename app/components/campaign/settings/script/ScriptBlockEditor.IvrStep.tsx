@@ -68,14 +68,13 @@ export function IvrStepFields({
     mode === "synthetic" && audioFile.trim().length === 0 ? (
       <Alert variant="warning" className="min-w-0 py-2">
         <AlertDescription>
-          Recipients hear nothing at this step yet. Enter the text to speak, or
-          switch to a recording.
+          Recipients hear nothing at this step.
         </AlertDescription>
       </Alert>
     ) : mode === "recorded" && audioFile.length === 0 ? (
       <Alert variant="warning" className="min-w-0 py-2">
         <AlertDescription>
-          Choose or upload a recording, or recipients hear nothing at this step.
+          Recipients hear nothing at this step.
         </AlertDescription>
       </Alert>
     ) : null;

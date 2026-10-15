@@ -101,11 +101,9 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
     expect(screen.getByPlaceholderText("Text to speech script...")).toBeInTheDocument();
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
+    expect(screen.getByText("Recipients hear nothing at this step.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Recipients hear nothing at this step/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Recipients hear nothing at this step/).compareDocumentPosition(
+      screen.getByText("Recipients hear nothing at this step.").compareDocumentPosition(
         screen.getByLabelText("Speech text"),
       ) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -188,7 +186,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       audioPreviewUrl: (name) => `/preview/${name}`,
     });
 
-    expect(screen.getByText(/Choose or upload a recording/)).toBeInTheDocument();
+    expect(screen.getByText("Recipients hear nothing at this step.")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Preview /)).not.toBeInTheDocument();
   });
 
