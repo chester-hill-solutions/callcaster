@@ -11,7 +11,6 @@ import {
   ErrorLoadingResults,
 } from "@/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
-import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { CampaignStatusRail } from "@/components/campaign/home/CampaignStatusRail";
 import { CampaignSendWindowNotice } from "@/components/campaign/CampaignSendWindowNotice";
 import { CampaignShellDirtyProvider } from "@/components/campaign/home/CampaignShellDirty";
@@ -23,7 +22,6 @@ import {
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
-import type { CampaignStatus } from "@/lib/db-types";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 
 import type { CampaignState } from "@/lib/campaign-home.types";
@@ -69,13 +67,6 @@ export default function CampaignScreen() {
     queuedCount: queueCounts.queuedCount ?? 0,
     completedCount: queueCounts.completedCount ?? 0,
   };
-  const campaignQueueProgress =
-    safeQueueCounts.fullCount > 0
-      ? {
-          completedCount: safeQueueCounts.completedCount,
-          totalCount: safeQueueCounts.fullCount,
-        }
-      : null;
   const campaignDetails = initialCampaignDetails;
 
   const railItems = useMemo(() => {
@@ -140,19 +131,6 @@ export default function CampaignScreen() {
     <CampaignShellDirtyProvider>
       <CampaignSendWindowNotice campaign={campaignData} canEdit={hasAccess} />
       <div className="flex h-full w-full flex-col">
-        <CampaignHeader
-          title={campaignData?.title || ""}
-          status={(campaignData?.status as CampaignStatus) || "pending"}
-          isDesktop={false}
-          queueProgress={campaignQueueProgress}
-        />
-        <div className="border-b border-border/70 pb-4">
-          <CampaignHeader
-            title={campaignData?.title || ""}
-            isDesktop
-            status={(campaignData?.status as CampaignStatus) || "pending"}
-          />
-        </div>
         {railItems.length > 0 ? (
           <div className="pb-4">
             <CampaignStatusRail items={railItems} />
