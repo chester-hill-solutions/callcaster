@@ -18,8 +18,9 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
     await page.getByLabel("Add a script block").click();
     await page.getByRole("option", { name: "Text area" }).click();
 
-    await page.getByRole("button", { name: "Edit block title" }).last().click();
-    await expect(page.getByLabel("block title").last()).toHaveValue(/^Block \d+$/);
+    await expect(
+      page.getByRole("textbox", { name: "block title", exact: true }).last(),
+    ).toHaveValue(/^Block \d+$/);
   });
 
   ownerTest("SCR-04 an IVR step switched to a recording offers the library picker and inline upload", async ({ page }) => {
@@ -40,8 +41,9 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
 
     await page.getByRole("button", { name: "Add a script block" }).click();
 
-    await page.getByRole("button", { name: "Edit block title" }).last().click();
-    await expect(page.getByLabel("block title").last()).toHaveValue(/^Step \d+$/);
+    await expect(
+      page.getByRole("textbox", { name: "block title", exact: true }).last(),
+    ).toHaveValue(/^Step \d+$/);
     await expect(
       page.getByRole("combobox", { name: "Block type" }).last(),
     ).toHaveText("Recording");
