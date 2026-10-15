@@ -34,6 +34,7 @@ async function renderNewCampaign(userRole?: string) {
   );
 
   render(createElement(RouterProvider, { router }));
+  await screen.findByRole("heading", { name: "Create campaign" });
 }
 
 // Creating a campaign is gated Admin+ server-side (new.action.server.ts).

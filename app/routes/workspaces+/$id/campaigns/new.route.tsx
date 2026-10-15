@@ -55,7 +55,7 @@ export default function CampaignsNew() {
   if (!canCreate) {
     return (
       <section id="form">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+        <PageShell title="Create campaign" maxWidth="narrow">
           <Section variant="flat">
             <Text variant="muted">
               Contact a workspace administrator to create a campaign.
@@ -68,14 +68,14 @@ export default function CampaignsNew() {
               </Link>
             </Button>
           </div>
-        </div>
+        </PageShell>
       </section>
     );
   }
 
   return (
     <section id="form">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <PageShell title="Create campaign" maxWidth="narrow">
         {actionData?.error != null ? (
           <Alert variant="destructive">
             <AlertDescription>
@@ -181,7 +181,7 @@ export default function CampaignsNew() {
             </Button>
           </div>
         </Form>
-      </div>
+      </PageShell>
     </section>
   );
 }
