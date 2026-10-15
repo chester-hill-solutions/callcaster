@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { getIvrPlaybackMode } from "@/lib/ivr-script-editor";
 import { IvrResponsesEditor } from "./ScriptBlockEditor.IvrResponses";
-import { IvrStepFields } from "./ScriptBlockEditor.IvrStep";
+import { IvrStepFields, NoInputFields } from "./ScriptBlockEditor.IvrStep";
 import { ChevronDown, ChevronUp, Copy, Trash2 } from "lucide-react";
 import { ScriptOptionRow } from "./ScriptOptionRow";
 
@@ -125,24 +125,29 @@ export function ScriptBlockEditor({
         {header}
         <IvrStepFields
           block={block}
-          readOnly={readOnly}
-          mediaNames={mediaNames}
-          audioPreviewUrl={audioPreviewUrl}
-          onUploadAudio={onUploadAudio}
-          routingTargets={routingTargets}
-          pageByBlockId={pageByBlockId}
-          onChange={onChange}
-        />
+           readOnly={readOnly}
+           mediaNames={mediaNames}
+           audioPreviewUrl={audioPreviewUrl}
+           onUploadAudio={onUploadAudio}
+           onChange={onChange}
+         />
         <IvrResponsesEditor
           options={options}
           readOnly={readOnly}
           routingTargets={routingTargets}
           inboundPageByBlockId={inboundFlow ? pageByBlockId : undefined}
           onOptionAdd={onOptionAdd}
-          onOptionChange={onOptionChange}
-          onOptionRemove={onOptionRemove}
-        />
-      </div>
+           onOptionChange={onOptionChange}
+           onOptionRemove={onOptionRemove}
+         />
+         <NoInputFields
+           block={block}
+           readOnly={readOnly}
+           routingTargets={routingTargets}
+           pageByBlockId={pageByBlockId}
+           onChange={onChange}
+         />
+       </div>
     );
   }
 

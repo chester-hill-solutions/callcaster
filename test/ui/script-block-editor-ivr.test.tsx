@@ -257,8 +257,8 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
   test("the IVR no-input panel writes gatherTimeoutSeconds and noInput on edits (#1883)", () => {
     const { onChange } = renderStep({ block: spokenBlock() });
 
-    // The "If the recipient stays silent" panel is present with defaults.
-    expect(screen.getByText("If the recipient stays silent")).toBeInTheDocument();
+    // The inline no-input controls are present with defaults.
+    expect(screen.getByText(/if recipient stays silent, wait/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Wait (seconds)")).toHaveValue(5);
     expect(screen.getByLabelText("On no input")).toHaveTextContent("Continue to the next step");
 

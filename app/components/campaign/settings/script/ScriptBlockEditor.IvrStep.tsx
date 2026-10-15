@@ -37,9 +37,6 @@ export type IvrStepFieldsProps = {
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
-  routingTargets: RoutingTarget[];
-  /** blockId -> owning pageId, for the no-input route target. */
-  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
 };
 
@@ -57,8 +54,6 @@ export function IvrStepFields({
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
-  routingTargets,
-  pageByBlockId,
   onChange,
 }: IvrStepFieldsProps) {
   const mode = getIvrPlaybackMode(block);
@@ -172,13 +167,6 @@ export function IvrStepFields({
         />
       )}
 
-      <NoInputFields
-        block={block}
-        readOnly={readOnly}
-        routingTargets={routingTargets}
-        pageByBlockId={pageByBlockId}
-        onChange={onChange}
-      />
     </div>
   );
 }
@@ -189,7 +177,7 @@ export function IvrStepFields({
  * `noInput` through wireExtras so editor serialization retains them; the wire model is
  * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
  */
-function NoInputFields({
+export function NoInputFields({
   block,
   readOnly,
   routingTargets,
@@ -228,65 +216,65 @@ function NoInputFields({
     .map((target) => ({ value: target.id, label: target.label }));
 
   return (
-    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
-      <span className="text-sm font-semibold">If the recipient stays silent</span>
-
-      <FormField label="Wait (seconds)" htmlFor={timeoutId}>
-        <Input
-          id={timeoutId}
-          type="number"
-          min={1}
-          max={60}
-          value={timeoutSeconds}
-          readOnly={readOnly}
-          onChange={(event) => {
-            const value = parseInt(event.target.value, 10);
-            const gathered =
-              Number.isFinite(value) && value >= 1 && value <= 60
-                ? value
-                : undefined;
-            onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
-          }}
-        />
-      </FormField>
-
-      <FormField label="On no input" htmlFor={actionId}>
-        <Select
-          value={action}
-          disabled={readOnly}
-          onValueChange={(next) => {
-            if (next === "next") setNoInput({ action: "next" });
-            else if (next === "hangup") setNoInput({ action: "hangup" });
-            else if (next === "replay") {
-              setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
-            } else if (next === "route") {
-              const blockId = routeTargets[0]?.value;
-              const pageId = blockId ? pageByBlockId[blockId] : undefined;
-              if (blockId && pageId) {
-                setNoInput({ action: { pageId, blockId } });
-              }
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span>if recipient stays silent, wait</span>
+      <Input
+        id={timeoutId}
+        type="number"
+        min={1}
+        max={60}
+        className="w-20"
+        aria-label="Wait (seconds)"
+        value={timeoutSeconds}
+        readOnly={readOnly}
+        onChange={(event) => {
+          const value = parseInt(event.target.value, 10);
+          const gathered =
+            Number.isFinite(value) && value >= 1 && value <= 60
+              ? value
+              : undefined;
+          onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
+        }}
+      />
+      <span>seconds. On no input</span>
+      <Select
+        value={action}
+        disabled={readOnly}
+        onValueChange={(next) => {
+          if (next === "next") setNoInput({ action: "next" });
+          else if (next === "hangup") setNoInput({ action: "hangup" });
+          else if (next === "replay") {
+            setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
+          } else if (next === "route") {
+            const blockId = routeTargets[0]?.value;
+            const pageId = blockId ? pageByBlockId[blockId] : undefined;
+            if (blockId && pageId) {
+              setNoInput({ action: { pageId, blockId } });
             }
-          }}
-        >
-          <SelectTrigger id={actionId}>
-            <SelectValue placeholder="Select…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="next">Continue to the next step</SelectItem>
-            <SelectItem value="hangup">Hang up</SelectItem>
-            <SelectItem value="replay">Replay these instructions</SelectItem>
-            <SelectItem value="route">Route to a step</SelectItem>
-          </SelectContent>
-        </Select>
-      </FormField>
+          }
+        }}
+      >
+        <SelectTrigger id={actionId} aria-label="On no input" className="w-56">
+          <SelectValue placeholder="Select…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="next">Continue to the next step</SelectItem>
+          <SelectItem value="hangup">Hang up</SelectItem>
+          <SelectItem value="replay">Replay these instructions</SelectItem>
+          <SelectItem value="route">Route to a step</SelectItem>
+        </SelectContent>
+      </Select>
 
       {action === "replay" && (
-        <FormField label="Max replays" htmlFor={maxId}>
+        <>
+          <span>Max replays</span>
           <Input
             id={maxId}
             type="number"
             min={1}
             max={10}
+            className="w-20"
+            aria-label="Max replays"
             value={maxReplays}
             readOnly={readOnly}
             onChange={(event) => {
@@ -296,11 +284,12 @@ function NoInputFields({
               setNoInput({ action: "replay", maxReplays: parsed });
             }}
           />
-        </FormField>
+        </>
       )}
 
       {action === "route" && (
-        <FormField label="Route to" htmlFor={routeId}>
+        <>
+          <span>Route to</span>
           <Select
             value={routeBlockId || routeTargets[0]?.value || ""}
             disabled={readOnly || routeTargets.length === 0}
@@ -311,7 +300,7 @@ function NoInputFields({
               }
             }}
           >
-            <SelectTrigger id={routeId}>
+            <SelectTrigger id={routeId} aria-label="Route to" className="w-56">
               <SelectValue placeholder="Select a step…" />
             </SelectTrigger>
             <SelectContent>
@@ -322,7 +311,7 @@ function NoInputFields({
               ))}
             </SelectContent>
           </Select>
-        </FormField>
+        </>
       )}
     </div>
   );
