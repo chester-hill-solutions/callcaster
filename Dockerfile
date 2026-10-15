@@ -19,7 +19,8 @@ COPY . .
 RUN bun run build
 
 # Prune devDependencies so the production stage ships runtime deps only
-RUN rm -rf node_modules && bun install --frozen-lockfile --production
+RUN rm -rf node_modules
+RUN bun install --frozen-lockfile --production
 
 # ─── Production stage ─────────────────────────────────────────────────
 FROM oven/bun:1.3.5-slim AS production
