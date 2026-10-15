@@ -82,13 +82,13 @@ describe("script editor shell — audio scripts", () => {
 
     expect(screen.getByRole("button", { name: "Add spoken step" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add recording step" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Add block")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Add a script block")).toBeInTheDocument();
   });
 
   test("a live-call script keeps the form block palette", () => {
     renderEditor(makeScript("script"));
 
-    expect(screen.getByLabelText("Add block")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add a script block")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add spoken step" })).not.toBeInTheDocument();
   });
 
@@ -96,7 +96,7 @@ describe("script editor shell — audio scripts", () => {
     renderEditor(makeScript("script"), true);
 
     expect(screen.getByRole("button", { name: "Add spoken step" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Add block")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Add a script block")).toBeInTheDocument();
   });
 
   test("adding a spoken step lands a synthetic playback block at the end of the page", () => {

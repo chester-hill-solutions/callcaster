@@ -74,7 +74,7 @@ describe("script editor — renders through the real design-system primitives", 
 
     expect(screen.getByLabelText("Script pages")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit page title" })).toBeTruthy();
-    expect(screen.getByLabelText("Add block")).toBeTruthy();
+    expect(screen.getByLabelText("Add a script block")).toBeTruthy();
   });
 
   test("edits and saves the active page title", () => {
@@ -93,7 +93,7 @@ describe("script editor — renders through the real design-system primitives", 
   test("focuses the title when a new block is added", () => {
     renderEditor();
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Add block" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Add a script block" }));
     fireEvent.click(screen.getByRole("option", { name: "Text area" }));
 
     expect(screen.getByLabelText("block title")).toHaveFocus();

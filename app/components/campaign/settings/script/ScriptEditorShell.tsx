@@ -303,7 +303,7 @@ export function ScriptEditorShell({
                 {!readOnly && audioFlow && (
                   <div
                     role="group"
-                    aria-label="Add step"
+                    aria-label="Add a script block"
                     className="flex flex-wrap gap-2"
                   >
                     <Button
@@ -325,7 +325,7 @@ export function ScriptEditorShell({
                   </div>
                 )}
                 {!readOnly && !audioFlow && (
-                  <FormField label="Add block" htmlFor={addBlockSelectId}>
+                  <div>
                     <Select
                       key={addBlockKey}
                       onValueChange={(type) => {
@@ -334,8 +334,8 @@ export function ScriptEditorShell({
                         setAddBlockKey((key) => key + 1);
                       }}
                     >
-                      <SelectTrigger id={addBlockSelectId}>
-                        <SelectValue placeholder="Choose type…" />
+                      <SelectTrigger id={addBlockSelectId} aria-label="Add a script block">
+                        <SelectValue placeholder="Add a script block..." />
                       </SelectTrigger>
                       <SelectContent>
                         {editor.blockTypes.map((type) => (
@@ -345,7 +345,7 @@ export function ScriptEditorShell({
                         ))}
                       </SelectContent>
                     </Select>
-                  </FormField>
+                  </div>
                 )}
               </div>
 
