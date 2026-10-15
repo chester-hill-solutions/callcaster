@@ -1,22 +1,7 @@
-import { useId } from "react";
 import type { ScriptOption } from "@chester-hill-solutions/scriptkit-call-script-core";
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
-import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  IVR_RESPONSE_KEYS,
-  isKnownIvrResponseKey,
-} from "@/lib/ivr-script-editor";
-import { NO_ROUTING_TARGET, routingOptionsFor } from "./ScriptBlockEditor.routing";
+import { ScriptOptionRow } from "./ScriptOptionRow";
 
 export type IvrResponsesEditorProps = {
   options: ScriptOption[];
@@ -42,8 +27,6 @@ export function IvrResponsesEditor({
   onOptionChange,
   onOptionRemove,
 }: IvrResponsesEditorProps) {
-  const routingOptions = routingOptionsFor(routingTargets, "Continue to the next step", inboundPageByBlockId);
-
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -60,108 +43,17 @@ export function IvrResponsesEditor({
         </p>
       ) : (
         options.map((option, index) => (
-          <IvrResponseRow
+          <ScriptOptionRow
             key={option.id ?? index}
+            mode="ivr"
             option={option}
             readOnly={readOnly}
-            routingOptions={routingOptions}
+            routingTargets={routingTargets}
+            inboundPageByBlockId={inboundPageByBlockId}
             onChange={(patch) => onOptionChange(option.id ?? "", patch)}
             onRemove={() => onOptionRemove(option.id ?? "")}
           />
         ))
-      )}
-    </div>
-  );
-}
-
-function IvrResponseRow({
-  option,
-  readOnly,
-  routingOptions,
-  onChange,
-  onRemove,
-}: {
-  option: ScriptOption;
-  readOnly: boolean;
-  routingOptions: ReturnType<typeof routingOptionsFor>;
-  onChange: (patch: Partial<ScriptOption>) => void;
-  onRemove: () => void;
-}) {
-  const keyId = useId();
-  const labelId = useId();
-  const nextId = useId();
-  const value = option.value ?? "";
-  const targetChoices = option.next && !routingOptions.some((target) => target.value === option.next)
-    ? [{ value: option.next, label: option.next }, ...routingOptions]
-    : routingOptions;
-  // Older scripts stored free-text values ("yes", "good"). Show them as-is so
-  // nothing silently changes, but only offer the keys the runtime can match.
-  const keyChoices =
-    value.length > 0 && !isKnownIvrResponseKey(value)
-      ? [{ value, label: `${value} (not a keypad key)` }, ...IVR_RESPONSE_KEYS]
-      : IVR_RESPONSE_KEYS;
-
-  return (
-    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end">
-      <FormField label="Recipient answers with" htmlFor={keyId}>
-        <Select
-          value={value}
-          disabled={readOnly}
-          onValueChange={(next) => onChange({ value: next })}
-        >
-          <SelectTrigger id={keyId}>
-            <SelectValue placeholder="Select a key…" />
-          </SelectTrigger>
-          <SelectContent>
-            {keyChoices.map((key) => (
-              <SelectItem key={key.value} value={key.value}>
-                {key.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormField>
-      <FormField label="Answer label" htmlFor={labelId} labelTooltip="Shown in results and exports.">
-        <Input
-          id={labelId}
-          value={option.label}
-          readOnly={readOnly}
-          onChange={(event) =>
-            onChange({ label: event.target.value, content: event.target.value })
-          }
-        />
-      </FormField>
-      <FormField label="Then go to" htmlFor={nextId}>
-        <Select
-          value={option.next || NO_ROUTING_TARGET}
-          disabled={readOnly}
-          onValueChange={(next) =>
-            onChange({ next: next === NO_ROUTING_TARGET ? undefined : next })
-          }
-        >
-          <SelectTrigger id={nextId}>
-            <SelectValue placeholder="Select…" />
-          </SelectTrigger>
-          <SelectContent>
-            {targetChoices.map((routingOption) => (
-              <SelectItem key={routingOption.value} value={routingOption.value}>
-                {routingOption.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormField>
-      {!readOnly && (
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Remove response"
-          title="Remove response"
-          onClick={onRemove}
-        >
-          <Trash2 className="h-4 w-4" aria-hidden />
-        </Button>
       )}
     </div>
   );

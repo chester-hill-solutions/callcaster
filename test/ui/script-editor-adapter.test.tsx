@@ -73,8 +73,51 @@ describe("script editor — renders through the real design-system primitives", 
     renderEditor();
 
     expect(screen.getByLabelText("Script pages")).toBeTruthy();
-    expect(screen.getByLabelText("Page title")).toBeTruthy();
-    expect(screen.getByLabelText("Add block")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit page title" })).toBeTruthy();
+    expect(screen.getByLabelText("Add a script block")).toBeTruthy();
+  });
+
+  test("edits and saves the active page title", () => {
+    const { onChange } = renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
+    fireEvent.change(screen.getByLabelText("page title"), {
+      target: { value: "Opening" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save page title" }));
+
+    const saved = onChange.mock.calls.at(-1)?.[0] as Script;
+    expect(saved.steps.pages.page_1.title).toBe("Opening");
+  });
+
+  test("focuses the title when a new block is added", () => {
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Add a script block" }));
+    fireEvent.click(screen.getByRole("option", { name: "Text area" }));
+
+    expect(screen.getByLabelText("block title")).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Add a script block" })).toBeInTheDocument();
+  });
+
+  test("changes block types without losing the prompt or options", () => {
+    render(<ControlledEditor initialScript={makeScript()} />);
+
+    const typeSelect = screen.getByRole("combobox", { name: "Block type" });
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
+
+    fireEvent.click(typeSelect);
+    fireEvent.click(screen.getByRole("option", { name: "Text area" }));
+
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Block type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Select" }));
+
+    expect(screen.getByLabelText("Question")).toHaveValue("How did it go?");
+    expect(screen.getAllByLabelText("Option label")).toHaveLength(2);
   });
 
   test("marks the start page", () => {

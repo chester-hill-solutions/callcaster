@@ -77,49 +77,43 @@ function blockOnPage(steps: WireSteps, index: number): WireBlock {
 }
 
 describe("script editor shell — audio scripts", () => {
-  test("an IVR script offers audio steps instead of form blocks", () => {
+  test("an IVR script offers a recording block button instead of form blocks", () => {
     renderEditor(makeScript("ivr"));
 
-    expect(screen.getByRole("button", { name: "Add spoken step" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add recording step" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Add block")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a script block" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add spoken step" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add recording step" })).not.toBeInTheDocument();
   });
 
   test("a live-call script keeps the form block palette", () => {
     renderEditor(makeScript("script"));
 
-    expect(screen.getByLabelText("Add block")).toBeInTheDocument();
+    expect(screen.getByLabelText("Add a script block")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add spoken step" })).not.toBeInTheDocument();
   });
 
   test("a campaign can force audio editing for a script row typed as a live-call script", () => {
     renderEditor(makeScript("script"), true);
 
-    expect(screen.getByRole("button", { name: "Add spoken step" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Add block")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add a script block" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Add a script block")).toBeInTheDocument();
   });
 
-  test("adding a spoken step lands a synthetic playback block at the end of the page", () => {
+  test("adding a script block adds a recording step and keeps the control visible", () => {
     const { lastSteps } = renderEditor(makeScript("ivr"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add spoken step" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a script block" }));
 
+    expect(screen.getByLabelText("block title")).toHaveFocus();
     const steps = lastSteps();
     expect(steps.pages.page_1?.blocks).toHaveLength(2);
     expect(blockOnPage(steps, 1)).toMatchObject({
-      type: "synthetic",
+      type: "recorded",
       audioFile: "",
       title: "Step 2",
       options: [],
     });
-  });
-
-  test("adding a recording step lands a recorded playback block", () => {
-    const { lastSteps } = renderEditor(makeScript("ivr"));
-
-    fireEvent.click(screen.getByRole("button", { name: "Add recording step" }));
-
-    expect(blockOnPage(lastSteps(), 1)).toMatchObject({ type: "recorded", audioFile: "" });
+    expect(screen.getByRole("button", { name: "Add a script block" })).toBeInTheDocument();
   });
 
   test("a legacy step with no options key can still take its first caller response", () => {

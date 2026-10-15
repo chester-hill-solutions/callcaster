@@ -96,13 +96,29 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
   test("a text-only block in an audio script is edited as a silent spoken step, with its prompt hidden", () => {
     renderStep({ block: legacyTextBlock() });
 
-    expect(screen.getByText("Spoken step")).toBeInTheDocument();
-    expect(screen.getByLabelText("Step name")).toHaveValue("Greeting");
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
+    expect(screen.getByText("Greeting")).toBeInTheDocument();
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Text to speech script...")).toBeInTheDocument();
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
+    expect(screen.getByText("Recipients hear nothing at this step.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Recipients hear nothing at this step/),
-    ).toBeInTheDocument();
+      screen.getByText("Recipients hear nothing at this step.").compareDocumentPosition(
+        screen.getByLabelText("Speech text"),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  test("edits and saves the block title", () => {
+    const { onChange } = renderStep({ block: legacyTextBlock() });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit block title" }));
+    fireEvent.change(screen.getByLabelText("block title"), {
+      target: { value: "Welcome" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save block title" }));
+
+    expect(onChange).toHaveBeenCalledWith({ title: "Welcome" });
   });
 
   test("the unspoken prompt can be promoted to speech text in one click, pinning the playback type", () => {
@@ -134,14 +150,14 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
 
     expect(screen.queryByText(/Callers hear nothing/)).not.toBeInTheDocument();
     expect(screen.getByLabelText("Voice")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Speak text" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Play a recording" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
   });
 
   test("switching to a recording writes the wire type, and mirrors the legacy speechType when present", () => {
     const { onChange } = renderStep({ block: spokenBlock({ speechType: "synthetic" }) });
 
-    fireEvent.click(screen.getByRole("button", { name: "Play a recording" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Block type" }));
+    fireEvent.click(screen.getByRole("option", { name: "Recording" }));
 
     expect(onChange).toHaveBeenCalledWith({
       callcasterType: "recorded",
@@ -156,7 +172,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       audioPreviewUrl: (name) => `/preview/${name}`,
     });
 
-    expect(screen.getByText("Recording step")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Recording");
     const player = screen.getByLabelText("Preview greeting.mp3");
     expect(player.tagName).toBe("AUDIO");
     expect(player).toHaveAttribute("src", "/preview/greeting.mp3");
@@ -170,7 +186,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       audioPreviewUrl: (name) => `/preview/${name}`,
     });
 
-    expect(screen.getByText(/Choose or upload a recording/)).toBeInTheDocument();
+    expect(screen.getByText("Recipients hear nothing at this step.")).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Preview /)).not.toBeInTheDocument();
   });
 
@@ -200,7 +216,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       content: "Yes please",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove response" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove option" }));
     expect(onOptionRemove).toHaveBeenCalledWith("o1");
 
     fireEvent.click(screen.getByRole("button", { name: "Add response" }));
@@ -222,15 +238,15 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Add response" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Remove response" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove option" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Remove block" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Play a recording" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toBeDisabled();
   });
 
   test("outside an audio script, a playback-typed block still gets the audio editor", () => {
     renderStep({ block: spokenBlock(), audioFlow: false });
 
-    expect(screen.getByText("Spoken step")).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Block type" })).toHaveTextContent("Spoken text");
     expect(screen.getByLabelText("Speech text")).toHaveValue("Press 1 for yes.");
   });
 
@@ -238,14 +254,14 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     renderStep({ block: legacyTextBlock(), audioFlow: false });
 
     expect(screen.queryByText("Spoken step")).not.toBeInTheDocument();
-    expect(screen.getByText("Prompt")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Write your question here...")).toBeInTheDocument();
   });
 
   test("the IVR no-input panel writes gatherTimeoutSeconds and noInput on edits (#1883)", () => {
     const { onChange } = renderStep({ block: spokenBlock() });
 
-    // The "If the recipient stays silent" panel is present with defaults.
-    expect(screen.getByText("If the recipient stays silent")).toBeInTheDocument();
+    // The inline no-input controls are present with defaults.
+    expect(screen.getByText(/if recipient stays silent, wait/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Wait (seconds)")).toHaveValue(5);
     expect(screen.getByLabelText("On no input")).toHaveTextContent("Continue to the next step");
 

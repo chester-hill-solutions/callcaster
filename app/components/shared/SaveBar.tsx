@@ -7,6 +7,9 @@ interface SaveBarProps {
   onReset?: () => void;
   isSaving?: boolean;
   message?: string;
+  showMessage?: boolean;
+  embedded?: boolean;
+  className?: string;
   /**
    * Where the bar sticks. A form long enough to scroll shows one at each end
    * so the actions are always in reach (#1128); only the top bar owns the
@@ -21,6 +24,9 @@ export const SaveBar = ({
   onReset,
   isSaving = false,
   message = 'You have unsaved changes',
+  showMessage = true,
+  embedded = false,
+  className = "",
   placement = 'top',
 }: SaveBarProps) => {
   /**
@@ -46,15 +52,18 @@ export const SaveBar = ({
 
   if (!isChanged && !isSaving) return null;
 
-  const stick =
-    placement === 'bottom' ? 'sticky bottom-0 border-t' : 'sticky top-0 border-b';
+  const stick = embedded
+    ? ''
+    : placement === 'bottom'
+      ? 'sticky bottom-0 border-t'
+      : 'sticky top-0 border-b';
 
   return (
     <div
-      className={`${stick} z-50 flex items-center justify-between gap-3 bg-background px-4 py-2`}
+      className={`${stick} z-50 flex items-center ${showMessage ? 'justify-between' : 'justify-end'} gap-3 ${embedded ? 'p-0' : 'bg-background px-4 py-2'} ${className}`}
       data-placement={placement}
     >
-      <span className="text-sm">{message}</span>
+      {showMessage && <span className="text-sm">{message}</span>}
       <div className="flex gap-2">
         {onReset && (
           <Button

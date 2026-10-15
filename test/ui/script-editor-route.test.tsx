@@ -68,18 +68,29 @@ async function renderScriptEditor() {
 }
 
 describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
-  test("shows title and back link on a pristine script", async () => {
+  test("shows the title without saved-state or back-link text", async () => {
     await renderScriptEditor();
 
-    // Regression: the SaveBar only mounts once the form is dirty, so a pristine
-    // script previously had no title and no way back to the script list.
     expect(await screen.findByRole("heading", { name: "Voter ID script" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Back to scripts")).toBeInTheDocument();
-    expect(screen.getByText("All changes saved")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Back to scripts")).not.toBeInTheDocument();
+    expect(screen.queryByText("All changes saved")).not.toBeInTheDocument();
+    expect(screen.queryByText("You have unsaved changes")).not.toBeInTheDocument();
 
     // Saving belongs to the SaveBar alone, which is dirty-only — so a pristine
     // script has no save control at all. There is nothing to save.
     expect(screen.queryByRole("button", { name: /save/i })).not.toBeInTheDocument();
+  });
+
+  test("edits and saves the script title", async () => {
+    await renderScriptEditor();
+    await screen.findByRole("heading", { name: "Voter ID script" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit script title" }));
+    await userEvent.clear(screen.getByLabelText("script title"));
+    await userEvent.type(screen.getByLabelText("script title"), "Updated script");
+    await userEvent.click(screen.getByRole("button", { name: "Save script title" }));
+
+    expect(screen.getByRole("heading", { name: "Updated script" })).toBeInTheDocument();
   });
 
   // The header deliberately does NOT mirror a Save button: two controls whose
