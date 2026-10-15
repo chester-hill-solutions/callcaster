@@ -300,61 +300,12 @@ export function ScriptEditorShell({
                   </div>
                 </div>
 
-                {!readOnly && audioFlow && (
-                  <div
-                    role="group"
-                    aria-label="Add a script block"
-                    className="flex flex-wrap gap-2"
-                  >
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => addIvrStep("synthetic")}
-                    >
-                      Add spoken step
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => addIvrStep("recorded")}
-                    >
-                      Add recording step
-                    </Button>
-                  </div>
-                )}
-                {!readOnly && !audioFlow && (
-                  <div>
-                    <Select
-                      key={addBlockKey}
-                      onValueChange={(type) => {
-                        const blockId = editor.addBlock(type as ScriptBlock["type"]);
-                        setNewBlockId(blockId);
-                        setAddBlockKey((key) => key + 1);
-                      }}
-                    >
-                      <SelectTrigger id={addBlockSelectId} aria-label="Add a script block">
-                        <SelectValue placeholder="Add a script block..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {editor.blockTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {BLOCK_TYPE_LABELS[type] ?? type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-3">
-                {editor.activePage.blockIds.length === 0 ? (
+                {editor.activePage.blockIds.length === 0 && readOnly ? (
                   <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-                    {audioFlow
-                      ? "Add a step to this page. Recipients hear steps in order."
-                      : "Add a block to this page."}
+                    No script blocks on this page.
                   </p>
                 ) : (
                   editor.activePage.blockIds.map((blockId, index) => {
@@ -408,6 +359,38 @@ export function ScriptEditorShell({
                       </div>
                     );
                   })
+                )}
+                {!readOnly && audioFlow && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    aria-label="Add a script block"
+                    onClick={() => addIvrStep("recorded")}
+                  >
+                    Add a script block
+                  </Button>
+                )}
+                {!readOnly && !audioFlow && (
+                  <Select
+                    key={addBlockKey}
+                    onValueChange={(type) => {
+                      const blockId = editor.addBlock(type as ScriptBlock["type"]);
+                      setNewBlockId(blockId);
+                      setAddBlockKey((key) => key + 1);
+                    }}
+                  >
+                    <SelectTrigger id={addBlockSelectId} aria-label="Add a script block">
+                      <SelectValue placeholder="Add a script block..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editor.blockTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {BLOCK_TYPE_LABELS[type] ?? type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
             </>

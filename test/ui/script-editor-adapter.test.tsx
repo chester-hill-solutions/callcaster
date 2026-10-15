@@ -97,6 +97,7 @@ describe("script editor — renders through the real design-system primitives", 
     fireEvent.click(screen.getByRole("option", { name: "Text area" }));
 
     expect(screen.getByLabelText("block title")).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Add a script block" })).toBeInTheDocument();
   });
 
   test("marks the start page", () => {
