@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign call controls return to Dial after the recipient disconnects, even when local phone cleanup reports an error ([#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
+
 - Fixed: SMS conversation search no longer loads unrelated additional pages while results update ([PR #2580](https://github.com/chester-hill-solutions/callcaster/pull/2580), [#2513](https://github.com/chester-hill-solutions/callcaster/issues/2513)).
 - Fixed: The SMS bulk confirmation checkbox now aligns before its wrapped confirmation text ([PR #2575](https://github.com/chester-hill-solutions/callcaster/pull/2575), [#2510](https://github.com/chester-hill-solutions/callcaster/issues/2510)).
 - Changed: Call device test and mute controls no longer show redundant button icons ([PR #2578](https://github.com/chester-hill-solutions/callcaster/pull/2578), [#2517](https://github.com/chester-hill-solutions/callcaster/issues/2517)).

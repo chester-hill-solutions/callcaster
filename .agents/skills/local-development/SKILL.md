@@ -184,6 +184,15 @@ execution paths. When changing startup, test `applyClientMigrationsOnBoot` on
 an owned fresh database and a tracked partial baseline. A green compose
 bootstrap does not prove runtime session state or per-file recovery.
 
+## Call teardown regressions
+
+SDK call and device teardown can throw before local session cleanup runs. Test
+the real session hook and call controls together: a provider terminal event
+must remove Hang Up even when either teardown throws. Keep an unrelated-call
+event as a control and verify that the replacement Dial still consumes the
+first confirmation click. A mocked hangUp callback or a manually completed
+callState cannot prove that the session cleanup path reaches the controls.
+
 ## Route authentication tests
 
 For readiness notices, check missing fields, complete pending or invalid

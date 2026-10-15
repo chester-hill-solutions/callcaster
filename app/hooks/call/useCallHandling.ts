@@ -446,9 +446,19 @@ export function useCallHandling({
         }
       }
 
-      target.disconnect();
+      // SDK teardown can throw after the provider has already ended the call.
+      // Each cleanup must still run so the controls do not retain a dead leg.
+      try {
+        target.disconnect();
+      } catch (err) {
+        logger.debug("Call disconnect failed during hangup cleanup", err);
+      }
       if (isActive && held.length === 0 && device) {
-        device.disconnectAll();
+        try {
+          device.disconnectAll();
+        } catch (err) {
+          logger.debug("Device disconnect failed during hangup cleanup", err);
+        }
       }
 
       if (isActive) {
