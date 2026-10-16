@@ -135,10 +135,12 @@ gh api graphql -f query='query { repository(owner: "chester-hill-solutions", nam
 
 ## Issue Development Branches
 
-- Read an issue before creating its branch: `gh issue view <number> --repo chester-hill-solutions/callcaster --json number,title,body,labels,assignees,milestone,state,url`. Check `gh issue develop --help` before relying on its flags.
-- Create a remote branch linked to an issue from `dev`: `gh issue develop <number> --repo chester-hill-solutions/callcaster --base dev --name feature/<number>-<kebab-description>`. Use `feature/` for implementation work; reserve `chore/<kebab-description>` for repository maintenance that is not the issue's product work.
-- Use a separate worktree for the linked branch. Fetch an explicit remote-tracking ref, then create the local tracking branch: `git fetch origin <branch>:refs/remotes/origin/<branch>` followed by `git worktree add --track -b <branch> ../<worktree-name> origin/<branch>`. Name the worktree after the branch without slashes, for example `../feature-1157-build-ai-test-audiences`.
-- For an unlinked chore branch, create the worktree from `dev`: `git worktree add -b chore/<kebab-description> ../chore-<kebab-description> dev`. After verification, commit, push with `git push -u origin <branch>`, and create the review with `gh pr create --repo chester-hill-solutions/callcaster --base dev --head <branch>`.
+- Read and deeply inspect the issue before creating its branch. At minimum, fetch the native Type, state reason, assignees, labels, milestone, parent, children, blocked-by and blocking relationships, linked PRs, timeline events, organization issue fields, and Project item fields. Follow the `github-issues` and `github-projects` skills for the complete inspection.
+- Use the native GitHub Type for the branch prefix: `Bug` → `bug/`, `Feature` → `feature/`, `Task` → `task/`, `Epic` → `epic/`, and `User Story` → `user-story/`. Do not default every issue to `feature/`.
+- Use one separate worktree per issue or atomic concern. Fetch an explicit remote-tracking ref, then create the local tracking branch: `git fetch origin <branch>:refs/remotes/origin/<branch>` followed by `git worktree add --track -b <branch> ../<worktree-name> origin/<branch>`. Replace `/` with `-` in the worktree name.
+- For an unlinked maintenance change, create `chore/<kebab-description>` in its own worktree from `origin/dev`. It must use the `no-issue` PR label.
+- If the issue has no supported native Type, stop and ask for classification. Do not infer the branch prefix from labels or title text.
+- After branch creation, verify the branch prefix, issue number, worktree path, and `origin/dev` starting point before editing.
 
 ## Changelog
 

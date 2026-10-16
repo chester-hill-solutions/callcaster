@@ -417,7 +417,7 @@
               "live_call",
               "robocall"
             ],
-            "description": "Campaign type (script-based). Use robocall for an automated phone menu."
+            "description": "Campaign type (script-based). Use robocall for an IVR."
           },
           "caller_id": {
             "type": "string",

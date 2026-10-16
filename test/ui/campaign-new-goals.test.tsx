@@ -39,7 +39,7 @@ describe("new campaign goals", () => {
     expect(screen.getByRole("radio", { name: /Live calling/i })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Text campaign/i })).toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: /Automated phone menu/i }),
+      screen.getByRole("radio", { name: /IVR/i }),
     ).toBeInTheDocument();
   });
 

@@ -7,7 +7,6 @@ import {
 } from "react";
 import type { ScriptBlock } from "@chester-hill-solutions/scriptkit-call-script-core";
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
-import { Mic, Volume2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -37,9 +36,6 @@ export type IvrStepFieldsProps = {
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
-  routingTargets: RoutingTarget[];
-  /** blockId -> owning pageId, for the no-input route target. */
-  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
 };
 
@@ -57,8 +53,6 @@ export function IvrStepFields({
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
-  routingTargets,
-  pageByBlockId,
   onChange,
 }: IvrStepFieldsProps) {
   const mode = getIvrPlaybackMode(block);
@@ -69,6 +63,20 @@ export function IvrStepFields({
   const fileId = useId();
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const playbackWarning =
+    mode === "synthetic" && audioFile.trim().length === 0 ? (
+      <Alert variant="warning" className="min-w-0 py-2">
+        <AlertDescription>
+          Recipients hear nothing at this step.
+        </AlertDescription>
+      </Alert>
+    ) : mode === "recorded" && audioFile.length === 0 ? (
+      <Alert variant="warning" className="min-w-0 py-2">
+        <AlertDescription>
+          Recipients hear nothing at this step.
+        </AlertDescription>
+      </Alert>
+    ) : null;
 
   const handleAudioFileSelected = async (
     event: ChangeEvent<HTMLInputElement>,
@@ -94,7 +102,7 @@ export function IvrStepFields({
 
   const canUploadAudio = !readOnly && Boolean(onUploadAudio);
 
-  const renderUploadControl = (showModeHint: boolean) =>
+  const renderUploadControl = () =>
     canUploadAudio ? (
       <div className="grid gap-1">
         <input
@@ -114,41 +122,15 @@ export function IvrStepFields({
         >
           {isUploadingAudio ? "Uploading…" : "Upload audio"}
         </Button>
-        {showModeHint && (
-          <p className="text-xs text-muted-foreground">
-            Uploading switches this step to a recording.
-          </p>
-        )}
       </div>
     ) : null;
 
   return (
     <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">What the recipient hears</span>
-        <div role="group" aria-label="Playback mode" className="flex gap-1">
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "synthetic" ? "default" : "outline"}
-            aria-pressed={mode === "synthetic"}
-            disabled={readOnly}
-            onClick={() => onChange(playbackModePatch(block, "synthetic"))}
-          >
-            <Volume2 className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Speak text
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "recorded" ? "default" : "outline"}
-            aria-pressed={mode === "recorded"}
-            disabled={readOnly}
-            onClick={() => onChange(playbackModePatch(block, "recorded"))}
-          >
-            <Mic className="mr-1 h-3.5 w-3.5" aria-hidden />
-            Play a recording
-          </Button>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-sm font-semibold">What the recipient hears</span>
+          {playbackWarning}
         </div>
       </div>
 
@@ -163,7 +145,6 @@ export function IvrStepFields({
             voiceId={voiceId}
             onChange={onChange}
           />
-          {renderUploadControl(true)}
         </>
       ) : (
         <RecordingStepFields
@@ -174,17 +155,10 @@ export function IvrStepFields({
           fileId={fileId}
           audioPreviewUrl={audioPreviewUrl}
           onChange={onChange}
-          uploadControl={renderUploadControl(false)}
+           uploadControl={renderUploadControl()}
         />
       )}
 
-      <NoInputFields
-        block={block}
-        readOnly={readOnly}
-        routingTargets={routingTargets}
-        pageByBlockId={pageByBlockId}
-        onChange={onChange}
-      />
     </div>
   );
 }
@@ -195,7 +169,7 @@ export function IvrStepFields({
  * `noInput` through wireExtras so editor serialization retains them; the wire model is
  * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
  */
-function NoInputFields({
+export function NoInputFields({
   block,
   readOnly,
   routingTargets,
@@ -234,65 +208,65 @@ function NoInputFields({
     .map((target) => ({ value: target.id, label: target.label }));
 
   return (
-    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
-      <span className="text-sm font-semibold">If the recipient stays silent</span>
-
-      <FormField label="Wait (seconds)" htmlFor={timeoutId}>
-        <Input
-          id={timeoutId}
-          type="number"
-          min={1}
-          max={60}
-          value={timeoutSeconds}
-          readOnly={readOnly}
-          onChange={(event) => {
-            const value = parseInt(event.target.value, 10);
-            const gathered =
-              Number.isFinite(value) && value >= 1 && value <= 60
-                ? value
-                : undefined;
-            onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
-          }}
-        />
-      </FormField>
-
-      <FormField label="On no input" htmlFor={actionId}>
-        <Select
-          value={action}
-          disabled={readOnly}
-          onValueChange={(next) => {
-            if (next === "next") setNoInput({ action: "next" });
-            else if (next === "hangup") setNoInput({ action: "hangup" });
-            else if (next === "replay") {
-              setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
-            } else if (next === "route") {
-              const blockId = routeTargets[0]?.value;
-              const pageId = blockId ? pageByBlockId[blockId] : undefined;
-              if (blockId && pageId) {
-                setNoInput({ action: { pageId, blockId } });
-              }
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <span>if recipient stays silent, wait</span>
+      <Input
+        id={timeoutId}
+        type="number"
+        min={1}
+        max={60}
+        className="w-20"
+        aria-label="Wait (seconds)"
+        value={timeoutSeconds}
+        readOnly={readOnly}
+        onChange={(event) => {
+          const value = parseInt(event.target.value, 10);
+          const gathered =
+            Number.isFinite(value) && value >= 1 && value <= 60
+              ? value
+              : undefined;
+          onChange({ wireExtras: { ...block.wireExtras, gatherTimeoutSeconds: gathered } });
+        }}
+      />
+      <span>seconds. On no input</span>
+      <Select
+        value={action}
+        disabled={readOnly}
+        onValueChange={(next) => {
+          if (next === "next") setNoInput({ action: "next" });
+          else if (next === "hangup") setNoInput({ action: "hangup" });
+          else if (next === "replay") {
+            setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
+          } else if (next === "route") {
+            const blockId = routeTargets[0]?.value;
+            const pageId = blockId ? pageByBlockId[blockId] : undefined;
+            if (blockId && pageId) {
+              setNoInput({ action: { pageId, blockId } });
             }
-          }}
-        >
-          <SelectTrigger id={actionId}>
-            <SelectValue placeholder="Select…" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="next">Continue to the next step</SelectItem>
-            <SelectItem value="hangup">Hang up</SelectItem>
-            <SelectItem value="replay">Replay these instructions</SelectItem>
-            <SelectItem value="route">Route to a step</SelectItem>
-          </SelectContent>
-        </Select>
-      </FormField>
+          }
+        }}
+      >
+        <SelectTrigger id={actionId} aria-label="On no input" className="w-56">
+          <SelectValue placeholder="Select…" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="next">Continue to the next step</SelectItem>
+          <SelectItem value="hangup">Hang up</SelectItem>
+          <SelectItem value="replay">Replay these instructions</SelectItem>
+          <SelectItem value="route">Route to a step</SelectItem>
+        </SelectContent>
+      </Select>
 
       {action === "replay" && (
-        <FormField label="Max replays" htmlFor={maxId}>
+        <>
+          <span>Max replays</span>
           <Input
             id={maxId}
             type="number"
             min={1}
             max={10}
+            className="w-20"
+            aria-label="Max replays"
             value={maxReplays}
             readOnly={readOnly}
             onChange={(event) => {
@@ -302,11 +276,12 @@ function NoInputFields({
               setNoInput({ action: "replay", maxReplays: parsed });
             }}
           />
-        </FormField>
+        </>
       )}
 
       {action === "route" && (
-        <FormField label="Route to" htmlFor={routeId}>
+        <>
+          <span>Route to</span>
           <Select
             value={routeBlockId || routeTargets[0]?.value || ""}
             disabled={readOnly || routeTargets.length === 0}
@@ -317,7 +292,7 @@ function NoInputFields({
               }
             }}
           >
-            <SelectTrigger id={routeId}>
+            <SelectTrigger id={routeId} aria-label="Route to" className="w-56">
               <SelectValue placeholder="Select a step…" />
             </SelectTrigger>
             <SelectContent>
@@ -328,7 +303,7 @@ function NoInputFields({
               ))}
             </SelectContent>
           </Select>
-        </FormField>
+        </>
       )}
     </div>
   );
@@ -357,23 +332,21 @@ function SpokenStepFields({
 
   return (
     <>
-      <FormField
-        label="Speech text"
-        htmlFor={textId}
-        description="Read aloud to the recipient in the selected voice."
-      >
+      <div className="grid gap-1">
         <Textarea
           id={textId}
           value={text}
           readOnly={readOnly}
+          aria-label="Speech text"
+          placeholder="Text to speech script..."
           onChange={(event) =>
             onChange({
               audioFile: event.target.value,
               ...ensurePlaybackTypePatch(block),
-            } as Partial<ScriptBlock>)
-          }
-        />
-      </FormField>
+              } as Partial<ScriptBlock>)
+            }
+          />
+      </div>
       {canUsePrompt && (
         <div className="grid gap-1">
           <p className="text-xs text-muted-foreground">
@@ -417,14 +390,6 @@ function SpokenStepFields({
           </SelectContent>
         </Select>
       </FormField>
-      {isSilent && (
-        <Alert variant="warning">
-          <AlertDescription>
-            Recipients hear nothing at this step yet. Enter the text to speak, or
-            switch to a recording.
-          </AlertDescription>
-        </Alert>
-      )}
     </>
   );
 }
@@ -501,13 +466,6 @@ function RecordingStepFields({
         >
           <track kind="captions" />
         </audio>
-      )}
-      {fileName.length === 0 && (
-        <Alert variant="warning">
-          <AlertDescription>
-            Choose or upload a recording, or recipients hear nothing at this step.
-          </AlertDescription>
-        </Alert>
       )}
     </>
   );

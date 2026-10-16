@@ -69,6 +69,7 @@ describe("password recovery feedback", () => {
           Component: ResetPassword,
           action: () => ({ success: true, error: null }),
         },
+        { path: "/signin", element: <div /> },
       ],
       { initialEntries: ["/reset-password?token=issued-token"] },
     );

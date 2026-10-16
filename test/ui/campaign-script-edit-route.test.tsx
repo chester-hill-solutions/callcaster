@@ -86,6 +86,32 @@ vi.mock(
   }),
 );
 
+vi.mock("@/components/MessageSettings", () => ({
+  MessageSettings: ({
+    details,
+    onChange,
+  }: {
+    details: { body_text?: string; message_media?: string[] };
+    onChange: (field: string, value: unknown) => void;
+  }) =>
+    createElement(
+      "div",
+      null,
+      createElement("button", {
+        onClick: () => onChange("message_media", ["new.png"]),
+      }, "upload image"),
+      createElement("button", {
+        onClick: () => onChange("body_text", "Unsaved draft"),
+      }, "edit message"),
+      createElement("span", { "data-testid": "message-media" },
+        (details.message_media ?? []).join(",") || "No media",
+      ),
+      createElement("span", { "data-testid": "message-body" },
+        details.body_text ?? "",
+      ),
+    ),
+}));
+
 function makeScript(id: number, name: string) {
   return {
     id,
@@ -169,6 +195,38 @@ afterEach(() => {
 });
 
 describe("campaign script edit route (#1124)", () => {
+  test("accepts persisted media while keeping message text editable and discardable", async () => {
+    await renderRoute(makeLoaderData({
+      data: {
+        id: 1,
+        workspace: "ws-1",
+        type: "message",
+        campaignDetails: {
+          campaign_id: 1,
+          created_at: "2026-01-01T00:00:00.000Z",
+          id: 11,
+          script_id: null,
+          workspace: "ws-1",
+          body_text: "Saved message",
+          message_media: [],
+        },
+      },
+    }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "upload image" }));
+    expect(screen.getByTestId("message-media")).toHaveTextContent("new.png");
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "edit message" }));
+    expect(screen.getByTestId("message-body")).toHaveTextContent("Unsaved draft");
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(screen.getByTestId("message-body")).toHaveTextContent("Saved message");
+    expect(screen.getByTestId("message-media")).toHaveTextContent("new.png");
+    expect(screen.queryByRole("button", { name: "Save changes" })).not.toBeInTheDocument();
+  });
+
   test("script preview starts read-only with an explicit edit affordance", async () => {
     await renderRoute();
 

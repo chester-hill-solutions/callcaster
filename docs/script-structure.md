@@ -2,11 +2,18 @@
 
 This document explains how CallCaster represents a **campaign script** in data: where it lives, how **pages** and **blocks** fit together, and how **navigation** works at runtime (especially IVR).
 
-For field-by-field JSON examples and upload-oriented rules, see **[Script JSON format](script-json-format.md)**. For a standalone validator you can run in Node or the browser, see **[`docs/script-validator.js`](script-validator.js)**.
+For the difference between stored wire data and the normalized editor document,
+see **[Script schema guide](script-schema-guide.md)**. For field-by-field JSON
+examples and upload-oriented rules, see **[Script JSON format](script-json-format.md)**.
+For a standalone validator you can run in Node or the browser, see
+**[`docs/script-validator.js`](script-validator.js)**.
 
 ## Where the script lives
 
 - In the database, a script row stores a JSON document on **`steps`** (see `script` table / `Script` type).
+- The stored CallCaster shape uses `page.blocks`; the normalized editor shape
+  uses `page.blockIds`. The conversion is documented in
+  [Script schema guide](script-schema-guide.md).
 - The app’s campaign script editor reads and writes **`steps`** as an object with at least:
   - **`pages`**: map of page id → page metadata and ordered block list
   - **`blocks`**: map of block id → block definition

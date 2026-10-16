@@ -187,7 +187,7 @@ describe("app/lib/campaign-setup-steps.ts", () => {
     expect(result.guideTitle).toBe("Set up your text campaign");
   });
 
-  test("automated phone menus use goal-specific labels and a readiness action", () => {
+  test("IVR use goal-specific labels and a readiness action", () => {
     const result = getCampaignSetupSteps({
       campaignData: {
         id: 44,
@@ -213,7 +213,7 @@ describe("app/lib/campaign-setup-steps.ts", () => {
       "Contacts to dial",
       "Start your campaign",
     ]);
-    expect(result.guideTitle).toBe("Set up your automated phone menu");
+    expect(result.guideTitle).toBe("Set up your IVR");
     expect(result.launchActionLabel).toBe("Start phone menu");
     expect(result.steps.find((step) => step.status === "current")?.action).toEqual({
       type: "link",

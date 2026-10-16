@@ -4,7 +4,7 @@ import { FaHeadset, FaPhoneVolume, FaSimCard } from "react-icons/fa6";
 import { MdOutlinePayments } from "react-icons/md";
 import { PiPhoneCallFill } from "react-icons/pi";
 import type { ReactNode } from "react";
-import type { MetaFunction } from "react-router";
+import { Link, type MetaFunction } from "react-router";
 import {
   buildPublicPricingContent,
   type PublicPricingRow,
@@ -96,6 +96,17 @@ export default function Pricing() {
         without demanding attention up front.
       */}
       <PricingCalculator />
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Writing an SMS?{" "}
+        <Link
+          to="/message-segment-calculator"
+          className="font-semibold text-brand-primary underline-offset-4 hover:underline"
+        >
+          Check its segment count and encoding
+        </Link>
+        .
+      </p>
 
       <SubsectionTitle>{staffedCallout.heading}</SubsectionTitle>
       <section className="overflow-hidden rounded-xl border border-border bg-card">

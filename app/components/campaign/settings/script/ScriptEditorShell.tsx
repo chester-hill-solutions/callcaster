@@ -7,7 +7,6 @@ import { useScriptEditorState } from "@chester-hill-solutions/scriptkit-call-scr
 import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -20,12 +19,14 @@ import {
   createIvrResponseOption,
   createIvrStepBlock,
   nextIvrStepTitle,
+  playbackModePatch,
   type IvrPlaybackMode,
 } from "@/lib/ivr-script-editor";
 import { validateIvrRouting } from "@/lib/ivr-script-validation";
 import { scripts } from "@/lib/call-script-service";
 import { validateInboundScriptSteps } from "@/lib/inbound-script-validation";
 import { cn } from "@/lib/utils";
+import { EditableTitle } from "@/components/ui/editable-title";
 import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
 import { ScriptValidationDetails } from "./ScriptValidationDetails";
 
@@ -64,6 +65,7 @@ export function ScriptEditorShell({
   const jumpSelectId = useId();
   const addBlockSelectId = useId();
   const [addBlockKey, setAddBlockKey] = useState(0);
+  const [newBlockId, setNewBlockId] = useState<string | null>(null);
 
   const editor = useScriptEditorState({
     initialDocument: document,
@@ -127,6 +129,7 @@ export function ScriptEditorShell({
       blocks: { ...editor.document.blocks, [blockId]: block },
     });
     editor.setActiveBlockId(blockId);
+    setNewBlockId(blockId);
   };
 
   // A step migrated from an older editor may have no `options` key at all,
@@ -213,10 +216,11 @@ export function ScriptEditorShell({
             <>
               <div className="space-y-3 rounded-md border border-border bg-card p-3 sm:p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <LabelledPageTitle
+                  <EditableTitle
                     value={editor.activePage.title}
                     readOnly={readOnly}
-                    onChange={(title) =>
+                    ariaLabel="page title"
+                    onSave={(title) =>
                       editor.renamePage(editor.activePageId, title)
                     }
                   />
@@ -230,7 +234,7 @@ export function ScriptEditorShell({
                           variant="secondary"
                           className="sm:hidden"
                           onClick={() => editor.addPage()}
-                        >
+                          >
                           Add page
                         </Button>
                         <Button
@@ -238,6 +242,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Move page up"
+                          title="Move page up"
                           disabled={activePageIndex <= 0}
                           onClick={() =>
                             editor.movePage(
@@ -253,6 +258,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Move page down"
+                          title="Move page down"
                           disabled={
                             activePageIndex < 0 ||
                             activePageIndex >= pageCount - 1
@@ -282,6 +288,7 @@ export function ScriptEditorShell({
                           size="sm"
                           variant="outline"
                           aria-label="Remove page"
+                          title="Remove page"
                           disabled={pageCount <= 1}
                           onClick={() =>
                             editor.removePage(editor.activePageId)
@@ -294,60 +301,12 @@ export function ScriptEditorShell({
                   </div>
                 </div>
 
-                {!readOnly && audioFlow && (
-                  <div
-                    role="group"
-                    aria-label="Add step"
-                    className="flex flex-wrap gap-2"
-                  >
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => addIvrStep("synthetic")}
-                    >
-                      Add spoken step
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => addIvrStep("recorded")}
-                    >
-                      Add recording step
-                    </Button>
-                  </div>
-                )}
-                {!readOnly && !audioFlow && (
-                  <FormField label="Add block" htmlFor={addBlockSelectId}>
-                    <Select
-                      key={addBlockKey}
-                      onValueChange={(type) => {
-                        editor.addBlock(type as ScriptBlock["type"]);
-                        setAddBlockKey((key) => key + 1);
-                      }}
-                    >
-                      <SelectTrigger id={addBlockSelectId}>
-                        <SelectValue placeholder="Choose type…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {editor.blockTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {BLOCK_TYPE_LABELS[type] ?? type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-                )}
               </div>
 
               <div className="space-y-3">
-                {editor.activePage.blockIds.length === 0 ? (
+                {editor.activePage.blockIds.length === 0 && readOnly ? (
                   <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-                    {audioFlow
-                      ? "Add a step to this page. Recipients hear steps in order."
-                      : "Add a block to this page."}
+                    No script blocks on this page.
                   </p>
                 ) : (
                   editor.activePage.blockIds.map((blockId, index) => {
@@ -388,6 +347,22 @@ export function ScriptEditorShell({
                           onMoveDown={() =>
                             editor.moveBlock(blockId, index + 1)
                           }
+                          blockTypes={editor.blockTypes}
+                          onTypeChange={(type) => {
+                            if (isIvrStepBlock(block, audioFlow)) {
+                              editor.updateBlock(
+                                blockId,
+                                playbackModePatch(block, type as IvrPlaybackMode),
+                              );
+                            } else {
+                              editor.changeBlockType(
+                                blockId,
+                                type as ScriptBlock["type"],
+                              );
+                            }
+                          }}
+                          autoEditTitle={newBlockId === blockId}
+                          onAutoEditTitleConsumed={() => setNewBlockId(null)}
                           onOptionAdd={() => addResponse(blockId, block)}
                           onOptionChange={(optionId, patch) =>
                             editor.updateOption(blockId, optionId, patch)
@@ -399,6 +374,38 @@ export function ScriptEditorShell({
                       </div>
                     );
                   })
+                )}
+                {!readOnly && audioFlow && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    aria-label="Add a script block"
+                    onClick={() => addIvrStep("recorded")}
+                  >
+                    Add a script block
+                  </Button>
+                )}
+                {!readOnly && !audioFlow && (
+                  <Select
+                    key={addBlockKey}
+                    onValueChange={(type) => {
+                      const blockId = editor.addBlock(type as ScriptBlock["type"]);
+                      setNewBlockId(blockId);
+                      setAddBlockKey((key) => key + 1);
+                    }}
+                  >
+                    <SelectTrigger id={addBlockSelectId} aria-label="Add a script block">
+                      <SelectValue placeholder="Add a script block..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {editor.blockTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {BLOCK_TYPE_LABELS[type] ?? type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 )}
               </div>
             </>
@@ -415,31 +422,5 @@ export function ScriptEditorShell({
       </div>
 
     </div>
-  );
-}
-
-function LabelledPageTitle({
-  value,
-  readOnly,
-  onChange,
-}: {
-  value: string;
-  readOnly: boolean;
-  onChange: (value: string) => void;
-}) {
-  const inputId = useId();
-  return (
-    <FormField
-      label="Page title"
-      htmlFor={inputId}
-      className="min-w-[12rem] flex-1"
-    >
-      <Input
-        id={inputId}
-        value={value}
-        readOnly={readOnly}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </FormField>
   );
 }

@@ -60,11 +60,11 @@ Prerequisites: a message campaign with a small call list, a workspace with a low
 | C8 | Let a campaign process its last queued contact through any path (an agent's call, an opt-out, a sent text) | Status flips to complete without waiting for a worker tick | #1601 | |
 | C9 | Set a campaign end date in the past with contacts still queued; wait for the next dispatch tick | Status becomes complete; a paused campaign with a past end date stays paused | #1532 | |
 | C10 | Add a contact with an unroutable number (Twilio test magic number) to a message campaign; launch | The row records failed attempts and is dead-lettered at the limit; the campaign completes instead of retrying forever | #1603 | |
-| C11 | Automated phone menu campaign with two contacts that share one phone number | The number is dialled once | #1529 | |
+| C11 | IVR campaign with two contacts that share one phone number | The number is dialled once | #1529 | |
 | C12 | Message campaign with 500+ contacts on a Canadian local number | Launch is blocked with the bulk safeguard; an admin can acknowledge the risk and override for this campaign; the override shows while active and can be removed | #1623 | |
 | C13 | Results page of a message campaign that sent two texts to one contact | "Total Messages" shows the message count with no "of N" denominator; contact progress counts the contact once | #1633 | |
 | C14 | Call list screens, queue picker, onboarding step | Copy says **Call list**, never "Audience" | #1591 | |
-| C15 | Campaign type and goal pickers | The automated calling goal is **Automated phone menu** everywhere; no "IVR" or "Robocall" labels | #1594 | |
+| C15 | Campaign type and goal pickers | The automated calling goal is **IVR** everywhere; no "IVR" or "Robocall" labels | #1594 | |
 | C16 | Open a call room in two tabs while another agent's access is revoked | Both tabs share one event connection; the revoked agent is disconnected instead of retrying every few seconds | #1531 | |
 | C17 | **API** `PATCH /api/campaign-queue` with `action: "update_status"` and no `status` | 400 naming the missing field; a complete body behaves as before | #1614 | |
 | C18 | **API** `POST /api/sms` outside the send window, then inside it, then with no balance | Deferred 200 (`deferred`, `reason`, `nextOpenAt`); dispatched 200 with `creditsExhausted`; 402 | #1625 | |

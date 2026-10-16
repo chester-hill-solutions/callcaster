@@ -4,6 +4,24 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-10-15 — release [#2668](https://github.com/chester-hill-solutions/callcaster/pull/2668)
+
+- Fixed: Campaign media previews and SMS/MMS estimates update after media uploads and removals ([PR #2666](https://github.com/chester-hill-solutions/callcaster/pull/2666), [#2655](https://github.com/chester-hill-solutions/callcaster/issues/2655)).
+- Added: Users can estimate SMS encoding, segment count, and credit cost before sending ([PR #2664](https://github.com/chester-hill-solutions/callcaster/pull/2664), [#2663](https://github.com/chester-hill-solutions/callcaster/issues/2663)).
+- Fixed: Call-list selections follow the visible page, and failed removals keep selected contacts available to retry ([PR #2665](https://github.com/chester-hill-solutions/callcaster/pull/2665), [#2634](https://github.com/chester-hill-solutions/callcaster/issues/2634)).
+- Fixed: After a successful password reset, users return to Sign In and see the password-updated confirmation ([PR #2606](https://github.com/chester-hill-solutions/callcaster/pull/2606), [#2605](https://github.com/chester-hill-solutions/callcaster/issues/2605)).
+- Fixed: Campaign call controls return to Dial after the recipient disconnects, even when phone cleanup reports an error ([PR #2604](https://github.com/chester-hill-solutions/callcaster/pull/2604), [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
+- Changed: Script editing keeps common controls visible, supports editable titles, and gives clearer IVR options and feedback ([PR #2600](https://github.com/chester-hill-solutions/callcaster/pull/2600), [#2596](https://github.com/chester-hill-solutions/callcaster/issues/2596)).
+- Changed: Campaign pages use breadcrumb and status navigation without repeating the campaign header ([PRs #2579](https://github.com/chester-hill-solutions/callcaster/pull/2579), [#2602](https://github.com/chester-hill-solutions/callcaster/pull/2602), [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503)).
+- Changed: SMS campaign setup keeps Send using beside Outbound number in a responsive three-column layout ([PRs #2577](https://github.com/chester-hill-solutions/callcaster/pull/2577), [#2601](https://github.com/chester-hill-solutions/callcaster/pull/2601), [#2504](https://github.com/chester-hill-solutions/callcaster/issues/2504)).
+- Changed: SMS campaign setup no longer repeats guidance that the message body is edited under Content ([PR #2583](https://github.com/chester-hill-solutions/callcaster/pull/2583), [#2505](https://github.com/chester-hill-solutions/callcaster/issues/2505)).
+- Added: Admins can open workspace details by selecting a workspace name in the admin workspace table ([PR #2582](https://github.com/chester-hill-solutions/callcaster/pull/2582), [#2508](https://github.com/chester-hill-solutions/callcaster/issues/2508)).
+- Changed: Customer-facing campaign and billing copy uses IVR terminology again, while technical identifiers stay unchanged ([PR #2581](https://github.com/chester-hill-solutions/callcaster/pull/2581), [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347)).
+- Fixed: SMS conversation search no longer loads extra pages while results update ([PR #2580](https://github.com/chester-hill-solutions/callcaster/pull/2580), [#2513](https://github.com/chester-hill-solutions/callcaster/issues/2513)).
+- Fixed: The SMS bulk-confirmation checkbox aligns with wrapped confirmation text ([PR #2575](https://github.com/chester-hill-solutions/callcaster/pull/2575), [#2510](https://github.com/chester-hill-solutions/callcaster/issues/2510)).
+- Changed: Call-device test and mute controls no longer show redundant button icons ([PR #2578](https://github.com/chester-hill-solutions/callcaster/pull/2578), [#2517](https://github.com/chester-hill-solutions/callcaster/issues/2517)).
+- Fixed: Sign-in and sign-up pages no longer scroll when their content fits the viewport ([PR #2572](https://github.com/chester-hill-solutions/callcaster/pull/2572), [#2010](https://github.com/chester-hill-solutions/callcaster/issues/2010)).
+
 ## 2026-10-14 — release [#2568](https://github.com/chester-hill-solutions/callcaster/pull/2568)
 
 - Removed: The app-generated ringing loop during campaign dialing, which could overlap answered calls or voicemail ([PR #2567](https://github.com/chester-hill-solutions/callcaster/pull/2567), [#2532](https://github.com/chester-hill-solutions/callcaster/issues/2532)).
@@ -15,6 +33,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Fixed: Notice telemetry records explicit severity, keeps success and neutral notices out of warning/error logs, and captures changed notices without losing same-text errors ([PR #2562](https://github.com/chester-hill-solutions/callcaster/pull/2562), [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062)).
 
 - Fixed: Neutral notices use the shared card style in both themes, and campaign safeguards, authenticator setup, and Twilio warnings use explicit warning tones ([PR #2561](https://github.com/chester-hill-solutions/callcaster/pull/2561), [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061)).
+
+- Security: SMS report export history exposes report details and private download links only to workspace owners and admins; ordinary exports remain available to workspace members ([PR #2560](https://github.com/chester-hill-solutions/callcaster/pull/2560), [#2559](https://github.com/chester-hill-solutions/callcaster/issues/2559)).
 
 - Fixed: Workspace settings show email validation beside Email and other action failures once in a toast, while retaining entered values for retry ([PR #2558](https://github.com/chester-hill-solutions/callcaster/pull/2558), [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306)).
 

@@ -1,6 +1,7 @@
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
+import { CampaignSmsSendMode } from "../CampaignSmsSendMode";
 import { Campaign, Flags, WorkspaceNumbers } from "@/lib/types";
 
 interface CampaignBasicInfoProps {
@@ -9,6 +10,12 @@ interface CampaignBasicInfoProps {
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
   callerIdOptional?: boolean;
+  isBusy?: boolean;
+  smsSendContext?: {
+    messagingServiceReady: boolean;
+    defaultMessagingServiceSid: string | null;
+    attachedSenderPhoneNumbers?: string[];
+  };
 }
 
 /** Setup fields only: type, number, schedule. Launch controls live on /launch. */
@@ -18,11 +25,15 @@ export const CampaignBasicInfo = ({
   phoneNumbers,
   flags: _flags,
   callerIdOptional = false,
+  isBusy = false,
+  smsSendContext,
 }: CampaignBasicInfoProps) => {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-4">
-        <div className="min-w-[250px] flex-1">
+      <div
+        className={`grid gap-4 ${campaignData.type === "message" ? "md:grid-cols-3" : "md:grid-cols-2"}`}
+      >
+        <div className="min-w-0">
           <SelectType
             campaignData={campaignData}
             handleInputChange={(name, value) =>
@@ -37,7 +48,17 @@ export const CampaignBasicInfo = ({
             }
           />
         </div>
-        <div id="campaign-setup-number" className="min-w-[250px] flex-1 space-y-1">
+        {campaignData.type === "message" ? (
+          <div className="min-w-0">
+            <CampaignSmsSendMode
+              value={campaignData.sms_send_mode}
+              onChange={handleInputChange}
+              isBusy={isBusy}
+              smsSendContext={smsSendContext}
+            />
+          </div>
+        ) : null}
+        <div id="campaign-setup-number" className="min-w-0 space-y-1">
           <SelectNumber
             campaignData={{ caller_id: campaignData.caller_id ?? undefined }}
             handleInputChange={(name, value) => handleInputChange(name, value)}

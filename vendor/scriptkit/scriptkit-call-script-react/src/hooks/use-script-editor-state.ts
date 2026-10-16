@@ -600,7 +600,7 @@ function createBlock(type: ScriptBlock["type"], id: string): ScriptBlock {
     case "support":
       return { id, type: "support", prompt: "" };
     case "textarea":
-      return { id, type: "textarea", prompt: "" };
+      return { id, type: "textarea", prompt: "", options: [] };
     case "select":
       return { id, type: "select", prompt: "", options: [] };
     case "radio":

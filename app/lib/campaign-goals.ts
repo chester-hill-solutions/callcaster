@@ -7,7 +7,7 @@ import type { WorkspaceOnboardingGoal } from "@/lib/types";
  * fields are unchanged; only copy reads from here. The Advanced IVR
  * simple/complex choice was removed from campaign setup.
  */
-export const AUTOMATED_PHONE_MENU_LABEL = "Automated phone menu";
+export const AUTOMATED_PHONE_MENU_LABEL = "IVR";
 
 export const CAMPAIGN_PRODUCT_GOAL_VALUES = [
   "live_calling",

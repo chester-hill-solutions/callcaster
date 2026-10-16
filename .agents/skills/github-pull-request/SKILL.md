@@ -21,6 +21,13 @@ subcommand manual and installed `gh <command> --help` before using a command.
 9. Merge only when the user requested the merge or explicitly approved it. Select the merge strategy deliberately, then verify `state`, `mergedAt`, `mergeCommit`, and the base branch.
 10. If `--delete-branch` is used, verify the remote branch no longer exists. A checked-out local branch may remain.
 
+## Draft pull requests
+
+Never change a draft pull request to ready for review unless the user explicitly
+instructs you to do so. A draft state is an intentional review signal, not a
+merge blocker to work around. If a draft must be ready before the requested
+operation can continue, report that constraint and ask for explicit permission.
+
 ## Late deployment contexts
 
 A first empty commit-status read does not prove that a PR has no deployment

@@ -13,9 +13,17 @@ export function ScriptValidationDetails({ errors, inbound }: { errors: string[];
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button type="button" size="sm" variant={hasErrors ? "destructive" : "outline"}>
+        <Button
+          type="button"
+          size="icon"
+          variant={hasErrors ? "destructive" : "outline"}
+          aria-label={hasErrors ? "Script validation: issues found" : "Script validation: no issues"}
+          title={hasErrors ? "Script validation: issues found" : "Script validation: no issues"}
+        >
           <Icon aria-hidden />
-          Script validation
+          <span className="sr-only">
+            {hasErrors ? "Script validation: issues found" : "Script validation: no issues"}
+          </span>
         </Button>
       </SheetTrigger>
       <span className="sr-only" role="status">

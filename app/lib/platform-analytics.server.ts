@@ -121,6 +121,10 @@ export async function listWorkspaceExportsApi(
     workspaceId,
   });
 
+  const role = await getUserRole({ user: { id: userId }, workspaceId });
+  const canReadSmsReports =
+    role?.role === MemberRole.Admin || role?.role === MemberRole.Owner;
+
   let files: Awaited<ReturnType<typeof listObjects>>;
   try {
     files = await listObjects("campaign-exports", workspaceId, {
@@ -139,6 +143,9 @@ export async function listWorkspaceExportsApi(
       try {
         const statusData = await downloadObject("campaign-exports", `${workspaceId}/${file.name}`);
         const content = JSON.parse(statusData.toString("utf-8")) as Record<string, unknown>;
+        if (content.exportType === "sms-report" && !canReadSmsReports) {
+          return null;
+        }
         const createdAt = new Date((content.created_at as string | undefined) || file.created_at || Date.now());
         const expiresAt = new Date(createdAt.getTime() + 24 * 60 * 60 * 1000);
 

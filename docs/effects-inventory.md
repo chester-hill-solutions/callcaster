@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**124** documented / **126** total effects (2 grandfathered, ratcheting to 0).
+**126** documented / **128** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -32,6 +32,8 @@
 | `app/components/sms-ui/ChatInput.tsx` | KEEP: align the controlled From selection with available sender | initialFrom, workspaceNumbers (available sender option values) | setSelectedFrom only | selectedFrom is intentional user-controlled state; |
 | `app/components/sms-ui/ChatInput.tsx` | After a scheduled-send submission completes, clear the schedule | messageFetcher.data, messageFetcher.state (tracks the submission lifecycle via submittedScheduleRef / observedSubmissionRef) | setSendLater, setSendAtLocal only | Schedule UI state is client-controlled; we only |
 | `app/components/ui/datetime.tsx` | Keep a two-second window for entering the second time digit. | flag (starts or clears the digit-entry timer) | timer + setFlag; timeout cleared on cleanup | The window follows live keyboard input in local client state. |
+| `app/components/ui/editable-title.tsx` | Keep the draft aligned with external title changes while not editing. | editing, value | local component state only | The title is local interactive editor state. |
+| `app/components/ui/editable-title.tsx` | Focus and select the title input when edit mode starts. | autoEdit, editing, onAutoEditConsumed | dom focus and text selection only | This is client-only focus behavior. |
 | `app/hooks/agent/useAgentStatus.ts` | Load the agent's current status on mount and send a heartbeat POST every 30s while mounted. | workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus | timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change | The recurring heartbeat is live client-only polling a loader can't express; |
 | `app/hooks/billing/useCreditReconciliation.ts` | Poll the workspace balance endpoint after a terminal call until the credit display converges on the ledger. | isTerminal (call reached/left a terminal outcome), workspaceId | setInterval polling GET /api/workspaces/:workspaceId/credits (max 30s, 2s cadence); cleared on convergence, timeout, new dial, unmount | Convergence is a client-time bounded retry against a missed SSE event; a loader only runs on navigation/revalidation and cannot poll. |
 | `app/hooks/call/useAudioDeviceTest.ts` | Tear down both timers, the raf loop, the AudioContext, the | [] — mount-once cleanup, no external state. | timer (clearTimeout ×2), subscription (cancelAnimationFrame), | Pure resource release, not data fetching. |

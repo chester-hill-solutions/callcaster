@@ -238,32 +238,6 @@ describe("app/components/campaign/settings/detailed/CampaignDetailed.ActivateBut
   });
 });
 
-describe("app/components/campaign/settings/detailed/CampaignDetailed.tsx", () => {
-  test("message setup shows send mode and content link", async () => {
-    const { CampaignTypeSpecificSettings } = await import(
-      "@/components/campaign/settings/detailed/CampaignDetailed"
-    );
-    render(
-      <SmokeRouter>
-        <CampaignTypeSpecificSettings
-          campaignData={makeCampaign({
-            type: "message",
-            caller_id: "+15551234567",
-            sms_send_mode: "from_number",
-          })}
-          handleInputChange={vi.fn()}
-          isBusy={false}
-        />
-      </SmokeRouter>,
-    );
-
-    expect(screen.getByText("Send using")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /Edit content/i }),
-    ).toBeInTheDocument();
-  });
-});
-
 describe("app/components/phone-numbers/NumberPurchase.constants.ts", () => {
   test("emptyMessageForMode", async () => {
     const mod = await import("@/components/phone-numbers/NumberPurchase.constants");

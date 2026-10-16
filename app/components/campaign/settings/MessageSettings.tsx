@@ -78,9 +78,10 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [tagsMenuOpen, setTagsMenuOpen] = useState(false);
     const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
-    const [prevMediaLinks, setPrevMediaLinks] = useState(mediaLinks);
-    if (prevMediaLinks !== mediaLinks) {
-        setPrevMediaLinks(mediaLinks);
+    const mediaLinksSignature = JSON.stringify(mediaLinks);
+    const [prevMediaLinksSignature, setPrevMediaLinksSignature] = useState(mediaLinksSignature);
+    if (prevMediaLinksSignature !== mediaLinksSignature) {
+        setPrevMediaLinksSignature(mediaLinksSignature);
         setResolvedMediaLinks(mediaLinks);
     }
     const textareaRef = useRef<HTMLTextAreaElement>(null);

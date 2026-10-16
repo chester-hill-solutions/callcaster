@@ -1,5 +1,11 @@
 # Script JSON Format Documentation
 
+This file documents the stored and upload-oriented CallCaster wire format.
+The editor normalizes this data into a `ScriptDocument`, which uses
+`page.blockIds` instead of `page.blocks`. See
+[`script-schema-guide.md`](script-schema-guide.md) before changing either
+format.
+
 ## Overview
 
 This document outlines the structure and format requirements for script JSON files that can be uploaded to the CallCaster platform. Scripts are used to define the flow and content of call campaigns and IVR (Interactive Voice Response) systems.
@@ -301,4 +307,4 @@ Your script JSON will be validated against these rules:
 2. Keep content concise and clear
 3. Test your script flow before uploading
 4. Consider organizing complex scripts into multiple pages for better organization
-5. Use consistent naming conventions for IDs (e.g., "page_1", "block_intro") 
+5. Use consistent naming conventions for IDs (e.g., "page_1", "block_intro")

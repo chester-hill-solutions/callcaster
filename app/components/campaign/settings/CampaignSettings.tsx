@@ -10,7 +10,6 @@ import {
 } from "@/lib/types";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignVoiceSettings } from "./basic/CampaignVoiceSettings";
-import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
@@ -104,20 +103,14 @@ export const CampaignSettings = ({
               campaignData.type === "message" &&
               campaignData.sms_send_mode === "messaging_service"
             }
+            isBusy={formFetcher.state !== "idle"}
+            smsSendContext={smsSendContext}
           />
           <CampaignVoiceSettings
             campaignData={campaignData}
             mediaData={mediaData}
             handleInputChange={handleInputChange}
           />
-          <div className="mt-6">
-            <CampaignTypeSpecificSettings
-              campaignData={campaignData}
-              handleInputChange={handleInputChange}
-              isBusy={formFetcher.state !== "idle"}
-              smsSendContext={smsSendContext}
-            />
-          </div>
         </Section>
       </Form>
       {handleSave && handleResetData && (

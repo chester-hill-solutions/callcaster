@@ -3,7 +3,8 @@
 ## Quick start
 
 ```bash
-make init         # start or repair local infrastructure
+make up           # start Postgres and Inbucket without changing database data
+make storage      # start Stow and ensure the object-storage bucket
 make app          # starts in background; logs: make app-logs
 make tunnel       # starts in background; logs: make tunnel-logs
 make calling:sync-local
@@ -172,12 +173,18 @@ create a second tunnel for the same developer and hostname. A Cloudflare
 connector reconnect does not change the hostname or require Twilio callback
 resynchronization.
 
-Initialize the local services after setting the local environment values:
+Initialize the local services after setting the local environment values. For
+returning developers, use the non-destructive commands:
 
 ```bash
-make init                  # services, .env, schema, bucket, and seed data
+make up                    # start Postgres and Inbucket; preserves database data
+make storage               # start Stow and ensure the bucket
 make app                   # terminal 1
 ```
+
+Use `make init` only for first-time setup or when you intentionally want to
+reset the local database. It drops and recreates the local database schemas,
+then applies the schema and seed data.
 
 Create the local TwiML App and sync local workspaces:
 
@@ -251,7 +258,7 @@ The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scri
 | `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
 | `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
 | `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
-| `make postgres init` | Start Postgres and bootstrap the schema only |
+| `make postgres init` | Start Postgres and reset/bootstrap the local schema; destructive to local database data |
 | `make ps` | Compose status |
 | `make app` | Run the React Router web app in the foreground |
 | `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
@@ -313,9 +320,9 @@ E2E uses mocked Twilio/Stripe and runs in CI on main/nightly only.
 
 ## What `make init` does
 
-`make init` is the complete first-time or repair setup. It is idempotent, so
-run it again after a broken setup or a local database reset. It does not
-install dependencies or start the app, worker, or media-stream process.
+`make init` is the complete first-time or intentional local database reset
+setup. It does not preserve existing local database rows. It does not install
+dependencies or start the app, worker, or media-stream process.
 
 It runs these steps:
 
@@ -324,9 +331,12 @@ It runs these steps:
 2. Start the Postgres and Inbucket Compose services.
 3. Start Stow as a local process and wait for its S3 endpoint.
 4. Wait for Postgres to accept connections.
-5. Apply the local database schema.
+5. Drop and recreate the local database schemas, then apply the local database schema.
 6. Ensure the Stow bucket exists.
 7. Seed test users, workspaces, and campaigns.
+
+For returning developers who need to preserve local data, use `make up` and
+`make storage` instead of `make init`.
 
 The Make targets for the common individual service operations are listed in
 [Service control](#service-control). In particular, use `make up` for Compose

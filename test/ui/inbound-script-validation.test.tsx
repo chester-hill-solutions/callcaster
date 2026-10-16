@@ -72,9 +72,9 @@ describe("inbound script validation details", () => {
 
   test("keeps the same validation action while details update and clear", async () => {
     const { rerender } = render(<ScriptValidationDetails errors={[]} inbound />);
-    const action = screen.getByRole("button", { name: "Script validation" });
+    const action = screen.getByRole("button", { name: "Script validation: no issues" });
     rerender(<ScriptValidationDetails errors={["Choose a valid target."]} inbound />);
-    expect(screen.getByRole("button", { name: "Script validation" })).toBe(action);
+    expect(screen.getByRole("button", { name: "Script validation: issues found" })).toBe(action);
     fireEvent.click(action);
     expect(await screen.findByRole("dialog", { name: "Script validation" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Choose a valid target.");
@@ -89,7 +89,7 @@ describe("inbound script validation details", () => {
   test("invalid inbound targets produce readable persistent details", async () => {
     render(<ScriptEditorShell document={document("forward:+0123")} onChange={vi.fn()} audioFlow inboundFlow />);
     expect(screen.getByRole("status")).toHaveTextContent("1 issues");
-    fireEvent.click(screen.getByRole("button", { name: "Script validation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Script validation: issues found" }));
     expect(await screen.findByRole("alert")).toHaveTextContent('invalid forward target "forward:+0123"');
     expect(screen.getByText(/keep an invalid menu as a draft/)).toBeInTheDocument();
   });
