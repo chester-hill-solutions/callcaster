@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   return {
     submit: vi.fn(),
+    fetcherState: "idle" as "idle" | "submitting" | "loading",
+    fetcherData: null as unknown,
     logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
   };
 });
@@ -12,8 +14,8 @@ const mocks = vi.hoisted(() => {
 vi.mock("react-router", () => ({
   useFetcher: () => ({
     submit: (...args: any[]) => mocks.submit(...args),
-    state: "idle",
-    data: null,
+    state: mocks.fetcherState,
+    data: mocks.fetcherData,
   }),
 }));
 
@@ -43,6 +45,8 @@ describe("app/components/MessageSettings.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.submit.mockReset();
+    mocks.fetcherState = "idle";
+    mocks.fetcherData = null;
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
     mocks.logger.warn.mockReset();
@@ -302,6 +306,95 @@ describe("app/components/MessageSettings.tsx", () => {
     const file = new File(["x"], "pic.png", { type: "image/png" });
     fireEvent.change(input, { target: { files: [file] } });
     expect(mocks.submit).toHaveBeenCalled();
+  });
+
+  test("shows the uploaded image and MMS estimate after the parent rerenders", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+
+    function ControlledMessageSettings() {
+      const [mediaNames, setMediaNames] = useState<string[]>([]);
+      return (
+        <MessageSettings
+          mediaLinks={[]}
+          details={{
+            ...baseProps().details,
+            body_text: "Hello",
+            message_media: mediaNames,
+          }}
+          onChange={(field, value) => {
+            if (field === "message_media") {
+              setMediaNames(value as string[]);
+            }
+          }}
+        />
+      );
+    }
+
+    const view = render(<ControlledMessageSettings />);
+    const input = view.container.querySelector(
+      'input[type="file"]#add-image',
+    ) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["image"], "new.png", { type: "image/png" })],
+      },
+    });
+
+    mocks.fetcherState = "submitting";
+    view.rerender(<ControlledMessageSettings />);
+    mocks.fetcherState = "idle";
+    mocks.fetcherData = {
+      success: true,
+      campaignUpdate: [{ message_media: ["new.png"] }],
+      uploadedFileName: "new.png",
+      url: "https://cdn.example/new.png",
+    };
+    view.rerender(<ControlledMessageSettings />);
+
+    expect(await screen.findByAltText("Campaign media 1")).toBeInTheDocument();
+    expect(screen.getByText("≈ 4 credits per recipient (MMS)")).toBeInTheDocument();
+  });
+
+  test("removes the same preview and returns the estimate to SMS after success", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+
+    function ControlledMessageSettings() {
+      const [mediaNames, setMediaNames] = useState<string[]>(["old.png"]);
+      return (
+        <MessageSettings
+          mediaLinks={["https://cdn.example/old.png"]}
+          details={{
+            ...baseProps().details,
+            body_text: "Hello",
+            message_media: mediaNames,
+          }}
+          onChange={(field, value) => {
+            if (field === "message_media") {
+              setMediaNames(value as string[]);
+            }
+          }}
+        />
+      );
+    }
+
+    const view = render(<ControlledMessageSettings />);
+    const image = screen.getByAltText("Campaign media 1");
+    fireEvent.mouseEnter(image.closest("div") as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+    mocks.fetcherState = "submitting";
+    view.rerender(<ControlledMessageSettings />);
+    mocks.fetcherState = "idle";
+    mocks.fetcherData = {
+      success: true,
+      campaignUpdate: [{ message_media: [] }],
+      removedFileName: "old.png",
+    };
+    view.rerender(<ControlledMessageSettings />);
+
+    expect(await screen.findByText("Media removed.")).toBeInTheDocument();
+    expect(screen.queryByAltText("Campaign media 1")).not.toBeInTheDocument();
+    expect(screen.getByText("≈ 2 credits per recipient")).toBeInTheDocument();
   });
 
   test("shows real GSM-7 segment usage and visible character counts", async () => {

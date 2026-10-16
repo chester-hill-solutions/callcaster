@@ -158,7 +158,7 @@ export default function ScriptEditor() {
   };
 
   const handleReset = () => {
-    setPageData(data);
+    setPageData(initData);
     setIsEditingScript(false);
   };
 
@@ -296,6 +296,21 @@ export default function ScriptEditor() {
                 }
                 details={pageData.campaignDetails}
                 onChange={(field, value) => {
+                  if (
+                    field === "message_media" &&
+                    Array.isArray(value) &&
+                    value.every((mediaName): mediaName is string =>
+                      typeof mediaName === "string",
+                    )
+                  ) {
+                    setInitData((current) => ({
+                      ...current,
+                      campaignDetails: {
+                        ...current.campaignDetails,
+                        message_media: value,
+                      },
+                    }));
+                  }
                   handlePageDataChange({
                     ...pageData,
                     campaignDetails: {
