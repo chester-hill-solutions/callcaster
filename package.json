@@ -196,6 +196,7 @@
     "@react-router/fs-routes": "^8.3.0",
     "@react-router/remix-routes-option-adapter": "^8.3.0",
     "@shadcn/lint": "^0.1.1",
+    "@stripe/cli": "^1.54.0",
     "@tailwindcss/vite": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
