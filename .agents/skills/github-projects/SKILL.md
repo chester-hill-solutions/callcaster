@@ -27,6 +27,54 @@ Project `9` (`CHS Backlog`) currently uses these `Status` values: `Backlog`, `In
 - The installed CLI supports the verified query `gh project item-list 9 --owner chester-hill-solutions --query "status:Backlog" --limit 500 --format json`. Filter those results to the target repository before acting.
 - To select work by both an organization Issue field and a Project status, query the Issue field first, query the Project status separately, then intersect the issue numbers. Do not treat a Project status as an issue label.
 
+## Issue Fields Versus Project Fields
+
+Keep these systems separate:
+
+- **Native Issue Type:** GitHub issue metadata. Current CallCaster types include
+  `Task`, `Bug`, `Feature`, `User Story`, `Epic`, `Change Request`, and
+  `User Log`. Edit it with `gh issue edit <number> --type <Type>`.
+- **Organization Issue fields:** `Priority`, `Effort`, and `Enviornment`.
+  Read and edit these with the GraphQL `issueFieldValues` query and the
+  `updateIssueFieldValue` mutation documented in `github-cli` and
+  `github-issues`. They are not Project fields.
+- **Project 9 fields:** `Status`, `Priority`, `Size`, `Estimate`, `Iteration`,
+  and `Effort`. Project `Priority` and `Effort` are separate from the
+  organization Issue `Priority` and `Effort`. The live Project field list is
+  authoritative; `.github/projects.yaml` is a local cache and can be stale.
+
+Read Project fields and the target item before editing:
+
+```bash
+gh project field-list 9 --owner chester-hill-solutions --format json
+gh project item-list 9 --owner chester-hill-solutions --format json --limit 500
+```
+
+Set a Project single-select field by its display name:
+
+```bash
+gh project item-edit 9 \
+  --owner chester-hill-solutions \
+  --url https://github.com/chester-hill-solutions/callcaster/issues/<number> \
+  --field "Priority" \
+  --value "High"
+```
+
+The same command can set Project `Status` or Project `Effort`. For scripted
+work, use the verified Project item ID, Project field ID, and option ID:
+
+```bash
+gh project item-edit \
+  --id <project-item-id> \
+  --project-id <project-node-id> \
+  --field-id <field-id> \
+  --single-select-option-id <option-id>
+```
+
+Do not use `gh project item-edit` to change organization Issue fields. After
+every edit, read the issue field values or Project item again and report the
+field name and option name.
+
 ## Pull Request and Issue Linking
 
 Each pull request must link to the issue it resolves.

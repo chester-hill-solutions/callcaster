@@ -117,15 +117,39 @@ a stale pull snapshot, or create another PR to force its head to update.
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.
 
-## Organization Effort Field
+## Organization Issue Fields
 
-- In CallCaster, `Effort` is an organization-level GitHub Issue field. Every organization issue has it; it is not an issue label or a GitHub Project field.
-- `gh issue view --json` does not expose organization Issue fields. Use GraphQL `issueFieldValues`; do not use `gh issue list --label "effort:<value>"` or Project item data.
-- Resolve the current field and option IDs before filtering. On 2026-09-22, `Effort` is `IFSS_kgDOAZggGQ` and `nothing-burger` is `IFSSO_kgDOBLhcrg`:
+- CallCaster has organization-level Issue fields. They are not labels and are not the same as Project fields.
+- The current fields are `Priority`, `Effort`, and the field named `Enviornment` (the spelling is part of the live field name).
+- Current options are:
+  - `Priority`: `Urgent`, `High`, `Medium`, `Low`
+  - `Effort`: `High`, `Medium`, `Low`, `nothing-burger`
+  - `Enviornment`: `prod`, `dev`
+- `Type` is different: it is GitHub's native Issue Type. It is not an organization Issue field or a label.
+- `gh issue view --json` does not expose organization Issue fields. Use GraphQL `issueFieldValues`; do not use labels or Project item data.
+- Resolve the current field and option IDs before filtering or editing. IDs can change. On 2026-10-17, `Priority` was `IFSS_kgDOAZggFg`, `Effort` was `IFSS_kgDOAZggGQ`, and `Enviornment` was `IFSS_kgDOAr9U4g`:
 
 ```bash
 gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueFields(first: 100) { nodes { ... on IssueFieldSingleSelect { id name options { id name } } } } } }'
 ```
+
+- Read an issue's organization field values. Use the field `name` and value `name`; do not report only opaque IDs:
+
+```bash
+gh api graphql -f query='query { repository(owner: "chester-hill-solutions", name: "callcaster") { issue(number: 1664) { issueFieldValues(first: 100) { nodes { ... on IssueFieldSingleSelectValue { field { ... on IssueFieldSingleSelect { name } } name value optionId } } } } } }'
+```
+
+- Set an organization Issue single-select field with the current field and option IDs. This is a GraphQL mutation, not `gh project item-edit`:
+
+```bash
+gh api graphql \
+  -f query='mutation($input: UpdateIssueFieldValueInput!) { updateIssueFieldValue(input: $input) { issue { number } issueFieldValue { ... on IssueFieldSingleSelectValue { field { ... on IssueFieldSingleSelect { name } } name value } } } }' \
+  -f 'input[issueId]=<issue-node-id>' \
+  -f 'input[issueField][fieldId]=<priority-field-id>' \
+  -f 'input[issueField][singleSelectOptionId]=<high-option-id>'
+```
+
+Replace the field and option IDs from the live inventory. Use the same mutation for `Effort` and `Enviornment`.
 
 - List open CallCaster issues for an Effort option with the verified repository filter. Replace the IDs only with values returned by the preceding query:
 
