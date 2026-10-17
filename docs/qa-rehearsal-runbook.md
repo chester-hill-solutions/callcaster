@@ -1,87 +1,51 @@
-# QA rehearsal runbook (#1300 phase 2)
+# Rename the Railway QA environment (#1355)
 
-Converts the `qa` Railway environment from the Supabase-era
-`hearty-expression` service to the v2 topology, populated with dev's
-workspaces. This is the dress rehearsal for the production cutover
-([#1303](https://github.com/chester-hill-solutions/callcaster/issues/1303)):
-phase 3 repeats these steps against production, with `source("production")`
-instead of `master` and live-mode Stripe keys instead of test-mode.
+Rename the existing Railway `staging` environment to `qa`. This is a name
+change only. It must preserve the existing services, Postgres database, volume,
+variables, domain, and `callcaster-staging` bucket.
 
-Decisions this encodes (see #1300):
+The QA environment continues to deploy `master`. It is not a branch.
 
-- QA is **not a branch** — it is a Railway environment mirroring
-  production. During the rehearsal it deploys from `master` (v2); phase 3
-  flips it to the `production` branch in the same change that promotes v2.
-- **Supabase data is dropped, not migrated.** The system of record is dev's
-  Postgres; its workspaces are cloned in (same schema lineage, plain
-  dump/restore).
-- Stripe stays **test-mode** in QA (dev's keys are already test-mode);
-  Twilio is the shared account for now, so cloned workspace telephony config
-  keeps working.
+## Before the Railway rename
 
-## Steps
+1. Configure the existing GitHub Actions `qa` environment:
+   - secrets: `RAILWAY_TOKEN`, `DATABASE_URL`
+   - variables: `RAILWAY_PROJECT_ID`, `RAILWAY_ENVIRONMENT_ID`
+2. Set `RAILWAY_ENVIRONMENT_ID` to the existing environment ID:
+   `3dc12c7d-6fb1-45ae-bb5c-3317145dfa9f`.
+3. Keep the `staging` GitHub environment until the QA drift workflow succeeds.
 
-All commands from the repo root, Railway CLI authenticated with account scope.
+## Rename and verify
 
-1. **Apply the QA topology** (destructive: deletes `hearty-expression`):
+1. In the Railway dashboard, rename the existing `staging` environment to
+   `qa`. Do not create another environment.
+2. Verify the environment ID is unchanged and the following resources remain
+   attached:
+   - `CallCaster`
+   - `callcaster-worker`
+   - `Postgres-mgzk` and its volume
+   - `callcaster-staging` bucket
+3. Verify the service domain. If Railway changes it, update the app's
+   `BASE_URL` and `BETTER_AUTH_URL` references before redeploying.
+4. From a worktree with the QA source model, run a read-only plan:
 
    ```bash
    railway environment qa
-   railway config plan --file .railway/railway.ts
-   # review: expect ~4 adds + 1 destructive delete (hearty-expression)
-   railway config apply --file .railway/railway.ts --confirm-destructive
-   railway environment dev
+   railway config plan --file .railway/railway.ts --detailed-exit-code --json
    ```
 
-2. **Get the QA app URL.** The apply creates the `CallCaster` service
-   instance in QA; give it a service domain (Railway dashboard → QA →
-   CallCaster → Networking, or `railway domain`). Note the URL.
+   Review the result. A rename must not recreate or delete infrastructure.
+   Do not apply a destructive plan.
 
-3. **Populate variables from dev** (Stripe test keys, shared Twilio, S3, etc.;
-   `DATABASE_URL` becomes a reference to QA's own Postgres — never dev's):
-
-   ```bash
-   scripts/railway/sync-qa-vars.sh https://<qa-app-domain>
-   ```
-
-4. **Clone dev's workspaces** into QA's Postgres. Use the public
-   `DATABASE_URL` from each environment's Postgres service (dev as source,
-   QA as target):
-
-   ```bash
-   SOURCE_DATABASE_URL='<dev postgres url>' \
-   TARGET_DATABASE_URL='<qa postgres url>' \
-   CONFIRM_CLONE=yes scripts/db/clone-database.sh
-   ```
-
-5. **Deploy.** Redeploy both QA services (variables were set with
-   `--skip-deploys`). Watch `/readyz` on the app.
-
-6. **Validate the rehearsal** — the things this environment exists to catch:
-   - sign-in with a cloned dev account (Better Auth against cloned data)
-   - Twilio: place a campaign call / send an SMS from a cloned workspace
-   - Stripe test-mode: buy credits end-to-end; confirm the ledger RPC applies
-     the purchase (`apply_ledger_entry_and_sync_credits` — the review-env
-     failure class from #1055)
-   - worker: enqueue an audience upload and confirm it completes
-    - `db:schema:check` / `check:db-rpcs` against QA's DATABASE_URL
-     (two-lineage drift check)
-
-7. **Record results on #1300** — anything that surprised us here becomes a
-   playbook line item for production.
+5. Merge the source rename. The Railway GitHub workflow only runs plans; it
+   does not apply infrastructure changes.
+6. Dispatch the `qa` ledger-drift workflow. It must complete both database
+   checks with the existing QA database.
+7. If the app or worker is redeployed, verify `/readyz`, database access, and
+   the `env:qa` TwiML App before removing `env:staging`.
 
 ## Rollback
 
-QA has no consumers; rollback is re-running step 1's apply from a
-reverted graph (restores `hearty-expression` from `master`, which still
-carries v2 — i.e. there is no meaningful rollback target and none needed).
-
-## Phase 3 deltas (production)
-
-- `source("production")` (the promotion push and this flip happen together)
-- live-mode Stripe keys + production webhook endpoint re-pointed
-- Twilio webhooks/TwiML apps re-pointed at the production URL; enable webhook
-  signature validation only after the host audit
-- DNS stays (same Railway service keeps callcaster.ca)
-- decommission Supabase + delete the two legacy `Postgres` services after
-  soak, via a follow-up IaC change
+Rename the same Railway environment back to `staging`, restore the GitHub
+workflow environment mapping, and keep the resource IDs unchanged. Do not
+clone a database or recreate a bucket as part of rollback.

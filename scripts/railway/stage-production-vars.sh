@@ -5,7 +5,7 @@
 # its baked environment untouched; the cutover deployment (first build after
 # v2 is promoted to the `production` branch) inherits these automatically.
 #
-# Reference variables wherever possible (same pattern as dev/staging):
+# Reference variables wherever possible (same pattern as dev/QA):
 #   DATABASE_URL -> ${{Postgres-jAO4.DATABASE_URL}}
 #   app URLs     -> https://${{RAILWAY_PUBLIC_DOMAIN}}   (renders callcaster.ca)
 #   worker URL   -> https://${{callcaster.RAILWAY_PUBLIC_DOMAIN}}
@@ -41,7 +41,7 @@ T_APP=$(need TWILIO_APP_SID "$P"); T_AUTH=$(need TWILIO_AUTH_TOKEN "$P")
 T_PHONE=$(need TWILIO_PHONE_NUMBER "$P"); T_SID=$(need TWILIO_SID "$P")
 [ -n "$HOST" ] && [ -n "$RESEND" ] || { echo "source variable fetch failed" >&2; exit 1; }
 
-echo "== staging vars on production app (skip-deploys) =="
+echo "== pre-staged variables on production app (skip-deploys) =="
 railway variable set \
   'DATABASE_URL=${{Postgres-jAO4.DATABASE_URL}}' \
   'BASE_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}' \
@@ -60,7 +60,7 @@ railway variable set \
   --service "$APP_ID" --environment production --skip-deploys >/dev/null
 echo "   done"
 
-echo "== staging vars on production worker (skip-deploys) =="
+echo "== pre-staged variables on production worker (skip-deploys) =="
 railway variable set \
   'DATABASE_URL=${{Postgres-jAO4.DATABASE_URL}}' \
   'BASE_URL=https://${{callcaster.RAILWAY_PUBLIC_DOMAIN}}' \

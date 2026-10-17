@@ -6,11 +6,8 @@ import { preservedVariables, source } from "../config/shared.ts";
 // Values are populated from dev by scripts/railway/sync-qa-vars.sh —
 // dev's Stripe keys are already test-mode and Twilio is shared for now.
 //
-// Applying this DELETES the legacy hearty-expression service (the Supabase-era
-// QA app, frozen since 2026-06-24). That is the point of phase 2, but the
-// apply is destructive and stays human-reviewed/manual — CI refuses to apply
-// destructive plans on push, so the conversion runs once by hand (see
-// docs/qa-rehearsal-runbook.md) and CI takes over from there.
+// The environment is renamed in Railway outside this model. The resource names,
+// including the callcaster-staging bucket, preserve the existing resources.
 //
 // Source: `master`, permanently. Topology directive 2026-08-31 (#1300):
 // production and QA both track master; there is no `production` deploy

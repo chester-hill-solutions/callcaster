@@ -23,7 +23,7 @@
  *
  * Usage — named targets, correct defaults, no flags needed:
  *
- *   npm run probe:dev        npm run probe:staging      npm run probe:prod
+ *   npm run probe:dev        npm run probe:qa           npm run probe:prod
  *   npm run probe:local      npm run probe -- --help
  *
  * Deployed targets default to strict provider auth + page routes; `local`
