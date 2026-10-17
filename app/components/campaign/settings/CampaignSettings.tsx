@@ -11,7 +11,7 @@ import {
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignVoiceSettings } from "./basic/CampaignVoiceSettings";
 import { SaveBar } from "@/components/shared/SaveBar";
-import { Section, SectionHeader } from "@/components/shared/Section";
+import { Section } from "@/components/shared/Section";
 import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 
 export type CampaignSettingsProps = {
@@ -93,7 +93,6 @@ export const CampaignSettings = ({
           value={JSON.stringify(campaignDetails)}
         />
         <Section variant="flat">
-          <SectionHeader compact title="Setup" />
           <CampaignBasicInfo
             campaignData={campaignData}
             handleInputChange={handleInputChange}

@@ -26,7 +26,7 @@ import {
   type CampaignTestKind,
 } from "./CampaignTestSendDialog";
 import { SaveBar } from "@/components/shared/SaveBar";
-import { Section, SectionHeader } from "@/components/shared/Section";
+import { Section } from "@/components/shared/Section";
 import { CampaignCostPanel } from "./CampaignCostPanel";
 import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -404,15 +404,11 @@ export const CampaignLaunch = ({
           />
           <Section variant="flat">
             <div className="space-y-4">
-              <SectionHeader
-                compact
-                title="Launch"
-                actions={
-                  campaignData.status ? (
-                    <StatusBadge status={campaignData.status} />
-                  ) : null
-                }
-              />
+              {campaignData.status ? (
+                <div className="flex justify-end">
+                  <StatusBadge status={campaignData.status} />
+                </div>
+              ) : null}
               <CampaignLaunchActions
                 status={campaignData.status ?? "draft"}
                 startLabel={startLabel}
