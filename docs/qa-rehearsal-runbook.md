@@ -44,6 +44,27 @@ The QA environment continues to deploy `master`. It is not a branch.
 7. If the app or worker is redeployed, verify `/readyz`, database access, and
    the `env:qa` TwiML App before removing `env:staging`.
 
+## QA custom domain
+
+The QA IaC model declares `qa.callcaster.ca` on the `CallCaster` service.
+After the Railway plan is reviewed and applied by an authorized operator:
+
+1. In Railway, open the QA `CallCaster` service and confirm the custom domain
+   is `qa.callcaster.ca` and its target port is `3000`.
+2. Add the DNS record requested by Railway at the `callcaster.ca` DNS provider.
+   Use the exact target shown by Railway; do not guess a CNAME target.
+3. Wait for TLS issuance and DNS propagation.
+4. Verify the endpoint:
+
+   ```bash
+   curl -fsS https://qa.callcaster.ca/readyz
+   ```
+
+   The response must be `{"ok":true}`.
+5. Set QA `BASE_URL` and `BETTER_AUTH_URL` to
+   `https://qa.callcaster.ca` before the QA redeploy. Keep
+   `callcaster-staging.up.railway.app` available until this check passes.
+
 ## Rollback
 
 Rename the same Railway environment back to `staging`, restore the GitHub

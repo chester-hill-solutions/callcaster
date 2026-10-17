@@ -78,6 +78,7 @@ export function qaResources() {
     healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
     networking: { privateNetworkEndpoint: "callcaster" },
+    domains: [{ domain: "qa.callcaster.ca", port: 3000 }],
     env: {
       ...preservedVariables(appVariables),
       // Not a secret: replay client/migrations at app boot so a migration
