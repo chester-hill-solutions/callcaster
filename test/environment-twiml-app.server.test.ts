@@ -63,7 +63,7 @@ describe("local environment helpers", () => {
 describe("isManagedEnvironment", () => {
   it.each([
     [{ RAILWAY_ENVIRONMENT_NAME: "callcaster-pr-1047" }, true],
-    [{ RAILWAY_ENVIRONMENT_NAME: "staging" }, true],
+    [{ RAILWAY_ENVIRONMENT_NAME: "qa" }, true],
     [{ RAILWAY_ENVIRONMENT_NAME: "production" }, false],
     [{}, false],
   ])("%o -> %s", (env, expected) => {

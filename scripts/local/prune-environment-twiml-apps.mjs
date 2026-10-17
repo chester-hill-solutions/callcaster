@@ -9,7 +9,7 @@
  * closes, so they accumulate against the account's app limit. This reconciles the
  * Twilio side against the environments Railway still reports.
  *
- * Only PR environments are ever deleted. Long-lived environments (dev, staging)
+ * Only PR environments are ever deleted. Long-lived environments (dev, qa)
  * are reported and left alone: their apps are not disposable, and a transient
  * Railway API hiccup that returned a short environment list would otherwise be
  * enough to delete them.
