@@ -24,10 +24,11 @@ The native Type is also the branch naming convention. Use `Bug` → `bug/`,
 Use `chore/<description>` only for issue-free repository maintenance. Do not
 use labels as Type substitutes. Stop when the Type is missing or unsupported.
 
-`Effort` and other custom fields are organization-level GitHub Issue fields, not
-labels or GitHub Project fields. `gh issue view --json` does not expose them.
-Resolve current field and option IDs with GraphQL before filtering or reporting
-them.
+`Priority`, `Effort`, and `Enviornment` are organization-level GitHub Issue
+fields, not labels or GitHub Project fields. `Type` is a native GitHub Issue
+Type. `gh issue view --json` does not expose organization Issue fields. Resolve
+current field and option IDs with GraphQL before filtering, reporting, or
+editing them.
 
 The supported CallCaster issue types are:
 
@@ -38,6 +39,8 @@ The supported CallCaster issue types are:
 | `Task` | A specific piece of work |
 | `Epic` | A large body of related work |
 | `User Story` | A user goal |
+| `Change Request` | A requested change to existing behavior or operations |
+| `User Log` | A record of actions or details about an experience |
 
 Recheck the live inventory before choosing a type when the target organization
 changes or `gh` rejects a type:
@@ -47,6 +50,17 @@ gh api graphql -f query='query { organization(login: "chester-hill-solutions") {
 ```
 
 Use only names returned with `isEnabled: true`; record the new verification date and CLI version in this skill when the inventory changes.
+
+Set the native Type with the CLI after reading the issue first:
+
+```bash
+gh issue edit <number> --repo chester-hill-solutions/callcaster --type Task
+```
+
+Do not use `Priority` or `Effort` as a Type. They are separate organization
+Issue fields. Use the `issueFieldValues` query and
+`updateIssueFieldValue` mutation in `github-cli` to edit them. Use
+`github-projects` for the separate Project fields.
 
 ## Older CLI fallback
 
@@ -74,23 +88,38 @@ state.
 gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueFields(first: 100) { nodes { ... on IssueFieldSingleSelect { id name options { id name } } ... on IssueFieldText { id name } ... on IssueFieldNumber { id name } } } } }'
 ```
 
-4. Query the target issue's field values with the current field IDs. Record the
-   field name and option name, not only opaque IDs. This includes `Effort`.
+4. Query the target issue's organization field values with the current field
+   IDs. Record the field name and option name, not only opaque IDs. This
+   includes `Priority`, `Effort`, and `Enviornment`.
 5. Read `.github/projects.yaml` before Project inspection. Refresh it if it is
    missing or stale, as described by `github-projects`.
 6. Resolve live Project fields with `gh project field-list 9 --owner
    chester-hill-solutions --format json`, then locate the issue with
    `gh project item-list 9 --owner chester-hill-solutions --format json`.
    Record the matching Project item ID, Status, and relevant custom fields.
-7. Never infer Project Status from labels, issue state, PR state, or comments.
+7. Never infer Project Status, Project Priority, or Project Effort from labels,
+   organization Issue fields, issue state, PR state, or comments.
 
-The investigation output must state the native Type, custom field values,
-Project Status, relationships, linked PRs, and any mismatch between source
-state and board state. Load `github-projects` for this work.
+The investigation output must state the native Type, organization Issue field
+values (`Priority`, `Effort`, and `Enviornment` when set), Project Status and
+relevant Project fields, relationships, linked PRs, and any mismatch between
+source state and board state. Load `github-projects` for this work.
 
 ## Closed Reasons
 
-`CLOSED` is not one state. Every closed issue carries a reason, and treating them identically produces wrong board verdicts (e.g. counting a wontfix as done):
+`CLOSED` is not one state. Every closed issue carries a reason, and treating them identically produces wrong board verdicts (e.g. counting a wontfix as done).
+
+The useful state model is:
+
+- `OPEN` with no close reason: work is active, queued, blocked, or awaiting a
+  decision. Project Status is separate and may be `Backlog`, `In progress`, or
+  another board value.
+- `CLOSED` with `COMPLETED`: the work landed.
+- `CLOSED` with `NOT_PLANNED`: the work will not be done, is stale, is a
+  wontfix, or works as designed.
+- `CLOSED` with `DUPLICATE`: the issue is folded into a canonical issue.
+- A `REOPENED` timeline event: a previously closed issue became open again;
+  re-check the old closure reason and current evidence.
 
 | Reason | Meaning |
 | --- | --- |
@@ -122,7 +151,17 @@ gh api "repos/chester-hill-solutions/callcaster/issues/1155/timeline" \
   --jq '.[] | select(.event == "cross-referenced") | .source.issue.number'
 ```
 
-When closing an issue you intend as wontfix, pass `--reason "not planned"` explicitly — the default closure reason is `COMPLETED`, and the board treats those oppositely.
+When closing an issue you intend as wontfix, pass `--reason "not planned"` explicitly — the default closure reason is `COMPLETED`, and the board treats those oppositely. For a duplicate, use the canonical issue directly:
+
+```bash
+gh issue close <duplicate-number> --repo chester-hill-solutions/callcaster \
+  --duplicate-of <canonical-number>
+```
+
+Use `--reason duplicate` only when the canonical relationship is already known
+and the CLI cannot use `--duplicate-of`. Verify `stateReason` and the duplicate
+relationship after closing. To reopen an issue, use `gh issue reopen`; a reopen
+is a state transition and does not erase the previous closure history.
 
 ## Issue Board Source Audits
 
