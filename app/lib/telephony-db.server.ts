@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
@@ -155,18 +155,27 @@ export async function findActiveConferenceIdsForUser(
   workspaceId: string,
   userId: string,
 ): Promise<string[]> {
-  const rows = await adminDb.execute(sql`
-    SELECT DISTINCT c.conference_id
-    FROM call c
-    JOIN outreach_attempt oa ON c.outreach_attempt_id = oa.id
-    WHERE c.workspace = ${workspaceId}
-      AND oa.user_id = ${userId}
-      AND c.conference_id IS NOT NULL
-      AND c.conference_id != ''
-      AND c.status::text = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
-  `);
-  // type-cast justified: raw SQL query result has unknown shape until cast to expected columns
-  return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);
+  const rows = await adminDb
+    .selectDistinct({ conferenceId: callTable.conference_id })
+    .from(callTable)
+    .innerJoin(
+      outreachAttemptTable,
+      eq(callTable.outreach_attempt_id, outreachAttemptTable.id),
+    )
+    .where(
+      and(
+        eq(callTable.workspace, workspaceId),
+        eq(outreachAttemptTable.user_id, userId),
+        isNotNull(callTable.conference_id),
+        ne(callTable.conference_id, ""),
+        // The four call_status values that are not terminal.
+        inArray(callTable.status, ["initiated", "queued", "ringing", "in-progress"]),
+      ),
+    );
+
+  return rows
+    .map((row) => row.conferenceId)
+    .filter((conferenceId): conferenceId is string => conferenceId !== null);
 }
 
 /**
