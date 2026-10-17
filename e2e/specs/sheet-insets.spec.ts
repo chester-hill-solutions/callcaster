@@ -51,24 +51,24 @@ for (const width of [390, 1280]) {
             `campaigns/${E2E_CAMPAIGNS.liveCall.id}/settings`,
           ),
         );
-        const trigger = page.getByRole("button", {
-          name: "Add audio",
-          exact: true,
-        });
+        const trigger = page
+          .locator('[aria-label="Campaign setup"]')
+          .getByRole("button", {
+            name: "Add audio",
+            exact: true,
+            includeHidden: true,
+          });
         await expect(trigger).toBeVisible();
         if (scheme === "dark")
           await expect(page.locator("html")).toHaveClass(/dark/);
         else await expect(page.locator("html")).not.toHaveClass(/dark/);
         await page.evaluate(() => document.fonts.ready);
         await trigger.scrollIntoViewIfNeeded();
-        const pageHeading = page
-          .locator('[aria-label="Campaign setup"]')
-          .getByRole("heading", {
-            name: "Setup",
-            exact: true,
-            includeHidden: true,
-          });
-        const before = await pageHeading.boundingBox();
+        // The control that opens the sheet is also the background landmark: if
+        // the sheet shifted page content, the button the user just pressed
+        // would move. `includeHidden` keeps it reachable once the modal marks
+        // the rest of the page inert.
+        const before = await trigger.boundingBox();
         await trigger.click();
         const sheet = page.locator('[data-slot="sheet-content"]');
         await expect(
@@ -90,10 +90,10 @@ for (const width of [390, 1280]) {
           throw new Error("Audio controls have no visible bounds");
         expect(nameBounds.x).toBeCloseTo(buttonBounds.x, 1);
         expect(nameBounds.width).toBeCloseTo(buttonBounds.width, 1);
-        expect(await pageHeading.boundingBox()).toEqual(before);
+        expect(await trigger.boundingBox()).toEqual(before);
         await page.getByRole("button", { name: "Cancel", exact: true }).click();
         await expect(sheet).toHaveCount(0);
-        expect(await pageHeading.boundingBox()).toEqual(before);
+        expect(await trigger.boundingBox()).toEqual(before);
       },
     );
   }
