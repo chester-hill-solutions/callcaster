@@ -163,7 +163,7 @@ export async function findActiveConferenceIdsForUser(
       AND oa.user_id = ${userId}
       AND c.conference_id IS NOT NULL
       AND c.conference_id != ''
-      AND c.status = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
+      AND c.status::text = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
   `);
   // type-cast justified: raw SQL query result has unknown shape until cast to expected columns
   return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);

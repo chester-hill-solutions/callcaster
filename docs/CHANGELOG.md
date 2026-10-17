@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Leaving a predictive campaign stops the conference and the dialer even when the call screen was reloaded, so no further calls are placed ([#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
+
 ## 2026-10-15 — release [#2668](https://github.com/chester-hill-solutions/callcaster/pull/2668)
 
 - Fixed: Campaign media previews and SMS/MMS estimates update after media uploads and removals ([PR #2666](https://github.com/chester-hill-solutions/callcaster/pull/2666), [#2655](https://github.com/chester-hill-solutions/callcaster/issues/2655)).
