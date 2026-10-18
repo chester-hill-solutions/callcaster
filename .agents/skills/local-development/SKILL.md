@@ -20,6 +20,11 @@ Before `ci:local`, check `node --version` and `bun --version` in the same
 command-scoped PATH. A missing Bun executable can be reported as lockfile
 drift; verify tool availability before changing either lockfile.
 
+Run only one full local gate per host at a time, including across worktrees.
+Concurrent suites can exhaust host resources and fail short UI waits. If this
+happens, retain the failure log, stop overlapping gates, rerun only failed cases,
+then run the full gate again on the final clean commit.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
