@@ -48,7 +48,11 @@ export function destroyTwilioDevice(
   try {
     const calls = new Set([...(device.calls ?? []), ...ownedCalls]);
     for (const call of calls) {
-      if (!call || call.status?.() === "closed") continue;
+      if (!call) continue;
+      if (call.status?.() === "closed") {
+        errorGuards.get(call)?.();
+        continue;
+      }
       try {
         guards.push(guardErrors(call));
       } catch (error) {

@@ -145,4 +145,34 @@ describe("installed Twilio SDK teardown (#2706)", () => {
     expect(resources).toMatchObject({ media: 3, audio: 1, signaling: 1 });
     expect(device.listenerCount("error")).toBe(0);
   });
+  test.each([false, true])(
+    "removes the temporary guard after an externally closed held call; existing listener=%s",
+    (hasExistingListener) => {
+      const { device, held, resources } = fixture(true);
+      const existingErrorListener = () => {};
+      if (hasExistingListener) held.on("error", existingErrorListener);
+      held._pstream = {
+        status: "connected",
+        hangup() {
+          throw new Error("Held call could not disconnect");
+        },
+      };
+      const partial = destroyTwilioDevice(device, [held]);
+      expect(partial.errors.length).toBeGreaterThan(0);
+      expect(held.status()).toBe("open");
+      expect(held.listenerCount("error")).toBe(hasExistingListener ? 2 : 1);
+      held._pstream.status = "disconnected";
+      held.disconnect();
+      expect(held.status()).toBe("closed");
+      const before = { ...resources };
+      expect(destroyTwilioDevice(device, [held])).toEqual({
+        destroyed: true,
+        errors: [],
+      });
+      expect(held.listenerCount("error")).toBe(hasExistingListener ? 1 : 0);
+      if (hasExistingListener)
+        expect(held.listeners("error")).toEqual([existingErrorListener]);
+      expect(resources).toEqual(before);
+    },
+  );
 });
