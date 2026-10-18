@@ -14,10 +14,6 @@ const mocks = vi.hoisted(() => {
     params: { id: "w1" } as Record<string, string>,
     navigate: vi.fn(),
     realtimeOpts: null as any,
-    interval: {
-      cb: null as null | (() => Promise<void> | void),
-      ms: null as any,
-    },
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
     onUploadComplete: vi.fn(),
   };
@@ -32,13 +28,6 @@ vi.mock("@/hooks/realtime/useWorkspaceRealtime", () => ({
   useWorkspaceEventSubscription: (opts: any) => {
     mocks.realtimeOpts = opts;
     return undefined;
-  },
-}));
-
-vi.mock("@/hooks/utils/useInterval", () => ({
-  useInterval: (cb: any, ms: any) => {
-    mocks.interval.cb = cb;
-    mocks.interval.ms = ms;
   },
 }));
 
@@ -165,7 +154,7 @@ async function startUpload(
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
   });
-  await waitFor(() => expect(mocks.interval.ms).toBe(5000));
+  await waitFor(() => expect(screen.getByText("Processing...")).toBeInTheDocument());
 }
 
 describe("app/components/audience/AudienceUploader.tsx", () => {
@@ -173,8 +162,6 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     vi.resetModules();
     mocks.navigate.mockReset();
     mocks.realtimeOpts = null;
-    mocks.interval.cb = null;
-    mocks.interval.ms = null;
     mocks.logger.error.mockReset();
     mocks.onUploadComplete.mockReset();
     vi.useRealTimers();
@@ -692,12 +679,12 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.queryByText("Preparing...")).toBeNull();
   });
 
-  test("polling callback returns early when no uploadId", async () => {
+  test("no status poll runs without an active upload", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader audienceName="A1" />);
 
-    (globalThis as any).fetch = vi.fn(async () => {
+    const fetcher = vi.fn(async () => {
       return {
         ok: true,
         async json() {
@@ -705,12 +692,22 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         },
       } as any;
     });
+    (globalThis as any).fetch = fetcher;
 
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000 * 3);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
 
-    expect((globalThis as any).fetch).not.toHaveBeenCalled();
+    expect(
+      fetcher.mock.calls.some(([url]) =>
+        String(url).includes("/api/audience-upload-status"),
+      ),
+    ).toBe(false);
   });
 
   test("upload with existingAudienceId appends audience_id (not audience_name)", async () => {
@@ -750,7 +747,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
 
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
+    await waitFor(() => expect(screen.getByText("Processing...")).toBeInTheDocument());
   });
 
   test("upload error response shows error, Try Again clears and returns to review", async () => {

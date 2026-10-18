@@ -39,6 +39,9 @@ export function useAudienceUploadProgress({
   const [progress, setProgress] = useState<AudienceUploadProgressState>({
     kind: "idle",
   });
+  // Bumped per processing attempt so a retry of the same upload id restarts
+  // the poll task instead of reusing the previous attempt's task.
+  const [attemptNonce, setAttemptNonce] = useState(0);
 
   const audienceIdRef = useRef<string | null>(existingAudienceId ?? null);
   const totalContactsRef = useRef(0);
@@ -252,7 +255,7 @@ export function useAudienceUploadProgress({
 
   /**
    * @effect Poll the upload status serially for one committed processing attempt; the Effect task aborts on exit or attempt replacement.
-   * @effect-deps pollingEnabled, uploadId, workspaceId (the committed processing identity)
+   * @effect-deps pollingEnabled, uploadId, workspaceId, attemptNonce (the committed processing identity; the nonce distinguishes a same-id retry)
    * @effect-side-effects Effect task + fetch; abort on unmount or identity replacement
    * @effect-why-not-loader Upload status is live server state that changes after the POST returns; a loader cannot poll.
    */
@@ -262,7 +265,7 @@ export function useAudienceUploadProgress({
       intervalMs: AUDIENCE_UPLOAD_PROCESSING_POLL_MS,
       read: (signal) => fetchStatusSnapshotRef.current(uploadId, signal),
     });
-  }, [pollingEnabled, uploadId, workspaceId]);
+  }, [pollingEnabled, uploadId, workspaceId, attemptNonce]);
 
   const startSubmitting = (totalContacts: number) => {
     attemptRef.current = null;
@@ -286,6 +289,7 @@ export function useAudienceUploadProgress({
     handedOffRef.current = false;
     audienceIdRef.current = args.audienceId;
     totalContactsRef.current = args.totalContacts;
+    setAttemptNonce((nonce) => nonce + 1);
     setProgress({
       kind: "processing",
       uploadId: args.uploadId,

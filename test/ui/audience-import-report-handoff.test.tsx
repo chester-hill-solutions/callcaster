@@ -11,9 +11,6 @@ vi.mock("@/hooks/realtime/useWorkspaceRealtime", async importOriginal => ({
   ...await importOriginal<typeof import("@/hooks/realtime/useWorkspaceRealtime")>(),
   useWorkspaceEventSubscription: (options: any) => { events.onChange = options.onChange; },
 }));
-vi.mock("@/hooks/utils/useInterval", async importOriginal => ({
-  ...await importOriginal<typeof import("@/hooks/utils/useInterval")>(), useInterval: () => {},
-}));
 afterEach(() => { toast.dismiss(); vi.unstubAllGlobals(); });
 
 test("an idle uploader has no completed report action", () => {
