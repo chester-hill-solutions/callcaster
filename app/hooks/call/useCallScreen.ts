@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   handleCall,
   handleConference,
+  releaseCallSession,
 } from "@/lib/callscreenActions";
 import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
@@ -413,15 +414,9 @@ export function useCallScreen() {
     });
   };
 
-  const requeueContacts = () => {
-    if (!campaign?.id) return;
-    const userId = user.id;
-    const campaignId = campaign.id.toString();
-    submit({ userId, campaignId }, {
-      method: "DELETE",
-      action: "/api/queues",
-      encType: "application/json",
-    });
+  const requeueContacts = async () => {
+    if (!campaign?.id) throw new Error("Campaign is required to release contacts");
+    await releaseCallSession(campaign.id);
   };
 
   const house = householdMap[nextRecipient?.contact?.address || ""];

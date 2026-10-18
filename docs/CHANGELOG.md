@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Leaving power dial releases only your unused assigned contacts and waits for success. Failed releases keep the call screen available to retry ([#2702](https://github.com/chester-hill-solutions/callcaster/issues/2702)).
+
 - Fixed: Workspace event streams combine concurrent notifications and polling reads, so saved events arrive once and in order during bursts ([#2703](https://github.com/chester-hill-solutions/callcaster/issues/2703)).
 - Fixed: Leaving a predictive campaign stops the conference and the dialer even when the call screen was reloaded, so no further calls are placed ([PR #2694](https://github.com/chester-hill-solutions/callcaster/pull/2694), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
 

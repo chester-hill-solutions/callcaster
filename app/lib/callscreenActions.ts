@@ -19,6 +19,17 @@ const getAttemptCalls = ({ attempt, calls }:{attempt:OutreachAttempt, calls:Call
   return calls.filter((call) => call.outreach_attempt_id === attempt.id);
 };
 
+export async function releaseCallSession(campaignId: number): Promise<void> {
+  const response = await fetch(`/api/campaigns/${campaignId}/call-session/release`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Could not release campaign contacts");
+  const result: unknown = await response.json();
+  if (!isObject(result) || typeof result.released !== "number" || !Number.isInteger(result.released) || result.released < 0) {
+    throw new Error("Could not confirm campaign contacts were released");
+  }
+}
+
 export const handleConference = ({ begin }:{begin:() => void}) => {
   const handleConferenceStart = () => {
     begin();

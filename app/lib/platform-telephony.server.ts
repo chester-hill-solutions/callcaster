@@ -260,6 +260,7 @@ export async function releaseCampaignCallSessionApi(
 
   const result = await releaseAssignedQueueForUser(userId,
     campaignId,
+    workspaceId,
   );
 
   if (!result.ok) {

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
-import { handleConference } from "@/lib/callscreenActions";
+import { handleConference, releaseCallSession } from "@/lib/callscreenActions";
 import { CallScreenLayout } from "@/components/call/CallScreen.Layout";
 
 const mocks = vi.hoisted(() => ({ showError: vi.fn() }));
@@ -40,7 +40,7 @@ function setup(
     creditState: "GOOD",
   };
   const device = { destroy: vi.fn() };
-  const requeueContacts = vi.fn();
+  const requeueContacts = vi.fn(() => releaseCallSession(1));
   const navigate = vi.fn();
   const props = {
     campaign: { id: 1, title: "Campaign", dial_type: dialType },
@@ -141,6 +141,7 @@ describe("Leave Campaign", () => {
   });
 
   test("live Leave waits for hangup before navigation and leaves device teardown to its hook", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ released: 1 }));
     const controls = setup("call", {});
     let finishHangUp!: () => void;
     controls.hangUp.mockImplementation(
@@ -155,10 +156,44 @@ describe("Leave Campaign", () => {
 
     await act(async () => finishHangUp());
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/campaigns/1/call-session/release", { method: "POST" });
     expect(controls.hangUp).toHaveBeenCalledTimes(1);
     expect(controls.device.destroy).not.toHaveBeenCalled();
     expect(controls.requeueContacts).toHaveBeenCalledTimes(1);
+  });
+
+  test("power-dial Leave waits for release and suppresses duplicate confirmation", async () => {
+    const pending = deferredResponse();
+    fetchMock.mockReturnValueOnce(pending.promise);
+    const controls = setup("call");
+    const confirm = confirmLeave();
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(confirm).toBeDisabled();
+    expect(controls.navigate).not.toHaveBeenCalled();
+    await act(async () => pending.resolve(Response.json({ released: 0 })));
+    await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+  });
+
+  test.each(["http", "network", "invalid-success"] as const)("power-dial Leave permits retry after %s release failure", async (failure) => {
+    if (failure === "network") fetchMock.mockRejectedValueOnce(new Error("offline"));
+    else fetchMock.mockResolvedValueOnce(failure === "http"
+      ? Response.json({ error: "Could not release" }, { status: 502 })
+      : Response.json({ error: "still assigned" }));
+    fetchMock.mockResolvedValueOnce(Response.json({ released: 2 }));
+    const controls = setup("call");
+    const confirm = confirmLeave();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith(
+      "Could not release your campaign contacts. Stay on this screen and try again.",
+    ));
+    expect(confirm).toBeEnabled();
+    expect(controls.navigate).not.toHaveBeenCalled();
+    expect(controls.device.destroy).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test("the welcome Leave callback requests confirmation before predictive cleanup", () => {

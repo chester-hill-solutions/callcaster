@@ -4,6 +4,7 @@ import {
   buildDequeuedQueueUpdate,
   buildProviderStatusQueueUpdate,
   buildQueuedQueueUpdate,
+  QUEUE_LIFECYCLE_ASSIGNED,
   QUEUE_STATUS_DEQUEUED,
   QUEUE_STATUS_QUEUED,
 } from "@/lib/queue-status";
@@ -748,36 +749,25 @@ export async function explainDequeueNoOp(args: {
 export async function releaseAssignedQueueForUser(
   userId: string,
   campaignId: string | number,
-  workspaceId?: string,
+  workspaceId: string,
 ): Promise<{ ok: true; released: number } | { ok: false; error: string }> {
   try {
     const conditions: SQL[] = [
       eq(campaignQueueTable.campaign_id, Number(campaignId)),
-      isNull(campaignQueueTable.dequeued_at),
+      eq(campaignQueueTable.workspace, workspaceId),
       eq(campaignQueueTable.assigned_to_user_id, userId),
+      eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED),
+      isNull(campaignQueueTable.dequeued_at),
+      isNull(campaignQueueTable.dequeued_by),
+      isNull(campaignQueueTable.dequeued_reason),
+      isNull(campaignQueueTable.provider_status),
+      sql`exists (select 1 from ${contactTable}
+        where ${contactTable.id} = ${campaignQueueTable.contact_id}
+          and ${contactTable.workspace} = ${campaignQueueTable.workspace}
+          and ${contactTable.opt_out} is not true)`,
     ];
-    if (workspaceId) {
-      conditions.push(eq(campaignQueueTable.workspace, workspaceId));
-    }
-
-    const assignedRows = await db
-      .select({ id: campaignQueueTable.id })
-      .from(campaignQueueTable)
-      .where(and(...conditions));
-
-    const assignedIds = assignedRows.map((row) => row.id);
-
-    if (assignedIds.length === 0) {
-      return { ok: true, released: 0 };
-    }
-
-    const updateConditions: SQL[] = [inArray(campaignQueueTable.id, assignedIds)];
-    if (workspaceId) {
-      updateConditions.push(eq(campaignQueueTable.workspace, workspaceId));
-    }
-
     const released = await updateCampaignQueueAndEmit({
-      conditions: updateConditions,
+      conditions,
       set: buildQueuedQueueUpdate(),
       workspaceId,
     });
