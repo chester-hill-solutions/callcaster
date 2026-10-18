@@ -722,6 +722,8 @@ listeners until public SDK cleanup finishes, so errors cannot trigger reconnect
 or interrupt EventEmitter dispatch. Include app-owned active and held calls:
 `Device.calls` contains pending incoming calls and omits those legs. Verify media,
 signaling and audio closure, repeat cleanup and late registration rejection.
+After failed cleanup, test an external call close before retrying cleanup.
+Remove only the helper's error guards; preserve existing listeners.
 A direct unexpected SDK exception can still stop public `destroy`; report that
 incomplete result and stop replacement registration instead of claiming closure.
 
