@@ -200,7 +200,7 @@ export function CallScreenLayout({
       }
       if (activeCall) await hangUp();
       if (campaign.dial_type !== "predictive") await requeueContacts();
-      navigate(-1);
+      await navigate(-1);
     } catch {
       toast.error("Could not release your campaign contacts. Stay on this screen and try again.");
     } finally {

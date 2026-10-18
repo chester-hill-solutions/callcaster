@@ -615,6 +615,11 @@ redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from
 a fresh result; verify a second send and later user edits.
 
+For exit confirmations, keep the submit guard active until navigation completes.
+Await the data router's navigation promise and test a delayed destination loader
+with the real router. An immediate mocked navigate function can hide a second
+release request and a second history change while the old screen remains visible.
+
 Route tests use `asRouteResponse` from `test/helpers/route-result.ts`. It returns
 a response-shaped adapter, not a native `Response`; narrow its documented fields
 when inspecting mixed concurrent-write results.

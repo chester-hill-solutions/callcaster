@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import { handleConference, releaseCallSession } from "@/lib/callscreenActions";
@@ -28,6 +28,9 @@ function deferredResponse() {
 function setup(
   dialType: "predictive" | "call" = "predictive",
   activeCall: unknown = null,
+  renderScreen: (props: CallScreenLayoutProps) => void = (props) => {
+    render(<MemoryRouter><CallScreenLayout {...props} /></MemoryRouter>);
+  },
 ) {
   const controls = {
     hangUp: vi.fn(),
@@ -60,7 +63,7 @@ function setup(
     audioControls: {},
     phoneVerification: {},
   } as unknown as CallScreenLayoutProps;
-  render(<MemoryRouter><CallScreenLayout {...props} /></MemoryRouter>);
+  renderScreen(props);
   return { ...controls, device, navigate, requeueContacts };
 }
 
@@ -174,6 +177,42 @@ describe("Leave Campaign", () => {
     expect(controls.navigate).not.toHaveBeenCalled();
     await act(async () => pending.resolve(Response.json({ released: 0 })));
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+  });
+
+  test("power-dial Leave stays disabled until real back navigation finishes", async () => {
+    fetchMock.mockImplementation(async () => Response.json({ released: 1 }));
+    let finishNavigation!: () => void;
+    const destinationReady = new Promise<void>((resolve) => { finishNavigation = resolve; });
+    const destinationLoader = vi.fn(async () => { await destinationReady; return null; });
+    let router!: ReturnType<typeof createMemoryRouter>;
+    setup("call", null, (props) => {
+      function CallRoute() {
+        const navigate = useNavigate();
+        return <CallScreenLayout {...props} navigate={navigate} />;
+      }
+      router = createMemoryRouter([
+        { path: "/before", element: <p>Before campaign</p> },
+        { path: "/campaign", loader: destinationLoader, element: <p>Campaign setup</p> },
+        { path: "/call", Component: CallRoute },
+      ], { initialEntries: ["/before", "/campaign", "/call"], initialIndex: 2 });
+      render(<RouterProvider router={router} />);
+    });
+    try {
+      const confirm = confirmLeave();
+      await act(async () => { fireEvent.click(confirm); });
+      await waitFor(() => expect(destinationLoader).toHaveBeenCalledTimes(1));
+      expect(router.state.navigation.state).toBe("loading");
+      await act(async () => { fireEvent.click(confirm); });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(confirm).toBeDisabled();
+      expect(router.state.navigation.location?.pathname).toBe("/campaign");
+      await act(async () => { finishNavigation(); });
+      await waitFor(() => expect(screen.getByText("Campaign setup")).toBeInTheDocument());
+      expect(router.state.location.pathname).toBe("/campaign");
+    } finally {
+      finishNavigation();
+      router.dispose();
+    }
   });
 
   test.each(["http", "network", "invalid-success"] as const)("power-dial Leave permits retry after %s release failure", async (failure) => {
