@@ -20,6 +20,11 @@ Before `ci:local`, check `node --version` and `bun --version` in the same
 command-scoped PATH. A missing Bun executable can be reported as lockfile
 drift; verify tool availability before changing either lockfile.
 
+Run only one full local gate per host at a time, including across worktrees.
+Concurrent suites can exhaust host resources and fail short UI waits. If this
+happens, retain the failure log, stop overlapping gates, rerun only failed cases,
+then run the full gate again on the final clean commit.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
@@ -614,6 +619,11 @@ For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from
 a fresh result; verify a second send and later user edits.
+
+For exit confirmations, keep the submit guard active until navigation completes.
+Await the data router's navigation promise and test a delayed destination loader
+with the real router. An immediate mocked navigate function can hide a second
+release request and a second history change while the old screen remains visible.
 
 Route tests use `asRouteResponse` from `test/helpers/route-result.ts`. It returns
 a response-shaped adapter, not a native `Response`; narrow its documented fields

@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider, useNavigate } from "react-router";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
-import { handleConference } from "@/lib/callscreenActions";
+import { handleConference, releaseCallSession } from "@/lib/callscreenActions";
 import { CallScreenLayout } from "@/components/call/CallScreen.Layout";
 
 const mocks = vi.hoisted(() => ({ showError: vi.fn() }));
@@ -28,6 +28,9 @@ function deferredResponse() {
 function setup(
   dialType: "predictive" | "call" = "predictive",
   activeCall: unknown = null,
+  renderScreen: (props: CallScreenLayoutProps) => void = (props) => {
+    render(<MemoryRouter><CallScreenLayout {...props} /></MemoryRouter>);
+  },
 ) {
   const controls = {
     hangUp: vi.fn(),
@@ -40,7 +43,7 @@ function setup(
     creditState: "GOOD",
   };
   const device = { destroy: vi.fn() };
-  const requeueContacts = vi.fn();
+  const requeueContacts = vi.fn(() => releaseCallSession(1));
   const navigate = vi.fn();
   const props = {
     campaign: { id: 1, title: "Campaign", dial_type: dialType },
@@ -60,7 +63,7 @@ function setup(
     audioControls: {},
     phoneVerification: {},
   } as unknown as CallScreenLayoutProps;
-  render(<MemoryRouter><CallScreenLayout {...props} /></MemoryRouter>);
+  renderScreen(props);
   return { ...controls, device, navigate, requeueContacts };
 }
 
@@ -141,6 +144,7 @@ describe("Leave Campaign", () => {
   });
 
   test("live Leave waits for hangup before navigation and leaves device teardown to its hook", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ released: 1 }));
     const controls = setup("call", {});
     let finishHangUp!: () => void;
     controls.hangUp.mockImplementation(
@@ -155,10 +159,80 @@ describe("Leave Campaign", () => {
 
     await act(async () => finishHangUp());
     await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/campaigns/1/call-session/release", { method: "POST" });
     expect(controls.hangUp).toHaveBeenCalledTimes(1);
     expect(controls.device.destroy).not.toHaveBeenCalled();
     expect(controls.requeueContacts).toHaveBeenCalledTimes(1);
+  });
+
+  test("power-dial Leave waits for release and suppresses duplicate confirmation", async () => {
+    const pending = deferredResponse();
+    fetchMock.mockReturnValueOnce(pending.promise);
+    const controls = setup("call");
+    const confirm = confirmLeave();
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(confirm).toBeDisabled();
+    expect(controls.navigate).not.toHaveBeenCalled();
+    await act(async () => pending.resolve(Response.json({ released: 0 })));
+    await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+  });
+
+  test("power-dial Leave stays disabled until real back navigation finishes", async () => {
+    fetchMock.mockImplementation(async () => Response.json({ released: 1 }));
+    let finishNavigation!: () => void;
+    const destinationReady = new Promise<void>((resolve) => { finishNavigation = resolve; });
+    const destinationLoader = vi.fn(async () => { await destinationReady; return null; });
+    let router!: ReturnType<typeof createMemoryRouter>;
+    setup("call", null, (props) => {
+      function CallRoute() {
+        const navigate = useNavigate();
+        return <CallScreenLayout {...props} navigate={navigate} />;
+      }
+      router = createMemoryRouter([
+        { path: "/before", element: <p>Before campaign</p> },
+        { path: "/campaign", loader: destinationLoader, element: <p>Campaign setup</p> },
+        { path: "/call", Component: CallRoute },
+      ], { initialEntries: ["/before", "/campaign", "/call"], initialIndex: 2 });
+      render(<RouterProvider router={router} />);
+    });
+    try {
+      const confirm = confirmLeave();
+      await act(async () => { fireEvent.click(confirm); });
+      await waitFor(() => expect(destinationLoader).toHaveBeenCalledTimes(1));
+      expect(router.state.navigation.state).toBe("loading");
+      await act(async () => { fireEvent.click(confirm); });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(confirm).toBeDisabled();
+      expect(router.state.navigation.location?.pathname).toBe("/campaign");
+      await act(async () => { finishNavigation(); });
+      await waitFor(() => expect(screen.getByText("Campaign setup")).toBeInTheDocument());
+      expect(router.state.location.pathname).toBe("/campaign");
+    } finally {
+      finishNavigation();
+      router.dispose();
+    }
+  });
+
+  test.each(["http", "network", "invalid-success"] as const)("power-dial Leave permits retry after %s release failure", async (failure) => {
+    if (failure === "network") fetchMock.mockRejectedValueOnce(new Error("offline"));
+    else fetchMock.mockResolvedValueOnce(failure === "http"
+      ? Response.json({ error: "Could not release" }, { status: 502 })
+      : Response.json({ error: "still assigned" }));
+    fetchMock.mockResolvedValueOnce(Response.json({ released: 2 }));
+    const controls = setup("call");
+    const confirm = confirmLeave();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith(
+      "Could not release your campaign contacts. Stay on this screen and try again.",
+    ));
+    expect(confirm).toBeEnabled();
+    expect(controls.navigate).not.toHaveBeenCalled();
+    expect(controls.device.destroy).not.toHaveBeenCalled();
+    fireEvent.click(confirm);
+    await waitFor(() => expect(controls.navigate).toHaveBeenCalledWith(-1));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test("the welcome Leave callback requests confirmation before predictive cleanup", () => {
