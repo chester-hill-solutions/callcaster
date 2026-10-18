@@ -102,6 +102,13 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+Before adding a second runtime version, inspect existing transitive peer
+requirements. An npm alias can isolate the app version while preserving an
+exact development-tool peer. Verify both lockfiles and a clean `npm ci`, then
+require `npm ls` to accept both versions. For async React owners, test a
+suspended identity transition: changing an owner ref during render can cancel
+work that still belongs to the committed screen.
+
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying

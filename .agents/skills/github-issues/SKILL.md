@@ -74,6 +74,10 @@ or create duplicate issues to repair a missing relationship.
 
 ## Required Deep Issue Inspection
 
+Inspect each duplicate-search hit before deciding whether the concern already
+has an issue. Search terms can match unrelated body text; a nonzero result
+count alone does not establish a duplicate.
+
 Every issue investigation must include the issue's relationships, organization
 fields, and Project context. Do not report only the title, body, labels, and
 state.
