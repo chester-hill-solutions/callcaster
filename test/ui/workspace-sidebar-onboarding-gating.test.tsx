@@ -43,6 +43,7 @@ vi.mock("react-router", async () => {
     }),
     useOutlet: () => null,
     useOutletContext: () => ({}),
+    useNavigation: () => ({ state: "idle" }),
     useRevalidator: () => ({ revalidate: mocks.revalidate }),
     useMatches: () => mocks.state.matches,
     useSearchParams: () => [new URLSearchParams()],
