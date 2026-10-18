@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed campaign exports starting overlapping status requests and applying results after leaving or switching campaigns, using a bounded Effect polling pilot ([#2712](https://github.com/chester-hill-solutions/callcaster/issues/2712)).
+- Fixed: Campaign exports wait for each status request and discard results after leaving or switching campaigns ([PR #2713](https://github.com/chester-hill-solutions/callcaster/pull/2713), [#2712](https://github.com/chester-hill-solutions/callcaster/issues/2712)).
 
 - Fixed: Phone cleanup on page exit and reconnect can finish after a signaling transport failure, and closed sessions no longer start registration retries ([#2706](https://github.com/chester-hill-solutions/callcaster/issues/2706)).
 
