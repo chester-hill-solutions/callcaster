@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Phone cleanup on page exit and reconnect can finish after a signaling transport failure, and closed sessions no longer start registration retries ([#2706](https://github.com/chester-hill-solutions/callcaster/issues/2706)).
+
 - Fixed: Leaving the campaign or softphone screen releases microphone capture that finishes opening after exit ([#2705](https://github.com/chester-hill-solutions/callcaster/issues/2705)).
 
 - Fixed: Workspace event bursts share refresh work and let navigation finish while campaign progress, status and credits stay current ([#2704](https://github.com/chester-hill-solutions/callcaster/issues/2704)).

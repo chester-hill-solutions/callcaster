@@ -99,8 +99,10 @@ export function useTwilioDevice({
     }
   }, [send]);
 
+  const ownedCallsRef = useRef<readonly (Call | null)[]>([]);
   const connection = useTwilioConnection({
     token,
+    getOwnedCalls: () => ownedCallsRef.current,
     enabled,
     onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange,
@@ -118,6 +120,7 @@ export function useTwilioDevice({
     onError: onCallError,
     onDeviceBusyChange: onDeviceBusy,
   });
+  ownedCallsRef.current = [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls];
 
   /**
    * @effect Mirror the latest `callHandling.receiveIncoming` handler into a
@@ -139,21 +142,20 @@ export function useTwilioDevice({
   const activeCallRef = useRef(callHandling.activeCall);
   const hangUpRef = useRef(callHandling.hangUp);
   const callStateRef = useRef(callHandling.callState);
-  const deviceRef = useRef(connection.device);
 
   activeCallRef.current = callHandling.activeCall;
   hangUpRef.current = callHandling.hangUp;
   callStateRef.current = callHandling.callState;
-  deviceRef.current = connection.device;
 
   /**
-   * @effect Hang up the active call and disconnect the Twilio device when
+   * @effect End the active call through the provider when
    * the component unmounts, so calls do not stay live and consume credits
    * after the agent navigates away.
    * @effect-deps [] — mount-once cleanup-only; reads latest values via refs
    * kept fresh on every render so the unmount teardown always acts on the
-   * current call/device regardless of stale closures.
-   * @effect-side-effects hung up / disconnecting SDK calls + device
+   * current call regardless of stale closures. Device cleanup belongs to
+   * useTwilioConnection.
+   * @effect-side-effects hangUp calls the provider hangup API.
    * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
    */
   useEffect(() => {
@@ -166,7 +168,6 @@ export function useTwilioDevice({
           logger.debug("Call hung up during unmount cleanup");
         });
       }
-      deviceRef.current?.disconnectAll();
     };
   }, []);
 

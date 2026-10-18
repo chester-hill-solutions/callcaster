@@ -406,6 +406,38 @@ describe("call hooks", () => {
     expect(result.current.deviceIsBusy).toBe(true);
   });
 
+  test.each(["campaign", "softphone"] as const)("%s exit disconnects app-owned active, held and pending legs absent from Device.calls", async (owner) => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const { useSoftphoneController } = await import("@/hooks/call/useSoftphoneController");
+    const held = createMockTwilioCall({ parameters: { CallSid: "CA-held", To: "+15550000001" } });
+    const active = createMockTwilioCall({ parameters: { CallSid: "CA-active", To: "+15550000002" } });
+    const pending = createMockTwilioCall({ parameters: { CallSid: "CA-pending", To: "+15550000003" } });
+    mockTwilioDevice.calls = [];
+    mockTwilioDevice.connect.mockResolvedValueOnce(held as never);
+    const { result, unmount } = renderHook(() => {
+      if (owner === "campaign") return useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send: vi.fn() });
+      return useSoftphoneController({ token: "tok", workspaceId: "ws", clientIdentity: "agent", endSession: vi.fn(), onNavigateBack: vi.fn(), onError: vi.fn() }).callHandling;
+    });
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => {
+      result.current.makeCall({ To: "+15550000001" });
+      await Promise.resolve();
+    });
+    expect(result.current.activeCall).toBe(held);
+    act(() => mockTwilioDevice.emit("incoming", active));
+    act(() => result.current.answer());
+    act(() => active.emit("accept"));
+    expect(result.current.activeCall).toBe(active);
+    act(() => mockTwilioDevice.emit("incoming", pending));
+    expect(result.current.incomingCall).toBe(pending);
+    unmount();
+    expect(held.disconnect).toHaveBeenCalledTimes(1);
+    expect(active.disconnect).toHaveBeenCalledTimes(1);
+    expect(pending.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+    await act(async () => { await Promise.resolve(); });
+  });
+
   test("unmount does not hang up a call again after hangUp completes", async () => {
     const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
     const { hangupCall } = await import("@/lib/services/hooks-api");
