@@ -2,9 +2,9 @@ import type { Device } from "@twilio/voice-sdk";
 
 type AudioInput = Pick<NonNullable<Device["audio"]>, "setInputDevice" | "unsetInputDevice">;
 
-export function createCallAudioInput(audio: AudioInput) {
+export function createCallAudioInput(audio: AudioInput, afterRelease = Promise.resolve()) {
   let disposed = false;
-  let pending = Promise.resolve();
+  let pending = afterRelease.catch(() => {});
   let release: Promise<void> | null = null;
 
   return {

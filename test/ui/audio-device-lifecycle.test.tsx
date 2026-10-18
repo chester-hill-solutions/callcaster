@@ -63,7 +63,7 @@ describe("audio device lifecycle", () => {
     vi.stubGlobal("AudioContext", MockAudioContext);
   });
 
-  test.each(["unmount", "replacement"] as const)(
+  test.each(["unmount", "replacement", "normal completion"] as const)(
     "releases SDK microphone capture that resolves after %s",
     async (exit) => {
       const require = createRequire(import.meta.url);
@@ -108,10 +108,18 @@ describe("audio device lifecycle", () => {
       }), { initialProps: { device: original } });
       try {
         await waitFor(() => expect(acquireSdkStream).toHaveBeenCalledTimes(1));
-        audio._destroy();
-        if (exit === "unmount") hook.unmount();
-        else hook.rerender({ device: replacement });
-        await act(async () => resolveSdkStream(sdkStream));
+        if (exit === "normal completion") {
+          await act(async () => resolveSdkStream(sdkStream));
+          await waitFor(() => expect(audio.inputStream).toBe(sdkStream));
+          expect(track.readyState).toBe("live");
+          expect(audio._isPollingInputVolume).toBe(true);
+          hook.unmount();
+        } else {
+          audio._destroy();
+          if (exit === "unmount") hook.unmount();
+          else hook.rerender({ device: replacement });
+          await act(async () => resolveSdkStream(sdkStream));
+        }
         await waitFor(() => expect(track.readyState).toBe("ended"));
         expect(audio.inputStream).toBeNull();
         expect(audio._isPollingInputVolume).toBe(false);
@@ -122,6 +130,36 @@ describe("audio device lifecycle", () => {
       }
     },
   );
+
+  test("StrictMode replay still selects the microphone and permits later changes", async () => {
+    let selected: string | null = null;
+    let finishReplayRelease!: () => void;
+    let releasing = false;
+    const replayRelease = new Promise<void>((resolve) => { finishReplayRelease = resolve; });
+    const device = {
+      audio: {
+        setInputDevice: vi.fn(async (id: string) => { selected = id; }),
+        unsetInputDevice: vi.fn(async () => {
+          releasing = true;
+          await replayRelease;
+          selected = null;
+        }),
+        speakerDevices: { set: setSpeakerDevice },
+      },
+    } as unknown as import("@twilio/voice-sdk").Device;
+    const { result, unmount } = renderHook(() => useCallAudioControls({
+      device, activeCall: null, micCoordinator: { isMicMuted: false, setMicMuted },
+    }), { reactStrictMode: true });
+    await waitFor(() => expect(releasing).toBe(true));
+    await waitFor(() => expect(result.current.microphone).toBe("default"));
+    expect(device.audio?.setInputDevice).not.toHaveBeenCalled();
+    await act(async () => finishReplayRelease());
+    await waitFor(() => expect(selected).toBe("default"));
+    act(() => result.current.handleMicrophoneChange({ target: { value: "usb-mic" } } as React.ChangeEvent<HTMLSelectElement>));
+    await waitFor(() => expect(selected).toBe("usb-mic"));
+    unmount();
+    await waitFor(() => expect(selected).toBeNull());
+  });
 
   test("queued microphone selections cannot open capture after disposal", async () => {
     let finishFirst!: () => void;
@@ -136,7 +174,7 @@ describe("audio device lifecycle", () => {
       unsetInputDevice: async () => { selected = null; },
     });
     const first = owner.select("default");
-    await Promise.resolve();
+    await waitFor(() => expect(started).toEqual(["default"]));
     const second = owner.select("usb-mic");
     const release = owner.dispose();
     expect(started).toEqual(["default"]);

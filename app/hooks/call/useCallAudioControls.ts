@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { playTone } from "@/lib/utils";
@@ -29,6 +29,10 @@ export function useCallAudioControls({
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const microphoneRequestGenerationRef = useRef(0);
+  const audioInputRef = useRef<{
+    audio: NonNullable<Device["audio"]>;
+    input: ReturnType<typeof createCallAudioInput>;
+  } | null>(null);
 
   const isMicrophoneMuted = micCoordinator.isMicMuted;
 
@@ -173,35 +177,39 @@ export function useCallAudioControls({
     };
   }, [refreshDevices]);
 
-  const audioInput = useMemo(() => {
-    const audio = device?.audio;
-    return audio ? createCallAudioInput(audio) : null;
-  }, [device]);
-
   /**
-   * @effect Release SDK input after pending microphone selection completes.
-   * @effect-deps audioInput (one owner per Twilio device).
+   * @effect Own SDK input selection and release it after pending capture completes.
+   * @effect-deps device (one input owner per device effect lifetime).
    * @effect-side-effects media capture release through SDK unsetInputDevice.
    * @effect-why-not-loader Browser media ownership ends with the device lifetime.
    */
-  useEffect(() => () => {
-    void audioInput?.dispose().catch((error: unknown) => {
-      logger.error("Error releasing microphone:", error);
-    });
-  }, [audioInput]);
+  useEffect(() => {
+    const audio = device?.audio;
+    if (!audio) return;
+    const previous = audioInputRef.current;
+    // StrictMode can reuse this helper before the prior effect has released it.
+    const afterRelease = previous?.audio === audio ? previous.input.dispose() : undefined;
+    const input = createCallAudioInput(audio, afterRelease);
+    audioInputRef.current = { audio, input };
+    return () => {
+      void input.dispose().catch((error: unknown) => {
+        logger.error("Error releasing microphone:", error);
+      });
+    };
+  }, [device]);
 
   /**
    * @effect Serialize microphone selection on the current SDK audio helper.
-   * @effect-deps audioInput, microphone (device ownership and selected input).
+   * @effect-deps device, microphone (device ownership and selected input).
    * @effect-side-effects media capture through SDK setInputDevice.
    * @effect-why-not-loader Live browser hardware selection follows user input.
    */
   useEffect(() => {
-    if (!audioInput || !microphone) return;
-    void audioInput.select(microphone).catch((error: unknown) => {
+    if (!device || !microphone) return;
+    void audioInputRef.current?.input.select(microphone).catch((error: unknown) => {
       logger.error("Error setting microphone:", error);
     });
-  }, [audioInput, microphone]);
+  }, [device, microphone]);
 
   /**
    * @effect Apply the selected speaker to the current Twilio device.
