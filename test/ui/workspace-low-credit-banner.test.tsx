@@ -36,6 +36,7 @@ vi.mock("react-router", async () => {
     }),
     useOutlet: () => null,
     useOutletContext: () => ({}),
+    useNavigation: () => ({ state: "idle" }),
     useRevalidator: () => STABLE_REVALIDATOR,
     useMatches: () => [],
     useLocation: () => ({ pathname: "/workspaces/ws-1" }),
