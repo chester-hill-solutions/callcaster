@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import type { MicCoordinator } from "@/lib/twilio/call-session-types";
+import { useTwilioAudioInput } from "./useTwilioAudioInput";
 import {
   getUsableAudioDevices,
   reconcileAudioDeviceId,
@@ -24,6 +25,7 @@ export function useSoftphoneAudioDevices({
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState<string | null>(null);
   const [selectedSpeakerId, setSelectedSpeakerId] = useState<string | null>(null);
+  const selectInput = useTwilioAudioInput(device);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -81,36 +83,33 @@ export function useSoftphoneAudioDevices({
   }, [refreshDevices]);
 
   /**
-   * @effect When a call becomes active (or the selected mic/speaker changes
-   * while a call is active), apply the currently selected input/output
-   * devices to the live Twilio Device's audio helper.
-   * @effect-deps activeCall, device, selectedMicId, selectedSpeakerId (reacts
-   * to a call starting or the user changing device selection mid-call)
-   * @effect-side-effects dom (imperative Device.audio.setInputDevice /
-   * speakerDevices.set calls against the WebRTC audio hardware); no
-   * timer/subscription/fetch.
-   * @effect-why-not-loader Imperative SDK/audio-hardware binding tied to an
-   * active call, not request/response data.
+   * @effect Apply the selected microphone when a call starts or its input changes.
+   * @effect-deps activeCall, selectInput, selectedMicId (active call and current input).
+   * @effect-side-effects dom (SDK input routing through the capture owner).
+   * @effect-why-not-loader Live WebRTC hardware selection follows the active call.
    */
   useEffect(() => {
-    if (!activeCall || !device?.audio) return;
-    if (selectedMicId) {
-      device.audio.setInputDevice(selectedMicId).catch(() => {});
-    }
-    if (selectedSpeakerId) {
-      device.audio.speakerDevices?.set(selectedSpeakerId).catch(() => {});
-    }
-  }, [activeCall, device, selectedMicId, selectedSpeakerId]);
+    if (!activeCall || !selectedMicId) return;
+    void selectInput(selectedMicId).catch(() => {});
+  }, [activeCall, selectInput, selectedMicId]);
+
+  /**
+   * @effect Apply the selected speaker when a call starts or its output changes.
+   * @effect-deps activeCall, device, selectedSpeakerId (active call and current output).
+   * @effect-side-effects dom (SDK speaker output routing).
+   * @effect-why-not-loader Live WebRTC speaker routing follows the active call.
+   */
+  useEffect(() => {
+    if (!activeCall || !device?.audio || !selectedSpeakerId) return;
+    void device.audio.speakerDevices?.set(selectedSpeakerId).catch(() => {});
+  }, [activeCall, device, selectedSpeakerId]);
 
   const handleMicChange = useCallback(
     (deviceId: string) => {
       setSelectedMicId(deviceId);
-      if (!device?.audio) return;
-      device.audio
-        .setInputDevice(deviceId)
-        .catch(() => {});
+      if (!activeCall) void selectInput(deviceId).catch(() => {});
     },
-    [device],
+    [activeCall, selectInput],
   );
 
   const handleSpeakerChange = useCallback(

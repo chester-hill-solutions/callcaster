@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Leaving the campaign or softphone screen releases microphone capture that finishes opening after exit ([#2705](https://github.com/chester-hill-solutions/callcaster/issues/2705)).
+
 - Fixed: Workspace event bursts share refresh work and let navigation finish while campaign progress, status and credits stay current ([#2704](https://github.com/chester-hill-solutions/callcaster/issues/2704)).
 
 - Fixed: Leaving power dial releases only your unused assigned contacts and waits for success. Failed releases keep the call screen available to retry ([#2702](https://github.com/chester-hill-solutions/callcaster/issues/2702)).

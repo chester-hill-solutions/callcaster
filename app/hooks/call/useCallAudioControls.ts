@@ -3,6 +3,7 @@ import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { playTone } from "@/lib/utils";
 import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
+import { useTwilioAudioInput } from "./useTwilioAudioInput";
 import type { MicCoordinator } from "@/lib/twilio/call-session-types";
 import {
   getUsableAudioDevices,
@@ -28,6 +29,7 @@ export function useCallAudioControls({
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const microphoneRequestGenerationRef = useRef(0);
+  const selectInput = useTwilioAudioInput(device);
 
   const isMicrophoneMuted = micCoordinator.isMicMuted;
 
@@ -173,25 +175,30 @@ export function useCallAudioControls({
   }, [refreshDevices]);
 
   /**
-   * @effect Apply the selected microphone and speaker device IDs to the
-   * active Twilio Device audio stack whenever hardware selection changes.
-   * @effect-deps device, microphone, output
-   * @effect-side-effects dom (Twilio Device audio input/output routing)
-   * @effect-why-not-loader Live Twilio audio routing follows user device picks.
+   * @effect Serialize microphone selection on the current SDK audio helper.
+   * @effect-deps selectInput, microphone (device ownership and selected input).
+   * @effect-side-effects media capture through SDK setInputDevice.
+   * @effect-why-not-loader Live browser hardware selection follows user input.
    */
   useEffect(() => {
-    if (!device?.audio) return;
-    if (microphone) {
-      device.audio.setInputDevice(microphone).catch((error: unknown) => {
-        logger.error("Error setting microphone:", error);
-      });
-    }
-    if (output) {
-      device.audio.speakerDevices.set(output).catch((error: unknown) => {
-        logger.error("Error setting speaker:", error);
-      });
-    }
-  }, [device, microphone, output]);
+    if (!microphone) return;
+    void selectInput(microphone).catch((error: unknown) => {
+      logger.error("Error setting microphone:", error);
+    });
+  }, [selectInput, microphone]);
+
+  /**
+   * @effect Apply the selected speaker to the current Twilio device.
+   * @effect-deps device, output (the active device and selected speaker).
+   * @effect-side-effects SDK speaker output routing.
+   * @effect-why-not-loader Speaker routing is a live browser hardware operation.
+   */
+  useEffect(() => {
+    if (!device?.audio || !output) return;
+    void device.audio.speakerDevices.set(output).catch((error: unknown) => {
+      logger.error("Error setting speaker:", error);
+    });
+  }, [device, output]);
 
   /**
    * @effect Auto-request microphone access whenever there's no live stream
