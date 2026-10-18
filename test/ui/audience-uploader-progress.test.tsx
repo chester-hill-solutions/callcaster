@@ -14,10 +14,6 @@ const mocks = vi.hoisted(() => {
     params: { id: "w1" } as Record<string, string>,
     navigate: vi.fn(),
     realtimeOpts: null as any,
-    interval: {
-      cb: null as null | (() => Promise<void> | void),
-      ms: null as any,
-    },
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
     onUploadComplete: vi.fn(),
   };
@@ -32,13 +28,6 @@ vi.mock("@/hooks/realtime/useWorkspaceRealtime", () => ({
   useWorkspaceEventSubscription: (opts: any) => {
     mocks.realtimeOpts = opts;
     return undefined;
-  },
-}));
-
-vi.mock("@/hooks/utils/useInterval", () => ({
-  useInterval: (cb: any, ms: any) => {
-    mocks.interval.cb = cb;
-    mocks.interval.ms = ms;
   },
 }));
 
@@ -152,7 +141,7 @@ async function startUpload(
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
   });
-  await waitFor(() => expect(mocks.interval.ms).toBe(5000));
+  await waitFor(() => expect(screen.getByText("Processing...")).toBeInTheDocument());
 }
 
 describe("AudienceUploader progress polling", () => {
@@ -161,8 +150,6 @@ describe("AudienceUploader progress polling", () => {
     mocks.params.id = "w1";
     mocks.navigate.mockReset();
     mocks.realtimeOpts = null;
-    mocks.interval.cb = null;
-    mocks.interval.ms = null;
     mocks.logger.error.mockReset();
     mocks.onUploadComplete.mockReset();
     vi.useRealTimers();
@@ -215,15 +202,12 @@ describe("AudienceUploader progress polling", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
 
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
-
-    expect(
-      screen.getByText("Live progress is delayed. Retrying automatically..."),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByText("Live progress is delayed. Retrying automatically..."),
+      ).toBeInTheDocument(),
+    );
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
@@ -286,14 +270,11 @@ describe("AudienceUploader progress polling", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
-
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
+    await waitFor(() =>
+      expect(screen.getByText("4 / 10 contacts")).toBeInTheDocument(),
+    );
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    expect(screen.getByText("4 / 10 contacts")).toBeInTheDocument();
     expect(screen.getByRole("progressbar").textContent).toBe("40");
   });
 
@@ -304,8 +285,10 @@ describe("AudienceUploader progress polling", () => {
 
     await goToReview(container, ["Phone", "123"].join("\n"));
 
+    let statusReads = 0;
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
+        statusReads += 1;
         return {
           ok: true,
           async json() {
@@ -329,17 +312,25 @@ describe("AudienceUploader progress polling", () => {
       } as any;
     });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-    });
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+      });
 
-    // The immediate post-submit status check surfaces the error without
-    // waiting for a poll tick (#1078); polling never starts for an error.
-    expect(screen.getByText("poll-bad")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Try Again" }),
-    ).toBeInTheDocument();
-    expect(mocks.interval.ms).toBeNull();
+      // The immediate post-submit status check surfaces the error without
+      // waiting for a poll tick (#1078); a terminal status ends the poll.
+      expect(screen.getByText("poll-bad")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Try Again" }),
+      ).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000 * 3);
+      });
+      expect(statusReads).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("polling status=error without error_message uses fallback", async () => {
@@ -426,13 +417,9 @@ describe("AudienceUploader progress polling", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
-
-    expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument();
-
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
+    await waitFor(() =>
+      expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument(),
+    );
 
     expect(screen.getByText("Processing...")).toBeInTheDocument();
     expect(screen.getByText("0 / 0 contacts")).toBeInTheDocument();
@@ -446,8 +433,10 @@ describe("AudienceUploader progress polling", () => {
 
     await goToReview(container, ["Phone", "123"].join("\n"));
 
+    let statusReads = 0;
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
+        statusReads += 1;
         return {
           ok: false,
           status: 500,
@@ -472,22 +461,23 @@ describe("AudienceUploader progress polling", () => {
       } as any;
     });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-    });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
-
-    for (let i = 0; i < 6; i++) {
+    vi.useFakeTimers();
+    try {
       await act(async () => {
-        await mocks.interval.cb?.();
+        fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
       });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000 * 6);
+      });
+    } finally {
+      vi.useRealTimers();
     }
 
+    expect(statusReads).toBeGreaterThan(1);
     expect(
       screen.getByText("Live progress is delayed. Retrying automatically..."),
     ).toBeInTheDocument();
     expect(screen.getByText("Processing...")).toBeInTheDocument();
-    expect(mocks.interval.ms).toBe(5000);
   });
 
   test("failed upload status with sidecar error field shows Error, not delayed warning", async () => {
@@ -497,8 +487,10 @@ describe("AudienceUploader progress polling", () => {
 
     await goToReview(container, ["Phone", "123"].join("\n"));
 
+    let statusReads = 0;
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
+        statusReads += 1;
         return {
           ok: true,
           async json() {
@@ -533,22 +525,30 @@ describe("AudienceUploader progress polling", () => {
       } as any;
     });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-    });
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+      });
 
-    // Immediate post-submit status check must treat sidecar `error` as the
-    // upload failure (via status=error), not as a transient poll failure.
-    expect(
-      screen.getByText("column support_level does not exist"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Try Again" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("Live progress is delayed. Retrying automatically..."),
-    ).toBeNull();
-    expect(mocks.interval.ms).toBeNull();
+      // Immediate post-submit status check must treat sidecar `error` as the
+      // upload failure (via status=error), not as a transient poll failure.
+      expect(
+        screen.getByText("column support_level does not exist"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Try Again" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Live progress is delayed. Retrying automatically..."),
+      ).toBeNull();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000 * 3);
+      });
+      expect(statusReads).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("non-JSON status response is treated as a transient poll failure", async () => {
@@ -558,8 +558,10 @@ describe("AudienceUploader progress polling", () => {
 
     await goToReview(container, ["Phone", "123"].join("\n"));
 
+    let statusReads = 0;
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
+        statusReads += 1;
         return {
           ok: false,
           status: 502,
@@ -584,19 +586,23 @@ describe("AudienceUploader progress polling", () => {
       } as any;
     });
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
-    });
-    await waitFor(() => expect(mocks.interval.ms).toBe(5000));
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
+      });
 
-    await act(async () => {
-      await mocks.interval.cb?.();
-    });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000 * 3);
+      });
 
-    expect(
-      screen.getByText("Live progress is delayed. Retrying automatically..."),
-    ).toBeInTheDocument();
-    expect(mocks.interval.ms).toBe(5000);
-    expect(screen.queryByText("Error")).toBeNull();
+      expect(statusReads).toBeGreaterThan(1);
+      expect(
+        screen.getByText("Live progress is delayed. Retrying automatically..."),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Error")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
