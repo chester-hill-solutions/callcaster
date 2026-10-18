@@ -1,7 +1,5 @@
-import { useRef, useCallback } from "react";
-import { useInterval } from "@/hooks/utils/useInterval";
-import { logger } from "@/lib/logger.client";
-import { normalizeProviderStatus } from "@/lib/call-status";
+import { useEffect, useRef } from "react";
+import { pollCallStatus } from "@/lib/call-status-polling.client";
 
 export interface UseCallStatusPollingOptions {
   callSid: string | null;
@@ -16,9 +14,12 @@ const DEFAULT_INTERVAL_MS = 5000;
 
 /**
  * Polls the call-status-poll API every intervalMs while enabled.
- * Uses an in-flight guard so overlapping requests are skipped.
- * Raw provider status is normalized via `normalizeProviderStatus` before being
- * forwarded, so callers never receive unknown/invalid status strings.
+ *
+ * One Effect task owns one committed identity (workspace, call SID, agent leg).
+ * A change to any of them interrupts the old task and starts a new one, so a
+ * read for a call the screen has already left cannot publish. Raw provider
+ * status is normalized via `normalizeProviderStatus` before being forwarded, so
+ * callers never receive unknown/invalid status strings.
  */
 export function useCallStatusPolling({
   callSid,
@@ -28,35 +29,28 @@ export function useCallStatusPolling({
   agentLegSid,
   onStatus,
 }: UseCallStatusPollingOptions): void {
-  const inFlightRef = useRef(false);
+  const onStatusRef = useRef(onStatus);
+  onStatusRef.current = onStatus;
 
-  const poll = useCallback(() => {
-    if (!callSid || !workspaceId || inFlightRef.current) return;
-
-    inFlightRef.current = true;
-    const params = new URLSearchParams({ callSid, workspaceId, agentLegSid: agentLegSid ?? "" });
-    fetch(`/api/call-status-poll?${params}`)
-      .then((res) => {
-        if (!res.ok) return res.json().then((data) => Promise.reject(data));
-        return res.json();
-      })
-      .then((data: { status?: string; callSid?: string }) => {
-        if (typeof data?.status === "string") {
-          const normalized = normalizeProviderStatus(data.status);
-          if (normalized) {
-            onStatus?.(normalized, data.callSid);
-          }
-        }
-      })
-      .catch((err) => {
-        logger.debug("Call status poll failed", err);
-      })
-      .finally(() => {
-        inFlightRef.current = false;
-      });
-  }, [callSid, workspaceId, agentLegSid, onStatus]);
-
-  const delay =
-    enabled && callSid && workspaceId ? intervalMs : null;
-  useInterval(poll, delay);
+  /**
+   * @effect Poll the provider call status serially for one committed call/agent-leg identity; the Effect task aborts on exit or identity change.
+   * @effect-deps enabled, callSid, workspaceId, agentLegSid, intervalMs (the committed polling identity)
+   * @effect-side-effects Effect task + fetch; abort on unmount or identity replacement
+   * @effect-why-not-loader Provider status is live server state that keeps changing after the call starts; a loader cannot poll.
+   */
+  useEffect(() => {
+    if (!enabled || !callSid || !workspaceId) return;
+    const params = new URLSearchParams({
+      callSid,
+      workspaceId,
+      agentLegSid: agentLegSid ?? "",
+    });
+    return pollCallStatus(
+      `/api/call-status-poll?${params}`,
+      intervalMs,
+      (status, resolvedSid) => {
+        onStatusRef.current?.(status, resolvedSid);
+      },
+    );
+  }, [enabled, callSid, workspaceId, agentLegSid, intervalMs]);
 }

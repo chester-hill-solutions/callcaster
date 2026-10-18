@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: The call screen ignores status updates for a call you have already left and stops polling once the call ends ([PR #2721](https://github.com/chester-hill-solutions/callcaster/pull/2721), [#2718](https://github.com/chester-hill-solutions/callcaster/issues/2718)).
+
 - Fixed: The Call list detail page clears its processing state when an upload completes or fails, without a page reload ([PR #2720](https://github.com/chester-hill-solutions/callcaster/pull/2720), [#2719](https://github.com/chester-hill-solutions/callcaster/issues/2719)).
 
 - Fixed: Railway plans preserve an existing legacy variable in each modeled environment ([PR #2715](https://github.com/chester-hill-solutions/callcaster/pull/2715), [#2714](https://github.com/chester-hill-solutions/callcaster/issues/2714)).
