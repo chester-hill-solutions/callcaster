@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Workspace event streams combine concurrent notifications and polling reads, so saved events arrive once and in order during bursts ([#2703](https://github.com/chester-hill-solutions/callcaster/issues/2703)).
 - Fixed: Leaving a predictive campaign stops the conference and the dialer even when the call screen was reloaded, so no further calls are placed ([PR #2694](https://github.com/chester-hill-solutions/callcaster/pull/2694), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
 
 ## 2026-10-15 — release [#2668](https://github.com/chester-hill-solutions/callcaster/pull/2668)
