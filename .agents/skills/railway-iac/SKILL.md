@@ -24,6 +24,10 @@ planning. The TypeScript SDK checks the executable in the child process's `_`
 variable; point that variable at the same verified CLI executable that runs the
 plan. An inherited shell value can point at an older CLI or another program.
 
+CLI `status --project` also requires `--environment` and filters its result to
+that environment. Read each modeled environment separately; do not treat a
+filtered response as the full project inventory.
+
 Link that worktree with explicit project, environment, and service IDs. Resolve
 the service in each environment; production's app can have a different ID from
 the dev and staging app. Read back the link before proceeding.
