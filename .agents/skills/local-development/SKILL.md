@@ -711,6 +711,22 @@ receive the same whitespace check as existing files. `ci:codegen:verify` compare
 an intended un-staged API delta otherwise fails the final gate. Do not stage
 drift without its matching reviewed source change.
 
+## Twilio SDK teardown tests
+
+Use the installed SDK at the transport boundary. Its WebSocket transport catches
+send exceptions and returns false; PStream then emits an error which Device
+forwards. A stub that throws directly from `hangup` tests a different failure.
+Keep a normal send-success control beside the real send-false control. Detach
+application callbacks before teardown, then keep safe Device and Call error
+listeners until public SDK cleanup finishes, so errors cannot trigger reconnect
+or interrupt EventEmitter dispatch. Include app-owned active and held calls:
+`Device.calls` contains pending incoming calls and omits those legs. Verify media,
+signaling and audio closure, repeat cleanup and late registration rejection.
+After failed cleanup, test an external call close before retrying cleanup.
+Remove only the helper's error guards; preserve existing listeners.
+A direct unexpected SDK exception can still stop public `destroy`; report that
+incomplete result and stop replacement registration instead of claiming closure.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.

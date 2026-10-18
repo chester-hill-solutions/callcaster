@@ -39,8 +39,10 @@ export function useSoftphoneController({
     [onError],
   );
 
+  const ownedCallsRef = useRef<readonly (Call | null)[]>([]);
   const connection = useTwilioConnection({
     token,
+    getOwnedCalls: () => ownedCallsRef.current,
     deviceOptions,
     onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange: noop,
@@ -60,6 +62,7 @@ export function useSoftphoneController({
     onError: handleCallError,
     onDeviceBusyChange: noop,
   });
+  ownedCallsRef.current = [callHandling.activeCall, callHandling.incomingCall, ...callHandling.heldCalls];
 
   /**
    * @effect Mirror the latest `callHandling.receiveIncoming` handler into a ref
@@ -111,21 +114,19 @@ export function useSoftphoneController({
 
   const activeCallRef = useRef(callHandling.activeCall);
   const hangUpRef = useRef(callHandling.hangUp);
-  const deviceRef = useRef(connection.device);
   activeCallRef.current = callHandling.activeCall;
   hangUpRef.current = callHandling.hangUp;
-  deviceRef.current = connection.device;
 
   /**
    * @effect On unmount (e.g. navigating away from the softphone), hang up any
-   * in-progress call and disconnect the Twilio device so a call session never
+   * in-progress call through the provider so a call session never
    * outlives the component and keeps consuming a line/credits.
    * @effect-deps [] — intentionally mount-once, cleanup-only; reads activeCall/
-   * hangUp/device via refs kept fresh on every render (see activeCallRef/
-   * hangUpRef/deviceRef above) so the cleanup always sees the latest call
+   * hangUp via refs kept fresh on every render (see activeCallRef/
+   * hangUpRef above) so the cleanup always sees the latest call
    * without re-running (and re-teardown-registering) this effect each render.
-   * @effect-side-effects fetch (hangUp() calls the Twilio hangup API) + dom/sdk
-   * (device.disconnectAll() tears down the WebRTC device); runs only in cleanup.
+   * @effect-side-effects fetch (hangUp() calls the Twilio hangup API).
+   * useTwilioConnection owns device teardown.
    * @effect-why-not-loader Imperative SDK teardown tied to component unmount,
    * not request/response data.
    */
@@ -134,7 +135,6 @@ export function useSoftphoneController({
       if (activeCallRef.current) {
         hangUpRef.current?.().catch(() => {});
       }
-      deviceRef.current?.disconnectAll();
     };
   }, []);
 
