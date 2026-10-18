@@ -181,6 +181,9 @@ lifetime changes, exercise the installed SDK at that boundary as well. Use
 Delay microphone acquisition across unmount and device replacement; require
 tracks and polling to stop. A `destroy()` call count alone does not prove
 cleanup completed. Keep a normal-completion control.
+For initial effect replay in hook tests, use the render root's
+`reactStrictMode: true` option. In React 19, a StrictMode child wrapper can omit
+that initial replay. Delay cleanup and prove the next owner waits before capture.
 
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
