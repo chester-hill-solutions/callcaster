@@ -1,5 +1,9 @@
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { EventEmitter } from "node:events";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { createCallAudioInput } from "@/lib/twilio/call-audio-input.client";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
 import {
@@ -59,6 +63,108 @@ describe("audio device lifecycle", () => {
     vi.stubGlobal("AudioContext", MockAudioContext);
   });
 
+  test.each(["unmount", "replacement"] as const)(
+    "releases SDK microphone capture that resolves after %s",
+    async (exit) => {
+      const require = createRequire(import.meta.url);
+      const sdkEntry = require.resolve("@twilio/voice-sdk");
+      const { default: AudioHelper } = require(join(dirname(sdkEntry), "twilio/audiohelper.js"));
+      let resolveSdkStream!: (stream: MediaStream) => void;
+      const acquireSdkStream = vi.fn(() => new Promise<MediaStream>((resolve) => {
+        resolveSdkStream = resolve;
+      }));
+      const track = {
+        readyState: "live",
+        stop() { track.readyState = "ended"; },
+      };
+      const sdkStream = { getTracks: () => [track] } as unknown as MediaStream;
+      vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+      const audio = new AudioHelper(async () => {}, async () => {}, {
+        mediaDevices: {
+          enumerateDevices: async () => devices,
+          addEventListener() {},
+          removeEventListener() {},
+        },
+        getUserMedia: acquireSdkStream,
+        audioContext: {
+          createAnalyser: () => ({ frequencyBinCount: 16 }),
+          createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
+        },
+        audioProcessorEventObserver: new EventEmitter(),
+        setSinkId: async () => {},
+      });
+      const original = { audio } as unknown as import("@twilio/voice-sdk").Device;
+      const replacement = {
+        audio: {
+          setInputDevice: vi.fn(async () => {}),
+          unsetInputDevice: vi.fn(async () => {}),
+          speakerDevices: { set: vi.fn(async () => {}) },
+        },
+      } as unknown as import("@twilio/voice-sdk").Device;
+      const hook = renderHook(({ device }) => useCallAudioControls({
+        device,
+        activeCall: null,
+        micCoordinator: { isMicMuted: false, setMicMuted },
+      }), { initialProps: { device: original } });
+      try {
+        await waitFor(() => expect(acquireSdkStream).toHaveBeenCalledTimes(1));
+        audio._destroy();
+        if (exit === "unmount") hook.unmount();
+        else hook.rerender({ device: replacement });
+        await act(async () => resolveSdkStream(sdkStream));
+        await waitFor(() => expect(track.readyState).toBe("ended"));
+        expect(audio.inputStream).toBeNull();
+        expect(audio._isPollingInputVolume).toBe(false);
+      } finally {
+        hook.unmount();
+        audio._destroy();
+        vi.unstubAllGlobals();
+      }
+    },
+  );
+
+  test("queued microphone selections cannot open capture after disposal", async () => {
+    let finishFirst!: () => void;
+    let selected: string | null = null;
+    const started: string[] = [];
+    const owner = createCallAudioInput({
+      setInputDevice: async (id) => {
+        started.push(id);
+        await new Promise<void>((resolve) => { finishFirst = resolve; });
+        selected = id;
+      },
+      unsetInputDevice: async () => { selected = null; },
+    });
+    const first = owner.select("default");
+    await Promise.resolve();
+    const second = owner.select("usb-mic");
+    const release = owner.dispose();
+    expect(started).toEqual(["default"]);
+    finishFirst();
+    await Promise.all([first, second, release]);
+    expect(started).toEqual(["default"]);
+    expect(selected).toBeNull();
+    expect(owner.dispose()).toBe(release);
+  });
+
+  test("a failed selection does not block later microphone changes or release", async () => {
+    let selected: string | null = null;
+    const owner = createCallAudioInput({
+      setInputDevice: async (id) => {
+        if (id === "removed-mic") throw new Error("Device removed");
+        selected = id;
+      },
+      unsetInputDevice: async () => { selected = null; },
+    });
+    await expect(owner.select("removed-mic")).rejects.toThrow("Device removed");
+    await owner.select("default");
+    expect(selected).toBe("default");
+    await owner.dispose();
+    expect(selected).toBeNull();
+    await owner.select("usb-mic");
+    expect(selected).toBeNull();
+  });
+
   test("does not turn an anonymous device into a synthetic default", () => {
     const usable = getUsableAudioDevices(
       [audioDevice("audioinput", "", "")],
@@ -73,6 +179,7 @@ describe("audio device lifecycle", () => {
     const device = {
       audio: {
         setInputDevice,
+        unsetInputDevice: vi.fn(async () => {}),
         speakerDevices: { set: setSpeakerDevice },
       },
     } as unknown as import("@twilio/voice-sdk").Device;
@@ -106,6 +213,7 @@ describe("audio device lifecycle", () => {
     const device = {
       audio: {
         setInputDevice,
+        unsetInputDevice: vi.fn(async () => {}),
         speakerDevices: { set: setSpeakerDevice },
       },
     } as unknown as import("@twilio/voice-sdk").Device;

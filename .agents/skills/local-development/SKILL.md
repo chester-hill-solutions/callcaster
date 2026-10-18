@@ -175,6 +175,13 @@ For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.
 with the file paths. `npm run test:node -- <file>` appends that path to the final
 Bun command and still runs the entire Node suite.
 
+The UI test config aliases `@twilio/voice-sdk` to a mock. For SDK resource
+lifetime changes, exercise the installed SDK at that boundary as well. Use
+`createRequire` to resolve its actual entry where the alias would hide it.
+Delay microphone acquisition across unmount and device replacement; require
+tracks and polling to stop. A `destroy()` call count alone does not prove
+cleanup completed. Keep a normal-completion control.
+
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
 checkout has no dependencies. Use the prepared worktree instead of fetching a
