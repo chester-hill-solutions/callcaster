@@ -63,71 +63,138 @@ describe("audio device lifecycle", () => {
     vi.stubGlobal("AudioContext", MockAudioContext);
   });
 
-  test.each(["unmount", "replacement", "normal completion"] as const)(
-    "releases SDK microphone capture that resolves after %s",
-    async (exit) => {
-      const require = createRequire(import.meta.url);
-      const sdkEntry = require.resolve("@twilio/voice-sdk");
-      const { default: AudioHelper } = require(join(dirname(sdkEntry), "twilio/audiohelper.js"));
-      let resolveSdkStream!: (stream: MediaStream) => void;
-      const acquireSdkStream = vi.fn(() => new Promise<MediaStream>((resolve) => {
-        resolveSdkStream = resolve;
-      }));
-      const track = {
-        readyState: "live",
-        stop() { track.readyState = "ended"; },
-      };
-      const sdkStream = { getTracks: () => [track] } as unknown as MediaStream;
-      vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
-      const audio = new AudioHelper(async () => {}, async () => {}, {
-        mediaDevices: {
-          enumerateDevices: async () => devices,
-          addEventListener() {},
-          removeEventListener() {},
+  describe.each(["campaign", "softphone call", "softphone idle"] as const)(
+    "%s SDK microphone ownership",
+    (mode) => {
+      test.each(["unmount", "replacement", "normal completion"] as const)(
+        "releases SDK microphone capture that resolves after %s",
+        async (exit) => {
+          const require = createRequire(import.meta.url);
+          const sdkEntry = require.resolve("@twilio/voice-sdk");
+          const { default: AudioHelper } = require(
+            join(dirname(sdkEntry), "twilio/audiohelper.js"),
+          );
+          let resolveSdkStream!: (stream: MediaStream) => void;
+          const acquireSdkStream = vi.fn(
+            () =>
+              new Promise<MediaStream>((resolve) => {
+                resolveSdkStream = resolve;
+              }),
+          );
+          const track = {
+            readyState: "live",
+            stop() {
+              track.readyState = "ended";
+            },
+          };
+          const sdkStream = {
+            getTracks: () => [track],
+          } as unknown as MediaStream;
+          vi.stubGlobal(
+            "requestAnimationFrame",
+            vi.fn(() => 1),
+          );
+          const audio = new AudioHelper(
+            async () => {},
+            async () => {},
+            {
+              mediaDevices: {
+                enumerateDevices: async () => devices,
+                addEventListener() {},
+                removeEventListener() {},
+              },
+              getUserMedia: acquireSdkStream,
+              audioContext: {
+                createAnalyser: () => ({ frequencyBinCount: 16 }),
+                createMediaStreamSource: () => ({
+                  connect() {},
+                  disconnect() {},
+                }),
+              },
+              audioProcessorEventObserver: new EventEmitter(),
+              setSinkId: async () => {},
+            },
+          );
+          const original = {
+            audio,
+          } as unknown as import("@twilio/voice-sdk").Device;
+          const replacement = {
+            audio: {
+              setInputDevice: vi.fn(async () => {}),
+              unsetInputDevice: vi.fn(async () => {}),
+              speakerDevices: { set: vi.fn(async () => {}) },
+            },
+          } as unknown as import("@twilio/voice-sdk").Device;
+          const activeCall =
+            mode === "softphone call"
+              ? ({} as import("@twilio/voice-sdk").Call)
+              : null;
+          const hook =
+            mode === "campaign"
+              ? renderHook(
+                  ({ device }) =>
+                    useCallAudioControls({
+                      device,
+                      activeCall: null,
+                      micCoordinator: { isMicMuted: false, setMicMuted },
+                    }),
+                  { initialProps: { device: original } },
+                )
+              : renderHook(
+                  ({ device }) =>
+                    useSoftphoneAudioDevices({
+                      device,
+                      activeCall,
+                      micCoordinator: { isMicMuted: false, setMicMuted },
+                    }),
+                  { initialProps: { device: original } },
+                );
+          try {
+            if (mode === "softphone idle") {
+              await waitFor(() =>
+                expect(
+                  "selectedMicId" in hook.result.current &&
+                    hook.result.current.selectedMicId,
+                ).toBe("default"),
+              );
+              expect(acquireSdkStream).not.toHaveBeenCalled();
+              act(() => {
+                if ("handleMicChange" in hook.result.current)
+                  hook.result.current.handleMicChange("usb-mic");
+              });
+            }
+            await waitFor(() =>
+              expect(acquireSdkStream).toHaveBeenCalledTimes(1),
+            );
+            if (exit === "normal completion") {
+              await act(async () => resolveSdkStream(sdkStream));
+              await waitFor(() => expect(audio.inputStream).toBe(sdkStream));
+              expect(track.readyState).toBe("live");
+              expect(audio._isPollingInputVolume).toBe(true);
+              hook.unmount();
+            } else {
+              audio._destroy();
+              if (exit === "unmount") hook.unmount();
+              else hook.rerender({ device: replacement });
+              await act(async () => resolveSdkStream(sdkStream));
+            }
+            await waitFor(() => expect(track.readyState).toBe("ended"));
+            expect(audio.inputStream).toBeNull();
+            expect(audio._isPollingInputVolume).toBe(false);
+            if (exit === "replacement") {
+              if (mode === "softphone idle") {
+                expect(replacement.audio?.setInputDevice).not.toHaveBeenCalled();
+              } else {
+                await waitFor(() => expect(replacement.audio?.setInputDevice).toHaveBeenCalledWith("default"));
+              }
+            }
+          } finally {
+            hook.unmount();
+            audio._destroy();
+            vi.unstubAllGlobals();
+          }
         },
-        getUserMedia: acquireSdkStream,
-        audioContext: {
-          createAnalyser: () => ({ frequencyBinCount: 16 }),
-          createMediaStreamSource: () => ({ connect() {}, disconnect() {} }),
-        },
-        audioProcessorEventObserver: new EventEmitter(),
-        setSinkId: async () => {},
-      });
-      const original = { audio } as unknown as import("@twilio/voice-sdk").Device;
-      const replacement = {
-        audio: {
-          setInputDevice: vi.fn(async () => {}),
-          unsetInputDevice: vi.fn(async () => {}),
-          speakerDevices: { set: vi.fn(async () => {}) },
-        },
-      } as unknown as import("@twilio/voice-sdk").Device;
-      const hook = renderHook(({ device }) => useCallAudioControls({
-        device,
-        activeCall: null,
-        micCoordinator: { isMicMuted: false, setMicMuted },
-      }), { initialProps: { device: original } });
-      try {
-        await waitFor(() => expect(acquireSdkStream).toHaveBeenCalledTimes(1));
-        if (exit === "normal completion") {
-          await act(async () => resolveSdkStream(sdkStream));
-          await waitFor(() => expect(audio.inputStream).toBe(sdkStream));
-          expect(track.readyState).toBe("live");
-          expect(audio._isPollingInputVolume).toBe(true);
-          hook.unmount();
-        } else {
-          audio._destroy();
-          if (exit === "unmount") hook.unmount();
-          else hook.rerender({ device: replacement });
-          await act(async () => resolveSdkStream(sdkStream));
-        }
-        await waitFor(() => expect(track.readyState).toBe("ended"));
-        expect(audio.inputStream).toBeNull();
-        expect(audio._isPollingInputVolume).toBe(false);
-      } finally {
-        hook.unmount();
-        audio._destroy();
-        vi.unstubAllGlobals();
-      }
+      );
     },
   );
 
@@ -213,39 +280,57 @@ describe("audio device lifecycle", () => {
     expect(reconcileAudioDeviceId(usable, null)).toBeNull();
   });
 
-  test("softphone falls back after unplug and preserves microphone mute", async () => {
-    const device = {
-      audio: {
-        setInputDevice,
-        unsetInputDevice: vi.fn(async () => {}),
-        speakerDevices: { set: setSpeakerDevice },
-      },
-    } as unknown as import("@twilio/voice-sdk").Device;
-    const { result } = renderHook(() =>
-      useSoftphoneAudioDevices({
-        device,
-        activeCall: null,
-        micCoordinator: { isMicMuted: true, setMicMuted },
-      }),
-    );
+  test.each(["idle", "active"] as const)(
+    "softphone %s input falls back after unplug and preserves mute",
+    async (state) => {
+      const device = {
+        audio: {
+          setInputDevice,
+          unsetInputDevice: vi.fn(async () => {}),
+          speakerDevices: { set: setSpeakerDevice },
+        },
+      } as unknown as import("@twilio/voice-sdk").Device;
+      const activeCall =
+        state === "active" ? ({} as import("@twilio/voice-sdk").Call) : null;
+      const { result } = renderHook(() =>
+        useSoftphoneAudioDevices({
+          device,
+          activeCall,
+          micCoordinator: { isMicMuted: true, setMicMuted },
+        }),
+      );
 
-    await waitFor(() => expect(result.current.selectedMicId).toBe("default"));
-    act(() => result.current.handleMicChange("usb-mic"));
-    await waitFor(() => expect(result.current.selectedMicId).toBe("usb-mic"));
-    expect(setMicMuted).not.toHaveBeenCalled();
+      await waitFor(() => expect(result.current.selectedMicId).toBe("default"));
+      if (state === "idle") expect(setInputDevice).not.toHaveBeenCalled();
+      else
+        await waitFor(() =>
+          expect(setInputDevice).toHaveBeenLastCalledWith("default"),
+        );
+      act(() => result.current.handleMicChange("usb-mic"));
+      await waitFor(() =>
+        expect(setInputDevice).toHaveBeenLastCalledWith("usb-mic"),
+      );
+      expect(result.current.selectedMicId).toBe("usb-mic");
+      expect(setMicMuted).not.toHaveBeenCalled();
 
-    devices = [
-      audioDevice("audioinput", "default", "Default microphone"),
-      audioDevice("audiooutput", "default", "Default speaker"),
-    ];
-    await act(async () => {
-      deviceChange?.();
-    });
+      devices = [
+        audioDevice("audioinput", "default", "Default microphone"),
+        audioDevice("audiooutput", "default", "Default speaker"),
+      ];
+      await act(async () => {
+        deviceChange?.();
+      });
 
-    await waitFor(() => expect(result.current.selectedMicId).toBe("default"));
-    expect(result.current.micMuted).toBe(true);
-    expect(setMicMuted).not.toHaveBeenCalled();
-  });
+      await waitFor(() => expect(result.current.selectedMicId).toBe("default"));
+      if (state === "active")
+        await waitFor(() =>
+          expect(setInputDevice).toHaveBeenLastCalledWith("default"),
+        );
+      else expect(setInputDevice).toHaveBeenLastCalledWith("usb-mic");
+      expect(result.current.micMuted).toBe(true);
+      expect(setMicMuted).not.toHaveBeenCalled();
+    },
+  );
 
   test("campaign controls re-enumerate and apply unplug fallback", async () => {
     const device = {
