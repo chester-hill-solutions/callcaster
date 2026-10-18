@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Railway plans preserve an existing legacy variable in each modeled environment ([#2714](https://github.com/chester-hill-solutions/callcaster/issues/2714)).
+- Fixed: Railway plans preserve an existing legacy variable in each modeled environment ([PR #2715](https://github.com/chester-hill-solutions/callcaster/pull/2715), [#2714](https://github.com/chester-hill-solutions/callcaster/issues/2714)).
 
 - Fixed: Campaign exports wait for each status request and discard results after leaving or switching campaigns ([PR #2713](https://github.com/chester-hill-solutions/callcaster/pull/2713), [#2712](https://github.com/chester-hill-solutions/callcaster/issues/2712)).
 
