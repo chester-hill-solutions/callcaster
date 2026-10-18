@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**129** documented / **131** total effects (2 grandfathered, ratcheting to 0).
+**131** documented / **133** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
