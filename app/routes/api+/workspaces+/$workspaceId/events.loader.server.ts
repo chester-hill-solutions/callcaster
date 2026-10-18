@@ -115,6 +115,8 @@ async function streamWorkspaceEvents(
       const encoder = new TextEncoder();
       let cursor = initialCursor;
       let closed = false;
+      let flushing = false;
+      let flushRequested = false;
       let listenUnsubscribe: (() => Promise<void>) | undefined;
 
       const closeStream = () => {
@@ -130,23 +132,38 @@ async function streamWorkspaceEvents(
         }
       };
 
+      const drainEvents = async () => {
+        let events = await fetchWorkspaceEventsAfter(workspaceId, cursor);
+        while (events.length > 0 && !closed) {
+          for (const event of events) {
+            controller.enqueue(encoder.encode(formatSseEvent(event)));
+            cursor = event.id;
+          }
+          if (events.length < 100) break;
+          events = await fetchWorkspaceEventsAfter(workspaceId, cursor);
+        }
+      };
+
       const flushEvents = async () => {
         if (closed) return;
+        // A wakeup can name rows committed after the active query's snapshot.
+        flushRequested = true;
+        if (flushing) return;
+        flushing = true;
 
         try {
-          let events = await fetchWorkspaceEventsAfter(workspaceId, cursor);
-          while (events.length > 0 && !closed) {
-            for (const event of events) {
-              controller.enqueue(encoder.encode(formatSseEvent(event)));
-              cursor = event.id;
+          do {
+            flushRequested = false;
+            try {
+              await drainEvents();
+            } catch {
+              if (!closed) {
+                controller.enqueue(encoder.encode("event: error\ndata: flush_failed\n\n"));
+              }
             }
-            if (events.length < 100) break;
-            events = await fetchWorkspaceEventsAfter(workspaceId, cursor);
-          }
-        } catch {
-          if (!closed) {
-            controller.enqueue(encoder.encode("event: error\ndata: flush_failed\n\n"));
-          }
+          } while (flushRequested && !closed);
+        } finally {
+          flushing = false;
         }
       };
 
