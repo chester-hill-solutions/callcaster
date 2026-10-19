@@ -558,22 +558,16 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Retire the remaining auth schema after dependency verification",
     "summary": "Partial fix only. Dead RPC removal and both actor rewrites are on dev; legacy auth shim remains and the fail-closed schema drop is absent. Issue discussion requires production dependency verification before the drop.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The two live RPCs now use app.current_user_id and get_outreach_attempts is dropped; auth.uid() is still created and schema auth remains to be retired.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. Chunks 1 and 2 shipped: the dead get_outreach_attempts RPC is dropped and the two live auth.uid() RPCs read app.current_user_id. What is still missing in the current tree: the auth schema still exists (no DROP SCHEMA auth migration), drizzle/0001_auth_uid_shim.sql still creates auth.uid() and scripts/db/bootstrap-fresh-db.mjs still applies it, and there is no dependency guard - a repo-wide search for pg_depend finds nothing. Chunk 3 is written but NOT merged: commit cd00ada0 (fix(db): drop the legacy auth schema with a fail-closed guard (#1885)) on origin/fix/1885-chunk3-drop-auth adds client/migrations/20260922120000_drop_legacy_auth_schema.sql, test/legacy-auth-sql-guard.test.ts and retires the shim in both bootstrap scripts. It is not an ancestor of dev.",
     "rootCause": "The live RPC actor rewrites and dead RPC removal shipped. The baseline shim still creates auth.uid(), and the final dependency guard and schema retirement remain unshipped.",
-    "resolution": "Remaining work only: ship a dependency guard, verify all production dependencies/data, then release the schema drop separately and retire the bootstrap shim.",
+    "resolution": "Chunk 3 is already written on origin/fix/1885-chunk3-drop-auth (cd00ada0): a fail-closed DROP SCHEMA auth migration with a dependency guard, the shim retired in drizzle/0001_auth_uid_shim.sql and both bootstrap scripts, and test/legacy-auth-sql-guard.test.ts. It was never merged, so nothing needs to be written. Before it can land, the production dependency and data-retention verification the issue requires has to be recorded, and the schema drop has to ship as its own release step rather than inside a feature PR.",
     "lookIn": [
-      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23",
-      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18",
-      "drizzle/0001_auth_uid_shim.sql:2",
-      "scripts/db/bootstrap-fresh-db.mjs:120",
-      "app/lib/db-rpc.server.ts",
-      "drizzle/0001_auth_uid_shim.sql",
-      "drizzle/0000_baseline.sql",
-      "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
-      "client/migrations/20260715140000_drop_legacy_rls.sql",
-      "scripts/db/check-db-orphans.mjs",
-      "scripts/db/bootstrap-fresh-db.mjs",
-      "scripts/e2e/bootstrap-compose-db.mjs"
+      "client/migrations/20260920120000_drop_get_outreach_attempts.sql (chunk 1, shipped)",
+      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23 (chunk 2, shipped)",
+      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18 (chunk 2, shipped)",
+      "origin/fix/1885-chunk3-drop-auth commit cd00ada0 (chunk 3, written but never merged)",
+      "drizzle/0001_auth_uid_shim.sql:2 (the shim that chunk 3 retires)",
+      "scripts/db/bootstrap-fresh-db.mjs:120 (the bootstrap that still applies the shim)"
     ],
     "existingTests": [
       "test/queue-rpc-contract.test.ts",
@@ -582,7 +576,8 @@
       "test/atomic-manual-dial-claims.integration.test.ts"
     ],
     "missingTests": [
-      "No legacy-auth SQL guard is present on dev. Existing queue contract tests need latest-definition and actor/no-actor coverage. Database state was not queried in this read-only code audit."
+      "test/legacy-auth-sql-guard.test.ts does not exist on dev; it exists only on the unmerged chunk 3 branch",
+      "The production dependency and data-retention verification the issue requires is not recorded anywhere"
     ],
     "acceptanceCriteria": [
       "A dependency guard fails before any destructive operation when non-auth functions, policies, views or other schema objects still depend on auth.",
@@ -594,7 +589,7 @@
     "blockedBy": [],
     "size": "M-L",
     "risk": "high",
-    "trackerRecommendation": "Blocked / split first. Chunks 1–2 shipped in #1966. The 2026-09-28 issue comment explicitly requires production checks and separate guard/drop release work; do not merge the old chunk-3 branch as-is. Related PR evidence: #1966, #1887. A PR reference alone does not prove deployed behavior."
+    "trackerRecommendation": "Lane is blocked-epic: the remaining work is a production verification plus a separate release step, and it touches client/migrations. The implementation is already written on origin/fix/1885-chunk3-drop-auth (cd00ada0) - start from that branch rather than writing it again. Do not merge the schema drop inside a feature PR."
   },
   {
     "issueNumber": 1873,
@@ -645,15 +640,14 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
     "summary": "The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.",
-    "currentBehavior": "Source audit: dev@7f2c2f9a, 2026-10-11. The cull report reads the checked-in three-workspace keep-list before phone-name and activity rules. PR #2536 passed full CI, E2E, schema checks, and both Railway preview deployments; issue #2168 is on-dev. Name backfill, repeat policy, and live cleanup remain separate.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The keep-list slice is done and proven: scripts/cull-keep-list.mjs holds the three confirmed workspace ids, it wins before every cull rule, and test/cull-report-policy.test.ts asserts that 2608141501 survives the phone-name rule. The report is still read-only with no delete path. What is not done: nothing renames the legacy UUID-named Twilio subaccounts - workspaceResourceName is used only on the create path - and the repeat-versus-one-off policy is unrecorded.",
     "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
-    "resolution": "The durable keep-list slice is complete in PR #2536, merged to dev. The phone-named workspace 2608141501 wins before cull rules. Keep the follow-up split: backfill existing Twilio subaccount names with an idempotent operation, decide whether cleanup repeats, and keep workspace-row deletion deferred. Recheck current ownership before any new live cleanup.",
+    "resolution": "The keep-list is done. What remains is a backfill that renames the legacy UUID-named Twilio subaccounts to the workspaceResourceName form, plus the decision on whether the cull is repeatable or a one-off. The naming helper already exists in app/lib/twilio-resource-name.ts, and the prune report from PR #2733 now resolves those legacy names to their owner workspace, so the backfill has a source of truth to work from.",
     "lookIn": [
-      "scripts/cull-report.mjs:1",
-      "app/lib/twilio-resource-name.ts:1",
-      "scripts/cull-report.mjs (read-only cull tool, merged #2171)",
-      "app/lib/twilio-resource-name.ts (naming helper, merged #2167)",
-      "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
+      "scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)",
+      "scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)",
+      "app/lib/database/workspace-twilio-subaccount.server.ts:39-62 (workspaceResourceName, create path only)",
+      "scripts/twilio-resource-prune-report.mjs (resolves legacy names to their owner workspace)"
     ],
     "existingTests": [
       "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings",
@@ -678,9 +672,9 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Correct the remaining temporal column types listed in the schema drift baseline",
     "summary": "The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. 64 committed temporal mismatch lines remain; guard and first table slices are on dev. Tenant write type boundary was tightened in PR #2244, so the earlier untyped-write prerequisite is resolved.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The guard and three slices landed: the campaign_queue, call and message tables now declare their temporal columns as timestamps (3d951645, 6fca427d), and test/integration-db/schema-type-drift.test.ts asserts no column has started lying about being text and that no baselined column has stopped lying. The baseline scripts/baselines/schema-type-drift.txt still holds all 64 entries, so no further table has been sliced. app/db/schema.ts:323 still declares date_updated as text().",
     "rootCause": "The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.",
-    "resolution": "Split remaining tables into atomic tasks and start one table slice. Validate invalid/empty values, wire contracts and Date sorting at each boundary.",
+    "resolution": "The guard and the first three slices are done. The remaining work is mechanical: correct the 64 baselined temporal columns in the same slice-at-a-time pattern, lowering the baseline with each slice, and remove the last text() temporal declaration. The existing guard test already refuses a stale baseline entry, so each slice is provable on its own.",
     "lookIn": [
       "scripts/baselines/schema-type-drift.txt:1",
       "test/integration-db/schema-type-drift.test.ts:141",
@@ -862,38 +856,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
-  },
-  {
-    "issueNumber": 1771,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
-    "summary": "Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.",
-    "currentBehavior": "The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.",
-    "rootCause": "Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.",
-    "resolution": "Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [
-      "#2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.",
-      "Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance."
-    ],
-    "missingTests": [
-      "Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.",
-      "Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.",
-      "Applicable deployed original-file/reporting acceptance and release verification."
-    ],
-    "acceptanceCriteria": [
-      "reviewable per-row failure list or download",
-      "original CSV retained safely",
-      "aggregate counts unchanged"
-    ],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.",
-    "blockedBy": []
   },
   {
     "issueNumber": 2356,
