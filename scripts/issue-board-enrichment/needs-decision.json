@@ -832,5 +832,23 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance."
+  },
+  {
+    "issueNumber": 1717,
+    "verdict": "needs-decision",
+    "summary": "A workspace URL that does not exist now lands on /workspaces, and an unknown path inside a workspace renders the 404 inside the workspace chrome (no longer the bare CallCaster error document), but nothing implements the requested URL-shape-dependent redirect: the workspace 404 still offers only a context-free window.history.back() and a root-level 404 still renders a CallCaster-branded shell with a manual 'Go home' link instead of redirecting.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/lib/workspace-middleware.server.ts",
+      ".loader.server.ts",
+      "app/components/shared/RouteErrorBoundary.tsx",
+      "app/root.tsx"
+    ],
+    "existingTests": [
+      "test/workspace-not-found.loader.test.ts — asserts the workspace catch-all throws a 404 Response and that the workspace layout's boundary renders 'Page not found' inside the app chrome; test/ui/route-error-messages.test.tsx:139-152 — asserts the 404 card keeps a 'Go back' button. No test asserts any URL-shape-dependent redirect destination."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The repository's own board record classified this issue as 'needs-decision' (scripts/issue-board-enrichment/needs-decision.json at 91c4409b^): \"404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.\" No ADR under docs/adr/ records that decision, so there is no written policy in the repo to implement. GitHub shows the issue closed 2026-10-14 as NOT_PLANNED with no commit, PR or test tied to it, and the current ISSUE_BOARD.md in master no longer lists it. Because the issue title is not a 'Decide:'/'Spike:' record, this is judged as a defect: two of the three requested destinations are not implemented as redirects."
   }
 ]
