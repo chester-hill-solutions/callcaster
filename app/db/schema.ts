@@ -585,14 +585,7 @@ export const verification_session = pgTable("verification_session", {
   created_at: text().notNull().default(sql`now()`),
 });
 
-export const verification_number = pgTable("verification_number", {
-  phone_number: text().notNull().primaryKey(),
-  provider_sid: text(),
-  label: text(),
-  region: text(),
-  is_active: boolean().notNull().default(false),
-  ...isoTimestamps(),
-});
+export { verification_number } from "./schema-verification-number";
 
 export const user = pgTable("user", {
   access_level: text().default("standard"),
