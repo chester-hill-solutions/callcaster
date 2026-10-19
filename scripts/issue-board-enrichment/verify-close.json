@@ -3464,5 +3464,39 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Lane is verify-close: source and regressions landed in PR #2468, so do not rebuild them. Only deployed provider acceptance and release promotion remain, and neither can run without a paid Twilio purchase. Close on promotion."
+  },
+  {
+    "issueNumber": 2459,
+    "verdict": "verify-close",
+    "recommendedTitle": "The Access form shows two success notices for one recovery click",
+    "summary": "Implemented in PR #2730 (43a3e532, on dev). The routed child of the admin workspace Tabs is now wrapped in the existing TabsContent panel, keyed to the active URL tab, so it keeps a single mount per page lifetime. One recovery click now produces one result notice.",
+    "currentBehavior": "Verified on dev@43a3e532, 19 October 2026. Six Router cases in test/ui/admin-access-result-notices.test.tsx pass, and the mount probe counts one mount and one toast per click. Reverting the one-line change fails 4 of the 6 cases and the probe reports 2 mounts and 2 toast.success calls for a single click.",
+    "rootCause": "The routed Access child was a bare child of Tabs with no TabPanel boundary, so React Aria's tabs collection builder unmounted and remounted it. useActionFeedback is identity-guarded per hook instance, so the replacement instance started with an empty guard and re-handled the action result already present in useActionData. The measured original case made one request and one write, so this was a presentation defect, not a duplicate mutation.",
+    "resolution": "No source work remains. Verify notice appearance, update and dismissal at phone and desktop widths in a deployed browser, confirm one notice per action, then promote through the normal release process.",
+    "lookIn": [
+      "app/routes/admin+/workspaces/$workspaceId.route.tsx:121 (routed child wrapped in TabsContent keyed to the active URL tab)",
+      "app/components/ui/tabs.tsx (Tabs and TabsContent wrappers over the shared library)",
+      "app/hooks/utils/useActionFeedback.ts (per-instance identity guard)",
+      "app/routes/admin+/workspaces/$workspaceId/invite.route.tsx (the Access route under test)",
+      "test/ui/admin-access-result-notices.test.tsx (the six-case regression)"
+    ],
+    "existingTests": [
+      "test/ui/admin-access-result-notices.test.tsx: 6 cases rendering the real parent route, the real Access route, the shared Tabs and the single root Toaster"
+    ],
+    "missingTests": [
+      "Browser geometry: notice appearance, update and dismissal were not measured for page-landmark stability at phone and desktop widths",
+      "A real full-app request and write probe; the fixture supplies router data and a stub action, so HTTP and database write counts are not re-measured"
+    ],
+    "acceptanceCriteria": [
+      "One recovery click produces exactly one result notice after loader revalidation, and the request and write counts stay at one each",
+      "A later valid action still produces its own result, including the same message; error and warning results remain visible and are not suppressed by a previous success",
+      "Navigation, revalidation and ordinary renders do not replay a handled result; pending controls, owner safety, target enrollment and saved data are preserved",
+      "Success and error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths, using the shared component library and the single root host",
+      "Deployed release acceptance is recorded separately from the source fix"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane is verify-close: the source fix and its regression landed in PR #2730 on dev, so do not rebuild them. The fixture role change that an earlier attempt made was rejected in review and is not part of this fix. Deployed browser acceptance and release promotion remain, and the issue closes on promotion."
   }
 ]

@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@b2c9f891` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@079eda00` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,26 +29,29 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 1
+## Fix now — 0
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-### [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459) The Access form shows two success notices for one recovery click
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
-- One click was measured as one POST, one membership update and two notices. A local existing-panel repair is tested; final browser approval remains pending.
-- Current behavior: Local 784265970c6d40f09667938c80a4909e22ff073c on older dev@8672297b1b3a97dcf2744b31e80f421b860a1da0 uses TabsContent around the admin Outlet. Six real parent/Access Router cases, full local CI, 1,001 actual PostgreSQL cases and both source reviews pass. There is no PR or candidate browser acceptance.
-- Root cause: The routed Access child was rendered in both the React Aria Tabs collection builder and visible tree because it lacked a TabPanel boundary. The measured original full-app case has one request and one write, so it is a presentation defect.
-- Resolution: Complete the explicitly approved isolated browser role tests, require one notice per result and zero page-landmark movement at phone/desktop widths, then refresh onto current dev and repeat full gates/reviews before one atomic PR. Preserve repeat messages, pending controls, owner safety and the single root host.
-- Look in: `app/routes/admin+/workspaces/$workspaceId.route.tsx`, `app/components/ui/tabs.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`
-- Missing tests: Candidate full-app notice/request/write counts, repeat Owner action, sole-owner refusal and phone/desktop landmarks await role-test approval. Local test/ui/admin-access-result-notices.test.tsx has six passing Router cases but is not on dev.
-- Done when: One recovery click produces one result notice after loader revalidation. Measure request/write counts before claiming a duplicate mutation or repairing that boundary.; A later valid action still produces its own result, including the same message. Error and warning results remain visible and are not suppressed by a previous success.; Navigation, revalidation and ordinary renders do not replay a handled result. Preserve pending controls, owner safety, target enrollment and saved data.; Success/error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths. Keep the shared component library and single root host.; Add an executed failing regression with valid controls, then prove restored behavior. Pass full local CI, independent source reviews, applicable exact-head remote gates and deployments before an atomic merge. Keep deployed release acceptance separate.
-- Tracker: Keep Fix now for the unmerged duplicate presentation repair. Automatic review rejected the fixture role change; no SQL, API or alternate browser bypass was used. Candidate base refresh, publication and deployed acceptance remain.
+_None._
 
 ---
 
-## Verify and close — 102
+## Verify and close — 103
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459) The Access form shows two success notices for one recovery click
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-19
+- Implemented in PR #2730 (43a3e532, on dev). The routed child of the admin workspace Tabs is now wrapped in the existing TabsContent panel, keyed to the active URL tab, so it keeps a single mount per page lifetime. One recovery click now produces one result notice.
+- Current behavior: Verified on dev@43a3e532, 19 October 2026. Six Router cases in test/ui/admin-access-result-notices.test.tsx pass, and the mount probe counts one mount and one toast per click. Reverting the one-line change fails 4 of the 6 cases and the probe reports 2 mounts and 2 toast.success calls for a single click.
+- Root cause: The routed Access child was a bare child of Tabs with no TabPanel boundary, so React Aria's tabs collection builder unmounted and remounted it. useActionFeedback is identity-guarded per hook instance, so the replacement instance started with an empty guard and re-handled the action result already present in useActionData. The measured original case made one request and one write, so this was a presentation defect, not a duplicate mutation.
+- Resolution: No source work remains. Verify notice appearance, update and dismissal at phone and desktop widths in a deployed browser, confirm one notice per action, then promote through the normal release process.
+- Look in: `app/routes/admin+/workspaces/$workspaceId.route.tsx:121 (routed child wrapped in TabsContent keyed to the active URL tab)`, `app/components/ui/tabs.tsx (Tabs and TabsContent wrappers over the shared library)`, `app/hooks/utils/useActionFeedback.ts (per-instance identity guard)`, `app/routes/admin+/workspaces/$workspaceId/invite.route.tsx (the Access route under test)`, `test/ui/admin-access-result-notices.test.tsx (the six-case regression)`
+- Existing tests: test/ui/admin-access-result-notices.test.tsx: 6 cases rendering the real parent route, the real Access route, the shared Tabs and the single root Toaster
+- Missing tests: Browser geometry: notice appearance, update and dismissal were not measured for page-landmark stability at phone and desktop widths; A real full-app request and write probe; the fixture supplies router data and a stub action, so HTTP and database write counts are not re-measured
+- Done when: One recovery click produces exactly one result notice after loader revalidation, and the request and write counts stay at one each; A later valid action still produces its own result, including the same message; error and warning results remain visible and are not suppressed by a previous success; Navigation, revalidation and ordinary renders do not replay a handled result; pending controls, owner safety, target enrollment and saved data are preserved; Success and error notice appearance, update and dismissal do not move page landmarks at phone and desktop widths, using the shared component library and the single root host; Deployed release acceptance is recorded separately from the source fix
+- Tracker: Lane is verify-close: the source fix and its regression landed in PR #2730 on dev, so do not rebuild them. The fixture role change that an earlier attempt made was rejected in review and is not part of this fix. Deployed browser acceptance and release promotion remain, and the issue closes on promotion.
 
 ### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-19
@@ -1644,6 +1647,16 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
+### [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030) Spike: weigh permission models against what the auth system already provides
+- Verdict: **Blocked / split first** · Size: M · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-19
+- The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.
+- Current behavior: Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.
+- Root cause: Roles were adopted as the model without first checking whether a permission primitive was available.
+- Resolution: Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.
+- Look in: `package.json (better-auth version and plugins in use)`, `app/lib/admin-middleware.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/server/tenant-db.ts`, `app/lib/data-plane-middleware.server.ts`
+- Done when: A written recommendation exists, reviewed before any implementation begins; better-auth permission capabilities are established from the installed version, not from documentation memory; Existing in-repo authorization is inventoried so it is extended rather than duplicated; Ruled-out options are recorded with reasons
+- Tracker: Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL.
+
 ### [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827) Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it
 - Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-10-17
 - Create a dedicated Twilio account for the dev environment (ideally via IaC) and update dev.callcaster.ca to use it.
@@ -1890,16 +1903,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Done when: No route or loader compares a broad role string where a permission check is meant; check:route-authz fails when a new role comparison is introduced; The sweep lands after the model, not before
 - Tracker: #2030 reported (docs/adr/0039-role-checks-become-capability-checks.md); still deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice.
 
-### [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030) Spike: weigh permission models against what the auth system already provides
-- Verdict: **Blocked / split first** · Size: M · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-09-25
-- The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.
-- Current behavior: Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.
-- Root cause: Roles were adopted as the model without first checking whether a permission primitive was available.
-- Resolution: Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.
-- Look in: `package.json (better-auth version and plugins in use)`, `app/lib/admin-middleware.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/server/tenant-db.ts`, `app/lib/data-plane-middleware.server.ts`
-- Done when: A written recommendation exists, reviewed before any implementation begins; better-auth permission capabilities are established from the installed version, not from documentation memory; Existing in-repo authorization is inventoried so it is extended rather than duplicated; Ruled-out options are recorded with reasons
-- Tracker: Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL.
-
 ### [#2009](https://github.com/chester-hill-solutions/callcaster/issues/2009) Agent ABAC: adding an Agent to a campaign unlocks that campaign type for them
 - Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
 - The attribute-based half of the cluster. Adding an Agent to a specific campaign should also unlock their broader ability to see and act on that campaign type: added to a live-call campaign, it appears on their list and is callable if open; added to an SMS campaign, its numbers become visible on the chats page.
@@ -2089,7 +2092,7 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2716](https://github.com/chester-hill-solutions/callcaster/issues/2716) Decide the next scoped Effect adoption
-- Status: on-dev · Labels: none · Assignee: @wra-sol · Updated: 2026-10-18
+- Status: In progress · Labels: none · Assignee: @wra-sol · Updated: 2026-10-18
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2714](https://github.com/chester-hill-solutions/callcaster/issues/2714) Railway plans propose deleting an existing legacy variable
