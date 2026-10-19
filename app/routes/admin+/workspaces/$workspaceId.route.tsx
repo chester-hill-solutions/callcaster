@@ -118,7 +118,9 @@ export default function WorkspaceDetails() {
                     twilioSnapshot={twilioPortalSnapshot}
                  />
                 ) : (
-                    <Outlet context={{ workspace, workspaceUsers, phoneNumbers }} />
+                    <TabsContent value={getActiveTab()}>
+                        <Outlet context={{ workspace, workspaceUsers, phoneNumbers }} />
+                    </TabsContent>
                 )}
             </Tabs>
         </div>
