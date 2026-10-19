@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: The platform Access form shows one success notice per action instead of two ([PR #2730](https://github.com/chester-hill-solutions/callcaster/pull/2730), [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459)).
+
 - Changed: Call-in verification numbers are managed in Admin instead of an environment variable, so the number can change without a redeploy ([PR #2726](https://github.com/chester-hill-solutions/callcaster/pull/2726), [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519)).
 
 - Fixed: Audio conversions and duration reads stop a process that never exits, so an upload cannot hang indefinitely ([PR #2725](https://github.com/chester-hill-solutions/callcaster/pull/2725), [#2724](https://github.com/chester-hill-solutions/callcaster/issues/2724)).
