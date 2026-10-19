@@ -25,6 +25,7 @@ const appVariables = [
   "SIGNUP_OPEN",
   "OPENAI_API_KEY",
   "RESEND_API_KEY",
+  "STRIPE_API_KEY",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "SUPABASE_ANON_KEY",
@@ -41,7 +42,7 @@ const appVariables = [
   "TWILIO_SID",
 ] as const;
 
-// Worker vars mirror staging's; values land at the cutover window (#1303).
+// Worker vars mirror QA's; values land at the cutover window (#1303).
 const workerVariables = [
   "BASE_URL",
   "BETTER_AUTH_SECRET",
@@ -66,10 +67,10 @@ export function productionResources() {
   const app = service("callcaster", {
     // Every config change to this service is deploy-triggering. Topology
     // directive 2026-08-31 (#1300): master is the release trunk — production
-    // and staging both deploy it; there is no separate `production` deploy
+    // and QA both deploy it; there is no separate `production` deploy
     // branch. Build stays NIXPACKS/V2 (what is live and serving); the
     // Dockerfile build modernization is a separate decision. The /readyz
-    // healthcheck (#1451) gates go-live like staging's: adopted once #1441
+    // healthcheck (#1451) gates go-live like QA's: adopted once #1441
     // made production pass it — an unhealthy build leaves the prior deploy
     // serving.
     source: source("master"),

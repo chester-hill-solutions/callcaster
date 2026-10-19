@@ -42,6 +42,7 @@ export const action = defineAction({
     const result = await releaseAssignedQueueForUser(
       user.id,
       campaign_id,
+      workspaceId,
     );
 
     if (!result.ok) {

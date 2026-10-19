@@ -35,7 +35,7 @@ import {
 import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { Tables } from "@/lib/db-types";
 import { toast } from "sonner";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
@@ -87,6 +87,7 @@ export function CallScreenLayout({
 }: CallScreenLayoutProps) {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const leaveInFlight = useRef(false);
   const {
     hangUp,
     answer,
@@ -190,16 +191,20 @@ export function CallScreenLayout({
   };
 
   const handleLeaveCampaign = async () => {
-    if (isLeaving) return;
+    if (leaveInFlight.current) return;
+    leaveInFlight.current = true;
     setIsLeaving(true);
     try {
       if (campaign.dial_type === "predictive") {
         if (!(await endPredictiveConference())) return;
       }
       if (activeCall) await hangUp();
-      if (campaign.dial_type !== "predictive") requeueContacts();
-      navigate(-1);
+      if (campaign.dial_type !== "predictive") await requeueContacts();
+      await navigate(-1);
+    } catch {
+      toast.error("Could not release your campaign contacts. Stay on this screen and try again.");
     } finally {
+      leaveInFlight.current = false;
       setIsLeaving(false);
     }
   };

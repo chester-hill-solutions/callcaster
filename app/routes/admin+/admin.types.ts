@@ -22,6 +22,14 @@ export type DeadLetteredJobRow = {
   created_at: string;
 };
 
+export type VerificationNumberRow = {
+  phoneNumber: string;
+  providerSid: string | null;
+  label: string | null;
+  region: string | null;
+  isActive: boolean;
+};
+
 export type AdminLoaderData = {
   user: Tables<"user">;
   workspaces: WorkspaceWithCampaigns[] | null;
@@ -31,6 +39,7 @@ export type AdminLoaderData = {
   workspaceRows: WorkspaceAdminRow[];
   campaigns: CampaignWithWorkspace[];
   deadLetteredJobs: DeadLetteredJobRow[];
+  verificationNumbers: VerificationNumberRow[];
   stats: {
     totalWorkspaces: number;
     totalUsers: number;

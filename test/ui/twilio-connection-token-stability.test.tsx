@@ -255,3 +255,95 @@ describe("useTwilioConnection reconnect storm (#1294)", () => {
     expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("useTwilioConnection teardown (#2706)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTwilioVoiceSdkMock();
+    mockTwilioDevice.calls = [];
+  });
+
+  test("unmount disconnects app-owned held calls absent from Device.calls", async () => {
+    const held = { disconnect: vi.fn() };
+    const { unmount } = renderHook(() => useTwilioConnection({
+      token: "tok-1", getOwnedCalls: () => [held as never],
+    }));
+    await act(async () => { await Promise.resolve(); });
+    unmount();
+    expect(held.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  test("reconnect does not register a replacement when SDK destruction fails", async () => {
+    const { result } = renderHook(() => useTwilioConnection({ token: "tok-1" }));
+    await act(async () => { await Promise.resolve(); });
+    mockTwilioDevice.destroy.mockImplementationOnce(() => { throw new Error("Unexpected SDK exception"); });
+    act(() => result.current.reconnect());
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.status).toBe("Error");
+    expect(result.current.error?.message).toMatch(/cleanup did not finish/i);
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+  });
+
+  test("reconnect stops when an app-owned call cannot disconnect even if Device.destroy returns", async () => {
+    const held = { on: vi.fn(), removeAllListeners: vi.fn(), disconnect: vi.fn(() => { throw new Error("Unexpected held call exception"); }) };
+    const { result } = renderHook(() => useTwilioConnection({ token: "tok-1", getOwnedCalls: () => [held as never] }));
+    await act(async () => { await Promise.resolve(); });
+    act(() => result.current.reconnect());
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.status).toBe("Error");
+    expect(result.current.error?.message).toMatch(/cleanup did not finish/i);
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+    held.disconnect.mockImplementation(() => {});
+    act(() => result.current.reconnect());
+    await act(async () => { await Promise.resolve(); });
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(2);
+  });
+
+  test("transport recovery waits for an app-owned active leg absent from Device.calls", async () => {
+    vi.useFakeTimers();
+    let ownedCalls: Array<{ disconnect: ReturnType<typeof vi.fn> }> = [{ disconnect: vi.fn() }];
+    try {
+      const { unmount } = renderHook(() => useTwilioConnection({ token: "tok-1", getOwnedCalls: () => ownedCalls as never[] }));
+      await act(async () => { await Promise.resolve(); });
+      act(() => mockTwilioDevice.emit("error", Object.assign(new Error("transport unavailable"), { code: 31009 })));
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+      ownedCalls = [];
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+      expect(mockTwilioDevice.register).toHaveBeenCalledTimes(2);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  test("late registration rejection after exit cannot report errors or start retries", async () => {
+    let reject!: (error: Error) => void;
+    mockTwilioDevice.register.mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const onError = vi.fn();
+    const { unmount } = renderHook(() => useTwilioConnection({ token: "tok-1", onError }));
+    await act(async () => { await Promise.resolve(); });
+    unmount();
+    await act(async () => { reject(new Error("Registration completed after exit")); });
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+  });
+
+  test("unmount cancels all retries after repeated device errors", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => useTwilioConnection({ token: "tok-1" }));
+      await act(async () => { await Promise.resolve(); });
+      act(() => {
+        mockTwilioDevice.emit("error", new Error("First error"));
+        mockTwilioDevice.emit("error", new Error("Second error"));
+      });
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+      expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+});

@@ -42,6 +42,7 @@
         "date-fns": "^3.6.0",
         "dotenv": "^16.6.1",
         "drizzle-orm": "^0.45.2",
+        "effect-runtime": "npm:effect@4.0.5",
         "isbot": "^4.1.0",
         "jwt-decode": "^4.0.0",
         "lucide-react": "^0.378.0",
@@ -77,6 +78,7 @@
         "@react-router/fs-routes": "^8.3.0",
         "@react-router/remix-routes-option-adapter": "^8.3.0",
         "@shadcn/lint": "^0.1.1",
+        "@stripe/cli": "^1.54.0",
         "@tailwindcss/vite": "^4",
         "@testing-library/dom": "^10.4.1",
         "@testing-library/jest-dom": "^6.9.1",
@@ -943,6 +945,18 @@
 
     "@standard-schema/utils": ["@standard-schema/utils@0.3.0", "", {}, "sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g=="],
 
+    "@stripe/cli": ["@stripe/cli@1.54.0", "", { "optionalDependencies": { "@stripe/cli-darwin-arm64": "1.54.0", "@stripe/cli-darwin-x64": "1.54.0", "@stripe/cli-linux-arm64": "1.54.0", "@stripe/cli-linux-x64": "1.54.0", "@stripe/cli-win32-x64": "1.54.0" }, "bin": { "stripe": "bin/shim.js" } }, "sha512-Uq9p/n9PhN0LYNvbu7AL51vux5dqGHkhjIEUQxa3300YBzey3g//ggIVYTeC1ctLWbHU3PswW1+uRSQlgie9BQ=="],
+
+    "@stripe/cli-darwin-arm64": ["@stripe/cli-darwin-arm64@1.54.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-v19Psh0y8e1Elu8Xgcl0U0Ws3AdLePXRi9fT9Hzdc9SXf02Mq8XeDAUJUOgI43kRrAG9a3fXzOlSD/ZNuu2ovA=="],
+
+    "@stripe/cli-darwin-x64": ["@stripe/cli-darwin-x64@1.54.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-n9rNMyVfncWsa03YnblYL5w/HxeDEuWkeoSqU27MESn1AzCabc44E37HDkOblG/jsRrAWrUyjE34WP8DaSI/kg=="],
+
+    "@stripe/cli-linux-arm64": ["@stripe/cli-linux-arm64@1.54.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-uhmYC+0DofkP5PO0IM6WlSzk5vxeoMegIU7SL8+s76lySrAPW0+AySZoniadyTp/yVD4PY9kS6iWFIMF7KDpLg=="],
+
+    "@stripe/cli-linux-x64": ["@stripe/cli-linux-x64@1.54.0", "", { "os": "linux", "cpu": "x64" }, "sha512-gp6rJTpJmHmtF5A7sVxAtJbLL11gNbhpvvgz81NLV8v9gJIBmhRG3yRCeBRwwXbzHziqefe7GuVD6R2C9/KmQA=="],
+
+    "@stripe/cli-win32-x64": ["@stripe/cli-win32-x64@1.54.0", "", { "os": "win32", "cpu": "x64" }, "sha512-nTIUTTyfBulb6ItF8QNb7prRtaYeXMGbI+3x1KWAJvydohnubXOFAP0MbHos7v6gU/beKGC21psiwOKRrXHIbg=="],
+
     "@stripe/stripe-js": ["@stripe/stripe-js@4.10.0", "", {}, "sha512-KrMOL+sH69htCIXCaZ4JluJ35bchuCCznyPyrbN8JXSGQfwBI1SuIEMZNwvy8L8ykj29t6sa5BAAiL7fNoLZ8A=="],
 
     "@swc/helpers": ["@swc/helpers@0.5.23", "", { "dependencies": { "tslib": "^2.8.0" } }, "sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw=="],
@@ -1532,6 +1546,8 @@
     "ee-first": ["ee-first@1.1.1", "", {}, "sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow=="],
 
     "effect": ["effect@4.0.0-rc.112", "", { "dependencies": { "fast-check": "^4.9.0", "msgpackr": "^2.0.5" } }, "sha512-wXxwuh1Ywnv4cPRM3Wfa0vDwuOHnZ1TsTgHJkG9XgzND6inhBH9n1vBxhg3iIXOia/OrpmvVmd3lrD4vq6bF3A=="],
+
+    "effect-runtime": ["effect@4.0.5", "", {}, "sha512-BY4/28NlpOd99yzmV741xbVGmp+1U7tks4oB7F/Png64bTa5tm5eCA6W0RiXsnuLDDoJpjfVSo4Dnq4BZb/89Q=="],
 
     "electron-to-chromium": ["electron-to-chromium@1.5.97", "", {}, "sha512-HKLtaH02augM7ZOdYRuO19rWDeY+QSJ1VxnXFa/XDFLf07HvM90pALIJFgrO+UVaajI3+aJMMpojoUTLZyQ7JQ=="],
 

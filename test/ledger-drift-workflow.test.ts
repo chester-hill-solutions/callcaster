@@ -27,7 +27,7 @@ function readWorkflow() {
 describe("environment drift comparison (#2064)", () => {
   test.each([
     { environment: "dev", branch: "dev", name: "Dev drift against dev" },
-    { environment: "staging", branch: "master", name: "Staging drift against master" },
+    { environment: "qa", branch: "master", name: "QA drift against master" },
     { environment: "production", branch: "master", name: "Production drift against master" },
   ])("$environment uses its deployed branch and preserves database gates", ({ environment, branch, name }) => {
     const job = readWorkflow().jobs[environment];

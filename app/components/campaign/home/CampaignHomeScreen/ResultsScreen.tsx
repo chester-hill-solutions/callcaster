@@ -45,9 +45,6 @@ const ResultsScreen = ({
   
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between">
-        <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
-      </div>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalCalls

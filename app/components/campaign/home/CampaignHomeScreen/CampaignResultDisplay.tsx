@@ -141,14 +141,10 @@ export const NoResultsYet = ({
   campaignType?: Campaign["type"] | null;
 }) => {
   const isMessage = campaignType === "message";
-  const title = isMessage
-    ? "Message Campaign Results"
-    : "Call Campaign Results";
   const totalLabel = isMessage ? "Total Messages" : "Contacts Completed";
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-6 text-3xl font-bold">{title}</h1>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="mb-8 flex flex-col">
           <h2 className="mb-0 text-2xl font-semibold">{totalLabel}: 0</h2>

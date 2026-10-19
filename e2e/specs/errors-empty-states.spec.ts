@@ -57,7 +57,13 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
       workspacePath(E2E_WORKSPACES.ready.id, `campaigns/${E2E_CAMPAIGNS.liveCall.id}`),
     );
 
-    await expect(page.getByRole("heading", { name: "Call Campaign Results" })).toBeVisible();
+    // The campaign header title is the hub's own heading; the "Call Campaign
+    // Results" section heading was removed as a duplicate in #2670.
+    await expect(
+      page
+        .getByRole("heading", { name: E2E_CAMPAIGNS.liveCall.title })
+        .filter({ visible: true }),
+    ).toBeVisible();
     await expect(
       page.getByText("Disposition breakdowns appear here as outreach completes."),
     ).toBeVisible();

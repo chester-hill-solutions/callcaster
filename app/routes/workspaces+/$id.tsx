@@ -7,7 +7,6 @@ import {
   Outlet,
   useOutlet,
   useOutletContext,
-  useRevalidator,
   useLocation,
   Link,
 } from "react-router";
@@ -21,7 +20,7 @@ import {
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
+import { useWorkspaceRealtimeRevalidation } from "@/hooks/realtime/useWorkspaceRealtimeRevalidation";
 import type { CampaignQueueProgressCounts } from "@/components/campaign/CampaignQueueProgress";
 import WorkspaceToday from "@/components/workspace/WorkspaceToday";
 import { ComplianceStatusPanel } from "@/components/workspace/ComplianceStatusPanel";
@@ -125,16 +124,10 @@ function WorkspaceResolvedView({
   const phoneNumbers = (
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
-  const revalidator = useRevalidator();
-
   // One workspace-tree EventSource for campaign + ledger freshness. Root and
   // workspace loaders revalidate together so Navbar, mobile menu, WorkspaceNav,
   // and low-credit banners stay in sync without a duplicate credit subscription.
-  useWorkspaceEventSubscription({
-    workspaceId: workspace.id,
-    table: ["campaign", "campaign_queue", "transaction_history"],
-    onChange: () => revalidator.revalidate(),
-  });
+  useWorkspaceRealtimeRevalidation(workspace.id);
 
   const liveCredits = workspace.credits;
   const canManageWorkspace = userRole === "admin" || userRole === "owner";

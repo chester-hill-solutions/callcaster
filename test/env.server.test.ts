@@ -94,7 +94,6 @@ describe("env.server", () => {
     vi.resetModules();
     seedRequiredEnv();
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_1";
-    process.env.VERIFICATION_PHONE_NUMBER = "+15551234567";
 
     const mod = await import("../app/lib/env.server");
 
@@ -106,7 +105,6 @@ describe("env.server", () => {
     expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk");
     expect(mod.env.RESEND_API_KEY()).toBe("re");
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBe("whsec_1");
-    expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBe("+15551234567");
 
     // env reads process.env on every call; it does not cache.
     process.env.BASE_URL = "https://example.com";
@@ -125,17 +123,6 @@ describe("env.server", () => {
     await import("../app/lib/env.server");
     expect(err).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
-  });
-
-  test.each([undefined, ""])("verification phone getter permits missing configuration %s", async (value) => {
-    vi.resetModules();
-    seedRequiredEnv();
-    if (value === undefined) delete process.env.VERIFICATION_PHONE_NUMBER;
-    else process.env.VERIFICATION_PHONE_NUMBER = value;
-
-    const mod = await import("../app/lib/env.server");
-    expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBeUndefined();
-    expect(() => mod.revalidateEnv()).not.toThrow();
   });
 
   test("getStripeKeyMode detects test, live, and unknown key prefixes", async () => {

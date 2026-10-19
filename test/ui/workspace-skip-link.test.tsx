@@ -59,6 +59,7 @@ vi.mock("react-router", async () => {
     // the WorkspaceToday branch instead, giving real, assertable content.
     useOutlet: () => null,
     useOutletContext: () => ({}),
+    useNavigation: () => ({ state: "idle" }),
     useRevalidator: () => ({ revalidate: mocks.revalidate }),
     // No onboarding child match in these bare renders, so the layout skips
     // the onboarding progress strip.

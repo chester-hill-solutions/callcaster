@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
@@ -103,6 +103,205 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
       created_at: "2026-07-15T00:00:00.000Z",
     };
   }
+
+  describe("serialized event drains (#2703)", () => {
+    let abort: AbortController;
+    let notify: (payload: string) => void;
+    let unlisten: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      abort = new AbortController();
+      unlisten = vi.fn().mockResolvedValue(undefined);
+      mocks.listen.mockImplementation(async (_channel, callback) => {
+        notify = callback;
+        return { unlisten };
+      });
+    });
+
+    afterEach(async () => {
+      abort.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      vi.useRealTimers();
+    });
+
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      let reject!: (reason: Error) => void;
+      const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+      });
+      return { promise, resolve, reject };
+    }
+
+    async function openStream() {
+      const mod = await import(
+        "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+      );
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs({
+          request: new Request("http://localhost/api/workspaces/ws-1/events", {
+            signal: abort.signal,
+          }),
+          params: { workspaceId: "ws-1" },
+        }),
+      );
+      const state = drain(response as Response);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(notify).toBeTypeOf("function");
+      mocks.fetchWorkspaceEventsAfter.mockClear();
+      return state;
+    }
+
+    function ids(state: { text: string }) {
+      return Array.from(state.text.matchAll(/^id: (\d+)$/gm), (match) => Number(match[1]));
+    }
+
+    function wake() {
+      notify(JSON.stringify({ workspace_id: "ws-1" }));
+    }
+
+    test.each([1, 100])(
+      "delivers paginated rows once and in order with %i notifications and overlapping polls",
+      async (notifications) => {
+        const state = await openStream();
+        const saved = Array.from({ length: 205 }, (_, index) => eventRow(index + 1, "saved"));
+        const firstRead = deferred<void>();
+        let activeReads = 0;
+        let maxActiveReads = 0;
+        mocks.fetchWorkspaceEventsAfter.mockImplementation(async (_workspace, cursor: number) => {
+          activeReads += 1;
+          maxActiveReads = Math.max(maxActiveReads, activeReads);
+          const page = saved.filter((row) => row.id > cursor).slice(0, 100);
+          await firstRead.promise;
+          activeReads -= 1;
+          return page;
+        });
+
+        for (let index = 0; index < notifications; index += 1) wake();
+        await vi.advanceTimersByTimeAsync(6_000);
+        firstRead.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(ids(state)).toEqual(Array.from({ length: 205 }, (_, index) => index + 1));
+        expect(maxActiveReads).toBe(1);
+        expect(mocks.fetchWorkspaceEventsAfter.mock.calls.length).toBeLessThanOrEqual(4);
+        expect(mocks.fetchWorkspaceEventsAfter.mock.calls.map((call) => call[1]))
+          .toEqual([0, 100, 200, 205]);
+      },
+    );
+
+    test("re-reads a short page when an event arrives after its snapshot", async () => {
+      const state = await openStream();
+      const read = deferred<ReturnType<typeof eventRow>[]>();
+      mocks.fetchWorkspaceEventsAfter
+        .mockImplementationOnce(() => read.promise)
+        .mockResolvedValueOnce([eventRow(2, "arrived-during-read")])
+        .mockResolvedValue([]);
+
+      wake();
+      wake();
+      read.resolve([eventRow(1, "snapshot")]);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(ids(state)).toEqual([1, 2]);
+      expect(mocks.fetchWorkspaceEventsAfter.mock.calls.map((call) => call[1])).toEqual([0, 1]);
+    });
+
+    test("ignores a notification for another workspace", async () => {
+      const state = await openStream();
+      mocks.fetchWorkspaceEventsAfter.mockResolvedValueOnce([eventRow(1, "poll-only")]);
+      notify(JSON.stringify({ workspace_id: "another-workspace" }));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.fetchWorkspaceEventsAfter).not.toHaveBeenCalled();
+      expect(ids(state)).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(ids(state)).toEqual([1]);
+    });
+
+    test("uses a pending wakeup to retry a failed read from the unchanged cursor", async () => {
+      const state = await openStream();
+      const read = deferred<ReturnType<typeof eventRow>[]>();
+      mocks.fetchWorkspaceEventsAfter
+        .mockImplementationOnce(() => read.promise)
+        .mockResolvedValueOnce([eventRow(1, "retry")])
+        .mockResolvedValue([]);
+
+      wake();
+      for (let index = 0; index < 100; index += 1) wake();
+      read.reject(new Error("temporary read failure"));
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(ids(state)).toEqual([1]);
+      expect(state.text.match(/event: error/g)).toHaveLength(1);
+      expect(mocks.fetchWorkspaceEventsAfter.mock.calls.map((call) => call[1])).toEqual([0, 0]);
+    });
+
+    test("releases the drain after failure so a later poll retries", async () => {
+      const state = await openStream();
+      mocks.fetchWorkspaceEventsAfter
+        .mockRejectedValueOnce(new Error("temporary read failure"))
+        .mockResolvedValueOnce([eventRow(1, "retry-on-poll")])
+        .mockResolvedValue([]);
+
+      wake();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ids(state)).toEqual([]);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(ids(state)).toEqual([1]);
+      expect(mocks.fetchWorkspaceEventsAfter.mock.calls.map((call) => call[1])).toEqual([0, 0]);
+    });
+
+    test("unsubscribes when LISTEN registration finishes after abort", async () => {
+      const registration = deferred<{ unlisten: typeof unlisten }>();
+      mocks.listen.mockImplementationOnce((_channel, callback) => {
+        notify = callback;
+        return registration.promise;
+      });
+      const state = await openStream();
+
+      abort.abort();
+      registration.resolve({ unlisten });
+      await vi.advanceTimersByTimeAsync(2_000);
+      wake();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(state.done).toBe(true);
+      expect(unlisten).toHaveBeenCalledTimes(1);
+      expect(mocks.fetchWorkspaceEventsAfter).not.toHaveBeenCalled();
+    });
+
+    test.each(["abort", "access revocation"])(
+      "closes on %s while a read and wakeup are pending",
+      async (reason) => {
+        const state = await openStream();
+        const read = deferred<ReturnType<typeof eventRow>[]>();
+        mocks.fetchWorkspaceEventsAfter.mockImplementation(() => read.promise);
+        wake();
+        wake();
+
+        if (reason === "abort") abort.abort();
+        else {
+          mocks.getUserRole.mockResolvedValue(null);
+          await vi.advanceTimersByTimeAsync(15_000);
+          expect(state.text).toContain("access_revoked");
+        }
+        read.resolve([eventRow(1, "must-not-leak")]);
+        await vi.advanceTimersByTimeAsync(10_000);
+        wake();
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(state.done).toBe(true);
+        expect(ids(state)).toEqual([]);
+        expect(state.text).not.toContain("must-not-leak");
+        expect(mocks.fetchWorkspaceEventsAfter).toHaveBeenCalledTimes(1);
+        expect(unlisten).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
 
   // #2133: the stream is gated on `audit.read`. These are the auth cases the
   // old `getDataPlaneRouteContext` preamble could not express — it admitted any

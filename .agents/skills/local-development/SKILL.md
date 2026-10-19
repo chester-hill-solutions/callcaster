@@ -20,6 +20,11 @@ Before `ci:local`, check `node --version` and `bun --version` in the same
 command-scoped PATH. A missing Bun executable can be reported as lockfile
 drift; verify tool availability before changing either lockfile.
 
+Run only one full local gate per host at a time, including across worktrees.
+Concurrent suites can exhaust host resources and fail short UI waits. If this
+happens, retain the failure log, stop overlapping gates, rerun only failed cases,
+then run the full gate again on the final clean commit.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
@@ -97,6 +102,13 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+Before adding a second runtime version, inspect existing transitive peer
+requirements. An npm alias can isolate the app version while preserving an
+exact development-tool peer. Verify both lockfiles and a clean `npm ci`, then
+require `npm ls` to accept both versions. For async React owners, test a
+suspended identity transition: changing an owner ref during render can cancel
+work that still belongs to the committed screen.
+
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
@@ -169,6 +181,17 @@ pre-commit guard imports TypeScript even for a Markdown-only change.
 For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.ts`
 with the file paths. `npm run test:node -- <file>` appends that path to the final
 Bun command and still runs the entire Node suite.
+
+The UI test config aliases `@twilio/voice-sdk` to a mock. For SDK resource
+lifetime changes, exercise the installed SDK at that boundary as well. Use
+`createRequire` to resolve its actual entry where the alias would hide it.
+Inventory every `setInputDevice` caller, including effects and user handlers.
+Delay microphone acquisition across unmount and device replacement; require
+tracks and polling to stop. A `destroy()` call count alone does not prove
+cleanup completed. Keep a normal-completion control.
+For initial effect replay in hook tests, use the render root's
+`reactStrictMode: true` option. In React 19, a StrictMode child wrapper can omit
+that initial replay. Delay cleanup and prove the next owner waits before capture.
 
 After the worktree's locked install completes, run project tools with
 `npx --no-install`. Plain `npx` can fetch a different tool version when the shared
@@ -615,6 +638,11 @@ redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from
 a fresh result; verify a second send and later user edits.
 
+For exit confirmations, keep the submit guard active until navigation completes.
+Await the data router's navigation promise and test a delayed destination loader
+with the real router. An immediate mocked navigate function can hide a second
+release request and a second history change while the old screen remains visible.
+
 Route tests use `asRouteResponse` from `test/helpers/route-result.ts`. It returns
 a response-shaped adapter, not a native `Response`; narrow its documented fields
 when inspecting mixed concurrent-write results.
@@ -690,6 +718,22 @@ receive the same whitespace check as existing files. `ci:codegen:verify` compare
 an intended un-staged API delta otherwise fails the final gate. Do not stage
 drift without its matching reviewed source change.
 
+## Twilio SDK teardown tests
+
+Use the installed SDK at the transport boundary. Its WebSocket transport catches
+send exceptions and returns false; PStream then emits an error which Device
+forwards. A stub that throws directly from `hangup` tests a different failure.
+Keep a normal send-success control beside the real send-false control. Detach
+application callbacks before teardown, then keep safe Device and Call error
+listeners until public SDK cleanup finishes, so errors cannot trigger reconnect
+or interrupt EventEmitter dispatch. Include app-owned active and held calls:
+`Device.calls` contains pending incoming calls and omits those legs. Verify media,
+signaling and audio closure, repeat cleanup and late registration rejection.
+After failed cleanup, test an external call close before retrying cleanup.
+Remove only the helper's error guards; preserve existing listeners.
+A direct unexpected SDK exception can still stop public `destroy`; report that
+incomplete result and stop replacement registration instead of claiming closure.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
@@ -707,7 +751,8 @@ drift without its matching reviewed source change.
 
 - `dev` is the trunk; `master` is the release branch and only moves by a dev → master release PR. Check `git log origin/dev` before starting an "open" issue: it may already be fixed.
 - For product work, create or update the GitHub issue before starting work. One issue, one concern, one PR; put `Closes #N` in the PR body, never close issues by hand. User-authorized repository maintenance follows the [Git skill](../git/SKILL.md) exception and uses the `no-issue` PR label.
-- The `dev → master` release PR must list every promoted issue with a closing keyword (`Closes #N, #M`) so GitHub closes them on promotion. A bare `(#N)` mention closes nothing, which is why shipped issues used to stay open; `release-close-issues.yml` gates this, with a `no-issue` label for a genuinely issue-free release.
+- The `dev → master` release PR must list every promoted issue with a closing keyword so GitHub closes them on promotion. A bare `(#N)` mention closes nothing, which is why shipped issues used to stay open; `release-close-issues.yml` gates this, with a `no-issue` label for a genuinely issue-free release.
+- **One keyword per issue.** GitHub closes one issue per closing keyword, so `Closes #1, #2, #3` closes only `#1`. Write `Closes #1, closes #2, closes #3`. The gate now rejects the grouped form and names the numbers it would strand: `scripts/check-release-closing-references.mjs` fails when a keyword is followed by a comma list, and its test pins the body of release PR #2668, which closed one issue out of seventeen.
 - Before committing, strip comments that narrate the code. A comment must state a reason the code cannot ("keep this in UTC", "auth.uid() has no shim") — not describe what the next line does. If deleting the comment (or the line under it) changes nothing for a reader, delete the comment. `callcaster/no-useless-comments` catches number-only and punctuation-only comments; the rest is a review standard, not a lint rule (#1978).
 - Every PR that changes behaviour adds a line under `## [Unreleased]` in `docs/CHANGELOG.md`.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.

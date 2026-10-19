@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
-import { useInterval } from "@/hooks/utils/useInterval";
+import { pollAudienceUploadStatus } from "@/lib/audience-upload-polling.client";
 import { logger } from "@/lib/logger.client";
 import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../shared/audience-upload";
 import type {
@@ -39,6 +39,9 @@ export function useAudienceUploadProgress({
   const [progress, setProgress] = useState<AudienceUploadProgressState>({
     kind: "idle",
   });
+  // Bumped per processing attempt so a retry of the same upload id restarts
+  // the poll task instead of reusing the previous attempt's task.
+  const [attemptNonce, setAttemptNonce] = useState(0);
 
   const audienceIdRef = useRef<string | null>(existingAudienceId ?? null);
   const totalContactsRef = useRef(0);
@@ -211,7 +214,7 @@ export function useAudienceUploadProgress({
     },
   });
 
-  const fetchStatusSnapshot = async (targetUploadId: number) => {
+  const fetchStatusSnapshot = async (targetUploadId: number, signal: AbortSignal) => {
     const attempt = attemptRef.current;
     if (!targetUploadId || !workspaceId || attempt?.uploadId !== targetUploadId ||
       attempt.workspaceId !== workspaceId) return;
@@ -222,6 +225,7 @@ export function useAudienceUploadProgress({
     try {
       const response = await fetch(
         `/api/audience-upload-status?uploadId=${targetUploadId}&workspaceId=${workspaceId}`,
+        { signal },
       );
       let data: AudienceUploadStatusResponse | null = null;
       try {
@@ -238,15 +242,30 @@ export function useAudienceUploadProgress({
       setWarning(null);
       applyServerSnapshot(data.snapshot, attempt);
     } catch (error) {
+      if (signal.aborted) return;
       logger.error("Error polling status:", error);
       setWarning(delayed);
     }
   };
 
-  useInterval(async () => {
-    if (uploadId == null) return;
-    await fetchStatusSnapshot(uploadId);
-  }, pollingEnabled ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null);
+  // Latest-ref: the poll task must read the current tenant/attempt without
+  // restarting on every render.
+  const fetchStatusSnapshotRef = useRef(fetchStatusSnapshot);
+  fetchStatusSnapshotRef.current = fetchStatusSnapshot;
+
+  /**
+   * @effect Poll the upload status serially for one committed processing attempt; the Effect task aborts on exit or attempt replacement.
+   * @effect-deps pollingEnabled, uploadId, workspaceId, attemptNonce (the committed processing identity; the nonce distinguishes a same-id retry)
+   * @effect-side-effects Effect task + fetch; abort on unmount or identity replacement
+   * @effect-why-not-loader Upload status is live server state that changes after the POST returns; a loader cannot poll.
+   */
+  useEffect(() => {
+    if (!pollingEnabled || uploadId == null || !workspaceId) return;
+    return pollAudienceUploadStatus({
+      intervalMs: AUDIENCE_UPLOAD_PROCESSING_POLL_MS,
+      read: (signal) => fetchStatusSnapshotRef.current(uploadId, signal),
+    });
+  }, [pollingEnabled, uploadId, workspaceId, attemptNonce]);
 
   const startSubmitting = (totalContacts: number) => {
     attemptRef.current = null;
@@ -270,6 +289,7 @@ export function useAudienceUploadProgress({
     handedOffRef.current = false;
     audienceIdRef.current = args.audienceId;
     totalContactsRef.current = args.totalContacts;
+    setAttemptNonce((nonce) => nonce + 1);
     setProgress({
       kind: "processing",
       uploadId: args.uploadId,
@@ -279,9 +299,6 @@ export function useAudienceUploadProgress({
       progress: 0,
       warning: null,
     });
-    // Small uploads often finish server-side before the first poll tick;
-    // check right away instead of waiting out the interval (#1078).
-    void fetchStatusSnapshot(args.uploadId);
   };
 
   const fail = (message: string) => {

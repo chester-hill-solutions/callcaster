@@ -13,7 +13,7 @@ import { AdminUsersPanel } from "@/routes/admin+/panels/AdminUsersPanel";
 import { AdminWorkspacesPanel } from "@/routes/admin+/panels/AdminWorkspacesPanel";
 
 export function AdminDashboardPage() {
-    const { user, workspaces, users, workspaceUsers, workspaceRows, campaigns, deadLetteredJobs, stats } =
+    const { user, workspaces, users, workspaceUsers, workspaceRows, campaigns, deadLetteredJobs, verificationNumbers, stats } =
         useLoaderData<AdminLoaderData>();
     const [searchParams, setSearchParams] = useSearchParams();
     const actionData = useActionData<AdminActionData>();
@@ -117,7 +117,10 @@ export function AdminDashboardPage() {
                 <AdminWorkspacesPanel workspaceRows={workspaceRows} />
                 <AdminUsersPanel users={users} workspaceUsers={workspaceUsers} workspaces={workspaces} />
                 <AdminCampaignsPanel campaigns={campaigns} workspaces={workspaces} />
-                <AdminSystemSettingsPanel deadLetteredJobs={deadLetteredJobs} />
+                <AdminSystemSettingsPanel
+                    deadLetteredJobs={deadLetteredJobs}
+                    verificationNumbers={verificationNumbers}
+                />
             </Tabs>
         </>
     );

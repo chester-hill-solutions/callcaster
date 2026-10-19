@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
+import { getActiveVerificationNumber } from "@/lib/verification-number.server";
 import { getSession } from "@/lib/auth.server";
 import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -15,7 +15,7 @@ export const loader = defineLoader({
   const { headers } = await getSession(request);
   const user = auth.user;
 
-  const verificationNumber = env.VERIFICATION_PHONE_NUMBER();
+  const verificationNumber = await getActiveVerificationNumber();
   if (!verificationNumber) {
     return routeData({ error: "Call-in verification is not configured" }, { status: 503 });
   }

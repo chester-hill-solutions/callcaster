@@ -15,6 +15,7 @@ import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
 import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../../../shared/audience-upload";
 
+import type { AudienceUploadStatusResponse } from "@/components/audience/audience-upload-phase";
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
 export default function AudienceView() {
@@ -56,9 +57,10 @@ export default function AudienceView() {
         const response = await fetch(
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspace_id}`
         );
-        const data = await response.json();
+        const data = (await response.json()) as AudienceUploadStatusResponse;
+        const uploadStatus = data.ok ? data.snapshot.status : null;
 
-        if (data.error || data.status === "completed" || data.status === "error") {
+        if (!data.ok || uploadStatus === "completed" || uploadStatus === "error") {
           setCurrentUploadId(null);
           revalidator.revalidate();
         }

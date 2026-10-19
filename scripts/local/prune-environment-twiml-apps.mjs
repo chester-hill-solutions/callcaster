@@ -6,13 +6,19 @@
  *
  * Environment apps are provisioned at boot by app/server/environment-twiml-app.server.ts
  * and named `env:<railway-environment-name>`. Nothing deletes them when a PR
- * closes, so they accumulate against the account's app limit. This reconciles the
- * Twilio side against the environments Railway still reports.
+ * closes, so they accumulate against the account's app limit.
  *
- * Only PR environments are ever deleted. Long-lived environments (dev, staging)
- * are reported and left alone: their apps are not disposable, and a transient
- * Railway API hiccup that returned a short environment list would otherwise be
- * enough to delete them.
+ * A preview environment is alive while its pull request is open. The Railway
+ * CLI does NOT report pull-request preview environments, so the live set comes
+ * from scripts/lib/live-environments.mjs: the Railway environments plus one
+ * entry per open pull request. Reading the Railway list alone would call every
+ * preview dead, including the preview of a pull request that is open now, and
+ * would delete its app.
+ *
+ * Only PR environments are ever deleted. Long-lived environments (dev, qa,
+ * production) are reported and left alone: their apps are not disposable, and
+ * a transient API hiccup that returned a short list would otherwise be enough
+ * to delete them.
  *
  * Dry-run by default; pass --apply to delete.
  *
@@ -25,12 +31,10 @@
 
 import "dotenv/config";
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
 import Twilio from "twilio";
 
-const execFileAsync = promisify(execFile);
+import { loadLiveEnvironmentNames } from "../lib/live-environments.mjs";
+
 const ENVIRONMENT_APP_PREFIX = "env:";
 
 /** Railway names PR environments `callcaster-pr-<number>`; only these are disposable. */
@@ -44,7 +48,7 @@ async function main() {
     requireEnv("TWILIO_AUTH_TOKEN"),
   );
 
-  const liveEnvironments = await loadRailwayEnvironments();
+  const liveEnvironments = await loadLiveEnvironmentNames();
   const applications = await client.applications.list({ limit: 1000 });
   const environmentApps = applications.filter((application) =>
     (application.friendlyName ?? "").startsWith(ENVIRONMENT_APP_PREFIX),
@@ -102,48 +106,8 @@ async function main() {
 
 /**
  * The Railway CLI is the source of truth for which environments still exist.
- * Bail out rather than guess: an empty or partial list here would classify every
- * live environment as stale and delete apps that are still in use.
+ * See scripts/lib/railway-environments.mjs.
  */
-async function loadRailwayEnvironments() {
-  // `railway environment` refuses to run outside a TTY; `railway status --json`
-  // returns the linked project including every environment, and works headless.
-  let stdout;
-  try {
-    ({ stdout } = await execFileAsync("railway", ["status", "--json"], {
-      timeout: 30_000,
-    }));
-  } catch (error) {
-    throw new Error(
-      `Could not read Railway project status (is the railway CLI installed and ` +
-        `linked to the CallCaster project?): ` +
-        `${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(stdout);
-  } catch {
-    throw new Error(`Railway CLI returned output this script cannot parse:\n${stdout}`);
-  }
-
-  const names = (parsed?.environments?.edges ?? [])
-    .map((edge) => edge?.node)
-    .filter((node) => node && !node.deletedAt)
-    .map((node) => node.name)
-    .filter((name) => typeof name === "string" && name.length > 0);
-
-  if (names.length === 0) {
-    throw new Error(
-      "Railway reported zero environments. Refusing to prune, since that would " +
-        "delete every environment app including live ones.",
-    );
-  }
-
-  return new Set(names);
-}
-
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) {

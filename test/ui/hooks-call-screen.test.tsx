@@ -124,6 +124,9 @@ describe("useCallScreen", () => {
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input);
+        if (url.includes("/call-session/release")) {
+          return Promise.resolve(Response.json({ released: 0 }));
+        }
         if (url.includes("/api/queues")) {
           return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
         }
@@ -245,7 +248,8 @@ describe("useCallScreen", () => {
         workspaceId: result.current.workspaceId,
       });
     });
-    act(() => result.current.queueControls.requeueContacts());
+    await act(async () => { await result.current.queueControls.requeueContacts(); });
+    expect(fetch).toHaveBeenCalledWith("/api/campaigns/1/call-session/release", { method: "POST" });
     act(() => result.current.callControls.handleVoiceDrop());
     act(() => result.current.audioControls.handleDTMF("5"));
 

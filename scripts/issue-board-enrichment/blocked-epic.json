@@ -5,8 +5,8 @@
     "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
     "summary": "Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.",
     "currentBehavior": "Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.",
-    "rootCause": "Dependent on the synthetic provider (#1328).",
-    "resolution": "Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.",
+    "rootCause": "Not implemented. It depended on the synthetic provider (#1328), which closed as completed on 2026-10-17 together with the three asks it consolidated (#1156, #1194, #1161).",
+    "resolution": "Keep as parent epic; the synthetic provider dependency is satisfied, so #1192 (server-owned scenario profiles) can start; #1193 is the final acceptance journey.",
     "lookIn": [
       "e2e/fixtures/seed.ts",
       "app/components/audience/AudienceUploader.tsx",
@@ -26,10 +26,8 @@
     ],
     "size": "L-XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic; blocked by #1328.",
-    "blockedBy": [
-      1328
-    ]
+    "trackerRecommendation": "Parent epic; #1328 landed, so the block is gone. Split before assignment — this is not single-agent work.",
+    "blockedBy": []
   },
   {
     "issueNumber": 1268,
@@ -164,86 +162,6 @@
     ]
   },
   {
-    "issueNumber": 1328,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feat(telephony): add provider factory and synthetic SMS transport (split further)",
-    "summary": "Build a gateway seam between CallCaster call/SMS paths and the provider, with a synthetic provider for local dev/tests (no Twilio credentials). Consolidates #1156/#1194/#1161.",
-    "currentBehavior": "Workspace Twilio client hard-wired; IVR/number-rental call Twilio directly; SMS has a client-like seam; E2E mocks intercept browser HTTP only; Compose uses placeholder creds + disabled webhook validation.",
-    "rootCause": "No server-side provider abstraction.",
-    "resolution": "Introduce a provider factory + synthetic SMS transport first; add voice and number rental as later slices. Provider selection explicit and fail-closed by environment.",
-    "lookIn": [
-      "app/lib/database/workspace.server.ts",
-      "app/lib/ivr-initiate.server.ts",
-      "app/lib/platform-workspace-numbers.server.ts",
-      "app/lib/sms-send.server.ts",
-      "e2e/fixtures/twilio-mocks.ts"
-    ],
-    "existingTests": [
-      "e2e mocks (browser-level only)"
-    ],
-    "missingTests": [
-      "server-side synthetic contract",
-      "status callback delivery",
-      "no external Twilio request assertion",
-      "synthetic number lifecycle"
-    ],
-    "acceptanceCriteria": [
-      "Provider selection explicit and fail-closed",
-      "Synthetic sends create deterministic events without creds",
-      "Tests prove no Twilio network call",
-      "Real Twilio unchanged"
-    ],
-    "size": "XL",
-    "risk": "high",
-    "trackerRecommendation": "Split: factory+SMS, voice, rental. Dependencies #1157/#1192/#1193.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1329,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feat(twilio-iac): add ownership manifest and read-only environment plan",
-    "summary": "Roadmap for the Twilio environment program (IaC controller, accounts, cost, testing). Railway IaC is separate and done; no Twilio controller exists. Sub-issues were folded into this issue and are not implemented.",
-    "currentBehavior": "Twilio operations are imperative workspace actions; workspace provisioning owns dynamic resources; no ownership manifest, plan artifact, or drift workflow.",
-    "rootCause": "Roadmap not started; too large for one agent.",
-    "resolution": "First slice only: ownership manifest + read-only 'plan' command (no apply/delete/rental/prune). Later: account separation, state import, drift guardrails, cost inventory, Test Credentials + smoke tests.",
-    "lookIn": [
-      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
-      "app/lib/platform-workspace-numbers.server.ts",
-      "scripts/railway/",
-      ".railway/README.md"
-    ],
-    "existingTests": [
-      "none"
-    ],
-    "missingTests": [
-      "plan fixtures",
-      "destructive-change rejection",
-      "read-back verification"
-    ],
-    "acceptanceCriteria": [
-      "Every managed resource has one env/owner/cleanup rule",
-      "Read-only plan compares declared vs actual",
-      "Plan cannot create/delete/rent",
-      "Secrets outside source and output"
-    ],
-    "size": "XL",
-    "risk": "high",
-    "trackerRecommendation": "Split; first slice is M/medium. #1195 overlaps its testing section.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1357,
-    "verdict": "blocked-epic",
-    "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
-    "resolution": "Resolve the naming decision, attach the domain through IaC, set DNS, and verify readyz externally.",
-    "lookIn": [
-      ".railway/environments/staging.ts"
-    ],
-    "blockedBy": [
-      1355
-    ]
-  },
-  {
     "issueNumber": 1498,
     "verdict": "blocked-epic",
     "summary": "The export report needs toplines, inbound replies, contact grouping, attribution and tenant-safe filtering. This is a feature program, not a release cleanup.",
@@ -252,42 +170,6 @@
       "app/lib/campaign-export.server.ts"
     ],
     "blockedBy": []
-  },
-  {
-    "issueNumber": 1645,
-    "verdict": "blocked-epic",
-    "summary": "Message tests shipped in #1648 and voice/IVR tests in #1654. The remaining slice is live-call rehearsal.",
-    "resolution": "Scope a separate live-call issue with isolation from queue, results and normal campaign metrics. Do not rebuild the shipped test-send paths.",
-    "lookIn": [],
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1752,
-    "verdict": "blocked-epic",
-    "summary": "The PDF/CSV report pipeline is implemented in #2530. Release review repaired timestamp decoding, send-window attribution, staff reply inclusion, multilingual text and access-denial handling in #2550. Report presentation, inbound daily volume and campaign-health acceptance remain open.",
-    "lookIn": [
-      "app/lib/campaign-sms-report.server.ts",
-      "app/lib/campaign-sms-report-data.server.ts",
-      "app/lib/campaign-sms-report-pdf.server.ts"
-    ],
-    "existingTests": [
-      "test/integration-db/campaign-sms-report.test.ts: real PostgreSQL send windows, sender isolation, staff replies, STOP handling and font embedding",
-      "test/campaign-export.route.test.ts and test/campaign-export-status.test.ts: access denial statuses"
-    ],
-    "missingTests": [
-      "Requested report-format comparison",
-      "Inbound daily volume and campaign-health acceptance"
-    ],
-    "acceptanceCriteria": [
-      "Finish the remaining requested report presentation, inbound daily-volume and campaign-health requirements in #1752",
-      "Compare the finished report with the requested example before closing #1752"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Keep open after release. The completed pipeline does not satisfy the remaining report-format and metric requirements.",
-    "currentBehavior": "Owners and admins can export completed non-test SMS campaigns. Private artifacts include campaign messages and related conversation replies on the matching sender and send window.",
-    "rootCause": "The original implementation treated raw driver timestamps as Date values and attributed replies by recipient alone. It also omitted staff replies and replaced non-Latin reply text.",
-    "resolution": "Keep the completed pipeline. Split the remaining format, inbound daily-volume and campaign-health work into scoped tasks; verify the finished report against the requested example before closing."
   },
   {
     "issueNumber": 1802,
@@ -300,40 +182,6 @@
       "bun.lock"
     ],
     "trackerRecommendation": "The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open."
-  },
-  {
-    "issueNumber": 1892,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
-    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).",
-    "currentBehavior": "scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).",
-    "rootCause": "Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.",
-    "resolution": "Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
-    "lookIn": [
-      "scripts/dry-baseline.json",
-      "scripts/check-dry.mjs"
-    ],
-    "existingTests": [
-      "check:dry gate is the acceptance signal"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "clones/duplicatedLines drop and the baseline is lowered to lock it",
-      "One implementation per clone; call sites behave the same"
-    ],
-    "blockedBy": [
-      1912,
-      1913,
-      1914,
-      1915,
-      1916,
-      1917,
-      1918,
-      1919
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1912-#1919."
   },
   {
     "issueNumber": 268,
@@ -409,48 +257,13 @@
     "trackerRecommendation": "Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands."
   },
   {
-    "issueNumber": 780,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Hang up controls/block in IVR script (parent of #1883 + #1884)",
-    "summary": "Bundles four asks. Split into #1883 (per-step configurable no-input wait + action; dev, PR #1937) and #1884 (explicit Hang up routing target + guaranteed terminal hangup; open). The runtime already understands next:'hangup' and ends the script with a hangup, so #1884 is editor exposure plus validation.",
-    "currentBehavior": "No-input handling exists on dev (#1883). 'Hang up' is selectable in the editor via scriptkit and maps to <Hangup/>; gaps are next:'end' unhandled, dangling targets unvalidated, no guaranteed terminal/cycle check (#1884).",
-    "rootCause": "Parent tracking ticket; the only remaining work is the explicit/validated terminal owned by #1884.",
-    "resolution": "Keep open until #1884 lands, then close. Do not rebuild the shipped #1883 no-input handling or the working hangup routing.",
-    "lookIn": [
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-      "app/components/campaign/settings/script/ScriptBlockEditor.routing.ts"
-    ],
-    "existingTests": [
-      "test/ivr-block-response.route.test.ts",
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "missingTests": [
-      "next:'end' is terminal at runtime",
-      "dangling page/block target hangs up instead of redirecting",
-      "reachable routing cycle is reported/blocked at launch"
-    ],
-    "acceptanceCriteria": [
-      "Hang up is selectable as an option's next step",
-      "A published script always ends in a terminal hangup",
-      "Configurable no-input wait and reroute (delivered by #1883)"
-    ],
-    "blockedBy": [
-      1884
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands."
-  },
-  {
     "issueNumber": 1861,
     "verdict": "blocked-epic",
     "recommendedTitle": "Spike: replace Twilio AMD with a local, faster voicemail classifier",
-    "summary": "Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.",
+    "summary": "Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set; both prerequisites (#1842 instrumentation, #1845 live AMD scope) landed on 2026-10-17.",
     "currentBehavior": "Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.",
     "rootCause": "Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.",
-    "resolution": "After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.",
+    "resolution": "Both prerequisites landed on 2026-10-17 (#1842, #1845), so run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.",
     "lookIn": [
       "app/lib/auto-dial.server.ts",
       "app/lib/campaign-ivr-dispatch.server.ts",
@@ -471,13 +284,10 @@
       "Recommendation with an accuracy-latency threshold and reconciliation/fallback policy",
       "If replacing: an ADR and a phased plan starting in shadow mode"
     ],
-    "blockedBy": [
-      1842,
-      1845
-    ],
+    "blockedBy": [],
     "size": "XL",
     "risk": "high",
-    "trackerRecommendation": "Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation."
+    "trackerRecommendation": "#1842 and #1845 landed on 2026-10-17, so the spike is unblocked. Run it scoped; produce an ADR before any implementation."
   },
   {
     "issueNumber": 1828,
@@ -485,8 +295,8 @@
     "recommendedTitle": "QA-environment PR acceptance suite against the smart test audience",
     "summary": "Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.",
     "currentBehavior": "PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.",
-    "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet.",
-    "resolution": "After #1829 lands (which needs #1357), add the QA acceptance workflow and specs: sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials.",
+    "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet, and #1829 (the account) closed as not planned on 2026-10-17 while #1357 (the qa DNS/IaC half) closed as completed.",
+    "resolution": "Re-scope rather than wait: #1829 closed as not planned, so first decide the QA credential path, then add the QA acceptance workflow and specs — sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials. #1157 (smart test audiences) still gates the audience half.",
     "lookIn": [
       ".github/workflows/e2e.yml",
       ".github/workflows/ci.yml",
@@ -509,78 +319,11 @@
       "Failures are attributable to the PR"
     ],
     "blockedBy": [
-      1157,
-      1829
+      1157
     ],
     "size": "L",
     "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1829 (CallCaster-qa Twilio account) and #1157 (smart test audiences) must land first; #1357 gates #1829."
-  },
-  {
-    "issueNumber": 1826,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Dev-environment PR acceptance suite",
-    "summary": "Per-PR dev tests: sign-up, create workspace, MFA, rent a number, upload an audience and audio, create a second workspace; plus Twilio-tier unit tests with CallCaster-dev credentials.",
-    "currentBehavior": "E2E runs in the local compose harness; nothing runs against a dev.callcaster.ca environment backed by a dedicated CallCaster-dev Twilio account.",
-    "rootCause": "There is no dedicated CallCaster-dev Twilio account; #1356 and #1827 are both open.",
-    "resolution": "After #1827 lands (which needs #1356), wire the dev PR suite over the listed steps and run the Twilio-tier unit tests with dev credentials.",
-    "lookIn": [
-      ".github/workflows/e2e.yml",
-      "e2e/specs/",
-      "test/integration-twilio/",
-      "docs/local-development.md"
-    ],
-    "existingTests": [
-      "e2e compose gate",
-      "test/integration-twilio/twilio-test-credentials.test.ts"
-    ],
-    "missingTests": [
-      "Dev-environment signup / workspace / MFA / number / audience / audio flow",
-      "Dev-credential unit tier"
-    ],
-    "acceptanceCriteria": [
-      "PRs run the dev checklist against CallCaster-dev",
-      "MFA is enabled on the dev test environment",
-      "Twilio unit tests use CallCaster-dev credentials"
-    ],
-    "blockedBy": [
-      1827
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827."
-  },
-  {
-    "issueNumber": 1829,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it",
-    "summary": "Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.",
-    "currentBehavior": "QA has no dedicated Twilio account; #1357 is open and is the prerequisite.",
-    "rootCause": "Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).",
-    "resolution": "Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.",
-    "lookIn": [
-      ".railway/environments/",
-      ".railway/railway.ts",
-      "docs/twilio-runtime-inventory.md",
-      "docs/twilio-parent-ops-runbook.md",
-      ".github/workflows/railway-iac.yml"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "n/a (operations task)"
-    ],
-    "acceptanceCriteria": [
-      "CallCaster-qa Twilio account exists and is documented",
-      "qa.callcaster.ca uses the QA account credentials",
-      "Credentials are stored as secrets/vars, not in the repo",
-      "IaC-vs-manual decision is recorded"
-    ],
-    "blockedBy": [
-      1357
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828."
+    "trackerRecommendation": "blocked-epic: #1157 (smart test audiences) still gates the audience half. #1829 closed as not planned on 2026-10-17, so the QA Twilio-account path needs a fresh decision instead of a wait; #1357 already landed."
   },
   {
     "issueNumber": 1827,
@@ -644,69 +387,13 @@
     "trackerRecommendation": "Parent epic. Sequencing lives here, not in the children. #2015 can proceed in parallel with the whole thing."
   },
   {
-    "issueNumber": 2010,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "auth pages: scrollbar appears even though the page fits the viewport",
-    "summary": "The sign-in and sign-up pages show a scrollbar even though the content fits within the viewport height. Grouped under the auth-pages epic (#2057).",
-    "currentBehavior": "A vertical scrollbar renders on pages whose content should fit.",
-    "rootCause": "Most likely an over-sized form container rather than genuinely long content.",
-    "resolution": "Blocked by #2013. Fix the shared container geometry first, then re-check. If the scrollbar is gone, close this as resolved-by rather than carrying a separate fix for a symptom that no longer exists. If it persists, reopen with the specific remaining cause rather than assuming it is the same issue.",
-    "lookIn": [
-      "app/routes/account.sign-in.*",
-      "app/routes/account.sign-up.*",
-      "app/components/shared/AuthCard.tsx"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "no scrollbar at 1x viewport height",
-      "regression guard once the container is fixed"
-    ],
-    "acceptanceCriteria": [
-      "No scrollbar at the supported viewport range",
-      "Either closed as resolved by #2013, or reopened with the specific remaining cause"
-    ],
-    "blockedBy": [
-      2013
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Suspect this closes for free with #2013. Do not fix it first — a scrollbar fix that is really a layout fix will be undone by the next alignment change."
-  },
-  {
-    "issueNumber": 2011,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "auth pages: sign-up is missing the background mural that sign-in has",
-    "summary": "The sign-up page lacks the background mural treatment the sign-in page already uses. Grouped under the auth-pages epic (#2057).",
-    "currentBehavior": "Sign-in has a background mural; sign-up does not.",
-    "rootCause": "The treatment was applied to one route only.",
-    "resolution": "Blocked by #2013 so the final visual pass sees the finished layout. Apply the same treatment to sign-up, ideally by extracting it so the two pages cannot drift apart again.",
-    "lookIn": [
-      "app/routes/account.sign-in.*",
-      "app/routes/account.sign-up.*"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "both routes render the mural treatment"
-    ],
-    "acceptanceCriteria": [
-      "Sign-up renders the same mural treatment as sign-in",
-      "The treatment is shared, not duplicated per route"
-    ],
-    "blockedBy": [
-      2013
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards."
-  },
-  {
     "issueNumber": 2002,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(authz): permission-based authorization instead of role checks",
     "summary": "Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
     "currentBehavior": "Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.",
     "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape.",
-    "resolution": "Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
+    "resolution": "#2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md): extend the capability layer that already exists in app/lib/capabilities.ts and the shared CHS auth packages, and do not adopt the better-auth admin or organization plugins. The vocabulary is therefore settled, so #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
     "lookIn": [
       "app/lib/admin-middleware.server.ts",
       "app/lib/workspace-middleware.server.ts",
@@ -725,12 +412,10 @@
       "Existing roles continue to work as groupings without a migration per user",
       "No route is left checking a broad role where a specific permission is meant"
     ],
-    "blockedBy": [
-      2030
-    ],
+    "blockedBy": [],
     "size": "XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports."
+    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. #2030 has reported (docs/adr/0039-role-checks-become-capability-checks.md), so specification can begin; do not re-run the options analysis."
   },
   {
     "issueNumber": 2030,
@@ -764,20 +449,35 @@
     "issueNumber": 2008,
     "verdict": "blocked-epic",
     "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",
-    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.",
-    "currentBehavior": "Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.",
-    "rootCause": "Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.",
-    "resolution": "Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
+    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt. The policy was deferred by the operator on 2026-10-19; the surface findings are filed here so the decision is the only thing left.",
+    "currentBehavior": "Mapped on dev@24631cc0, 19 October 2026. Agent is the `caller` role (MemberRole.Caller, UI label Agent). The capability matrix in app/lib/capabilities.ts already grants caller `campaigns.read`, `calls.start` and `calls.control`; it also grants `messages.send` to member but not to caller. The catalog has NO per-campaign-type capability at all, so there is currently no way to express live-call versus IVR versus SMS. IVR (robocall, simple_ivr, complex_ivr) and SMS (message) campaigns are served by the SAME routes as live-call campaigns and differ only by campaign.type, so any denial has to be type-aware. Sidebar visibility is 100% hasMinRole; there is no capability check anywhere in the UI.",
+    "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape. The capability layer grew beside it rather than replacing it, and the catalog was never extended to express campaign-type distinctions, so capability-by-capability policy is enforced ad hoc in whichever component happened to check it.",
+    "resolution": "The vocabulary is settled: #2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md) and says to grow PRODUCT_CAPABILITIES in app/lib/capabilities.ts rather than invent a second model, and to leave workspace-customized permissions to a later decision. Still needed before enforcement: (1) a confirmed policy - the issue defaults are a proposal, not a decision; (2) new per-campaign-type capability ids, which means adding them to CAPABILITY_CATEGORIES in app/lib/api-key-capabilities.shared.ts and the ProductCapabilityId enum in app/lib/openapi-platform-components.ts, both of which are exhaustive; (3) a workspace-route capability strategy, because app/lib/capability-guard.server.ts is data-plane only and has no workspace equivalent; (4) type-aware enforcement at the campaign list and the campaign detail route, because IVR and SMS share the campaign routes; (5) the sidebar and the route must read the same source, so the nav items and the route guard derive from one capability set; (6) scripts/check-route-authz.mjs must be taught about capabilities, because its regex only recognises hasMinRole and role equality, and the three routes it allowlists for callers (call, handset, chats) are exactly the surfaces in scope.",
     "lookIn": [
-      "app/components/layout/WorkspaceSidebar.tsx",
-      "app/lib/workspace-middleware.server.ts",
-      "app/routes/workspaces+/$id/**",
-      "app/db/workspace-scoped-tables.ts"
+      "app/lib/capabilities.ts (PRODUCT_CAPABILITIES, CALLCASTER_ROLE_CAPABILITY_MATRIX, capabilityIdsForRole)",
+      "app/lib/member-role.ts (MemberRole enum, WORKSPACE_ROLE_RANK, hasMinRole)",
+      "app/lib/workspace-role-display.ts (Agent = caller, Coordinator = member, Administrator = admin/owner)",
+      "app/components/workspace/WorkspaceNav.tsx (the real sidebar; the board's WorkspaceSidebar.tsx path does not exist)",
+      "app/routes/workspaces+/$id.tsx (renders WorkspaceNav, defaults a null role to MemberRole.Member)",
+      "app/routes/workspaces+/$id/campaigns.route.tsx and campaigns/$selected_id.loader.server.ts (the shared campaign routes)",
+      "app/routes/workspaces+/$id/handset.loader.server.ts and chats.loader.server.ts (the handset and SMS surfaces)",
+      "app/lib/capability-guard.server.ts (data-plane only; no workspace-route capability strategy exists yet)",
+      "app/lib/workspace-route.server.ts and app/lib/workspace-middleware.server.ts (403 shape, membership versus capability)",
+      "app/lib/database/campaign.server.ts (CampaignType and IVR_CAMPAIGN_TYPES)",
+      "app/lib/api-key-capabilities.shared.ts and app/lib/openapi-platform-components.ts (exhaustive capability id maps)",
+      "scripts/check-route-authz.mjs and scripts/lib/route-read-role-floor.mjs (gates that only understand role checks)"
     ],
-    "existingTests": [],
+    "existingTests": [
+      "test/ui/workspace-nav-campaign-caller-gating.test.tsx: asserts the Agent does not see New Campaign, and explicitly asserts the Agent STILL SEES Today, Campaigns, Messages, Call History, Voicemails, Analytics, Handset and Settings",
+      "test/capabilities.test.ts and test/capability-actor.test.ts: the role-to-capability matrix and deny-by-default behaviour",
+      "test/capability-gated-routes.test.ts and test/data-plane-role-gate.test.ts: data-plane 403 versus 404",
+      "e2e/specs/rbac.spec.ts: RBAC-01 asserts the caller nav shows Campaigns and Messages, RBAC-06 asserts the 403 page shape"
+    ],
     "missingTests": [
       "each capability has a route-level enforcement test",
-      "sidebar visibility and route enforcement agree"
+      "sidebar visibility and route enforcement agree",
+      "a caller denied an IVR campaign gets 403 on a direct URL to that campaign",
+      "a caller denied SMS campaigns does not see message-type campaigns in the list"
     ],
     "acceptanceCriteria": [
       "The Agent capability set is written down as data, not scattered conditionals",
@@ -785,12 +485,10 @@
       "The 403-versus-404 boundary is decided and documented rather than incidental",
       "Sidebar visibility and route enforcement read from the same source"
     ],
-    "blockedBy": [
-      2030
-    ],
+    "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
+    "trackerRecommendation": "Unblocked by #2030 (docs/adr/0039-role-checks-become-capability-checks.md). The surface was mapped on 2026-10-19 and the operator deferred the policy decision, so this is the only open question. Do not re-run the options analysis and do not re-map the surface; the findings above are current for dev@24631cc0. The two existing tests that assert the Agent sees Messages and Handset will have to change once the policy is decided, and that change is expected rather than a regression."
   },
   {
     "issueNumber": 2009,
@@ -831,7 +529,7 @@
     "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.",
     "currentBehavior": "Checks are inconsistent, comparing roles in some places and something narrower in others.",
     "rootCause": "Each check was written locally against whatever was convenient at the time.",
-    "resolution": "Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
+    "resolution": "#2030 is done (docs/adr/0039-role-checks-become-capability-checks.md). The sweep still waits on the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
     "lookIn": [
       "app/lib/**-middleware.server.ts",
       "scripts/checks/check-route-authz.mjs",
@@ -849,34 +547,27 @@
       "The sweep lands after the model, not before"
     ],
     "blockedBy": [
-      2030,
       2008
     ],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
+    "trackerRecommendation": "#2030 reported (docs/adr/0039-role-checks-become-capability-checks.md); still deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
   },
   {
     "issueNumber": 1885,
     "verdict": "blocked-epic",
     "recommendedTitle": "Retire the remaining auth schema after dependency verification",
     "summary": "Partial fix only. Dead RPC removal and both actor rewrites are on dev; legacy auth shim remains and the fail-closed schema drop is absent. Issue discussion requires production dependency verification before the drop.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The two live RPCs now use app.current_user_id and get_outreach_attempts is dropped; auth.uid() is still created and schema auth remains to be retired.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. Chunks 1 and 2 shipped: the dead get_outreach_attempts RPC is dropped and the two live auth.uid() RPCs read app.current_user_id. What is still missing in the current tree: the auth schema still exists (no DROP SCHEMA auth migration), drizzle/0001_auth_uid_shim.sql still creates auth.uid() and scripts/db/bootstrap-fresh-db.mjs still applies it, and there is no dependency guard - a repo-wide search for pg_depend finds nothing. Chunk 3 is written but NOT merged: commit cd00ada0 (fix(db): drop the legacy auth schema with a fail-closed guard (#1885)) on origin/fix/1885-chunk3-drop-auth adds client/migrations/20260922120000_drop_legacy_auth_schema.sql, test/legacy-auth-sql-guard.test.ts and retires the shim in both bootstrap scripts. It is not an ancestor of dev.",
     "rootCause": "The live RPC actor rewrites and dead RPC removal shipped. The baseline shim still creates auth.uid(), and the final dependency guard and schema retirement remain unshipped.",
-    "resolution": "Remaining work only: ship a dependency guard, verify all production dependencies/data, then release the schema drop separately and retire the bootstrap shim.",
+    "resolution": "Chunk 3 is already written on origin/fix/1885-chunk3-drop-auth (cd00ada0): a fail-closed DROP SCHEMA auth migration with a dependency guard, the shim retired in drizzle/0001_auth_uid_shim.sql and both bootstrap scripts, and test/legacy-auth-sql-guard.test.ts. It was never merged, so nothing needs to be written. Before it can land, the production dependency and data-retention verification the issue requires has to be recorded, and the schema drop has to ship as its own release step rather than inside a feature PR.",
     "lookIn": [
-      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23",
-      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18",
-      "drizzle/0001_auth_uid_shim.sql:2",
-      "scripts/db/bootstrap-fresh-db.mjs:120",
-      "app/lib/db-rpc.server.ts",
-      "drizzle/0001_auth_uid_shim.sql",
-      "drizzle/0000_baseline.sql",
-      "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
-      "client/migrations/20260715140000_drop_legacy_rls.sql",
-      "scripts/db/check-db-orphans.mjs",
-      "scripts/db/bootstrap-fresh-db.mjs",
-      "scripts/e2e/bootstrap-compose-db.mjs"
+      "client/migrations/20260920120000_drop_get_outreach_attempts.sql (chunk 1, shipped)",
+      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23 (chunk 2, shipped)",
+      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18 (chunk 2, shipped)",
+      "origin/fix/1885-chunk3-drop-auth commit cd00ada0 (chunk 3, written but never merged)",
+      "drizzle/0001_auth_uid_shim.sql:2 (the shim that chunk 3 retires)",
+      "scripts/db/bootstrap-fresh-db.mjs:120 (the bootstrap that still applies the shim)"
     ],
     "existingTests": [
       "test/queue-rpc-contract.test.ts",
@@ -885,7 +576,8 @@
       "test/atomic-manual-dial-claims.integration.test.ts"
     ],
     "missingTests": [
-      "No legacy-auth SQL guard is present on dev. Existing queue contract tests need latest-definition and actor/no-actor coverage. Database state was not queried in this read-only code audit."
+      "test/legacy-auth-sql-guard.test.ts does not exist on dev; it exists only on the unmerged chunk 3 branch",
+      "The production dependency and data-retention verification the issue requires is not recorded anywhere"
     ],
     "acceptanceCriteria": [
       "A dependency guard fails before any destructive operation when non-auth functions, policies, views or other schema objects still depend on auth.",
@@ -897,7 +589,7 @@
     "blockedBy": [],
     "size": "M-L",
     "risk": "high",
-    "trackerRecommendation": "Blocked / split first. Chunks 1–2 shipped in #1966. The 2026-09-28 issue comment explicitly requires production checks and separate guard/drop release work; do not merge the old chunk-3 branch as-is. Related PR evidence: #1966, #1887. A PR reference alone does not prove deployed behavior."
+    "trackerRecommendation": "Lane is blocked-epic: the remaining work is a production verification plus a separate release step, and it touches client/migrations. The implementation is already written on origin/fix/1885-chunk3-drop-auth (cd00ada0) - start from that branch rather than writing it again. Do not merge the schema drop inside a feature PR."
   },
   {
     "issueNumber": 1873,
@@ -948,15 +640,14 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
     "summary": "The keep-list now lives in the repo and is enforced by PR #2536 on dev. Name backfill and the repeat-policy decision remain; workspace-row cleanup stays deferred.",
-    "currentBehavior": "Source audit: dev@7f2c2f9a, 2026-10-11. The cull report reads the checked-in three-workspace keep-list before phone-name and activity rules. PR #2536 passed full CI, E2E, schema checks, and both Railway preview deployments; issue #2168 is on-dev. Name backfill, repeat policy, and live cleanup remain separate.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The keep-list slice is done and proven: scripts/cull-keep-list.mjs holds the three confirmed workspace ids, it wins before every cull rule, and test/cull-report-policy.test.ts asserts that 2608141501 survives the phone-name rule. The report is still read-only with no delete path. What is not done: nothing renames the legacy UUID-named Twilio subaccounts - workspaceResourceName is used only on the create path - and the repeat-versus-one-off policy is unrecorded.",
     "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
-    "resolution": "The durable keep-list slice is complete in PR #2536, merged to dev. The phone-named workspace 2608141501 wins before cull rules. Keep the follow-up split: backfill existing Twilio subaccount names with an idempotent operation, decide whether cleanup repeats, and keep workspace-row deletion deferred. Recheck current ownership before any new live cleanup.",
+    "resolution": "The keep-list is done. What remains is a backfill that renames the legacy UUID-named Twilio subaccounts to the workspaceResourceName form, plus the decision on whether the cull is repeatable or a one-off. The naming helper already exists in app/lib/twilio-resource-name.ts, and the prune report from PR #2733 now resolves those legacy names to their owner workspace, so the backfill has a source of truth to work from.",
     "lookIn": [
-      "scripts/cull-report.mjs:1",
-      "app/lib/twilio-resource-name.ts:1",
-      "scripts/cull-report.mjs (read-only cull tool, merged #2171)",
-      "app/lib/twilio-resource-name.ts (naming helper, merged #2167)",
-      "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
+      "scripts/cull-keep-list.mjs (the confirmed keep-list, shipped)",
+      "scripts/cull-report-policy.mjs:8-24 (the keep-list wins first)",
+      "app/lib/database/workspace-twilio-subaccount.server.ts:39-62 (workspaceResourceName, create path only)",
+      "scripts/twilio-resource-prune-report.mjs (resolves legacy names to their owner workspace)"
     ],
     "existingTests": [
       "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings",
@@ -971,21 +662,19 @@
       "2608141501 survives, since it is on both the keep-list and the phone-number-named rule",
       "The cull report remains read-only with no delete path"
     ],
-    "blockedBy": [
-      2170
-    ],
+    "blockedBy": [],
     "size": "S-M",
     "risk": "low",
-    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
+    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. #2170 (stale subaccount credentials) closed as completed on 2026-10-17, so that credential block is gone. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
   },
   {
     "issueNumber": 2213,
     "verdict": "blocked-epic",
     "recommendedTitle": "Correct the remaining temporal column types listed in the schema drift baseline",
     "summary": "The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. 64 committed temporal mismatch lines remain; guard and first table slices are on dev. Tenant write type boundary was tightened in PR #2244, so the earlier untyped-write prerequisite is resolved.",
+    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The guard and three slices landed: the campaign_queue, call and message tables now declare their temporal columns as timestamps (3d951645, 6fca427d), and test/integration-db/schema-type-drift.test.ts asserts no column has started lying about being text and that no baselined column has stopped lying. The baseline scripts/baselines/schema-type-drift.txt still holds all 64 entries, so no further table has been sliced. app/db/schema.ts:323 still declares date_updated as text().",
     "rootCause": "The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.",
-    "resolution": "Split remaining tables into atomic tasks and start one table slice. Validate invalid/empty values, wire contracts and Date sorting at each boundary.",
+    "resolution": "The guard and the first three slices are done. The remaining work is mechanical: correct the 64 baselined temporal columns in the same slice-at-a-time pattern, lowering the baseline with each slice, and remove the last text() temporal declaration. The existing guard test already refuses a stale baseline entry, so each slice is provable on its own.",
     "lookIn": [
       "scripts/baselines/schema-type-drift.txt:1",
       "test/integration-db/schema-type-drift.test.ts:141",
@@ -1169,81 +858,6 @@
     "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
   },
   {
-    "issueNumber": 2128,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Complete audience upload recovery after opt-out normalization",
-    "summary": "Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.",
-    "currentBehavior": "Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.",
-    "resolution": "Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/lib/audience-upload-db.server.ts",
-      "app/routes/api+/audience-upload.action.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/components/audience/AudienceUploadMapStep.tsx",
-      "shared/contact-import-headers.ts",
-      "app/lib/csv-contacts.ts",
-      "app/lib/chat-opt-out.ts"
-    ],
-    "existingTests": [
-      "#2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.",
-      "Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.",
-      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.",
-      "Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.",
-      "Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.",
-      "#2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green."
-    ],
-    "missingTests": [
-      "Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.",
-      "Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.",
-      "Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification."
-    ],
-    "acceptanceCriteria": [
-      "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
-      "An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.",
-      "A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).",
-      "Re-uploading the same file does not duplicate the rows that already landed.",
-      "An opt-out value is never dropped on the floor: the contact is excluded from dispatch."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.",
-    "rootCause": "Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed."
-  },
-  {
-    "issueNumber": 1771,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
-    "summary": "Original-file retention source is merged through native child #2350 / PR #2351. Per-row failure/review capture and reviewable/downloadable output in the existing progress panel remain open; do not create a duplicate Feature.",
-    "currentBehavior": "The route now retains private immutable original bytes before campaign link/status/enqueue and records storage failure without those effects. The import still exposes only aggregate invalid/duplicate counts and does not persist per-row outcomes or unknown opt-out review warnings.",
-    "rootCause": "Original source retention is implemented. Validation/dedupe lose precise source-row attribution and the worker has no durable per-row error/outcome representation or existing-panel review/download delivery.",
-    "resolution": "Split per-row source identity/capture, durable reporting and existing progress-panel retrieval into reviewable native Tasks with real prerequisite edges. Coordinate landed-row evidence with #2128 recovery. Keep aggregate behavior and every existing Feature acceptance; original retention still needs deployed acceptance/release under #2350.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [
-      "#2350 / PR #2351: 11 actual-route artifact cases; 50 focused upload cases; original bytes, immutable concrete key, storage acknowledgement, truthful failure and denied/foreign controls. Six faults fail; restored 11 pass.",
-      "Both full local gates, both independent reviews, applicable exact-head remote checks and both deployments passed. Remote quality ran all 11 artifact cases. This is source/deployment evidence, not functional deployed acceptance."
-    ],
-    "missingTests": [
-      "Durable per-row rowNumber/field/reason capture, including blank/header/BOM/multiline records and rows removed by validation/dedupe.",
-      "Unknown opt-out review warnings and review/download output in the existing progress/completion panel with tenant checks and unchanged aggregates.",
-      "Applicable deployed original-file/reporting acceptance and release verification."
-    ],
-    "acceptanceCriteria": [
-      "reviewable per-row failure list or download",
-      "original CSV retained safely",
-      "aggregate counts unchanged"
-    ],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Native original-file child Task #2350 is source complete. Keep this existing Feature open, split its remaining reporting work, and retain #2128 whole-run/replay requirements. #1770 remains related context.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 2356,
     "verdict": "blocked-epic",
     "recommendedTitle": "Reconcile audio objects left unattached after campaign update failure",
@@ -1281,10 +895,10 @@
     "issueNumber": 1878,
     "verdict": "blocked-epic",
     "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
-    "summary": "The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.",
-    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. Native #2396 now blocks #1878.",
+    "summary": "The session-selected audio feature remains unfinished. The prerequisite shipped: the separately confirmed AMD playback/continuation defect in #2396 was fixed in master (db0e1686) and its issue is closed, so nothing blocks this one now. Complete-query validation is implemented.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. The #2396 prerequisite is met; the picker itself is not built.",
     "rootCause": "The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.",
-    "resolution": "Resolve #2396 as a separate callback operation first, with durable duplicate/acknowledgement recovery. Then extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
+    "resolution": "The #2396 prerequisite is done. What remains is the feature itself: extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
     "lookIn": [
       "app/components/call/CallScreen.Dialogs.tsx",
       "app/components/call/CallScreen.Layout.tsx",
@@ -1317,24 +931,10 @@
       "What is surfaced matches what the dialer actually plays",
       "The choice is session-only and does not write the campaign config"
     ],
-    "blockedBy": [
-      2396
-    ],
+    "blockedBy": [],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged."
-  },
-  {
-    "issueNumber": 1803,
-    "verdict": "blocked-epic",
-    "summary": "Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.",
-    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "trackerRecommendation": "Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments."
+    "trackerRecommendation": "Keep OPEN in Blocked / split first, now for size rather than for a dependency: it is an L at high risk and it needs more than one agent. The #2396 prerequisite shipped, so do not re-do that work. Preserve the session-only selection and media/recipient ownership plan; the original feature criteria are unchanged."
   },
   {
     "issueNumber": 2099,
@@ -1342,7 +942,7 @@
     "recommendedTitle": "Harden public request rate limits",
     "summary": "Retention source is merged. Trusted public client identity and deployed verification remain separate child tasks.",
     "currentBehavior": "PR #2331 merged the indexed one-day retention repair at f877b636d963cf1154fbab81ef45ef1244bc61ec. The actual daily handler prunes bounded batches, protects reactivated rows, logs counts and preserves rescheduling after cleanup failure. #2329 remains open for deployed tick/retention acceptance. #2330 still owns client identity; current source reads leftmost X-Forwarded-For and falls back to unknown. The actual CallCaster ingress and header trust rule remain unverified.",
-    "resolution": "Complete and verify #2329 deployed retention and #2330 trusted client identity. Test the actual ingress and forged-header controls before selecting a new trusted source; do not reimplement the merged retention repair. Keep the parent open until both child outcomes are verified and promoted.",
+    "resolution": "#2329 deployed retention is complete (closed as completed on 2026-10-17). Complete and verify #2330 trusted client identity: test the actual ingress and forged-header controls before selecting a new trusted source, and do not reimplement the merged retention repair. Keep the parent open until #2330 is verified and promoted.",
     "lookIn": [
       "app/lib/platform-rate-limit.server.ts",
       "app/lib/platform-rate-limit-db.server.ts",
@@ -1364,11 +964,10 @@
       "The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria)."
     ],
     "blockedBy": [
-      2329,
       2330
     ],
     "size": "S",
     "risk": "high",
-    "trackerRecommendation": "The parent tracks two independent child outcomes. Retention source completion does not complete trusted identity or release acceptance."
+    "trackerRecommendation": "The parent tracks two independent child outcomes. #2329 closed as completed on 2026-10-17; #2330 trusted client identity remains open."
   }
 ]

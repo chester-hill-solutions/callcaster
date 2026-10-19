@@ -4,13 +4,14 @@ import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
 
 const mocks = vi.hoisted(() => ({
-  env: {
-    VERIFICATION_PHONE_NUMBER: vi.fn(),
-  },
+  activeVerificationNumber: vi.fn(),
   insertVerificationSession: vi.fn(),
 }));
 
-vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
+vi.mock("@/lib/verification-number.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/verification-number.server")>()),
+  getActiveVerificationNumber: (...args: unknown[]) => mocks.activeVerificationNumber(...args),
+}));
 vi.mock("@/lib/verification-db.server", () => ({
   insertVerificationSession: (...args: unknown[]) => mocks.insertVerificationSession(...args),
 }));
@@ -21,7 +22,7 @@ vi.mock("@/lib/auth.server", () => ({
 describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReset();
+    mocks.activeVerificationNumber.mockReset();
     mocks.insertVerificationSession.mockReset();
   });
 
@@ -30,7 +31,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       headers: new Headers(),
       user: null,
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.activeVerificationNumber.mockResolvedValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
@@ -42,12 +43,12 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 
-  test("loader returns 503 when VERIFICATION_PHONE_NUMBER not configured", async () => {
+  test("loader returns 503 when no verification number is active", async () => {
     queueJsonAuthSession({
       headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue(undefined);
+    mocks.activeVerificationNumber.mockResolvedValue(null);
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
@@ -66,7 +67,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.activeVerificationNumber.mockResolvedValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
@@ -83,7 +84,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.activeVerificationNumber.mockResolvedValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
@@ -99,7 +100,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.activeVerificationNumber.mockResolvedValue("+15550001111");
     mocks.insertVerificationSession.mockResolvedValueOnce({
       id: "vs-abc",
       userId: "u1",
@@ -137,7 +138,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.activeVerificationNumber.mockResolvedValue("+15550001111");
     mocks.insertVerificationSession.mockRejectedValueOnce(new Error("db error"));
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
