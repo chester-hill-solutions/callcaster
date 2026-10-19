@@ -317,9 +317,21 @@ npm run tools:twilio:prune-report -- --skip-subaccounts
 npm run tools:twilio:prune-report -- --json
 ```
 
-`DATABASE_URL` is optional. Without it the owner check cannot run and every
-workspace-owned resource stays `UNKNOWN`. The script reads and prints; it has
-no delete path.
+`DATABASE_URL` is optional, and `DATABASE_PUBLIC_URL` wins over it when both
+are set, because `DATABASE_URL` on a Railway service points at the internal
+host. Without a database the owner check cannot run and every workspace-owned
+resource stays `UNKNOWN`. The report reads and prints; it has no delete path.
+
+Run it against the database that holds the live accounts. The owner check
+resolves a resource to a workspace by reading that database, so a report run
+against an empty environment cannot see the workspaces that own the resources.
+It prints the accounts it found and when each was last active, so you can see
+which ones are live.
+
+Some resources are held whatever the database says. `scripts/twilio-resource-prune-keep-list.mjs`
+is a frozen list of the resources that must never be touched, currently the
+Chester Hill Solutions business line and its numbers. It is checked before
+every other rule.
 
 ## Vendored packages
 

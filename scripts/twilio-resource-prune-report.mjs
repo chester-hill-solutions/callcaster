@@ -50,6 +50,12 @@ import postgres from "postgres";
 
 import { loadLiveEnvironmentNames } from "./lib/live-environments.mjs";
 import { buildTwilioPruneReport, PRUNE_VERDICT } from "./lib/twilio-resource-prune-policy.mjs";
+import {
+  TWILIO_PRUNE_KEEP_NAMES,
+  TWILIO_PRUNE_KEEP_OWNER_PREFIXES,
+  TWILIO_PRUNE_KEEP_PHONE_NUMBERS,
+  TWILIO_PRUNE_KEEP_SIDS,
+} from "./twilio-resource-prune-keep-list.mjs";
 
 const args = process.argv.slice(2);
 const asJson = args.includes("--json");
@@ -60,6 +66,12 @@ const SCAN_CONCURRENCY = 5;
 
 /** Page size for every list call. Twilio allows up to 1000. */
 const PAGE_SIZE = 1000;
+
+/**
+ * A workspace counts as active when it has done something in this window.
+ * Activity only ever holds a resource. It never makes one prunable.
+ */
+const ACTIVE_WINDOW_DAYS = 30;
 
 async function main() {
   const client = new Twilio.Twilio(
@@ -76,7 +88,13 @@ async function main() {
     resources,
     liveEnvironments,
     knownWorkspaceIds: database.workspaceIds,
+    knownWorkspaceNames: database.workspaceNames,
+    activeWorkspacePrefixes: database.activeWorkspacePrefixes,
     referencedNumberSids: database.numberSids,
+    keepSids: TWILIO_PRUNE_KEEP_SIDS,
+    keepNames: TWILIO_PRUNE_KEEP_NAMES,
+    keepPhoneNumbers: TWILIO_PRUNE_KEEP_PHONE_NUMBERS,
+    keepOwnerPrefixes: TWILIO_PRUNE_KEEP_OWNER_PREFIXES,
   });
 
   if (asJson) {
@@ -85,6 +103,7 @@ async function main() {
         {
           liveEnvironments: [...liveEnvironments].sort(),
           database: database.source,
+          accounts: database.accounts,
           counts: report.counts,
           entries: report.entries,
         },
@@ -228,9 +247,18 @@ async function listSubaccountMessagingServices(client, subaccountSid) {
  * resource UNKNOWN, which is the safe answer, and the report says so.
  */
 async function readDatabaseEvidence() {
-  const databaseUrl = process.env.DATABASE_URL;
+  // The public URL wins: DATABASE_URL on a Railway service points at the
+  // internal host, which is not reachable from a laptop.
+  const databaseUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
   if (!databaseUrl) {
-    return { source: "not configured", workspaceIds: [], numberSids: new Set() };
+    return {
+      source: "not configured",
+      workspaceIds: [],
+      workspaceNames: new Map(),
+      activeWorkspacePrefixes: new Set(),
+      numberSids: new Set(),
+      accounts: [],
+    };
   }
 
   const sql = postgres(databaseUrl, {
@@ -239,16 +267,71 @@ async function readDatabaseEvidence() {
   });
 
   try {
-    const workspaceRows = await sql`SELECT id FROM workspace`;
+    // One query, shaped like scripts/cull-report.mjs, which already reads
+    // these tables: a workspace with no activity still has to appear.
+    const accountRows = await sql.unsafe(`
+      WITH act AS (
+        SELECT w.id,
+               GREATEST(max(c.date_created), max(m.date_created), max(camp.created_at)) AS last_any
+        FROM workspace w
+        LEFT JOIN call c        ON c.workspace = w.id
+        LEFT JOIN message m     ON m.workspace = w.id
+        LEFT JOIN campaign camp ON camp.workspace = w.id
+        GROUP BY w.id
+      ),
+      nums AS (
+        SELECT workspace,
+               count(*) FILTER (WHERE type = 'rented')::int    AS rented,
+               count(*) FILTER (WHERE type = 'caller_id')::int AS caller_id,
+               count(*)::int                                   AS total
+        FROM workspace_number
+        GROUP BY workspace
+      )
+      SELECT w.id, w.name,
+             act.last_any::text AS last_any,
+             COALESCE(nums.total, 0)::int     AS numbers_total,
+             COALESCE(nums.rented, 0)::int    AS rented,
+             COALESCE(nums.caller_id, 0)::int AS caller_id
+      FROM workspace w
+      LEFT JOIN act  ON act.id = w.id
+      LEFT JOIN nums ON nums.workspace = w.id
+      ORDER BY act.last_any DESC NULLS LAST, w.name
+    `);
+
     const numberRows = await sql`
       SELECT twilio_phone_number_sid, workspace
       FROM workspace_number
       WHERE twilio_phone_number_sid IS NOT NULL
     `;
+
+    const cutoff = Date.now() - ACTIVE_WINDOW_DAYS * 86_400_000;
+    const accounts = accountRows.map((row) => {
+      const lastActivity = row.last_any ? new Date(row.last_any) : null;
+      const active = lastActivity ? lastActivity.getTime() >= cutoff : false;
+      return {
+        id: row.id,
+        name: row.name,
+        lastActivity: lastActivity ? lastActivity.toISOString() : null,
+        active,
+        numbersTotal: row.numbers_total,
+        rented: row.rented,
+        callerId: row.caller_id,
+      };
+    });
+
+    const workspaceNames = new Map(
+      accountRows.map((row) => [String(row.name ?? "").trim().toLowerCase(), row]),
+    );
+
     return {
-      source: `${workspaceRows.length} workspaces, ${numberRows.length} workspace numbers`,
-      workspaceIds: workspaceRows.map((row) => row.id),
+      source: `${accountRows.length} workspaces, ${numberRows.length} workspace numbers`,
+      workspaceIds: accountRows.map((row) => row.id),
+      workspaceNames,
+      activeWorkspacePrefixes: new Set(
+        accounts.filter((account) => account.active).map((account) => account.id.slice(0, 8).toLowerCase()),
+      ),
       numberSids: new Set(numberRows.map((row) => row.twilio_phone_number_sid)),
+      accounts,
     };
   } finally {
     await sql.end({ timeout: 5 });
@@ -270,6 +353,18 @@ function printReport({ report, liveEnvironments, database, resources }) {
   console.log(`KEEP:                       ${report.counts.keep}`);
   console.log(`STALE (prunable):           ${report.counts.stale}`);
   console.log(`UNKNOWN (owner unproven):   ${report.counts.unknown}`);
+
+  if (database.accounts.length > 0) {
+    console.log("");
+    console.log(`Accounts in this environment (active in the last ${ACTIVE_WINDOW_DAYS} days):`);
+    for (const account of database.accounts) {
+      const flag = account.active ? "ACTIVE" : "idle  ";
+      const last = account.lastActivity ? account.lastActivity.slice(0, 10) : "never";
+      console.log(
+        `  ${flag}  ${account.id.slice(0, 8)}  ${pad(account.name, 42)}  numbers=${String(account.numbersTotal).padStart(2)}  last=${last}`,
+      );
+    }
+  }
 
   const stale = report.entries.filter((entry) => entry.verdict === PRUNE_VERDICT.STALE);
   if (stale.length > 0) {
@@ -303,6 +398,10 @@ function chunk(items, size) {
     batches.push(items.slice(index, index + size));
   }
   return batches;
+}
+
+function pad(value, width) {
+  return String(value ?? "—").slice(0, width).padEnd(width);
 }
 
 function requireEnv(name) {

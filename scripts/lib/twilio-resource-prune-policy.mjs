@@ -80,6 +80,36 @@ export const PRUNE_VERDICT = {
   UNKNOWN: "UNKNOWN",
 };
 
+/**
+ * A resource that is on the keep list is never prunable, whatever else is true
+ * about it. The keep list is checked first, so a keep-listed resource that
+ * also looks like a dead preview is still held.
+ */
+export function keepListVerdict({
+  sid,
+  friendlyName,
+  phoneNumber,
+  keepSids = new Set(),
+  keepNames = new Set(),
+  keepPhoneNumbers = new Set(),
+  keepOwnerPrefixes = new Set(),
+} = {}) {
+  if (sid && keepSids.has(String(sid).toLowerCase())) {
+    return "on the keep list by resource id";
+  }
+  if (phoneNumber && keepPhoneNumbers.has(String(phoneNumber).replace(/[^\d+]/g, ""))) {
+    return "on the keep list by phone number";
+  }
+  if (friendlyName && keepNames.has(String(friendlyName).trim().toLowerCase())) {
+    return "on the keep list by name";
+  }
+  const ownerHint = workspaceOwnerHintForResource(friendlyName);
+  if (ownerHint && keepOwnerPrefixes.has(ownerHint)) {
+    return "on the keep list by owner workspace";
+  }
+  return null;
+}
+
 /** Resource types the report knows about, and whether the API can remove one. */
 export const REMOVABLE_VIA_API = {
   twiml_app: true,
@@ -139,20 +169,41 @@ export function classifyTwilioResource({
   resourceType,
   sid,
   friendlyName,
+  phoneNumber,
   liveEnvironments = new Set(),
   knownWorkspacePrefixes = new Set(),
+  activeWorkspacePrefixes = new Set(),
+  knownWorkspaceNames = new Map(),
   referencedNumberSids = new Set(),
+  keepSids = new Set(),
+  keepNames = new Set(),
+  keepPhoneNumbers = new Set(),
+  keepOwnerPrefixes = new Set(),
 } = {}) {
   const entry = {
     resourceType,
     sid: sid ?? null,
     friendlyName: friendlyName ?? null,
+    phoneNumber: phoneNumber ?? null,
     verdict: PRUNE_VERDICT.UNKNOWN,
     why: "",
     environmentName: null,
     ownerHint: null,
     removableViaApi: REMOVABLE_VIA_API[resourceType] === true,
   };
+
+  const keepReason = keepListVerdict({
+    sid,
+    friendlyName,
+    phoneNumber,
+    keepSids,
+    keepNames,
+    keepPhoneNumbers,
+    keepOwnerPrefixes,
+  });
+  if (keepReason) {
+    return { ...entry, verdict: PRUNE_VERDICT.KEEP, why: keepReason };
+  }
 
   if (resourceType === "incoming_phone_number" && referencedNumberSids.has(sid)) {
     return { ...entry, verdict: PRUNE_VERDICT.KEEP, why: "still attached to a workspace number" };
@@ -177,7 +228,13 @@ export function classifyTwilioResource({
   if (ownerHint !== null) {
     entry.ownerHint = ownerHint;
     if (knownWorkspacePrefixes.has(ownerHint)) {
-      return { ...entry, verdict: PRUNE_VERDICT.KEEP, why: `owner workspace ${ownerHint} exists in this database` };
+      return {
+        ...entry,
+        verdict: PRUNE_VERDICT.KEEP,
+        why: activeWorkspacePrefixes.has(ownerHint)
+          ? `owner workspace ${ownerHint} is an active account`
+          : `owner workspace ${ownerHint} exists in this database`,
+      };
     }
     return {
       ...entry,
@@ -185,6 +242,19 @@ export function classifyTwilioResource({
       why:
         `owner workspace ${ownerHint} is not in this database; the Twilio account is shared, ` +
         "so check the environment that owns it before deleting",
+    };
+  }
+
+  // A resource named after a live workspace has a live owner, even when the
+  // name carries no owner hint. Names change, so this is a weaker signal than
+  // the owner hint, and it only ever holds a resource.
+  const nameKey = typeof friendlyName === "string" ? friendlyName.trim().toLowerCase() : "";
+  if (nameKey && knownWorkspaceNames.has(nameKey)) {
+    const owner = knownWorkspaceNames.get(nameKey);
+    return {
+      ...entry,
+      verdict: PRUNE_VERDICT.KEEP,
+      why: `name matches the live workspace "${owner.name}"`,
     };
   }
 
@@ -202,7 +272,13 @@ export function buildTwilioPruneReport({
   resources = [],
   liveEnvironments = new Set(),
   knownWorkspaceIds = [],
+  knownWorkspaceNames = new Map(),
+  activeWorkspacePrefixes = new Set(),
   referencedNumberSids = new Set(),
+  keepSids = new Set(),
+  keepNames = new Set(),
+  keepPhoneNumbers = new Set(),
+  keepOwnerPrefixes = new Set(),
 } = {}) {
   const knownWorkspacePrefixes = new Set(
     [...knownWorkspaceIds].map(workspaceOwnerPrefix).filter((prefix) => prefix !== null),
@@ -213,7 +289,13 @@ export function buildTwilioPruneReport({
       ...resource,
       liveEnvironments,
       knownWorkspacePrefixes,
+      knownWorkspaceNames,
+      activeWorkspacePrefixes,
       referencedNumberSids,
+      keepSids,
+      keepNames,
+      keepPhoneNumbers,
+      keepOwnerPrefixes,
     }),
   );
 

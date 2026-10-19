@@ -10,6 +10,13 @@ import {
   workspaceOwnerHintForResource,
   workspaceOwnerPrefix,
 } from "../scripts/lib/twilio-resource-prune-policy.mjs";
+import {
+  TWILIO_PRUNE_KEEP,
+  TWILIO_PRUNE_KEEP_NAMES,
+  TWILIO_PRUNE_KEEP_OWNER_PREFIXES,
+  TWILIO_PRUNE_KEEP_PHONE_NUMBERS,
+  TWILIO_PRUNE_KEEP_SIDS,
+} from "../scripts/twilio-resource-prune-keep-list.mjs";
 
 const DEAD_PREVIEW = "callcaster-pr-1047";
 const LIVE_PREVIEW = "callcaster-pr-2001";
@@ -51,6 +58,120 @@ describe("workspaceOwnerHintForResource", () => {
 describe("workspaceOwnerPrefix", () => {
   it("takes the first 8 characters of the workspace uuid", () => {
     expect(workspaceOwnerPrefix(KNOWN_WORKSPACE_ID)).toBe("701582c0");
+  });
+});
+
+describe("the keep list", () => {
+  it("holds the business line numbers named in #1320", () => {
+    expect(TWILIO_PRUNE_KEEP.workspaceIds).toContain(
+      "c916b473-17b1-4c5d-86d5-df8e4326a4b6",
+    );
+    expect(TWILIO_PRUNE_KEEP.phoneNumbers).toEqual(
+      expect.arrayContaining([
+        "+16478657844",
+        "+19058088017",
+        "+12894600186",
+        "+14313409877",
+      ]),
+    );
+    expect(TWILIO_PRUNE_KEEP_OWNER_PREFIXES.has("c916b473")).toBe(true);
+  });
+
+  it("holds a resource by id, by phone number, by name and by owner workspace", () => {
+    const base = {
+      resourceType: "incoming_phone_number",
+      sid: "PN1",
+      liveEnvironments: new Set(),
+      knownWorkspacePrefixes: new Set(),
+    };
+
+    expect(
+      classifyTwilioResource({
+        ...base,
+        sid: "PN0f56c811eee5ce5987476c01c3319274",
+        friendlyName: "Chester Hill Solutions",
+        keepSids: TWILIO_PRUNE_KEEP_SIDS,
+      }).verdict,
+    ).toBe("KEEP");
+
+    expect(
+      classifyTwilioResource({
+        ...base,
+        sid: "PN-other",
+        friendlyName: "Some Client",
+        phoneNumber: "+1 647 865 7844",
+        keepPhoneNumbers: TWILIO_PRUNE_KEEP_PHONE_NUMBERS,
+      }).verdict,
+    ).toBe("KEEP");
+
+    expect(
+      classifyTwilioResource({
+        ...base,
+        sid: "PN-other2",
+        friendlyName: "Chester Hill Solutions",
+        keepNames: TWILIO_PRUNE_KEEP_NAMES,
+      }).verdict,
+    ).toBe("KEEP");
+
+    expect(
+      classifyTwilioResource({
+        ...base,
+        sid: "PN-other3",
+        friendlyName: "Chester Hill Solutions · c916b473",
+        keepOwnerPrefixes: TWILIO_PRUNE_KEEP_OWNER_PREFIXES,
+      }).verdict,
+    ).toBe("KEEP");
+  });
+
+  it("holds a keep-listed resource even when it looks like a dead preview", () => {
+    const entry = classifyTwilioResource({
+      resourceType: "twiml_app",
+      sid: "AP1",
+      friendlyName: "env:callcaster-pr-1047",
+      liveEnvironments: new Set(),
+      // The keep list stores SIDs lowercased, and the lookup lowercases the
+      // SID it is given, so the comparison is on the same footing.
+      keepSids: new Set(["ap1"]),
+    });
+    expect(entry.verdict).toBe("KEEP");
+    expect(entry.why).toContain("keep list");
+  });
+});
+
+describe("a live workspace name", () => {
+  it("holds a resource named after a live workspace even with no owner hint", () => {
+    const entry = classifyTwilioResource({
+      resourceType: "incoming_phone_number",
+      sid: "PN1",
+      friendlyName: "Chester Hill Solutions",
+      knownWorkspaceNames: new Map([["chester hill solutions", { name: "Chester Hill Solutions" }]]),
+    });
+    expect(entry.verdict).toBe("KEEP");
+    expect(entry.why).toContain("live workspace");
+  });
+
+  it("does not hold a resource whose name matches nothing", () => {
+    const entry = classifyTwilioResource({
+      resourceType: "incoming_phone_number",
+      sid: "PN1",
+      friendlyName: "Tanveer for BEY",
+      knownWorkspaceNames: new Map([["chester hill solutions", { name: "Chester Hill Solutions" }]]),
+    });
+    expect(entry.verdict).toBe("UNKNOWN");
+  });
+});
+
+describe("an active account", () => {
+  it("says so when the owner workspace is active", () => {
+    const entry = classifyTwilioResource({
+      resourceType: "subaccount",
+      sid: "AC1",
+      friendlyName: "c916b473-17b1-4c5d-86d5-df8e4326a4b6",
+      knownWorkspacePrefixes: new Set(["c916b473"]),
+      activeWorkspacePrefixes: new Set(["c916b473"]),
+    });
+    expect(entry.verdict).toBe("KEEP");
+    expect(entry.why).toContain("active account");
   });
 });
 
