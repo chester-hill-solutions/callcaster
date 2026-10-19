@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@7476ec88` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@8b786af3` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,19 +29,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 2
+## Fix now — 1
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
-- Number purchase still has explicit deferred-Q43 code and no regulatory addressSid. Its service-address precheck and validated emergencyAddressSid do not resolve local/foreign regulatory requirements.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Purchase requires a service address and may pass validated emergencyAddressSid. It still explicitly defers regulatory addressRequirements/addressSid, and provider create rejection maps to 500.
-- Resolution: Look up inventory requirement, select compliant validated regulatory address, explain absence before purchase and pass addressSid.
-- Look in: `app/lib/platform-workspace-numbers.server.ts:171`, `app/lib/platform-workspace-numbers.server.ts:187`, `app/lib/platform-workspace-numbers.server.ts:152`, `app/lib/platform-workspace-numbers.server.ts:344`, `app/lib/platform-workspace-numbers.server.ts:175-192,339-346`, `app/lib/number-address-requirements.ts (`resolveAddressForRequirement`, `addressRequirementUserMessage`)`, `app/lib/numbers-search.server.ts`, `app/lib/numbers-search.types.ts`, `app/components/phone-numbers/ (the search row and purchase fetcher)`, `isNanpTollFreeNumber`
-- Missing tests: Purchase-boundary missing/compliant/foreign address tests and search badge. Twilio rejection and live address data were not reproduced.
-- Done when: A number with `addressRequirements: "local"` and no validated address returns 400 with the address-specific message, and no Twilio number is created (kill-check: remove the resolve call and confirm the test goes red).; With a compliant address, the purchase succeeds and passes `addressSid`.; A `foreign` requirement is satisfied by a foreign address.; The badge is visible on the search row.; No purchase path returns 500 for an address requirement.
-- Tracker: Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter.
 
 ### [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459) The Access form shows two success notices for one recovery click
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
@@ -56,7 +46,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 101
+## Verify and close — 102
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -216,6 +206,19 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
 - Done when: The UI distinguishes invalid credentials from a provider outage or rate limit; A wrong password no longer reads as a generic temporary failure; The raw provider payload is mapped, not passed through to the user; The error is surfaced through the toast pattern, not inline text
 - Tracker: Verify and close after deployed QA and default-branch release. PR #2361 is merged into dev; keep the issue open until the remaining verification is complete.
+
+### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-07
+- Recommended title: **Q43 regulatory address requirements are applied at the purchase boundary**
+- Implemented in PR #2468 (1a71ab1e, on dev). The purchase path resolves the number's regulatory address requirement before provider creation: it re-reads the exact inventory, returns 409 when the number is gone, lists the purchasing account's addresses and resolves the requirement. A missing or non-qualifying address returns 400 with the address-specific message and the reservation is cancelled. A compliant address is sent as AddressSid, distinct from EmergencyAddressSID. The search row shows the requirement badge before the click.
+- Current behavior: Verified on dev@8b786af3, 19 October 2026. 23 regulatory-address integration cases, 27 purchase/credit cases and 4 rendered badge cases pass. Removing the resolve call from the purchase path fails 13 of the 23 address cases and lets creation proceed without an address.
+- Root cause: The original purchase path called incomingPhoneNumbers.create with no addressSid and mapped the provider rejection to a bare 500. That path is gone: the resolve runs first and its 400/409 is returned with the reservation cancelled.
+- Resolution: No source work remains. Verify live provider address/locality and bundle acceptance during release checks — country matching alone cannot prove every local provider rule — then promote through the normal release process.
+- Look in: `app/lib/number-purchase.server.ts:394 (resolve before create; cancel on failure; AddressSid on success)`, `app/lib/number-regulatory-address.server.ts (resolveNumberPurchaseAddress, numberPurchaseAddressRejection, addressFailure)`, `app/lib/number-address-requirements.ts (resolveAddressForRequirement)`, `app/routes/api+/numbers.action.server.ts:54 (legacy route maps the address result)`, `app/components/phone-numbers/NumberPurchase.columns.tsx (search-row badge)`
+- Existing tests: test/integration-db/number-regulatory-address.test.ts: 23 cases through the installed SDK boundary and real Postgres; test/integration-db/number-purchase-credits.test.ts: 27 purchase, credit and recovery cases; test/ui/number-address-badge.test.tsx: 4 rendered search-row cases
+- Missing tests: Live provider address/locality acceptance for a real local purchase (needs a paid Twilio purchase); Deployed reproduction of a provider address rejection
+- Done when: A number with addressRequirements local and no validated address returns 400 with the address-specific message, and no number is created; With a compliant address, the purchase succeeds and passes addressSid; A foreign requirement is satisfied by a foreign address; The badge is visible on the search row; No purchase path returns 500 for an address requirement
+- Tracker: Lane is verify-close: source and regressions landed in PR #2468, so do not rebuild them. Only deployed provider acceptance and release promotion remain, and neither can run without a paid Twilio purchase. Close on promotion.
 
 ### [#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123) The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07

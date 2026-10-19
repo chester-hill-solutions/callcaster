@@ -1,39 +1,5 @@
 [
   {
-    "issueNumber": 2144,
-    "verdict": "fix-now",
-    "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500",
-    "summary": "Number purchase still has explicit deferred-Q43 code and no regulatory addressSid. Its service-address precheck and validated emergencyAddressSid do not resolve local/foreign regulatory requirements.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Purchase requires a service address and may pass validated emergencyAddressSid. It still explicitly defers regulatory addressRequirements/addressSid, and provider create rejection maps to 500.",
-    "resolution": "Look up inventory requirement, select compliant validated regulatory address, explain absence before purchase and pass addressSid.",
-    "lookIn": [
-      "app/lib/platform-workspace-numbers.server.ts:171",
-      "app/lib/platform-workspace-numbers.server.ts:187",
-      "app/lib/platform-workspace-numbers.server.ts:152",
-      "app/lib/platform-workspace-numbers.server.ts:344",
-      "app/lib/platform-workspace-numbers.server.ts:175-192,339-346",
-      "app/lib/number-address-requirements.ts (`resolveAddressForRequirement`, `addressRequirementUserMessage`)",
-      "app/lib/numbers-search.server.ts`, `app/lib/numbers-search.types.ts",
-      "app/components/phone-numbers/ (the search row and purchase fetcher)",
-      "isNanpTollFreeNumber"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Purchase-boundary missing/compliant/foreign address tests and search badge. Twilio rejection and live address data were not reproduced."
-    ],
-    "acceptanceCriteria": [
-      "A number with `addressRequirements: \"local\"` and no validated address returns 400 with the address-specific message, and no Twilio number is created (kill-check: remove the resolve call and confirm the test goes red).",
-      "With a compliant address, the purchase succeeds and passes `addressSid`.",
-      "A `foreign` requirement is satisfied by a foreign address.",
-      "The badge is visible on the search row.",
-      "No purchase path returns 500 for an address requirement."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Keep Fix now. E911 address handling is not the Q43 regulatory address requirement implementation; current source does not resolve the latter."
-  },
-  {
     "issueNumber": 2459,
     "verdict": "fix-now",
     "acceptanceCriteria": [
