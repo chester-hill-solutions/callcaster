@@ -58,6 +58,10 @@ vi.mock("@/lib/admin-jobs.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/admin-jobs.server")>()),
   listRecentDeadLetteredJobs: async () => [],
 }));
+vi.mock("@/lib/verification-number.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/verification-number.server")>()),
+  listVerificationNumbers: async () => [],
+}));
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
   createWorkspaceTwilioInstance: boundary.client,
@@ -259,6 +263,7 @@ for (const surface of surfaces)
               "workspaceRows",
               "campaigns",
               "deadLetteredJobs",
+              "verificationNumbers",
               "stats",
               ...(surface.api ? [] : ["user"]),
             ]
