@@ -3428,5 +3428,41 @@
       "Live signed-call and storage acceptance, release QA and default-branch promotion remain."
     ],
     "trackerRecommendation": "Verify and close after candidate acceptance and default-branch promotion. PR #2457 passed full local CI, applicable exact-head remote gates, actual PostgreSQL coverage and app/worker previews; source-equivalent squash and owned cleanup are verified."
+  },
+  {
+    "issueNumber": 2144,
+    "verdict": "verify-close",
+    "recommendedTitle": "Q43 regulatory address requirements are applied at the purchase boundary",
+    "summary": "Implemented in PR #2468 (1a71ab1e, on dev). The purchase path resolves the number's regulatory address requirement before provider creation: it re-reads the exact inventory, returns 409 when the number is gone, lists the purchasing account's addresses and resolves the requirement. A missing or non-qualifying address returns 400 with the address-specific message and the reservation is cancelled. A compliant address is sent as AddressSid, distinct from EmergencyAddressSID. The search row shows the requirement badge before the click.",
+    "currentBehavior": "Verified on dev@8b786af3, 19 October 2026. 23 regulatory-address integration cases, 27 purchase/credit cases and 4 rendered badge cases pass. Removing the resolve call from the purchase path fails 13 of the 23 address cases and lets creation proceed without an address.",
+    "rootCause": "The original purchase path called incomingPhoneNumbers.create with no addressSid and mapped the provider rejection to a bare 500. That path is gone: the resolve runs first and its 400/409 is returned with the reservation cancelled.",
+    "resolution": "No source work remains. Verify live provider address/locality and bundle acceptance during release checks — country matching alone cannot prove every local provider rule — then promote through the normal release process.",
+    "lookIn": [
+      "app/lib/number-purchase.server.ts:394 (resolve before create; cancel on failure; AddressSid on success)",
+      "app/lib/number-regulatory-address.server.ts (resolveNumberPurchaseAddress, numberPurchaseAddressRejection, addressFailure)",
+      "app/lib/number-address-requirements.ts (resolveAddressForRequirement)",
+      "app/routes/api+/numbers.action.server.ts:54 (legacy route maps the address result)",
+      "app/components/phone-numbers/NumberPurchase.columns.tsx (search-row badge)"
+    ],
+    "existingTests": [
+      "test/integration-db/number-regulatory-address.test.ts: 23 cases through the installed SDK boundary and real Postgres",
+      "test/integration-db/number-purchase-credits.test.ts: 27 purchase, credit and recovery cases",
+      "test/ui/number-address-badge.test.tsx: 4 rendered search-row cases"
+    ],
+    "missingTests": [
+      "Live provider address/locality acceptance for a real local purchase (needs a paid Twilio purchase)",
+      "Deployed reproduction of a provider address rejection"
+    ],
+    "acceptanceCriteria": [
+      "A number with addressRequirements local and no validated address returns 400 with the address-specific message, and no number is created",
+      "With a compliant address, the purchase succeeds and passes addressSid",
+      "A foreign requirement is satisfied by a foreign address",
+      "The badge is visible on the search row",
+      "No purchase path returns 500 for an address requirement"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Lane is verify-close: source and regressions landed in PR #2468, so do not rebuild them. Only deployed provider acceptance and release promotion remain, and neither can run without a paid Twilio purchase. Close on promotion."
   }
 ]
