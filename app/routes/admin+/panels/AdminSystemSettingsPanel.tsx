@@ -1,20 +1,115 @@
-import { Button } from "@/components/ui/button";
+import { Form, Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { TabsContent } from "@/components/ui/tabs";
-import { Link } from "react-router";
-import type { DeadLetteredJobRow } from "../admin.types";
+import type { DeadLetteredJobRow, VerificationNumberRow } from "../admin.types";
 
 export function AdminSystemSettingsPanel({
     deadLetteredJobs = [],
+    verificationNumbers = [],
 }: {
     deadLetteredJobs?: DeadLetteredJobRow[];
+    verificationNumbers?: VerificationNumberRow[];
 }) {
+    const activeNumber = verificationNumbers.find((row) => row.isActive) ?? null;
+
     return (
         <TabsContent value="settings">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Call-In Verification Numbers</CardTitle>
+                        <CardDescription>
+                            The number an agent dials to verify a handset. One number is active at a
+                            time; register several here for later region and bandwidth growth.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {verificationNumbers.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No verification number is registered. Call-in verification returns a
+                                feature-unavailable response until one is registered and active.
+                            </p>
+                        ) : (
+                            <div className="space-y-3">
+                                {verificationNumbers.map((row) => (
+                                    <div
+                                        key={row.phoneNumber}
+                                        className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                                    >
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{row.phoneNumber}</span>
+                                                {row.isActive ? (
+                                                    <Badge variant="outline">Active</Badge>
+                                                ) : (
+                                                    <Badge variant="outline">Inactive</Badge>
+                                                )}
+                                            </div>
+                                            <span className="text-xs text-muted-foreground">
+                                                {[row.label, row.region].filter(Boolean).join(" · ") ||
+                                                    "No label or region recorded"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {row.isActive ? null : (
+                                                <Form method="post">
+                                                    <input type="hidden" name="_action" value="activate_verification_number" />
+                                                    <input type="hidden" name="phoneNumber" value={row.phoneNumber} />
+                                                    <Button type="submit" size="sm" variant="outline">
+                                                        Set active
+                                                    </Button>
+                                                </Form>
+                                            )}
+                                            <Form method="post">
+                                                <input type="hidden" name="_action" value="remove_verification_number" />
+                                                <input type="hidden" name="phoneNumber" value={row.phoneNumber} />
+                                                <Button type="submit" size="sm" variant="destructive">
+                                                    Remove
+                                                </Button>
+                                            </Form>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <Form method="post" className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-end">
+                            <input type="hidden" name="_action" value="register_verification_number" />
+                            <FormField htmlFor="admin-verification-number" label="Phone number (E.164)">
+                                <FormFieldControl>
+                                    <Input
+                                        id="admin-verification-number"
+                                        name="phoneNumber"
+                                        placeholder="+15551234567"
+                                        required
+                                        className="max-w-xs"
+                                    />
+                                </FormFieldControl>
+                            </FormField>
+                            <FormField htmlFor="admin-verification-label" label="Label">
+                                <FormFieldControl>
+                                    <Input id="admin-verification-label" name="label" placeholder="Main" className="max-w-xs" />
+                                </FormFieldControl>
+                            </FormField>
+                            <FormField htmlFor="admin-verification-region" label="Region">
+                                <FormFieldControl>
+                                    <Input id="admin-verification-region" name="region" placeholder="ca-central" className="max-w-xs" />
+                                </FormFieldControl>
+                            </FormField>
+                            <Button type="submit">Register</Button>
+                        </Form>
+                        {activeNumber === null && verificationNumbers.length > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                                No number is active. Call-in verification stays unavailable until you set one active.
+                            </p>
+                        ) : null}
+                    </CardContent>
+                </Card>
+
                 <Card className="md:col-span-2">
                     <CardHeader>
                         <CardTitle>Dead-Lettered Jobs</CardTitle>
@@ -54,51 +149,6 @@ export function AdminSystemSettingsPanel({
                                 ))}
                             </div>
                         )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>System Settings</CardTitle>
-                        <CardDescription>Configure global system settings</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <FormField htmlFor="admin-default-credits" label="Default Credits for New Workspaces">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                <FormFieldControl>
-                                    <Input id="admin-default-credits" type="number" defaultValue="100" className="max-w-xs" />
-                                </FormFieldControl>
-                                <Button>Save</Button>
-                            </div>
-                        </FormField>
-
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-medium">System Maintenance Mode</h3>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline">Enable Maintenance Mode</Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Audit Log</CardTitle>
-                        <CardDescription>Recent system activity</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {[1, 2, 3, 4, 5].map((i) => (
-                                <div key={i} className="flex items-start gap-4 text-sm">
-                                    <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5"></div>
-                                    <div>
-                                        <p className="font-medium">System update completed</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {new Date(Date.now() - i * 3600000).toLocaleString()}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
                     </CardContent>
                 </Card>
             </div>
