@@ -11,6 +11,27 @@ name: Release closes its issues
 # gate requires at least one closing reference in a release PR body, with the
 # existing `no-issue` label override for a genuinely issue-free release.
 #
+# GitHub closes ONE issue per closing keyword. It does not read a comma
+# separated list behind a single keyword, and it does not read a bare number
+# in that list either.
+#
+# Release PR #2668 (dev → master, merged 2026-10-16) ended with
+#
+#   Closes #2655, #2663, #2634, #2605, #1292, #2596, #2588, #2503, #2504,
+#   #2505, #2513, #2510, #2517, #2508, #1347, #2010, #2298
+#
+# and only #2655 closed. The issue timelines are the proof: #2655 closed at
+# the merge timestamp by the merger, #2663 and #2504 were closed by hand a
+# day later, and #2605, #2503, #2513 and #2510 were never closed at all even
+# though their fixes are in master. An issue that stays open stays on the
+# on-dev lane of the CHS backlog project, so the board keeps re-auditing
+# work that already shipped.
+#
+# This gate used to accept that body, because its regex treated the comma
+# list as a group of closing references. It was checking a shape GitHub does
+# not honour. scripts/check-release-closing-references.mjs now checks the
+# shape GitHub actually implements: every issue needs its own keyword.
+#
 # The `dev`-branch gate (`pr-issue-reference.yml`) is unchanged: dev PRs may
 # reference an issue with a bare `Issues: #N` line, because a dev merge only
 # marks the issue on-dev, it does not close it.
@@ -45,25 +66,16 @@ jobs:
         env:
           BODY: ${{ github.event.pull_request.body }}
         run: |
-          # Closing keywords only — a bare `Issues: #N` line is deliberately
-          # NOT accepted here: it does not close anything on merge. The list
-          # group captures `Closes #1, #2, #3`, not just the first number. The
-          # sort+tr must stay INSIDE the $(...) or the subshell loses the
-          # assignment.
-          numbers=$(
-            printf '%s' "$BODY" \
-              | grep -oiE '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*:?[[:space:]]*#[0-9]+([[:space:],]+#?[0-9]+)*' \
-              | grep -oE '#[0-9]+' | grep -oE '[0-9]+' | sort -un | tr '\n' ' '
-          )
+          printf '%s' "$BODY" > "$RUNNER_TEMP/release-body.md"
+          node scripts/check-release-closing-references.mjs "$RUNNER_TEMP/release-body.md"
+          numbers=$(node scripts/check-release-closing-references.mjs --json "$RUNNER_TEMP/release-body.md" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{process.stdout.write(String(JSON.parse(s).closes.length))})')
           echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
-          if [ -n "$numbers" ]; then
-            echo "Closing references: $numbers"
-          fi
+          echo "Closing references: $numbers"
 
       - name: Fail when the release has no closing reference
-        if: steps.labels.outputs.has_override != 'true' && steps.closes.outputs.numbers == ''
+        if: steps.labels.outputs.has_override != 'true' && steps.closes.outputs.numbers == '0'
         run: |
           echo "::error::A dev → master release PR must close the issues it promotes."
-          echo "::error::Add a \"Closes #N, #M\" line for the promoted issues so GitHub closes them on merge,"
+          echo "::error::Add a \"Closes #N\" line for the promoted issues so GitHub closes them on merge,"
           echo "::error::or label the PR 'no-issue' for a genuinely issue-free release."
           exit 1

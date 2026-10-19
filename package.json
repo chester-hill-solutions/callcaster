@@ -121,6 +121,7 @@
     "test:sim:headed": "playwright test -c e2e/playwright.sim.config.ts --headed",
     "check:route-authz": "node scripts/check-route-authz.mjs",
     "check:route-membership": "node scripts/check-route-membership.mjs",
+    "check:release-closing": "node scripts/check-release-closing-references.mjs",
     "ci:codegen:verify": "npm run tools:api:codegen && npm run tools:api:surface:report && git diff --exit-code -- openapi app/lib/api-generated app/lib/api-surface-generated.ts docs/api-surface-inventory.md",
     "check:test-echo": "node scripts/check-test-echo.mjs"
   },
