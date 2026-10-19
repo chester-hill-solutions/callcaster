@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@8b786af3` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@b2c9f891` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -49,6 +49,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ## Verify and close — 102
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-19
+- Recommended title: **Q43 regulatory address requirements are applied at the purchase boundary**
+- Implemented in PR #2468 (1a71ab1e, on dev). The purchase path resolves the number's regulatory address requirement before provider creation: it re-reads the exact inventory, returns 409 when the number is gone, lists the purchasing account's addresses and resolves the requirement. A missing or non-qualifying address returns 400 with the address-specific message and the reservation is cancelled. A compliant address is sent as AddressSid, distinct from EmergencyAddressSID. The search row shows the requirement badge before the click.
+- Current behavior: Verified on dev@8b786af3, 19 October 2026. 23 regulatory-address integration cases, 27 purchase/credit cases and 4 rendered badge cases pass. Removing the resolve call from the purchase path fails 13 of the 23 address cases and lets creation proceed without an address.
+- Root cause: The original purchase path called incomingPhoneNumbers.create with no addressSid and mapped the provider rejection to a bare 500. That path is gone: the resolve runs first and its 400/409 is returned with the reservation cancelled.
+- Resolution: No source work remains. Verify live provider address/locality and bundle acceptance during release checks — country matching alone cannot prove every local provider rule — then promote through the normal release process.
+- Look in: `app/lib/number-purchase.server.ts:394 (resolve before create; cancel on failure; AddressSid on success)`, `app/lib/number-regulatory-address.server.ts (resolveNumberPurchaseAddress, numberPurchaseAddressRejection, addressFailure)`, `app/lib/number-address-requirements.ts (resolveAddressForRequirement)`, `app/routes/api+/numbers.action.server.ts:54 (legacy route maps the address result)`, `app/components/phone-numbers/NumberPurchase.columns.tsx (search-row badge)`
+- Existing tests: test/integration-db/number-regulatory-address.test.ts: 23 cases through the installed SDK boundary and real Postgres; test/integration-db/number-purchase-credits.test.ts: 27 purchase, credit and recovery cases; test/ui/number-address-badge.test.tsx: 4 rendered search-row cases
+- Missing tests: Live provider address/locality acceptance for a real local purchase (needs a paid Twilio purchase); Deployed reproduction of a provider address rejection
+- Done when: A number with addressRequirements local and no validated address returns 400 with the address-specific message, and no number is created; With a compliant address, the purchase succeeds and passes addressSid; A foreign requirement is satisfied by a foreign address; The badge is visible on the search row; No purchase path returns 500 for an address requirement
+- Tracker: Lane is verify-close: source and regressions landed in PR #2468, so do not rebuild them. Only deployed provider acceptance and release promotion remain, and neither can run without a paid Twilio purchase. Close on promotion.
 
 ### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: M-L · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-19
@@ -206,19 +219,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed acceptance and default-branch release remain pending; source and automated checks do not prove deployed appearance or end-to-end behavior.
 - Done when: The UI distinguishes invalid credentials from a provider outage or rate limit; A wrong password no longer reads as a generic temporary failure; The raw provider payload is mapped, not passed through to the user; The error is surfaced through the toast pattern, not inline text
 - Tracker: Verify and close after deployed QA and default-branch release. PR #2361 is merged into dev; keep the issue open until the remaining verification is complete.
-
-### [#2144](https://github.com/chester-hill-solutions/callcaster/issues/2144) Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-07
-- Recommended title: **Q43 regulatory address requirements are applied at the purchase boundary**
-- Implemented in PR #2468 (1a71ab1e, on dev). The purchase path resolves the number's regulatory address requirement before provider creation: it re-reads the exact inventory, returns 409 when the number is gone, lists the purchasing account's addresses and resolves the requirement. A missing or non-qualifying address returns 400 with the address-specific message and the reservation is cancelled. A compliant address is sent as AddressSid, distinct from EmergencyAddressSID. The search row shows the requirement badge before the click.
-- Current behavior: Verified on dev@8b786af3, 19 October 2026. 23 regulatory-address integration cases, 27 purchase/credit cases and 4 rendered badge cases pass. Removing the resolve call from the purchase path fails 13 of the 23 address cases and lets creation proceed without an address.
-- Root cause: The original purchase path called incomingPhoneNumbers.create with no addressSid and mapped the provider rejection to a bare 500. That path is gone: the resolve runs first and its 400/409 is returned with the reservation cancelled.
-- Resolution: No source work remains. Verify live provider address/locality and bundle acceptance during release checks — country matching alone cannot prove every local provider rule — then promote through the normal release process.
-- Look in: `app/lib/number-purchase.server.ts:394 (resolve before create; cancel on failure; AddressSid on success)`, `app/lib/number-regulatory-address.server.ts (resolveNumberPurchaseAddress, numberPurchaseAddressRejection, addressFailure)`, `app/lib/number-address-requirements.ts (resolveAddressForRequirement)`, `app/routes/api+/numbers.action.server.ts:54 (legacy route maps the address result)`, `app/components/phone-numbers/NumberPurchase.columns.tsx (search-row badge)`
-- Existing tests: test/integration-db/number-regulatory-address.test.ts: 23 cases through the installed SDK boundary and real Postgres; test/integration-db/number-purchase-credits.test.ts: 27 purchase, credit and recovery cases; test/ui/number-address-badge.test.tsx: 4 rendered search-row cases
-- Missing tests: Live provider address/locality acceptance for a real local purchase (needs a paid Twilio purchase); Deployed reproduction of a provider address rejection
-- Done when: A number with addressRequirements local and no validated address returns 400 with the address-specific message, and no number is created; With a compliant address, the purchase succeeds and passes addressSid; A foreign requirement is satisfied by a foreign address; The badge is visible on the search row; No purchase path returns 500 for an address requirement
-- Tracker: Lane is verify-close: source and regressions landed in PR #2468, so do not rebuild them. Only deployed provider acceptance and release promotion remain, and neither can run without a paid Twilio purchase. Close on promotion.
 
 ### [#2123](https://github.com/chester-hill-solutions/callcaster/issues/2123) The nested RouteErrorBoundary throws away the server's explanation for non-404 route errors
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-07
@@ -1720,12 +1720,11 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.
 - Current behavior: Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.
 - Root cause: Authorization was modelled as a role comparison from the start and every check since has followed that shape.
-- Resolution: Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.
+- Resolution: #2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md): extend the capability layer that already exists in app/lib/capabilities.ts and the shared CHS auth packages, and do not adopt the better-auth admin or organization plugins. The vocabulary is therefore settled, so #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.
 - Look in: `app/lib/admin-middleware.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/lib/auth-layout.server.ts`, `eslint.config.mjs (no-restricted-imports, tenant boundary)`
-- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
 - Missing tests: permission model exists; each permission has a test at the route that enforces it
 - Done when: A permission model exists that roles map onto as default groupings; Authorization checks a permission rather than comparing a role string; Existing roles continue to work as groupings without a migration per user; No route is left checking a broad role where a specific permission is meant
-- Tracker: Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports.
+- Tracker: Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. #2030 has reported (docs/adr/0039-role-checks-become-capability-checks.md), so specification can begin; do not re-run the options analysis.
 
 ### [#2128](https://github.com/chester-hill-solutions/callcaster/issues/2128) An opt-out column value like "unsubscribe" crashes the audience import mid-run and leaves a partial import committed
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-08
@@ -1883,13 +1882,13 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.
 - Current behavior: Checks are inconsistent, comparing roles in some places and something narrower in others.
 - Root cause: Each check was written locally against whatever was convenient at the time.
-- Resolution: Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.
+- Resolution: #2030 is done (docs/adr/0039-role-checks-become-capability-checks.md). The sweep still waits on the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.
 - Look in: `app/lib/**-middleware.server.ts`, `scripts/checks/check-route-authz.mjs`, `eslint.config.mjs`
-- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030), [#2008](https://github.com/chester-hill-solutions/callcaster/issues/2008)
+- Blocked by: [#2008](https://github.com/chester-hill-solutions/callcaster/issues/2008)
 - Existing tests: check:route-authz structural gate
 - Missing tests: a gate that fails when a new route compares a role string directly
 - Done when: No route or loader compares a broad role string where a permission check is meant; check:route-authz fails when a new role comparison is introduced; The sweep lands after the model, not before
-- Tracker: Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice.
+- Tracker: #2030 reported (docs/adr/0039-role-checks-become-capability-checks.md); still deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice.
 
 ### [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030) Spike: weigh permission models against what the auth system already provides
 - Verdict: **Blocked / split first** · Size: M · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-09-25
@@ -1918,12 +1917,11 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.
 - Current behavior: Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.
 - Root cause: Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.
-- Resolution: Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.
+- Resolution: #2030 supplies the vocabulary (docs/adr/0039-role-checks-become-capability-checks.md): grow PRODUCT_CAPABILITIES in app/lib/capabilities.ts rather than inventing a second model. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.
 - Look in: `app/components/layout/WorkspaceSidebar.tsx`, `app/lib/workspace-middleware.server.ts`, `app/routes/workspaces+/$id/**`, `app/db/workspace-scoped-tables.ts`
-- Blocked by: [#2030](https://github.com/chester-hill-solutions/callcaster/issues/2030)
 - Missing tests: each capability has a route-level enforcement test; sidebar visibility and route enforcement agree
 - Done when: The Agent capability set is written down as data, not scattered conditionals; Every denied surface returns 403 on a direct URL attempt, not only when hidden; The 403-versus-404 boundary is decided and documented rather than incidental; Sidebar visibility and route enforcement read from the same source
-- Tracker: This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes.
+- Tracker: Unblocked by #2030 (docs/adr/0039-role-checks-become-capability-checks.md). This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes.
 
 ### [#1862](https://github.com/chester-hill-solutions/callcaster/issues/1862) IVR: match spoken/DTMF input to the script's declared options (normalize + fuzzy)
 - Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-25

@@ -462,7 +462,7 @@
     "summary": "Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
     "currentBehavior": "Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.",
     "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape.",
-    "resolution": "Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
+    "resolution": "#2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md): extend the capability layer that already exists in app/lib/capabilities.ts and the shared CHS auth packages, and do not adopt the better-auth admin or organization plugins. The vocabulary is therefore settled, so #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
     "lookIn": [
       "app/lib/admin-middleware.server.ts",
       "app/lib/workspace-middleware.server.ts",
@@ -481,12 +481,10 @@
       "Existing roles continue to work as groupings without a migration per user",
       "No route is left checking a broad role where a specific permission is meant"
     ],
-    "blockedBy": [
-      2030
-    ],
+    "blockedBy": [],
     "size": "XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports."
+    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. #2030 has reported (docs/adr/0039-role-checks-become-capability-checks.md), so specification can begin; do not re-run the options analysis."
   },
   {
     "issueNumber": 2030,
@@ -523,7 +521,7 @@
     "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.",
     "currentBehavior": "Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.",
     "rootCause": "Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.",
-    "resolution": "Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
+    "resolution": "#2030 supplies the vocabulary (docs/adr/0039-role-checks-become-capability-checks.md): grow PRODUCT_CAPABILITIES in app/lib/capabilities.ts rather than inventing a second model. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
     "lookIn": [
       "app/components/layout/WorkspaceSidebar.tsx",
       "app/lib/workspace-middleware.server.ts",
@@ -541,12 +539,10 @@
       "The 403-versus-404 boundary is decided and documented rather than incidental",
       "Sidebar visibility and route enforcement read from the same source"
     ],
-    "blockedBy": [
-      2030
-    ],
+    "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
+    "trackerRecommendation": "Unblocked by #2030 (docs/adr/0039-role-checks-become-capability-checks.md). This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
   },
   {
     "issueNumber": 2009,
@@ -587,7 +583,7 @@
     "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.",
     "currentBehavior": "Checks are inconsistent, comparing roles in some places and something narrower in others.",
     "rootCause": "Each check was written locally against whatever was convenient at the time.",
-    "resolution": "Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
+    "resolution": "#2030 is done (docs/adr/0039-role-checks-become-capability-checks.md). The sweep still waits on the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
     "lookIn": [
       "app/lib/**-middleware.server.ts",
       "scripts/checks/check-route-authz.mjs",
@@ -605,12 +601,11 @@
       "The sweep lands after the model, not before"
     ],
     "blockedBy": [
-      2030,
       2008
     ],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
+    "trackerRecommendation": "#2030 reported (docs/adr/0039-role-checks-become-capability-checks.md); still deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
   },
   {
     "issueNumber": 1885,
