@@ -82,7 +82,9 @@ for (const record of incoming) {
 }
 
 for (const [file, records] of lanes) {
-  records.sort((a, b) => a.issueNumber - b.issueNumber);
+  // Preserve the existing order. The lane files are mostly sorted with newer
+  // records appended, and re-sorting them turns a one-record change into a
+  // whole-file diff.
   writeFileSync(path.join(dir, file), `${JSON.stringify(records, null, 2)}\n`);
 }
 console.log(`added ${added} records, replaced ${replaced}`);
