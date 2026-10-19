@@ -18,6 +18,8 @@ PR [#2726](https://github.com/chester-hill-solutions/callcaster/pull/2726) store
 2. Check that calling the number reaches the verification flow, and that a wrong code is rejected.
 3. Check that the platform shows the number as unconfigured, and that the verification session route reports the feature as unavailable, when no number is active.
 
+**Production has no verification number today.** It has no `VERIFICATION_PHONE_NUMBER` in its environment and no row in the table, so the feature is unavailable before this release and unavailable after it. What changed is the failure mode: the old getter threw, the new one returns "not configured" and the route answers 503. To turn the feature on, register a number in Admin after the deploy and check it again.
+
 ## SMS dispatch window and pacing — #1791, #1792
 
 PRs [#1796](https://github.com/chester-hill-solutions/callcaster/pull/1796) keep campaign sends window-aware and fair.
@@ -115,7 +117,7 @@ PR [#2729](https://github.com/chester-hill-solutions/callcaster/pull/2729) recor
 
 - Confirm the release PR passes the exact-head checks and both app and worker preview deployments.
 - Confirm the production app and worker deploy the release merge commit.
-- **This release adds a migration**: `client/migrations/20261019000001_verification_number.sql` creates the `verification_number` table and inserts the first row. It is additive, with no change to an existing table, but check that the production database has the table and one active row after the deploy.
+- **This release adds a migration**: `client/migrations/20261019000001_verification_number.sql` creates the `verification_number` table and its single-active unique index. It is additive, touches no existing table, and inserts no row. Check that the production database has the table after the deploy; the feature stays unavailable until an operator registers a number in Admin.
 - **This release adds a dependency**: `effect-runtime` (an alias of `effect@4.0.5`). Confirm the app and worker images build and boot with it.
 - Confirm the release PR body names every promoted issue with its own closing keyword. The release gate fails when a keyword is followed by a comma list, because GitHub closes one issue per keyword.
 - Recheck all production behavior after deploy. The live call check needs the agreed recipient and purpose.
