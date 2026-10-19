@@ -1,1 +1,179 @@
-[]
+[
+  {
+    "issueNumber": 100,
+    "verdict": "fix-now",
+    "summary": "The theme provider still returns next-themes' raw `theme` string, so `useTheme().theme` is undefined before hydration and equals \"system\" (not \"light\"/\"dark\") under the app's default; only the mode toggle defends against that by falling back to \"system\", while the react-icons colour sites still branch on the raw `theme` value.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/components/shared/theme-provider.tsx",
+      "app/components/workspace/TeamMember.tsx",
+      "app/components/shared/mode-toggle.tsx",
+      "app/root.tsx"
+    ],
+    "existingTests": [
+      "test/ui/mode-toggle.test.tsx — covers the mode toggle's theme fallback, but no test covers the TeamMember react-icons colour branch, which is the part the issue is about"
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The issue text asks for the \"Theme\" value to be usable to conditionally render react-icons. The value is still the raw next-themes `theme`: undefined on the server/first render and \"system\" by default, so `theme === \"dark\"` in TeamMember.tsx is false for a system-dark user and the icon is painted black on a dark background. The mode toggle was hardened (da1a1f7d) but the shared provider was not given a defined default, and the icons named in the issue were not migrated to `resolvedTheme`. The issue was closed on 2024-08-22 without a matching commit; the only later reference (bot comment pointing at PR #2735 / 20f59d0e) is a CI release-gate change that is not in master and has nothing to do with theming."
+  },
+  {
+    "issueNumber": 1165,
+    "verdict": "fix-now",
+    "summary": "A read-only dry-run Twilio prune report exists in master (scripts/twilio-resource-prune-report.mjs) driven by a shared policy module that classifies every resource as KEEP / STALE / UNKNOWN with an environment check and an owner check, and the only deletion path (scripts/local/prune-environment-twiml-apps.mjs) deletes nothing but closed pull-request preview TwiML Apps, dry-run by default.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "scripts/twilio-resource-prune-report.mjs",
+      "scripts/lib/twilio-resource-prune-policy.mjs",
+      "scripts/local/prune-environment-twiml-apps.mjs",
+      "scripts/lib/live-environments.mjs"
+    ],
+    "existingTests": [
+      "test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)"
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "PARTIAL, and manual. The report and both checks are in master, but the goal says \"Find and remove stale Twilio resources in development, review, and closed-preview environments\" and the removal half is only implemented for closed-preview TwiML Apps: the only `.remove()` call in the repo is in prune-environment-twiml-apps.mjs. There is no delete path for a stale messaging service, incoming phone number, or subaccount, and by design a workspace-owned resource can never be STALE (UNKNOWN), so dev/review-owned resources are never removed automatically — that matches the issue's own \"do not remove production resources automatically\" but leaves \"remove in development and review environments\" unbuilt. The report is a script against a live Twilio account with live credentials and a live database, so a human must run it and act on the STALE list to confirm the behaviour; the classification logic itself is machine-checked. Also note the candidate PR commit b4046027 is unrelated to this issue (it is a CI ledger-drift gate) — the real work is the 2026-10-19 release commit 91c4409b, which added the report, the policy module and the shared live-environment list."
+  },
+  {
+    "issueNumber": 1826,
+    "verdict": "fix-now",
+    "summary": "Nothing in origin/master provides a dev-environment PR acceptance suite: the only PR-level end-to-end gate is the local docker-compose Playwright run, and the Twilio tier uses Twilio's free test credentials, not a CallCaster-dev account.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "test/integration-twilio/twilio-test-credentials.test.ts"
+    ],
+    "existingTests": [
+      "None. `git ls-tree -r origin/master --name-only | grep -i acceptance` returns nothing, and there is no dev-environment Playwright project (e2e/playwright.config.ts and e2e/playwright.sim.config.ts both target the local compose/sim stack)."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "This issue is an acceptance-suite work item, not a code defect, so nothing in the tree can 'fix' it in the usual sense. The upstream dependency is #1827 'Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it', which the board still lists in the 'Blocked / split first' lane (ISSUE_BOARD.md:565-574) with #1356 (dev DNS/IaC) ahead of it. manual: true because the missing artefact is a dev-environment acceptance run that only a person with the dev Twilio account and dev environment credentials can execute."
+  },
+  {
+    "issueNumber": 1829,
+    "verdict": "fix-now",
+    "summary": "No dedicated CallCaster-qa Twilio account exists and qa.callcaster.ca is not pointed at one: the QA Railway environment still copies the dev/shared Twilio credentials and there is no Twilio account provisioning in the IaC model or in any script.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      ".railway/environments/qa.ts",
+      "ISSUE_BOARD.md"
+    ],
+    "existingTests": [
+      "None. There is no test or check that asserts a QA-specific Twilio account; `git grep -n \"qa.callcaster.ca\" origin/master -- .` returns only .railway/environments/qa.ts and docs/qa-rehearsal-runbook.md."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The issue has no symptom body — it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm."
+  },
+  {
+    "issueNumber": 1846,
+    "verdict": "fix-now",
+    "summary": "The onboarding verification sheet is now handed the number's `verification_status` (the wiring the issue asked for), but the value it reads comes from the onboarding route's loader snapshot, and nothing on that page refreshes that snapshot when Twilio's callback flips the capability — so the sheet still sits on 'Verification pending' until the page is reloaded.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "id/onboarding/OnboardingFirstNumberStep.tsx",
+      "id/onboarding/onboarding.loader.server.ts",
+      "id/phone-numbers.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx — 'the verification sheet reflects the live status without a reload (#1846)' renders the step with `phoneNumbers: [number({ type: \"caller_id\", phone_number: \"+14165550100\", capabilities: { verification_status: \"success\" } })]` and asserts 'Number verified' appears. The test proves the PROP is wired, not that the data is live: it injects the already-successful capability directly into the component props, so the loader/realtime path it needs is never exercised. There is no test that flips the capability through the callback and observes the sheet."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The wiring the issue title asks for ('pass the live caller-ID verification status to the onboarding verification sheet') is in master, but the status it passes is only as live as the onboarding loader's snapshot, and that snapshot has no refresh path for a Twilio webhook. The remaining work is one of: subscribe the onboarding page to the `workspace_number` SSE event (as the phone-numbers route does), or add `workspace_number` to the workspace layout's revalidation table list (app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts:76), or poll the number while the sheet is open. Only one commit in master references this issue (`git log --oneline origin/master --grep=1846` -> d582992b), so nothing later has closed the gap. manual: true — confirming it needs a real Twilio caller-ID verification call (a real phone call), then a person watching the onboarding sheet flip to 'Number verified' without a reload."
+  },
+  {
+    "issueNumber": 1875,
+    "verdict": "fix-now",
+    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/lib/ivr-gather.server.ts",
+      "app/lib/ivr-webhook-auth.server.ts",
+      "app/lib/ivr-results.ts"
+    ],
+    "existingTests": [
+      "test/ivr-webhook-auth.server.test.ts — 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" → `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts — the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts — the export carries the structured answer and its confidence; test/ivr-gather.test.ts — the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false — everything that is implemented is machine-checkable."
+  },
+  {
+    "issueNumber": 1981,
+    "verdict": "fix-now",
+    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name — so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts"
+    ],
+    "existingTests": [
+      "None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
+  },
+  {
+    "issueNumber": 2503,
+    "verdict": "fix-now",
+    "summary": "Master removes the duplicated section headings on the campaign pages (the 'Setup' heading under the Setup/Content/Queue/Launch tab row, the 'Launch' section header and the 'Call/Message Campaign Results' h1), but the campaign title header and the 'Create campaign' page heading are still rendered.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignSettings.tsx",
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
+      "selected_id.route.tsx",
+      "id/campaigns/new.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaigns-new-caller-gating.test.tsx:37 — `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 — 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate — the big 'Setup' heading under the Setup/Content/Queue/Launch tabs — is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
+  },
+  {
+    "issueNumber": 2507,
+    "verdict": "fix-now",
+    "summary": "Nothing in origin/master changes the CSV upload success notice: it is still a root toast with an infinite duration that prompts 'Download row report'.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/components/audience/use-audience-upload-progress.ts",
+      "app/components/audience/AudienceUploadProgressPanel.tsx"
+    ],
+    "existingTests": [
+      "none — no test asserts the toast is removed; test/ui/audience-import-report-handoff.test.tsx:57-59 asserts the opposite ('Call-list upload completed' is in the document and the 'Download row report' button is present), so the current behaviour is locked in by the suite."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The brief listed no candidate commits, and none exist for this issue. The only related later work in master is #2720/#2719 and #2722/#2723 (audience upload polling), which change when the completion snapshot is noticed, not whether the toast appears or how long it lasts. Fixing this requires dropping the root toast (or giving it a finite duration and no download action) in app/components/audience/use-audience-upload-progress.ts and updating test/ui/audience-import-report-handoff.test.tsx."
+  },
+  {
+    "issueNumber": 2684,
+    "verdict": "fix-now",
+    "summary": "The decision is recorded and CORS is genuinely off, but the decision required the policy in three places and only one of them documents it.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "docs/api-overview.md"
+    ],
+    "existingTests": [],
+    "acceptanceCriteria": [],
+    "rootCause": "Overridden from the batch verdict. The decision was made and recorded; the documentation half of it is one of three done."
+  },
+  {
+    "issueNumber": 2686,
+    "verdict": "fix-now",
+    "summary": "The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "docs/research/cms-platform-capabilities.md"
+    ],
+    "existingTests": [],
+    "acceptanceCriteria": [],
+    "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
+  }
+]

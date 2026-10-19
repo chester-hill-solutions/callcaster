@@ -418,34 +418,6 @@
     "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. #2030 has reported (docs/adr/0039-role-checks-become-capability-checks.md), so specification can begin; do not re-run the options analysis."
   },
   {
-    "issueNumber": 2030,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Spike: weigh permission models against what the auth system already provides",
-    "summary": "The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.",
-    "currentBehavior": "Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.",
-    "rootCause": "Roles were adopted as the model without first checking whether a permission primitive was available.",
-    "resolution": "Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.",
-    "lookIn": [
-      "package.json (better-auth version and plugins in use)",
-      "app/lib/admin-middleware.server.ts",
-      "app/lib/workspace-middleware.server.ts",
-      "app/server/tenant-db.ts",
-      "app/lib/data-plane-middleware.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A written recommendation exists, reviewed before any implementation begins",
-      "better-auth permission capabilities are established from the installed version, not from documentation memory",
-      "Existing in-repo authorization is inventoried so it is extended rather than duplicated",
-      "Ruled-out options are recorded with reasons"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "low",
-    "trackerRecommendation": "Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL."
-  },
-  {
     "issueNumber": 2008,
     "verdict": "blocked-epic",
     "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",
