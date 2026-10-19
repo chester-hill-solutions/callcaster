@@ -5,8 +5,8 @@
     "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
     "summary": "Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.",
     "currentBehavior": "Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.",
-    "rootCause": "Dependent on the synthetic provider (#1328).",
-    "resolution": "Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.",
+    "rootCause": "Not implemented. It depended on the synthetic provider (#1328), which closed as completed on 2026-10-17 together with the three asks it consolidated (#1156, #1194, #1161).",
+    "resolution": "Keep as parent epic; the synthetic provider dependency is satisfied, so #1192 (server-owned scenario profiles) can start; #1193 is the final acceptance journey.",
     "lookIn": [
       "e2e/fixtures/seed.ts",
       "app/components/audience/AudienceUploader.tsx",
@@ -26,10 +26,8 @@
     ],
     "size": "L-XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic; blocked by #1328.",
-    "blockedBy": [
-      1328
-    ]
+    "trackerRecommendation": "Parent epic; #1328 landed, so the block is gone. Split before assignment — this is not single-agent work.",
+    "blockedBy": []
   },
   {
     "issueNumber": 1268,
@@ -164,86 +162,6 @@
     ]
   },
   {
-    "issueNumber": 1328,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feat(telephony): add provider factory and synthetic SMS transport (split further)",
-    "summary": "Build a gateway seam between CallCaster call/SMS paths and the provider, with a synthetic provider for local dev/tests (no Twilio credentials). Consolidates #1156/#1194/#1161.",
-    "currentBehavior": "Workspace Twilio client hard-wired; IVR/number-rental call Twilio directly; SMS has a client-like seam; E2E mocks intercept browser HTTP only; Compose uses placeholder creds + disabled webhook validation.",
-    "rootCause": "No server-side provider abstraction.",
-    "resolution": "Introduce a provider factory + synthetic SMS transport first; add voice and number rental as later slices. Provider selection explicit and fail-closed by environment.",
-    "lookIn": [
-      "app/lib/database/workspace.server.ts",
-      "app/lib/ivr-initiate.server.ts",
-      "app/lib/platform-workspace-numbers.server.ts",
-      "app/lib/sms-send.server.ts",
-      "e2e/fixtures/twilio-mocks.ts"
-    ],
-    "existingTests": [
-      "e2e mocks (browser-level only)"
-    ],
-    "missingTests": [
-      "server-side synthetic contract",
-      "status callback delivery",
-      "no external Twilio request assertion",
-      "synthetic number lifecycle"
-    ],
-    "acceptanceCriteria": [
-      "Provider selection explicit and fail-closed",
-      "Synthetic sends create deterministic events without creds",
-      "Tests prove no Twilio network call",
-      "Real Twilio unchanged"
-    ],
-    "size": "XL",
-    "risk": "high",
-    "trackerRecommendation": "Split: factory+SMS, voice, rental. Dependencies #1157/#1192/#1193.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1329,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feat(twilio-iac): add ownership manifest and read-only environment plan",
-    "summary": "Roadmap for the Twilio environment program (IaC controller, accounts, cost, testing). Railway IaC is separate and done; no Twilio controller exists. Sub-issues were folded into this issue and are not implemented.",
-    "currentBehavior": "Twilio operations are imperative workspace actions; workspace provisioning owns dynamic resources; no ownership manifest, plan artifact, or drift workflow.",
-    "rootCause": "Roadmap not started; too large for one agent.",
-    "resolution": "First slice only: ownership manifest + read-only 'plan' command (no apply/delete/rental/prune). Later: account separation, state import, drift guardrails, cost inventory, Test Credentials + smoke tests.",
-    "lookIn": [
-      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
-      "app/lib/platform-workspace-numbers.server.ts",
-      "scripts/railway/",
-      ".railway/README.md"
-    ],
-    "existingTests": [
-      "none"
-    ],
-    "missingTests": [
-      "plan fixtures",
-      "destructive-change rejection",
-      "read-back verification"
-    ],
-    "acceptanceCriteria": [
-      "Every managed resource has one env/owner/cleanup rule",
-      "Read-only plan compares declared vs actual",
-      "Plan cannot create/delete/rent",
-      "Secrets outside source and output"
-    ],
-    "size": "XL",
-    "risk": "high",
-    "trackerRecommendation": "Split; first slice is M/medium. #1195 overlaps its testing section.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1357,
-    "verdict": "blocked-epic",
-    "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
-    "resolution": "Resolve the naming decision, attach the domain through IaC, set DNS, and verify readyz externally.",
-    "lookIn": [
-      ".railway/environments/staging.ts"
-    ],
-    "blockedBy": [
-      1355
-    ]
-  },
-  {
     "issueNumber": 1498,
     "verdict": "blocked-epic",
     "summary": "The export report needs toplines, inbound replies, contact grouping, attribution and tenant-safe filtering. This is a feature program, not a release cleanup.",
@@ -252,42 +170,6 @@
       "app/lib/campaign-export.server.ts"
     ],
     "blockedBy": []
-  },
-  {
-    "issueNumber": 1645,
-    "verdict": "blocked-epic",
-    "summary": "Message tests shipped in #1648 and voice/IVR tests in #1654. The remaining slice is live-call rehearsal.",
-    "resolution": "Scope a separate live-call issue with isolation from queue, results and normal campaign metrics. Do not rebuild the shipped test-send paths.",
-    "lookIn": [],
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1752,
-    "verdict": "blocked-epic",
-    "summary": "The PDF/CSV report pipeline is implemented in #2530. Release review repaired timestamp decoding, send-window attribution, staff reply inclusion, multilingual text and access-denial handling in #2550. Report presentation, inbound daily volume and campaign-health acceptance remain open.",
-    "lookIn": [
-      "app/lib/campaign-sms-report.server.ts",
-      "app/lib/campaign-sms-report-data.server.ts",
-      "app/lib/campaign-sms-report-pdf.server.ts"
-    ],
-    "existingTests": [
-      "test/integration-db/campaign-sms-report.test.ts: real PostgreSQL send windows, sender isolation, staff replies, STOP handling and font embedding",
-      "test/campaign-export.route.test.ts and test/campaign-export-status.test.ts: access denial statuses"
-    ],
-    "missingTests": [
-      "Requested report-format comparison",
-      "Inbound daily volume and campaign-health acceptance"
-    ],
-    "acceptanceCriteria": [
-      "Finish the remaining requested report presentation, inbound daily-volume and campaign-health requirements in #1752",
-      "Compare the finished report with the requested example before closing #1752"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Keep open after release. The completed pipeline does not satisfy the remaining report-format and metric requirements.",
-    "currentBehavior": "Owners and admins can export completed non-test SMS campaigns. Private artifacts include campaign messages and related conversation replies on the matching sender and send window.",
-    "rootCause": "The original implementation treated raw driver timestamps as Date values and attributed replies by recipient alone. It also omitted staff replies and replaced non-Latin reply text.",
-    "resolution": "Keep the completed pipeline. Split the remaining format, inbound daily-volume and campaign-health work into scoped tasks; verify the finished report against the requested example before closing."
   },
   {
     "issueNumber": 1802,
@@ -300,40 +182,6 @@
       "bun.lock"
     ],
     "trackerRecommendation": "The Bun mandatory runtime trace resolves 594 nodes, zero missing required edges and zero affected nodes; it excludes vendor devDependencies and optional peer integrations. The most recent 2026-10-04 master snapshot has two runtime alerts (#220, #218) plus 37 development alerts, a separate release view. All six source PRs passed full local CI, exact-head remote gates and both deployments. Keep #1805 and closed #1809 as existing history; all applicable child QA/release requirements remain open."
-  },
-  {
-    "issueNumber": 1892,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
-    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).",
-    "currentBehavior": "scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).",
-    "rootCause": "Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.",
-    "resolution": "Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
-    "lookIn": [
-      "scripts/dry-baseline.json",
-      "scripts/check-dry.mjs"
-    ],
-    "existingTests": [
-      "check:dry gate is the acceptance signal"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "clones/duplicatedLines drop and the baseline is lowered to lock it",
-      "One implementation per clone; call sites behave the same"
-    ],
-    "blockedBy": [
-      1912,
-      1913,
-      1914,
-      1915,
-      1916,
-      1917,
-      1918,
-      1919
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1912-#1919."
   },
   {
     "issueNumber": 268,
@@ -447,10 +295,10 @@
     "issueNumber": 1861,
     "verdict": "blocked-epic",
     "recommendedTitle": "Spike: replace Twilio AMD with a local, faster voicemail classifier",
-    "summary": "Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.",
+    "summary": "Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set; both prerequisites (#1842 instrumentation, #1845 live AMD scope) landed on 2026-10-17.",
     "currentBehavior": "Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.",
     "rootCause": "Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.",
-    "resolution": "After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.",
+    "resolution": "Both prerequisites landed on 2026-10-17 (#1842, #1845), so run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.",
     "lookIn": [
       "app/lib/auto-dial.server.ts",
       "app/lib/campaign-ivr-dispatch.server.ts",
@@ -471,13 +319,10 @@
       "Recommendation with an accuracy-latency threshold and reconciliation/fallback policy",
       "If replacing: an ADR and a phased plan starting in shadow mode"
     ],
-    "blockedBy": [
-      1842,
-      1845
-    ],
+    "blockedBy": [],
     "size": "XL",
     "risk": "high",
-    "trackerRecommendation": "Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation."
+    "trackerRecommendation": "#1842 and #1845 landed on 2026-10-17, so the spike is unblocked. Run it scoped; produce an ADR before any implementation."
   },
   {
     "issueNumber": 1828,
@@ -485,8 +330,8 @@
     "recommendedTitle": "QA-environment PR acceptance suite against the smart test audience",
     "summary": "Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.",
     "currentBehavior": "PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.",
-    "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet.",
-    "resolution": "After #1829 lands (which needs #1357), add the QA acceptance workflow and specs: sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials.",
+    "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet, and #1829 (the account) closed as not planned on 2026-10-17 while #1357 (the qa DNS/IaC half) closed as completed.",
+    "resolution": "Re-scope rather than wait: #1829 closed as not planned, so first decide the QA credential path, then add the QA acceptance workflow and specs — sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials. #1157 (smart test audiences) still gates the audience half.",
     "lookIn": [
       ".github/workflows/e2e.yml",
       ".github/workflows/ci.yml",
@@ -509,12 +354,11 @@
       "Failures are attributable to the PR"
     ],
     "blockedBy": [
-      1157,
-      1829
+      1157
     ],
     "size": "L",
     "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1829 (CallCaster-qa Twilio account) and #1157 (smart test audiences) must land first; #1357 gates #1829."
+    "trackerRecommendation": "blocked-epic: #1157 (smart test audiences) still gates the audience half. #1829 closed as not planned on 2026-10-17, so the QA Twilio-account path needs a fresh decision instead of a wait; #1357 already landed."
   },
   {
     "issueNumber": 1826,
@@ -549,38 +393,6 @@
     "size": "L",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827."
-  },
-  {
-    "issueNumber": 1829,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it",
-    "summary": "Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.",
-    "currentBehavior": "QA has no dedicated Twilio account; #1357 is open and is the prerequisite.",
-    "rootCause": "Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).",
-    "resolution": "Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.",
-    "lookIn": [
-      ".railway/environments/",
-      ".railway/railway.ts",
-      "docs/twilio-runtime-inventory.md",
-      "docs/twilio-parent-ops-runbook.md",
-      ".github/workflows/railway-iac.yml"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "n/a (operations task)"
-    ],
-    "acceptanceCriteria": [
-      "CallCaster-qa Twilio account exists and is documented",
-      "qa.callcaster.ca uses the QA account credentials",
-      "Credentials are stored as secrets/vars, not in the repo",
-      "IaC-vs-manual decision is recorded"
-    ],
-    "blockedBy": [
-      1357
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828."
   },
   {
     "issueNumber": 1827,
@@ -642,62 +454,6 @@
     "size": "M",
     "risk": "low",
     "trackerRecommendation": "Parent epic. Sequencing lives here, not in the children. #2015 can proceed in parallel with the whole thing."
-  },
-  {
-    "issueNumber": 2010,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "auth pages: scrollbar appears even though the page fits the viewport",
-    "summary": "The sign-in and sign-up pages show a scrollbar even though the content fits within the viewport height. Grouped under the auth-pages epic (#2057).",
-    "currentBehavior": "A vertical scrollbar renders on pages whose content should fit.",
-    "rootCause": "Most likely an over-sized form container rather than genuinely long content.",
-    "resolution": "Blocked by #2013. Fix the shared container geometry first, then re-check. If the scrollbar is gone, close this as resolved-by rather than carrying a separate fix for a symptom that no longer exists. If it persists, reopen with the specific remaining cause rather than assuming it is the same issue.",
-    "lookIn": [
-      "app/routes/account.sign-in.*",
-      "app/routes/account.sign-up.*",
-      "app/components/shared/AuthCard.tsx"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "no scrollbar at 1x viewport height",
-      "regression guard once the container is fixed"
-    ],
-    "acceptanceCriteria": [
-      "No scrollbar at the supported viewport range",
-      "Either closed as resolved by #2013, or reopened with the specific remaining cause"
-    ],
-    "blockedBy": [
-      2013
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Suspect this closes for free with #2013. Do not fix it first — a scrollbar fix that is really a layout fix will be undone by the next alignment change."
-  },
-  {
-    "issueNumber": 2011,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "auth pages: sign-up is missing the background mural that sign-in has",
-    "summary": "The sign-up page lacks the background mural treatment the sign-in page already uses. Grouped under the auth-pages epic (#2057).",
-    "currentBehavior": "Sign-in has a background mural; sign-up does not.",
-    "rootCause": "The treatment was applied to one route only.",
-    "resolution": "Blocked by #2013 so the final visual pass sees the finished layout. Apply the same treatment to sign-up, ideally by extracting it so the two pages cannot drift apart again.",
-    "lookIn": [
-      "app/routes/account.sign-in.*",
-      "app/routes/account.sign-up.*"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "both routes render the mural treatment"
-    ],
-    "acceptanceCriteria": [
-      "Sign-up renders the same mural treatment as sign-in",
-      "The treatment is shared, not duplicated per route"
-    ],
-    "blockedBy": [
-      2013
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards."
   },
   {
     "issueNumber": 2002,
@@ -971,12 +727,10 @@
       "2608141501 survives, since it is on both the keep-list and the phone-number-named rule",
       "The cull report remains read-only with no delete path"
     ],
-    "blockedBy": [
-      2170
-    ],
+    "blockedBy": [],
     "size": "S-M",
     "risk": "low",
-    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
+    "trackerRecommendation": "Blocked / split first: durable keep-list is on dev in PR #2536. Name backfill is a separate Twilio-write task and needs idempotence. Record the repeat/retention decision before scheduling cleanup. Workspace-row cleanup remains deferred. #2170 (stale subaccount credentials) closed as completed on 2026-10-17, so that credential block is gone. Related PRs: #2536, #2171, #2167. PR #2536 passed full CI, E2E, schema, and Railway preview checks; issue #2168 is on-dev."
   },
   {
     "issueNumber": 2213,
@@ -1342,7 +1096,7 @@
     "recommendedTitle": "Harden public request rate limits",
     "summary": "Retention source is merged. Trusted public client identity and deployed verification remain separate child tasks.",
     "currentBehavior": "PR #2331 merged the indexed one-day retention repair at f877b636d963cf1154fbab81ef45ef1244bc61ec. The actual daily handler prunes bounded batches, protects reactivated rows, logs counts and preserves rescheduling after cleanup failure. #2329 remains open for deployed tick/retention acceptance. #2330 still owns client identity; current source reads leftmost X-Forwarded-For and falls back to unknown. The actual CallCaster ingress and header trust rule remain unverified.",
-    "resolution": "Complete and verify #2329 deployed retention and #2330 trusted client identity. Test the actual ingress and forged-header controls before selecting a new trusted source; do not reimplement the merged retention repair. Keep the parent open until both child outcomes are verified and promoted.",
+    "resolution": "#2329 deployed retention is complete (closed as completed on 2026-10-17). Complete and verify #2330 trusted client identity: test the actual ingress and forged-header controls before selecting a new trusted source, and do not reimplement the merged retention repair. Keep the parent open until #2330 is verified and promoted.",
     "lookIn": [
       "app/lib/platform-rate-limit.server.ts",
       "app/lib/platform-rate-limit-db.server.ts",
@@ -1364,11 +1118,10 @@
       "The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria)."
     ],
     "blockedBy": [
-      2329,
       2330
     ],
     "size": "S",
     "risk": "high",
-    "trackerRecommendation": "The parent tracks two independent child outcomes. Retention source completion does not complete trusted identity or release acceptance."
+    "trackerRecommendation": "The parent tracks two independent child outcomes. #2329 closed as completed on 2026-10-17; #2330 trusted client identity remains open."
   }
 ]

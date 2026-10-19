@@ -85,10 +85,8 @@
     ],
     "size": "S-M",
     "risk": "high",
-    "trackerRecommendation": "Ops task with rollback plan; may depend on #1329 account ownership.",
-    "blockedBy": [
-      1329
-    ]
+    "trackerRecommendation": "Ops task with a rollback plan. The possible dependency on #1329 was dropped when #1329 closed as not planned on 2026-10-17; re-check current account ownership before the transfer.",
+    "blockedBy": []
   },
   {
     "issueNumber": 1345,
@@ -120,16 +118,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1355,
-    "verdict": "needs-decision",
-    "summary": "The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.",
-    "resolution": "Verify a safe in-place rename before changing IaC. Do not recreate the environment.",
-    "lookIn": [
-      ".railway/environments/staging.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1521,
     "verdict": "needs-decision",
     "summary": "Refunds and disputes do not reverse credits under the current documented billing scope.",
@@ -137,16 +125,6 @@
     "lookIn": [
       "app/routes/api+/stripe-webhook.action.server.ts",
       "docs/billing-source-of-truth.md"
-    ],
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1657,
-    "verdict": "needs-decision",
-    "summary": "The admin Twilio page needs grouping. The issue explicitly requests confirmation of panel priorities before implementation.",
-    "resolution": "Confirm the default tab and grouping, then ship a presentation-only PR.",
-    "lookIn": [
-      "app/routes/admin+/workspaces/$workspaceId/twilio"
     ],
     "blockedBy": []
   },
@@ -159,31 +137,6 @@
       "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.UsagePanel.tsx"
     ],
     "blockedBy": []
-  },
-  {
-    "issueNumber": 1741,
-    "verdict": "needs-decision",
-    "recommendedTitle": "change(ivr): make simple/complex a script property, not a campaign type",
-    "summary": "Campaign setup offers Simple IVR vs Complex IVR, but the runtime treats both identically; complexity belongs to the script (one page vs menus).",
-    "currentBehavior": "CampaignBasicInfo.SelectType exposes simple_ivr/complex_ivr; dispatch/execution treat them the same.",
-    "rootCause": "Design decision.",
-    "resolution": "Decide: single IVR option at campaign setup; campaign_type simple_ivr/complex_ivr kept for existing rows and possibly derived from the script.",
-    "lookIn": [
-      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
-      "app/lib/campaign-execution.server.ts",
-      "app/db/schema.ts"
-    ],
-    "existingTests": [
-      "test/ui/campaign-* type selection"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "campaign setup asks IVR once",
-      "no behavioural difference to lose"
-    ],
-    "size": "S-M",
-    "risk": "low",
-    "trackerRecommendation": "Product decision first; storage/UI change after."
   },
   {
     "issueNumber": 1742,
@@ -243,37 +196,9 @@
     "trackerRecommendation": "Scope with #1771 (can ship together or split)."
   },
   {
-    "issueNumber": 1699,
-    "verdict": "needs-decision",
-    "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1700,
     "verdict": "needs-decision",
     "summary": "Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1705,
-    "verdict": "needs-decision",
-    "summary": "Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -302,20 +227,6 @@
     "issueNumber": 1710,
     "verdict": "needs-decision",
     "summary": "Architecture question whether surveys should merge into scripts. Surveys exist as a separate module with public & workspace routes; consolidation scope needs a decision.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1717,
-    "verdict": "needs-decision",
-    "summary": "404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -369,20 +280,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1725,
-    "verdict": "needs-decision",
-    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1729,
     "verdict": "needs-decision",
     "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
@@ -400,20 +297,6 @@
     "issueNumber": 1732,
     "verdict": "needs-decision",
     "summary": "Umbrella queue status-model redesign (completion vs outreach status; missing opted-out/dialing/failed states). Big product decision; 1720 is a subset.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1763,
-    "verdict": "needs-decision",
-    "summary": "Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -619,27 +502,6 @@
     ],
     "acceptanceCriteria": [
       "No implementation until the tax decision is recorded"
-    ]
-  },
-  {
-    "issueNumber": 1347,
-    "verdict": "needs-decision",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "",
-    "recommendedTitle": "Robocall vs IVR vs Automated Phone Menu — terminology consistency",
-    "summary": "Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.",
-    "currentBehavior": "Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.",
-    "resolution": "Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.",
-    "lookIn": [
-      "app/components/campaign/settings/CampaignLaunch.tsx",
-      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
-      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
-    ],
-    "acceptanceCriteria": [
-      "One customer-facing term; API values unaffected"
     ]
   },
   {
