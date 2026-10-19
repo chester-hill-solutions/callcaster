@@ -386,41 +386,6 @@
     "trackerRecommendation": "needs-decision/roadmap spike. Keep vx-any as-is until answered; its outcome decides #1862."
   },
   {
-    "issueNumber": 1858,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Unify IVR and live script blocks and define prompt, multi-select, input, and end-call semantics",
-    "summary": "Umbrella request to align the IVR script model with the live-call script model and add block kinds: prompt-only, multi-select with an explicit 'do nothing' default, free input with a stop key, end-call options, and a per-block default go-to.",
-    "currentBehavior": "IVR scripts use IvrBlock; live scripts use a separate instruction/multi-select model. There is no prompt-only block, no stop-key input block, no end-call block, and no general per-block default destination beyond noInput.",
-    "rootCause": "Two parallel script models and undefined block semantics.",
-    "resolution": "Decide the unified block model, the default 'do nothing' behaviour, and stop-key/end-call semantics first; record the decision, then split into tracer-sized tickets (one block kind each).",
-    "lookIn": [
-      "app/components/campaign/settings/script/",
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/lib/ivr-gather.server.ts",
-      "app/lib/campaign-ivr.server.ts",
-      "app/db/schema-campaign.ts"
-    ],
-    "existingTests": [
-      "test/ivr-block-runtime.test.ts",
-      "test/ivr-gather.test.ts",
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "missingTests": [
-      "Default go-to when the caller gives no input",
-      "Input block stop-key handling",
-      "End-call block routes/hangs up as authored"
-    ],
-    "acceptanceCriteria": [
-      "Product decision recorded for the unified block model and defaults",
-      "Blocks split into ticket-sized units before implementation",
-      "Prompt, multi-select, input, and end-call semantics specified with a default do-nothing path"
-    ],
-    "blockedBy": [],
-    "size": "XL",
-    "risk": "medium",
-    "trackerRecommendation": "Decision first, then split. Related: #1862, #1741. #1856 and #1841 are already fixed on dev and should not be re-done."
-  },
-  {
     "issueNumber": 1852,
     "verdict": "needs-decision",
     "recommendedTitle": "cleanup .env: document Twilio env vars and define config-as-code vs layered secrets",

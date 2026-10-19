@@ -257,41 +257,6 @@
     "trackerRecommendation": "Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands."
   },
   {
-    "issueNumber": 780,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Hang up controls/block in IVR script (parent of #1883 + #1884)",
-    "summary": "Bundles four asks. Split into #1883 (per-step configurable no-input wait + action; dev, PR #1937) and #1884 (explicit Hang up routing target + guaranteed terminal hangup; open). The runtime already understands next:'hangup' and ends the script with a hangup, so #1884 is editor exposure plus validation.",
-    "currentBehavior": "No-input handling exists on dev (#1883). 'Hang up' is selectable in the editor via scriptkit and maps to <Hangup/>; gaps are next:'end' unhandled, dangling targets unvalidated, no guaranteed terminal/cycle check (#1884).",
-    "rootCause": "Parent tracking ticket; the only remaining work is the explicit/validated terminal owned by #1884.",
-    "resolution": "Keep open until #1884 lands, then close. Do not rebuild the shipped #1883 no-input handling or the working hangup routing.",
-    "lookIn": [
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-      "app/components/campaign/settings/script/ScriptBlockEditor.routing.ts"
-    ],
-    "existingTests": [
-      "test/ivr-block-response.route.test.ts",
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "missingTests": [
-      "next:'end' is terminal at runtime",
-      "dangling page/block target hangs up instead of redirecting",
-      "reachable routing cycle is reported/blocked at launch"
-    ],
-    "acceptanceCriteria": [
-      "Hang up is selectable as an option's next step",
-      "A published script always ends in a terminal hangup",
-      "Configurable no-input wait and reroute (delivered by #1883)"
-    ],
-    "blockedBy": [
-      1884
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands."
-  },
-  {
     "issueNumber": 1861,
     "verdict": "blocked-epic",
     "recommendedTitle": "Spike: replace Twilio AMD with a local, faster voicemail classifier",
@@ -359,40 +324,6 @@
     "size": "L",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1157 (smart test audiences) still gates the audience half. #1829 closed as not planned on 2026-10-17, so the QA Twilio-account path needs a fresh decision instead of a wait; #1357 already landed."
-  },
-  {
-    "issueNumber": 1826,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Dev-environment PR acceptance suite",
-    "summary": "Per-PR dev tests: sign-up, create workspace, MFA, rent a number, upload an audience and audio, create a second workspace; plus Twilio-tier unit tests with CallCaster-dev credentials.",
-    "currentBehavior": "E2E runs in the local compose harness; nothing runs against a dev.callcaster.ca environment backed by a dedicated CallCaster-dev Twilio account.",
-    "rootCause": "There is no dedicated CallCaster-dev Twilio account; #1356 and #1827 are both open.",
-    "resolution": "After #1827 lands (which needs #1356), wire the dev PR suite over the listed steps and run the Twilio-tier unit tests with dev credentials.",
-    "lookIn": [
-      ".github/workflows/e2e.yml",
-      "e2e/specs/",
-      "test/integration-twilio/",
-      "docs/local-development.md"
-    ],
-    "existingTests": [
-      "e2e compose gate",
-      "test/integration-twilio/twilio-test-credentials.test.ts"
-    ],
-    "missingTests": [
-      "Dev-environment signup / workspace / MFA / number / audience / audio flow",
-      "Dev-credential unit tier"
-    ],
-    "acceptanceCriteria": [
-      "PRs run the dev checklist against CallCaster-dev",
-      "MFA is enabled on the dev test environment",
-      "Twilio unit tests use CallCaster-dev credentials"
-    ],
-    "blockedBy": [
-      1827
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827."
   },
   {
     "issueNumber": 1827,
@@ -518,20 +449,35 @@
     "issueNumber": 2008,
     "verdict": "blocked-epic",
     "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",
-    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.",
-    "currentBehavior": "Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.",
-    "rootCause": "Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.",
-    "resolution": "#2030 supplies the vocabulary (docs/adr/0039-role-checks-become-capability-checks.md): grow PRODUCT_CAPABILITIES in app/lib/capabilities.ts rather than inventing a second model. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
+    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt. The policy was deferred by the operator on 2026-10-19; the surface findings are filed here so the decision is the only thing left.",
+    "currentBehavior": "Mapped on dev@24631cc0, 19 October 2026. Agent is the `caller` role (MemberRole.Caller, UI label Agent). The capability matrix in app/lib/capabilities.ts already grants caller `campaigns.read`, `calls.start` and `calls.control`; it also grants `messages.send` to member but not to caller. The catalog has NO per-campaign-type capability at all, so there is currently no way to express live-call versus IVR versus SMS. IVR (robocall, simple_ivr, complex_ivr) and SMS (message) campaigns are served by the SAME routes as live-call campaigns and differ only by campaign.type, so any denial has to be type-aware. Sidebar visibility is 100% hasMinRole; there is no capability check anywhere in the UI.",
+    "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape. The capability layer grew beside it rather than replacing it, and the catalog was never extended to express campaign-type distinctions, so capability-by-capability policy is enforced ad hoc in whichever component happened to check it.",
+    "resolution": "The vocabulary is settled: #2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md) and says to grow PRODUCT_CAPABILITIES in app/lib/capabilities.ts rather than invent a second model, and to leave workspace-customized permissions to a later decision. Still needed before enforcement: (1) a confirmed policy - the issue defaults are a proposal, not a decision; (2) new per-campaign-type capability ids, which means adding them to CAPABILITY_CATEGORIES in app/lib/api-key-capabilities.shared.ts and the ProductCapabilityId enum in app/lib/openapi-platform-components.ts, both of which are exhaustive; (3) a workspace-route capability strategy, because app/lib/capability-guard.server.ts is data-plane only and has no workspace equivalent; (4) type-aware enforcement at the campaign list and the campaign detail route, because IVR and SMS share the campaign routes; (5) the sidebar and the route must read the same source, so the nav items and the route guard derive from one capability set; (6) scripts/check-route-authz.mjs must be taught about capabilities, because its regex only recognises hasMinRole and role equality, and the three routes it allowlists for callers (call, handset, chats) are exactly the surfaces in scope.",
     "lookIn": [
-      "app/components/layout/WorkspaceSidebar.tsx",
-      "app/lib/workspace-middleware.server.ts",
-      "app/routes/workspaces+/$id/**",
-      "app/db/workspace-scoped-tables.ts"
+      "app/lib/capabilities.ts (PRODUCT_CAPABILITIES, CALLCASTER_ROLE_CAPABILITY_MATRIX, capabilityIdsForRole)",
+      "app/lib/member-role.ts (MemberRole enum, WORKSPACE_ROLE_RANK, hasMinRole)",
+      "app/lib/workspace-role-display.ts (Agent = caller, Coordinator = member, Administrator = admin/owner)",
+      "app/components/workspace/WorkspaceNav.tsx (the real sidebar; the board's WorkspaceSidebar.tsx path does not exist)",
+      "app/routes/workspaces+/$id.tsx (renders WorkspaceNav, defaults a null role to MemberRole.Member)",
+      "app/routes/workspaces+/$id/campaigns.route.tsx and campaigns/$selected_id.loader.server.ts (the shared campaign routes)",
+      "app/routes/workspaces+/$id/handset.loader.server.ts and chats.loader.server.ts (the handset and SMS surfaces)",
+      "app/lib/capability-guard.server.ts (data-plane only; no workspace-route capability strategy exists yet)",
+      "app/lib/workspace-route.server.ts and app/lib/workspace-middleware.server.ts (403 shape, membership versus capability)",
+      "app/lib/database/campaign.server.ts (CampaignType and IVR_CAMPAIGN_TYPES)",
+      "app/lib/api-key-capabilities.shared.ts and app/lib/openapi-platform-components.ts (exhaustive capability id maps)",
+      "scripts/check-route-authz.mjs and scripts/lib/route-read-role-floor.mjs (gates that only understand role checks)"
     ],
-    "existingTests": [],
+    "existingTests": [
+      "test/ui/workspace-nav-campaign-caller-gating.test.tsx: asserts the Agent does not see New Campaign, and explicitly asserts the Agent STILL SEES Today, Campaigns, Messages, Call History, Voicemails, Analytics, Handset and Settings",
+      "test/capabilities.test.ts and test/capability-actor.test.ts: the role-to-capability matrix and deny-by-default behaviour",
+      "test/capability-gated-routes.test.ts and test/data-plane-role-gate.test.ts: data-plane 403 versus 404",
+      "e2e/specs/rbac.spec.ts: RBAC-01 asserts the caller nav shows Campaigns and Messages, RBAC-06 asserts the 403 page shape"
+    ],
     "missingTests": [
       "each capability has a route-level enforcement test",
-      "sidebar visibility and route enforcement agree"
+      "sidebar visibility and route enforcement agree",
+      "a caller denied an IVR campaign gets 403 on a direct URL to that campaign",
+      "a caller denied SMS campaigns does not see message-type campaigns in the list"
     ],
     "acceptanceCriteria": [
       "The Agent capability set is written down as data, not scattered conditionals",
@@ -542,7 +488,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Unblocked by #2030 (docs/adr/0039-role-checks-become-capability-checks.md). This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
+    "trackerRecommendation": "Unblocked by #2030 (docs/adr/0039-role-checks-become-capability-checks.md). The surface was mapped on 2026-10-19 and the operator deferred the policy decision, so this is the only open question. Do not re-run the options analysis and do not re-map the surface; the findings above are current for dev@24631cc0. The two existing tests that assert the Agent sees Messages and Handset will have to change once the policy is decided, and that change is expected rather than a regression."
   },
   {
     "issueNumber": 2009,
@@ -918,49 +864,6 @@
     "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
   },
   {
-    "issueNumber": 2128,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "Complete audience upload recovery after opt-out normalization",
-    "summary": "Normalization source is merged in PR #2349. Original-file source is merged in PR #2351 under existing Feature #1771. Unknown-value review reporting, exact landed outcomes and safe failure/replay/re-upload remain unfinished; neither child completes this Bug.",
-    "currentBehavior": "Actual handler/worker boundary faults return ok: true and complete the job after caught import failure. Four isolated PostgreSQL cases show orphan contacts after membership failure, committed contact/link rows after progress failure and duplicate contacts on replay or input with no mapped phone. Foreign/public controls stayed unchanged. Originals are now retained before enqueue, but the worker has no source-row outcome journal.",
-    "resolution": "Keep the complete zero-or-durable-report and same-file re-upload acceptance. Use #1771 for reporting. Split a reviewed durable recovery protocol into atomic native Tasks; preserve source-row identity before filtering and commit effects with recovery evidence. Prove process loss, concurrent replay and failure at every write/status boundary before enabling retry. Verify both child Tasks on deployment/release.",
-    "lookIn": [
-      "app/lib/audience-upload-process.server.ts",
-      "app/lib/audience-upload-db.server.ts",
-      "app/routes/api+/audience-upload.action.server.ts",
-      "app/components/audience/AudienceUploader.tsx",
-      "app/components/audience/AudienceUploadMapStep.tsx",
-      "shared/contact-import-headers.ts",
-      "app/lib/csv-contacts.ts",
-      "app/lib/chat-opt-out.ts"
-    ],
-    "existingTests": [
-      "#2348: 25 actual server upload cases with real CSV/value parsers; 111 focused upload/standalone parser/route/dedupe cases pass.",
-      "Removing normalization fails 24 cases with the unmapped control passing; changing the fallback fails 12 with 13 controls passing. Restored source passes all 25.",
-      "Existing phone dedupe tests cover within-file and already-linked audience phones; they do not prove recovery after linking or progress failure.",
-      "Six actual handler/worker boundary cases reproduce caught-success and completed-job behavior after failure; SQL/write/storage boundaries are mocked.",
-      "Four isolated real-PostgreSQL stored-row cases reproduce orphan contacts, partial progress effects, replay and no-phone duplication; foreign-workspace/public-table controls remain unchanged. Pools closed and only the owned schema was dropped. These cases prove the defect, not its repair.",
-      "#2350: 11 actual-route original-artifact cases and 50 focused upload cases pass; all six injected source faults fail. PR #2351 has both full local gates, both reviews, applicable remote gates and both deployments green."
-    ],
-    "missingTests": [
-      "Per-row/unknown-value review output and exact durable landed-row outcomes under #1771.",
-      "Repair proof for insert/link/progress/final-status/status-storage failures, lease/process loss, concurrent replay and same-file re-upload, including no mapped phone. A per-chunk transaction alone is insufficient.",
-      "Opted-out rows excluded from actual dispatch, applicable deployed upload/recovery acceptance and default-branch release verification."
-    ],
-    "acceptanceCriteria": [
-      "`unsubscribe`, `opted out`, `opted-out`, `no`, `false`, `n`, `0` are all accepted and normalised (a parameterised test over the set).",
-      "An unrecognised value does not throw; it maps to the documented safe default and the row is reported as needing review.",
-      "A failure part-way through a run leaves **zero** rows committed, or commits with a per-row report naming exactly which rows landed (kill-check: remove the transaction and confirm the test goes red).",
-      "Re-uploading the same file does not duplicate the rows that already landed.",
-      "An opt-out value is never dropped on the floor: the contact is excluded from dispatch."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Native normalization Task #2348 is under #2128; native original-file Task #2350 is under existing Feature #1771. Both sources are merged; keep their deployed acceptance/release open. Retain this parent’s full acceptance and implement the pinned recovery fault contract through separate atomic children. Do not duplicate #1771 or call normalization/artifact retention a recovery fix.",
-    "rootCause": "Mapped opt-out strings are now normalized, but the worker still catches import failure as success. Contact, membership and progress writes commit separately, phone dedupe cannot see orphan/unmapped-phone rows, and no durable source-row journal proves which effects landed."
-  },
-  {
     "issueNumber": 1771,
     "verdict": "blocked-epic",
     "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
@@ -1030,10 +933,10 @@
     "issueNumber": 1878,
     "verdict": "blocked-epic",
     "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
-    "summary": "The session-selected audio feature remains unfinished. Complete-query validation is implemented; the separately confirmed AMD playback/continuation defect in #2396 is a prerequisite for complete playback behavior.",
-    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. Native #2396 now blocks #1878.",
+    "summary": "The session-selected audio feature remains unfinished. The prerequisite shipped: the separately confirmed AMD playback/continuation defect in #2396 was fixed in master (db0e1686) and its issue is closed, so nothing blocks this one now. Complete-query validation is implemented.",
+    "currentBehavior": "Source audit: dev@eb7bc066, 2026-10-05. The dialog carries a voicemail boolean and no picker; predictive callbacks and agent drop still use campaign defaults. Machine and agent recording choices are session-only. Manual calling keeps its no-AMD policy. The shared verifier now authenticates complete queries, including GET/HEAD semantics. Actual-route follow-up at dev@9f33f3e7 confirmed enabled-drop callbacks request playback twice and next-turn continuation runs before the playback update acknowledgement. The existing drop-off concurrency control passes. The #2396 prerequisite is met; the picker itself is not built.",
     "rootCause": "The call-loader and screen contract lose file identity. The start service and every predictive continuation lack a machine selection. Agent drop resolves a child SID, which does not cover independent predictive recipient legs, and reads the shared default.",
-    "resolution": "Resolve #2396 as a separate callback operation first, with durable duplicate/acknowledgement recovery. Then extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
+    "resolution": "The #2396 prerequisite is done. What remains is the feature itself: extend the workspace library and shared Select/FormField composition. Define omitted/default, explicit None and named selections. Keep screen state by workspace/campaign/agent through revalidation; freeze the machine choice at conference start and carry it through every signed callback edge. Keep the agent picker reachable in-call, including after None. Validate existing tenant-owned objects and actor/campaign/conference-bound active recipients before playback; await provider acknowledgement and retain the connected call on failure. Extend the public start OpenAPI contract before validation and generated clients. Do not write campaign or script configuration.",
     "lookIn": [
       "app/components/call/CallScreen.Dialogs.tsx",
       "app/components/call/CallScreen.Layout.tsx",
@@ -1066,24 +969,10 @@
       "What is surfaced matches what the dialer actually plays",
       "The choice is session-only and does not write the campaign config"
     ],
-    "blockedBy": [
-      2396
-    ],
+    "blockedBy": [],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Keep OPEN in Blocked / split first with native #2396 dependency. Preserve the session-only selection and media/recipient ownership plan; the signature prerequisite is fulfilled. Original feature criteria remain unchanged."
-  },
-  {
-    "issueNumber": 1803,
-    "verdict": "blocked-epic",
-    "summary": "Development security remains a native Epic. At dev@ee28af66, thirteen of fourteen live high-severity default-branch advisory ranges match five current npm development package families: Browserslist, fast-uri, ip-address, js-yaml and undici. The Axios range does not match current npm 1.20.0. This subset comparison does not replace the earlier full audit or establish exploit reachability, runtime exposure or Bun scope.",
-    "resolution": "Trace advisory conditions and real consumers, then create separate native child Tasks by package or toolchain concern before implementation. Verify both locks and meaningful tool behavior; do not apply automatic audit major changes or downgrades without compatibility proof.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "trackerRecommendation": "Keep runtime fixes under #1802 and existing landed PostCSS work under #2342/#2346. Trace current advisory conditions and tool consumers; split confirmed concerns into atomic native child Tasks. Normalize provider range syntax and reject invalid ranges before deciding applicability. Preserve full npm/Bun install and codegen/test/coverage/build behavior, with complete local/remote gates and both deployments."
+    "trackerRecommendation": "Keep OPEN in Blocked / split first, now for size rather than for a dependency: it is an L at high risk and it needs more than one agent. The #2396 prerequisite shipped, so do not re-do that work. Preserve the session-only selection and media/recipient ownership plan; the original feature criteria are unchanged."
   },
   {
     "issueNumber": 2099,
