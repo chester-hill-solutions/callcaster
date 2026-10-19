@@ -96,6 +96,7 @@ const steps = [
   "client/migrations/20261007000004_workspace_member_workspace_reference.sql",
   "client/migrations/20261007000005_audience_import_recovery.sql",
   "client/migrations/20261009120000_keep_manual_households_together.sql",
+  "client/migrations/20261019000001_verification_number.sql",
 ];
 
 /**
