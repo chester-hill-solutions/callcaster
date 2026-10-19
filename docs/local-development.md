@@ -281,16 +281,57 @@ non-production deployment would mint Voice SDK tokens against production's app a
 place its calls through production's code, database, and caller ID.
 
 Closed PRs leave their apps behind. Reconcile Twilio against the environments
-Railway still reports (dry-run by default):
+that still exist (dry-run by default):
 
 ```bash
 bun ./scripts/local/prune-environment-twiml-apps.mjs
 bun ./scripts/local/prune-environment-twiml-apps.mjs --apply
 ```
 
+A pull-request preview is alive while its pull request is open, and Railway
+does not report preview environments, so the live set is the Railway
+environments plus one entry per open pull request. If the `gh` CLI cannot be
+read, the script throws and deletes nothing.
+
 Run these with `bun`, not `node`: the `twilio` package pulls in
 `buffer-equal-constant-time`, which reads `SlowBuffer` and throws on import under
 Node 24+.
+
+## Twilio Resource Inventory And Prune Report
+
+`scripts/twilio-resource-prune-report.mjs` lists every Twilio resource in the
+account — TwiML Apps, Messaging Services, incoming phone numbers and
+subaccounts, in the parent account and in every subaccount — and classifies
+each one:
+
+- `KEEP` — attached to something that still exists.
+- `STALE` — the owning pull-request preview no longer exists. This is the only
+  verdict a deletion may act on.
+- `UNKNOWN` — the owner could not be verified. The Twilio account is shared by
+  every environment, so a workspace missing from the connected database is not
+  evidence that its resources are stale.
+
+```bash
+npm run tools:twilio:prune-report
+npm run tools:twilio:prune-report -- --skip-subaccounts
+npm run tools:twilio:prune-report -- --json
+```
+
+`DATABASE_URL` is optional, and `DATABASE_PUBLIC_URL` wins over it when both
+are set, because `DATABASE_URL` on a Railway service points at the internal
+host. Without a database the owner check cannot run and every workspace-owned
+resource stays `UNKNOWN`. The report reads and prints; it has no delete path.
+
+Run it against the database that holds the live accounts. The owner check
+resolves a resource to a workspace by reading that database, so a report run
+against an empty environment cannot see the workspaces that own the resources.
+It prints the accounts it found and when each was last active, so you can see
+which ones are live.
+
+Some resources are held whatever the database says. `scripts/twilio-resource-prune-keep-list.mjs`
+is a frozen list of the resources that must never be touched, currently the
+Chester Hill Solutions business line and its numbers. It is checked before
+every other rule.
 
 ## Vendored packages
 
