@@ -1,8 +1,4 @@
-import os from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { rm, writeFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import {
   AudioUploadError,
   MIN_CLIP_DURATION_MS,
@@ -10,6 +6,7 @@ import {
   NORMALIZED_AUDIO_EXTENSION,
   isAllowedAudioExtension,
 } from "@/lib/audio-upload";
+import { runAudioProcess } from "@/lib/audio-process.server";
 
 export {
   AudioUploadError,
@@ -49,7 +46,7 @@ type TrimAudioBufferDeps = Partial<{
 }>;
 
 type ProbeAudioDurationDeps = Partial<{
-  runAudioTool: typeof runAudioTool;
+  runAudioProcess: typeof runAudioProcess;
 }>;
 
 /** Encoder flags shared by normalization and trimming so every object in the
@@ -147,42 +144,11 @@ export async function runAudioTool(
   inputBuffer: Buffer,
   messages: { unavailable: string; failed: string },
 ) {
-  return await new Promise<Buffer>((resolve, reject) => {
-    const child = spawn(command, args);
-    const stdoutChunks: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
-
-    child.stdout.on("data", (chunk: Buffer | string) => {
-      stdoutChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-
-    child.stderr.on("data", (chunk: Buffer | string) => {
-      stderrChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-
-    child.once("error", (error) => {
-      reject(new AudioUploadError(`${messages.unavailable}: ${error.message}`, 500));
-    });
-
-    child.once("close", (code) => {
-      if (code === 0) {
-        resolve(Buffer.concat(stdoutChunks));
-        return;
-      }
-
-      const details = Buffer.concat(stderrChunks).toString("utf8").trim();
-      reject(
-        new AudioUploadError(
-          details ? `${messages.failed}: ${details}` : `${messages.failed}.`,
-          500,
-        ),
-      );
-    });
-
-    child.stdin.once("error", () => {
-      // Ignore EPIPE here; the process exit code captures the real failure.
-    });
-    child.stdin.end(inputBuffer);
+  return runAudioProcess({
+    command,
+    buildArgs: () => args,
+    inputBuffer,
+    messages,
   });
 }
 
@@ -191,27 +157,24 @@ export async function transcodeAudioBuffer(inputBuffer: Buffer) {
   // their `moov` atom at the end (non-faststart), and ffmpeg cannot seek a pipe
   // to find it — it demuxes a "partial file", writes a header-only stub, and
   // still exits 0, so the stub would be stored as a "successful" upload.
-  const filePath = path.join(
-    os.tmpdir(),
-    `callcaster-transcode-${randomUUID()}.${NORMALIZED_AUDIO_EXTENSION}`,
-  );
-
-  try {
-    await writeFile(filePath, inputBuffer);
-    return await runAudioTool(
-      "ffmpeg",
-      ["-hide_banner", "-loglevel", "error", "-i", filePath, ...MP3_ENCODE_ARGS, "pipe:1"],
-      Buffer.alloc(0),
-      {
-        unavailable: "Audio transcoding is unavailable",
-        failed: "Audio transcoding failed",
-      },
-    );
-  } finally {
-    await rm(filePath, { force: true }).catch(() => {
-      // Best effort: a stranded temp file must not fail the upload.
-    });
-  }
+  return runAudioProcess({
+    command: "ffmpeg",
+    buildArgs: (inputTarget) => [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      inputTarget,
+      ...MP3_ENCODE_ARGS,
+      "pipe:1",
+    ],
+    inputBuffer,
+    messages: {
+      unavailable: "Audio transcoding is unavailable",
+      failed: "Audio transcoding failed",
+    },
+    stage: { prefix: "callcaster-transcode" },
+  });
 }
 
 /**
@@ -222,27 +185,24 @@ export async function transcodeAudioBuffer(inputBuffer: Buffer) {
 export async function transcodeToWavBuffer(inputBuffer: Buffer) {
   // Same seekable-temp-file reason as transcodeAudioBuffer: MP4/M4A `moov`
   // atoms sit at the end, and a pipe cannot be seeked.
-  const filePath = path.join(
-    os.tmpdir(),
-    `callcaster-wav-${randomUUID()}.${NORMALIZED_AUDIO_EXTENSION}`,
-  );
-
-  try {
-    await writeFile(filePath, inputBuffer);
-    return await runAudioTool(
-      "ffmpeg",
-      ["-hide_banner", "-loglevel", "error", "-i", filePath, ...WAV_ENCODE_ARGS, "pipe:1"],
-      Buffer.alloc(0),
-      {
-        unavailable: "Audio transcoding is unavailable",
-        failed: "Audio transcoding failed",
-      },
-    );
-  } finally {
-    await rm(filePath, { force: true }).catch(() => {
-      // Best effort: a stranded temp file must not fail the upload.
-    });
-  }
+  return runAudioProcess({
+    command: "ffmpeg",
+    buildArgs: (inputTarget) => [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-i",
+      inputTarget,
+      ...WAV_ENCODE_ARGS,
+      "pipe:1",
+    ],
+    inputBuffer,
+    messages: {
+      unavailable: "Audio transcoding is unavailable",
+      failed: "Audio transcoding failed",
+    },
+    stage: { prefix: "callcaster-wav" },
+  });
 }
 
 /**
@@ -321,43 +281,31 @@ export async function probeAudioDurationMs(
   inputBuffer: Buffer,
   deps: ProbeAudioDurationDeps = {},
 ) {
-  const d = { runAudioTool, ...deps };
+  const d = { runAudioProcess, ...deps };
 
-  const filePath = path.join(
-    os.tmpdir(),
-    `callcaster-probe-${randomUUID()}.${NORMALIZED_AUDIO_EXTENSION}`,
-  );
+  const output = await d.runAudioProcess({
+    command: "ffprobe",
+    buildArgs: (inputTarget) => [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      inputTarget,
+    ],
+    inputBuffer,
+    messages: {
+      unavailable: "Audio inspection is unavailable",
+      failed: "Audio inspection failed",
+    },
+    stage: { prefix: "callcaster-probe" },
+  });
 
-  try {
-    await writeFile(filePath, inputBuffer);
-
-    const output = await d.runAudioTool(
-      "ffprobe",
-      [
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        filePath,
-      ],
-      Buffer.alloc(0),
-      {
-        unavailable: "Audio inspection is unavailable",
-        failed: "Audio inspection failed",
-      },
-    );
-
-    const seconds = Number.parseFloat(output.toString("utf8").trim());
-    if (!Number.isFinite(seconds) || seconds < 0) {
-      return null;
-    }
-
-    return Math.round(seconds * 1000);
-  } finally {
-    await rm(filePath, { force: true }).catch(() => {
-      // Best effort: a stranded temp file must not fail the upload.
-    });
+  const seconds = Number.parseFloat(output.toString("utf8").trim());
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return null;
   }
+
+  return Math.round(seconds * 1000);
 }

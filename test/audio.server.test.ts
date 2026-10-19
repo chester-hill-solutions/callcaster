@@ -351,15 +351,22 @@ describe("app/lib/audio.server.ts", () => {
   });
 
   test("probes duration from a seekable temp file, not a pipe", async () => {
-    const mod = await import("../app/lib/audio.server");
-    const runAudioTool = vi.fn(async () => Buffer.from("5.042000\n"));
+    const proc = createSpawnMock();
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
-    await expect(
-      mod.probeAudioDurationMs(Buffer.from("mp3"), { runAudioTool }),
-    ).resolves.toBe(5042);
+    const mod = await import("../app/lib/audio.server");
+    const pending = mod.probeAudioDurationMs(Buffer.from("mp3"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+
+    proc.stdout.emit("data", Buffer.from("5.042000\n"));
+    proc.emit("close", 0);
+
+    await expect(pending).resolves.toBe(5042);
 
     // MP3 has no header duration, so ffprobe reports N/A for pipe input.
-    const args = runAudioTool.mock.calls[0][1] as string[];
+    const args = spawn.mock.calls[0][1] as string[];
     expect(args).not.toContain("pipe:0");
     expect(args.at(-1)).toMatch(/callcaster-probe-.*\.mp3$/);
   });
@@ -369,7 +376,7 @@ describe("app/lib/audio.server.ts", () => {
 
     await expect(
       mod.probeAudioDurationMs(Buffer.from("mp3"), {
-        runAudioTool: vi.fn(async () => Buffer.from("N/A\n")),
+        runAudioProcess: vi.fn(async () => Buffer.from("N/A\n")),
       }),
     ).resolves.toBeNull();
   });
@@ -380,16 +387,21 @@ describe("app/lib/audio.server.ts", () => {
       rm,
       writeFile: vi.fn(async () => undefined),
     }));
+    const proc = createSpawnMock();
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
+    const pending = mod.probeAudioDurationMs(Buffer.from("mp3"));
 
-    await expect(
-      mod.probeAudioDurationMs(Buffer.from("mp3"), {
-        runAudioTool: vi.fn(async () => {
-          throw new Error("ffprobe exploded");
-        }),
-      }),
-    ).rejects.toThrow("ffprobe exploded");
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+
+    proc.stderr.emit("data", Buffer.from("ffprobe exploded"));
+    proc.emit("close", 1);
+
+    await expect(pending).rejects.toThrow(
+      "Audio inspection failed: ffprobe exploded",
+    );
 
     expect(rm).toHaveBeenCalledTimes(1);
   });

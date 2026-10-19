@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Audio conversions and duration reads stop a process that never exits, so an upload cannot hang indefinitely ([#2724](https://github.com/chester-hill-solutions/callcaster/issues/2724)).
+
 - Fixed: Call-list upload progress runs one status request at a time and stops the pending request when you leave or start another upload ([PR #2723](https://github.com/chester-hill-solutions/callcaster/pull/2723), [#2722](https://github.com/chester-hill-solutions/callcaster/issues/2722)).
 
 - Fixed: The call screen ignores status updates for a call you have already left and stops polling once the call ends ([PR #2721](https://github.com/chester-hill-solutions/callcaster/pull/2721), [#2718](https://github.com/chester-hill-solutions/callcaster/issues/2718)).
