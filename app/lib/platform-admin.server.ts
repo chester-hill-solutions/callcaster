@@ -6,6 +6,7 @@ import {
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
 import { projectWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { listRecentDeadLetteredJobs } from "@/lib/admin-jobs.server";
+import { listVerificationNumbers } from "@/lib/verification-number.server";
 import type { Database } from "@/lib/db-types";
 import {
   listPendingInvitesForUsername,
@@ -73,6 +74,7 @@ export async function getAdminDashboard() {
     workspaceNumbers,
     allCampaigns,
     deadLetteredJobs,
+    verificationNumbers,
   ] = await Promise.all([
     listAllWorkspacesOrdered(),
     listAllUsersOrdered(),
@@ -80,6 +82,7 @@ export async function getAdminDashboard() {
     listAllWorkspaceNumbers(),
     listAllCampaignsOrdered(),
     listRecentDeadLetteredJobs(),
+    listVerificationNumbers(),
   ]);
 
   const campaignsByWorkspace = new Map<string, typeof allCampaigns>();
@@ -113,6 +116,7 @@ export async function getAdminDashboard() {
     workspaceRows,
     campaigns: allCampaigns,
     deadLetteredJobs,
+    verificationNumbers,
     stats: {
       totalWorkspaces: workspaces.length,
       totalUsers: users.length,

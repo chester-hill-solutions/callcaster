@@ -7,6 +7,12 @@ import {
   syncWorkspaceTwilio,
   toggleWorkspaceStatus,
 } from "@/lib/platform-admin.server";
+import {
+  activateVerificationNumber,
+  registerVerificationNumber,
+  removeVerificationNumber,
+} from "@/lib/verification-number.server";
+import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { adminRouteAuth } from "@/lib/admin-route.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -86,6 +92,46 @@ export const action = defineAction({
     }
 
     return routeData({ success: "User disabled successfully" });
+  }
+
+  if (actionType === "register_verification_number") {
+    const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
+    const label = String(formData.get("label") ?? "").trim();
+    const region = String(formData.get("region") ?? "").trim();
+
+    if (!isValidPhoneNumber(phoneNumber)) {
+      return routeData({ error: "Enter a valid phone number in E.164 format" });
+    }
+
+    await registerVerificationNumber({
+      phoneNumber: normalizePhoneNumber(phoneNumber),
+      label: label || null,
+      region: region || null,
+    });
+
+    return routeData({ success: `Registered verification number ${phoneNumber}` });
+  }
+
+  if (actionType === "activate_verification_number") {
+    const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
+    const activated = await activateVerificationNumber(phoneNumber);
+
+    if (!activated) {
+      return routeData({ error: "Verification number not found" });
+    }
+
+    return routeData({ success: `${phoneNumber} is now the active verification number` });
+  }
+
+  if (actionType === "remove_verification_number") {
+    const phoneNumber = String(formData.get("phoneNumber") ?? "").trim();
+    const removed = await removeVerificationNumber(phoneNumber);
+
+    if (!removed) {
+      return routeData({ error: "Verification number not found" });
+    }
+
+    return routeData({ success: `Removed verification number ${phoneNumber}` });
   }
 
   return routeData({ error: "Invalid action" });

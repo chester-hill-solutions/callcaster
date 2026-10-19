@@ -35,7 +35,6 @@ type EnvConfig = {
   TWILIO_COMPLIANCE_NOTIFY_EMAIL?: string;
   /** Trust Hub secondary customer-profile policy SID (override; optional). */
   TWILIO_TRUSTHUB_SECONDARY_POLICY_SID?: string;
-  VERIFICATION_PHONE_NUMBER?: string;
   TWILIO_VALIDATE_WEBHOOKS?: string;
   /** Shared secret required on /api/twilio/a2p/events (Event Streams webhook sink). */
   TWILIO_EVENTS_SINK_SECRET?: string;
@@ -53,7 +52,6 @@ const requiredEnvVars = [...REQUIRED_ENV_KEYS] as (keyof EnvConfig)[];
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
   'STRIPE_WEBHOOK_SECRET',
-  'VERIFICATION_PHONE_NUMBER',
   'TWILIO_VALIDATE_WEBHOOKS',
   'TWILIO_COMPLIANCE_NOTIFY_EMAIL',
   'TWILIO_TRUSTHUB_SECONDARY_POLICY_SID',
@@ -210,7 +208,6 @@ export const env = {
   /** Trust Hub secondary customer-profile policy SID override (optional). */
   TWILIO_TRUSTHUB_SECONDARY_POLICY_SID: () =>
     getEnv('TWILIO_TRUSTHUB_SECONDARY_POLICY_SID'),
-  VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
   /** When `false` or `0`, Remix Twilio webhooks skip signature checks (local dev only). */
   TWILIO_VALIDATE_WEBHOOKS: () => getEnv('TWILIO_VALIDATE_WEBHOOKS'),
   /** When "true" or "1", enables Twilio Lookup v2 line-type checks (see twilio-lookup.server.ts). Off by default. */

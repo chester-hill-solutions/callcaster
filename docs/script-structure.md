@@ -127,7 +127,7 @@ The [`scripts/`](../scripts/) directory holds **Node** helpers (not campaign JSO
 | [`scripts/local/dev-stable.mjs`](../scripts/local/dev-stable.mjs) | Stable local dev: custom Express server with Vite middleware (wired as `npm run dev`). |
 | [`scripts/local/sync-calling-dev.mjs`](../scripts/local/sync-calling-dev.mjs) | Sync Twilio / workspace URLs for local calling (`npm run dev:calling:sync`). |
 | [`scripts/coverage/merge-and-check.mjs`](../scripts/coverage/merge-and-check.mjs) | Merge Vitest + Deno LCOV and enforce coverage gates. |
-| [`scripts/configure-verification-number.mjs`](../scripts/configure-verification-number.mjs) | Point a verification number’s Voice URL at `/api/inbound-verification`. |
+| [`scripts/configure-verification-number.mjs`](../scripts/configure-verification-number.mjs) | Set a verification number’s Voice URL and register it as the active call-in verification number. |
 | [`scripts/dev/websocket-server.js`](../scripts/dev/websocket-server.js) | Optional TLS WebSocket dev server + certs under `scripts/dev/certs/`. |
 
 See root [`package.json`](../package.json) `scripts` for the exact `npm run` names.
