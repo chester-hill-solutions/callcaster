@@ -76,6 +76,7 @@ test, a browser test, or reading the code is enough. Most UI defects are in this
   "issue": 2507,
   "verdict": "NOT_FIXED",
   "manual": false,
+  "remaining": "code",
   "mechanism": "one sentence: what the code now does",
   "evidence": ["app/routes/x.ts:42 — the guard that returns early"],
   "in_master": true,
@@ -83,6 +84,10 @@ test, a browser test, or reading the code is enough. Most UI defects are in this
   "note": "anything the reader needs"
 }
 ```
+
+`remaining` is optional. It is `"person"` when what is left is a person's action on master,
+and `"code"` when there is still code to write. It decides whether a partial or not-fixed
+issue lands in `on-qa` or in `In progress`.
 
 The full protocol, including how to delegate the sweep in parallel, is in
 [PROTOCOL.md](PROTOCOL.md).
@@ -102,8 +107,16 @@ The rules it applies:
 |---|---|---|
 | `VERIFIED`, machine-checkable | close if open | `on-prod` if already there, else `on-dev` — **the operator promotes to `on-prod` by hand** |
 | `VERIFIED`, `manual: true` | reopen | `on-qa` |
-| `PARTIAL` | reopen | `on-dev` |
-| `NOT_FIXED` | reopen | `on-dev`, or `In progress` when no fix exists anywhere |
+| `PARTIAL` / `NOT_FIXED`, `remaining: "person"` | reopen | `on-qa` |
+| `PARTIAL` / `NOT_FIXED`, `remaining: "code"` | reopen | `on-dev`, or `In progress` when no fix exists anywhere |
+
+**The Status follows the remaining work, not the verdict label.** A verdict can carry
+`"remaining": "person"` or `"remaining": "code"`. When what is left is a person's action on
+master — register a number, make a call, read a number — the issue belongs in `on-qa` with the
+other verification work. When it is code, it belongs in `In progress`. #2519 is the case in
+point: the code is in master and complete, but production still has no verification number, so
+the operator has to register one and place a call. Calling that "needs code work" would send
+an engineer looking for code that does not need writing.
 
 ## The rules the operator set
 

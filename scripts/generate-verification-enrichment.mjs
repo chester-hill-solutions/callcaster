@@ -47,9 +47,12 @@ const LANE = {
 
 // Some issues belong in a lane other than the one their verdict implies.
 // #1717 was never implemented because the policy decision was never written
-// down, so it is a decision, not a fix.
+// down, so it is a decision, not a fix. #2519's code is done and no new code
+// is needed: what is left is an operator registering a number and making a
+// real call, which is the verify-close lane.
 const LANE_OVERRIDE = {
   1717: "needs-decision",
+  2519: "verify-close",
 };
 
 /** The verifier's note reads as a diagnosis followed by the action. Split it. */
@@ -78,23 +81,29 @@ for (const [issue, verdict] of briefs) {
     ),
   ];
   const { rootCause, resolution } = splitNote(verdict.note);
+  // When what is left is a person's action, the code is in master and the
+  // record says so. Saying "the claimed fix does not resolve the symptom"
+  // would be wrong: it resolves everything the code can resolve.
+  const personAction = verdict.remaining === "person";
   const record = {
     issueNumber: issue,
     verdict: LANE_OVERRIDE[issue] ?? lane,
     summary: verdict.mechanism || "Claimed fix does not resolve the symptom.",
-    currentBehavior:
-      verdict.verdict === "VERIFIED"
+    currentBehavior: personAction
+      ? "The code is in master. What is left is a person's action on master, so the issue stays open until they finish it and confirm it."
+      : verdict.verdict === "VERIFIED"
         ? "The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it."
         : "The claimed fix does not resolve the reported symptom.",
-    resolution:
-      resolution ||
-      (verdict.verdict === "VERIFIED"
-        ? "Run the verification on master, then close. No new code unless it fails."
-        : "Implement the missing mechanism named in the root cause."),
+    resolution: personAction
+      ? "No new code. Register and activate the number (or run the operator script), then make the real call and confirm it."
+      : resolution ||
+        (verdict.verdict === "VERIFIED"
+          ? "Run the verification on master, then close. No new code unless it fails."
+          : "Implement the missing mechanism named in the root cause."),
     lookIn,
     existingTests: verdict.test ? [verdict.test] : [],
     acceptanceCriteria:
-      verdict.verdict === "VERIFIED"
+      verdict.verdict === "VERIFIED" || personAction
         ? ["A person confirms the reported symptom is gone on master."]
         : [],
   };

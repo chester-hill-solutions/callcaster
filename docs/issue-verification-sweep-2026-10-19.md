@@ -80,13 +80,13 @@ wrongly-closed issues is why: the sweep's closures were hiding work that was nev
 | Verdict | Issues | What it means |
 | --- | --- | --- |
 | `VERIFIED` | 122 | the code in `master` resolves the reported symptom |
-| `VERIFIED, manual` | 16 | the fix is in `master`, but only a person can confirm the symptom is gone |
+| `VERIFIED, manual` | 15 | the fix is in `master`, but only a person can confirm the symptom is gone |
 | `PARTIAL` | 4 | the code covers part of the symptom only |
-| `PARTIAL, manual` | 3 | partly fixed, and the rest also needs a person |
+| `PARTIAL, manual` | 4 | partly fixed, and the rest also needs a person |
 | `NOT_FIXED, manual` | 3 | not fixed, and confirming it needs a person |
 | `NOT_FIXED` | 2 | nothing in `master` resolves the symptom |
 
-**150 issues checked. 122 verified by the code, 16 verified but needing a person, 12 not fully fixed.**
+**150 issues checked. 122 verified by the code, 15 verified but needing a person, 13 not fully fixed.**
 
 ### The issues that were closed and should not have been
 
@@ -115,7 +115,7 @@ wrongly-closed issues is why: the sweep's closures were hiding work that was nev
 | [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503) | `PARTIAL, manual` | `In progress` | the fix covers part of the symptom only |
 | [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507) | `NOT_FIXED` | `In progress` | nothing in `master` resolves the symptom |
 | [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) | `VERIFIED, manual` | `on-qa` | the fix is in `master`, but only a person can confirm it |
-| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `VERIFIED, manual` | `on-qa` | the fix is in `master`, but only a person can confirm it |
+| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `PARTIAL, manual` | `on-qa` | the fix covers part of the symptom only |
 | [#2524](https://github.com/chester-hill-solutions/callcaster/issues/2524) | `VERIFIED, manual` | `on-qa` | the fix is in `master`, but only a person can confirm it |
 | [#2592](https://github.com/chester-hill-solutions/callcaster/issues/2592) | `VERIFIED, manual` | `on-qa` | the fix is in `master`, but only a person can confirm it |
 | [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) | `PARTIAL` | `In progress` | the fix covers part of the symptom only |
@@ -149,10 +149,10 @@ wrongly-closed issues is why: the sweep's closures were hiding work that was nev
 | [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282) | `VERIFIED` | `on-qa` | Brand registration is now gated on a prepared, submitted A2P Messaging Profile: `prepareA2pMessagingProfile` creates or recovers the `us_a2p_messaging_profile_i |
 | [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396) | `VERIFIED` | `on-qa` | Predictive-machine playback is now a durable, leased operation row bound to workspace/call/attempt/campaign/actor/conference, so a signed replay polls the journ |
 | [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503) | `PARTIAL` | `In progress` | Master removes the duplicated section headings on the campaign pages (the 'Setup' heading under the Setup/Content/Queue/Launch tab row, the 'Launch' section hea |
-| [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) | `VERIFIED` | `on-qa` | The chats list defaults to the "hasReplied" filter and the rows are virtualised: sortConversationSummaries filters through matchesChatSortFilter before sorting, |
-| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `VERIFIED` | `on-qa` | The call-in verification number is no longer an environment variable that was never set: it is a database row read through getActiveVerificationNumber and regis |
+| [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) | `VERIFIED` | `on-qa` | The chats list defaults to the hasReplied filter and renders a virtual row window: the loader and the hook both default the sort to hasReplied, the SQL and the  |
+| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `PARTIAL` | `on-qa` | The call-in verification number is now platform data instead of an environment variable: a verification_number table holds the numbers, getActiveVerificationNum |
 | [#2524](https://github.com/chester-hill-solutions/callcaster/issues/2524) | `VERIFIED` | `on-qa` | app/hooks/call/useCallAudioControls.ts:100-111 — the owned stream is released on cleanup: `useEffect(() => { if (!stream) return; return () => { stream.getTrack |
-| [#2592](https://github.com/chester-hill-solutions/callcaster/issues/2592) | `VERIFIED` | `on-qa` | A script can end a call: the IVR step editor offers a 'Hang up' no-input action, the runtime resolves it to a hangup target and emits twiml.hangup(), the replay |
+| [#2592](https://github.com/chester-hill-solutions/callcaster/issues/2592) | `VERIFIED` | `on-qa` | app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts:108-117,231-232 — the live runtime: nextStep === "hangup" or "end" is terminal and an |
 
 ### Every issue checked
 
@@ -278,7 +278,7 @@ wrongly-closed issues is why: the sweep's closures were hiding work that was nev
 | [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) | `VERIFIED, manual` | yes | open | `on-qa` |
 | [#2513](https://github.com/chester-hill-solutions/callcaster/issues/2513) | `VERIFIED` | yes | closed | `on-dev` |
 | [#2518](https://github.com/chester-hill-solutions/callcaster/issues/2518) | `VERIFIED` | yes | closed | `on-dev` |
-| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `VERIFIED, manual` | yes | open | `on-qa` |
+| [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) | `PARTIAL, manual` | yes | open | `on-qa` |
 | [#2522](https://github.com/chester-hill-solutions/callcaster/issues/2522) | `VERIFIED` | yes | closed | `on-dev` |
 | [#2523](https://github.com/chester-hill-solutions/callcaster/issues/2523) | `VERIFIED` | yes | closed | `on-dev` |
 | [#2524](https://github.com/chester-hill-solutions/callcaster/issues/2524) | `VERIFIED, manual` | yes | open | `on-qa` |
@@ -308,7 +308,6 @@ wrongly-closed issues is why: the sweep's closures were hiding work that was nev
 | [#2719](https://github.com/chester-hill-solutions/callcaster/issues/2719) | `VERIFIED` | yes | closed | `on-prod` |
 | [#2722](https://github.com/chester-hill-solutions/callcaster/issues/2722) | `VERIFIED` | yes | closed | `on-prod` |
 | [#2724](https://github.com/chester-hill-solutions/callcaster/issues/2724) | `VERIFIED` | yes | closed | `on-prod` |
-
 
 ## What this changes in the tooling
 

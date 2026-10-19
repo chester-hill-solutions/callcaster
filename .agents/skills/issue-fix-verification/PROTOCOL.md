@@ -83,3 +83,7 @@ issue lands in a lane the operator can act on:
 | `VERIFIED` + `manual: true` | `verify-close` — the fix is in, a person must confirm it |
 | `PARTIAL` | `fix-now` — the resolution path is known |
 | `NOT_FIXED` | `fix-now` if the root cause is known, otherwise `needs-repro` |
+
+A verdict can also carry `remaining: "person"` when the last step is an operator action
+rather than code. Those land in `verify-close` too: the code is done, and what is left is a
+person registering something and confirming it on master. #2519 is the case in point.
