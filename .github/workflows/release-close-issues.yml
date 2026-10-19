@@ -42,6 +42,7 @@ on:
     branches: [master]
 
 permissions:
+  contents: read
   pull-requests: read
 
 jobs:
@@ -59,6 +60,12 @@ jobs:
           else
             echo "has_override=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # The checker is a script in this repository, so the repository has to be
+      # on disk. The gate used to read the body with a shell regex and needed
+      # no checkout.
+      - name: Check out the repository
+        uses: actions/checkout@v4
 
       - name: Find closing references
         id: closes
