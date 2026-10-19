@@ -31,8 +31,14 @@ name: Issue on dev
 # A stale value makes the option lookup fail and the step skip silently while
 # still posting the comment (the original #1822 symptom).
 #
-# The release promotion keeps closing the issue on `master`, so "closed"
-# still means "in production".
+# A release promotion closes the issues it names, because a closing keyword
+# closes an issue when the pull request merges into `master`. That means
+# "closed" means "a release named this issue", NOT "this issue is fixed" —
+# a release can carry a keyword for a fix that does not resolve the symptom.
+# The 2026-10-19 verification sweep found 94 issues and 17 release closures
+# resting on that assumption, 16 of which had to be reopened. Verify the fix
+# before treating an issue as done; see
+# .agents/skills/issue-fix-verification/SKILL.md.
 
 on:
   pull_request:
