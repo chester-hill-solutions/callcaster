@@ -4,32 +4,21 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-10-19 — release [#2740](https://github.com/chester-hill-solutions/callcaster/pull/2740)
+
 - Fixed: The platform Access form shows one success notice per action instead of two ([PR #2730](https://github.com/chester-hill-solutions/callcaster/pull/2730), [#2459](https://github.com/chester-hill-solutions/callcaster/issues/2459)).
-
 - Changed: Call-in verification numbers are managed in Admin instead of an environment variable, so the number can change without a redeploy ([PR #2726](https://github.com/chester-hill-solutions/callcaster/pull/2726), [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519)).
-
 - Fixed: Audio conversions and duration reads stop a process that never exits, so an upload cannot hang indefinitely ([PR #2725](https://github.com/chester-hill-solutions/callcaster/pull/2725), [#2724](https://github.com/chester-hill-solutions/callcaster/issues/2724)).
-
 - Fixed: Call-list upload progress runs one status request at a time and stops the pending request when you leave or start another upload ([PR #2723](https://github.com/chester-hill-solutions/callcaster/pull/2723), [#2722](https://github.com/chester-hill-solutions/callcaster/issues/2722)).
-
 - Fixed: The call screen ignores status updates for a call you have already left and stops polling once the call ends ([PR #2721](https://github.com/chester-hill-solutions/callcaster/pull/2721), [#2718](https://github.com/chester-hill-solutions/callcaster/issues/2718)).
-
 - Fixed: The Call list detail page clears its processing state when an upload completes or fails, without a page reload ([PR #2720](https://github.com/chester-hill-solutions/callcaster/pull/2720), [#2719](https://github.com/chester-hill-solutions/callcaster/issues/2719)).
-
 - Fixed: Railway plans preserve an existing legacy variable in each modeled environment ([PR #2715](https://github.com/chester-hill-solutions/callcaster/pull/2715), [#2714](https://github.com/chester-hill-solutions/callcaster/issues/2714)).
-
 - Fixed: Campaign exports wait for each status request and discard results after leaving or switching campaigns ([PR #2713](https://github.com/chester-hill-solutions/callcaster/pull/2713), [#2712](https://github.com/chester-hill-solutions/callcaster/issues/2712)).
-
 - Fixed: Phone cleanup on page exit and reconnect can finish after a signaling transport failure, and closed sessions no longer start registration retries ([#2706](https://github.com/chester-hill-solutions/callcaster/issues/2706)).
-
 - Fixed: Leaving the campaign or softphone screen releases microphone capture that finishes opening after exit ([#2705](https://github.com/chester-hill-solutions/callcaster/issues/2705)).
-
 - Fixed: Workspace event bursts share refresh work and let navigation finish while campaign progress, status and credits stay current ([#2704](https://github.com/chester-hill-solutions/callcaster/issues/2704)).
-
 - Fixed: Leaving power dial releases only your unused assigned contacts and waits for success. Failed releases keep the call screen available to retry ([#2702](https://github.com/chester-hill-solutions/callcaster/issues/2702)).
-
 - Fixed: Workspace event streams combine concurrent notifications and polling reads, so saved events arrive once and in order during bursts ([#2703](https://github.com/chester-hill-solutions/callcaster/issues/2703)).
-
 - Fixed: Leaving a predictive campaign stops the conference and the dialer even when the call screen was reloaded, so no further calls are placed ([PR #2694](https://github.com/chester-hill-solutions/callcaster/pull/2694), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
 
 ## 2026-10-15 — release [#2668](https://github.com/chester-hill-solutions/callcaster/pull/2668)
