@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@4a7c153b` · 198 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@959d859b` · 198 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -136,32 +136,34 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
-### [#2592](https://github.com/chester-hill-solutions/callcaster/issues/2592) Add IVR end-call options
-- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-19
-- A script can end a call: the IVR step editor offers a 'Hang up' no-input action, the runtime resolves it to a hangup target and emits twiml.hangup(), the replay is capped so the terminal behaviour is bounded, and the routing validation treats hangup and end as terminal targets rather than dangling ones.
-- Current behavior: The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.
-- Root cause: The capability predates the issue: the hangup option landed in 0dc620be (PR #1992) and the terminal-target validation in 1c9d1306 (PR #1991), both before the issue was raised on 2026-10-15. The issue was closed the same day with no cited evidence. manual: true because 'safe terminal behavior at runtime' means a real call must end cleanly.
-- Resolution: Run the verification on master, then close. No new code unless it fails.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-script-validation.ts`
-- Done when: A person confirms the reported symptom is gone on master.
-
 ### [#2519](https://github.com/chester-hill-solutions/callcaster/issues/2519) call settings: call in verification not conigured
 - Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-19
-- The call-in verification number is no longer an environment variable that was never set: it is a database row read through getActiveVerificationNumber and registered from Admin, and the session route answers a clean 503 'Call-in verification is not configured' instead of throwing.
+- The call-in verification number is now platform data instead of an environment variable: a verification_number table holds the numbers, getActiveVerificationNumber reads the one active row, the Admin System Settings panel registers, activates and removes a number, and the session route answers 503 'Call-in verification is not configured' when no row is active.
+- Current behavior: The code is in master. What is left is a person's action on master, so the issue stays open until they finish it and confirm it.
+- Root cause: PARTIAL, and manual. What is covered: the number is no longer an invisible, redeploy-only environment variable. It is a database row, it is visible and changeable in Admin, the decision is written in docs/adr/0038, and the route answers a clean 503 instead of failing. What is not covered: the number itself. The issue's screenshot is the Call settings modal showing 'Call-in verification is not configured', and that is exactly what production still shows after this release, because no row is active. The release guide for the same release says so in plain words. The remaining work is an operator action, not a code change: register and activate a number in Admin (or run scripts/configure-verification-number.mjs), then place a real verification call. manual: true because that last step is a real phone call to a real handset. The candidate commit 6c7c361a (PR #2726) is not an ancestor of origin/master by SHA, but its content is in master through the release merge 91c4409b.
+- Resolution: No new code. Register and activate the number (or run the operator script), then make the real call and confirm it.
+- Look in: `app/lib/verification-number.server.ts`, `/verify-call-in-session.loader.server.ts`, `/route.action.server.ts`, `/panels/AdminSystemSettingsPanel.tsx`, `docs/release-test-guide-2026-10-19.md`
+- Existing tests: No automated test for this change. scripts/configure-verification-number.mjs registers and activates a number in one transaction and is the operator path, and docs/release-test-guide-2026-10-19.md:13-21 lists the manual checks.
+- Done when: A person confirms the reported symptom is gone on master.
+
+### [#2592](https://github.com/chester-hill-solutions/callcaster/issues/2592) Add IVR end-call options
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-10-19
+- An IVR author can end a call from the script: the step editor offers a Hang up option for the no-input action, the routing target list offers a Hang up special target, the runtime resolves that target to a hangup and emits twiml.hangup(), and the routing validation treats hangup and end as terminal targets instead of dangling ones.
 - Current behavior: The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.
-- Root cause: The configuration path is the deliverable and it is in master. manual: true because production still has no number registered: a person must register one in Admin and place a real verification call to prove the feature works.
+- Root cause: The capability predates the issue: the hangup option landed in 0dc620be (PR #1992) and the terminal-target validation in 1c9d1306 (PR #1991), both before the issue was raised on 2026-10-15. The issue was closed the same day with state_reason duplicate and was then reopened on 2026-10-19. No commit or document mentions #2592 itself, so the verdict rests on the code, not on a linked change. manual: true because 'safe terminal behavior at runtime' means a real call must end cleanly, which only a person on a handset can confirm; the code stops at the TwiML.
 - Resolution: Run the verification on master, then close. No new code unless it fails.
-- Look in: `app/lib/verification-number.server.ts`, `/verify-call-in-session.loader.server.ts`
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `vendor/scriptkit/scriptkit-call-script-react/src/hooks/use-script-editor-state.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-script-validation.ts`, `blockId/response.action.server.ts`
+- Existing tests: test/ivr-block-runtime.test.ts:11 — 'hangup ends the call' asserts resolveNoInputTarget({ action: "hangup" }, 3) equals { kind: "hangup" }; vendor/scriptkit/scriptkit-call-script-react/test/script-editor.test.ts:353 — 'routingTargets lists pages, blocks and hangup by label, never raw ids'.
 - Done when: A person confirms the reported symptom is gone on master.
 
 ### [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) SMS Message page is super slow when sending out a campaign
 - Verdict: **Verify and close** · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-19
-- The chats list defaults to the "hasReplied" filter and the rows are virtualised: sortConversationSummaries filters through matchesChatSortFilter before sorting, and the default sort is hasReplied, so conversations where the contact never replied are hidden; ConversationList renders a virtual row window over a fixed-height spacer, and the accumulated pages are cached under a key built from the campaign, sort and search filters.
+- The chats list defaults to the hasReplied filter and renders a virtual row window: the loader and the hook both default the sort to hasReplied, the SQL and the JS filter drop conversations the contact never replied to, ConversationList draws a fixed-height spacer with absolutely positioned rows, and the accumulated pages are cached under a fetcher key built from the campaign, sort and search filters.
 - Current behavior: The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.
-- Root cause: Both requirements are implemented. manual: true because the symptom is perceived slowness under a real campaign load; the virtualisation is structural but no test measures the frame cost.
+- Root cause: Both asks are implemented in master: the list defaults to conversations where the other user replied, and the list is virtualised with a page cache so the page does not freeze as the list grows. manual: true because the reported symptom is perceived slowness under a real campaign load; the virtualisation is structural but no test measures frame cost, so only a person on a large campaign can confirm the page stays responsive.
 - Resolution: Run the verification on master, then close. No new code unless it fails.
-- Look in: `app/lib/chat-conversation-sort.ts`, `app/hooks/chats/useChatsPage.ts`, `id/chats/ConversationList.tsx`
-- Existing tests: test/conversation-utils.test.ts — added by 4ea8f3ba (PR #2535)
+- Look in: `app/hooks/chats/useChatsPage.ts`, `id/chats.loader.server.ts`, `app/lib/database/workspace-conversations.server.ts`, `app/lib/chat-conversation-sort.ts`, `id/chats/ConversationList.tsx`, `app/lib/chats/conversation-utils.ts`
+- Existing tests: test/chat-conversation-sort.test.ts:31 — 'filters out unreplied conversations for hasReplied' and the getChatSortOption default cases (lines 189-196); test/ui/use-chats-page-pagination.test.tsx:185 — 'defaults to conversations with a reply' plus the page-cache key cases; test/conversation-utils.test.ts — the phone-key merge cases. Added by 4ea8f3ba (PR #2535).
 - Done when: A person confirms the reported symptom is gone on master.
 
 ### [#2396](https://github.com/chester-hill-solutions/callcaster/issues/2396) Make predictive machine playback and continuation retry-safe

@@ -174,6 +174,17 @@ function plan(verdict, current) {
           : "verified by the code; the operator promotes to on-prod",
     };
   }
+  // A partial or missing fix. The Status follows the remaining work, not the
+  // verdict label: when what is left is a person's action on master the issue
+  // belongs in the on-qa lane with the other verification work, and when it
+  // is code it belongs in In progress.
+  if (verdict.remaining === "person") {
+    return {
+      action: "reopen",
+      status: "on-qa",
+      why: "the code is in master, but the last step is a person's action on master",
+    };
+  }
   if (verdict.verdict === "PARTIAL") {
     // A partial fix is not a completed fix, so it is unfinished work.
     return {
@@ -216,17 +227,7 @@ for (const verdict of verdicts) {
     // The issue is not on the CHS backlog. Its state is still wrong, so the
     // reopen still happens; only the Status has nowhere to go.
     const issue = JSON.parse(gh(["api", `repos/${REPO}/issues/${verdict.issue}`]));
-    const target =
-      verdict.verdict === "VERIFIED"
-        ? { action: "close", status: null, why: "verified by the code" }
-        : {
-            action: "reopen",
-            status: null,
-            why:
-              verdict.verdict === "PARTIAL"
-                ? "the fix covers part of the symptom only"
-                : "nothing in master resolves the reported symptom",
-          };
+    const target = plan(verdict, { status: null, state: issue.state });
     const stateChange =
       target.action === "reopen" ? issue.state === "closed" : issue.state === "open";
     const row = {
