@@ -213,7 +213,74 @@ const rows = [];
 for (const verdict of verdicts) {
   const current = board.get(verdict.issue);
   if (!current) {
-    rows.push({ issue: verdict.issue, skipped: "not on the CHS backlog" });
+    // The issue is not on the CHS backlog. Its state is still wrong, so the
+    // reopen still happens; only the Status has nowhere to go.
+    const issue = JSON.parse(gh(["api", `repos/${REPO}/issues/${verdict.issue}`]));
+    const target =
+      verdict.verdict === "VERIFIED"
+        ? { action: "close", status: null, why: "verified by the code" }
+        : {
+            action: "reopen",
+            status: null,
+            why:
+              verdict.verdict === "PARTIAL"
+                ? "the fix covers part of the symptom only"
+                : "nothing in master resolves the reported symptom",
+          };
+    const stateChange =
+      target.action === "reopen" ? issue.state === "closed" : issue.state === "open";
+    const row = {
+      issue: verdict.issue,
+      verdict: verdict.verdict,
+      manual: Boolean(verdict.manual),
+      from_state: issue.state,
+      to_state: target.action === "reopen" ? "OPEN" : "CLOSED",
+      from_status: null,
+      to_status: null,
+      stateChange,
+      statusChange: false,
+      why: target.why,
+      notOnBoard: true,
+    };
+    rows.push(row);
+    if (!APPLY) continue;
+    if (stateChange) {
+      gh([
+        "api",
+        "--method",
+        "PATCH",
+        `repos/${REPO}/issues/${verdict.issue}`,
+        "-f",
+        `state=${target.action === "reopen" ? "open" : "closed"}`,
+      ]);
+    }
+    if (stateChange) {
+      const body = [
+        verdict.verdict === "VERIFIED"
+          ? "Closed after verifying the fix: the code in `master` resolves the reported symptom."
+          : "Reopened: the claimed fix does not resolve the reported symptom.",
+        "",
+        `**Verdict:** ${verdict.verdict}`,
+        `**Finding:** ${verdict.mechanism ?? "none"}`,
+        "",
+        "**Evidence**",
+        ...(verdict.evidence ?? []).map((e) => `- ${e}`),
+        verdict.test ? `- test: ${verdict.test}` : null,
+        verdict.note ? `- note: ${verdict.note}` : null,
+        "",
+        "_Verified against `origin/master` by reading the code, not by noticing that a commit reached master._",
+      ]
+        .filter((line) => line !== null)
+        .join("\n");
+      gh([
+        "api",
+        "--method",
+        "POST",
+        `repos/${REPO}/issues/${verdict.issue}/comments`,
+        "-f",
+        `body=${body}`,
+      ]);
+    }
     continue;
   }
   const target = plan(verdict, current);
@@ -267,13 +334,28 @@ for (const verdict of verdicts) {
     }
   }
   if (row.stateChange || (verdict.manual && row.statusChange)) {
+    const wasReopened = target.action === "reopen" && current.state === "CLOSED";
+    const wasClosed = target.action === "close" && current.state === "OPEN";
+    const headline = wasReopened
+      ? {
+          VERIFIED:
+            "Reopened: the fix is in `master`, but only a person can confirm the symptom is gone.",
+          PARTIAL: "Reopened: the fix covers part of the symptom only.",
+          NOT_FIXED: "Reopened: the claimed fix does not resolve the reported symptom.",
+        }[verdict.verdict]
+      : wasClosed
+        ? "Verified and closed: the code in `master` resolves the reported symptom."
+        : "Status updated after verifying the claimed fix.";
+    const label = {
+      VERIFIED: "Mechanism",
+      PARTIAL: "What is there",
+      NOT_FIXED: "What is missing",
+    }[verdict.verdict] ?? "Finding";
     const body = [
-      verdict.manual
-        ? "Reopened: the fix is in `master`, but only a person can confirm the symptom is gone."
-        : "Reopened: the claimed fix does not resolve the reported symptom.",
+      headline,
       "",
       `**Verdict:** ${verdict.verdict}${verdict.manual ? " — needs a physical test" : ""}`,
-      `**Mechanism found:** ${verdict.mechanism ?? "none"}`,
+      `**${label}:** ${verdict.mechanism ?? "none"}`,
       "",
       "**Evidence**",
       ...(verdict.evidence ?? []).map((e) => `- ${e}`),
