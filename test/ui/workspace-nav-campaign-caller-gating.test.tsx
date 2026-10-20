@@ -26,10 +26,6 @@ vi.mock("@/lib/logger.client", () => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
 }));
 
-const CAMPAIGNS = [
-  { id: 7, title: "Summer outreach", status: "in_progress" },
-];
-
 function renderNav(
   userRole: MemberRole,
   initialEntry = "/workspaces/ws-1/campaigns",
@@ -38,7 +34,6 @@ function renderNav(
     <MemoryRouter initialEntries={[initialEntry]}>
       <WorkspaceNav
         workspace={{ id: "ws-1", name: "Test Workspace", credits: 42 }}
-        campaigns={CAMPAIGNS}
         userRole={userRole}
       />
     </MemoryRouter>,
