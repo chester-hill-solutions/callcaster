@@ -1,7 +1,10 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, RouterProvider, useLoaderData } from "react-router";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import Workspace from "@/routes/workspaces+/$id";
+import { OnboardingFirstNumberStep } from "@/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep";
+import { onboardingFixture, onboardingNumberFixture } from "../fixtures/onboarding";
 
 vi.mock("@/routes/workspaces+/$id.loader.server", () => ({ loader: vi.fn() }));
 vi.mock("@/routes/workspaces+/$id.middleware.server", () => ({
@@ -62,7 +65,7 @@ function deferred() {
   return { promise, resolve };
 }
 
-async function fixture() {
+async function fixture(page: "results" | "onboarding" = "results") {
   let credits = 42;
   let status = "running";
   let completedCount = 0;
@@ -71,6 +74,14 @@ async function fixture() {
   let starts = 0;
   let aborts = 0;
   let setupStarts = 0;
+  let onboardingStarts = 0;
+  let verificationStatus: "pending" | "success" | "failed" = "pending";
+  const onboarding = onboardingFixture();
+  onboarding.messagingService.serviceSid = "MG_test";
+  const validationRequest = {
+    accountSid: "AC_test", callSid: "CA_test", friendlyName: "Team",
+    phoneNumber: "+14165550100", validationCode: "123456",
+  };
   const router = createMemoryRouter(
     [
       {
@@ -104,6 +115,26 @@ async function fixture() {
         children: [
           { path: "results", element: <p>Results</p> },
           {
+            path: "onboarding",
+            loader: () => {
+              onboardingStarts++;
+              return {
+                onboarding, workspaceId: "ws-1", phoneNumbers: [onboardingNumberFixture({
+                  workspace: "ws-1", type: "caller_id", phone_number: "+14165550100",
+                  capabilities: { verification_status: verificationStatus },
+                })],
+                creditsBalance: 0, isReadOnly: false, workspaceUsers: [], mediaNames: [],
+                inboundQueues: [], scripts: [], validationRequest,
+                pending: {
+                  isSavingWorkspaceName: false, isSavingBusinessProfile: false, isSavingChannels: false,
+                  isProvisioningA2P: false, isSavingRcs: false, isAttachingRcsSender: false,
+                  isReviewingEmergencyVoice: false, isVerifyingCallerId: false,
+                },
+              } satisfies ComponentProps<typeof OnboardingFirstNumberStep>;
+            },
+            Component: () => <OnboardingFirstNumberStep {...useLoaderData<ComponentProps<typeof OnboardingFirstNumberStep>>()} />,
+          },
+          {
             path: "setup",
             element: <p>Setup</p>,
             loader: async ({ request }) => {
@@ -118,13 +149,13 @@ async function fixture() {
         ],
       },
     ],
-    { initialEntries: ["/workspaces/ws-1/results"] },
+    { initialEntries: [`/workspaces/ws-1/${page}${page === "onboarding" ? "?step=first_number&numberStep=verify" : ""}`] },
   );
   let view!: ReturnType<typeof render>;
   await act(async () => {
     view = render(<RouterProvider router={router} />);
   });
-  expect(screen.getByText("Results")).toBeInTheDocument();
+  if (page === "results") expect(screen.getByText("Results")).toBeInTheDocument();
   return {
     router,
     view,
@@ -140,6 +171,9 @@ async function fixture() {
     get setupStarts() {
       return setupStarts;
     },
+    get onboardingStarts() {
+      return onboardingStarts;
+    },
     get aborts() {
       return aborts;
     },
@@ -147,6 +181,9 @@ async function fixture() {
       credits = 30;
       status = "completed";
       completedCount = 100;
+    },
+    setVerificationStatus(status: "success" | "failed") {
+      verificationStatus = status;
     },
     blockRefresh() {
       refreshBlock = deferred();
@@ -170,8 +207,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("workspace campaign and credit realtime revalidation", () => {
-  test.each(["campaign", "campaign_queue", "transaction_history"])(
+describe("workspace realtime revalidation", () => {
+  test.each(["campaign", "campaign_queue", "transaction_history", "workspace_number"])(
     "coalesces a %s burst and displays fresh final data",
     async (table) => {
       const f = await fixture();
@@ -193,6 +230,27 @@ describe("workspace campaign and credit realtime revalidation", () => {
       f.router.dispose();
     },
   );
+
+  test.each([
+    { status: "success" as const, title: "Number verified" },
+    { status: "failed" as const, title: "Verification failed" },
+  ])("updates the onboarding sheet to $title from a number event (#1846)", async ({ status, title }) => {
+    const f = await fixture("onboarding");
+    expect(screen.getByRole("dialog", { name: "Verification pending" })).toHaveTextContent("123456");
+    f.setVerificationStatus(status);
+    act(() => f.source.emit("contact"));
+    await tick();
+    expect(f.onboardingStarts).toBe(1);
+    expect(screen.getByRole("dialog", { name: "Verification pending" })).toBeInTheDocument();
+
+    act(() => f.source.emit("workspace_number"));
+    await tick();
+    expect(f.onboardingStarts).toBe(2);
+    expect(screen.getByRole("dialog", { name: title })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Verification pending" })).toBeNull();
+    expect(f.router.state.location.search).toBe("?step=first_number&numberStep=verify");
+    f.router.dispose();
+  });
 
   test("lets a pending user navigation finish before refreshing a 100-event burst", async () => {
     const f = await fixture();

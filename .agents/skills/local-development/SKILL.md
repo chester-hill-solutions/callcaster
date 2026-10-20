@@ -368,6 +368,12 @@ proof before claiming coverage. Use the measured test report counts.
 
 ## Realtime snapshot reconciliation
 
+For workspace-event UI regressions, start with pending loader data, deliver the
+event through the real shared EventSource subscription, and observe the nested
+loader refresh and displayed result. Use
+`test/ui/workspace-realtime-revalidation.test.tsx` as the fixture. Passing an
+already-completed value into component props proves only the rendering branch.
+
 An INSERT matcher cannot safely match every row in a loader snapshot. Check new
 saved-row identity and suitable time before replacing optimistic state. Test a
 repeated reply against known, older and unknown-time rows; it must remain present

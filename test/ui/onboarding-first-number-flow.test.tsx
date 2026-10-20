@@ -159,7 +159,7 @@ describe("guided phone setup (#1205, #1763, #1764)", () => {
     expect(screen.queryByRole("button", { name: "Verify number" })).toBeNull();
   });
 
-  test("the verification sheet reflects the live status without a reload (#1846)", async () => {
+  test("the verification sheet shows an already verified caller ID (#1846)", async () => {
     renderFlow("", {
       validationRequest: {
         accountSid: "AC_test",
@@ -177,8 +177,6 @@ describe("guided phone setup (#1205, #1763, #1764)", () => {
       ],
     });
 
-    // Settings → Numbers already flipped to "Number verified" from the live
-    // capability; onboarding used to sit on "Verification pending".
     expect(await screen.findByText("Number verified")).toBeVisible();
   });
 });
