@@ -2,9 +2,9 @@
   {
     "issueNumber": 100,
     "verdict": "fix-now",
-    "summary": "The theme provider still returns next-themes' raw `theme` string, so `useTheme().theme` is undefined before hydration and equals \"system\" (not \"light\"/\"dark\") under the app's default; only the mode toggle defends against that by falling back to \"system\", while the react-icons colour sites still branch on the raw `theme` value.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
+    "summary": "Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.",
+    "currentBehavior": "Confirmed on the dev source in an isolated browser fixture with real components and app CSS; the live dev workspace had no eligible member rows. PR #2753 (https://github.com/chester-hill-solutions/callcaster/pull/2753) is awaiting review and merge.",
+    "resolution": "Use the compact icon-xs ghost buttons and inherit their themed foreground for both icons. Browser measurements confirm 12 px icons in 28 px buttons and 8 px role dots; preserve the next-themes provider and system default.",
     "lookIn": [
       "app/components/shared/theme-provider.tsx",
       "app/components/workspace/TeamMember.tsx",
@@ -12,10 +12,15 @@
       "app/root.tsx"
     ],
     "existingTests": [
-      "test/ui/mode-toggle.test.tsx — covers the mode toggle's theme fallback, but no test covers the TeamMember react-icons colour branch, which is the part the issue is about"
+      "test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
+      "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching",
+      "Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode."
     ],
-    "acceptanceCriteria": [],
-    "rootCause": "The issue text asks for the \"Theme\" value to be usable to conditionally render react-icons. The value is still the raw next-themes `theme`: undefined on the server/first render and \"system\" by default, so `theme === \"dark\"` in TeamMember.tsx is false for a system-dark user and the icon is painted black on a dark background. The mode toggle was hardened (da1a1f7d) but the shared provider was not given a defined default, and the icons named in the issue were not migrated to `resolvedTheme`. The issue was closed on 2024-08-22 without a matching commit; the only later reference (bot comment pointing at PR #2735 / 20f59d0e) is a CI release-gate change that is not in master and has nothing to do with theming."
+    "acceptanceCriteria": [
+      "Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.",
+      "Icons render without waiting for a JavaScript theme value; theme switching and member actions remain available."
+    ],
+    "rootCause": "TeamMember compares the raw next-themes theme with dark and supplies black otherwise. System mode keeps theme equal to system even when resolvedTheme is dark. An undefined value before hydration is expected from next-themes, so changing the provider default would conceal the wrong dependency. CSS currentColor and the existing theme tokens remove that dependency. The default button variant also supplies a dark primary background despite bg-transparent; the ghost variant supplies the intended transparent icon control and readable hover colours."
   },
   {
     "issueNumber": 1165,

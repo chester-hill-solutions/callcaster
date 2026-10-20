@@ -1,5 +1,4 @@
 import { clsx } from "clsx";
-import { useTheme } from "next-themes";
 import { GrUserSettings } from "react-icons/gr";
 import { Button } from "@/components/ui/button";
 import { capitalize } from "@/lib/utils";
@@ -26,7 +25,7 @@ export { MemberRole };
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
   clsx(
-    "aspect-square w-8 rounded-full",
+    "size-2 shrink-0 rounded-full",
     memberRole === MemberRole.Owner && "bg-green-500",
     memberRole === MemberRole.Member && "bg-cyan-500",
     memberRole === MemberRole.Caller && "bg-rose-500",
@@ -78,7 +77,6 @@ export default function TeamMember({
     ? getWorkspaceRoleDisplayName(memberRole)
     : capitalize(memberRole);
 
-  const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;
   return (
     <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
@@ -93,22 +91,12 @@ export default function TeamMember({
             {permissions.canOpen && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button
-                  className="h-fit rounded-full bg-transparent p-2"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-foreground"
                   aria-label={`Manage ${member.username ?? "team member"}`}
                 >
-                  {theme === "dark" ? (
-                    <GrUserSettings
-                      size="16px"
-                      className="mx-auto aspect-square w-fit"
-                      color="white"
-                    />
-                  ) : (
-                    <GrUserSettings
-                      size="16px"
-                      className="mx-auto aspect-square w-fit"
-                      color="black"
-                    />
-                  )}
+                  <GrUserSettings />
                 </Button>
               </SheetTrigger>
             )}
@@ -117,23 +105,13 @@ export default function TeamMember({
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
               <Button
-                className="h-fit rounded-full bg-transparent p-2"
+                variant="ghost"
+                size="icon-xs"
+                className="text-foreground"
                 type="submit"
                 aria-label={`Cancel invite for ${member.username ?? "this member"}`}
               >
-                {theme === "dark" ? (
-                  <MdCancel
-                    size="16px"
-                    className="mx-auto aspect-square w-fit"
-                    color="white"
-                  />
-                ) : (
-                  <MdCancel
-                    size="16px"
-                    className="mx-auto aspect-square w-fit"
-                    color="black"
-                  />
-                )}
+                <MdCancel />
               </Button>
               </Form>
             )}
