@@ -25,6 +25,10 @@ Concurrent suites can exhaust host resources and fail short UI waits. If this
 happens, retain the failure log, stop overlapping gates, rerun only failed cases,
 then run the full gate again on the final clean commit.
 
+If guard child processes time out under the default worker count, rerun the
+failed cases first. When they pass alone, rerun the complete gate with command-scoped
+`VITEST_MAX_WORKERS=2 npm run ci:local` before changing tracked worker or time limits.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 
@@ -367,6 +371,12 @@ confirm that the behavior test fails. If the fault still passes, strengthen the
 proof before claiming coverage. Use the measured test report counts.
 
 ## Realtime snapshot reconciliation
+
+For workspace-event UI regressions, start with pending loader data, deliver the
+event through the real shared EventSource subscription, and observe the nested
+loader refresh and displayed result. Use
+`test/ui/workspace-realtime-revalidation.test.tsx` as the fixture. Passing an
+already-completed value into component props proves only the rendering branch.
 
 An INSERT matcher cannot safely match every row in a loader snapshot. Check new
 saved-row identity and suitable time before replacing optimistic state. Test a

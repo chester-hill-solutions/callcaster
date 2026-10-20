@@ -73,7 +73,7 @@ export function useWorkspaceRealtimeRevalidation(workspaceId: string): void {
 
   useWorkspaceEventSubscription({
     workspaceId,
-    table: ["campaign", "campaign_queue", "transaction_history"],
+    table: ["campaign", "campaign_queue", "transaction_history", "workspace_number"],
     onChange: () => requestRefreshRef.current?.(),
   });
 }
