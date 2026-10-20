@@ -326,9 +326,7 @@ const WorkspaceNav = ({
                 <CreditCard className="h-5 w-5 shrink-0" aria-hidden="true" />
                 <span className={desktopLabelClass}>Credits</span>
                 <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-brand-secondary/40 px-1 text-xs font-bold leading-none text-foreground">
-                  {isCollapsed
-                    ? formatCollapsedCreditCount(workspace.credits)
-                    : workspace.credits}
+                  {isCollapsed ? formatCollapsedCreditCount(workspace.credits) : workspace.credits}
                 </span>
               </span>
             </NavLink>
