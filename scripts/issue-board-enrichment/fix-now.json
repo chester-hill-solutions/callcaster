@@ -4,7 +4,7 @@
     "verdict": "fix-now",
     "summary": "Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.",
     "currentBehavior": "Confirmed on the dev source in an isolated browser fixture with real components and app CSS; the live dev workspace had no eligible member rows. PR #2753 (https://github.com/chester-hill-solutions/callcaster/pull/2753) is awaiting review and merge.",
-    "resolution": "Use the ghost button variant and inherit its themed foreground for both icons; preserve the next-themes provider and system default.",
+    "resolution": "Use the compact icon-xs ghost buttons and inherit their themed foreground for both icons. Browser measurements confirm 12 px icons in 28 px buttons; preserve the next-themes provider and system default.",
     "lookIn": [
       "app/components/shared/theme-provider.tsx",
       "app/components/workspace/TeamMember.tsx",
@@ -14,7 +14,7 @@
     "existingTests": [
       "test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
       "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching",
-      "Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet; both candidate icon colours match the app foreground"
+      "Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground"
     ],
     "acceptanceCriteria": [
       "Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.",

@@ -92,13 +92,11 @@ export default function TeamMember({
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-fit rounded-full p-2 text-foreground"
+                  size="icon-xs"
+                  className="text-foreground"
                   aria-label={`Manage ${member.username ?? "team member"}`}
                 >
-                  <GrUserSettings
-                    size="16px"
-                    className="mx-auto aspect-square w-fit"
-                  />
+                  <GrUserSettings />
                 </Button>
               </SheetTrigger>
             )}
@@ -108,14 +106,12 @@ export default function TeamMember({
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
               <Button
                 variant="ghost"
-                className="h-fit rounded-full p-2 text-foreground"
+                size="icon-xs"
+                className="text-foreground"
                 type="submit"
                 aria-label={`Cancel invite for ${member.username ?? "this member"}`}
               >
-                <MdCancel
-                  size="16px"
-                  className="mx-auto aspect-square w-fit"
-                />
+                <MdCancel />
               </Button>
               </Form>
             )}
