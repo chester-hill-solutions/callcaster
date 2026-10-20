@@ -45,63 +45,6 @@ function renderNav(
   );
 }
 
-// The create action requires Admin+, so navigation visibility mirrors that
-// minimum role while preserving read-only campaign links for every role.
-describe("WorkspaceNav gates campaign creation by minimum role", () => {
-  beforeEach(() => {
-    mocks.fetchConversationSummaries.mockResolvedValue([]);
-  });
-
-  test("caller does not see the New Campaign link", () => {
-    renderNav(MemberRole.Caller);
-
-    expect(screen.queryByRole("link", { name: /new campaign/i })).toBeNull();
-  });
-
-  test("caller still sees the Archived Campaigns link (read-only)", () => {
-    renderNav(MemberRole.Caller);
-
-    expect(
-      screen.getByRole("link", { name: /archived campaigns/i }),
-    ).toBeInTheDocument();
-  });
-
-  test.each([
-    "Today",
-    "Campaigns",
-    "Messages",
-    "Call History",
-    "Voicemails",
-    "Analytics",
-    "Handset",
-    "Settings",
-  ])(
-    "agent still sees the %s link",
-    (name) => {
-      renderNav(MemberRole.Caller);
-
-      expect(screen.getByRole("link", { name })).toBeInTheDocument();
-    },
-  );
-
-  test("coordinator does not see the New Campaign link", () => {
-    renderNav(MemberRole.Member);
-
-    expect(screen.queryByRole("link", { name: /new campaign/i })).toBeNull();
-  });
-
-  test.each([MemberRole.Admin, MemberRole.Owner])(
-    "%s sees the New Campaign link",
-    (role) => {
-      renderNav(role);
-
-      expect(
-        screen.getByRole("link", { name: /new campaign/i }),
-      ).toBeInTheDocument();
-    },
-  );
-});
-
 describe("WorkspaceNav task groups and destinations", () => {
   beforeEach(() => {
     mocks.fetchConversationSummaries.mockResolvedValue([]);
@@ -209,13 +152,11 @@ describe("WorkspaceNav task groups and destinations", () => {
     );
   });
 
-  test("preserves dynamic campaign links and status labels", () => {
+  test("keeps campaign rows out of workspace navigation", () => {
     renderNav(MemberRole.Member);
 
-    expect(
-      screen.getByRole("link", { name: /summer outreach/i }),
-    ).toHaveAttribute("href", "/workspaces/ws-1/campaigns/7");
-    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /summer outreach/i })).toBeNull();
+    expect(screen.queryByText("In progress")).toBeNull();
   });
 
   test("renders the same authorized links in desktop and mobile navigation", async () => {

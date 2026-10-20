@@ -28,10 +28,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
-import {
-  CampaignQueueProgress,
-  type CampaignQueueProgressCounts,
-} from "@/components/campaign/CampaignQueueProgress";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { workspaceSidebarHeightClass } from "./workspace-panel-classes";
 
@@ -56,13 +52,6 @@ interface NavGroup {
   name: string;
   items: NavItem[];
 }
-
-type CampaignNavSubItem = {
-  name: string;
-  path: string;
-  status?: string | null;
-  campaignId?: string | number;
-};
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -153,20 +142,12 @@ interface WorkspaceNavProps {
     name: string;
     credits: number;
   };
-  campaigns: Array<{
-    id: string | number;
-    title?: string | null;
-    status?: string | null;
-  }>;
-  campaignQueueProgress?: Record<string, CampaignQueueProgressCounts>;
   userRole: MemberRole;
   className?: string;
 }
 
 const WorkspaceNav = ({
   workspace,
-  campaigns,
-  campaignQueueProgress = {},
   userRole,
   className = "",
 }: WorkspaceNavProps) => {
@@ -200,37 +181,6 @@ const WorkspaceNav = ({
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
-  const campaignStatusClass = (status: string) => {
-    switch (status) {
-      case "active":
-      case "running":
-      case "waiting":
-      case "in_progress":
-        return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
-      case "scheduled":
-      case "queued":
-        return "bg-amber-500/20 text-amber-700 dark:text-amber-300";
-      case "complete":
-      case "completed":
-      case "archived":
-        return "bg-slate-500/20 text-slate-700 dark:text-slate-300";
-      case "failed":
-      case "error":
-        return "bg-red-500/20 text-red-700 dark:text-red-300";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const formatCampaignStatus = (status: string) => {
-    const normalized = status.replaceAll("_", " ").trim();
-    if (normalized.length === 0) return "Unknown";
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  };
-
-  const isCampaignsParentActive =
-    location.pathname === `${baseUrl}/campaigns` ||
-    location.pathname.startsWith(`${baseUrl}/campaigns/`);
   const isPeopleParentActive =
     location.pathname === `${baseUrl}/audiences` ||
     location.pathname.startsWith(`${baseUrl}/audiences/`) ||
@@ -239,16 +189,6 @@ const WorkspaceNav = ({
 
   const navBody = (
     <>
-      {/* px-6 = body px-3 + item px-3, so this text lines up with nav item text. */}
-      <div className="border-b border-border/60 px-6 py-4">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          Workspace
-        </p>
-        <h2 className="mt-1 truncate font-Tabac-Slab text-xl font-black text-brand-primary dark:text-brand-secondary">
-          {workspace.name}
-        </h2>
-      </div>
-
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
         <nav
           aria-label="Workspace sections"
@@ -263,33 +203,11 @@ const WorkspaceNav = ({
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
-                  const isCampaignsItem = item.path === "campaigns";
                   const isPeopleItem = item.name === "People";
-                  const showCampaignSubNav =
-                    isCampaignsItem && isCampaignsParentActive;
-                  const showSubNav =
-                    showCampaignSubNav || isPeopleItem;
+                  const showSubNav = isPeopleItem;
                   const visibleStaticSubItems = (item.subItems ?? []).filter(
                     (subItem) => hasMinRole(userRole, subItem.minRole),
                   );
-                  const campaignSubItems: CampaignNavSubItem[] =
-                    isCampaignsItem
-                      ? [
-                          ...visibleStaticSubItems,
-                          // Archived campaigns live in the dedicated Archive
-                          // view; keep them out of the everyday nav (#1072).
-                          ...campaigns
-                            .filter((campaign) => campaign.status !== "archived")
-                            .map((campaign) => ({
-                            name:
-                              campaign.title?.trim() ||
-                              `Campaign ${String(campaign.id)}`,
-                            path: `campaigns/${campaign.id}`,
-                            status: campaign.status,
-                            campaignId: campaign.id,
-                          })),
-                        ]
-                      : visibleStaticSubItems;
 
                   return (
                     <div key={item.name} className="space-y-1">
@@ -297,9 +215,7 @@ const WorkspaceNav = ({
                         to={itemTo}
                         className={(navState) =>
                           primaryLinkClass({
-                            isActive: isCampaignsItem
-                              ? isCampaignsParentActive
-                              : isPeopleItem
+                            isActive: isPeopleItem
                                 ? isPeopleParentActive
                               : navState.isActive,
                           })
@@ -317,16 +233,12 @@ const WorkspaceNav = ({
                           </span>
                         ) : null}
                       </NavLink>
-                      {campaignSubItems.length > 0 && showSubNav ? (
+                      {visibleStaticSubItems.length > 0 && showSubNav ? (
                         <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
-                          {campaignSubItems.map((subItem) => {
+                          {visibleStaticSubItems.map((subItem) => {
                             const subItemTo = subItem.path
                               ? `${baseUrl}/${subItem.path}`
                               : baseUrl;
-                            const progress =
-                              subItem.campaignId != null
-                                ? campaignQueueProgress[String(subItem.campaignId)]
-                                : undefined;
                             return (
                               <NavLink
                                 key={subItem.path || subItem.name}
@@ -336,26 +248,6 @@ const WorkspaceNav = ({
                                 <span className="min-w-0 truncate">
                                   {subItem.name}
                                 </span>
-                                {progress?.totalCount || subItem.status ? (
-                                  <span className="flex shrink-0 items-center gap-1.5">
-                                    {progress?.totalCount ? (
-                                      <CampaignQueueProgress
-                                        completedCount={progress.completedCount}
-                                        totalCount={progress.totalCount}
-                                        className="text-[10px] font-semibold uppercase tracking-wide"
-                                      />
-                                    ) : null}
-                                    {subItem.status ? (
-                                      <span
-                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
-                                          subItem.status,
-                                        )}`}
-                                      >
-                                        {formatCampaignStatus(subItem.status)}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                ) : null}
                               </NavLink>
                             );
                           })}
@@ -395,14 +287,9 @@ const WorkspaceNav = ({
       </aside>
 
       <div className="mb-2 flex items-center justify-between gap-2 lg:hidden">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            Workspace
-          </p>
-          <h2 className="line-clamp-2 break-words font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
-            {workspace.name}
-          </h2>
-        </div>
+        <p className="min-w-0 font-Zilla-Slab text-sm font-semibold text-muted-foreground">
+          Workspace navigation
+        </p>
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="font-Zilla-Slab font-semibold">
