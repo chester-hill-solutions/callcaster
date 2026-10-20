@@ -223,7 +223,7 @@ const WorkspaceNav = ({
             <section key={group.name} aria-label={group.name}>
               {group.name !== "Work" ? (
                 <h3
-                  className={`mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
+                  className={`flex h-9 items-center px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
                     isCollapsed ? "lg:invisible" : ""
                   }`}
                 >
