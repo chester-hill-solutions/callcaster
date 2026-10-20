@@ -199,12 +199,12 @@ const WorkspaceNav = ({
 
   const navBody = (
     <>
-      <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-0 px-3 py-4">
         <Button
           type="button"
           variant="ghost"
-          size={isCollapsed ? "icon" : "sm"}
-          className={isCollapsed ? "self-center" : "w-full justify-start"}
+          size="sm"
+          className="w-full justify-start"
           aria-label={
             isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"
           }
@@ -301,7 +301,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="relative z-10 shrink-0 rounded-lg border border-border/80 bg-card p-2">
+          <div className="relative z-10 mt-4 shrink-0 rounded-lg border border-border/80 bg-card p-2">
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
