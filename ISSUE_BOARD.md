@@ -34,13 +34,13 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
 ### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
-- Verdict: **Fix now** · Labels: none · Assignee: @manstephen · Updated: 2026-10-19
-- The theme provider still returns next-themes' raw `theme` string, so `useTheme().theme` is undefined before hydration and equals "system" (not "light"/"dark") under the app's default; only the mode toggle defends against that by falling back to "system", while the react-icons colour sites still branch on the raw `theme` value.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: The issue text asks for the "Theme" value to be usable to conditionally render react-icons. The value is still the raw next-themes `theme`: undefined on the server/first render and "system" by default, so `theme === "dark"` in TeamMember.tsx is false for a system-dark user and the icon is painted black on a dark background. The mode toggle was hardened (da1a1f7d) but the shared provider was not given a defined default, and the icons named in the issue were not migrated to `resolvedTheme`. The issue was closed on 2024-08-22 without a matching commit; the only later reference (bot comment pointing at PR #2735 / 20f59d0e) is a CI release-gate change that is not in master and has nothing to do with theming.
-- Resolution: Implement the missing mechanism named in the root cause.
-- Look in: `app/components/shared/theme-provider.tsx`, `app/components/workspace/TeamMember.tsx`, `app/components/shared/mode-toggle.tsx`, `app/root.tsx`
-- Existing tests: test/ui/mode-toggle.test.tsx — covers the mode toggle's theme fallback, but no test covers the TeamMember react-icons colour branch, which is the part the issue is about
+- Verdict: **Fix now** · Type: Bug · Assignees: @manstephen, @wra-sol · Updated: 2026-10-20
+- Browser verification confirms black icons in system-dark mode. The candidate fix uses the themed button foreground and awaits review and merge.
+- Root cause: The raw theme is `system`, so the `theme === "dark"` branch selects black. Undefined before hydration is expected; icon colour should follow CSS instead.
+- Resolution: Use ghost buttons and inherited icon colour. Keep the theme provider and system default.
+- Look in: `app/components/workspace/TeamMember.tsx`
+- Existing tests: `test/ui/team-member-theme.test.tsx` covers both icons before theme resolution; member controls and the mode toggle retain their existing coverage. An isolated browser fixture covers light, dark, system-light, system-dark and a system preference change.
+- Done when: Both icons follow the foreground in all theme modes and member actions still work.
 
 ### [#2686](https://github.com/chester-hill-solutions/callcaster/issues/2686) Research: what common CMS and member platforms expose
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: wayfinder:research · Assignee: none · Updated: 2026-10-19
