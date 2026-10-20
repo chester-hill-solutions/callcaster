@@ -11,6 +11,7 @@ import {
   Link,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import CampaignSidebar from "@/components/campaign/CampaignSidebar";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
 import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
 import {
@@ -118,9 +119,7 @@ function WorkspaceResolvedView({
   const audiences = (resolvedData.audiences ?? []) as Array<{
     id: string | number;
   }>;
-  const campaigns = (resolvedData.campaigns ?? []) as Array<{
-    id: string | number;
-  }>;
+  const campaigns = (resolvedData.campaigns ?? []) as Campaign[];
   const phoneNumbers = (
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
@@ -153,14 +152,22 @@ function WorkspaceResolvedView({
       }`}
     >
       {showSidebar ? (
-        <WorkspaceNav
-          workspace={workspace}
-          campaigns={campaigns as Campaign[]}
-          campaignQueueProgress={campaignQueueProgress}
-          userRole={
-            (userRole as MemberRole | null | undefined) ?? MemberRole.Member
-          }
-        />
+        <>
+          <WorkspaceNav
+            workspace={workspace}
+            userRole={
+              (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+            }
+          />
+          <CampaignSidebar
+            workspaceId={workspace.id}
+            campaigns={campaigns}
+            campaignQueueProgress={campaignQueueProgress}
+            userRole={
+              (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+            }
+          />
+        </>
       ) : null}
       <main
         id="workspace-main-content"
