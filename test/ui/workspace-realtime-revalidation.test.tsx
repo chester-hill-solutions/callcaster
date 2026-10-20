@@ -11,20 +11,24 @@ vi.mock("@/routes/workspaces+/$id.middleware.server", () => ({
   middleware: [],
 }));
 vi.mock("@/components/workspace/WorkspaceNav", () => ({
-  default: ({
-    workspace,
-    campaigns,
-    campaignQueueProgress,
-  }: {
-    workspace: { credits: number };
-    campaigns: Array<{ status: string }>;
-    campaignQueueProgress: Record<string, { completedCount: number }>;
-  }) => (
-    <nav>
-      {workspace.credits} credits; {campaigns[0]?.status};{" "}
-      {campaignQueueProgress["20"]?.completedCount} done
-    </nav>
-  ),
+  default: () => null,
+}));
+vi.mock("@/components/campaign/CampaignSidebar", () => ({
+  default: function CampaignSidebarFixture() {
+    const data = useLoaderData<{
+      workspaceData: {
+        workspace: { credits: number };
+        campaigns: Array<{ status: string }>;
+      };
+      campaignQueueProgress: Record<string, { completedCount: number }>;
+    }>();
+    return (
+      <nav>
+        {data.workspaceData.workspace.credits} credits; {data.workspaceData.campaigns[0]?.status};{" "}
+        {data.campaignQueueProgress["20"]?.completedCount} done
+      </nav>
+    );
+  },
 }));
 
 class TestEventSource extends EventTarget {
