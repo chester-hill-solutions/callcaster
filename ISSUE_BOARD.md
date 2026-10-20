@@ -71,13 +71,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance.
 
 ### [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507) CSV Upload success should not have a toast (or be a simple success toast that goes away).
-- **IN PROGRESS** · Verdict: **Fix now** · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-19
-- Nothing in origin/master changes the CSV upload success notice: it is still a root toast with an infinite duration that prompts 'Download row report'.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: The brief listed no candidate commits, and none exist for this issue. The only related later work in master is #2720/#2719 and #2722/#2723 (audience upload polling), which change when the completion snapshot is noticed, not whether the toast appears or how long it lasts. Fixing this requires dropping the root toast (or giving it a finite duration and no download action) in app/components/audience/use-audience-upload-progress.ts and updating test/ui/audience-import-report-handoff.test.tsx.
-- Resolution: Implement the missing mechanism named in the root cause.
+- **IN PROGRESS** · Verdict: **Fix now** · Labels: ux · Assignee: @sai-sy, @wra-sol · Updated: 2026-10-19
+- A candidate removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Publication and deployed verification remain.
+- Current behavior: Production still has the persistent success toast. The candidate completion hook calls the existing completion callback without creating a toast; the upload panel retains its success message and row report link.
+- Root cause: The completion hook created an infinite-duration root success toast with a report download action, duplicating the upload panel's feedback and report action.
+- Resolution: Publish the atomic candidate after full local CI. Verify the deployed upload completion and saved report access before closing the issue.
 - Look in: `app/components/audience/use-audience-upload-progress.ts`, `app/components/audience/AudienceUploadProgressPanel.tsx`
-- Existing tests: none — no test asserts the toast is removed; test/ui/audience-import-report-handoff.test.tsx:57-59 asserts the opposite ('Call-list upload completed' is in the document and the 'Download row report' button is present), so the current behaviour is locked in by the suite.
+- Existing tests: test/ui/audience-import-report-handoff.test.tsx: embedded completion and standalone inline success/report checks both fail on the original source and pass with the repair.; 32 focused UI cases pass across report handoff, report panel, uploader progress and status polling.
+- Missing tests: Deployed CSV upload acceptance and saved row report access remain.
+- Done when: CSV upload success does not create a root toast or a toast download prompt.; Inline completion feedback and the saved row report link remain available.; Embedded and standalone completion callbacks still run once.
+- Tracker: Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified.
 
 ### [#2503](https://github.com/chester-hill-solutions/callcaster/issues/2503) Campaign creation pages don't need headers since they have the breadcrumbs
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: design · Assignee: @sai-sy · Updated: 2026-10-19

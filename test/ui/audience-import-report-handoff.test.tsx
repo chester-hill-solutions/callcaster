@@ -11,7 +11,7 @@ vi.mock("@/hooks/realtime/useWorkspaceRealtime", async importOriginal => ({
   ...await importOriginal<typeof import("@/hooks/realtime/useWorkspaceRealtime")>(),
   useWorkspaceEventSubscription: (options: any) => { events.onChange = options.onChange; },
 }));
-afterEach(() => { toast.dismiss(); vi.unstubAllGlobals(); });
+afterEach(() => { toast.dismiss(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 test("an idle uploader has no completed report action", () => {
   function Idle() {
@@ -39,8 +39,9 @@ test("queued uploads gain their download only when real progress carries saved e
   expect(screen.getByRole("link", { name:"Download row report" })).toHaveAttribute("href", "/workspaces/workspace-one/audience-imports/17/report");
 });
 
-test("the real root toast keeps the report action after the caller removes the completed uploader", async () => {
+test("completion has no root toast after the caller removes the uploader (#2507)", async () => {
   const completed = vi.fn();
+  const successToast = vi.spyOn(toast, "success");
   function Upload({ done }: { done: (id: string) => void }) {
     const progress = useAudienceUploadProgress({ workspaceId: "workspace-one", onUploadComplete: done });
     return <button onClick={() => progress.beginProcessing({ uploadId:17, audienceId:"42", totalContacts:2 })}>Start owned upload</button>;
@@ -54,9 +55,33 @@ test("the real root toast keeps the report action after the caller removes the c
   await act(async () => { events.onChange?.({ eventType:"UPDATE", new:{ status:"completed", audience_id:42, import_run_id:"owned-run" } }); });
   expect(completed).toHaveBeenCalledExactlyOnceWith("42");
   expect(screen.queryByRole("button", { name:"Start owned upload" })).toBeNull();
-  expect(await screen.findByText("Call-list upload completed")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name:"Download row report" })).toBeInTheDocument();
-  await waitFor(() => expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(1));
+  expect(successToast).not.toHaveBeenCalled();
+  expect(screen.queryByText("Call-list upload completed")).toBeNull();
+  expect(screen.queryByRole("button", { name:"Download row report" })).toBeNull();
+  expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(0);
+});
+
+test("standalone completion keeps the inline success and saved report without a toast (#2507)", async () => {
+  const completed = vi.fn();
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+    ok: true, snapshot: { status: "processing", report_available: false },
+  }))));
+  function Upload() {
+    const upload = useAudienceUploadProgress({ workspaceId: "workspace-one", onStandaloneComplete: completed });
+    const progress = upload.progress;
+    return <><button onClick={() => upload.beginProcessing({ uploadId:17, audienceId:"42", totalContacts:2 })}>Start upload</button>
+      {(progress.kind === "processing" || progress.kind === "completed") &&
+        <AudienceUploadProgressPanel status={progress.kind} progress={progress.progress}
+          processedContacts={progress.processedContacts} totalContacts={progress.totalContacts} workspaceId="workspace-one"
+          uploadId={progress.uploadId} reportAvailable={progress.reportAvailable} showCompletionChrome onTryAgain={() => {}} />}</>;
+  }
+  render(<><Toaster /><Upload /></>);
+  await act(async () => { screen.getByRole("button", { name:"Start upload" }).click(); });
+  await act(async () => { events.onChange?.({ eventType:"UPDATE", new:{ id:17, status:"completed", audience_id:42, import_run_id:"owned-run" } }); });
+  await waitFor(() => expect(completed).toHaveBeenCalledExactlyOnceWith("42"));
+  expect(screen.getByText("Upload completed successfully!")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name:"Download row report" })).toHaveAttribute("href", "/workspaces/workspace-one/audience-imports/17/report");
+  expect(document.querySelectorAll('[data-sonner-toast]')).toHaveLength(0);
 });
 
 
