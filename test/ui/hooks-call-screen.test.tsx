@@ -455,6 +455,8 @@ describe("useCallScreen", () => {
       expect.objectContaining({ contact_id: 2, callId: null, update: { notes: "Leave a message" } }),
       expect.anything(),
     );
+    act(() => { result.current.queueControls.switchQuestionContact({ contact: queueItem }); });
+    expect(result.current.formState.update).toEqual({ q1: "yes", notes: "Call after 6 pm" });
   });
 
   test("a predictive connection to another contact clears the previous notes", async () => {

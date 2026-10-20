@@ -4,18 +4,20 @@
     "verdict": "fix-now",
     "summary": "The call screen now has a Notes field for all callers in Power and Predictive modes. Focused tests pass; full CI, review and deployed acceptance remain.",
     "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact’s answers.",
-    "rootCause": "The call screen only renders script questions. Saved outreach results are not used to initialize the result draft, and automatic contact changes do not clear that draft.",
-    "resolution": "Add Notes to the existing questionnaire and save result.notes through the existing caller result endpoint. Restore the selected attempt’s saved result, preserve answers and notes during edits, and reset drafts when the selected contact changes.",
+    "rootCause": "The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.",
+    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline.",
     "lookIn": [
       "app/components/call/CallScreen.Questionnaire.tsx",
       "app/hooks/call/useCallScreen.ts",
       "app/hooks/utils/useDebouncedSave.ts",
-      "app/routes/api+/questions.action.server.ts"
+      "app/routes/api+/questions.action.server.ts",
+      "app/lib/callscreenActions.ts"
     ],
     "existingTests": [
-      "52 focused UI cases pass, including both dialer modes without admin access, saved notes, clearing, answer preservation, disposition saves, autosave and automatic contact changes.",
+      "69 focused UI cases pass, including both dialer modes without admin access, saved notes, clearing, answer preservation, disposition saves, autosave, late result loading, return to a contact and automatic contact changes.",
       "18 existing save-route and typed-result cases pass; three pre-existing cases remain skipped.",
-      "Original source fails all three initial Notes regressions while nine existing hook cases pass. The automatic-contact regression also fails before the contact/draft reset."
+      "Original source fails all three initial Notes regressions while nine existing hook cases pass. The automatic-contact regression also fails before the contact/draft reset.",
+      "Pending, settled and manual save handoffs each have an executed failure before their repair; the fixed hook saves the original contact once and does not submit an unchanged result for the next contact."
     ],
     "missingTests": [
       "Full local CI and applicable remote checks before publication and merge.",

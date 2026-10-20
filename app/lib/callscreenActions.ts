@@ -147,12 +147,7 @@ export const handleContact = ({
     }
     const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
     const recentCall = recentCalls[0];
-    if (!recentCall) {
-      setRecentAttempt(null);
-      setUpdate(null);
-      return contact;
-    }
-    setRecentAttempt({ ...newRecentAttempt, call: recentCall });
+    setRecentAttempt({ ...newRecentAttempt, call: recentCall ?? [] });
     setUpdate(isObject(newRecentAttempt.result) ? newRecentAttempt.result : null);
     return contact;
   };
@@ -189,11 +184,7 @@ export const handleContact = ({
     if (newRecentAttempt && isRecent(newRecentAttempt.created_at)) {
       const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
       const recentCall = recentCalls[0];
-      if (!recentCall) {
-        setRecentAttempt(null);
-        return;
-      }
-      setRecentAttempt({ ...newRecentAttempt, call: recentCall });
+      setRecentAttempt({ ...newRecentAttempt, call: recentCall ?? [] });
       setUpdate(isObject(newRecentAttempt.result) ? newRecentAttempt.result : null);
     }
   };

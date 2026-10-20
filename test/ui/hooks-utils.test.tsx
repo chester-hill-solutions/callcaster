@@ -116,7 +116,7 @@ describe("utils hooks", () => {
   // the agent records anything — so saveData must key off questionContact
   // (who the panel is showing), never a queue-derived recipient, or the
   // save silently no-ops right when it matters most.
-  test("useDebouncedSave targets questionContact even when the queue has nothing else in it", async () => {
+  test.each(["pending", "settled", "manual"])("useDebouncedSave keeps %s notes with questionContact across a contact change", async (saveState) => {
     const fetcher = createMockFetcher({ state: "idle" });
     mockUseFetcher.mockReturnValue(fetcher);
 
@@ -124,17 +124,16 @@ describe("utils hooks", () => {
     const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
 
     const questionContact = { id: 42, contact: { id: 99 } } as any;
-    const { result } = renderHook(() =>
-      useDebouncedSave({
-        update: { q1: "a" },
-        recentAttempt: { id: 7 } as any,
-        questionContact,
-        campaign: { id: 3 } as any,
-        workspaceId: "ws1",
-        disposition: "completed",
-        toast,
-      }),
-    );
+    const base: Parameters<typeof useDebouncedSave>[0] = {
+      update: { q1: "a" },
+      recentAttempt: { id: 7 } as any,
+      questionContact,
+      campaign: { id: 3 } as any,
+      workspaceId: "ws1",
+      disposition: "completed",
+      toast,
+    };
+    const { result, rerender } = renderHook((props) => useDebouncedSave(props), { initialProps: base });
 
     act(() => result.current.saveData());
 
@@ -143,6 +142,30 @@ describe("utils hooks", () => {
       expect.objectContaining({ action: "/api/questions" }),
     );
     expect(toast.warning).not.toHaveBeenCalled();
+    fetcher.submit.mockClear();
+
+    rerender({ ...base, update: { notes: "Call the first contact after 6 pm" } });
+    act(() => vi.advanceTimersByTime(saveState === "settled" ? 2000 : 500));
+    if (saveState === "manual") act(() => result.current.saveData());
+    const next = {
+      ...base, update: null, recentAttempt: null,
+      questionContact: { ...questionContact, id: 43, contact: { id: 100 } },
+    };
+    rerender(next);
+    expect(fetcher.submit).toHaveBeenCalledTimes(1);
+    expect(fetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contact_id: 99, callId: 7, update: { notes: "Call the first contact after 6 pm" } }),
+      expect.objectContaining({ action: "/api/questions" }),
+    );
+    act(() => vi.advanceTimersByTime(2000));
+    expect(fetcher.submit).toHaveBeenCalledTimes(1);
+    rerender({ ...next, update: { notes: "The second contact asked for email" } });
+    act(() => vi.advanceTimersByTime(2000));
+    expect(fetcher.submit).toHaveBeenCalledTimes(2);
+    expect(fetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contact_id: 100, callId: null, update: { notes: "The second contact asked for email" } }),
+      expect.objectContaining({ action: "/api/questions" }),
+    );
   });
 
   test("useDebouncedSave silent option suppresses success toast but keeps error toast", async () => {
