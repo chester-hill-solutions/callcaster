@@ -307,7 +307,7 @@ const WorkspaceNav = ({
             >
               <span className="inline-flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
-                Credits
+                <span className={desktopLabelClass}>Credits</span>
               </span>
                                 <span className={`rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground ${desktopLabelClass}`}>
                 {workspace.credits}
@@ -322,7 +322,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-2xl border border-border/80 bg-card shadow-sm lg:sticky lg:top-6 lg:flex ${isCollapsed ? "lg:w-16 lg:max-w-16" : "lg:w-63 lg:max-w-63"} ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-12 lg:max-w-12" : "lg:w-63 lg:max-w-63"} ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>

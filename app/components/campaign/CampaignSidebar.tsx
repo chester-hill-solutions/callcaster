@@ -100,7 +100,7 @@ function CampaignSidebarList({
   };
 
   return (
-    <nav aria-label="Campaigns" className="min-h-0 overflow-y-auto">
+    <nav aria-label="Campaigns" className="min-h-0 flex-1 overflow-y-auto">
       {visibleCampaigns.length > 0 ? (
         <div className="space-y-1">
           {visibleCampaigns.map((campaign) => {
@@ -193,7 +193,7 @@ export default function CampaignSidebar({
       <aside
         aria-label="Campaign navigation"
         className={cn(
-          "hidden h-[calc(100vh-112px)] w-full max-w-[280px] shrink-0 overflow-hidden border-r border-border/70 bg-card/40 lg:sticky lg:top-6 lg:flex",
+          "hidden h-full w-full max-w-[280px] shrink-0 overflow-hidden border-r border-border/70 bg-card/40 lg:sticky lg:top-0 lg:flex",
           className,
         )}
       >

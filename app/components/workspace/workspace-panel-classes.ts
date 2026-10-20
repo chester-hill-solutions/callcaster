@@ -14,4 +14,4 @@ export const workspacePanelHeightLgClass =
  * than a short viewport pins at the top and its bottom (Billing/Credits)
  * becomes unreachable (#1059). The nav body scrolls internally instead.
  */
-export const workspaceSidebarHeightClass = "h-[calc(100vh-112px)]";
+export const workspaceSidebarHeightClass = "h-full min-h-0";
