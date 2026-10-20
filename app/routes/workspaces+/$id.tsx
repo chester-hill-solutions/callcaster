@@ -175,7 +175,7 @@ function WorkspaceResolvedView({
       <main
         id="workspace-main-content"
         tabIndex={-1}
-        className={`flex min-w-0 flex-1 flex-col gap-4 focus:outline-none ${
+          className={`flex min-w-0 flex-1 flex-col gap-4 focus:outline-none lg:min-h-0 ${
           isChatsScreen ? "lg:min-h-0" : ""
         }`}
       >
