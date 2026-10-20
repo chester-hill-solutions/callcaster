@@ -173,6 +173,7 @@ export const handleContact = ({
     );
     if (!nextContact) return;
 
+    setQuestionContact(nextContact);
     setNextRecipient(nextContact);
     setRecentAttempt(null);
     setUpdate({});

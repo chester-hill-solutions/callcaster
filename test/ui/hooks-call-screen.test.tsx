@@ -497,6 +497,26 @@ describe("useCallScreen", () => {
     }
   });
 
+  test("Skip Person saves pending notes for the previous contact", async () => {
+    queueItems = [queueItem, { ...queueItem, id: 2, contact_id: 2, contact: { ...queueItem.contact, id: 2 } }];
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useCallScreen());
+    try {
+      act(() => result.current.formState.handleResponse({ blockId: "notes", value: "First contact asked for a callback" }));
+      act(() => vi.advanceTimersByTime(500));
+      act(() => result.current.queueControls.handleNextNumber(false));
+      expect(result.current.formState.questionContact?.contact.id).toBe(2);
+      expect(saveFetcher.submit).toHaveBeenCalledWith(
+        expect.objectContaining({ contact_id: 1, update: { notes: "First contact asked for a callback" } }),
+        expect.anything(),
+      );
+      expect(result.current.formState.update).toBeNull();
+      act(() => vi.advanceTimersByTime(2000));
+      expect(saveFetcher.submit).toHaveBeenCalledTimes(1);
+    } finally { unmount(); vi.useRealTimers(); }
+  });
+
   test.each([{ contact_id: 2 }, { campaign_id: 2 }, { workspace: "other" }])("does not hydrate notes from an unrelated attempt: %j", async (mismatch) => {
     initialAttempt = {
       id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",

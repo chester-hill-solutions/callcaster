@@ -14,10 +14,11 @@
       "app/lib/callscreenActions.ts"
     ],
     "existingTests": [
-      "69 focused UI cases pass, including both dialer modes without admin access, saved notes, clearing, answer preservation, disposition saves, autosave, late result loading, return to a contact and automatic contact changes.",
+      "70 focused UI cases pass, including both dialer modes without admin access, saved notes, clearing, answer preservation, disposition saves, autosave, late result loading, return to a contact and automatic contact changes and Skip Person.",
       "18 existing save-route and typed-result cases pass; three pre-existing cases remain skipped.",
       "Original source fails all three initial Notes regressions while nine existing hook cases pass. The automatic-contact regression also fails before the contact/draft reset.",
-      "Pending, settled and manual save handoffs each have an executed failure before their repair; the fixed hook saves the original contact once and does not submit an unchanged result for the next contact."
+      "Pending, settled and manual save handoffs each have an executed failure before their repair; the fixed hook saves the original contact once and does not submit an unchanged result for the next contact.",
+      "The real-hook Skip Person case fails before selecting the new contact synchronously, then passes after the contact/draft handoff is made atomic."
     ],
     "missingTests": [
       "Full local CI and applicable remote checks before publication and merge.",
