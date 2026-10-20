@@ -52,7 +52,7 @@ describe("WorkspaceNav task groups and destinations", () => {
       screen.getAllByRole("heading", { level: 3 }).map((heading) =>
         heading.textContent?.trim(),
       ),
-    ).toEqual(["Work", "Prepare", "Review", "Setup"]);
+    ).toEqual(["Prepare", "Review", "Setup"]);
     for (const groupName of ["Work", "Prepare", "Review", "Setup"]) {
       expect(
         screen.queryByRole("link", { name: groupName }),

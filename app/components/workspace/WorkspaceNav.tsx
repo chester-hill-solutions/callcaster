@@ -221,13 +221,15 @@ const WorkspaceNav = ({
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
-              <h3
-                className={`mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
-                  isCollapsed ? "lg:hidden" : ""
-                }`}
-              >
-                {group.name}
-              </h3>
+              {group.name !== "Work" ? (
+                <h3
+                  className={`mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
+                    isCollapsed ? "lg:invisible" : ""
+                  }`}
+                >
+                  {group.name}
+                </h3>
+              ) : null}
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
