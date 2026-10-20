@@ -171,7 +171,7 @@ const WorkspaceNav = ({
   const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
   const desktopCenterClass = "";
   const utilityCollapsedClass = isCollapsed
-    ? "lg:justify-start lg:gap-2"
+    ? "lg:justify-center lg:gap-0"
     : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
     `group flex h-auto items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:h-9 lg:text-sm ${desktopCenterClass} ${
@@ -181,7 +181,7 @@ const WorkspaceNav = ({
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center justify-between rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
+    `flex h-auto items-center justify-between rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-12 ${desktopCenterClass} ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -312,9 +312,9 @@ const WorkspaceNav = ({
               title={`Credits: ${workspace.credits}`}
             >
               <span className="inline-flex items-center gap-2">
-                <span className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center">
-                  <CreditCard className="h-6 w-6" aria-hidden="true" />
-                  <span className="absolute bottom-0.5 scale-75 text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
+                <span className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center">
+                  <CreditCard className="h-12 w-12" aria-hidden="true" />
+                  <span className="absolute bottom-1 whitespace-nowrap scale-75 text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
                 </span>
                 <span className={desktopLabelClass}>Credits</span>
               </span>
