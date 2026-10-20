@@ -2,15 +2,19 @@ import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
   BarChart3,
+  Archive,
   CalendarDays,
   ClipboardList,
+  ContactRound,
   CreditCard,
   FileText,
   Headset,
   Megaphone,
   MessageSquare,
   Phone,
+  Plus,
   Settings,
+  List,
   Upload,
   Users,
   AudioLines,
@@ -45,6 +49,7 @@ interface NavItem {
     name: string;
     path: string;
     minRole?: MemberRole;
+    icon: React.ComponentType<{ className?: string }>;
   }>;
 }
 
@@ -67,8 +72,9 @@ const NAV_GROUPS: NavGroup[] = [
             name: "New Campaign",
             path: "campaigns/new",
             minRole: MemberRole.Admin,
+            icon: Plus,
           },
-          { name: "Archived Campaigns", path: "campaigns/archive" },
+          { name: "Archived Campaigns", path: "campaigns/archive", icon: Archive },
         ],
       },
       { name: "Messages", path: "chats", icon: MessageSquare },
@@ -104,8 +110,8 @@ const NAV_GROUPS: NavGroup[] = [
         minRole: MemberRole.Member,
         icon: Users,
         subItems: [
-          { name: "Call lists", path: "audiences" },
-          { name: "Contacts", path: "contacts" },
+          { name: "Call lists", path: "audiences", icon: List },
+          { name: "Contacts", path: "contacts", icon: ContactRound },
         ],
       },
     ],
@@ -161,21 +167,21 @@ const WorkspaceNav = ({
   })).filter((group) => group.items.length > 0);
 
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${
+    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:justify-center lg:px-2 ${
       isActive
         ? "border-brand-primary bg-brand-primary/10 text-brand-primary dark:border-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "border-transparent text-foreground/85 hover:border-border hover:bg-muted"
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${
+    `flex items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:justify-center lg:px-2 ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${
+    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:justify-center lg:px-2 ${
       isActive
         ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -196,7 +202,7 @@ const WorkspaceNav = ({
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
-              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground lg:hidden">
                 {group.name}
               </h3>
               <div className="space-y-1">
@@ -221,9 +227,10 @@ const WorkspaceNav = ({
                           })
                         }
                         end={item.end}
+                        title={item.name}
                       >
                         <Icon className="h-5 w-5" />
-                        <span>{item.name}</span>
+                        <span className="lg:sr-only">{item.name}</span>
                         {item.path === "chats" && unreadChatsCount > 0 ? (
                           <span
                             data-testid="chats-unread-badge"
@@ -244,8 +251,10 @@ const WorkspaceNav = ({
                                 key={subItem.path || subItem.name}
                                 to={subItemTo}
                                 className={subLinkClass}
+                                title={subItem.name}
                               >
-                                <span className="min-w-0 truncate">
+                                <subItem.icon className="h-4 w-4 shrink-0" />
+                                <span className="min-w-0 truncate lg:sr-only">
                                   {subItem.name}
                                 </span>
                               </NavLink>
@@ -263,12 +272,16 @@ const WorkspaceNav = ({
 
         {isAdmin ? (
           <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
-            <NavLink to={`${baseUrl}/billing`} className={utilityLinkClass}>
+            <NavLink
+              to={`${baseUrl}/billing`}
+              className={utilityLinkClass}
+              title="Credits"
+            >
               <span className="inline-flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
                 Credits
               </span>
-              <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground">
+              <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground lg:sr-only">
                 {workspace.credits}
               </span>
             </NavLink>
@@ -281,7 +294,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-        className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex lg:w-16 lg:max-w-16 ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
