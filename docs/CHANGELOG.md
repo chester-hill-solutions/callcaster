@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: CSV uploads show success in the upload panel without a persistent toast. The saved row report remains available from the page ([PR #2749](https://github.com/chester-hill-solutions/callcaster/pull/2749), [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507)).
 - Fixed: Caller-ID verification in onboarding updates automatically when verification succeeds or fails ([PR #2750](https://github.com/chester-hill-solutions/callcaster/pull/2750), [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
 
 ## 2026-10-19 — release [#2740](https://github.com/chester-hill-solutions/callcaster/pull/2740)

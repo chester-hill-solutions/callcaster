@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
-import { audienceImportReportUrl } from "@/lib/audience-import-report";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import { pollAudienceUploadStatus } from "@/lib/audience-upload-polling.client";
 import { logger } from "@/lib/logger.client";
@@ -61,8 +59,8 @@ export function useAudienceUploadProgress({
 
   /**
    * @effect Hand a completed upload off to the caller's callback exactly once.
-   * @effect-deps [progress, workspaceId] — completion state and tenant report destination
-   * @effect-side-effects DOM (root toast report action), completion callbacks via refs
+   * @effect-deps [progress] — completion state
+   * @effect-side-effects Completion callbacks via refs
    * @effect-why-not-loader Completion arrives asynchronously via realtime/poll
    * snapshots, not a route transition; the callbacks advance the wizard or
    * schedule the standalone redirect.
@@ -71,21 +69,12 @@ export function useAudienceUploadProgress({
     if (progress.kind !== "completed" || handedOffRef.current) return;
     handedOffRef.current = true;
     const audienceId = progress.audienceId;
-    if (workspaceId && progress.uploadId != null && progress.reportAvailable) {
-      const reportUrl = audienceImportReportUrl(workspaceId, progress.uploadId);
-      toast.success("Call-list upload completed", {
-        id: `audience-import-report-${workspaceId}-${progress.uploadId}`,
-        description: "Download the row report to review imported, skipped and consent-warning rows.",
-        duration: Infinity,
-        action: { label: "Download row report", onClick: () => window.location.assign(reportUrl) },
-      });
-    }
     if (onUploadCompleteRef.current) {
       onUploadCompleteRef.current(audienceId);
     } else if (onStandaloneCompleteRef.current) {
       onStandaloneCompleteRef.current(audienceId);
     }
-  }, [progress, workspaceId]);
+  }, [progress]);
 
   const isCurrentAttempt = (
     state: AudienceUploadProgressState,
