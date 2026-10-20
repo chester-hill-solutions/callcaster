@@ -25,6 +25,10 @@ Concurrent suites can exhaust host resources and fail short UI waits. If this
 happens, retain the failure log, stop overlapping gates, rerun only failed cases,
 then run the full gate again on the final clean commit.
 
+If guard child processes time out under the default worker count, rerun the
+failed cases first. When they pass alone, rerun the complete gate with command-scoped
+`VITEST_MAX_WORKERS=2 npm run ci:local` before changing tracked worker or time limits.
+
 Do not run `npm run ci:local` after each edit. During implementation, run the
 smallest check that proves the changed behavior, plus `git diff --check`:
 

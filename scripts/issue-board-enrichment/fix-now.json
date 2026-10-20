@@ -69,9 +69,9 @@
   {
     "issueNumber": 1846,
     "verdict": "fix-now",
-    "summary": "A candidate refreshes the onboarding loader from workspace_number events, so an open verification sheet changes from pending to success or failure without a reload. Merge and deployed verification remain.",
+    "summary": "PR #2750 refreshes the onboarding loader from workspace_number events, so an open verification sheet changes from pending to success or failure without a reload. Merge and deployed verification remain.",
     "currentBehavior": "Source on origin/master passes the verification status into the sheet but does not refresh its loader snapshot on a number event. The candidate adds workspace_number to the existing batched workspace revalidation subscription.",
-    "resolution": "Review the atomic candidate after full local CI. Verify a real caller-ID verification in the deployed onboarding flow before closing.",
+    "resolution": "Review and merge PR #2750 into dev. Verify a real caller-ID verification in the deployed onboarding flow before closing.",
     "lookIn": [
       "app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts",
       "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
@@ -79,7 +79,8 @@
     ],
     "existingTests": [
       "test/ui/workspace-realtime-revalidation.test.tsx: three expected failures on original source; the repaired subscription passes number-event batching plus pending-to-success and pending-to-failure sheet checks through the real Workspace layout, shared subscription and child loader",
-      "37 focused UI cases pass across workspace refresh, onboarding number setup and the shared event connection"
+      "37 focused UI cases pass across workspace refresh, onboarding number setup and the shared event connection",
+      "Full npm run ci:local passes with VITEST_MAX_WORKERS=2: 5573 Node, 34 Bun and 1483 UI tests, all guards, the production build, bundle check and codegen verification"
     ],
     "acceptanceCriteria": [
       "An open pending verification sheet displays the success or failure returned by the callback without a page reload",
@@ -90,7 +91,7 @@
     "missingTests": [
       "A real caller-ID verification call in the deployed onboarding flow remains"
     ],
-    "trackerRecommendation": "Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance."
+    "trackerRecommendation": "Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance."
   },
   {
     "issueNumber": 1875,

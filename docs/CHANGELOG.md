@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Caller-ID verification in onboarding updates automatically when verification succeeds or fails ([#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
+- Fixed: Caller-ID verification in onboarding updates automatically when verification succeeds or fails ([PR #2750](https://github.com/chester-hill-solutions/callcaster/pull/2750), [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
 
 ## 2026-10-19 — release [#2740](https://github.com/chester-hill-solutions/callcaster/pull/2740)
 
