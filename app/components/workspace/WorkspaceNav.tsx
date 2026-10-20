@@ -217,7 +217,7 @@ const WorkspaceNav = ({
         </Button>
         <nav
           aria-label="Workspace sections"
-          className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 lg:overflow-visible"
+          className="min-h-0 flex-1 overflow-y-auto pr-1 lg:overflow-visible"
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
