@@ -194,14 +194,23 @@
   {
     "issueNumber": 2686,
     "verdict": "fix-now",
-    "summary": "The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
+    "summary": "The recovered findings document now follows the recorded identity, consent, and push-only decisions. Review, merge and promotion remain.",
+    "currentBehavior": "The research artifact is absent from origin/master and origin/dev. This candidate restores all six platform findings, checks the cited vendor sources, and separates source-platform features from agreed CallCaster behavior.",
+    "resolution": "Review and merge the corrected findings document. Promote it to master before closing the research task; do not reopen or override the recorded decisions.",
     "lookIn": [
       "docs/research/cms-platform-capabilities.md"
     ],
-    "existingTests": [],
-    "acceptanceCriteria": [],
-    "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
+    "existingTests": [
+      "Manual source check: the identity, consent and push-only conclusions match the resolution comments on #2679, #2681 and #2683",
+      "Manual vendor-source and local-link checks cover platform IDs, event delivery, consent scope, server execution and automation HTTP features"
+    ],
+    "acceptanceCriteria": [
+      "All researched platforms have findings for phone fields, stable IDs, events, consent, server execution and automation",
+      "CallCaster uses external_id with normalized-phone fallback; source namespacing remains a separate decision",
+      "Consent evidence and the interim opt_out limits match #2681 and ADR-0034",
+      "The integration remains push-only with no generic inbound event endpoint; uncertain vendor details stay explicit"
+    ],
+    "rootCause": "The research stayed on a throwaway branch. Its conclusions removed the accepted phone fallback, invented a consent model, and proposed a generic inbound endpoint that the recorded decisions rejected.",
+    "trackerRecommendation": "Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children or open blockers. Blocking links point to closed decisions #2679 and #2681; no active fixing PR at the start. Keep the issue open until the artifact reaches master."
   }
 ]

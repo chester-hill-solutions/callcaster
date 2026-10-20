@@ -43,12 +43,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/ui/mode-toggle.test.tsx — covers the mode toggle's theme fallback, but no test covers the TeamMember react-icons colour branch, which is the part the issue is about
 
 ### [#2686](https://github.com/chester-hill-solutions/callcaster/issues/2686) Research: what common CMS and member platforms expose
-- **IN PROGRESS** · Verdict: **Fix now** · Labels: wayfinder:research · Assignee: none · Updated: 2026-10-19
-- The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands.
-- Resolution: Implement the missing mechanism named in the root cause.
+- **IN PROGRESS** · Verdict: **Fix now** · Labels: wayfinder:research · Assignee: @wra-sol · Updated: 2026-10-20
+- The recovered findings document now follows the recorded identity, consent, and push-only decisions. Review, merge and promotion remain.
+- Current behavior: The research artifact is absent from origin/master and origin/dev. This candidate restores all six platform findings, checks the cited vendor sources, and separates source-platform features from agreed CallCaster behavior.
+- Root cause: The research stayed on a throwaway branch. Its conclusions removed the accepted phone fallback, invented a consent model, and proposed a generic inbound endpoint that the recorded decisions rejected.
+- Resolution: Review and merge the corrected findings document. Promote it to master before closing the research task; do not reopen or override the recorded decisions.
 - Look in: `docs/research/cms-platform-capabilities.md`
+- Existing tests: Manual source check: the identity, consent and push-only conclusions match the resolution comments on #2679, #2681 and #2683; Manual vendor-source and local-link checks cover platform IDs, event delivery, consent scope, server execution and automation HTTP features
+- Done when: All researched platforms have findings for phone fields, stable IDs, events, consent, server execution and automation; CallCaster uses external_id with normalized-phone fallback; source namespacing remains a separate decision; Consent evidence and the interim opt_out limits match #2681 and ADR-0034; The integration remains push-only with no generic inbound event endpoint; uncertain vendor details stay explicit
+- Tracker: Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children or open blockers. Blocking links point to closed decisions #2679 and #2681; no active fixing PR at the start. Keep the issue open until the artifact reaches master.
+
+---
 
 ### [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) Decide the CORS policy for the public API
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: wayfinder:grilling · Assignee: @wra-sol · Updated: 2026-10-19
