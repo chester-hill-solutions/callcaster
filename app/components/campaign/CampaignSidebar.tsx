@@ -229,24 +229,26 @@ export default function CampaignSidebar({
                 Browse campaigns and view their status and progress.
               </SheetDescription>
             </SheetHeader>
-            <SheetBody inset="none" className="flex h-full flex-col bg-background p-4">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <h2 className="font-Zilla-Slab text-lg font-bold text-foreground">
-                  Campaigns
-                </h2>
-                {canManageCampaigns ? (
-                  <NavLink
-                    to={`/workspaces/${workspaceId}/campaigns/new`}
-                    className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  >
-                    New
-                  </NavLink>
-                ) : null}
+            <SheetBody inset="none" className="flex h-full flex-col bg-background">
+              <div className="flex h-full flex-col p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h2 className="font-Zilla-Slab text-lg font-bold text-foreground">
+                    Campaigns
+                  </h2>
+                  {canManageCampaigns ? (
+                    <NavLink
+                      to={`/workspaces/${workspaceId}/campaigns/new`}
+                      className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                    >
+                      New
+                    </NavLink>
+                  ) : null}
+                </div>
+                <CampaignSidebarList
+                  {...bodyProps}
+                  onNavigate={() => undefined}
+                />
               </div>
-              <CampaignSidebarList
-                {...bodyProps}
-                onNavigate={() => undefined}
-              />
             </SheetBody>
           </SheetContent>
         </Sheet>
