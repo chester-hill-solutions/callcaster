@@ -147,7 +147,7 @@ const CallQuestionnaire = ({
             name="notes"
             rows={4}
             value={typeof update?.notes === "string" ? update.notes : ""}
-            disabled={disabled || isBusy}
+            disabled={disabled}
             onChange={(event) => {
               const value = event.target.value;
               handleResponse({ blockId: "notes", value });
