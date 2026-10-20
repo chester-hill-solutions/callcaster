@@ -3,6 +3,7 @@ import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   callPanelHeaderPrimaryClass,
   callPanelShellClass,
@@ -104,10 +105,10 @@ const CallQuestionnaire = ({
 
   return (
     <div className={`${callPanelShellClass} min-w-0 flex-1`}>
-      <div className={callPanelHeaderPrimaryClass}>
+      <div className={cn(callPanelHeaderPrimaryClass, "flex-none")}>
         Script & Questionnaire{contactLabel}
       </div>
-      <div className="flex flex-col p-4">
+      <div className="flex flex-1 flex-col p-4">
         <div className="flex flex-col gap-4">
           {(scriptSteps?.pages?.[currentPageId || ""]?.blocks ?? []).map(renderBlock)}
         </div>
@@ -154,7 +155,7 @@ const CallQuestionnaire = ({
             }}
           />
         </FormField>
-        <div className="flex justify-end p-2">
+        <div className="mt-auto flex justify-end p-2">
           <Button type="button" onClick={handleQuickSave} disabled={isBusy}>
             Save
           </Button>

@@ -2,10 +2,10 @@
   {
     "issueNumber": 2531,
     "verdict": "fix-now",
-    "summary": "PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration and contact-safe autosave. Source CI and local browser checks pass; review and deployed acceptance remain.",
+    "summary": "PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.",
     "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact’s answers.",
     "rootCause": "The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.",
-    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline.",
+    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.",
     "lookIn": [
       "app/components/call/CallScreen.Questionnaire.tsx",
       "app/hooks/call/useCallScreen.ts",
@@ -19,7 +19,8 @@
       "Original source fails all three initial Notes regressions while nine existing hook cases pass. The automatic-contact regression also fails before the contact/draft reset.",
       "Pending, settled and manual save handoffs each have an executed failure before their repair; the fixed hook saves the original contact once and does not submit an unchanged result for the next contact.",
       "The real-hook Skip Person case fails before selecting the new contact synchronously, then passes after the contact/draft handoff is made atomic.",
-      "Full npm run ci:local passes on c4d1962a: 5,573 Node, 34 Bun and 1,502 UI tests, plus all guards, production build, bundle check and codegen verification. The real call-screen components pass local note-entry, theme and phone/desktop geometry checks."
+      "Full npm run ci:local passes on c4d1962a: 5,573 Node, 34 Bun and 1,502 UI tests, plus all guards, production build, bundle check and codegen verification. The real call-screen components pass local note-entry, theme and phone/desktop geometry checks.",
+      "Local browser measurements confirm equal desktop panel heights for short scripts, long scripts and long queues. Queue and call controls stay visible during a long-script scroll; the 390 px phone view stays stacked without horizontal overflow."
     ],
     "missingTests": [
       "Applicable exact-head remote checks before merge.",
@@ -30,7 +31,8 @@
       "Notes save with the selected outreach attempt and return after reload or contact selection.",
       "Questionnaire answers, notes and disposition edits preserve one another.",
       "Notes do not carry over when the selected contact changes.",
-      "The field uses the shared accessible controls and works at phone and desktop widths."
+      "The field uses the shared accessible controls and works at phone and desktop widths.",
+      "Desktop queue, questionnaire and call-control frames have equal heights; long scripts retain reachable call controls and phone layouts remain stacked."
     ],
     "blockedBy": [],
     "size": "S",

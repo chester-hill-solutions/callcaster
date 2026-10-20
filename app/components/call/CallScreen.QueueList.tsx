@@ -14,6 +14,7 @@ import {
   callPanelBodyScrollClass,
   callPanelHeaderSecondaryClass,
   callPanelShellClass,
+  callPanelRailContentClass,
 } from "@/components/call/call-panel-classes";
 import type { Contact, QueueItem } from "@/lib/types";
 
@@ -86,83 +87,88 @@ const QueueList = ({
   }, [groupByHousehold, households, queue, selectedContactId]);
 
   return (
-    <div className={callPanelShellClass}>
-      <div className={callPanelHeaderSecondaryClass}>
-        {!predictive ? (
-          <div className="flex w-full gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="flex-1 font-Zilla-Slab text-xs"
-              onClick={() => handleNextNumber(true)}
-              disabled={isBusy}
-            >
-              Skip Household
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="flex-1 border-primary font-Zilla-Slab text-xs text-primary"
-              onClick={() => handleNextNumber(false)}
-              disabled={isBusy}
-            >
-              Skip Person
-            </Button>
-          </div>
-        ) : (
-          <span className="font-semibold">Recipient List</span>
-        )}
-      </div>
-
-      <div className={callPanelBodyScrollClass}>
-        <Table className="w-full border-collapse">
-          <TableHeader>
-            <TableRow>
-              <TableHead hidden>Name</TableHead>
-              <TableHead hidden>Number</TableHead>
-              <TableHead hidden>Address</TableHead>
-            </TableRow>
-          </TableHeader>
-          {queue.length > 0 ? (
-            <TableBody>{queueRows}</TableBody>
+    <div className={`${callPanelShellClass} xl:flex-1 xl:overflow-clip`}>
+      <div className={callPanelRailContentClass}>
+        <div className={`${callPanelHeaderSecondaryClass} shrink-0`}>
+          {!predictive ? (
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="font-Zilla-Slab flex-1 text-xs"
+                onClick={() => handleNextNumber(true)}
+                disabled={isBusy}
+              >
+                Skip Household
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-primary font-Zilla-Slab text-primary flex-1 text-xs"
+                onClick={() => handleNextNumber(false)}
+                disabled={isBusy}
+              >
+                Skip Person
+              </Button>
+            </div>
           ) : (
-            <TableBody>
-              {!predictive && (
-                <TableRow>
-                  <TableCell colSpan={3} className="px-4 py-9 text-center">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-primary font-Zilla-Slab text-primary"
-                      onClick={handleQueueButton}
-                    >
-                      Load Queue
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              )}
-              {!queue.length && count === 0 && completed === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="px-4 py-9 text-center">
-                    <Text variant="muted">
-                      Check with your administration to ensure your queue is set up.
-                    </Text>
-                  </TableCell>
-                </TableRow>
-              )}
-              {!queue.length && completed > 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="px-4 py-9 text-center">
-                    <Text variant="muted">You&apos;re all done! Great work.</Text>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
+            <span className="font-semibold">Recipient List</span>
           )}
-        </Table>
+        </div>
+
+        <div className={`${callPanelBodyScrollClass} min-h-0`}>
+          <Table className="w-full border-collapse">
+            <TableHeader>
+              <TableRow>
+                <TableHead hidden>Name</TableHead>
+                <TableHead hidden>Number</TableHead>
+                <TableHead hidden>Address</TableHead>
+              </TableRow>
+            </TableHeader>
+            {queue.length > 0 ? (
+              <TableBody>{queueRows}</TableBody>
+            ) : (
+              <TableBody>
+                {!predictive && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="px-4 py-9 text-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-primary font-Zilla-Slab text-primary"
+                        onClick={handleQueueButton}
+                      >
+                        Load Queue
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!queue.length && count === 0 && completed === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="px-4 py-9 text-center">
+                      <Text variant="muted">
+                        Check with your administration to ensure your queue is
+                        set up.
+                      </Text>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!queue.length && completed > 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="px-4 py-9 text-center">
+                      <Text variant="muted">
+                        You&apos;re all done! Great work.
+                      </Text>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            )}
+          </Table>
+        </div>
       </div>
     </div>
   );

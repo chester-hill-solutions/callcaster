@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { callPanelShellClass } from "@/components/call/call-panel-classes";
+import { callPanelRailContentClass, callPanelShellClass } from "@/components/call/call-panel-classes";
 import { formatDispositionLabel } from "@/lib/outreach-disposition";
 
 type Attempt = Tables<"outreach_attempt">;
@@ -448,34 +448,41 @@ export const CallArea: React.FC<CallAreaProps> = ({
   onResetCall,
 }: CallAreaProps) => {
   return (
-    <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
-      <StatusBar displayState={displayState} callDuration={callDuration} />
-      <ContactStrip nextRecipient={nextRecipient} questionContact={questionContact} />
-      <CallControls
-        isBusy={isBusy}
-        isStartingConference={isStartingConference}
-        startDisabledReason={startDisabledReason}
-        nextRecipient={nextRecipient}
-        hangUp={hangUp}
-        handleVoiceDrop={handleVoiceDrop}
-        handleDialNext={handleDialNext}
-        predictive={predictive}
-        conference={conference}
-        voiceDrop={voiceDrop}
-        callState={state}
-        isMicrophoneMuted={isMicrophoneMuted}
-        onToggleMute={onToggleMute}
-        onLoadQueue={onLoadQueue}
-        onResetCall={onResetCall}
-      />
-      <DispositionBar
-        isBusy={isBusy}
-        questionContact={questionContact}
-        handleDequeueNext={handleDequeueNext}
-        disposition={disposition}
-        dispositionOptions={dispositionOptions}
-        setDisposition={setDisposition}
-      />
+    <div
+      className={cn(callPanelShellClass, "min-h-0 xl:flex-1 xl:overflow-clip")}
+    >
+      <div className={cn(callPanelRailContentClass, "justify-between")}>
+        <StatusBar displayState={displayState} callDuration={callDuration} />
+        <ContactStrip
+          nextRecipient={nextRecipient}
+          questionContact={questionContact}
+        />
+        <CallControls
+          isBusy={isBusy}
+          isStartingConference={isStartingConference}
+          startDisabledReason={startDisabledReason}
+          nextRecipient={nextRecipient}
+          hangUp={hangUp}
+          handleVoiceDrop={handleVoiceDrop}
+          handleDialNext={handleDialNext}
+          predictive={predictive}
+          conference={conference}
+          voiceDrop={voiceDrop}
+          callState={state}
+          isMicrophoneMuted={isMicrophoneMuted}
+          onToggleMute={onToggleMute}
+          onLoadQueue={onLoadQueue}
+          onResetCall={onResetCall}
+        />
+        <DispositionBar
+          isBusy={isBusy}
+          questionContact={questionContact}
+          handleDequeueNext={handleDequeueNext}
+          disposition={disposition}
+          dispositionOptions={dispositionOptions}
+          setDisposition={setDisposition}
+        />
+      </div>
     </div>
   );
 };
