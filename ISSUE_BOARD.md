@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 11
+## Fix now — 12
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -138,6 +138,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Implement the missing mechanism named in the root cause.
 - Look in: `app/lib/platform-billing.server.ts`
 - Existing tests: None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo.
+
+### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
+- Recommended title: **Show the correct dialing mode on the call screen**
+- The call-screen header labels predictive campaigns as Power dialing and power campaigns as Manual dialing. A local label correction is prepared.
+- Current behavior: Source checked at dev@d0972882 on 2026-10-20. CallScreenLayout passes campaign.dial_type === "predictive" to TopChrome; only its displayed mode names are wrong.
+- Root cause: TopChrome assigns the wrong user-facing name to both values of the predictive flag.
+- Resolution: Show Predictive dialing for predictive campaigns and Power dialing for power campaigns. Keep the existing mode selection and call controls.
+- Look in: `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: test/ui/call-screen-leave.test.tsx: two new mode-label cases fail on the original header; existing leave-campaign cases remain passing.
+- Missing tests: Complete full local and exact-head remote checks; verify both labels on deployed dev after merge.
+- Done when: Predictive Dialer campaigns show Predictive dialing.; Power Dialer campaigns show Power dialing.; Existing campaign call and leave behavior stays covered.
+- Tracker: Keep open through dev review and release verification. No linked PR existed at the 2026-10-20 inspection.
 
 ---
 
@@ -1134,7 +1147,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 95
+## Needs triage — 94
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -1160,10 +1173,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#2700](https://github.com/chester-hill-solutions/callcaster/issues/2700) Cannot find stripe account that is connected to dev environment
 - Status: Backlog · Labels: question · Assignee: @wra-sol · Updated: 2026-10-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
-- Status: Backlog · Labels: design, ux · Assignee: none · Updated: 2026-10-18
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2696](https://github.com/chester-hill-solutions/callcaster/issues/2696) Railway IaC fails on dev: the plan proposes deleting CallCaster.STRIPE_API_KEY

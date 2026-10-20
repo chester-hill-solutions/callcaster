@@ -82,6 +82,16 @@ describe("Leave Campaign", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  test("identifies a predictive campaign as Predictive dialing", () => {
+    setup("predictive");
+    expect(screen.getByText("Predictive dialing")).toBeInTheDocument();
+  });
+
+  test("identifies a power campaign as Power dialing", () => {
+    setup("call");
+    expect(screen.getByText("Power dialing")).toBeInTheDocument();
+  });
+
   test("waits for predictive conference completion before teardown and never resets the queue", async () => {
     const pending = deferredResponse();
     fetchMock.mockReturnValueOnce(pending.promise);

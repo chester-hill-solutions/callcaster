@@ -1,5 +1,34 @@
 [
   {
+    "issueNumber": 2698,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show the correct dialing mode on the call screen",
+    "summary": "The call-screen header labels predictive campaigns as Power dialing and power campaigns as Manual dialing. A local label correction is prepared.",
+    "currentBehavior": "Source checked at dev@d0972882 on 2026-10-20. CallScreenLayout passes campaign.dial_type === \"predictive\" to TopChrome; only its displayed mode names are wrong.",
+    "rootCause": "TopChrome assigns the wrong user-facing name to both values of the predictive flag.",
+    "resolution": "Show Predictive dialing for predictive campaigns and Power dialing for power campaigns. Keep the existing mode selection and call controls.",
+    "lookIn": [
+      "app/components/call/CallScreen.Header.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "test/ui/call-screen-leave.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-leave.test.tsx: two new mode-label cases fail on the original header; existing leave-campaign cases remain passing."
+    ],
+    "missingTests": [
+      "Complete full local and exact-head remote checks; verify both labels on deployed dev after merge."
+    ],
+    "acceptanceCriteria": [
+      "Predictive Dialer campaigns show Predictive dialing.",
+      "Power Dialer campaigns show Power dialing.",
+      "Existing campaign call and leave behavior stays covered."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Keep open through dev review and release verification. No linked PR existed at the 2026-10-20 inspection."
+  },
+  {
     "issueNumber": 100,
     "verdict": "fix-now",
     "summary": "Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.",
