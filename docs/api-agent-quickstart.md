@@ -2,6 +2,13 @@
 
 Headless lifecycle for CallCaster: register, authenticate, create a workspace, provision telephony, buy credits, and operate campaigns over JSON `/api` routes.
 
+Run these examples from your backend or a command-line client. **The public
+integrator API is server-to-server; CORS is disabled for cross-origin browser
+calls.** Keep workspace API keys out of browser JavaScript. A CMS or member
+portal calls its own backend, which calls CallCaster. See the
+[CORS policy](./api-overview.md#cors) and
+[browser CORS failure reference](./api-overview.md#browser-cors-failures).
+
 ## Authentication
 
 ### Register

@@ -52,11 +52,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ### [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) Decide the CORS policy for the public API
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: wayfinder:grilling · Assignee: @wra-sol · Updated: 2026-10-19
-- The decision is recorded and CORS is genuinely off, but the decision required the policy in three places and only one of them documents it.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: Overridden from the batch verdict. The decision was made and recorded; the documentation half of it is one of three done.
-- Resolution: Implement the missing mechanism named in the root cause.
-- Look in: `docs/api-overview.md`
+- This change states the existing server-to-server CORS policy in both quickstarts and the public error reference, and replaces the overview's stale Express wording. Review and merge remain.
+- Current behavior: Production documentation has the policy only in the overview's final CORS section. The candidate puts the backend requirement before the examples and explains browser preflight failures separately from API HTTP errors.
+- Root cause: The earlier closure recorded the policy decision but left its promised quickstart and error-reference guidance unwritten. Only the overview's final CORS section mentioned the constraint, and it still named the retired Express layer.
+- Resolution: Review and merge the documentation completion. Keep CORS disabled and retain the decision; no API runtime or schema change is required.
+- Look in: `docs/api-overview.md`, `docs/api-agent-quickstart.md`
+- Existing tests: Manual documentation check: all six added local links resolve to their target headings; Source review: the Bun server and public API auth add no CORS allow headers; the MDN CORS guide confirms the distinction between a blocked preflight request and a blocked response
+- Done when: The overview, quickstarts and error reference state that public integrator calls are server-to-server and workspace API keys stay on the backend; The error reference explains that failed preflight blocks the intended request, while a request without preflight can reach the server but its response remains blocked in browser JavaScript; Same-origin browser session access remains documented and CORS remains disabled
+- Tracker: Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master.
 
 ### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Pass the live caller-ID verification status to the onboarding verification sheet
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-20

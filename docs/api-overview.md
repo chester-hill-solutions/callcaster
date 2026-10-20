@@ -19,6 +19,12 @@ Human guides: [API auth matrix](./api-auth-matrix.md), [complete inventory](./ap
 
 ## Quickstart
 
+Run these requests from your server or a command-line client. **The public
+integrator API is server-to-server; cross-origin browser calls are disabled.**
+Keep the workspace API key on your backend. A CMS or member portal must call
+its own backend, which calls CallCaster. See [CORS](#cors) and
+[browser CORS failures](#browser-cors-failures).
+
 Set `BASE_URL` to your CallCaster origin (e.g. `https://app.example.com`).
 
 ```bash
@@ -109,6 +115,22 @@ Validation errors from Zod-backed public routes may include field paths, e.g. `t
 | `405` | Wrong HTTP method | Non-POST to action route |
 | `500` | Server/Twilio failure | Twilio send error; database error |
 
+### Browser CORS failures
+
+CORS is disabled for the public integrator API. A browser call from another
+origin with `X-API-Key`, `Authorization`, or `Content-Type: application/json`
+requires an `OPTIONS` preflight. The preflight does not grant cross-origin
+access, so the browser blocks the intended API request before it is sent.
+JavaScript receives a fetch error, not a readable API JSON error or `401`.
+Use the browser console and Network panel to inspect the CORS failure. See
+[MDN's CORS guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS).
+
+Requests that do not require a preflight can reach the server, but the browser
+still blocks access to the response. The remedy is to call CallCaster from
+your backend and keep the workspace API key there. Server clients receive the
+normal HTTP statuses and JSON error bodies in the catalog above. Signed-in
+browser clients on the CallCaster app origin use session cookies.
+
 ---
 
 ## Public endpoints (OpenAPI)
@@ -176,4 +198,10 @@ The public OpenAPI spec documents user-facing session and integrator routes. The
 
 ## CORS
 
-Browser clients should use session cookies on the app origin. Public JSON APIs are intended for server-to-server integration; cross-origin browser access is not enabled at the Express layer by default.
+**Cross-origin browser access to the public integrator API is disabled.**
+Use server-to-server requests and keep workspace API keys in your backend,
+outside browser JavaScript. A CMS or member portal needs its own backend to
+call CallCaster. The [quickstart](#quickstart) follows this model; the
+[error reference](#browser-cors-failures) explains failed browser requests.
+
+Signed-in browser clients on the CallCaster app origin use session cookies.
