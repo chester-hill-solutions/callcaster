@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Callers can write notes in both dialing modes; notes save with the call result and stay with the selected contact ([PR #2755](https://github.com/chester-hill-solutions/callcaster/pull/2755), [#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531)).
 - Added: Callers can write notes in both dialing modes; notes save with the call result and stay with the selected contact ([#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531)).
 - Fixed: The campaign message editor has a visible label, connected personalization help and message counts, and the shared keyboard focus treatment ([#2652](https://github.com/chester-hill-solutions/callcaster/issues/2652)).
 - Fixed: Weekly Calling Hours and Send Window controls identify each day's start and end time, local time zone and end-time guidance for assistive technology ([#2658](https://github.com/chester-hill-solutions/callcaster/issues/2658)).
