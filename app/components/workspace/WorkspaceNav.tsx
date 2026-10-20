@@ -198,7 +198,7 @@ const WorkspaceNav = ({
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
         <nav
           aria-label="Workspace sections"
-          className="min-h-0 space-y-5 overflow-y-auto pr-1"
+          className="min-h-0 space-y-5 overflow-y-auto pr-1 lg:overflow-visible"
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
@@ -216,7 +216,10 @@ const WorkspaceNav = ({
                   );
 
                   return (
-                    <div key={item.name} className="space-y-1">
+                    <div
+                      key={item.name}
+                      className={`space-y-1 ${isPeopleItem ? "lg:group/people lg:relative" : ""}`}
+                    >
                       <NavLink
                         to={itemTo}
                         className={(navState) =>
@@ -241,7 +244,7 @@ const WorkspaceNav = ({
                         ) : null}
                       </NavLink>
                       {visibleStaticSubItems.length > 0 && showSubNav ? (
-                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
+                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3 lg:absolute lg:left-full lg:top-0 lg:z-50 lg:ml-2 lg:hidden lg:w-48 lg:rounded-lg lg:border lg:bg-card lg:p-2 lg:shadow-lg lg:group-hover/people:block lg:group-focus-within/people:block">
                           {visibleStaticSubItems.map((subItem) => {
                             const subItemTo = subItem.path
                               ? `${baseUrl}/${subItem.path}`
@@ -254,7 +257,7 @@ const WorkspaceNav = ({
                                 title={subItem.name}
                               >
                                 <subItem.icon className="h-4 w-4 shrink-0" />
-                                <span className="min-w-0 truncate lg:sr-only">
+                                <span className="min-w-0 truncate">
                                   {subItem.name}
                                 </span>
                               </NavLink>
@@ -294,7 +297,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-          className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex lg:w-16 lg:max-w-16 ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-visible rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex lg:w-16 lg:max-w-16 ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
