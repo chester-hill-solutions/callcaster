@@ -170,6 +170,9 @@ const WorkspaceNav = ({
 
   const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
   const desktopCenterClass = "";
+  const utilityCollapsedClass = isCollapsed
+    ? "lg:justify-start lg:gap-2"
+    : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
     `group flex h-auto items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:h-9 lg:text-sm ${desktopCenterClass} ${
       isActive
@@ -178,7 +181,7 @@ const WorkspaceNav = ({
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${
+    `flex h-auto items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -301,7 +304,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="relative z-10 mt-4 shrink-0 rounded-lg border border-border/80 bg-card p-2">
+          <div className={`relative z-10 mt-4 shrink-0 border-0 bg-card p-2 ${isCollapsed ? "lg:-mx-3 lg:w-18 lg:rounded-none" : "lg:w-full"}`}>
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
@@ -311,7 +314,7 @@ const WorkspaceNav = ({
                 <CreditCard className="h-4 w-4" />
                 <span className={desktopLabelClass}>Credits</span>
               </span>
-                                <span className={`rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground ${desktopLabelClass}`}>
+              <span className="shrink-0 rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground">
                 {workspace.credits}
               </span>
             </NavLink>
