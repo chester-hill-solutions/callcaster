@@ -40,6 +40,17 @@ function formatUnreadBadgeCount(count: number): string {
   return count > 99 ? "99+" : String(count);
 }
 
+function formatCollapsedCreditCount(count: number): string {
+  const absoluteCount = Math.abs(count);
+  if (absoluteCount >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (absoluteCount >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return String(count);
+}
+
 interface NavItem {
   name: string;
   path: string;
@@ -315,7 +326,9 @@ const WorkspaceNav = ({
                 <CreditCard className="h-5 w-5 shrink-0" aria-hidden="true" />
                 <span className={desktopLabelClass}>Credits</span>
                 <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-brand-secondary/40 px-1 text-xs font-bold leading-none text-foreground">
-                  {workspace.credits}
+                  {isCollapsed
+                    ? formatCollapsedCreditCount(workspace.credits)
+                    : workspace.credits}
                 </span>
               </span>
             </NavLink>
