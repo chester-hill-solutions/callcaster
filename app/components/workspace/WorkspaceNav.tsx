@@ -314,7 +314,7 @@ const WorkspaceNav = ({
               <span className="inline-flex items-center gap-2">
                 <span className="relative inline-flex h-11 w-12 shrink-0 items-center justify-center">
                   <CreditCard className="h-11 w-12" aria-hidden="true" />
-                  <span className="absolute bottom-1 whitespace-nowrap scale-75 text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
+                  <span className="absolute bottom-3 whitespace-nowrap scale-75 text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
                 </span>
                 <span className={desktopLabelClass}>Credits</span>
               </span>
