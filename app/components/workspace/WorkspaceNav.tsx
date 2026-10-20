@@ -299,7 +299,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
+          <div className="relative z-10 shrink-0 rounded-lg border border-border/80 bg-card p-2">
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}

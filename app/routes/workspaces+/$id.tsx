@@ -11,7 +11,6 @@ import {
   Link,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
-import CampaignSidebar from "@/components/campaign/CampaignSidebar";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
 import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
 import {
@@ -159,14 +158,6 @@ function WorkspaceResolvedView({
               (userRole as MemberRole | null | undefined) ?? MemberRole.Member
             }
           />
-          <CampaignSidebar
-            workspaceId={workspace.id}
-            campaigns={campaigns}
-            campaignQueueProgress={campaignQueueProgress}
-            userRole={
-              (userRole as MemberRole | null | undefined) ?? MemberRole.Member
-            }
-          />
         </>
       ) : null}
       <main
@@ -260,6 +251,7 @@ function WorkspaceResolvedView({
                 campaigns,
                 phoneNumbers,
                 userRole,
+                campaignQueueProgress,
                 ...context,
               }}
             />
@@ -317,10 +309,10 @@ export default function Workspace() {
           showSidebar={showSidebar}
           isOnboarding={Boolean(onboardingStrip)}
           serviceAddressRequired={serviceAddressRequired}
-          complianceOnboarding={complianceOnboarding}
-          a2pBlockingIssues={a2pBlockingIssues}
-          campaignQueueProgress={campaignQueueProgress}
-        />
+           complianceOnboarding={complianceOnboarding}
+           a2pBlockingIssues={a2pBlockingIssues}
+           campaignQueueProgress={campaignQueueProgress}
+         />
       </div>
     </>
   );
