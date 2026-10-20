@@ -6,7 +6,6 @@ import {
   CalendarDays,
   ClipboardList,
   ContactRound,
-  CreditCard,
   FileText,
   Headset,
   Megaphone,
@@ -181,7 +180,7 @@ const WorkspaceNav = ({
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center justify-between rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-11 ${desktopCenterClass} ${utilityCollapsedClass} ${
+    `flex h-auto items-center justify-between rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -312,11 +311,10 @@ const WorkspaceNav = ({
               title={`Credits: ${workspace.credits}`}
             >
               <span className="inline-flex items-center gap-2">
-                <span className="relative inline-flex h-11 w-12 shrink-0 items-center justify-center">
-                  <CreditCard className="h-11 w-12" aria-hidden="true" />
-                  <span className="absolute bottom-3 whitespace-nowrap scale-75 text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
-                </span>
                 <span className={desktopLabelClass}>Credits</span>
+                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-brand-secondary/40 px-1 text-xs font-bold leading-none text-foreground">
+                  {workspace.credits}
+                </span>
               </span>
             </NavLink>
           </div>
