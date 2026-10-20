@@ -255,7 +255,7 @@ const WorkspaceNav = ({
                         end={item.end}
                         title={item.name}
                       >
-                        <Icon className="h-5 w-5 lg:h-4 lg:w-4" />
+                        <Icon className="h-5 w-5 shrink-0 lg:h-4 lg:w-4" />
                         <span className={desktopLabelClass}>{item.name}</span>
                         {item.path === "chats" && unreadChatsCount > 0 ? (
                           <span
@@ -322,7 +322,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-12 lg:max-w-12" : "lg:w-63 lg:max-w-63"} ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-18 lg:max-w-18" : "lg:w-63 lg:max-w-63"} ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
