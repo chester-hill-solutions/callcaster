@@ -142,15 +142,15 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
 - Recommended title: **Show the correct dialing mode on the call screen**
-- The call-screen header labels predictive campaigns as Power dialing and power campaigns as Manual dialing. A local label correction is prepared.
+- PR #2754 contains the correct call-screen mode labels and regression coverage. Deployed acceptance remains after merge.
 - Current behavior: Source checked at dev@d0972882 on 2026-10-20. CallScreenLayout passes campaign.dial_type === "predictive" to TopChrome; only its displayed mode names are wrong.
 - Root cause: TopChrome assigns the wrong user-facing name to both values of the predictive flag.
 - Resolution: Show Predictive dialing for predictive campaigns and Power dialing for power campaigns. Keep the existing mode selection and call controls.
 - Look in: `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-leave.test.tsx`
-- Existing tests: test/ui/call-screen-leave.test.tsx: two new mode-label cases fail on the original header; existing leave-campaign cases remain passing.
-- Missing tests: Complete full local and exact-head remote checks; verify both labels on deployed dev after merge.
-- Done when: Predictive Dialer campaigns show Predictive dialing.; Power Dialer campaigns show Power dialing.; Existing campaign call and leave behavior stays covered.
-- Tracker: Keep open through dev review and release verification. No linked PR existed at the 2026-10-20 inspection.
+- Existing tests: test/ui/call-screen-leave.test.tsx: both new mode cases fail against the original header; all 22 focused header and leave tests pass after the correction.; Browser check: the real header and app CSS show both corrected labels in light and dark themes.
+- Missing tests: Verify both labels on deployed dev after merge and complete release acceptance before default-branch promotion.
+- Done when: Predictive Dialer campaigns show Predictive dialing; Power Dialer campaigns show Power dialing; Existing campaign call and leave behavior stays covered
+- Tracker: Review [PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), then verify on dev. Keep the issue open until default-branch promotion and release acceptance.
 
 ---
 
