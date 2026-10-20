@@ -171,7 +171,7 @@ const WorkspaceNav = ({
   const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
   const desktopCenterClass = isCollapsed ? "lg:justify-center lg:px-2" : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${desktopCenterClass} ${
+    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:text-sm ${desktopCenterClass} ${
       isActive
         ? "border-brand-primary bg-brand-primary/10 text-brand-primary dark:border-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "border-transparent text-foreground/85 hover:border-border hover:bg-muted"
@@ -212,7 +212,7 @@ const WorkspaceNav = ({
           title={isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
           onClick={() => setIsCollapsed((collapsed) => !collapsed)}
         >
-          <Menu className="h-5 w-5" aria-hidden="true" />
+          <Menu className="h-5 w-5 lg:h-4 lg:w-4" aria-hidden="true" />
           <span className={desktopLabelClass}>Workspace menu</span>
         </Button>
         <nav
@@ -255,7 +255,7 @@ const WorkspaceNav = ({
                         end={item.end}
                         title={item.name}
                       >
-                        <Icon className="h-5 w-5" />
+                        <Icon className="h-5 w-5 lg:h-4 lg:w-4" />
                         <span className={desktopLabelClass}>{item.name}</span>
                         {item.path === "chats" && unreadChatsCount > 0 ? (
                           <span
