@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Textarea } from "@/components/ui/textarea";
 import {
   callPanelHeaderPrimaryClass,
   callPanelShellClass,
@@ -24,7 +26,7 @@ interface Script {
 
 interface CallQuestionnaireProps {
   handleResponse: (response: {
-    pageId: string;
+    pageId?: string;
     blockId: string;
     value: string | boolean | string[];
   }) => void;
@@ -51,6 +53,7 @@ const CallQuestionnaire = ({
     pageKeys[0] || undefined,
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
+  const notesId = useId();
 
 
   const handleBlockResponse = (
@@ -138,6 +141,19 @@ const CallQuestionnaire = ({
             </Button>
           </div>
         ) : null}
+        <FormField htmlFor={notesId} label="Notes" className="mt-4">
+          <Textarea
+            id={notesId}
+            name="notes"
+            rows={4}
+            value={typeof update?.notes === "string" ? update.notes : ""}
+            disabled={disabled || isBusy}
+            onChange={(event) => {
+              const value = event.target.value;
+              handleResponse({ blockId: "notes", value });
+            }}
+          />
+        </FormField>
         <div className="flex justify-end p-2">
           <Button type="button" onClick={handleQuickSave} disabled={isBusy}>
             Save

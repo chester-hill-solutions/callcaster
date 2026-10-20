@@ -107,6 +107,21 @@ describe("app/components/call/CallScreen.Questionnaire.tsx", () => {
     expect(screen.getByTestId("init-b1").textContent).toBe("v");
   });
 
+  test("restores notes when the saved result arrives after the panel mounts", async () => {
+    const { CallQuestionnaire } = await import("@/components/call/CallScreen.Questionnaire");
+    const handleResponse = vi.fn();
+    const props = {
+      handleResponse, campaignDetails: makeCampaignDetails(), nextRecipient: null,
+      handleQuickSave: vi.fn(), disabled: false, isBusy: false,
+    };
+    const { rerender } = render(<CallQuestionnaire {...props} update={{}} />);
+    expect(screen.getByRole("textbox", { name: "Notes", exact: true })).toHaveValue("");
+    rerender(<CallQuestionnaire {...props} update={{ notes: "Saved callback request" }} />);
+    expect(screen.getByRole("textbox", { name: "Notes", exact: true })).toHaveValue("Saved callback request");
+    fireEvent.change(screen.getByRole("textbox", { name: "Notes", exact: true }), { target: { value: "Updated callback request" } });
+    expect(handleResponse).toHaveBeenCalledWith({ blockId: "notes", value: "Updated callback request" });
+  });
+
   test("empty-string update value is coerced to null for initResult", async () => {
     const { CallQuestionnaire } = await import("@/components/call/CallScreen.Questionnaire");
     render(

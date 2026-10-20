@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Added: Callers can write notes in both dialing modes; notes save with the call result and stay with the selected contact ([#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531)).
 - Fixed: The campaign message editor has a visible label, connected personalization help and message counts, and the shared keyboard focus treatment ([#2652](https://github.com/chester-hill-solutions/callcaster/issues/2652)).
 - Fixed: Weekly Calling Hours and Send Window controls identify each day's start and end time, local time zone and end-time guidance for assistive technology ([#2658](https://github.com/chester-hill-solutions/callcaster/issues/2658)).
 - Changed: New accounts must confirm their email address before they can sign in. Registration now sends a verification link, and the signup and invitation pages say an email was sent instead of moving on to the workspace; a sign-in attempt with the right password but an unconfirmed address sends a fresh link. Registering an address that already has an account no longer reveals that it exists — it receives an account-exists email instead. This closes an account-takeover path where anyone could register an address they do not control ([#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216)).

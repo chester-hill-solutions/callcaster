@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
@@ -27,7 +27,7 @@ vi.mock("@/hooks/call/useCallRoom", () => ({
   default: vi.fn(() => ({
     status: "online",
     users: [],
-    predictiveState: { status: "idle", contact_id: null },
+    predictiveState: roomState,
   })),
 }));
 
@@ -57,6 +57,7 @@ const queueItem = {
   contact_id: 1,
   campaign_id: 1,
   status: "queued",
+  queue_state: "queued",
   attempts: 0,
   contact: { id: 1, phone: "+15551234567", address: "123 Main" },
 } as any;
@@ -65,6 +66,18 @@ let dialType = "call";
 let callerId = "+15550000001";
 let verifiedNumbers: string[] = [];
 let workspaceAccess = true;
+let queueItems = [queueItem];
+let roomState: { status: string; contact_id: number | null } = { status: "idle", contact_id: null };
+let initialAttempt: {
+  id: number;
+  contact_id: number;
+  campaign_id: number;
+  workspace: string;
+  user_id: string;
+  created_at: string;
+  disposition: string;
+  result: Record<string, unknown>;
+} | null = null;
 const navigate = vi.fn();
 const createOscillator = vi.fn();
 let fetcherCall = 0;
@@ -90,17 +103,17 @@ vi.mock("react-router", async () => {
         caller_id: callerId,
         group_household_queue: false,
       },
-      attempts: [],
+      attempts: initialAttempt ? [initialAttempt] : [],
       user: { id: "user-1" },
       workspaceId: "ws",
       campaignDetails: { script_id: 1 },
       credits: 100,
       contacts: [],
-      queue: [queueItem],
+      queue: queueItems,
       nextRecipient: queueItem,
       initalCallsList: [],
       initialRecentCall: null,
-      initialRecentAttempt: null,
+      initialRecentAttempt: initialAttempt,
       token: "twilio-token",
       count: 0,
       completed: 0,
@@ -118,6 +131,9 @@ describe("useCallScreen", () => {
     callerId = "+15550000001";
     verifiedNumbers = [];
     workspaceAccess = true;
+    queueItems = [queueItem];
+    roomState = { status: "idle", contact_id: null };
+    initialAttempt = null;
     vi.clearAllMocks();
     vi.stubGlobal("alert", vi.fn());
     vi.stubGlobal(
@@ -374,5 +390,119 @@ describe("useCallScreen", () => {
       new KeyboardEvent("keypress", { key: "3", bubbles: true }),
     );
     expect(playTone).toHaveBeenCalled();
+  });
+
+  test.each(["call", "predictive"])("a caller can edit and clear saved notes in %s mode without losing answers", async (mode) => {
+    dialType = mode;
+    workspaceAccess = false;
+    initialAttempt = {
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      created_at: new Date().toISOString(), disposition: "answered",
+      result: { q1: "yes", notes: "Call after 6 pm" },
+    };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { CallScreenLayout } = await import("@/components/call/CallScreen.Layout");
+    const { MemoryRouter } = await import("react-router");
+    function CallScreen() {
+      const model = useCallScreen();
+      return <CallScreenLayout {...model} dialogControls={{ ...model.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }} />;
+    }
+    render(<MemoryRouter><CallScreen /></MemoryRouter>);
+    const notes = screen.getByRole("textbox", { name: "Notes", exact: true });
+    expect(notes).toBeEnabled();
+    expect(notes).toHaveValue("Call after 6 pm");
+    fireEvent.change(notes, { target: { value: "Call after 7 pm\nAsk for Alex" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contact_id: 1, campaign_id: 1, workspace: "ws", callId: 31, update: { q1: "yes", notes: "Call after 7 pm\nAsk for Alex" } }),
+      { method: "PATCH", action: "/api/questions", encType: "application/json" },
+    );
+    fireEvent.change(notes, { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ update: { q1: "yes", notes: "" } }),
+      expect.anything(),
+    );
+  });
+
+  test("a disposition save preserves loaded notes and switching contacts clears them", async () => {
+    initialAttempt = {
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      created_at: new Date().toISOString(), disposition: "answered",
+      result: { q1: "yes", notes: "Call after 6 pm" },
+    };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result } = renderHook(() => useCallScreen());
+    expect(result.current.formState.update).toEqual({ q1: "yes", notes: "Call after 6 pm" });
+    act(() => result.current.callControls.setDisposition("not_home"));
+    act(() => result.current.formState.saveData());
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ disposition: "not_home", update: { q1: "yes", notes: "Call after 6 pm" } }),
+      expect.anything(),
+    );
+    act(() => result.current.formState.handleResponse({ blockId: "q2", value: "follow-up" }));
+    act(() => result.current.formState.saveData());
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ update: { q1: "yes", q2: "follow-up", notes: "Call after 6 pm" } }),
+      expect.anything(),
+    );
+    const secondContact = { ...queueItem, id: 2, contact_id: 2, contact: { ...queueItem.contact, id: 2 } };
+    act(() => { result.current.queueControls.switchQuestionContact({ contact: secondContact }); });
+    expect(result.current.formState.update).toBeNull();
+    act(() => result.current.formState.handleResponse({ blockId: "notes", value: "Leave a message" }));
+    act(() => result.current.formState.saveData());
+    expect(saveFetcher.submit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ contact_id: 2, callId: null, update: { notes: "Leave a message" } }),
+      expect.anything(),
+    );
+  });
+
+  test("a predictive connection to another contact clears the previous notes", async () => {
+    dialType = "predictive";
+    const secondContact = { ...queueItem, id: 2, contact_id: 2, contact: { ...queueItem.contact, id: 2 } };
+    queueItems = [queueItem, secondContact];
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    act(() => result.current.formState.handleResponse({ blockId: "notes", value: "First contact only" }));
+    expect(result.current.formState.update).toEqual({ notes: "First contact only" });
+    roomState = { status: "connected", contact_id: 2 };
+    rerender();
+    expect(result.current.formState.questionContact?.contact.id).toBe(2);
+    expect(result.current.formState.update).toBeNull();
+  });
+
+  test("notes without questionnaire answers use the existing autosave", async () => {
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { CallScreenLayout } = await import("@/components/call/CallScreen.Layout");
+    const { MemoryRouter } = await import("react-router");
+    function CallScreen() {
+      const model = useCallScreen();
+      return <CallScreenLayout {...model} dialogControls={{ ...model.dialogControls, isDialogOpen: false, isErrorDialogOpen: false }} />;
+    }
+    vi.useFakeTimers();
+    const view = render(<MemoryRouter><CallScreen /></MemoryRouter>);
+    try {
+      fireEvent.change(screen.getByRole("textbox", { name: "Notes", exact: true }), { target: { value: "Asked for a callback" } });
+      expect(saveFetcher.submit).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(saveFetcher.submit).toHaveBeenCalledWith(
+        expect.objectContaining({ contact_id: 1, callId: null, update: { notes: "Asked for a callback" } }),
+        { method: "PATCH", action: "/api/questions", encType: "application/json" },
+      );
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  test.each([{ contact_id: 2 }, { campaign_id: 2 }, { workspace: "other" }])("does not hydrate notes from an unrelated attempt: %j", async (mismatch) => {
+    initialAttempt = {
+      id: 31, contact_id: 1, campaign_id: 1, workspace: "ws", user_id: "user-1",
+      created_at: new Date().toISOString(), disposition: "answered",
+      result: { notes: "Another call's notes" }, ...mismatch,
+    };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result } = renderHook(() => useCallScreen());
+    expect(result.current.formState.update).toBeNull();
   });
 });
