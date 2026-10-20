@@ -147,9 +147,9 @@
   {
     "issueNumber": 2507,
     "verdict": "fix-now",
-    "summary": "A candidate removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Publication and deployed verification remain.",
-    "currentBehavior": "Production still has the persistent success toast. The candidate completion hook calls the existing completion callback without creating a toast; the upload panel retains its success message and row report link.",
-    "resolution": "Publish the atomic candidate after full local CI. Verify the deployed upload completion and saved report access before closing the issue.",
+    "summary": "PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.",
+    "currentBehavior": "The source on origin/master still creates the persistent success toast. The candidate completion hook calls the existing completion callback without creating a toast; the upload panel retains its success message and row report link.",
+    "resolution": "Review PR #2749 and its remote checks. Verify the deployed upload completion and saved report access before closing the issue.",
     "lookIn": [
       "app/components/audience/use-audience-upload-progress.ts",
       "app/components/audience/AudienceUploadProgressPanel.tsx"
@@ -167,7 +167,7 @@
       "Embedded and standalone completion callbacks still run once."
     ],
     "rootCause": "The completion hook created an infinite-duration root success toast with a report download action, duplicating the upload panel's feedback and report action.",
-    "trackerRecommendation": "Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified."
+    "trackerRecommendation": "Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. PR #2749 targets dev and has the verified Development link. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified."
   },
   {
     "issueNumber": 2684,
