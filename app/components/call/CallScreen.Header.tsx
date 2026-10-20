@@ -247,7 +247,7 @@ export function TopChrome({
               {count - completed} of {count} remaining
             </span>
             <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
-              {predictive ? "Power dialing" : "Manual dialing"}
+              {predictive ? "Predictive dialing" : "Power dialing"}
             </span>
             {hasAccess ? (
               <span
