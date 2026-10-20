@@ -35,7 +35,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
 - Verdict: **Fix now** · Type: Bug · Assignees: @manstephen, @wra-sol · Updated: 2026-10-20
-- Browser verification confirms black icons in system-dark mode. The candidate fix uses the themed button foreground and awaits review and merge.
+- Browser verification confirms black icons in system-dark mode. [PR #2753](https://github.com/chester-hill-solutions/callcaster/pull/2753) uses the themed button foreground and awaits review and merge.
 - Root cause: The raw theme is `system`, so the `theme === "dark"` branch selects black. Undefined before hydration is expected; icon colour should follow CSS instead.
 - Resolution: Use ghost buttons and inherited icon colour. Keep the theme provider and system default.
 - Look in: `app/components/workspace/TeamMember.tsx`
