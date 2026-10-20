@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import {
   BarChart3,
@@ -11,6 +11,7 @@ import {
   Headset,
   Megaphone,
   MessageSquare,
+  Menu,
   Phone,
   Plus,
   Settings,
@@ -158,6 +159,7 @@ const WorkspaceNav = ({
   className = "",
 }: WorkspaceNavProps) => {
   const location = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const unreadChatsCount = useUnreadConversationsCount(workspace.id);
   const isAdmin = hasMinRole(userRole, MemberRole.Admin);
   const baseUrl = `/workspaces/${workspace.id}`;
@@ -166,22 +168,24 @@ const WorkspaceNav = ({
     items: group.items.filter((item) => hasMinRole(userRole, item.minRole)),
   })).filter((group) => group.items.length > 0);
 
+  const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
+  const desktopCenterClass = isCollapsed ? "lg:justify-center lg:px-2" : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:justify-center lg:px-2 ${
+    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${desktopCenterClass} ${
       isActive
         ? "border-brand-primary bg-brand-primary/10 text-brand-primary dark:border-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "border-transparent text-foreground/85 hover:border-border hover:bg-muted"
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:justify-center lg:px-2 ${
+    `flex items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${desktopCenterClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:justify-center lg:px-2 ${
+    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${desktopCenterClass} ${
       isActive
         ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -196,13 +200,32 @@ const WorkspaceNav = ({
   const navBody = (
     <>
       <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size={isCollapsed ? "icon" : "sm"}
+          className={isCollapsed ? "self-center" : "w-full justify-start"}
+          aria-label={
+            isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"
+          }
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
+          onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+          <span className={desktopLabelClass}>Workspace menu</span>
+        </Button>
         <nav
           aria-label="Workspace sections"
           className="min-h-0 space-y-5 overflow-y-auto pr-1 lg:overflow-visible"
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
-              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground lg:hidden">
+              <h3
+                className={`mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
+                  isCollapsed ? "lg:hidden" : ""
+                }`}
+              >
                 {group.name}
               </h3>
               <div className="space-y-1">
@@ -233,7 +256,7 @@ const WorkspaceNav = ({
                         title={item.name}
                       >
                         <Icon className="h-5 w-5" />
-                        <span className="lg:sr-only">{item.name}</span>
+                        <span className={desktopLabelClass}>{item.name}</span>
                         {item.path === "chats" && unreadChatsCount > 0 ? (
                           <span
                             data-testid="chats-unread-badge"
@@ -257,7 +280,9 @@ const WorkspaceNav = ({
                                 title={subItem.name}
                               >
                                 <subItem.icon className="h-4 w-4 shrink-0" />
-                                <span className="min-w-0 truncate">
+                                <span
+                                  className={`min-w-0 truncate ${isCollapsed ? "lg:not-sr-only" : ""}`}
+                                >
                                   {subItem.name}
                                 </span>
                               </NavLink>
@@ -284,7 +309,7 @@ const WorkspaceNav = ({
                 <CreditCard className="h-4 w-4" />
                 Credits
               </span>
-              <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground lg:sr-only">
+                                <span className={`rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground ${desktopLabelClass}`}>
                 {workspace.credits}
               </span>
             </NavLink>
@@ -297,7 +322,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-          className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-visible rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex lg:w-16 lg:max-w-16 ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${isCollapsed ? "lg:w-16 lg:max-w-16" : "lg:w-63 lg:max-w-63"} ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>

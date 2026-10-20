@@ -1,5 +1,6 @@
 import React from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
@@ -54,6 +55,24 @@ describe("app/components/workspace/WorkspaceNav.tsx unread chats badge", () => {
       expect(mocks.fetch).toHaveBeenCalled(),
     );
     expect(screen.queryAllByTestId("chats-unread-badge")).toHaveLength(0);
+  });
+
+  test("toggles the desktop workspace rail between collapsed and expanded states", async () => {
+    replyWithCount(0);
+    const user = userEvent.setup();
+
+    renderNav();
+
+    const expandButtons = screen.getAllByRole("button", {
+      name: "Expand workspace sidebar",
+    });
+    expect(expandButtons.length).toBeGreaterThan(0);
+
+    await user.click(expandButtons[0]);
+
+    expect(
+      screen.getAllByRole("button", { name: "Collapse workspace sidebar" }).length,
+    ).toBeGreaterThan(0);
   });
 
   test("renders the workspace unread total returned by the count API", async () => {
