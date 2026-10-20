@@ -25,7 +25,7 @@ export { MemberRole };
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
   clsx(
-    "aspect-square w-8 rounded-full",
+    "size-2 shrink-0 rounded-full",
     memberRole === MemberRole.Owner && "bg-green-500",
     memberRole === MemberRole.Member && "bg-cyan-500",
     memberRole === MemberRole.Caller && "bg-rose-500",
