@@ -308,14 +308,15 @@ const WorkspaceNav = ({
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
-              title="Credits"
+              aria-label={`Credits: ${workspace.credits}`}
+              title={`Credits: ${workspace.credits}`}
             >
               <span className="inline-flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
+                <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
+                  <CreditCard className="h-5 w-5" aria-hidden="true" />
+                  <span className="absolute scale-75 bg-card text-xs font-bold leading-none text-foreground">{workspace.credits}</span>
+                </span>
                 <span className={desktopLabelClass}>Credits</span>
-              </span>
-              <span className="shrink-0 rounded-md bg-brand-secondary/40 px-1.5 py-0.5 text-xs text-foreground">
-                {workspace.credits}
               </span>
             </NavLink>
           </div>
