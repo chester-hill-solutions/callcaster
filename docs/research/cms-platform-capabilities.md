@@ -26,8 +26,8 @@ the [CORS policy](../api-overview.md#cors).
 
 ## Memberstack
 
-Memberstack is a membership layer for Webflow and other front ends. It is
-client-side. It has no hosting.
+Memberstack is a membership layer for Webflow and other front ends. The documented
+Admin REST integration needs a server owned by the integrator.
 
 ### 1. Member/contact record
 
@@ -35,7 +35,8 @@ client-side. It has no hosting.
 - A phone number is a **custom field**. Custom fields are global key-value pairs
   that you define in the dashboard. The docs show a "Phone" custom field.
 - Hidden custom fields (`restrictToAdmin`) are backend-only.
-- Metadata is backend-write-only and is limited to 500 characters.
+- Metadata is readable in the frontend, writable from the backend, and limited
+  to 500 characters.
 - Member JSON holds nested data (1 MB limit). DataTables hold multi-row records.
 
 ### 2. Upsert key
@@ -62,14 +63,14 @@ client-side. It has no hosting.
 
 ### 4. Consent
 
-- No built-in consent field.
-- Use a custom field, for example `sms_consent`.
-- The docs give no SMS consent guidance.
+- The cited member-data schema defines custom fields, not an SMS consent record.
+- Map source-owned consent evidence through those fields; see the agreed consent
+  contract below.
 
 ### 5. Server-side execution surface
 
-- None. Memberstack does not host code.
-- The site owner needs their own server or an automation tool.
+- Use the site owner's server or an automation tool. The cited Admin REST guide
+  requires a server-side environment.
 - The Admin REST API base URL is `https://admin.memberstack.com`. Authenticate with
   the `X-API-KEY` header. Full member CRUD is available.
 
@@ -121,8 +122,8 @@ a member authentication record; the integrator must map its member data.
   `timestamp + ":" + body`. The key is the site token secret or the OAuth client
   secret. `x-webflow-timestamp` gives the send time. Reject requests older than
   5 minutes.
-- Retries: up to 3 more tries. Webflow can then deactivate the
-  webhook and sends an email.
+- Retries: up to 3 more tries. Webflow can then deactivate the webhook and send
+  an email.
 - **Important:** webhooks made in the dashboard do not include the signature
   headers. Create the webhook through the API to get signing.
 
@@ -192,7 +193,7 @@ HubSpot is a CRM. It has the richest contact model of the platforms here.
   client secret and body. For v3, validate `X-HubSpot-Signature-v3` and
   `X-HubSpot-Request-Timestamp` as documented. Do not apply the v3 algorithm to a
   v1 delivery.
-- Retries: up to 10 tries over 24 hours after a failure, a 4xx or 5xx status, or a
+- Retries: up to 10 retries over 24 hours after a failure, a 4xx or 5xx status, or a
   response slower than 5 seconds.
 - A separate "Send a webhook" workflow action has different retry rules (up to
   three days; not on 4xx except 429).
@@ -205,8 +206,8 @@ HubSpot is a CRM. It has the richest contact model of the platforms here.
 - The Communication Preferences API covers the **EMAIL** channel. It does not
   return or set SMS or WhatsApp consent. The exact SMS consent property names are
   **unverified**.
-- Common practice is a dedicated consent property. The docs do not define a fixed
-  internal name.
+- The cited guides do not establish a fixed field mapping for SMS evidence.
+  Verify the source fields in the selected account.
 
 ### 5. Server-side execution surface
 
@@ -221,8 +222,8 @@ HubSpot is a CRM. It has the richest contact model of the platforms here.
 
 ### What this means for the CallCaster spec
 
-- HubSpot is the only platform here with a consent model. Still require an explicit
-  consent field, because the API does not expose SMS consent.
+- HubSpot documents SMS consent, but the cited Communication Preferences API
+  exposes email consent. Require the evidence in the agreed CallCaster contract.
 - HubSpot's `idProperty` aliases apply to HubSpot's own API. In CallCaster, use
   `external_id` or the agreed normalized-phone fallback.
 - Expect an extra read after `contact.creation`.
@@ -271,7 +272,7 @@ system.
 ### 5. Server-side execution surface
 
 - The WordPress site is the server. It runs PHP on ordinary hosting.
-- The REST API uses Application Passwords for authentication.
+- Server integrations can use Application Passwords for REST authentication.
 - A plugin or theme can call the CallCaster API server-side.
 
 ### 6. No-code automation
@@ -354,8 +355,8 @@ alternative to PMP. It has a clearer webhook story.
 ### 1. Member/contact record
 
 - A record is a WordPress customer plus a "user membership" object.
-- Phone: WooCommerce stores `billing_phone` on the customer and order. It is not a
-  membership field.
+- The customer REST API exposes phone as `billing.phone`. It is not a membership
+  field; read the customer identified by the membership's `customer_id`.
 - A user membership has `profile_fields` and `meta_data`.
 
 ### 2. Upsert key
@@ -376,9 +377,10 @@ alternative to PMP. It has a clearer webhook story.
 - Payload: the user membership object (or plan object).
 - Signing: a webhook secret generates an HMAC hash. The hash is in the request
   headers (`X-WC-Webhook-Signature`).
-- Delivery: WooCommerce disables a webhook after more than 5 consecutive failures. A
-  successful response is 2xx, 301, or 302. The cited page gives no timed retry
-  schedule; do not infer one from the disable threshold.
+- Delivery: the operations guide says that more than 5 consecutive failures
+  disable a webhook and treats 2xx, 301, and 302 as success. The legacy v2 API
+  guide uses a different threshold and failure rule. Verify the installed version;
+  neither guide establishes a timed retry schedule.
 
 ### 4. Consent
 
@@ -405,6 +407,7 @@ Sources:
 
 - https://godaddy-wordpress.github.io/woocommerce-memberships-rest-api-docs/
 - https://developer.woocommerce.com/docs/apis/rest-api/v2/webhooks/
+- https://developer.woocommerce.com/docs/apis/rest-api/v2/customers/
 - https://woocommerce.com/document/webhooks/
 - https://docs.n8n.io/integrations/builtin/app-nodes/n8n-nodes-base.woocommerce/
 
@@ -444,7 +447,7 @@ Sources:
 | HubSpot | First-class `phone` | Record `id`, email, or custom unique id in HubSpot | Yes (verify the delivery's signature version) | SMS subscription UI; cited API is EMAIL-only |
 | WordPress core | None (user meta) | User `id` | No | None (user meta) |
 | Paid Memberships Pro | Custom User Field | User `id` | Zapier add-on; core option unverified | Custom field |
-| WooCommerce Memberships | `billing_phone` (WooCommerce) | Membership `id` / `customer_id` | Yes (HMAC-signed) | No SMS evidence in the cited membership schema |
+| WooCommerce Memberships | `billing.phone` on the customer | Membership `id` / `customer_id` | Yes (HMAC-signed) | No SMS evidence in the cited membership schema |
 
 ## Agreed CallCaster decisions
 
