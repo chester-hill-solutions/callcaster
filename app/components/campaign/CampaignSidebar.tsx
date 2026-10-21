@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { NavLink, useFetcher } from "react-router";
-import { Headset, MessageSquare, Pause, Phone, Play, Plus } from "lucide-react";
+import { Headset, Mail, MessageSquare, Pause, Phone, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -88,7 +88,9 @@ function CampaignTypeIcon({ type }: { type: string | null | undefined }) {
       ? MessageSquare
       : type === "live_call"
         ? Headset
-        : Phone;
+        : type === "email"
+          ? Mail
+          : Phone;
   return <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />;
 }
 
