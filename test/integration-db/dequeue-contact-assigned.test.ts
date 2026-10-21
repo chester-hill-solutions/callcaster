@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
+import { sql } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -401,6 +402,29 @@ describeDb("dequeue_contact against real Postgres", () => {
     } finally {
       executed.mockRestore();
     }
+  });
+
+  test("a transaction rollback restores both the dequeue and campaign status (#2052)", async () => {
+    for (const contactId of [primaryContactId, siblingContactId]) {
+      await setState(contactId, { queue_state: "dequeued" });
+    }
+
+    await expect(drizzle(client).transaction(async (tx) => {
+      await dequeueQueueEntry({
+        by: { contactId: Number(loneContactId), campaignId: Number(campaignId) },
+        workspaceId, household: false, userId: AGENT_A, reason: "Last contact",
+        exec: tx,
+      });
+      const [campaign] = await tx.execute(sql`
+        select status::text from public.campaign where id = ${campaignId}::bigint`);
+      expect(campaign.status).toBe("complete");
+      throw new Error("rollback completion probe");
+    })).rejects.toThrow("rollback completion probe");
+
+    expect(await queueRow(loneContactId)).toMatchObject({ queue_state: "queued", dequeued_at: null });
+    const [campaign] = await client<{ status: string }[]>`
+      select status::text from public.campaign where id = ${campaignId}::bigint`;
+    expect(campaign.status).toBe("running");
   });
 
   test.each([

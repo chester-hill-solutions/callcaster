@@ -685,7 +685,7 @@ export async function dequeueQueueEntry(
       dequeuedReasonText: args.reason,
     });
     if (primaryRowsDequeued > 0) {
-      await tryCompleteDrainedCampaigns([campaignId], exec);
+      await tryCompleteDrainedCampaigns([campaignId], exec, args.workspaceId);
     }
     return { dequeuedPrimary: primaryRowsDequeued > 0 };
   }

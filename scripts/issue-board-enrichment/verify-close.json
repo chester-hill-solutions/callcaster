@@ -1,44 +1,5 @@
 [
   {
-    "issueNumber": 2052,
-    "verdict": "verify-close",
-    "recommendedTitle": "Give the completion RPC one best-effort owner",
-    "summary": "Five call sites invoke try_complete_campaign_if_drained and only two guard it. campaign-queue-completion.server.ts:51-68 and ivr/status.action.server.ts:130-153 catch and log; the #2048 campaign-settle-recheck.server.ts catches and logs under a third event name; campaign.server.ts continueOrCompleteDispatch and auto-dial.server.ts:437-444 do not catch at all, so an RPC failure propagates and fails the dispatch job or dial drain. An RPC failure only means 'not complete yet', which must never fail unrelated work.",
-    "currentBehavior": "Completion failures are reported three different ways depending on surface, and on two surfaces they fail the surrounding job instead of being absorbed.",
-    "rootCause": "Each call site invented its own try/catch and log message. The #2048 wrapper was created for the same reason, so there are now two wrappers and three policies.",
-    "resolution": "One internal helper owns 'ask the gate, log, never throw', with a comment stating why. All five call sites use it and lose their own try/catch. Collapse campaign-settle-recheck.server.ts into the same owner rather than keeping two wrappers. Normalise the log event name and fields so a completion failure reads the same from every surface.",
-    "lookIn": [
-      "app/lib/campaign-queue-completion.server.ts:51-68",
-      "app/routes/api+/ivr/status.action.server.ts:130-153",
-      "app/lib/campaign-settle-recheck.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts (continueOrCompleteDispatch)",
-      "app/lib/auto-dial.server.ts:437-444",
-      "app/lib/db-rpc.server.ts:176-184"
-    ],
-    "existingTests": [
-      "test/webhook-side-effects.test.ts",
-      "test/campaign-settle-recheck.server.test.ts"
-    ],
-    "missingTests": [
-      "completion RPC failure does not propagate out of a dispatch job",
-      "completion RPC failure does not propagate out of a dial drain",
-      "completion RPC failure does not fail a Twilio webhook",
-      "completion RPC failure does not fail an open-sync sweep",
-      "one log event name is used from every surface"
-    ],
-    "acceptanceCriteria": [
-      "Exactly one code path owns the best-effort completion call",
-      "All five call sites use it with no local try/catch",
-      "A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep",
-      "One log event name and field set from every surface",
-      "Failure path tested at each call site, not only at the owner"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Small cleanup, no live defect. Raised by the #2048 structural review and deliberately deferred there to keep that PR atomic. Lane is verify-close because the work is a de-duplication with no behavioural change to specify."
-  },
-  {
     "issueNumber": 1333,
     "verdict": "verify-close",
     "recommendedTitle": "test(chats): prove STOP and START text remains visible to operators",

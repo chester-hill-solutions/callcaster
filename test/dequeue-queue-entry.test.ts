@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { logger } from "@/lib/logger.server";
 
 /**
  * Unit tests for dequeueQueueEntry's routing logic (app/lib/campaign-queue-db.server.ts,
@@ -341,5 +342,21 @@ describe("dequeueQueueEntry completes a campaign its dequeue drained (#1484)", (
     });
 
     expect(result).toEqual({ dequeuedPrimary: true });
+    expect(logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
+      campaignId: 99, workspaceId: "workspace-1", reason: "queue_dequeue", error: "db down",
+    });
+  });
+
+  test("completion uses the dequeue transaction executor (#2154)", async () => {
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+    const transaction = { execute: vi.fn(async () => []) };
+
+    await dequeueQueueEntry({
+      by: { contactId: 7, campaignId: 55 }, workspaceId: "workspace-1",
+      household: true, userId: "user-1", reason: "Last contact", exec: transaction,
+    });
+
+    expect(rpcTryCompleteMock).toHaveBeenCalledWith(transaction, 55);
+    expect(dbMocks.execute).not.toHaveBeenCalled();
   });
 });

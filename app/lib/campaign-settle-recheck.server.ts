@@ -31,55 +31,10 @@
  * - A NULL `campaignId` is not re-checked. The inbound SMS write path leaves
  *   `message.campaign_id` NULL (#2046), and there is no campaign to complete.
  */
-import {
-  rpcCampaignIdsWithUnsettledMessages,
-  rpcTryCompleteCampaignIfDrained,
-} from "@/lib/db-rpc.server";
+import { rpcCampaignIdsWithUnsettledMessages } from "@/lib/db-rpc.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb } from "@/server/tenant-db";
-
-/**
- * Ask the completion gate about one campaign, best-effort.
- *
- * Returns true when the campaign is now complete. Never throws: a Twilio status
- * webhook must still return 200 when this fails, or Twilio retries the
- * callback and the billing side effects run twice.
- *
- * `reason` is for the log line only. It says which event prompted the ask, so a
- * campaign that completes here can be traced back to the callback or sweep that
- * closed it.
- */
-export async function recheckCampaignCompletion(input: {
-  workspaceId: string;
-  campaignId: number | null | undefined;
-  reason: string;
-}): Promise<boolean> {
-  const { workspaceId, campaignId, reason } = input;
-  if (campaignId == null) return false;
-
-  try {
-    const completed = await rpcTryCompleteCampaignIfDrained(
-      createTenantDb(workspaceId),
-      campaignId,
-    );
-    if (completed) {
-      logger.info("campaign.completed_on_recheck", {
-        campaignId,
-        workspaceId,
-        reason,
-      });
-    }
-    return completed;
-  } catch (error) {
-    logger.warn("campaign.completion_recheck_failed", {
-      campaignId,
-      workspaceId,
-      reason,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
-}
 
 /**
  * Re-check every campaign in the workspace that the gate is currently
@@ -125,6 +80,7 @@ export async function recheckCampaignsWithUnsettledMessages(input: {
       workspaceId,
       campaignId,
       reason,
+      exec: createTenantDb(workspaceId),
     });
     if (didComplete) completed += 1;
   }

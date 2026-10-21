@@ -489,7 +489,6 @@ test/ivr-page.route.test.ts::@/lib/telephony-db.server#1
 test/ivr-page.route.test.ts::@/lib/twilio-webhook.server#1
 test/ivr-status.route.test.ts::@/lib/campaign-ivr.server#1
 test/ivr-status.route.test.ts::@/lib/env.server#1
-test/ivr-status.route.test.ts::@/lib/logger.server#1
 test/ivr-status.route.test.ts::@/lib/object-storage.server#1
 test/ivr-status.route.test.ts::@/lib/telephony-db.server#1
 test/ivr-status.route.test.ts::@/lib/transaction-history.server#1
