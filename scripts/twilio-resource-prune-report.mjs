@@ -48,6 +48,7 @@ import "dotenv/config";
 import Twilio from "twilio";
 import postgres from "postgres";
 
+import { collectResources } from "./lib/twilio-prune-resources.mjs";
 import { loadLiveEnvironmentNames } from "./lib/live-environments.mjs";
 import { buildTwilioPruneReport, PRUNE_VERDICT } from "./lib/twilio-resource-prune-policy.mjs";
 import {
@@ -60,12 +61,6 @@ import {
 const args = process.argv.slice(2);
 const asJson = args.includes("--json");
 const skipSubaccounts = args.includes("--skip-subaccounts");
-
-/** How many subaccounts to scan at the same time. */
-const SCAN_CONCURRENCY = 5;
-
-/** Page size for every list call. Twilio allows up to 1000. */
-const PAGE_SIZE = 1000;
 
 /**
  * A workspace counts as active when it has done something in this window.
@@ -115,128 +110,6 @@ async function main() {
   }
 
   printReport({ report, liveEnvironments, database, resources });
-}
-
-/**
- * Every Twilio resource in the account, in one flat list.
- *
- * The parent account is scanned first, then every subaccount. A workspace is a
- * subaccount, so most workspace-owned resources only show up in the subaccount
- * scan.
- */
-async function collectResources(client, { skipSubaccounts }) {
-  const resources = [];
-  const accounts = client.api.v2010.accounts;
-
-  for (const application of await client.applications.list({ limit: PAGE_SIZE })) {
-    resources.push({
-      resourceType: "twiml_app",
-      sid: application.sid,
-      friendlyName: application.friendlyName,
-      scope: "parent",
-    });
-  }
-
-  for (const service of await client.messaging.v1.services.list({ limit: PAGE_SIZE })) {
-    resources.push({
-      resourceType: "messaging_service",
-      sid: service.sid,
-      friendlyName: service.friendlyName,
-      scope: "parent",
-    });
-  }
-
-  for (const number of await client.incomingPhoneNumbers.list({ limit: PAGE_SIZE })) {
-    resources.push({
-      resourceType: "incoming_phone_number",
-      sid: number.sid,
-      friendlyName: number.friendlyName,
-      phoneNumber: number.phoneNumber,
-      scope: "parent",
-    });
-  }
-
-  const subaccounts = (await accounts.list({ limit: 200 })).filter(
-    (account) => account.sid !== client.accountSid,
-  );
-
-  for (const subaccount of subaccounts) {
-    resources.push({
-      resourceType: "subaccount",
-      sid: subaccount.sid,
-      friendlyName: subaccount.friendlyName,
-      scope: "subaccount",
-    });
-  }
-
-  if (skipSubaccounts) {
-    return resources;
-  }
-
-  // A subaccount's resources belong to the workspace that owns the subaccount,
-  // so they are reported under the subaccount's name, which carries the owner
-  // hint. The hint is the same either way, and the subaccount's own status is
-  // not part of the verdict.
-  for (const batch of chunk(subaccounts, SCAN_CONCURRENCY)) {
-    const scanned = await Promise.all(
-      batch.map(async (subaccount) => {
-        const sub = accounts(subaccount.sid);
-        const found = [];
-        for (const application of await sub.applications.list({ limit: PAGE_SIZE })) {
-          found.push({
-            resourceType: "twiml_app",
-            sid: application.sid,
-            friendlyName: application.friendlyName,
-            scope: "subaccount",
-          });
-        }
-        for (const service of await listSubaccountMessagingServices(client, subaccount.sid)) {
-          found.push({
-            resourceType: "messaging_service",
-            sid: service.sid,
-            friendlyName: service.friendlyName,
-            scope: "subaccount",
-          });
-        }
-        for (const number of await sub.incomingPhoneNumbers.list({ limit: PAGE_SIZE })) {
-          found.push({
-            resourceType: "incoming_phone_number",
-            sid: number.sid,
-            friendlyName: number.friendlyName,
-            phoneNumber: number.phoneNumber,
-            scope: "subaccount",
-          });
-        }
-        return found;
-      }),
-    );
-    for (const found of scanned) resources.push(...found);
-  }
-
-  return resources;
-}
-
-/**
- * The messaging services of one subaccount.
- *
- * The SDK exposes messaging services under the client's own namespace, not
- * under an account namespace, so a subaccount's services are only reachable
- * through the account-scoped REST path. A failure here is recorded and the
- * scan continues: one unreadable subaccount must not abort the report.
- */
-async function listSubaccountMessagingServices(client, subaccountSid) {
-  try {
-    const response = await client.request({
-      method: "get",
-      uri: `https://api.twilio.com/2010-04-01/Accounts/${subaccountSid}/Messaging/Services.json`,
-    });
-    return (response?.messaging_services ?? []).map((service) => ({
-      sid: service.sid,
-      friendlyName: service.friendly_name ?? null,
-    }));
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -392,13 +265,6 @@ function printReport({ report, liveEnvironments, database, resources }) {
   );
 }
 
-function chunk(items, size) {
-  const batches = [];
-  for (let index = 0; index < items.length; index += size) {
-    batches.push(items.slice(index, index + size));
-  }
-  return batches;
-}
 
 function pad(value, width) {
   return String(value ?? "—").slice(0, width).padEnd(width);

@@ -3,9 +3,9 @@
     "issueNumber": 2531,
     "verdict": "fix-now",
     "summary": "PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.",
-    "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact’s answers.",
+    "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact\u2019s answers.",
     "rootCause": "The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.",
-    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.",
+    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt\u2019s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact\u2019s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.",
     "lookIn": [
       "app/components/call/CallScreen.Questionnaire.tsx",
       "app/hooks/call/useCallScreen.ts",
@@ -377,5 +377,38 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification."
+  },
+  {
+    "issueNumber": 2757,
+    "verdict": "fix-now",
+    "summary": "The report repair uses the Messaging Services API with subaccount credentials, scans all SDK pages and stops on unreadable lists. The keep-list and deletion policy stay unchanged.",
+    "currentBehavior": "At dev@e4bb8ac6, the CLI silently reports no subaccount Messaging Services after a failed request and can truncate accounts at 200 or resources at 1,000.",
+    "rootCause": "The subaccount lookup used /2010-04-01/Accounts/{sid}/Messaging/Services.json, ignored the raw response shape and caught every error as an empty list. SDK limit options capped the total inventory instead of setting a page size.",
+    "resolution": "Extract the resource collector for SDK transport tests. Use messaging.v1.services.list with each subaccount\u2019s credentials, use pageSize without a total limit and preserve a failed read with its account context.",
+    "lookIn": [
+      "scripts/twilio-resource-prune-report.mjs",
+      "scripts/lib/twilio-prune-resources.mjs",
+      "test/twilio-prune-resources.test.ts"
+    ],
+    "existingTests": [
+      "Four new real-SDK transport regressions fail against the original collector while two controls pass.",
+      "38 focused cases pass: seven collector cases plus 31 existing environment, owner and keep-list policy cases.",
+      "A live read-only probe confirms that a suspended subaccount rejects Messaging Services reads with HTTP 401 even when listed and fetched tokens match. The report must fail rather than imply that inventory is complete.",
+      "Isolated negative controls: restoring a total service cap fails one of seven collector cases; switching the child client to parent credentials fails four. The unchanged control passes all seven."
+    ],
+    "missingTests": [
+      "Full local CI and exact-head remote checks before publication/merge.",
+      "Complete live inventory remains subject to suspended-account access; the report repair must report that failure clearly."
+    ],
+    "acceptanceCriteria": [
+      "Include Messaging Services with the subaccount\u2019s own credentials.",
+      "Enumerate all account and resource pages.",
+      "Fail unreadable lists with account context instead of reporting an empty successful scan.",
+      "Keep the report read-only and preserve all keep-list and environment/owner decisions."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog was verified in the browser. Parent #1165; no children, blockers or fixing PR at the start. This repair does not complete the broader cleanup or its retention decision."
   }
 ]
