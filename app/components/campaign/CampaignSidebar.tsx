@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { useFetcherOnIdle } from "@/hooks/utils";
+import { campaignStatusBarClass } from "@/lib/campaign-status";
 import type { Campaign } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -63,17 +64,6 @@ const CAMPAIGN_TYPE_OPTIONS = [
   ["live_call", "Live calling"],
   ["email", "Email"],
 ] as const;
-
-const campaignStatusBarClass: Record<string, string> = {
-  pending: "border-l-violet-500",
-  scheduled: "border-l-info-text",
-  running: "border-l-success-text",
-  complete: "border-l-cyan-500",
-  paused: "border-l-orange-500",
-  draft: "border-l-muted-foreground",
-  archived: "border-l-border",
-  waiting: "border-l-yellow-500",
-};
 
 function campaignTypeFilterValue(type: string | null | undefined): string {
   if (type === "simple_ivr" || type === "complex_ivr" || type === "robocall") {
@@ -154,7 +144,7 @@ function CampaignSidebarList({
             return (
               <div
                 key={campaign.id}
-                className={`flex items-center gap-1 rounded-lg border border-transparent border-l-4 p-1 hover:border-border hover:bg-muted/60 ${campaignStatusBarClass[campaign.status ?? ""] ?? "border-l-border"}`}
+                className={`flex items-center gap-1 rounded-lg border border-transparent border-l-4 p-1 hover:border-border hover:bg-muted/60 ${campaignStatusBarClass(campaign.status)}`}
               >
                 <NavLink
                   to={`/workspaces/${workspaceId}/campaigns/${campaign.id}`}

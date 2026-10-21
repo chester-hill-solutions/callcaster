@@ -1,5 +1,6 @@
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { campaignStatusBadgeClass } from "@/lib/campaign-status";
 
 type StatusVariant = NonNullable<BadgeProps["variant"]>;
 
@@ -90,9 +91,13 @@ export type StatusBadgeProps = {
  */
 export function StatusBadge({ status, label, className }: StatusBadgeProps) {
   const variant = statusToVariant[status.toLowerCase()] ?? "outline";
+  const campaignClass = campaignStatusBadgeClass(status);
 
   return (
-    <Badge variant={variant} className={cn("shrink-0", className)}>
+    <Badge
+      variant={campaignClass ? "outline" : variant}
+      className={cn("shrink-0", campaignClass, className)}
+    >
       {label ?? formatStatusLabel(status)}
     </Badge>
   );
