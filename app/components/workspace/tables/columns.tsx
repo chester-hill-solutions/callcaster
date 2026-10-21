@@ -7,7 +7,14 @@ import { Button } from "@/components/ui/button";
 import { NavLink, useSubmit } from "react-router";
 import { downloadBlobPart } from "@/lib/download-blob.client";
 
-function AudienceDownloadCell({ audienceId }: { audienceId: string | number }) {
+function audienceActionTarget(audience: Pick<Audience, "id" | "name">) {
+  return `${audience.name || "Unnamed Call list"} (Call list ${audience.id})`;
+}
+
+function AudienceDownloadCell({ audienceId, audienceLabel }: {
+  audienceId: string | number;
+  audienceLabel: string;
+}) {
   const handleDownload = async () => {
     const response = await fetch(
       `/api/audiences?audienceId=${encodeURIComponent(String(audienceId))}&returnType=csv`,
@@ -27,20 +34,25 @@ function AudienceDownloadCell({ audienceId }: { audienceId: string | number }) {
     <Button
         type="button"
         variant="ghost"
+        aria-label={`Download ${audienceLabel}`}
         onClick={() => {
           void handleDownload();
         }}
       >
-        <MdDownload className="text-brand-primary dark:text-white" />
+        <MdDownload className="text-brand-primary dark:text-white" aria-hidden />
       </Button>
   );
 }
 
-function AudienceDeleteCell({ audienceId }: { audienceId: string | number }) {
+function AudienceDeleteCell({ audienceId, audienceLabel }: {
+  audienceId: string | number;
+  audienceLabel: string;
+}) {
   const submit = useSubmit();
 
   return (
     <Button
+      aria-label={`Delete ${audienceLabel}`}
       onClick={() => {
         submit(
           { id: audienceId },
@@ -52,7 +64,7 @@ function AudienceDeleteCell({ audienceId }: { audienceId: string | number }) {
         );
       }}
     >
-      <MdRemoveCircle />
+      <MdRemoveCircle aria-hidden />
     </Button>
   );
 }
@@ -75,8 +87,11 @@ export const audienceColumns: ColumnDef<Audience>[] = [
     cell: ({ row }) => {
       return (
         <Button asChild variant="ghost">
-          <NavLink to={`${row.original?.id}`}>
-            <MdEdit />
+          <NavLink
+            to={`${row.original?.id}`}
+            aria-label={`Edit ${audienceActionTarget(row.original)}`}
+          >
+            <MdEdit aria-hidden />
           </NavLink>
         </Button>
       );
@@ -86,14 +101,20 @@ export const audienceColumns: ColumnDef<Audience>[] = [
   {
     header: "Download",
     cell: ({ row }) => {
-      return <AudienceDownloadCell audienceId={row.original.id} />;
+      return <AudienceDownloadCell
+        audienceId={row.original.id}
+        audienceLabel={audienceActionTarget(row.original)}
+      />;
     },
     maxSize: 50,
   },
   {
     header: "Delete",
     cell: ({ row }) => {
-      return <AudienceDeleteCell audienceId={row.original.id} />;
+      return <AudienceDeleteCell
+        audienceId={row.original.id}
+        audienceLabel={audienceActionTarget(row.original)}
+      />;
     },
     maxSize: 50,
   },
