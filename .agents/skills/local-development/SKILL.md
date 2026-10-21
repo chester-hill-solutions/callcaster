@@ -299,6 +299,12 @@ boundary through the route's reader. Bun can derive a parsed File's MIME type
 from its filename; `Response(FormData).formData()` can take a different path.
 Check the parsed file's policy in both runtimes, not only a hand-built File.
 
+A jsdom `File` passed through Node `Request.formData()` can retain its bytes but
+lose its filename. For UI payload checks, inspect the original `FormData` at the
+fetcher submission boundary while retaining real router transitions. Use a native
+browser `File` through the multipart reader for wire-filename claims. Do not
+change application upload code to compensate for this fixture conversion.
+
 Use object rows when a `test.each` case contains an array input, for example
 `[{ ids: [] }, { ids: ["id"] }]`. Vitest spreads a bare array row into positional
 arguments; an empty row supplies no argument. Check the fixed positive cases
