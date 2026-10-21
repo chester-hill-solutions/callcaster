@@ -4,7 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-- Fixed: Local Stow setup verifies downloads on macOS and Linux without GNU checksum tools, and still rejects missing or incorrect checksums ([#2493](https://github.com/chester-hill-solutions/callcaster/issues/2493)).
+- Fixed: Local Stow setup verifies downloads on macOS and Linux without GNU checksum tools, and still rejects missing or incorrect checksums ([PR #2766](https://github.com/chester-hill-solutions/callcaster/pull/2766), [#2493](https://github.com/chester-hill-solutions/callcaster/issues/2493)).
 - Fixed: The call screen identifies Predictive Dialer and Power Dialer campaigns with the correct dialing mode ([PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698)).
 - Fixed: Workspace member rows use small role dots and compact action icons that stay visible when the theme follows the system setting ([PR #2753](https://github.com/chester-hill-solutions/callcaster/pull/2753), [#100](https://github.com/chester-hill-solutions/callcaster/issues/100)).
 - Fixed: CSV uploads show success in the upload panel without a persistent toast. The saved row report remains available from the page ([PR #2749](https://github.com/chester-hill-solutions/callcaster/pull/2749), [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507)).
