@@ -66,12 +66,12 @@ describe("CampaignSidebar", () => {
     mocks.submit.mockReset();
   });
 
-  test("shows active campaigns, progress, and hides archived campaigns", () => {
+  test("shows campaigns, progress, and status bars", () => {
     renderSidebar();
 
     expect(screen.getAllByText("Running campaign")).toHaveLength(1);
     expect(screen.getAllByText("Paused campaign")).toHaveLength(1);
-    expect(screen.queryByText("Archived campaign")).toBeNull();
+    expect(screen.getByText("Archived campaign")).toBeInTheDocument();
     expect(screen.getAllByText("4 / 10")).toHaveLength(1);
   });
 
