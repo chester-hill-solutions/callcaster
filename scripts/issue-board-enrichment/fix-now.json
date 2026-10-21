@@ -394,12 +394,10 @@
       "Four new real-SDK transport regressions fail against the original collector while two controls pass.",
       "38 focused cases pass: seven collector cases plus 31 existing environment, owner and keep-list policy cases.",
       "A live read-only probe confirms that a suspended subaccount rejects Messaging Services reads with HTTP 401 even when listed and fetched tokens match. The report must fail rather than imply that inventory is complete.",
-      "Isolated negative controls: restoring a total service cap fails one of seven collector cases; switching the child client to parent credentials fails four. The unchanged control passes all seven."
+      "Isolated negative controls: restoring a total service cap fails one of seven collector cases; switching the child client to parent credentials fails four. The unchanged control passes all seven.",
+      "Full ci:local passes at source commit 3ce5fc82: 5,580 Node, 34 Bun and 1,490 UI cases. PR #2758 is open for review."
     ],
-    "missingTests": [
-      "Full local CI and exact-head remote checks before publication/merge.",
-      "Complete live inventory remains subject to suspended-account access; the report repair must report that failure clearly."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "Include Messaging Services with the subaccount\u2019s own credentials.",
       "Enumerate all account and resource pages.",
@@ -409,6 +407,6 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog was verified in the browser. Parent #1165; no children, blockers or fixing PR at the start. This repair does not complete the broader cleanup or its retention decision."
+    "trackerRecommendation": "Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog verified in the browser. Parent #1165. Review https://github.com/chester-hill-solutions/callcaster/pull/2758; the parent full audit and retention decisions remain blocked."
   }
 ]
