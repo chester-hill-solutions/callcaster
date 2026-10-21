@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { NavLink, useFetcher, useRevalidator } from "react-router";
+import { useMemo, useState } from "react";
+import { NavLink, useFetcher } from "react-router";
 import { Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,7 +19,7 @@ import {
   type CampaignQueueProgressCounts,
 } from "@/components/campaign/CampaignQueueProgress";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
-import { sortCampaignsForList } from "@/lib/campaign-list-order";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import type { Campaign } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -63,31 +63,21 @@ function CampaignSidebarList({
   userRole,
   onNavigate,
 }: CampaignSidebarProps & { onNavigate?: () => void }) {
-  const revalidator = useRevalidator();
   const fetcher = useFetcher<CampaignSidebarActionData>();
   const canManageCampaigns = hasMinRole(userRole, MemberRole.Admin);
-  const visibleCampaigns = sortCampaignsForList(
-    campaigns.filter((campaign) => campaign.status !== "archived"),
+  const visibleCampaigns = useMemo(
+    () => campaigns.filter((campaign) => campaign.status !== "archived"),
+    [campaigns],
   );
   const busyCampaignId = fetcher.formData?.get("campaignId")?.toString();
 
-  /**
-   * @effect Show the server result and refresh the workspace campaign data after
-   * a quick status action completes.
-   * @effect-deps fetcher.data, fetcher.state, revalidator
-   * @effect-side-effects toast notification + route revalidation
-   * @effect-why-not-loader The result belongs to a client-side fetcher submit.
-   */
-  useEffect(() => {
-    if (fetcher.state !== "idle" || !fetcher.data) return;
-
-    if (fetcher.data.success) {
+  useFetcherOnIdle(fetcher, (data) => {
+    if (data?.success) {
       toast.success("Campaign status updated.");
-      revalidator.revalidate();
-    } else if (fetcher.data.error) {
-      toast.error(fetcher.data.error);
+    } else if (data?.error) {
+      toast.error(data.error);
     }
-  }, [fetcher.data, fetcher.state, revalidator]);
+  });
 
   const submitStatus = (campaign: Campaign, status: "paused" | "running") => {
     fetcher.submit(
@@ -181,6 +171,7 @@ export default function CampaignSidebar({
   className = "",
 }: CampaignSidebarProps) {
   const canManageCampaigns = hasMinRole(userRole, MemberRole.Admin);
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
   const bodyProps = {
     workspaceId,
     campaigns,
@@ -216,7 +207,7 @@ export default function CampaignSidebar({
       </aside>
 
       <div className="mb-3 lg:hidden">
-        <Sheet>
+        <Sheet open={isMobileSheetOpen} onOpenChange={setIsMobileSheetOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="font-Zilla-Slab font-semibold">
               Browse campaigns
@@ -244,10 +235,12 @@ export default function CampaignSidebar({
                     </NavLink>
                   ) : null}
                 </div>
-                <CampaignSidebarList
-                  {...bodyProps}
-                  onNavigate={() => undefined}
-                />
+                {isMobileSheetOpen ? (
+                  <CampaignSidebarList
+                    {...bodyProps}
+                    onNavigate={() => setIsMobileSheetOpen(false)}
+                  />
+                ) : null}
               </div>
             </SheetBody>
           </SheetContent>

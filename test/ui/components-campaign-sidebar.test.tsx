@@ -10,7 +10,6 @@ import type { Campaign } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
-  revalidate: vi.fn(),
 }));
 
 vi.mock("react-router", async (importOriginal) => {
@@ -22,10 +21,6 @@ vi.mock("react-router", async (importOriginal) => {
       data: undefined,
       formData: undefined,
       submit: mocks.submit,
-    }),
-    useRevalidator: () => ({
-      state: "idle",
-      revalidate: mocks.revalidate,
     }),
   };
 });
@@ -69,16 +64,15 @@ function renderSidebar(userRole = MemberRole.Admin) {
 describe("CampaignSidebar", () => {
   beforeEach(() => {
     mocks.submit.mockReset();
-    mocks.revalidate.mockReset();
   });
 
   test("shows active campaigns, progress, and hides archived campaigns", () => {
     renderSidebar();
 
-    expect(screen.getAllByText("Running campaign").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Paused campaign").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Running campaign")).toHaveLength(1);
+    expect(screen.getAllByText("Paused campaign")).toHaveLength(1);
     expect(screen.queryByText("Archived campaign")).toBeNull();
-    expect(screen.getAllByText("4 / 10").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("4 / 10")).toHaveLength(1);
   });
 
   test("offers pause and resume controls to campaign managers", async () => {
