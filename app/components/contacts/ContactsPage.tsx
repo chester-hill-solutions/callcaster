@@ -1,13 +1,14 @@
 import { Link, NavLink, useFetcher, useLoaderData, useSearchParams } from "react-router";
 import { MdEdit } from "react-icons/md";
 import { Search, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import type { ContactListRow, ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
@@ -70,6 +71,8 @@ export default function ContactsPage() {
   const { contacts, error, pagination, userRole } =
     useLoaderData<ContactsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchId = useId();
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [contactToDelete, setContactToDelete] = useState<
     { id: number; name: string } | null
   >(null);
@@ -137,25 +140,41 @@ export default function ContactsPage() {
       </div>
 
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <FormField
+          htmlFor={searchId}
+          label="Search contacts"
+          className="contents [&>label]:sr-only"
+        >
+          <div className="contents">
             <div className="relative w-72">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search contacts..."
-                value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="bg-background pl-8 text-foreground"
-              />
+              <Search aria-hidden="true" className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <FormFieldControl>
+                <Input
+                  id={searchId}
+                  ref={searchInputRef}
+                  placeholder="Search contacts..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="bg-background pl-8 text-foreground"
+                />
+              </FormFieldControl>
               {searchTerm && (
                 <Button
+                  aria-label="Clear search"
                   variant="ghost"
                   size="sm"
                   className="absolute right-0 top-0 h-full hover:bg-muted"
-                  onClick={() => handleSearchChange("")}
+                  onClick={() => {
+                    handleSearchChange("");
+                    searchInputRef.current?.focus();
+                  }}
                 >
-                  <X className="h-4 w-4" />
+                  <X aria-hidden="true" className="h-4 w-4" />
                 </Button>
               )}
             </div>
+          </div>
+        </FormField>
 
             {searchTerm && (
               <div className="text-sm text-muted-foreground">
