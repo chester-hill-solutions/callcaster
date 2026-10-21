@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Both audio editor return links open the same workspace's Audio Library and preserve browser Back navigation ([#2642](https://github.com/chester-hill-solutions/callcaster/issues/2642)).
 - Fixed: The Text campaign Send using selector has an accessible label and announces its help text ([#2654](https://github.com/chester-hill-solutions/callcaster/issues/2654)).
 - Fixed: Call list Edit, Download and Delete actions identify their target by name and list ID for assistive technology ([#2647](https://github.com/chester-hill-solutions/callcaster/issues/2647)).
 - Fixed: Campaign image attachments have named Add and Remove controls for keyboard and touch, with pending locks and retry after a failed upload ([#2656](https://github.com/chester-hill-solutions/callcaster/issues/2656)).

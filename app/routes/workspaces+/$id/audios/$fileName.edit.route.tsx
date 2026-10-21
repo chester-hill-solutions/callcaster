@@ -59,7 +59,7 @@ export default function EditAudioPage() {
           <AlertDescription>{error ?? "Audio not found."}</AlertDescription>
         </Alert>
         <Button asChild variant="outline" className="mt-4">
-          <Link to="../../audios" relative="path">
+          <Link to="..">
             Back to audio library
           </Link>
         </Button>
@@ -103,7 +103,7 @@ export default function EditAudioPage() {
       />
 
       <Button asChild variant="outline" className="mt-6">
-        <Link to="../../audios" relative="path">
+        <Link to="..">
           Back to audio library
         </Link>
       </Button>
