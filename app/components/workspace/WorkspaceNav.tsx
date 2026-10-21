@@ -180,7 +180,7 @@ const WorkspaceNav = ({
   })).filter((group) => group.items.length > 0);
 
   const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
-  const collapsedPrimaryClass = isCollapsed ? "lg:w-8 lg:self-center lg:justify-center lg:px-0" : "";
+  const collapsedPrimaryClass = isCollapsed ? "lg:mx-auto lg:w-8 lg:justify-center lg:px-0" : "";
   const utilityCollapsedClass = isCollapsed
     ? "lg:justify-center lg:gap-0"
     : "";
@@ -218,7 +218,7 @@ const WorkspaceNav = ({
           type="button"
           variant="ghost"
           size="sm"
-          className="w-full justify-start"
+          className={isCollapsed ? "w-full justify-center" : "w-full justify-start"}
           aria-label={
             isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"
           }
