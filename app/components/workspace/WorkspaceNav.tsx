@@ -315,7 +315,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="relative z-10 mt-1 shrink-0 border-0 bg-brand-secondary/40 p-0 after:pointer-events-none after:absolute after:-bottom-3 after:left-0 after:h-3 after:w-full after:bg-brand-secondary/40 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-1">
+          <div className="relative z-10 mt-1 shrink-0 border-0 bg-brand-secondary/40 p-0 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-4">
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
