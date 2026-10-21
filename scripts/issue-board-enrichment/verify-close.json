@@ -238,33 +238,6 @@
     "currentBehavior": "PR #2257 implements #2095: Leave waits for the server stop, keeps the local device on failure and omits queue reset. The endpoint finds the current user's idle conferences and reports completion failures. All 57 focused UI and server cases passed; restoring the old Leave handler failed four regressions, and restoring the old endpoint failed twelve regressions with five controls passing."
   },
   {
-    "issueNumber": 1956,
-    "verdict": "verify-close",
-    "recommendedTitle": "Release PRs must close the issues they promote (Closes #N)",
-    "summary": "The gate shipped in PR #1960 was incomplete. It accepted a release body of `Closes #1, #2, #3` because its regex treated the comma list as a group of closing references. GitHub closes ONE issue per closing keyword, so only #1 closed. Release PR #2668 listed 17 issues that way and closed one: #2655 closed at the merge timestamp, #2663 and #2504 were closed by hand a day later, and #2605, #2503, #2513 and #2510 were never closed even though their fixes are in master. A sweep of the on-dev lane on 19 October 2026 found 57 open issues whose fix was already in production. The gate is now scripts/check-release-closing-references.mjs, which rejects the grouped form and names the numbers it would strand.",
-    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026, in PR #2735. Twelve cases cover the real release 2668 body, a body that gives every issue its own keyword, a bare mention, prose that mentions a fix, a sentence after a keyword, a list whose later numbers have no hash, and the command line. Breaking the list detection fails five of the twelve. The dev-branch gate is untouched.",
-    "rootCause": "The gate checked a shape GitHub does not honour. Its regex captured a comma list behind one keyword as a group of closing references, so the gate passed while GitHub ignored every number but the first.",
-    "resolution": "No source work remains. The next dev to master release PR must write one keyword per issue; the gate names the numbers it would otherwise strand. The issues that shipped without closing have been closed and moved to on-prod.",
-    "lookIn": [
-      "scripts/check-release-closing-references.mjs (the checker: one keyword per issue)",
-      "test/check-release-closing-references.test.ts (twelve cases, including the real release 2668 body)",
-      ".github/workflows/release-close-issues.yml (the gate that calls it)"
-    ],
-    "existingTests": [
-      "test/check-release-closing-references.test.ts: 12 cases over the grouped form, the correct form, prose false positives and the command line"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A release PR body that names an issue behind a single closing keyword fails the gate",
-      "A release PR body that gives every issue its own keyword passes and closes them all",
-      "A bare mention and prose that mentions a fix are not treated as closing references"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Lane is verify-close: the gate shipped and the checker is tested. Do not rebuild it. The next release must use the correct body shape; the gate names what it would strand."
-  },
-  {
     "issueNumber": 1841,
     "verdict": "verify-close",
     "summary": "The IVR prompt is now emitted inside the `<Gather>` element instead of as its sibling, so Twilio listens for DTMF while the prompt plays and a key press stops the audio and takes the mapped branch; both the outbound campaign IVR and the inbound IVR route render through the same shared block renderer that does this.",

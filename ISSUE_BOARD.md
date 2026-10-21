@@ -1,6 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@959d859b` · 198 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Targeted verification of #1956 at `master@91c4409b` · Global inventory not refreshed · Refresh with `npm run tools:issues:board`
+
+Other lanes and Project markers are cached from `dev@959d859b` and were not refreshed.
 
 ## How to use this board
 
@@ -154,7 +156,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 24
+## Verify and close — 23
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -317,17 +319,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/campaign-outbound-estimate.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`
 - Existing tests: test/campaign-outbound-estimate.test.ts:93-131 — 'IVR completion rate is bounded by the concurrent call limit over avg call time (#1874)' (100 concurrent -> `effectiveCompletionPerSecond` = 100/75 and < the dial-start rate, `avgCallDurationSeconds` = 75, warning contains 'bound by the concurrent call limit'), 'IVR completion rate equals the dial-start rate when concurrency is not the bound' (10,000 concurrent) and 'a low concurrent call limit caps completion well below the dial-start rate' (10 concurrent -> 10/75). Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/campaign-outbound-estimate.test.ts ...` -> 4 files passed, 34 tests passed.
 - Done when: A person confirms the reported symptom is gone on master.
-
-### [#1956](https://github.com/chester-hill-solutions/callcaster/issues/1956) Release PRs must close the issues they promote (Closes #N)
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-19
-- The gate shipped in PR #1960 was incomplete. It accepted a release body of `Closes #1, #2, #3` because its regex treated the comma list as a group of closing references. GitHub closes ONE issue per closing keyword, so only #1 closed. Release PR #2668 listed 17 issues that way and closed one: #2655 closed at the merge timestamp, #2663 and #2504 were closed by hand a day later, and #2605, #2503, #2513 and #2510 were never closed even though their fixes are in master. A sweep of the on-dev lane on 19 October 2026 found 57 open issues whose fix was already in production. The gate is now scripts/check-release-closing-references.mjs, which rejects the grouped form and names the numbers it would strand.
-- Current behavior: Verified on dev@20f59d0e, 19 October 2026, in PR #2735. Twelve cases cover the real release 2668 body, a body that gives every issue its own keyword, a bare mention, prose that mentions a fix, a sentence after a keyword, a list whose later numbers have no hash, and the command line. Breaking the list detection fails five of the twelve. The dev-branch gate is untouched.
-- Root cause: The gate checked a shape GitHub does not honour. Its regex captured a comma list behind one keyword as a group of closing references, so the gate passed while GitHub ignored every number but the first.
-- Resolution: No source work remains. The next dev to master release PR must write one keyword per issue; the gate names the numbers it would otherwise strand. The issues that shipped without closing have been closed and moved to on-prod.
-- Look in: `scripts/check-release-closing-references.mjs (the checker: one keyword per issue)`, `test/check-release-closing-references.test.ts (twelve cases, including the real release 2668 body)`, `.github/workflows/release-close-issues.yml (the gate that calls it)`
-- Existing tests: test/check-release-closing-references.test.ts: 12 cases over the grouped form, the correct form, prose false positives and the command line
-- Done when: A release PR body that names an issue behind a single closing keyword fails the gate; A release PR body that gives every issue its own keyword passes and closes them all; A bare mention and prose that mentions a fix are not treated as closing references
-- Tracker: Lane is verify-close: the gate shipped and the checker is tested. Do not rebuild it. The next release must use the correct body shape; the gate names what it would strand.
 
 ### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) STOP and START text remains visible to operators but no system information messages
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-10-18
