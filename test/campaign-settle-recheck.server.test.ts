@@ -7,7 +7,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => false),
   rpcCampaignIdsWithUnsettledMessages: vi.fn(async (): Promise<number[]> => []),
-  createTenantDb: vi.fn(() => ({ kind: "tenant-db" })),
+  createTenantDb: vi.fn(() => ({ kind: "tenant-db", execute: vi.fn(async () => []) })),
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -58,7 +58,7 @@ describe("campaign settle re-check (#2048)", () => {
     vi.clearAllMocks();
     mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
     mocks.rpcCampaignIdsWithUnsettledMessages.mockResolvedValue([]);
-    mocks.createTenantDb.mockReturnValue({ kind: "tenant-db" });
+    mocks.createTenantDb.mockReturnValue({ kind: "tenant-db", execute: vi.fn(async () => []) });
   });
 
   describe("recheckCampaignCompletion", () => {

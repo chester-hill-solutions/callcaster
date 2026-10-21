@@ -362,11 +362,10 @@
     "existingTests": [
       "136 focused Node cases cover dispatch, dialer, dequeue, IVR, SMS settlement and recovery sweep, with common failure event fields.",
       "52 real-Postgres cases cover completion gates and dequeue scope, including transaction rollback.",
-      "Original source fails the new dispatch case; 42 control cases pass."
+      "Original source fails the new dispatch case; 42 control cases pass.",
+      "Full ci:local passes at source commit 88bf3518: 5,577 Node, 34 Bun and 1,490 UI cases. Rethrowing completion failures breaks seven caller cases; losing the transaction executor breaks the real-Postgres rollback case."
     ],
-    "missingTests": [
-      "Full ci:local at the final review commit."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "Exactly one code path owns the best-effort completion call",
       "All five call sites use it with no local try/catch",
@@ -377,6 +376,6 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Source fix is under test in a dedicated Task branch. Keep open until its review and delivery checks pass."
+    "trackerRecommendation": "Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification."
   }
 ]
