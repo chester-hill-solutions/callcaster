@@ -315,7 +315,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className={`relative z-10 mt-4 shrink-0 border-0 bg-card p-0 ${isCollapsed ? "lg:-mx-3 lg:w-18 lg:rounded-none" : "lg:w-full"}`}>
+          <div className="relative z-10 mt-4 shrink-0 border-0 bg-brand-secondary/40 p-0 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-4">
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
@@ -325,7 +325,7 @@ const WorkspaceNav = ({
               <span className="inline-flex items-center gap-2">
                 <CreditCard className="h-5 w-5 shrink-0" aria-hidden="true" />
                 <span className={desktopLabelClass}>Credits</span>
-                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md bg-brand-secondary/40 px-1 text-xs font-bold leading-none text-foreground">
+                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1 text-xs font-bold leading-none text-foreground">
                   {isCollapsed ? formatCollapsedCreditCount(workspace.credits) : workspace.credits}
                 </span>
               </span>
