@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { NavLink, useFetcher } from "react-router";
-import { Headset, Mail, MessageSquare, Pause, Phone, Play, Plus } from "lucide-react";
+import { Pause, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { campaignStatusBarClass } from "@/lib/campaign-status";
+import { CampaignTypeIcon } from "@/components/campaign/CampaignTypeIcon";
 import type { Campaign } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -70,18 +71,6 @@ function campaignTypeFilterValue(type: string | null | undefined): string {
     return "ivr";
   }
   return type ?? "";
-}
-
-function CampaignTypeIcon({ type }: { type: string | null | undefined }) {
-  const Icon =
-    type === "message"
-      ? MessageSquare
-      : type === "live_call"
-        ? Headset
-        : type === "email"
-          ? Mail
-          : Phone;
-  return <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />;
 }
 
 function campaignName(campaign: Campaign): string {
