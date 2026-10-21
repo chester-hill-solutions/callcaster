@@ -462,6 +462,19 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+
+For historical production assessments, resolve the app, environment and database
+service before reading data; compare their resolved connection identities without
+printing credentials. Use a server-enforced read-only snapshot and bounded
+statements. Return aggregate populations and check RLS/role visibility before
+interpreting zero counts. An unlogged failed request is unknown, even when no
+stored rows remain. Keep repeated legitimate visits distinct in query controls;
+a shared contact, survey or time window is not proof of one broken attempt.
+
+Select deployment IDs, revisions, times and status from structured metadata
+before printing it; commit messages can be very large. Deployment creation time
+is not an exact traffic switch time. Preserve that limit in historical reports.
+
 For a render timeout during concurrent full gates, wait for the other gate
 to stop, rerun the failing cases for diagnosis, then rerun the complete gate.
 A passing focused rerun does not replace `ci:local`; do not weaken assertions
