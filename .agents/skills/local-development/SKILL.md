@@ -803,3 +803,8 @@ Test this with a real router fetcher action, including delayed event delivery.
 A stale loader can also arrive after SSE resolution: discard incoming intents
 whose identity is already resolved. Historical rows without a client reference
 must never consume a server intent through content matching.
+
+Keep throwaway browser fixtures outside the repository checkout. A Git-ignored
+`.local/` file can still enter the full ESLint scan and lint ratchet. Point the
+fixture's aliases at the owned worktree, and keep its dependencies and cache in
+its own temporary directory.
