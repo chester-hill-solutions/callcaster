@@ -180,26 +180,26 @@ const WorkspaceNav = ({
   })).filter((group) => group.items.length > 0);
 
   const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
-  const desktopCenterClass = "";
+  const collapsedPrimaryClass = isCollapsed ? "lg:w-8 lg:self-center lg:justify-center lg:px-0" : "";
   const utilityCollapsedClass = isCollapsed
     ? "lg:justify-center lg:gap-0"
     : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `group flex h-auto items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:h-9 lg:text-sm ${desktopCenterClass} ${
+    `group flex h-auto items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:h-9 lg:text-sm ${collapsedPrimaryClass} ${
       isActive
         ? "border-brand-primary bg-brand-primary/10 text-brand-primary dark:border-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "border-transparent text-foreground/85 hover:border-border hover:bg-muted"
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
+    `flex h-auto items-center rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${
+    `flex h-auto items-center gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${
       isActive
         ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
