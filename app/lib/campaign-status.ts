@@ -29,8 +29,8 @@ const CAMPAIGN_STATUS_COLORS: Record<
     badge: "bg-muted text-muted-foreground border-border",
   },
   scheduled: {
-    bar: "border-l-blue-500",
-    badge: "bg-blue-500/20 text-blue-700 border-blue-500/40 dark:text-blue-300",
+    bar: "border-l-violet-500",
+    badge: "bg-violet-500/20 text-violet-700 border-violet-500/40 dark:text-violet-300",
   },
   running: {
     bar: "border-l-cyan-500",
