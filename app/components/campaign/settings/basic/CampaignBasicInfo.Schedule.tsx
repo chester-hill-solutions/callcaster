@@ -8,6 +8,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { days } from "@/lib/utils";
 import InfoPopover from "@/components/shared/InfoPopover";
 
@@ -37,6 +38,7 @@ const WeeklyScheduleTable = ({
   endTooltip?: string;
 }) => {
   const timeZone = browserTimeZone();
+  const timeZoneDescription = `Times are shown in your local time zone (${timeZone}).`;
   return (
     <Table>
       <TableHeader>
@@ -61,26 +63,48 @@ const WeeklyScheduleTable = ({
               />
             </TableCell>
             <TableCell>
-              <input
-                name={`${day.toLowerCase()}-start`}
-                id={`${day.toLowerCase()}-start`}
-                type="time"
-                className="rounded border p-1"
-                value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.start || ""}
-                onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'start', e.target.value, 0)}
-                disabled={!schedule[day.toLowerCase() as DayName]?.active}
-              />
+              <FormField
+                htmlFor={`${day.toLowerCase()}-start`}
+                label={`${day} start time`}
+                description={timeZoneDescription}
+                className="contents [&>label]:sr-only [&>p]:sr-only"
+              >
+                <div className="contents">
+                  <FormFieldControl>
+                    <input
+                      name={`${day.toLowerCase()}-start`}
+                      id={`${day.toLowerCase()}-start`}
+                      type="time"
+                      className="rounded border p-1"
+                      value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.start || ""}
+                      onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'start', e.target.value, 0)}
+                      disabled={!schedule[day.toLowerCase() as DayName]?.active}
+                    />
+                  </FormFieldControl>
+                </div>
+              </FormField>
             </TableCell>
             <TableCell>
-              <input
-                name={`${day.toLowerCase()}-end`}
-                id={`${day.toLowerCase()}-end`}
-                type="time"
-                className="rounded border p-1"
-                value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.end || ""}
-                onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'end', e.target.value, 0)}
-                disabled={!schedule[day.toLowerCase() as DayName]?.active}
-              />
+              <FormField
+                htmlFor={`${day.toLowerCase()}-end`}
+                label={`${day} end time`}
+                description={`${timeZoneDescription} ${endTooltip}`}
+                className="contents [&>label]:sr-only [&>p]:sr-only"
+              >
+                <div className="contents">
+                  <FormFieldControl>
+                    <input
+                      name={`${day.toLowerCase()}-end`}
+                      id={`${day.toLowerCase()}-end`}
+                      type="time"
+                      className="rounded border p-1"
+                      value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.end || ""}
+                      onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'end', e.target.value, 0)}
+                      disabled={!schedule[day.toLowerCase() as DayName]?.active}
+                    />
+                  </FormFieldControl>
+                </div>
+              </FormField>
             </TableCell>
           </TableRow>
         ))}

@@ -37,6 +37,11 @@ smallest check that proves the changed behavior, plus `git diff --check`:
 - TypeScript or Vite config: focused lint and `npm run typecheck`;
 - route or service behavior: the affected focused Vitest file.
 
+Inspect warning counts in focused lint results. ESLint can exit zero while a
+ratchet still rejects new warnings. For nested fields, use the canonical
+`FormFieldControl` contract instead of overriding spacing owned by `FormField`.
+Keep layout-only wrappers outside the control association.
+
 Run the complete `npm run ci:local` once on the final clean commit before a
 push or pull request. The full gate remains required before publication. If a
 later commit changes source, dependencies, configuration, tests, migrations, or

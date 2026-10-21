@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Weekly Calling Hours and Send Window controls identify each day's start and end time, local time zone and end-time guidance for assistive technology ([#2658](https://github.com/chester-hill-solutions/callcaster/issues/2658)).
 - Changed: New accounts must confirm their email address before they can sign in. Registration now sends a verification link, and the signup and invitation pages say an email was sent instead of moving on to the workspace; a sign-in attempt with the right password but an unconfirmed address sends a fresh link. Registering an address that already has an account no longer reveals that it exists — it receives an account-exists email instead. This closes an account-takeover path where anyone could register an address they do not control ([#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216)).
 - Fixed: Transactional emails render with their own type and button styling. A quoted font name inside an inline `style` attribute cut every rule after it, so the reset email's button showed as a bare underlined link on a plain red pill and the body, facts and footer fell back to the mail client's defaults ([#2943](https://github.com/chester-hill-solutions/callcaster/issues/2943)).
 - Fixed: Both audio editor return links open the same workspace's Audio Library and preserve browser Back navigation ([#2642](https://github.com/chester-hill-solutions/callcaster/issues/2642)).
