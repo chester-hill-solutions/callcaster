@@ -315,7 +315,7 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="relative z-10 mt-1 shrink-0 border-0 bg-brand-secondary/40 p-0 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-4">
+          <div className="relative z-10 mt-1 shrink-0 border-0 bg-brand-secondary/40 p-0 after:pointer-events-none after:absolute after:-bottom-3 after:left-0 after:h-3 after:w-full after:bg-brand-secondary/40 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-1">
             <NavLink
               to={`${baseUrl}/billing`}
               className={utilityLinkClass}
@@ -339,7 +339,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-visible rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-18 lg:max-w-18" : "lg:w-63 lg:max-w-63"} ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-hidden rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-18 lg:max-w-18" : "lg:w-63 lg:max-w-63"} ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
