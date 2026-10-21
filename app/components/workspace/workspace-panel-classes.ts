@@ -5,9 +5,8 @@ export const workspacePanelHeightClass =
 /** Strict desktop viewport height for panels that scroll their own content. */
 export const workspaceViewportHeightLgClass = "lg:h-[calc(100vh-112px)]";
 
-/** Same height as {@link workspacePanelHeightClass}, scoped to large breakpoints. */
-export const workspacePanelHeightLgClass =
-  "lg:h-[calc(100vh-112px)] lg:min-h-[560px]";
+/** Let the workspace content panel fill the available shell height and scroll internally. */
+export const workspacePanelHeightLgClass = "lg:min-h-0";
 
 /**
  * Sidebar variant: same height but no 560px floor — a sticky panel taller
