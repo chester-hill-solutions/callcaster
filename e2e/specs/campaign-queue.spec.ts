@@ -7,6 +7,6 @@ ownerTest.describe("Campaign queue @authenticated", () => {
       workspacePath(E2E_WORKSPACES.ready.id, `campaigns/${E2E_CAMPAIGNS.liveCall.id}/queue`),
     );
     await expect(page.getByTestId("campaign-queue-table")).toBeVisible();
-    await expect(page.getByText(/Contact/i).first()).toBeVisible();
+    await expect(page.locator("main").getByText(/Contact/i).first()).toBeVisible();
   });
 });

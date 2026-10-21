@@ -11,6 +11,7 @@ import {
   Link,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import CampaignSidebar from "@/components/campaign/CampaignSidebar";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
 import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
 import {
@@ -118,9 +119,7 @@ function WorkspaceResolvedView({
   const audiences = (resolvedData.audiences ?? []) as Array<{
     id: string | number;
   }>;
-  const campaigns = (resolvedData.campaigns ?? []) as Array<{
-    id: string | number;
-  }>;
+  const campaigns = (resolvedData.campaigns ?? []) as Campaign[];
   const phoneNumbers = (
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
@@ -145,27 +144,38 @@ function WorkspaceResolvedView({
   // credits" link here that would bypass that.
   const isCallScreen = location.pathname.endsWith("call");
   const isChatsScreen = /\/chats(?:\/|$)/.test(location.pathname);
+  const isCampaignsPage = /\/campaigns(?:\/|$)/.test(location.pathname);
 
   return (
     <div
-      className={`flex flex-col gap-4 lg:flex-row lg:items-stretch ${
+      className={`flex flex-col gap-4 lg:h-full lg:min-h-0 lg:flex-row lg:items-stretch lg:gap-0 ${
         isChatsScreen ? `${workspaceViewportHeightLgClass} lg:min-h-0` : ""
       }`}
     >
       {showSidebar ? (
-        <WorkspaceNav
-          workspace={workspace}
-          campaigns={campaigns as Campaign[]}
-          campaignQueueProgress={campaignQueueProgress}
-          userRole={
-            (userRole as MemberRole | null | undefined) ?? MemberRole.Member
-          }
-        />
+        <>
+          <WorkspaceNav
+            workspace={workspace}
+            userRole={
+              (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+            }
+          />
+          {isCampaignsPage ? (
+            <CampaignSidebar
+              workspaceId={workspace.id}
+              campaigns={campaigns}
+              campaignQueueProgress={campaignQueueProgress}
+              userRole={
+                (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+              }
+            />
+          ) : null}
+        </>
       ) : null}
       <main
         id="workspace-main-content"
         tabIndex={-1}
-        className={`flex min-w-0 flex-1 flex-col gap-4 focus:outline-none ${
+          className={`flex min-w-0 flex-1 flex-col gap-4 focus:outline-none lg:min-h-0 ${
           isChatsScreen ? "lg:min-h-0" : ""
         }`}
       >
@@ -253,6 +263,7 @@ function WorkspaceResolvedView({
                 campaigns,
                 phoneNumbers,
                 userRole,
+                campaignQueueProgress,
                 ...context,
               }}
             />
@@ -299,7 +310,7 @@ export default function Workspace() {
           excluding WorkspaceNav's sidebar so the skip link above actually
           bypasses it (a landmark that wrapped the sidebar too would still
           hand focus to the sidebar's first link on the very next Tab). */}
-      <div className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6">
+       <div className="mx-auto flex min-h-[80vh] w-full flex-col px-4 py-6 sm:px-6 lg:h-[calc(100vh-64px)] lg:min-h-0 lg:px-0 lg:py-0">
         <WorkspaceResolvedView
           resolvedData={workspaceData}
           userRole={userRole}
@@ -310,10 +321,10 @@ export default function Workspace() {
           showSidebar={showSidebar}
           isOnboarding={Boolean(onboardingStrip)}
           serviceAddressRequired={serviceAddressRequired}
-          complianceOnboarding={complianceOnboarding}
-          a2pBlockingIssues={a2pBlockingIssues}
-          campaignQueueProgress={campaignQueueProgress}
-        />
+           complianceOnboarding={complianceOnboarding}
+           a2pBlockingIssues={a2pBlockingIssues}
+           campaignQueueProgress={campaignQueueProgress}
+         />
       </div>
     </>
   );

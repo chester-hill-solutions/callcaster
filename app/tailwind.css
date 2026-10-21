@@ -53,6 +53,11 @@
   --color-destructive-text: var(--destructive-text);
 }
 
+/* Skip paint and layout work for campaign rows outside their internal scroller. */
+@utility content-auto {
+  content-visibility: auto;
+}
+
 /* Preserve CallCaster legacy font utility class names */
 @theme inline {
   --font-Tabac-Slab: var(--font-brand);

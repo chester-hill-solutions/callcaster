@@ -143,14 +143,16 @@ export default function CampaignScreen() {
         <CampaignHeader
           title={campaignData?.title || ""}
           status={(campaignData?.status as CampaignStatus) || "pending"}
+          campaignType={campaignData?.type}
           isDesktop={false}
           queueProgress={campaignQueueProgress}
         />
         <div className="border-b border-border/70 pb-4">
           <CampaignHeader
-            title={campaignData?.title || ""}
-            isDesktop
-            status={(campaignData?.status as CampaignStatus) || "pending"}
+          title={campaignData?.title || ""}
+          isDesktop
+          status={(campaignData?.status as CampaignStatus) || "pending"}
+          campaignType={campaignData?.type}
           />
         </div>
         {railItems.length > 0 ? (
