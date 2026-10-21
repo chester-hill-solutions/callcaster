@@ -11,7 +11,21 @@ vi.mock("@/routes/workspaces+/$id.middleware.server", () => ({
   middleware: [],
 }));
 vi.mock("@/components/workspace/WorkspaceNav", () => ({
-  default: () => null,
+  default: function WorkspaceNavFixture() {
+    const data = useLoaderData<{
+      workspaceData: {
+        workspace: { credits: number };
+        campaigns: Array<{ status: string }>;
+      };
+      campaignQueueProgress: Record<string, { completedCount: number }>;
+    }>();
+    return (
+      <nav>
+        {data.workspaceData.workspace.credits} credits; {data.workspaceData.campaigns[0]?.status};{" "}
+        {data.campaignQueueProgress["20"]?.completedCount} done
+      </nav>
+    );
+  },
 }));
 vi.mock("@/components/campaign/CampaignSidebar", () => ({
   default: function CampaignSidebarFixture() {
