@@ -118,6 +118,15 @@ point: the code is in master and complete, but production still has no verificat
 the operator has to register one and place a call. Calling that "needs code work" would send
 an engineer looking for code that does not need writing.
 
+## Projects access fallback
+
+The verdict CLI needs Projects API read access even in dry run. If the token
+lacks that access, keep the JSON verdict and read the issue and its live Project
+Status in an authenticated browser. For an already-authorized single-item change,
+apply the same verdict table there. Read the current options, update only the
+verified issue, then check its state and Status and save a screenshot. Keep the
+operator promotion rule below: preserve `on-prod` only when it was already set.
+
 ## The rules the operator set
 
 - **Do not set `on-prod`.** The operator moves verified issues to `on-prod` themselves, so

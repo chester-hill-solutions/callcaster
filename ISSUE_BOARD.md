@@ -1,6 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@959d859b` · 198 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Targeted audit of #1938 at `dev@e4bb8ac6` · Global inventory not refreshed · Refresh with `npm run tools:issues:board`
+
+Other lanes and Project markers are cached from `dev@959d859b` and were not refreshed.
 
 ## How to use this board
 
@@ -29,9 +31,21 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 12
+## Fix now — 13
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
+- **IN PROGRESS** · Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-21
+- PARTIAL: middleware reuses the scoped tenant client, but the released import guard skips JavaScript modules. The candidate guard covers supported JavaScript/TypeScript extensions and counts every statically named import.
+- Current behavior: Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.
+- Root cause: The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.
+- Resolution: Parse supported JavaScript/TypeScript files with the existing TypeScript parser. Count static imports, re-exports, dynamic imports, require calls and type imports. Migrate only the pinned base debt and reject new, increased, reduced or stale counts.
+- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `test/unscoped-db-imports-guard.test.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`
+- Existing tests: test/unscoped-db-imports-guard.test.ts: 46 actual CLI cases; 39 fail and 7 controls pass on the original guard. All 46 pass with the fix.; Pinned dev baseline: the same 84 file/module keys, 85 syntax occurrences; no new source exceptions. Separate fault injections exercise extension coverage, module syntax, counts, stale debt and fixture-root safety.
+- Missing tests: Review and merge the candidate, then verify the exact promoted guard before closing.
+- Done when: Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.; A new app/lib module cannot import an unscoped database client without a counted baseline exception.; Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.; npm run ci:local is green.
+- Tracker: Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified.
 
 ### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
 - Verdict: **Fix now** · Type: Bug · Assignees: @manstephen, @wra-sol · Updated: 2026-10-20
@@ -154,7 +168,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 24
+## Verify and close — 23
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -352,18 +366,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed browser/phone calling verification, including delayed and failed conference completion.
 - Done when: With `campaign.dial_type === "predictive"`, clicking "Leave Campaign" posts `/api/auto-dial/end` and completes the conference.; No `DELETE /api/queues` requeue is issued when the campaign is being left in predictive mode.; The dialer stops placing calls within one turn after leave.; A non-predictive (live) campaign's Leave behaviour is unchanged.; The control is confirmed before it fires (see the related UX issue).
 - Tracker: The source fix is in PR #2257. This board update travels with that fix; after merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
-
-### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
-- Verdict: **Verify and close** · Size: L-XL · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-17
-- All three children shipped on dev: middleware builds the scoped tdb once (#1940/PR #1941), the unscoped admin client is banned in app/lib with a ratchet baseline (#1939/PR #1943), and the base db client is ratcheted too (#1942/PR #1944). The epic's acceptance is met on dev.
-- Current behavior: workspaceMiddleware and dataPlaneMiddleware build createTenantDb(workspaceId) once and expose tdb on the route context; workspaces+ routes read context.tdb. scripts/check-unscoped-db-imports.mjs bans @/server/admin-db and @/server/db in app/lib against an 81-entry baseline.
-- Root cause: The scoped-client rule was enforced only in app/routes; app/lib was honor-system.
-- Resolution: No code work left. Verify on the review env that no workspaces+ route constructs createTenantDb and that the unscoped-import guard fails on a probe import, then close when dev is promoted to master.
-- Look in: `app/lib/route-context.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/lib/workspace-route.server.ts`, `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `eslint.config.mjs`
-- Existing tests: test/helpers/route-context-mock.ts; test/ci-guard-scripts.test.ts
-- Missing tests: A guard probe that a new app/lib module importing @/server/admin-db fails the run
-- Done when: No route file under app/routes constructs createTenantDb for a plain request-scoped read or write; tdb is built once per workspace request, in middleware; A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist; npm run ci:local is green
-- Tracker: Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master.
 
 ### [#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869) Verify: test calls leave the campaign queue untouched
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @sai-sy · Updated: 2026-10-17

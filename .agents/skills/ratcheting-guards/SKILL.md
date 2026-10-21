@@ -9,7 +9,9 @@ Read [the quality policy](../../../docs/lint-ratchet-rules.md) and the actual
 runner before changing a guard. Keep one concern per issue and PR.
 
 - Scan syntax across the whole file when a rule concerns calls; comments and
-  string samples are not executable occurrences.
+  string samples are not executable occurrences. Cover every source extension
+  the project supports, including JavaScript when allowJs is enabled. Exercise
+  the actual CLI across those extensions before declaring a guard complete.
 - Read complete structured annotations, including continuation lines through
   the next tag or comment end. Test wrapped valid and invalid declarations
   before measuring debt; parser truncation must not become a baseline exception.
@@ -25,7 +27,7 @@ runner before changing a guard. Keep one concern per issue and PR.
 - Remove each safeguard separately and prove its regression test fails while
   controls still pass. Restore all source bytes before full gates and reviews.
 
-The redirect and mock guards accept `--root=<fixture>` for isolated CLI tests.
+The redirect, mock and unscoped-database guards accept `--root=<fixture>` for isolated CLI tests.
 Apply a root override to scans, baseline reads and baseline writes. Verify that
 fixture rewrites leave the repository baseline bytes unchanged. Their default
 roots and rewrite commands remain the repository contract. Run

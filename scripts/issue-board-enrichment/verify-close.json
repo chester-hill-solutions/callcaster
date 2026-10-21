@@ -70,41 +70,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1938,
-    "verdict": "verify-close",
-    "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
-    "summary": "All three children shipped on dev: middleware builds the scoped tdb once (#1940/PR #1941), the unscoped admin client is banned in app/lib with a ratchet baseline (#1939/PR #1943), and the base db client is ratcheted too (#1942/PR #1944). The epic's acceptance is met on dev.",
-    "currentBehavior": "workspaceMiddleware and dataPlaneMiddleware build createTenantDb(workspaceId) once and expose tdb on the route context; workspaces+ routes read context.tdb. scripts/check-unscoped-db-imports.mjs bans @/server/admin-db and @/server/db in app/lib against an 81-entry baseline.",
-    "rootCause": "The scoped-client rule was enforced only in app/routes; app/lib was honor-system.",
-    "resolution": "No code work left. Verify on the review env that no workspaces+ route constructs createTenantDb and that the unscoped-import guard fails on a probe import, then close when dev is promoted to master.",
-    "lookIn": [
-      "app/lib/route-context.server.ts",
-      "app/lib/workspace-middleware.server.ts",
-      "app/lib/data-plane-middleware.server.ts",
-      "app/lib/workspace-route.server.ts",
-      "scripts/check-unscoped-db-imports.mjs",
-      "scripts/baselines/unscoped-db-imports.txt",
-      "eslint.config.mjs"
-    ],
-    "existingTests": [
-      "test/helpers/route-context-mock.ts",
-      "test/ci-guard-scripts.test.ts"
-    ],
-    "missingTests": [
-      "A guard probe that a new app/lib module importing @/server/admin-db fails the run"
-    ],
-    "acceptanceCriteria": [
-      "No route file under app/routes constructs createTenantDb for a plain request-scoped read or write",
-      "tdb is built once per workspace request, in middleware",
-      "A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist",
-      "npm run ci:local is green"
-    ],
-    "blockedBy": [],
-    "size": "L-XL",
-    "risk": "high",
-    "trackerRecommendation": "Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master."
-  },
-  {
     "issueNumber": 1869,
     "verdict": "verify-close",
     "recommendedTitle": "Verify: test calls leave the campaign queue untouched",

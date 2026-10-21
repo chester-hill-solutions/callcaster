@@ -238,5 +238,38 @@
     "existingTests": [],
     "acceptanceCriteria": [],
     "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
+  },
+  {
+    "issueNumber": 1938,
+    "verdict": "fix-now",
+    "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
+    "summary": "PARTIAL: middleware reuses the scoped tenant client, but the released import guard skips JavaScript modules. The candidate guard covers supported JavaScript/TypeScript extensions and counts every statically named import.",
+    "currentBehavior": "Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.",
+    "rootCause": "The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.",
+    "resolution": "Parse supported JavaScript/TypeScript files with the existing TypeScript parser. Count static imports, re-exports, dynamic imports, require calls and type imports. Migrate only the pinned base debt and reject new, increased, reduced or stale counts.",
+    "lookIn": [
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "test/unscoped-db-imports-guard.test.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts"
+    ],
+    "existingTests": [
+      "test/unscoped-db-imports-guard.test.ts: 46 actual CLI cases; 39 fail and 7 controls pass on the original guard. All 46 pass with the fix.",
+      "Pinned dev baseline: the same 84 file/module keys, 85 syntax occurrences; no new source exceptions. Separate fault injections exercise extension coverage, module syntax, counts, stale debt and fixture-root safety."
+    ],
+    "missingTests": [
+      "Review and merge the candidate, then verify the exact promoted guard before closing."
+    ],
+    "acceptanceCriteria": [
+      "Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.",
+      "A new app/lib module cannot import an unscoped database client without a counted baseline exception.",
+      "Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.",
+      "npm run ci:local is green."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified."
   }
 ]
