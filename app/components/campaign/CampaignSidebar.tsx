@@ -46,6 +46,13 @@ type CampaignSidebarProps = {
   className?: string;
 };
 
+type CampaignFilterProps = {
+  typeFilter: string;
+  statusFilter: string;
+  onTypeFilterChange: (value: string) => void;
+  onStatusFilterChange: (value: string) => void;
+};
+
 const ACTIVE_CAMPAIGNS = new Set(["running", "waiting"]);
 
 const CAMPAIGN_STATUS_OPTIONS = [
@@ -77,6 +84,40 @@ function campaignName(campaign: Campaign): string {
   return campaign.title?.trim() || `Campaign ${String(campaign.id)}`;
 }
 
+function CampaignFilters({
+  typeFilter,
+  statusFilter,
+  onTypeFilterChange,
+  onStatusFilterChange,
+}: CampaignFilterProps) {
+  return (
+    <div className="flex min-w-0 flex-1 gap-2">
+      <Select value={typeFilter} onValueChange={onTypeFilterChange}>
+        <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
+          <SelectValue placeholder="All Types" />
+        </SelectTrigger>
+        <SelectContent animated={false}>
+          <SelectItem value="all">All Types</SelectItem>
+          {CAMPAIGN_TYPE_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value} value={value}>{label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+        <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
+          <SelectValue placeholder="All Statuses" />
+        </SelectTrigger>
+        <SelectContent animated={false}>
+          <SelectItem value="all">All Statuses</SelectItem>
+          {CAMPAIGN_STATUS_OPTIONS.map(([value, label]) => (
+            <SelectItem key={value} value={value}>{label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function getQuickAction(status: string | null | undefined):
   | { label: "Pause" | "Resume"; nextStatus: "paused" | "running"; icon: typeof Pause }
   | null {
@@ -95,7 +136,8 @@ function CampaignSidebarList({
   campaignQueueProgress,
   userRole,
   onNavigate,
-}: CampaignSidebarProps & { onNavigate?: () => void }) {
+  hasActiveFilters,
+}: CampaignSidebarProps & { onNavigate?: () => void; hasActiveFilters: boolean }) {
   const fetcher = useFetcher<CampaignSidebarActionData>();
   const canManageCampaigns = hasMinRole(userRole, MemberRole.Admin);
   const busyCampaignId = fetcher.formData?.get("campaignId")?.toString();
@@ -133,7 +175,7 @@ function CampaignSidebarList({
             return (
               <div
                 key={campaign.id}
-                className={`flex items-center gap-1 rounded-lg border border-transparent border-l-4 p-1 hover:border-border hover:bg-muted/60 ${campaignStatusBarClass(campaign.status)}`}
+                className={`content-auto flex items-center gap-1 rounded-lg border border-transparent border-l-4 p-1 hover:border-border hover:bg-muted/60 ${campaignStatusBarClass(campaign.status)}`}
               >
                 <NavLink
                   to={`/workspaces/${workspaceId}/campaigns/${campaign.id}`}
@@ -183,7 +225,7 @@ function CampaignSidebarList({
         </div>
       ) : (
         <p className="px-2 py-3 text-sm text-muted-foreground">
-          No active campaigns.
+          {hasActiveFilters ? "No campaigns match these filters." : "No campaigns yet."}
         </p>
       )}
     </nav>
@@ -216,6 +258,7 @@ export default function CampaignSidebar({
     campaigns: filteredCampaigns,
     campaignQueueProgress,
     userRole,
+    hasActiveFilters: typeFilter !== "all" || statusFilter !== "all",
   };
 
   return (
@@ -229,28 +272,12 @@ export default function CampaignSidebar({
       >
         <div className="flex h-full w-full flex-col">
           <div className="mt-4 mb-3 flex items-center gap-2 px-3">
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {CAMPAIGN_TYPE_OPTIONS.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {CAMPAIGN_STATUS_OPTIONS.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CampaignFilters
+              typeFilter={typeFilter}
+              statusFilter={statusFilter}
+              onTypeFilterChange={setTypeFilter}
+              onStatusFilterChange={setStatusFilter}
+            />
             {canManageCampaigns ? (
               <NavLink
                 to={`/workspaces/${workspaceId}/campaigns/new`}
@@ -283,30 +310,12 @@ export default function CampaignSidebar({
             <SheetBody inset="none" className="flex h-full flex-col bg-background">
               <div className="flex h-full flex-col p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-1 gap-2">
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        {CAMPAIGN_TYPE_OPTIONS.map(([value, label]) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-8 min-w-0 flex-1 px-2 text-xs">
-                        <SelectValue placeholder="All Statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        {CAMPAIGN_STATUS_OPTIONS.map(([value, label]) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <CampaignFilters
+                    typeFilter={typeFilter}
+                    statusFilter={statusFilter}
+                    onTypeFilterChange={setTypeFilter}
+                    onStatusFilterChange={setStatusFilter}
+                  />
                   {canManageCampaigns ? (
                     <NavLink
                       to={`/workspaces/${workspaceId}/campaigns/new`}

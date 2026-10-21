@@ -75,6 +75,20 @@ describe("CampaignSidebar", () => {
     expect(screen.getAllByText("4 / 10")).toHaveLength(1);
   });
 
+  test("explains when the workspace has no campaigns", () => {
+    render(
+      <MemoryRouter initialEntries={["/workspaces/ws-1/campaigns"]}>
+        <CampaignSidebar
+          workspaceId="ws-1"
+          campaigns={[]}
+          userRole={MemberRole.Admin}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("No campaigns yet.")).toBeInTheDocument();
+  });
+
   test("offers pause and resume controls to campaign managers", async () => {
     const user = userEvent.setup();
     renderSidebar();
