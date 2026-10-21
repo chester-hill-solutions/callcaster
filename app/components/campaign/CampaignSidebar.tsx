@@ -65,14 +65,14 @@ const CAMPAIGN_TYPE_OPTIONS = [
 ] as const;
 
 const campaignStatusBarClass: Record<string, string> = {
-  pending: "border-l-warning-text",
+  pending: "border-l-violet-500",
   scheduled: "border-l-info-text",
   running: "border-l-success-text",
-  complete: "border-l-success-text",
-  paused: "border-l-warning-text",
+  complete: "border-l-cyan-500",
+  paused: "border-l-orange-500",
   draft: "border-l-muted-foreground",
   archived: "border-l-border",
-  waiting: "border-l-warning-text",
+  waiting: "border-l-yellow-500",
 };
 
 function campaignTypeFilterValue(type: string | null | undefined): string {
