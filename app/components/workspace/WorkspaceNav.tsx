@@ -192,14 +192,14 @@ const WorkspaceNav = ({
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center justify-between rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
+    `flex h-auto items-center rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-auto items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${
+    `flex h-auto items-center gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${desktopCenterClass} ${
       isActive
         ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
