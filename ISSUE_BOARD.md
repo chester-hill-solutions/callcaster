@@ -1,6 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@959d859b` · 198 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Targeted audit of #2760 at `dev@e4bb8ac6` · Global inventory not refreshed · Refresh with `npm run tools:issues:board`
+
+Other lanes and Project markers are cached from `dev@959d859b` and were not refreshed.
 
 ## How to use this board
 
@@ -29,9 +31,20 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 12
+## Fix now — 13
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2760](https://github.com/chester-hill-solutions/callcaster/issues/2760) Detect dev-only fixes correctly in the issue verification planner
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-21
+- The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.
+- Current behavior: At dev@e4bb8ac6, hasDevOnlyFix returns false for the current origin/dev candidate even though the master check exits 1 and the dev check exits 0. PARTIAL and NOT_FIXED code verdicts consequently plan In progress instead of on-dev.
+- Root cause: git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.
+- Resolution: Use a small Git ancestry helper that requires exit 1 against master and exit 0 against dev. Keep unknown refs and malformed candidates conservative. Exercise the actual dry-run CLI with temporary Git graphs and a GitHub boundary that rejects writes.
+- Look in: `.opencode/tools/apply-issue-verdicts.mjs`, `.opencode/tools/lib/issue-verdict-git.mjs`, `test/apply-issue-verdicts.test.ts`
+- Existing tests: Ten real-CLI cases pass. Original source fails three dev-only cases while seven controls pass.; Controls cover already-released, unrelated, missing and malformed candidates; unavailable refs; and the remaining-person on-qa route.; Negative controls: inverted master ancestry fails four cases; treating an unavailable master as a confirmed miss fails one. The restored source passes all ten.
+- Done when: PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.; A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.; Remaining operator actions still plan on-qa.; The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests.
+- Tracker: Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks.
 
 ### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
 - Verdict: **Fix now** · Type: Bug · Assignees: @manstephen, @wra-sol · Updated: 2026-10-20

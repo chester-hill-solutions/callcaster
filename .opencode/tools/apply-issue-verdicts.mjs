@@ -23,6 +23,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { hasDevOnlyFix } from "./lib/issue-verdict-git.mjs";
 
 const REPO = "chester-hill-solutions/callcaster";
 const PROJECT_NUMBER = 9;
@@ -62,10 +63,6 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
 const gh = (args) =>
   execFileSync("gh", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-
-function git(args) {
-  return execFileSync("git", args, { cwd: repoRoot, encoding: "utf8" }).trim();
-}
 
 // ---------------------------------------------------------------- verdicts
 const verdicts = [];
@@ -143,19 +140,6 @@ while (more) {
 }
 
 // ------------------------------------------------------------------ planning
-/** A fix that exists on dev but not in master means the work is in flight. */
-function hasDevOnlyFix(issue) {
-  const shas = [];
-  if (verdictCandidates.has(issue)) shas.push(...verdictCandidates.get(issue));
-  for (const sha of shas) {
-    try {
-      if (git(["merge-base", "--is-ancestor", sha, "origin/master"])) continue;
-      if (git(["merge-base", "--is-ancestor", sha, "origin/dev"])) return true;
-    } catch {}
-  }
-  return false;
-}
-
 function plan(verdict, current) {
   if (verdict.verdict === "VERIFIED") {
     if (verdict.manual) {
@@ -185,17 +169,20 @@ function plan(verdict, current) {
       why: "the code is in master, but the last step is a person's action on master",
     };
   }
+  const status = hasDevOnlyFix(verdictCandidates.get(verdict.issue) ?? [], repoRoot)
+    ? "on-dev"
+    : "In progress";
   if (verdict.verdict === "PARTIAL") {
     // A partial fix is not a completed fix, so it is unfinished work.
     return {
       action: "reopen",
-      status: hasDevOnlyFix(verdict.issue) ? "on-dev" : "In progress",
+      status,
       why: "the fix covers part of the symptom only",
     };
   }
   return {
     action: "reopen",
-    status: hasDevOnlyFix(verdict.issue) ? "on-dev" : "In progress",
+    status,
     why: "nothing in master resolves the reported symptom",
   };
 }
