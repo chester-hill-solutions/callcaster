@@ -3,7 +3,7 @@ import { NavLink } from "react-router";
 import { FaPlus } from "react-icons/fa";
 import { Card, CardHeader } from "@/components/ui/card";
 import { MemberRole } from "@/components/workspace/TeamMember";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { CampaignStatusBadge } from "@/components/campaign/CampaignStatusBadge";
 import { Campaign } from "@/lib/types";
 
 const handleNavlinkStyles = ({
@@ -61,7 +61,7 @@ const CampaignsList = ({
                 <span className="line-clamp-2 leading-tight">
                   {row.title || `Unnamed campaign ${i + 1}`}
                 </span>
-                <StatusBadge status={row.status || ""} className="text-xxs" />
+                <CampaignStatusBadge status={row.status || ""} className="text-xxs" />
               </NavLink>
             )
           );

@@ -1,5 +1,5 @@
 import { NavLink } from "react-router";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { CampaignStatusBadge } from "@/components/campaign/CampaignStatusBadge";
 import { Heading } from "@/components/ui/typography";
 import { CampaignTypeIcon } from "@/components/campaign/CampaignTypeIcon";
 import type { Enums } from "@/lib/db-types";
@@ -39,7 +39,7 @@ export const CampaignHeader = ({
         <Heading as="h3" level={3} branded={false} className="inline">
           {title}
         </Heading>
-        <StatusBadge status={status} className="ml-2" />
+        <CampaignStatusBadge status={status} className="ml-2" />
         {queueProgress?.totalCount ? (
           <CampaignQueueProgress
             completedCount={queueProgress.completedCount}
