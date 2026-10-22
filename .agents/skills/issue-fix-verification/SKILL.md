@@ -38,6 +38,18 @@ issue at `on-prod` is worse than an open issue, because it hides work that was n
 | `PARTIAL` | The code addresses part of the symptom only. |
 | `NOT_FIXED` | Nothing in `origin/master` addresses the symptom. |
 
+**A verdict is one of those three words and nothing else.** Never write a qualified verdict
+such as `VERIFIED — needs a physical test`. That is a deferral wearing a verdict's name: on
+the board it reads as done, while in fact nothing has been confirmed. "Only a person can
+confirm this" is what the `manual` flag is for.
+
+This is not hypothetical. Three issues — #2075, #2282, #2396 — carried exactly that comment
+and sat open for days with no action, because the comment named no next step and no owner.
+The operator's reply to all three was "can you physically test?", which is the question the
+comment should have answered: `VERIFIED`, `manual: true`, status `on-qa`, waiting on a
+person. Two more — #2518 and #1874 — were marked `VERIFIED` on a code read and were
+disproved by the next physical test, one of them a second time.
+
 Every verdict cites `file:line` or a quoted diff hunk. A verdict without a code citation
 is not a verdict.
 
