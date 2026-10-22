@@ -52,10 +52,20 @@ jobs:
       - name: Plan Railway dev configuration
         run: |
           set +e
-          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-dev-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-dev-plan.json 2> railway-dev-plan.err
           status=$?
           cat railway-dev-plan.json
+          cat railway-dev-plan.err
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            if grep -qiE "invalid railway_token|unauthori[sz]ed|not authorized|invalid token|forbidden" railway-dev-plan.err railway-dev-plan.json; then
+              # An authentication failure is not a plan verdict: the configuration
+              # was never evaluated, so nothing about the diff was checked (#2899).
+              # Label it as the infrastructure fault it is, so the cause is
+              # readable without opening the log.
+              echo "::error title=Railway authentication failed (dev)::The Railway CLI could not authenticate, so no plan was computed. The RAILWAY_TOKEN secret for the 'dev' GitHub environment is invalid or expired. Fix it with: gh secret set RAILWAY_TOKEN --repo chester-hill-solutions/callcaster --env dev"
+            else
+              echo "::error title=Railway plan failed (dev)::railway config plan exited $status without producing a plan. See the log above."
+            fi
             exit "$status"
           fi
           if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-dev-plan.json > /dev/null; then
@@ -92,10 +102,18 @@ jobs:
       - name: Plan Railway QA configuration
         run: |
           set +e
-          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-qa-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-qa-plan.json 2> railway-qa-plan.err
           status=$?
           cat railway-qa-plan.json
+          cat railway-qa-plan.err
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            if grep -qiE "invalid railway_token|unauthori[sz]ed|not authorized|invalid token|forbidden" railway-qa-plan.err railway-qa-plan.json; then
+              # An authentication failure is not a plan verdict: the configuration
+              # was never evaluated, so nothing about the diff was checked (#2899).
+              echo "::error title=Railway authentication failed (qa)::The Railway CLI could not authenticate, so no plan was computed. The RAILWAY_TOKEN secret for the 'qa' GitHub environment is invalid or expired. Fix it with: gh secret set RAILWAY_TOKEN --repo chester-hill-solutions/callcaster --env qa"
+            else
+              echo "::error title=Railway plan failed (qa)::railway config plan exited $status without producing a plan. See the log above."
+            fi
             exit "$status"
           fi
           if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-qa-plan.json > /dev/null; then
@@ -131,10 +149,18 @@ jobs:
       - name: Plan Railway production configuration
         run: |
           set +e
-          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-production-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-production-plan.json 2> railway-production-plan.err
           status=$?
           cat railway-production-plan.json
+          cat railway-production-plan.err
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            if grep -qiE "invalid railway_token|unauthori[sz]ed|not authorized|invalid token|forbidden" railway-production-plan.err railway-production-plan.json; then
+              # An authentication failure is not a plan verdict: the configuration
+              # was never evaluated, so nothing about the diff was checked (#2899).
+              echo "::error title=Railway authentication failed (production)::The Railway CLI could not authenticate, so no plan was computed. The RAILWAY_TOKEN secret for the 'production' GitHub environment is invalid or expired. Fix it with: gh secret set RAILWAY_TOKEN --repo chester-hill-solutions/callcaster --env production"
+            else
+              echo "::error title=Railway plan failed (production)::railway config plan exited $status without producing a plan. See the log above."
+            fi
             exit "$status"
           fi
           if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-production-plan.json > /dev/null; then
