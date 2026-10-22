@@ -48,7 +48,8 @@ export function buildMediaStreamWsUrl(sessionId: string, token: string): string 
  * misconfigured, so the call itself always proceeds. A missing
  * `MEDIA_STREAM_HOST` while the stream was wanted fails closed (no `<Stream>`)
  * and is logged as an error — it is a deploy misconfiguration, not a normal
- * "feature off" path.
+ * "feature off" path. A missing call SID fails closed the same way, because
+ * the token it would mint could not be bound to a call.
  */
 export function appendLiveTranscriptionStreamTwiml({
   twiml,
@@ -64,6 +65,23 @@ export function appendLiveTranscriptionStreamTwiml({
     return false;
   }
 
+  // Fail closed. Every transcript and coaching row is keyed by the call SID, and
+  // the service refuses any `start` frame that names a different call, so a
+  // token without one authorizes writes to a call it never named. A caller that
+  // cannot name the call does not get a stream.
+  const callSid = params.callSid != null ? String(params.callSid).trim() : "";
+  if (!callSid) {
+    logger.error(
+      "Skipping <Stream> — no call SID to bind the media-stream token to",
+      {
+        guard: "media-stream-callsid-missing",
+        workspaceId,
+        direction,
+      },
+    );
+    return false;
+  }
+
   try {
     const sessionId = randomUUID();
     const token = createMediaStreamToken({
@@ -72,7 +90,7 @@ export function appendLiveTranscriptionStreamTwiml({
         params.campaignId != null ? String(params.campaignId) : "",
       userId,
       sessionId,
-      callSid: params.callSid != null ? String(params.callSid) : undefined,
+      callSid,
     });
 
     const url = buildMediaStreamWsUrl(sessionId, token);

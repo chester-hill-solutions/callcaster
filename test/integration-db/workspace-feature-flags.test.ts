@@ -86,7 +86,14 @@ suite("real stored workspace feature flags (#2118)", () => {
         const enabled = stream.appendLiveTranscriptionStreamTwiml({
           twiml: voice,
           featureFlags: row.feature_flags as Record<string, unknown>,
-          params: { workspaceId: id, userId: "fixture-user", direction: "outbound" },
+          // A call SID is mandatory: without one the token could not be bound
+          // to a call, so the helper fails closed and attaches no <Stream>.
+          params: {
+            workspaceId: id,
+            userId: "fixture-user",
+            direction: "outbound",
+            callSid: "CA-feature-flags-fixture",
+          },
         });
         return { enabled, xml: voice.toString() };
       },

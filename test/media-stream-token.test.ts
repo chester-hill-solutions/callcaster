@@ -11,6 +11,7 @@ describe("media-stream-token", () => {
     campaignId: "camp-1",
     userId: "user-1",
     sessionId: "session-1",
+    callSid: "CA-token-1",
   };
 
   beforeEach(() => {
@@ -56,5 +57,31 @@ describe("media-stream-token", () => {
     const [encoded] = token.split(".");
     const tampered = `${encoded}-extra.${token.split(".")[1]}`;
     expect(() => verifyMediaStreamToken(tampered)).toThrow("signature mismatch");
+  });
+
+  // #2889: the call SID is the row key for the service's unscoped writes, so a
+  // token without one would authorize writes on a call it never named.
+  test("refuses to mint a token with no call SID", () => {
+    expect(() =>
+      createMediaStreamToken({ ...basePayload, callSid: "" }),
+    ).toThrow("callSid is required");
+    expect(() =>
+      createMediaStreamToken({ ...basePayload, callSid: "   " }),
+    ).toThrow("callSid is required");
+
+    const omitted: Record<string, unknown> = { ...basePayload };
+    delete omitted.callSid;
+    expect(() => createMediaStreamToken(omitted as never)).toThrow(
+      "callSid is required",
+    );
+  });
+
+  test("the call SID is part of the signed payload", () => {
+    const token = createMediaStreamToken({
+      ...basePayload,
+      callSid: "CA-signed",
+      exp: Math.floor(Date.now() / 1000) + 60,
+    });
+    expect(verifyMediaStreamToken(token).callSid).toBe("CA-signed");
   });
 });
