@@ -57,6 +57,10 @@ ADRs live in [`adr/`](adr/) and document hard-to-reverse, surprising, trade-off-
 - [0033 — Immutable Script Revision, Campaign Run, and audited Interaction state](adr/0033-immutable-revision-run-and-audited-interaction-state.md)
 - [0034 — Recipient Messaging Consent ledger and fail-closed disclosure for automated SMS](adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md)
 
+### Platform operations (ADR-0040)
+
+- [0040 — Inherited configuration as code and pluggable secret providers](adr/0040-inherited-config-and-pluggable-secrets.md)
+
 ## Active docs
 
 - `design-system.md`
@@ -64,6 +68,7 @@ ADRs live in [`adr/`](adr/) and document hard-to-reverse, surprising, trade-off-
 - `local-development.md`
 - `testing-map.md`
 - `e2e-testing.md`
+- `synthetic-telephony-testing.md` — agent-friendly SIM tasks, SIP personas, and load testing
 - `error-handling.md`
 - `stripe-webhook.md`
 - `number-rental-billing.md`

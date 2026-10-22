@@ -6,7 +6,7 @@ local CI do not include it.
 
 ## Sai-local SMS flow
 
-`npm run test:sim` runs the `sai-local` SMS proof only when all of these
+`npm run test:sim` currently runs the `sai-local` SMS proof only when these
 environment variables are set in the calling shell or secret manager:
 
 ```text
@@ -21,6 +21,12 @@ SIM_SMS_MESSAGE="<unique test message>"
 The suite rejects a missing or changed sai-local workspace or recipient value.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
+
+The planned inherited configuration and secret-provider migration is defined in
+[ADR-0040](adr/0040-inherited-config-and-pluggable-secrets.md). Until ADR-0040
+Phase 5 migrates SIM, this page describes the current interface. Do not add new
+SIM-specific variables; new SIM work uses the compatibility boundary until the
+shared loader is available.
 
 The flow does these tasks through the product UI:
 
