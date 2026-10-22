@@ -791,16 +791,9 @@ export interface UseWorkspaceRealtimeProps {
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
 
-// Utility function to generate survey links. `proof` is the per-contact
-// signature the survey route requires before it treats a `?contact=` id as
-// proof of ownership (#2868) — mint it server-side with
-// `createSurveyContactProof`. A link generated without one is anonymous.
+// `proof` (createSurveyContactProof) is what makes a link per-contact (#2868).
 export function generateSurveyLink(
-  contactId: number,
-  surveyId: string,
-  baseUrl: string,
-  proof?: string,
+  contactId: number, surveyId: string, baseUrl: string, proof?: string,
 ): string {
-  const payload = proof ? `${contactId}:${surveyId}:${proof}` : `${contactId}:${surveyId}`;
-  return `${baseUrl}/?q=${btoa(payload)}`;
+  return `${baseUrl}/?q=${btoa(proof ? `${contactId}:${surveyId}:${proof}` : `${contactId}:${surveyId}`)}`;
 }
