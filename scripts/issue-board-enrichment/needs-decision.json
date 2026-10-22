@@ -832,5 +832,255 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance."
+  },
+  {
+    "issueNumber": 2903,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Two-factor authentication is opt-in and unset in every maintained deployment model: without TWO_FACTOR_ENABLED the Better Auth twoFactor plugin is never…",
+    "summary": "The two-factor control is opt-in, and the maintained deployment models leave it unset, so a deployment that never sets the flag runs with no second factor",
+    "currentBehavior": "The two-factor control is opt-in, and the maintained deployment models leave it unset, so a deployment that never sets the flag runs with no second factor. (1) The feature switch is opt-in: isTwoFactorFeatureEnabled (app/lib/env.server.ts:268-271) returns true only for the exact strings 'true' or '1'. Reproduced locally under NODE_ENV=production: unset -> false; '1' and 'true' -> true; '0', 'false' and 'yes' -> false. (2) The Better Auth plugin follows the flag: auth-instance.ts:61-67 registers the twoFactor plugin only when the flag is on. Reproduced locally by instantiating the repository's own Better Auth instance: with the flag unset the instance exposes zero plugins; with…",
+    "rootCause": "app/lib/env.server.ts:268-271 enables the two-factor feature only for the exact strings 'true'/'1', so an unset TWO_FACTOR_ENABLED means the feature is off; app/server/auth-instance.ts:61-67 registers the Better Auth twoFactor plugin only when that flag is on; and app/lib/two-factor.server.ts:55-61 returns 'enforcement disabled' on the feature-off branch before the production refusal at lines 67-85 can apply. No maintained Railway environment model sets TWO_FACTOR_ENABLED (.railway/environments/production.ts:4, .railway/environments/qa.ts:15; dev sets DISABLE_2FA_ENFORCEMENT instead at .railway/environments/dev.ts:10) and .env.example:159 ships it commented out, so a deployment that never…",
+    "resolution": "Owner-observed, read-only and non-destructive. (1) Read the live value of the flag: `railway variables --service callcaster --environment production`, and the same read for the review/dev and QA app services. An absent or unset TWO_FACTOR_ENABLED confirms the deployed default is 'no second factor' on that environment; a value of 'true' or '1' refutes the finding for that environment. This is a read only; no variable is written. (2) Confirm the effect without mutating anything: sign in with a password-only privileged account on the review environment and observe whether a TOTP prompt appears, and open Account -> Security to see whether the feature is reported as unavailable…",
+    "lookIn": [
+      "app/lib/env.server.ts",
+      "app/server/auth-instance.ts",
+      "app/lib/two-factor.server.ts",
+      ".railway/environments/production.ts",
+      ".env.example",
+      "app/lib/workspace-members-db.server.ts",
+      "test/two-factor.server.test.ts",
+      "agents/h18-origins-and-env/artifacts/evidence.json"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2911,
+    "verdict": "needs-decision",
+    "recommendedTitle": "GET /confirm-payment credits the tenant named by the Stripe session metadata, with no binding to the calling principal's workspace",
+    "summary": "GET /confirm-payment?session_id=<id> is the browser-facing credit-grant path",
+    "currentBehavior": "GET /confirm-payment?session_id=<id> is the browser-facing credit-grant path. The route takes the Checkout Session id from the query string, requires only that some session exists (verifyAuth inside the handler: no workspace, no role), and then confirmStripeCheckoutSessionForRedirect retrieves that Checkout Session and credits the workspace named in the session's metadata, for the number of credits named in the same metadata. Nothing on this path compares the session's tenant with a workspace the calling principal belongs to, and nothing validates the metadata amount the way the two sibling grant paths do. pollBillingCheckoutSession compares session.metadata.workspaceId with the caller's…",
+    "rootCause": "The browser-facing credit-grant path treats the Stripe Checkout Session's metadata as the authority for both the target tenant and the credited amount, and applies neither of the two controls its sibling grant paths apply: no binding between the session's tenant and the requesting principal's workspace, and no finite-positive validation of the amount. The unscoped db client is a code-hygiene difference, not the missing control: createTenantDb(workspaceId).execute delegates to the raw client (app/server/tenant-db.ts:227), so the webhook path's tenant-scoped client passes the same metadata tenant to the RPC. The credits delta is whatever p_amount the metadata carried, applied by the RPC to…",
+    "resolution": "Owner-observed checks only, no probing of a live target: (a) in the Stripe Dashboard for the platform account, list every Checkout Session and confirm that each one carries metadata.workspaceId equal to the tenant that created it and a creditAmount equal to the priced amount, and confirm that no Payment Link, Dashboard-created session, other CHS product, other CallCaster environment or stripe listen forwarder writes sessions to the same account; (b) confirm that no cs_... id belonging to one tenant is reachable by another tenant through transaction_history.idempotency_key, the ledger note, the workspace_events SSE payload, the admin Credits tab, the success_url or application logs; (c)…",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts",
+      "app/routes/api+/stripe-webhook.action.server.ts",
+      "app/routes/confirm-payment.loader.server.ts",
+      "app/server/tenant-db.ts",
+      "shared/billing-keys.ts",
+      "app/lib/auth.server.ts",
+      "client/migrations/20260711000000_money_columns_integer_and_ledger_hardening.sql"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2912,
+    "verdict": "needs-decision",
+    "recommendedTitle": "The JSON admin plane (/api/admin/*) applies no two-factor enrolment mandate to sudo operators, while the HTML admin panel does",
+    "summary": "The HTML admin panel and the JSON admin plane apply different authentication bars to the same sudo operator",
+    "currentBehavior": "The HTML admin panel and the JSON admin plane apply different authentication bars to the same sudo operator. The HTML panel (app/lib/admin-middleware.server.ts) requires two things: public.user.access_level === 'sudo' (line 25) and TOTP enrolment (requireTwoFactorEnrollmentForPrivilegedUser with isPrivileged: true, line 34). The JSON admin plane under app/routes/api+/admin+/ requires only the first: requireSudo (app/lib/api-auth.server.ts:201-220) checks access_level and returns the operator. It never reads auth_user.two_factor_enabled, it imports nothing from app/lib/two-factor.server, and it never calls blockUnenrolledPrivilegedSessionUser, the JSON guard the workspace data plane uses for…",
+    "rootCause": "requireSudo was written as a standalone JSON guard and never adopted blockUnenrolledPrivilegedSessionUser, the helper the data-plane middleware uses for the same privileged-session check (app/lib/data-plane-middleware.server.ts:27). The JSON admin plane sits outside the data-plane middleware tree (app/routes/api+/admin+/ exports no middleware), so the helper is never reached on that path.",
+    "resolution": "Owner runs the read-only Railway listing for the CallCaster app service in the production environment (railway variables --service <app service> --environment production) and records whether TWO_FACTOR_ENABLED is present and set to 'true' or '1'; repeat for the review environment. If it is unset (the state recorded on 19 October 2026), requireSudo must still gain the enrolment gate before the flag is switched on, and the enable/disable decision itself should be closed under issue #1815 with the per-environment state written down in an ADR. If it is set, the JSON-plane gap is live now and requireSudo must gain the enrolment gate before the next deploy. The check is read-only: do not set,…",
+    "lookIn": [
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/api-auth.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/two-factor.server.ts",
+      "app/lib/env.server.ts",
+      "ISSUE_BOARD.md",
+      "app/routes/api+/admin+/users+/$userId.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2913,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Ownership transfer's MFA precondition is a stored-column check that is not bound to the platform's 2FA enforcement kill switch, so it disagrees with the…",
+    "summary": "Workspace ownership transfer is the platform's trust-root operation: it is the only path that can grant the highest workspace role, and it is documented as requiring an MFA-enrolled incoming owner (openapi/public-api.json:10634, generated…",
+    "currentBehavior": "Workspace ownership transfer is the platform's trust-root operation: it is the only path that can grant the highest workspace role, and it is documented as requiring an MFA-enrolled incoming owner (openapi/public-api.json:10634, generated from app/lib/openapi-platform.ts:643: 'The incoming owner must have MFA enrolled (SEC-08)'; docs/api-workspace-admin.md:17-24 'Ownership transfer'). Both reachable writers of that precondition - the route-level product function (app/lib/platform-workspace.server.ts:180) and the canonical writer (app/lib/workspace-members-db.server.ts:200), which the settings-form path also reaches (app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:138) - implement…",
+    "rootCause": "The transfer's assurance gate calls isTwoFactorEnabled(userId) (app/lib/two-factor.server.ts:135) - a read of the stored auth_user.two_factor_enabled column - instead of the platform's enforcement kill switch isTwoFactorEnforcementDisabled() (app/lib/two-factor.server.ts:55) that every sibling privileged-role gate honours, so the precondition is satisfied by a leftover column value regardless of whether a second factor is registered, prompted or enforced on that user's sessions.",
+    "resolution": "Owner-observed, read-only inspection only - no probing of any live endpoint: (1) 'railway variables --service <production web service>' to record whether TWO_FACTOR_ENABLED and DISABLE_2FA_ENFORCEMENT are set; this is the decisive fact, because with TWO_FACTOR_ENABLED=true|1 the transfer gate tracks live enrollment and the candidate does not apply. (2) 'select count(*) from auth_user where two_factor_enabled' on the production database to size the leftover-row population the stale-column gate would admit. (3) 'select id, email from auth_user where two_factor_enabled' to identify which accounts could be promoted to owner on a leftover row. (4) 'select count(*) from workspace_member wm left…",
+    "lookIn": [
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/platform-workspace.server.ts",
+      "app/lib/two-factor.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/server/auth-instance.ts",
+      "docs/release-test-guide-2026-09-07.md",
+      "docs/CHANGELOG.md",
+      "app/lib/env.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2916,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Pull-request-controlled npm install lifecycle scripts run in CI jobs whose environment already exports repository and environment secrets",
+    "summary": "Every pull-request-reachable dependency install in this repository runs `npm ci` against the pull request's own checkout, and npm executes the root package's install lifecycle scripts from that pull-request-controlled package.json while…",
+    "currentBehavior": "Every pull-request-reachable dependency install in this repository runs `npm ci` against the pull request's own checkout, and npm executes the root package's install lifecycle scripts from that pull-request-controlled package.json while the install step's environment already holds secrets. In ci.yml the install step exports `NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}` (the same step shape at lines 78/92/110/127/144/193/214, secret at 80/94/112/129/146/195/216); e2e.yml:76/79 and schema-default-drift.yml:54/56 repeat the pattern; and in railway-iac.yml the same secret is exported on the install step (lines 49, 89, 128) while `RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}`…",
+    "rootCause": "The dependency-install step trusts the manifest it is handed: `npm ci` reads the pull-request-controlled root package.json and executes its install lifecycle hooks, while the workflow places secrets in the environment of that same step - step-scoped `NODE_AUTH_TOKEN` for the install step, and job-scoped `RAILWAY_TOKEN` in railway-iac.yml, inherited by every step of the job. The repository's own images show the opposite containment: Dockerfile:9-11 and Dockerfile.worker:6-8 copy only `package.json`, `bun.lock` and `vendor/` before installing, so the checked-in `prepare` hook is an inert no-op there (`test -f scripts/setup-githooks.sh` fails and the `|| true` swallows it) and CI is the only…",
+    "resolution": "Owner-observed, non-destructive, no probing of a live target: (1) read Settings > Actions > General > Workflow permissions for the repository and the organization default, and note whether 'Send write tokens to workflows from pull requests' and 'Require approval for all outside collaborators' are enabled; (2) read the protection rules of the dev, qa and production GitHub environments (required reviewers, deployment branch rules, wait timer) and note whether the dev and qa jobs can start unattended; (3) list the repository's collaborators and their permissions to establish who can push a branch, and therefore open a secret-bearing pull request, and whether any of them is a lower-trust…",
+    "lookIn": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/railway-iac.yml",
+      ".railway/README.md",
+      ".github/workflows/e2e.yml",
+      ".github/workflows/schema-default-drift.yml",
+      "package.json",
+      "package-lock.json",
+      ".npmrc"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2918,
+    "verdict": "needs-decision",
+    "recommendedTitle": "The media-stream process - token-authorized, unscoped writes and credit debits - has no infrastructure-as-code definition, and its only deploy runbook…",
+    "summary": "Confirmed from source: the repository declares three deployable processes (docs/adr/0030-media-stream-bun-service-third-railway-process.md:3, CONTEXT.md:158, docs/media-stream-ops.md:3) and models two",
+    "currentBehavior": "Confirmed from source: the repository declares three deployable processes (docs/adr/0030-media-stream-bun-service-third-railway-process.md:3, CONTEXT.md:158, docs/media-stream-ops.md:3) and models two. A read-only sandbox scan of the whole .railway/ tree found zero references to media-stream, MEDIA_STREAM_SECRET or MEDIA_STREAM_HOST; .railway/environments/production.ts:108, qa.ts:104 and dev.ts:118 return only the app, the worker, the database, the volume and the bucket, and .railway/config/shared.ts:10 emits preserve() only for the listed names, so MEDIA_STREAM_SECRET and MEDIA_STREAM_HOST sit outside every preservation list - including the app's, even though the app itself signs the…",
+    "rootCause": "The repository models only two of its three declared processes in .railway/environments/*.ts, so nothing about the media-stream service - its image, runtime configuration, secret provisioning, or even its existence - is covered by a plan, a preservation list or a review, and the only runbook that governs it (docs/media-stream-ops.md) still describes the service as having no database writes and no credit debits and as sharing one image with the worker. The half-applied 2026-08-03 remediation is the proximate origin: the image fix landed, the runbook correction and the IaC modelling did not.",
+    "resolution": "Read-only and non-destructive, per environment, using the procedure in .agents/skills/railway-iac/SKILL.md. For each of dev, qa and production separately: (1) `railway status --project --environment <env>` and `railway service list --json` to enumerate the environment's services and check whether a media-stream service exists, and if so its build method (Dockerfile path or start command), source branch, and public domain; (2) `railway variable list --service <id> --environment <env> --json` for the app, the worker and any media-stream service, inspecting variable NAMES only - never `--show-values`, `--decrypt-variables`, or `config apply` - and record whether MEDIA_STREAM_SECRET and…",
+    "lookIn": [
+      ".railway/environments/production.ts",
+      ".railway/config/shared.ts",
+      "services/media-stream/index.ts",
+      "services/media-stream/db-writer.ts",
+      "services/media-stream/coaching-billing.ts",
+      "docs/media-stream-ops.md",
+      "Dockerfile.worker",
+      "Dockerfile"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2919,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Boot-time secret validation is presence-only, so a deployment configured from .env.example runs on the repository's published dev secret literals",
+    "summary": "The repository publishes three secret literals in .env.example: BETTER_AUTH_SECRET=dev-better-auth-secret-change-me (line 41), CRON_SECRET=dev-cron-secret-change-me (line 151) and MEDIA_STREAM_SECRET=dev-media-stream-secret-change-me (line…",
+    "currentBehavior": "The repository publishes three secret literals in .env.example: BETTER_AUTH_SECRET=dev-better-auth-secret-change-me (line 41), CRON_SECRET=dev-cron-secret-change-me (line 151) and MEDIA_STREAM_SECRET=dev-media-stream-secret-change-me (line 169). Neither production configuration control rejects them. validateRequiredEnv (app/lib/required-env-keys.mjs:55) computes missing = REQUIRED_ENV_KEYS.filter((key) => !env[key]) - presence only - so the published BETTER_AUTH_SECRET literal passes the boot gate that server/bun.ts:51 depends on (reproduced: accepted under NODE_ENV=production; only an absent key is rejected). env.MEDIA_STREAM_SECRET (app/lib/env.server.ts:218-229) refuses only the unset…",
+    "rootCause": "app/lib/required-env-keys.mjs#validateRequiredEnv (line 55) checks only that the required secret variables are present and non-empty, and app/lib/env.server.ts#MEDIA_STREAM_SECRET (lines 218-229) refuses only the unset case, so neither control rejects the dev/example secret literals that the repository itself publishes in .env.example. The production refusal of the dev fallback secret is value-blind: it fires when MEDIA_STREAM_SECRET is absent, and stays silent when MEDIA_STREAM_SECRET is set to the very literal the code treats as the dev fallback secret.",
+    "resolution": "Owner-observed check of the production Railway environment, comparing values in place without printing or transmitting them. For the 'callcaster' application service: confirm BETTER_AUTH_SECRET differs from 'dev-better-auth-secret-change-me' and CRON_SECRET differs from 'dev-cron-secret-change-me'. For the media-stream service: confirm MEDIA_STREAM_SECRET is set and differs from 'dev-media-stream-secret-change-me', and confirm NODE_ENV is 'production' - if NODE_ENV is not 'production' and MEDIA_STREAM_SECRET is unset, app/lib/env.server.ts:228 returns the published literal and the service keys tokens with the published value; a configured MEDIA_STREAM_SECRET is returned unchanged…",
+    "lookIn": [
+      ".env.example",
+      "app/lib/required-env-keys.mjs",
+      "server/bun.ts",
+      "app/lib/env.server.ts",
+      "app/lib/media-stream-token.server.ts",
+      "services/media-stream/index.ts",
+      "services/media-stream/workspace-config.ts",
+      "services/media-stream/db-writer.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2920,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Stripe webhook credits the tenant and the credit amount named in the event's session metadata, with no check against the money the session actually collected",
+    "summary": "The only authentication on POST /api/stripe-webhook is the Stripe signature over the raw body (app/routes/api+/stripe-webhook.action.server.ts:42)",
+    "currentBehavior": "The only authentication on POST /api/stripe-webhook is the Stripe signature over the raw body (app/routes/api+/stripe-webhook.action.server.ts:42). That check proves the bytes were signed by the holder of STRIPE_WEBHOOK_SECRET and says nothing about which Checkout Session the event describes, who paid, or how much was collected; it does hold, and a body mutated after signing is rejected with 400. The grant then takes the credited tenant from session.metadata.workspaceId (line 59) and the credited amount from Number(session.metadata.creditAmount) (line 60), and never compares the amount with session.amount_total or session.currency (session.amount_total occurs nowhere in app/, shared/,…",
+    "rootCause": "The webhook treats the event payload's session metadata as the source of truth for both the tenant that is credited and the number of credits granted, instead of resolving the event against a server-side record of the purchase it created (or at minimum validating the granted amount against session.amount_total / session.currency and the customer against workspace.stripe_id). Because the ledger's idempotency key stripe_session:<sessionId> is only unique within (workspace, type), a metadata-derived grant is also scoped per tenant, so one session yields one grant per tenant rather than one grant overall.",
+    "resolution": "Owner-observed, no probing of the live target: in the Stripe Dashboard for the platform account, list every Webhook endpoint and its signing secret and confirm that STRIPE_WEBHOOK_SECRET for /api/stripe-webhook is used by that endpoint alone; list every source of Checkout Sessions in the account - this app, any other CHS product, Payment Links, Dashboard-created sessions - and confirm that none can set metadata.workspaceId / metadata.creditAmount or update the metadata of a completed cs_* session; record which Stripe account each environment (dev, qa, prod) points at and whether the signing secret is shared between them; and check the Stripe event log for whether one cs_* session can ever…",
+    "lookIn": [
+      "app/routes/api+/stripe-webhook.action.server.ts",
+      "app/lib/platform-billing.server.ts",
+      "shared/pricing.ts",
+      "drizzle/0000_baseline.sql",
+      "client/migrations/20260711000000_money_columns_integer_and_ledger_hardening.sql",
+      "docs/stripe-webhook.md",
+      "agents/v04-stripe-metadata-grant/artifacts/evidence.json",
+      "app/lib/transaction-history.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2922,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Twilio webhook boundary verifies requests that name no tenant with the platform main-account auth token, so platform-signed callbacks reach routes that are not…",
+    "summary": "requireTwilioSignature has two credential paths",
+    "currentBehavior": "requireTwilioSignature has two credential paths. When the caller supplies a workspace option (workspaceId, callSid, messageSid, phoneNumber), the request is verified against that tenant's own subaccount auth token and fails closed if the tenant cannot be resolved (app/lib/twilio-webhook.server.ts:217-266). When the caller supplies no workspace option, the request is verified against the platform main-account token env.TWILIO_AUTH_TOKEN() (app/lib/twilio-webhook.server.ts:251-253) and no tenant resolver runs at all. The Bun pre-handler decides which path a request takes from the request body alone: server/twilio-webhook.ts:26-52 produces a workspace option only when the body carries…",
+    "rootCause": "The webhook boundary selects between two credential worlds from the request body alone. When a workspace option is supplied, the request is verified against that tenant's subaccount token and fails closed if the tenant cannot be resolved (app/lib/twilio-webhook.server.ts:217-266). When no workspace option is supplied, which the Bun pre-handler decides purely from the body (server/twilio-webhook.ts:26-52, line 51), the request is verified against the platform main-account token env.TWILIO_AUTH_TOKEN() (app/lib/twilio-webhook.server.ts:251-253) with no tenant resolver consulted. Routes that always take that second path (/api/inbound-verification, and /api/call when the body omits…",
+    "resolution": "Owner-observed checks only, no probing of a live target: (1) query the production database for workspace rows whose twilio_data->>'sid' equals the platform TWILIO_SID and count them; (2) in the Twilio console, list every phone number and TwiML App whose voice URL or status callback points at a tenant-less webhook path and record the owning account of each; (3) place one ordinary call from a second number to the active verification number and record the From value Twilio delivers to /api/inbound-verification, comparing it with the app logs; (4) count twilio.webhook.auth_failed events with reason missing_credentials and attemptedWorkspace=false in the app logs to size the population of…",
+    "lookIn": [
+      "app/lib/twilio-webhook.server.ts",
+      "server/twilio-webhook.ts",
+      "app/routes/api+/inbound-verification.action.server.ts",
+      "app/routes/api+/call.action.server.ts",
+      "app/lib/merge-workspace-twilio-data.server.ts",
+      "docs/adr/0038-verification-numbers-are-platform-data.md",
+      "app/routes/api+/verify-call-in-session.loader.server.ts",
+      "app/lib/database/workspace-twilio-subaccount.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
   }
 ]

@@ -57,5 +57,357 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Unassigned native child of #2099. Required CallCaster ingress proof remains; primary provider guidance was added to the issue without claiming acceptance."
+  },
+  {
+    "issueNumber": 2902,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Caller-supplied forwarded host/proto widen the per-request Better Auth trusted-origin list; a wildcard host becomes a catch-all glob that switches off the CSRF…",
+    "summary": "resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value",
+    "currentBehavior": "resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value. app/server/auth-instance.ts:20 passes that resolver to Better Auth as `trustedOrigins`, and better-auth 1.6.23 matches the Origin header (the CSRF check) and the callbackURL/redirectTo (the post-authentication redirect allow-list) against the merged list with matchesOriginPattern, which compares http/https origins exactly BUT expands any pattern containing `*` or `?` into a glob. Verified locally against the application's own auth instance (drizzle + Postgres) and the…",
+    "rootCause": "app/lib/auth-trusted-origins.server.ts:84-87 reads `x-forwarded-host` (first comma-separated element) with the `host` header as fallback, and `x-forwarded-proto` for the scheme, from the request itself; lines 100-109 then add `${proto}://${host}` to the trusted-origin set with no allowlist against the configured origins, no hostname validation and no rejection of wildcard characters. app/server/auth-instance.ts:20 passes that resolver to Better Auth as the `trustedOrigins` option, and Better Auth's matcher (node_modules/better-auth/dist/auth/trusted-origins.mjs:18-22) expands any pattern containing `*` or `?` into a glob, so a caller-chosen host of `*` becomes a catch-all pattern. Both…",
+    "resolution": "Owner-observed check against the application's own public auth endpoint, non-destructive and creating no account and no session for a real user. Use a non-existent address and a made-up password: POST https://<app-host>/api/auth/sign-in/email with Content-Type: application/json, body {\"email\":\"v40-probe@example.invalid\",\"password\":\"not-a-real-password\"}, header `Origin: https://probe-host.invalid` and header `X-Forwarded-Host: probe-host.invalid`; repeat once with `X-Forwarded-Host: *` and `X-Forwarded-Proto: https`; repeat once with no X-Forwarded-* header at all as the control. Send at most three requests and space them more than 10 seconds apart so Better Auth's own per-path rate limit…",
+    "lookIn": [
+      "app/lib/auth-trusted-origins.server.ts",
+      "app/server/auth-instance.ts",
+      "node_modules/better-auth/dist/auth/trusted-origins.mjs",
+      "node_modules/better-auth/dist/api/middlewares/origin-check.mjs",
+      "node_modules/better-auth/dist/cookies/index.mjs",
+      "server/bun.ts",
+      "app/lib/safe-redirect.ts",
+      "app/routes/remember.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2905,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Outbound voicemail, ops-alert and Twilio-compliance email bodies interpolate caller- and provider-originated text into HTML without escapeHtml",
+    "summary": "Three outbound email builders build their HTML body by raw template-literal interpolation, without the HTML-escaping helper the repository already owns (app/lib/email-html.ts#escapeHtml), while the same codebase applies that helper in the…",
+    "currentBehavior": "Three outbound email builders build their HTML body by raw template-literal interpolation, without the HTML-escaping helper the repository already owns (app/lib/email-html.ts#escapeHtml), while the same codebase applies that helper in the sibling builders (app/lib/low-credit-notify.server.ts:50, app/lib/billing-reconciliation-alert.server.ts:40, app/lib/number-rental-billing.server.ts:124 and :330). The omission is real and I reproduced it independently in the approved sandbox: calling the PRODUCTION builders with only the provider boundaries stubbed and parsing the resulting html field with parse5, the payload <a href=\"https://attacker.invalid/verify-callcaster\">Verify your CallCaster…",
+    "rootCause": "The three ops-email HTML bodies are built with template-literal interpolation of values that are not passed through escapeHtml (app/lib/email-html.ts), so caller- or provider-originated text is inserted into the HTML body (and, for the voicemail subject, into the subject line) as markup instead of as text. The same codebase applies escapeHtml to the equivalent interpolations in app/lib/low-credit-notify.server.ts:50, app/lib/billing-reconciliation-alert.server.ts:40 and app/lib/number-rental-billing.server.ts:124 and :330, so the omission is inconsistent rather than a deliberate design. Verified: none of app/lib/inbound-voicemail-email.server.ts, app/lib/ops-alert.server.ts or…",
+    "resolution": "Owner-observed checks, non-production tenant only, with no mail sent to any uninvolved recipient. (a) Sink 1: on a non-production tenant whose voicemail notification address is a mailbox the owner controls, place a real inbound call from a carrier or VoIP provider that permits a non-numeric or alphanumeric caller id, and record byte-for-byte what Twilio delivers in the From parameter of the inbound-call webhook (app/routes/api+/inbound.action.server.ts:163) together with the value stored in call.from. If From is always E.164, sink 1 collapses to tenant self-injection only and the candidate must be re-scoped to the provider-echo sinks with severity reassessed. (b) Sink 3: on the same…",
+    "lookIn": [
+      "app/lib/email-html.ts",
+      "app/lib/inbound-voicemail-email.server.ts",
+      "app/lib/ops-alert.server.ts",
+      "app/lib/twilio-compliance-notify.server.ts",
+      "app/lib/env.server.ts",
+      "app/routes/api+/email-vm.action.server.ts",
+      "app/routes/api+/inbound.action.server.ts",
+      "app/lib/twilio-webhook.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2906,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Outbound webhook guard accepts IETF special-purpose address ranges, including 100.100.100.200 (Alibaba Cloud instance metadata)",
+    "summary": "The SSRF guard that every user-configured outbound webhook passes through classifies any parseable address it does not explicitly list as a public destination",
+    "currentBehavior": "The SSRF guard that every user-configured outbound webhook passes through classifies any parseable address it does not explicitly list as a public destination. Its IPv4 list (app/lib/safe-outbound-url.server.ts:49-62) covers 0.0.0.0/8, 10.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, 172.16.0.0/12 and 192.168.0.0/16 and nothing else. RFC 6598 shared address space (100.64.0.0/10), RFC 2544 benchmarking (198.18.0.0/15), RFC 6890 protocol assignments (192.0.0.0/24), multicast (224.0.0.0/4), reserved (240.0.0.0/4) and the broadcast address are therefore accepted as webhook destinations, and 100.64.0.0/10 contains 100.100.100.200, the Alibaba Cloud instance-metadata endpoint that returns workload…",
+    "rootCause": "app/lib/safe-outbound-url.server.ts:49-62 isPrivateIpv4 enumerates only six IPv4 prefixes (0/8, 10/8, 127/8, 169.254/16, 172.16/12, 192.168/16) and returns false for every other parseable address. app/lib/safe-outbound-url.server.ts:99-109 isPrivateOrMetadataIp special-cases 169.254.169.254, unwraps IPv4-mapped IPv6 and then defers to isPrivateIpv4/isPrivateIpv6, failing closed only for unparseable addresses, so every other special-purpose address inherits the 'public' verdict. app/lib/safe-outbound-url.server.ts:85-97 isPrivateIpv6 rejects only ::1, ::, fc00::/7 and fe80::/10, so fec0::/10, 64:ff9b::/96 and 2002::/16 are classified public. Both resolveSafeOutboundTarget (lines 146-151 for…",
+    "resolution": "Owner-observed, read-only check inside a production container, without contacting any endpoint and without sending traffic to any candidate address: (a) record the cloud provider and region the workload runs in, and the private-network peer addressing Railway assigns to the app, the worker and the PostgreSQL service; (b) read the workload's route table (ip route / route -n) and the platform's own instance-metadata configuration (the address that cloud provider documents for that workload) and write both down; (c) compare those two lists against the omitted ranges - 100.64.0.0/10, 198.18.0.0/15, 192.0.0.0/24, 224.0.0.0/4, 240.0.0.0/4, 255.255.255.255 and, for IPv6, fec0::/10, 64:ff9b::/96,…",
+    "lookIn": [
+      "app/lib/safe-outbound-url.server.ts",
+      "app/lib/webhook-test-delivery.server.ts",
+      "app/lib/schemas/api/platform-workspace-admin.ts",
+      ".railway/environments/dev.ts",
+      "app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts",
+      "app/lib/platform-members.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2907,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Caller-supplied webhook custom headers are forwarded unfiltered, so the outbound request's Host can be decoupled from the validated destination",
+    "summary": "The webhook custom-header map is copied verbatim from the request body and spread over the outbound request headers, with no allowlist, denylist, case normalisation or length limit on header names",
+    "currentBehavior": "The webhook custom-header map is copied verbatim from the request body and spread over the outbound request headers, with no allowlist, denylist, case normalisation or length limit on header names. safeOutboundFetch hands the map unchanged to http.request/https.request, so a caller-supplied Host key replaces the URL host in the emitted request while the socket stays pinned to the DNS-validated address, and a caller-supplied Transfer-Encoding key produces a request that carries both Transfer-Encoding: chunked and the runtime's Content-Length over a body that is not chunk-framed. I reproduced this independently in the approved sandbox with the production runtime (bun 1.3.14), driving the real…",
+    "rootCause": "app/lib/platform-members.server.ts:240-252 normalizeCustomHeaders copies every caller-supplied [key, value] pair into a Record with no header-name constraint, and app/lib/schemas/api/platform-workspace-admin.ts:63-82 accepts any record of string to string (or an array of string tuples) for custom_headers. app/lib/workspace-webhooks.server.ts:59-69 and app/lib/webhook-test-delivery.server.ts:14-31 spread that map after the 'Content-Type: application/json' default and pass it to safeOutboundFetch, which forwards init.headers unchanged as the `headers` option of the request (app/lib/safe-outbound-url.server.ts:267). No layer inspects the header names between the request body and the socket.",
+    "resolution": "Owner-observed configuration review only - no request is made to any live or third-party system. (1) From the deployment configuration, record the egress source addresses of the callcaster app and callcaster-worker processes, and whether the platform is registered with, or allowlisted by, any destination that fronts more than one virtual host from one public address. (2) For each such front-end, ask its owner - do not probe it - whether an access rule is keyed to the source address of the platform and whether that rule applies to virtual hosts other than the one named in destination_url. (3) For each candidate front-end/origin pair, obtain the owner-documented framing behaviour,…",
+    "lookIn": [
+      "app/lib/platform-members.server.ts",
+      "app/lib/schemas/api/platform-workspace-admin.ts",
+      "app/lib/workspace-webhooks.server.ts",
+      "app/lib/webhook-test-delivery.server.ts",
+      "app/lib/safe-outbound-url.server.ts",
+      "docs/remediation/critical-review-orchestration-plan-2026-07-12.md",
+      "app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2908,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Transcoded audio output has no byte ceiling: the ffmpeg child's whole stdout is buffered in the shared web process and the only limit is a 10-minute wall clock",
+    "summary": "Every accepted workspace-audio upload runs ffmpeg twice: once to normalise the file to MP3 (app/lib/audio.server.ts:155) and once to write the 8 kHz mono PCM WAV sidecar (app/lib/audio.server.ts:185)",
+    "currentBehavior": "Every accepted workspace-audio upload runs ffmpeg twice: once to normalise the file to MP3 (app/lib/audio.server.ts:155) and once to write the 8 kHz mono PCM WAV sidecar (app/lib/audio.server.ts:185). `runAudioProcess` pushes every stdout chunk into an array and concatenates it (app/lib/audio-process.server.ts:36 and :49), so the whole transcoded output is resident in the one web process that serves every workspace. The sidecar encoder is fixed at 8 kHz, 1 channel, pcm_s16le (app/lib/audio.server.ts:72), which emits 16,000 bytes of uncompressed PCM per second of source audio however small the uploaded file was, and the upload path never bounds the source duration: `assertValidAudioUpload`…",
+    "rootCause": "`runAudioProcess` (app/lib/audio-process.server.ts:78) collects the child's whole stdout into an in-memory chunk list and concatenates it at lines 36 and 49, with no output-size ceiling on the collector and no `-t`, `-fs` or `-frames:a` limit on the encoder argv; `transcodeToWavBuffer` (app/lib/audio.server.ts:185) encodes with `WAV_ENCODE_ARGS` (app/lib/audio.server.ts:72: -vn -acodec pcm_s16le -ac 1 -ar 8000 -f wav), which produces 16,000 bytes of uncompressed output per second of source audio however small the uploaded file was. Nothing in the upload path bounds the source duration or the produced output, and the AbortSignal that `runAudioProcess` accepts…",
+    "resolution": "Owner-observed, read-only, on the owner's own deployment; no customer traffic, no workspace data and no deployed endpoint is contacted by this audit. (1) Confirm from the production build log that the app image contains ffmpeg (`ffmpeg -version`), because .railway/environments/production.ts:77 selects the Nixpacks builder for the app service while the ffmpeg install lives in the Dockerfile that production.ts:100-101 wires only to the worker. (2) Read the container memory allocation for the `callcaster` service (one replica, .railway/environments/production.ts:80) from the Railway dashboard, so the resident-buffer blast radius has a denominator. (3) Transcode one 60-minute silent source once…",
+    "lookIn": [
+      "app/lib/audio.server.ts",
+      "app/lib/audio-process.server.ts",
+      "app/routes/workspaces+/$id/audios/record.action.server.ts",
+      "server/bun.ts",
+      "app/lib/api-write-rate-limit.server.ts",
+      "app/lib/platform-media.server.ts",
+      ".railway/environments/production.ts",
+      "app/routes/api+/workspaces+/$workspaceId/audios.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2909,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Workspace audio upload buffers the whole multipart body with no application-level byte cap and enforces no file-size limit",
+    "summary": "POST /api/workspaces/:workspaceId/audios (app/routes/api+/workspaces+/$workspaceId/audios.action.server.ts:36), POST /api/audio-upload (app/routes/api+/audio-upload.action.server.ts:17) and the workspace-UI form action POST…",
+    "currentBehavior": "POST /api/workspaces/:workspaceId/audios (app/routes/api+/workspaces+/$workspaceId/audios.action.server.ts:36), POST /api/audio-upload (app/routes/api+/audio-upload.action.server.ts:17) and the workspace-UI form action POST /workspaces/:workspaceId/audios/new (app/routes/workspaces+/$id/audios/new.action.server.ts:30, a third audio upload entrypoint the candidate did not cite) read their multipart body with `await request.formData()` and pass the file to uploadWorkspaceAudioApi -> normalizeUploadedAudio -> assertValidAudioUpload (app/lib/audio.server.ts:88), which checks only the file extension and the MIME type and has no size check. The repository's own bounded-body control is applied to…",
+    "rootCause": "The audio upload path never applies the repository's existing bounded-body control. `app/routes/api+/workspaces+/$workspaceId/audios.action.server.ts:36`, `app/routes/api+/audio-upload.action.server.ts:17` and `app/routes/workspaces+/$id/audios/new.action.server.ts:30` call `await request.formData()` instead of `readBoundedFormData(request, MAX_MEDIA_BODY_BYTES)` (`app/lib/bounded-form-data.server.ts:11`), and the shared validator `assertValidAudioUpload` (`app/lib/audio.server.ts:88`) omits the `file.size > MAX_MEDIA_FILE_BYTES` check that its sibling `validateMediaFile` (`app/lib/media-upload.server.ts:79`) performs.",
+    "resolution": "Owner-observed on the production service, non-destructive and with no load generation: (1) confirm the effective maxRequestBodySize of the production Bun server, since server/bun.ts:357 sets none; (2) confirm the memory limit configured for the `callcaster` Railway service, which has one replica (.railway/environments/production.ts:80); (3) confirm whether any edge proxy in front of the application caps request bodies below 134,217,728 bytes; (4) as a single-request check only (one request, no concurrency), observe that POST /api/audio-upload, POST /api/workspaces/:workspaceId/audios or POST /workspaces/:workspaceId/audios/new today accepts a body larger than 10,551,296 bytes and does not…",
+    "lookIn": [
+      "app/lib/media-upload.server.ts",
+      "app/lib/bounded-form-data.server.ts",
+      "app/routes/api+/media.action.server.ts",
+      "app/routes/api+/message_media.action.server.ts",
+      "app/lib/api-surface-annotations.ts",
+      "app/lib/openapi-build.ts",
+      "app/lib/api-write-rate-limit.server.ts",
+      "app/lib/platform-media.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2910,
+    "verdict": "needs-repro",
+    "recommendedTitle": "The Stripe Checkout return URLs are built from the incoming request origin instead of the configured canonical origin env.BASE_URL(), and the payment-return…",
+    "summary": "When a workspace Admin starts a credit purchase, app/lib/platform-billing.server.ts:146 computes `const baseUrl = new URL(requestUrl).origin` from the URL of the incoming request, and lines 170-171 send `success_url =…",
+    "currentBehavior": "When a workspace Admin starts a credit purchase, app/lib/platform-billing.server.ts:146 computes `const baseUrl = new URL(requestUrl).origin` from the URL of the incoming request, and lines 170-171 send `success_url = ${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}` and `cancel_url = ${baseUrl}/workspaces/<workspaceId>/billing?payment_status=canceled` to Stripe. The configured canonical public origin, env.BASE_URL() (app/lib/env.server.ts:196), is never consulted: the string 'BASE_URL' does not occur anywhere in app/lib/platform-billing.server.ts, although the file already imports `env` for the Stripe key. I reproduced the app-side behaviour independently in the approved sandbox…",
+    "rootCause": "app/lib/platform-billing.server.ts:146 derives the Stripe Checkout return-URL origin from the incoming request URL (its host and scheme) instead of from the configured canonical origin env.BASE_URL(). The host and scheme of a request are a deployment-level trust decision that the application is expected to normalise, and it does not: server/bun.ts hands the raw request to the React Router handler without rewriting the URL from X-Forwarded-Host or X-Forwarded-Proto (the only reader of those headers in the tree is app/lib/auth-trusted-origins.server.ts:85-87, for Better Auth's origin set), and Bun derives the request origin from the Host header or the absolute-form request target.",
+    "resolution": "Owner-observed, read-only checks. (a) Read BASE_URL (and BETTER_AUTH_URL) from the app service's environment variables in the Railway dashboard - no changes. (b) In the Stripe dashboard, open the most recent Checkout Sessions for the platform account and read their success_url: record the host and whether the scheme is https - read-only inspection, do not create, complete or refund a session. (c) Determine what the edge sends to the app: whether the request that reaches the app carries the canonical Host header and whether X-Forwarded-Proto is set, and whether the edge answers http with an https redirect (if it does, note that the cleartext first hop still exposes the session id). (d) If…",
+    "lookIn": [
+      "app/lib/platform-billing.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.action.server.ts",
+      "app/routes/workspaces+/$id/billing.action.server.ts",
+      "server/bun.ts",
+      "app/lib/twilio-webhook.server.ts",
+      "app/lib/low-credit-notify.server.ts",
+      "app/lib/env.server.ts",
+      "app/lib/safe-redirect.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2914,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Workspace deletion performs no teardown: it purges no stored objects and releases no provider resources, and the cascade destroys the only database records of…",
+    "summary": "Both server-side workspace-delete paths end in the same five-line function",
+    "currentBehavior": "Both server-side workspace-delete paths end in the same five-line function. handleDeleteWorkspace calls deleteWorkspaceById(workspaceId) and nothing else: it issues no object-storage request and no provider request, so the tenant's stored objects are never purged and the tenant's Twilio subaccount and rented numbers are never released. At the same moment the workspace row goes, the FK cascade destroys every database record that identifies those provider assets, leaving the platform holding objects it will never clean up and provider resources it can no longer map to a tenant. Reproduced in the sandbox against the application's own modules on a private Postgres 18: with S3 pointed at a local…",
+    "rootCause": "The workspace teardown is a bare row delete. deleteWorkspaceById (app/lib/workspace-members-db.server.ts:375-381) issues a single DELETE on the workspace row through the unscoped admin client and adds no teardown step: it does not list or delete the tenant's objects under the workspaceAudio, messageMedia, campaign-exports and audience-uploads prefixes, and it makes no call to release the tenant's Twilio subaccount or rented numbers. The FK cascade then removes the rows that hold the Twilio number SIDs and, with the workspace row, the subaccount auth token - the only records the platform has of those provider assets.",
+    "resolution": "Owner-observed, on a scratch tenant in a staging environment, with no real customer data and no destructive action beyond the tenant itself: (a) pick a tenant with no job rows (or delete its job rows first) so the delete is not rejected by job_workspace_id_fkey, and record before the delete its workspace uuid, its subaccount SID and auth token (workspace.twilio_data), the SIDs of its rented numbers (workspace_number.twilio_phone_number_sid, workspace_number_purchase.provider_sid) and the exact object keys under the workspaceAudio/<ws>/, messageMedia/<ws>/, campaign-exports/<ws>/ and audience-uploads/<ws>/ prefixes; (b) delete the workspace with DELETE /api/workspaces/{id} as the owner…",
+    "lookIn": [
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/lib/object-storage.server.ts",
+      "app/db/schema.ts",
+      "drizzle/0000_baseline.sql",
+      "docs/remediation/workspace-billing.md",
+      "scripts/lib/twilio-resource-prune-policy.mjs",
+      "app/lib/worker/handlers/cron.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2915,
+    "verdict": "needs-repro",
+    "recommendedTitle": "e2e.yml is the only workflow with no workflow-level permissions block, and its changes job runs the pull request's own script with an unpinned GITHUB_TOKEN",
+    "summary": "Verified in source: of the nine workflow files in .github/workflows, eight declare a workflow-level `permissions:` block (ci.yml:32, issue-on-dev.yml:48, ledger-drift-check.yml:77, pr-issue-reference.yml:18, railway-iac.yml:25,…",
+    "currentBehavior": "Verified in source: of the nine workflow files in .github/workflows, eight declare a workflow-level `permissions:` block (ci.yml:32, issue-on-dev.yml:48, ledger-drift-check.yml:77, pr-issue-reference.yml:18, railway-iac.yml:25, release-close-issues.yml:44, review-coverage.yml:24, schema-default-drift.yml:34) and e2e.yml does not. Inside e2e.yml the sibling `e2e` job pins `contents: read` and `packages: read` at job level (e2e.yml:59-61), but the `changes` job (e2e.yml:41-52) declares no `permissions:` at either level, so its GITHUB_TOKEN is never pinned by this repository. That job checks out the pull request's merge ref (e2e.yml:46, `actions/checkout@v4` with `fetch-depth: 0` and no `ref:`…",
+    "rootCause": "The token-permission narrowing that the repository applies at workflow level was not applied to .github/workflows/e2e.yml, and the one job left without a pinned token is the job that executes unmerged pull-request code.",
+    "resolution": "Owner-observed, read-only checks; no probe of a deployed target and no workflow edit required. (1) Read the default token permission setting: repository Settings > Actions > General > 'Default Workflow permissions', plus the organisation default under Organization Settings > Actions > Policies if the organisation sets one. If the effective default is the read-only default, the unpinned job's token is equivalent to the pinned {contents: read, packages: read} and the finding is a hardening and consistency gap with no privilege difference. (2) Read the effective scope of the `changes` job's token on a recent pull-request run of e2e.yml, using the sibling `e2e` job as the control; the job log…",
+    "lookIn": [
+      ".github/workflows/e2e.yml",
+      ".github/workflows/ci.yml",
+      "scripts/ci-changes.mjs"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2917,
+    "verdict": "needs-repro",
+    "recommendedTitle": "public.claim_next_queue_contact has no workspace predicate and the tenant-scoped executor adds no filter to raw SQL",
+    "summary": "public.claim_next_queue_contact(campaign_id_variable integer, user_id_variable uuid) is SECURITY DEFINER and its deployed body never mentions a workspace column: the row set is selected from campaign_queue JOIN contact JOIN campaign WHERE…",
+    "currentBehavior": "public.claim_next_queue_contact(campaign_id_variable integer, user_id_variable uuid) is SECURITY DEFINER and its deployed body never mentions a workspace column: the row set is selected from campaign_queue JOIN contact JOIN campaign WHERE ca.id = campaign_id_variable, and the UPDATE that follows writes that row with no workspace predicate either. The application reaches it through createTenantDb(workspaceId).execute(), whose execute is a straight pass-through to the underlying client, so the 'tenant-scoped' executor contributes no isolation to the raw SQL. Independently reproduced in the parent-approved sandbox against a private Postgres 18 booted from the repository migration chain, with…",
+    "rootCause": "public.claim_next_queue_contact(campaign_id_variable integer, user_id_variable uuid) is SECURITY DEFINER and filters only on `ca.id = campaign_id_variable`, with no workspace comparison on campaign_queue, contact or campaign (client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql:20-46, 52-71; pg_get_functiondef of the deployed body on the sandbox database returns a 2488-character body with no occurrence of the word 'workspace' at all). The application calls it as `select * from claim_next_queue_contact(campaignId, userId::uuid)` through the caller-supplied executor (app/lib/campaign-queue-db.server.ts:163-165), and createTenantDb's execute is a straight pass-through to…",
+    "resolution": "Owner-observed checks on a database copy (no live traffic, read-only): (1) select cq.id, cq.workspace, cq.campaign_id, c.workspace as contact_workspace from campaign_queue cq join contact c on c.id = cq.contact_id where cq.workspace <> c.workspace - any row proves the foreign-contact precondition of the second blocker; (2) select c.id, c.workspace, c.campaign_id from call c where c.campaign_id is not null and not exists (select 1 from campaign cm where cm.id = c.campaign_id and cm.workspace = c.workspace) - any row proves a call row already carries another workspace's campaign; (3) select ca.contact_id, c.workspace as contact_workspace, a.workspace as audience_workspace from…",
+    "lookIn": [
+      "client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql",
+      "app/server/tenant-db.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "client/migrations/20260705000200_add_campaign_queue_workspace.sql",
+      "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2921,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Tenant-scoped Drizzle facade hands out an unscoped raw-SQL executor, so TenantDb.execute applies no workspace predicate",
+    "summary": "createTenantDb implements tenancy as a per-table workspaceFilter (app/server/tenant-db.ts:187) that is merged into each table method's where clause (lines 191-223), and the facade's own doc comment promises exactly that (lines 33-35):…",
+    "currentBehavior": "createTenantDb implements tenancy as a per-table workspaceFilter (app/server/tenant-db.ts:187) that is merged into each table method's where clause (lines 191-223), and the facade's own doc comment promises exactly that (lines 33-35): 'Auto-scoped Drizzle facade for a single workspace. Every table in WORKSPACE_SCOPED_TABLES is filtered by its tenancy column on every query.' The facade also attaches execute (line 227), which forwards the caller's SQL straight to the shared Drizzle client with no tenancy predicate of any kind, and execute is part of the exported TenantDb type (line 40), so the tenant-scoped facade structurally satisfies RpcExecutor (app/lib/db-rpc.server.ts:9) and can be…",
+    "rootCause": "app/server/tenant-db.ts#createTenantDb builds a per-workspace facade whose tenancy guarantee is implemented solely as a per-table workspaceFilter merged into findMany/findFirst/insert/insertMany/update/delete/count (app/server/tenant-db.ts:187-223), while the same facade attaches execute, defined as (query: SQL) => dbInstance.execute(query) at app/server/tenant-db.ts:227 and declared on the exported TenantDb type at app/server/tenant-db.ts:40. Because execute bypasses the per-table facade entirely, none of the workspaceScopedFilter predicates apply to it, so the one method that can reach any table, column or plpgsql function is the one method the filter never reaches. The type is part of…",
+    "resolution": "Owner-observed inspection only, no probing of a live target and no writes: (1) read the deployed definition with SELECT pg_get_functiondef('public.claim_next_queue_contact(integer,uuid)'::regprocedure) and compare it with client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql, confirming whether it still selects only on ca.id = campaign_id_variable, still takes no workspace argument, and is SECURITY DEFINER; (2) compare the deployed application build against commit 67d40abb for the set of call sites that pass a TenantDb to an RpcExecutor or call TenantDb.execute, and identify any caller that binds a campaign id without first proving it belongs to the caller's workspace;…",
+    "lookIn": [
+      "app/server/tenant-db.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql",
+      "app/lib/auto-dial-start.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/lib/contacts/tenant-scope.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2923,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Job claim fence binds only the lane id, not the per-claim attempt number",
+    "summary": "The worker's post-claim fence is `id + status='running' + claimed_by = workerId` (poll-jobs.server.ts:228-230, 253-256, 354-357)",
+    "currentBehavior": "The worker's post-claim fence is `id + status='running' + claimed_by = workerId` (poll-jobs.server.ts:228-230, 253-256, 354-357). The identity it stores is not per claim: `claimed_by` is a process-scoped lane id, `bun-worker-${process.pid}-${Date.now()}` (poll-jobs.server.ts:70-72), reused for every claim that process makes, while the per-claim discriminator `attempt_count` is written by the claim UPDATE (poll-jobs.server.ts:188-190) and never used by the fence. Two claims of the same row that share a `claimed_by` value are therefore indistinguishable: the earlier attempt's completeJob, failJob and heartbeat satisfy the fence and overwrite the newer owner's state. This was reproduced…",
+    "rootCause": "The claim identity stored on the row is not unique per claim. `claimed_by` is set to a process-scoped lane id (`bun-worker-${process.pid}-${Date.now()}`, poll-jobs.server.ts:70-72) that is reused for every claim that process makes (poll-jobs.server.ts:188), and the post-claim UPDATEs fence on `claimed_by` alone (poll-jobs.server.ts:228-230, 253-256, 354-357) without binding the attempt number that claimNextJob increments (poll-jobs.server.ts:190). Two claims of the same row that share a claimed_by value are therefore indistinguishable, so an earlier attempt's completeJob, failJob or heartbeat passes the fence and overwrites the newer owner's state.",
+    "resolution": "Read-only, with no queue writes: (1) in the Railway console for the worker service, read the replica count and the container and pid model, because the repository states the console rather than railway.worker.toml is authoritative; (2) collect the `worker.start` banner line, which prints the workerId (worker/index.ts:168), from every live worker process and check whether two concurrently live processes ever report the SAME workerId, since that is the only way two claim-holders of one row can share a claimed_by value; (3) establish the lease-expiry precondition from the rows themselves through the operator's own admin jobs view (app/lib/admin-jobs.server.ts), looking for rows with…",
+    "lookIn": [
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/lib/worker/run-worker.server.ts",
+      "app/server/audience-import-recovery.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "test/worker.test.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2924,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Unsanitised media name reaches the workspaceAudio S3 object key and the signed URL, bypassing the repository's own traversal check; the cross-tenant effect is…",
+    "summary": "Source-confirmed defect: a workspace member controls the media name supplied as the form field `name` (or `media-name`) on POST /api/workspaces/$workspaceId/audios",
+    "currentBehavior": "Source-confirmed defect: a workspace member controls the media name supplied as the form field `name` (or `media-name`) on POST /api/workspaces/$workspaceId/audios. That name reaches the workspaceAudio object key with `..` and `/` intact - `uploadWorkspaceAudioApi` builds `${workspaceId}/${getSafeMediaBaseName(name)}.${ext}` (app/lib/platform-media.server.ts line 127), `getSafeMediaBaseName` (app/lib/audio-upload.ts line 53) only strips a trailing allowed audio extension, and `uploadObject` (app/lib/object-storage.server.ts line 202) validates nothing about the path it is handed. The repository ships the rule for exactly this job - `isSafeObjectName` (app/lib/audio-upload.ts line 36), whose…",
+    "rootCause": "`getSafeMediaBaseName` is used as the object-name sanitiser for the workspace audio library, but it only removes a known trailing audio extension and never rejects path separators or dot segments, so it is not the control the repository states for this job. The repository already ships two controls for exactly this job - `isSafeObjectName` (app/lib/audio-upload.ts line 36, applied to every route parameter that is concatenated into an object key) and `sanitizeFilename` (app/lib/media-upload.server.ts line 44, used by /api/media and /api/message_media). `uploadWorkspaceAudioApi` uses neither, and `uploadObject` in app/lib/object-storage.server.ts performs no validation of the object path, so…",
+    "resolution": "Owner-observed, non-destructive, on the deployed bucket only. (1) Create two throwaway non-production workspaces P (the uploader) and T (the target) and record their UUIDs. (2) From P, POST /api/workspaces/<P>/audios with a small throwaway audio file and the form field name='../<T-uuid>/probe.mp3'; record the response status (201 versus 4xx/5xx). (3) List the bucket keys (Railway dashboard or `aws s3api list-objects-v2` against the same bucket) and record whether a key appears as the literal '<P-uuid>/../<T-uuid>/probe.mp3' or as the cleaned '<T-uuid>/probe.mp3'. (4) GET the signed_url from the response twice - once exactly as a browser would (the path normalises) and once with the raw path…",
+    "lookIn": [
+      "app/lib/audio-upload.ts",
+      "app/lib/media-upload.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/lib/object-storage.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/audios.action.server.ts",
+      "app/routes/workspaces+/$id/audios/new.action.server.ts",
+      "app/lib/audio-clip.server.ts",
+      "app/routes/api+/audio-upload.action.server.ts"
+    ],
+    "existingTests": [
+      "The source-visible half was reproduced in an OS-enforced sandbox with no external network."
+    ],
+    "missingTests": [
+      "Run the recorded deployment observation; the verdict depends on it, not on more code."
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium"
   }
 ]
