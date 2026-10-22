@@ -1,3 +1,4 @@
+import { renderBrandedEmail } from "@/lib/email-layout.server";
 import { env } from "@/lib/env.server";
 import { resolveTwilioRestBasicAuth } from "@/lib/twilio-workspace-credentials";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
@@ -88,28 +89,21 @@ export async function prepareVoicemailEmail(args: {
     from: "Callcaster <info@callcaster.ca>",
     to: [recipient],
     subject: `New Voicemail from ${call.from}`,
-    html: `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>New Voicemail Received</h2>
-      <p><strong>From:</strong> ${call.from}</p>
-      <p><strong>To:</strong> ${call.to}</p>
-      <p><strong>Workspace:</strong> ${number.workspace.name}</p>
-      <p><strong>Date:</strong> ${now.toLocaleString()}</p>
-      <p><a href="${signedUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Listen to Voicemail</a></p>
-      <p><a href="${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
-    </div>
-  `,
-    text: `
-    New Voicemail Received
-
-    From: ${call.from}
-    To: ${call.to}
-    Workspace: ${number.workspace.name}
-    Date: ${now.toLocaleString()}
-
-    Listen to voicemail: ${signedUrl}
-    View in workspace: ${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails
-  `,
+    ...renderBrandedEmail({
+      heading: "New voicemail received",
+      intro: `A new voicemail arrived for ${number.workspace.name}.`,
+      facts: [
+        { label: "From", value: call.from ?? "Unknown" },
+        { label: "To", value: call.to ?? "Unknown" },
+        { label: "Workspace", value: number.workspace.name },
+        { label: "Received", value: now.toLocaleString() },
+      ],
+      cta: { label: "Listen to voicemail", url: signedUrl },
+      footerLink: {
+        label: "View in workspace",
+        url: `${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails`,
+      },
+    }),
   };
   return { signedUrl, payload };
 }

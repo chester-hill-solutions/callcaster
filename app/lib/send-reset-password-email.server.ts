@@ -1,3 +1,4 @@
+import { renderBrandedEmail } from "@/lib/email-layout.server";
 import { sendTransactionalEmail } from "@/lib/transactional-email.server";
 
 /**
@@ -17,24 +18,15 @@ export async function sendResetPasswordEmail(
   _request?: Request,
 ): Promise<void> {
   const subject = "Reset your CallCaster password";
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>Reset your password</h2>
-      <p>We received a request to reset the password for your CallCaster account.</p>
-      <p>
-        <a href="${url}" style="background-color: #c91d25; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset password</a>
-      </p>
-      <p>If you didn't request this, you can safely ignore this email.</p>
-    </div>
-  `;
-  const text = `
-    Reset your password
-
-    We received a request to reset the password for your CallCaster account.
-    Reset it here: ${url}
-
-    If you didn't request this, you can safely ignore this email.
-  `;
+  const { html, text } = renderBrandedEmail({
+    heading: "Reset your password",
+    intro:
+      "We received a request to reset the password for your CallCaster account.",
+    note: {
+      text: "If you didn't request this, you can safely ignore this email.",
+    },
+    cta: { label: "Reset password", url },
+  });
 
   await sendTransactionalEmail({
     to: user.email,
