@@ -75,6 +75,26 @@ export async function createRespondentToken(
   return { token, resultId };
 }
 
+/**
+ * The shape a decoded payload must have before it may be trusted. Extracted so
+ * `verifyRespondentToken` stays a straight line of checks rather than one
+ * branch per field (it was already at the complexity threshold).
+ */
+function isRespondentTokenPayload(value: unknown): value is RespondentTokenPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const payload = value as Partial<RespondentTokenPayload>;
+  const contactId = payload.contact_id ?? null;
+  return (
+    Number.isSafeInteger(payload.survey_id) && (payload.survey_id ?? 0) > 0 &&
+    typeof payload.workspace === "string" && payload.workspace.length > 0 &&
+    typeof payload.result_id === "string" && payload.result_id.length > 0 &&
+    (contactId === null ||
+      (Number.isSafeInteger(contactId) && contactId > 0)) &&
+    Number.isFinite(payload.exp) &&
+    (payload.exp ?? 0) > Math.floor(Date.now() / 1000)
+  );
+}
+
 export async function verifyRespondentToken(
   token: string,
   expectedSurveyId?: number,
@@ -92,15 +112,8 @@ export async function verifyRespondentToken(
     if (header.alg !== "HS256" || header.typ !== "JWT") {
       return null;
     }
-    const payload = JSON.parse(base64urlDecode(payloadB64)) as RespondentTokenPayload;
-    const contactId = payload.contact_id ?? null;
-    if (
-      !Number.isSafeInteger(payload.survey_id) || payload.survey_id <= 0 ||
-      typeof payload.workspace !== "string" || !payload.workspace ||
-      typeof payload.result_id !== "string" || !payload.result_id ||
-      (contactId !== null && (!Number.isSafeInteger(contactId) || contactId <= 0)) ||
-      !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)
-    ) {
+    const payload: unknown = JSON.parse(base64urlDecode(payloadB64));
+    if (!isRespondentTokenPayload(payload)) {
       return null;
     }
     const signed = `${headerB64}.${payloadB64}`;
