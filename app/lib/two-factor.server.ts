@@ -6,7 +6,7 @@ import { adminDb } from "@/server/admin-db";
 import { authUser } from "@/db/auth-schema";
 import { user as platformUser, workspace_member } from "@/db/schema";
 
-/** Workspace roles that must enroll in TOTP 2FA (owner/admin; field_director mapped to admin in Phase B). */
+/** Workspace roles that must enroll in TOTP 2FA (owner/admin). */
 export const PRIVILEGED_WORKSPACE_ROLES = ["owner", "admin"] as const;
 
 export type PrivilegedWorkspaceRole = (typeof PRIVILEGED_WORKSPACE_ROLES)[number];
