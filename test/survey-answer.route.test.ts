@@ -260,6 +260,25 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     expect(await res.json()).toMatchObject({ respondent_token: token });
   });
 
+  // #2868: the respondent token is the only thing that names the contact a
+  // submission may act as. A form field must not be able to stamp a contact
+  // the token does not carry.
+  test("refuses a submitted contactId the token does not name", async () => {
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", contactId: "100" }) } as any));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "Invalid contact" });
+    expect(surveyDbMocks.saveSurveyAnswer).not.toHaveBeenCalled();
+  });
+
+  test("accepts a submitted contactId the token does name", async () => {
+    const { token } = await createRespondentToken(1, "ws-1", { contactId: 100 });
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", contactId: "100", respondent_token: token }) } as any));
+    expect(res.status).toBe(200);
+    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(expect.objectContaining({ contactId: 100 }));
+  });
+
   test.each(["tampered", "expired", "other-survey", "other-workspace"])("refuses a %s identity without writing", async (kind) => {
     const { token } = await createRespondentToken(kind === "other-survey" ? 2 : 1, kind === "other-workspace" ? "ws-other" : "ws-1");
     const invalid = kind === "tampered" ? token.replace(/^./, "x") : token;
