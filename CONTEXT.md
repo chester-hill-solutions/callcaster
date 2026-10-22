@@ -6,7 +6,7 @@ A calling and SMS platform for political campaigns, built on Bun, React Router 8
 
 ### Core concepts
 
-**Workspace**: A tenant organization (typically a political campaign or riding association). Owns campaigns, contacts, numbers, scripts, credits. Has members (users with roles: owner, admin, member, caller, field_director).
+**Workspace**: A tenant organization (typically a political campaign or riding association). Owns campaigns, contacts, numbers, scripts, credits. Has members (users with roles: owner, admin, member, caller).
 _Avoid_: Tenant, account, organization
 
 **Campaign**: A dialing or messaging effort against an audience. Has a type (live_call, ivr, message), a phase (identification, persuasion, gotv), a script, a caller ID, a queue, and a schedule. v2 consolidates the former live_campaign/ivr_campaign/message_campaign type-specific tables into a single campaign table with type-gated columns.
