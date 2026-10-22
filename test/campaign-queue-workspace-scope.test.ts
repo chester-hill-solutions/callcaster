@@ -51,7 +51,8 @@ vi.mock("@/server/db", () => ({ db: makeDb() }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => makeDb()),
 }));
-vi.mock("@/lib/workspace-events.server", () => ({
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-events.server")>()),
   emitQueueEvent: vi.fn(async () => undefined),
   publishWorkspaceEvent: vi.fn(async () => undefined),
 }));
