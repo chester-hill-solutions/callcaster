@@ -373,5 +373,79 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released."
+  },
+  {
+    "issueNumber": 2052,
+    "verdict": "verify-close",
+    "recommendedTitle": "Give the completion RPC one best-effort owner",
+    "summary": "Five call sites invoke try_complete_campaign_if_drained and only two guard it. campaign-queue-completion.server.ts:51-68 and ivr/status.action.server.ts:130-153 catch and log; the #2048 campaign-settle-recheck.server.ts catches and logs under a third event name; campaign.server.ts continueOrCompleteDispatch and auto-dial.server.ts:437-444 do not catch at all, so an RPC failure propagates and fails the dispatch job or dial drain. An RPC failure only means 'not complete yet', which must never fail unrelated work.",
+    "currentBehavior": "Completion failures are reported three different ways depending on surface, and on two surfaces they fail the surrounding job instead of being absorbed.",
+    "rootCause": "Each call site invented its own try/catch and log message. The #2048 wrapper was created for the same reason, so there are now two wrappers and three policies.",
+    "resolution": "One internal helper owns 'ask the gate, log, never throw', with a comment stating why. All five call sites use it and lose their own try/catch. Collapse campaign-settle-recheck.server.ts into the same owner rather than keeping two wrappers. Normalise the log event name and fields so a completion failure reads the same from every surface.",
+    "lookIn": [
+      "app/lib/campaign-queue-completion.server.ts:51-68",
+      "app/routes/api+/ivr/status.action.server.ts:130-153",
+      "app/lib/campaign-settle-recheck.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts (continueOrCompleteDispatch)",
+      "app/lib/auto-dial.server.ts:437-444",
+      "app/lib/db-rpc.server.ts:176-184"
+    ],
+    "existingTests": [
+      "test/webhook-side-effects.test.ts",
+      "test/campaign-settle-recheck.server.test.ts"
+    ],
+    "missingTests": [
+      "completion RPC failure does not propagate out of a dispatch job",
+      "completion RPC failure does not propagate out of a dial drain",
+      "completion RPC failure does not fail a Twilio webhook",
+      "completion RPC failure does not fail an open-sync sweep",
+      "one log event name is used from every surface"
+    ],
+    "acceptanceCriteria": [
+      "Exactly one code path owns the best-effort completion call",
+      "All five call sites use it with no local try/catch",
+      "A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep",
+      "One log event name and field set from every surface",
+      "Failure path tested at each call site, not only at the owner"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Small cleanup, no live defect. Raised by the #2048 structural review and deliberately deferred there to keep that PR atomic. Lane is verify-close because the work is a de-duplication with no behavioural change to specify."
+  },
+  {
+    "issueNumber": 1938,
+    "verdict": "verify-close",
+    "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
+    "summary": "All three children shipped on dev: middleware builds the scoped tdb once (#1940/PR #1941), the unscoped admin client is banned in app/lib with a ratchet baseline (#1939/PR #1943), and the base db client is ratcheted too (#1942/PR #1944). The epic's acceptance is met on dev.",
+    "currentBehavior": "workspaceMiddleware and dataPlaneMiddleware build createTenantDb(workspaceId) once and expose tdb on the route context; workspaces+ routes read context.tdb. scripts/check-unscoped-db-imports.mjs bans @/server/admin-db and @/server/db in app/lib against an 81-entry baseline.",
+    "rootCause": "The scoped-client rule was enforced only in app/routes; app/lib was honor-system.",
+    "resolution": "No code work left. Verify on the review env that no workspaces+ route constructs createTenantDb and that the unscoped-import guard fails on a probe import, then close when dev is promoted to master.",
+    "lookIn": [
+      "app/lib/route-context.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/workspace-route.server.ts",
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "eslint.config.mjs"
+    ],
+    "existingTests": [
+      "test/helpers/route-context-mock.ts",
+      "test/ci-guard-scripts.test.ts"
+    ],
+    "missingTests": [
+      "A guard probe that a new app/lib module importing @/server/admin-db fails the run"
+    ],
+    "acceptanceCriteria": [
+      "No route file under app/routes constructs createTenantDb for a plain request-scoped read or write",
+      "tdb is built once per workspace request, in middleware",
+      "A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist",
+      "npm run ci:local is green"
+    ],
+    "blockedBy": [],
+    "size": "L-XL",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master."
   }
 ]
