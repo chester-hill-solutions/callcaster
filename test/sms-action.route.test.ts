@@ -190,6 +190,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 501 },
       userId: "u1",
+      workspaceId: TEST_WORKSPACE_ID,
       reason: "Contact opted out",
     });
     expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
@@ -310,6 +311,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 503 },
       userId: "u1",
+      workspaceId: TEST_WORKSPACE_ID,
       reason: "Landline — cannot receive SMS",
     });
     expect(mocks.getOrLookupLineType).toHaveBeenCalledWith(
