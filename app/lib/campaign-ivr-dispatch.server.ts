@@ -265,6 +265,7 @@ async function dispatchIvrQueueMember(
     await dequeueQueueEntry({
       by: { id: member.id },
       userId: context.userId,
+      workspaceId: context.workspaceId,
       reason: OPTED_OUT_IVR_DEQUEUED_REASON,
     });
     context.state.counts.dequeued += 1;
@@ -294,6 +295,7 @@ async function dispatchIvrQueueMember(
     await dequeueQueueEntry({
       by: { id: member.id },
       userId: context.userId,
+      workspaceId: context.workspaceId,
       reason: DUPLICATE_IVR_DEQUEUED_REASON,
     });
     context.state.counts.dequeued += 1;
@@ -335,6 +337,7 @@ async function reserveIvrPhone(
     await dequeueQueueEntry({
       by: { id: member.id },
       userId: context.userId,
+      workspaceId: context.workspaceId,
       reason: DUPLICATE_IVR_DEQUEUED_REASON,
     });
     context.state.counts.dequeued += 1;
@@ -391,6 +394,7 @@ async function createOutreachAttemptAndCall(
     await dequeueQueueEntry({
       by: { id: member.id },
       userId: context.userId,
+      workspaceId: context.workspaceId,
       reason: IVR_CALL_DEQUEUED_REASON,
     });
     context.state.counts.called += 1;

@@ -106,10 +106,12 @@ export const action = defineAction({
 
       if (!callRow) throw new Error("Failed to insert call record");
 
-      // Dequeue
+      // Dequeue. The queue row must belong to the workspace this request was
+      // authorised against, so the by-id dequeue is scoped to it.
       await dequeueQueueEntry({
         by: { id: Number(queue_id) },
         userId: user_id,
+        workspaceId: workspace_id,
         reason: "IVR dial dispatched",
       });
 

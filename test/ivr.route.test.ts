@@ -195,6 +195,9 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 3 },
       userId: "u1",
+      // The queue row must be scoped to the workspace this request was
+      // authorised against, so a foreign row cannot be dequeued by id.
+      workspaceId: "w1",
       reason: "IVR dial dispatched",
     });
   });

@@ -504,6 +504,7 @@ async function handleMemberInner(
       dequeueQueueEntry({
         by: { id: member.id },
         userId,
+        workspaceId,
         reason: OPTED_OUT_SMS_DEQUEUED_REASON,
       }),
     );
@@ -537,6 +538,7 @@ async function handleMemberInner(
         dequeueQueueEntry({
           by: { id: member.id },
           userId,
+          workspaceId,
           reason: DUPLICATE_SMS_DEQUEUED_REASON,
         }),
       );
@@ -570,7 +572,12 @@ async function handleMemberInner(
 }
 
 async function dequeueSmsIncapableMember(member: QueueMember, ctx: HandleMemberCtx): Promise<HandleMemberResult> {
-  await dequeueQueueEntry({ by: { id: member.id }, userId: ctx.userId, reason: LANDLINE_SMS_DEQUEUED_REASON });
+  await dequeueQueueEntry({
+    by: { id: member.id },
+    userId: ctx.userId,
+    workspaceId: ctx.workspaceId,
+    reason: LANDLINE_SMS_DEQUEUED_REASON,
+  });
   ctx.counts.dequeued += 1;
   return memberResponse({
     [member.contact_id]: { success: true, skipped: true, reason: LANDLINE_SMS_DEQUEUED_REASON },
@@ -630,6 +637,7 @@ async function prepareClaimedMember(
     await dequeueQueueEntry({
       by: { id: member.id },
       userId,
+      workspaceId,
       reason: DUPLICATE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
