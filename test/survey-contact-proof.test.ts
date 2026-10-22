@@ -42,7 +42,14 @@ describe("survey contact proof", () => {
   test("a tampered signature does not verify", async () => {
     const proof = await createSurveyContactProof(42, 1234);
     const [exp, signature] = proof.split(".");
-    const flipped = signature.slice(0, -1) + (signature.endsWith("A") ? "B" : "A");
+    // Tamper a MIDDLE character. The final base64url character carries only
+    // padding bits, so flipping it can decode to byte-identical input and
+    // leave the signature valid — a flaky test, not a real rejection.
+    const index = Math.floor(signature.length / 2);
+    const flipped =
+      signature.slice(0, index) +
+      (signature[index] === "A" ? "B" : "A") +
+      signature.slice(index + 1);
     expect(await verifySurveyContactProof(42, 1234, `${exp}.${flipped}`)).toBe(false);
   });
 
