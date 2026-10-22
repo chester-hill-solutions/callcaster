@@ -100,6 +100,25 @@ export function capabilityIdsForRole(role: string): readonly ProductCapabilityId
   }
 }
 
+/**
+ * The stored scopes a role STILL holds.
+ *
+ * The single definition of "which capabilities this role grants" is
+ * {@link capabilityIdsForRole}, so the mint-time cap and the per-request
+ * re-check cannot drift apart. Unknown scope strings are dropped rather than
+ * kept: a scope this build does not recognise is not a capability either.
+ */
+export function scopesWithinRole(
+  role: string,
+  scopes: readonly string[],
+): ProductCapabilityId[] {
+  const granted = new Set<string>(capabilityIdsForRole(role));
+  return scopes.filter(
+    (scope): scope is ProductCapabilityId =>
+      granted.has(scope) && isProductCapabilityId(scope),
+  );
+}
+
 /** Default / max API-key TTL (SEC-07). */
 export const API_KEY_DEFAULT_TTL_DAYS = 90;
 export const API_KEY_MAX_TTL_DAYS = 365;
