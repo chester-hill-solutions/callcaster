@@ -53,10 +53,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (qParam) {
     try {
       const decoded = atob(qParam);
-      const [contactId, surveyId] = decoded.split(":");
+      const [contactId, surveyId, proof] = decoded.split(":");
 
       if (contactId && surveyId) {
-        return redirect(`/survey/${surveyId}?contact=${contactId}`);
+        // The per-contact proof rides in the same payload, so the survey route
+        // can tell a link this server minted from a guessed contact id (#2868).
+        const proofParam = proof ? `&proof=${encodeURIComponent(proof)}` : "";
+        return redirect(`/survey/${surveyId}?contact=${contactId}${proofParam}`);
       }
     } catch (error) {
       logger.error("Failed to decode survey link:", error);

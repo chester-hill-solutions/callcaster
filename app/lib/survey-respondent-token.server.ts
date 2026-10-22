@@ -7,6 +7,15 @@ export type RespondentTokenPayload = {
   survey_id: number;
   workspace: string;
   result_id: string;
+  /**
+   * The contact this session belongs to, or null for an anonymous respondent.
+   *
+   * This is the identity the submission may claim. `?contact=` is a bare
+   * integer on links already in the wild and proves nothing on its own, so the
+   * actions compare any submitted contact against THIS value rather than
+   * trusting the form. Absent on tokens minted before #2868 — read it as null.
+   */
+  contact_id: number | null;
   exp: number;
 };
 
@@ -40,18 +49,23 @@ async function sign(message: string): Promise<ArrayBuffer> {
 export async function createRespondentToken(
   surveyId: number,
   workspace: string,
-  options: { resultId?: string } = {},
+  options: { resultId?: string; contactId?: number | null } = {},
 ): Promise<{ token: string; resultId: string }> {
   // The legacy database uses bigint IDs, which postgres.js returns as strings.
   const numericSurveyId = Number(surveyId);
   if (!Number.isSafeInteger(numericSurveyId) || numericSurveyId <= 0) {
     throw new Error("Invalid survey identity");
   }
+  const contactId = options.contactId ?? null;
+  if (contactId !== null && (!Number.isSafeInteger(contactId) || contactId <= 0)) {
+    throw new Error("Invalid survey contact identity");
+  }
   const resultId = options.resultId ?? randomUUID();
   const payload: RespondentTokenPayload = {
     survey_id: numericSurveyId,
     workspace,
     result_id: resultId,
+    contact_id: contactId,
     exp: Math.floor((Date.now() + TOKEN_TTL_MS) / 1000),
   };
   const header = { alg: "HS256", typ: "JWT" };
@@ -79,10 +93,12 @@ export async function verifyRespondentToken(
       return null;
     }
     const payload = JSON.parse(base64urlDecode(payloadB64)) as RespondentTokenPayload;
+    const contactId = payload.contact_id ?? null;
     if (
       !Number.isSafeInteger(payload.survey_id) || payload.survey_id <= 0 ||
       typeof payload.workspace !== "string" || !payload.workspace ||
       typeof payload.result_id !== "string" || !payload.result_id ||
+      (contactId !== null && (!Number.isSafeInteger(contactId) || contactId <= 0)) ||
       !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)
     ) {
       return null;

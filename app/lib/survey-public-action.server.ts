@@ -28,7 +28,7 @@ async function resolveRespondentToken(
   formData: FormData,
   survey: SurveyRecord,
 ): Promise<
-  | { ok: true; resultId: string; token: string }
+  | { ok: true; resultId: string; token: string; contactId: number | null }
   | { ok: false; response: ErrorResponse }
 > {
   const token = getRespondentToken(request, formData);
@@ -43,7 +43,12 @@ async function resolveRespondentToken(
         ),
       };
     }
-    return { ok: true, resultId: payload.result_id, token };
+    return {
+      ok: true,
+      resultId: payload.result_id,
+      token,
+      contactId: payload.contact_id ?? null,
+    };
   }
   return {
     ok: false,
@@ -56,6 +61,11 @@ export type PublicSurveySubmission = {
   survey: SurveyRecord;
   resultId: string;
   token: string;
+  /**
+   * The contact this token belongs to, or null when the respondent is
+   * anonymous. The only thing that may name the contact a submission acts as.
+   */
+  contactId: number | null;
 };
 
 export type PublicSurveyGuard =
@@ -130,6 +140,7 @@ export async function guardPublicSurveySubmission(
       survey,
       resultId: tokenResult.resultId,
       token: tokenResult.token,
+      contactId: tokenResult.contactId,
     },
   };
 }
@@ -138,10 +149,18 @@ export type PublicSurveyContact =
   | { ok: true; contactId: number | null }
   | { ok: false; response: ErrorResponse };
 
-/** Parses and validates the optional `contactId` field for a submission. */
+/**
+ * Parses and validates the optional `contactId` field for a submission.
+ *
+ * `tokenContactId` is the contact the respondent token was minted for, or null
+ * for an anonymous session. The submitted id must EQUAL it: the token is the
+ * only thing that says which contact this session may act as, so a caller
+ * cannot stamp a contact onto a response the token does not name (#2868).
+ */
 export async function resolvePublicSurveyContactId(
   formData: FormData,
   survey: Pick<SurveyRecord, "workspace">,
+  tokenContactId: number | null = null,
 ): Promise<PublicSurveyContact> {
   const contactId = formData.get("contactId") as string;
   const contactIdNum = contactId ? parseInt(contactId, 10) : null;
@@ -149,6 +168,12 @@ export async function resolvePublicSurveyContactId(
     return {
       ok: false,
       response: routeData({ error: "Invalid contact ID" }, { status: 400 }),
+    };
+  }
+  if (contactIdNum !== tokenContactId) {
+    return {
+      ok: false,
+      response: routeData({ error: "Invalid contact" }, { status: 400 }),
     };
   }
   if (contactIdNum !== null) {
