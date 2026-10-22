@@ -206,7 +206,9 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
   });
 
   test("rejects contact outside survey workspace", async () => {
-    // Scoped at the query, so a contact in another workspace does not resolve.
+    // The token names the contact, so this exercises the workspace-scoped
+    // lookup itself: a contact in another workspace does not resolve.
+    const { token } = await createRespondentToken(1, "ws-1", { contactId: 100 });
     surveyDbMocks.loadSurveyRespondentContact.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/survey-answer");
     const res = await asRouteResponse(mod.action({
@@ -215,6 +217,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
         questionId: "Q1",
         pageId: "p1",
         contactId: "100",
+        respondent_token: token,
       }),
     } as any));
     expect(res.status).toBe(400);
@@ -258,6 +261,40 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(expect.objectContaining({ resultId }));
     expect(await res.json()).toMatchObject({ respondent_token: token });
+  });
+
+  // #2868 / #2930: the respondent token is the only thing that names the
+  // contact a submission may act as, so a form field cannot stamp a contact
+  // onto a response. A disagreeing field is IGNORED rather than rejected: a
+  // link with a bare `?contact=` id loads anonymously, the page posts the id it
+  // was given, and rejecting that 400s a submission the product accepts.
+  test("ignores a submitted contactId the token does not name", async () => {
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", contactId: "100" }) } as any));
+    expect(res.status).toBe(200);
+    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: null }),
+    );
+    // The id names no contact the token carries, so it is never even looked up.
+    expect(surveyDbMocks.loadSurveyRespondentContact).not.toHaveBeenCalled();
+  });
+
+  test("records the token's contact when the submitted id disagrees", async () => {
+    const { token } = await createRespondentToken(1, "ws-1", { contactId: 100 });
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", contactId: "999", respondent_token: token }) } as any));
+    expect(res.status).toBe(200);
+    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: 100 }),
+    );
+  });
+
+  test("accepts a submitted contactId the token does name", async () => {
+    const { token } = await createRespondentToken(1, "ws-1", { contactId: 100 });
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", contactId: "100", respondent_token: token }) } as any));
+    expect(res.status).toBe(200);
+    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(expect.objectContaining({ contactId: 100 }));
   });
 
   test.each(["tampered", "expired", "other-survey", "other-workspace"])("refuses a %s identity without writing", async (kind) => {
