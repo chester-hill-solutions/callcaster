@@ -111,3 +111,31 @@ describe("Better Auth catch-all rate limiting", () => {
     expect(other.status).not.toBe(429);
   });
 });
+
+describe("Better Auth two-factor state changes", () => {
+  beforeEach(() => {
+    resetRateLimitsForTests();
+    mocks.authHandler.mockClear();
+  });
+
+  test("the raw enable endpoint is refused: 2FA state changes go through the app", async () => {
+    const response = await callAction("/api/auth/two-factor/enable", "10.0.0.9");
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Change two-factor authentication from the account security page.",
+    });
+    expect(mocks.authHandler).not.toHaveBeenCalled();
+  });
+
+  test("the raw disable endpoint is refused too", async () => {
+    const response = await callAction("/api/auth/two-factor/disable", "10.0.0.10");
+    expect(response.status).toBe(403);
+    expect(mocks.authHandler).not.toHaveBeenCalled();
+  });
+
+  test("the sign-in TOTP challenge stays reachable", async () => {
+    const response = await callAction("/api/auth/two-factor/verify-totp", "10.0.0.11");
+    expect(response.status).not.toBe(403);
+    expect(mocks.authHandler).toHaveBeenCalledTimes(1);
+  });
+});
