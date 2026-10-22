@@ -191,8 +191,7 @@ export async function claimNextQueueContact(
       .where(eq(contactTable.id, row.contact_id))
       .limit(1);
     if (contactRow?.opt_out) {
-      // The dequeue is scoped to the row's own workspace. If the row cannot be
-      // read there is nothing left to dequeue.
+      // Nothing to dequeue if the row can no longer be read.
       if (!queueRow) continue;
       await dequeueCampaignQueueById({
         queueId: row.queue_id,
@@ -404,9 +403,8 @@ async function dequeueCampaignQueueById(args: {
   exec?: QueueWriteExecutor;
   deferEmit?: DeferredEmit;
 }) {
-  // The workspace predicate is a property of this helper, not an optional
-  // argument. `campaign_queue` is a workspace-scoped table, so a write
-  // without it can reach another tenant's row.
+  // The workspace predicate belongs to the helper: `campaign_queue` is a
+  // workspace-scoped table, so a write without it can reach another tenant.
   const conditions: SQL[] = [
     eq(campaignQueueTable.id, args.queueId),
     eq(campaignQueueTable.workspace, args.workspaceId),
@@ -611,8 +609,6 @@ export async function recordQueueAttemptFailure(args: {
   await updateCampaignQueueAndEmit({
     conditions: [
       eq(campaignQueueTable.id, args.queueId),
-      // The attempt counter is a tenant-scoped write: it must only ever land
-      // on a row of the caller's own workspace.
       eq(campaignQueueTable.workspace, args.workspaceId),
       isNull(campaignQueueTable.dequeued_at),
     ],
