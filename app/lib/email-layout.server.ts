@@ -69,16 +69,16 @@ const TONE_COLOUR: Record<BrandedEmailTone, string> = {
 };
 
 /**
- * The footer's postal line, if the deployment sets one.
+ * The registered postal address, rendered in every footer.
  *
- * Deliberately not hard-coded: a postal address is a legal identity, and this
- * repository does not carry one. Transactional mail does not require an
- * unsubscribe, but it should identify who is writing — so the sender address
- * always appears and the postal line appears when configured.
+ * Hard-coded rather than configured: it is the sender's legal identity, the
+ * same in every deployment, and not a secret. Transactional mail does not
+ * require an unsubscribe, but it should say who is writing.
  */
-function footerAddress(): string | null {
-  const configured = process.env.EMAIL_FOOTER_ADDRESS?.trim();
-  return configured ? configured : null;
+const POSTAL_ADDRESS = "442 Pharmacy Ave, Toronto, ON M1L 3G6";
+
+function footerAddress(): string {
+  return POSTAL_ADDRESS;
 }
 
 /**
@@ -124,10 +124,7 @@ function renderHtml(input: BrandedEmailInput): string {
     ? `<br /><a href="${escapeHtml(input.footerLink.url)}" style="color:${MUTED};text-decoration:underline;">${escapeHtml(input.footerLink.label)}</a>`
     : "";
 
-  const address = footerAddress();
-  const footerIdentityHtml = address
-    ? `<br />${escapeHtml(address)}`
-    : "";
+  const footerIdentityHtml = `<br />${escapeHtml(footerAddress())}`;
 
   return `<!doctype html>
 <html lang="en">
@@ -184,8 +181,7 @@ function renderText(input: BrandedEmailInput): string {
   if (input.note) lines.push("", input.note.text);
   if (input.cta) lines.push("", `${input.cta.label}: ${input.cta.url}`);
   lines.push("", `${PRODUCT_NAME} · ${SENDER_ADDRESS}`);
-  const address = footerAddress();
-  if (address) lines.push(address);
+  lines.push(footerAddress());
   if (input.footerLink) lines.push(`${input.footerLink.label}: ${input.footerLink.url}`);
   return lines.join("\n");
 }

@@ -136,17 +136,22 @@ function buildReminderEmail(args: {
     { label: "Cost", value: `${cost} credits` },
   ];
 
+  const balance =
+    typeof args.credits === "number" && Number.isFinite(args.credits)
+      ? args.credits
+      : null;
+
   let note: { text: string; tone: BrandedEmailTone };
   let shortfall = 0;
-  if (args.credits === null) {
+  if (balance === null) {
     note = {
       text: `We could not read your balance just now. This workspace needs ${cost} credits on ${dueDateLabel} to renew without interruption.`,
       tone: "default",
     };
   } else {
-    const remaining = args.credits - cost;
+    const remaining = balance - cost;
     shortfall = remaining < 0 ? -remaining : 0;
-    facts.push({ label: "Your balance", value: `${args.credits} credits` });
+    facts.push({ label: "Your balance", value: `${balance} credits` });
     facts.push({
       label: remaining >= 0 ? "After renewal" : "Short by",
       value: remaining >= 0 ? `${remaining} credits` : `${shortfall} credits`,
@@ -188,11 +193,11 @@ async function sendNumberRentalReminderEmail(args: {
   daysUntilDue: number;
   dueDate: Date;
   workspaceName: string;
-}): Promise<void> {
-  if (args.recipients.length === 0) return;
+}): Promise<boolean> {
+  if (args.recipients.length === 0) return false;
   const credits = await getWorkspaceCreditsBalance(args.workspaceId);
   const { subject, html, text } = buildReminderEmail({ ...args, credits });
-  await sendTransactionalEmail({ to: args.recipients, subject, html, text });
+  return sendTransactionalEmail({ to: args.recipients, subject, html, text });
 }
 
 /**
@@ -629,7 +634,7 @@ export async function runNumberRentalBilling(args: {
               workspaceId: number.workspace,
             });
           } else {
-            await sendNumberRentalReminderEmail({
+            const delivered = await sendNumberRentalReminderEmail({
               workspaceId: number.workspace,
               workspaceName,
               recipients,
@@ -637,7 +642,11 @@ export async function runNumberRentalBilling(args: {
               daysUntilDue,
               dueDate: nextDue,
             });
-            remindersSent++;
+            // Counted with expressions, not an if/else: a block here would be
+            // a sixth nesting level inside the sweep and trip the max-depth
+            // ratchet.
+            remindersSent += delivered ? 1 : 0;
+            remindersFailed += delivered ? 0 : 1;
           }
         } catch (error) {
           remindersFailed++;
