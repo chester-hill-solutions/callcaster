@@ -682,6 +682,9 @@ export async function findWorkspaceApiKeyByPrefix(keyPrefix: string) {
       key_hash: workspaceApiKeyTable.key_hash,
       scopes: workspaceApiKeyTable.scopes,
       expires_at: workspaceApiKeyTable.expires_at,
+      // The creator's CURRENT membership is what a request is re-checked
+      // against, so the authenticator needs to know who minted the key (#2894).
+      created_by: workspaceApiKeyTable.created_by,
     })
     .from(workspaceApiKeyTable)
     .where(eq(workspaceApiKeyTable.key_prefix, keyPrefix))
