@@ -44,6 +44,10 @@ const defaultSecretProviderByEnvironment: Record<EnvironmentName, SecretProvider
   production: "railway",
 };
 
+export function defaultSecretProvider(environment: EnvironmentName): SecretProviderName {
+  return defaultSecretProviderByEnvironment[environment];
+}
+
 const safeProfileSegment = z
   .string()
   .min(1)

@@ -53,6 +53,7 @@
     "tools:config:inventory": "node scripts/generate-configuration-inventory.mjs",
     "config:show": "tsx --tsconfig tsconfig.json scripts/config-show.ts",
     "config:compare-runtime": "tsx --tsconfig tsconfig.json scripts/compare-runtime-config.mjs",
+    "secrets:required": "tsx --tsconfig tsconfig.json scripts/secrets-required.ts",
     "check:config-drift": "node scripts/check-configuration-drift.mjs",
     "tools:cull:report": "node scripts/cull-report.mjs",
     "tools:twilio:subaccounts": "node scripts/twilio-subaccount-inventory.mjs",
