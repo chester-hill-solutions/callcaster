@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { secretNames } from "./secret-names";
 
 /** Environments supported by the shared project configuration. */
 export const environmentNames = [
@@ -13,17 +14,29 @@ export const EnvironmentNameSchema = z.enum(environmentNames);
 export type EnvironmentName = z.infer<typeof EnvironmentNameSchema>;
 
 /** Secret names are references only. Secret values and providers are not config. */
-const secretNamePattern = /^[A-Z][A-Z0-9_]*$/;
-export const SecretNameSchema = z
-  .string()
-  .regex(secretNamePattern, "Secret names must be uppercase environment-key names")
-  .brand<"SecretName">();
+export const SecretNameSchema = z.enum(secretNames).brand<"SecretName">();
 export type SecretName = z.infer<typeof SecretNameSchema>;
 
 export const SecretReferenceSchema = z
   .object({ name: SecretNameSchema })
   .strict();
 export type SecretReference = z.infer<typeof SecretReferenceSchema>;
+
+export const secretProviderNames = ["dotenv", "password-manager", "github", "railway"] as const;
+export type SecretProviderName = (typeof secretProviderNames)[number];
+
+/**
+ * Local environments use local secret sources. Deployed environments run on
+ * Railway; password-manager remains available for controlled migrations.
+ * GitHub is retained for CI adapters, not as a runtime environment source.
+ */
+export const environmentProviderCompatibility: Record<EnvironmentName, readonly SecretProviderName[]> = {
+  local: ["dotenv", "password-manager"],
+  "sai-local": ["dotenv", "password-manager"],
+  dev: ["password-manager", "railway"],
+  qa: ["password-manager", "railway"],
+  production: ["password-manager", "railway"],
+};
 
 /** A service receives a named, allowlisted slice of non-secret settings. */
 export const ServiceSliceSchema = z
@@ -59,7 +72,7 @@ export const ProjectConfigSchema = z
     environment: EnvironmentNameSchema,
     parent: EnvironmentNameSchema.optional(),
     secretProvider: z
-      .enum(["dotenv", "password-manager", "github", "railway"])
+      .enum(secretProviderNames)
       .default("dotenv"),
     runtime: z
       .object({ mode: z.enum(["development", "test", "production"]).default("development") })
@@ -94,11 +107,11 @@ export const ProjectConfigSchema = z
       ctx.addIssue({ code: "custom", path: ["parent"], message: "an environment cannot inherit from itself" });
     }
 
-    if (config.environment !== "production" && config.secretProvider === "railway") {
+    if (!environmentProviderCompatibility[config.environment].includes(config.secretProvider)) {
       ctx.addIssue({
         code: "custom",
         path: ["secretProvider"],
-        message: "railway secrets are only valid for production",
+        message: `secret provider '${config.secretProvider}' is not valid for ${config.environment}`,
       });
     }
 
