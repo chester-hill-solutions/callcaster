@@ -133,15 +133,62 @@ function collectEnvironmentNames(text) {
   ]);
 }
 
+function expressionBodyEnd(text, start) {
+  let depth = 0;
+  let quote = null;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "(" || character === "[" || character === "{") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")" || character === "]" || character === "}") {
+      if (depth === 0) return index;
+      depth -= 1;
+      continue;
+    }
+    if (depth === 0 && character === ",") return index;
+  }
+  return text.length;
+}
+
 function collectionForAccess(text, collections, keyName, accessIndex) {
   const prefix = text.slice(0, accessIndex);
-  const method = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\[[^\]\n]+\])?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)].at(-1);
-  if (method && method[2] === keyName && collections.has(method[1])) return method[1];
-  const loop = [...prefix.matchAll(/for\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+([A-Za-z_$][\w$]*)(?:\[[^\]\n]+\])?\s*\)\s*\{/g)].at(-1);
-  if (loop && loop[1] === keyName && collections.has(loop[2])) return loop[2];
-  if (method) {
-    const nested = [...prefix.matchAll(new RegExp(`\\b([A-Za-z_$][\\w$]*)\\s*\\.\\s*(?:some|every|filter|map|forEach)\\s*\\(\\s*\\(?\\s*${method[1]}\\s*\\)?\\s*=>`, "g"))].at(-1);
-    if (nested && collections.has(nested[1])) return nested[1];
+  const methods = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\[[^\]\n]+\])?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)]
+    .map((match) => {
+      let bodyStart = match.index + match[0].length;
+      while (/\s/.test(text[bodyStart] ?? "")) bodyStart += 1;
+      const bodyEnd = text[bodyStart] === "{" ? matchingDelimiter(text, bodyStart) : expressionBodyEnd(text, bodyStart);
+      return { collection: match[1], key: match[2], bodyStart, bodyEnd };
+    })
+    .filter((method) => method.bodyEnd >= 0 && accessIndex >= method.bodyStart && accessIndex < method.bodyEnd);
+
+  const loops = [...prefix.matchAll(/for\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+([A-Za-z_$][\w$]*)(?:\[[^\]\n]+\])?\s*\)\s*\{/g)]
+    .map((match) => {
+      const bodyStart = match.index + match[0].length - 1;
+      return { collection: match[2], key: match[1], bodyStart, bodyEnd: matchingDelimiter(text, bodyStart) };
+    })
+    .filter((loop) => loop.bodyEnd >= 0 && accessIndex >= loop.bodyStart && accessIndex < loop.bodyEnd);
+
+  for (const scope of [...methods, ...loops].reverse()) {
+    if (scope.key === keyName && collections.has(scope.collection)) return scope.collection;
+    if (scope.key !== keyName) continue;
+    let parent = methods.find((candidate) => candidate.key === scope.collection
+      && candidate.bodyStart <= scope.bodyStart && candidate.bodyEnd >= scope.bodyEnd);
+    while (parent) {
+      if (collections.has(parent.collection)) return parent.collection;
+      parent = methods.find((candidate) => candidate.key === parent.collection
+        && candidate.bodyStart <= parent.bodyStart && candidate.bodyEnd >= parent.bodyEnd);
+    }
   }
   return null;
 }

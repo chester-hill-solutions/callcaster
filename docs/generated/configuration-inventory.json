@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "cc620d585049524cc69a185b303b9bdb2d8502d811c0bc90a034e3ed8dec036c",
+    "recordDigest": "7762ed383c7d056080765d94620e1cd3c847615d3d9045a8bb6849204571e1aa",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -8095,7 +8095,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_ACCESS_KEY_ID",
@@ -8111,7 +8111,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_DEFAULT_REGION",
@@ -8127,7 +8127,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_ENDPOINT_URL",
@@ -8143,7 +8143,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_S3_BUCKET_NAME",
@@ -8159,7 +8159,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_SECRET_ACCESS_KEY",
@@ -8175,7 +8175,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "BUCKET",
@@ -8191,7 +8191,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "ENDPOINT",
@@ -8207,7 +8207,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "REGION",
@@ -8223,7 +8223,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_ACCESS_KEY_ID",
@@ -8239,7 +8239,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_BUCKET",
@@ -8255,7 +8255,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_ENDPOINT",
@@ -8271,7 +8271,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_REGION",
@@ -8287,7 +8287,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
@@ -8303,7 +8303,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "SECRET_ACCESS_KEY",
@@ -8319,7 +8319,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from the ENV_ALIASES key collection used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "E2E_TEST",
@@ -9718,7 +9718,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "scripts/configuration-inventory/scan-env-inputs.mjs",
-      "line": 306,
+      "line": 353,
       "consumer": "script",
       "environment": "shared",
       "usage": "read",
@@ -12626,7 +12626,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "test/configuration-inventory.test.ts",
-      "line": 140,
+      "line": 157,
       "consumer": "test",
       "environment": "shared",
       "usage": "loader",

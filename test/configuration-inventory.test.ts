@@ -45,6 +45,23 @@ describe("configuration input inventory", () => {
     expect(records.some((record) => record.key === null)).toBe(false);
   });
 
+  test("does not bleed a prior collection callback into an unrelated injected read", () => {
+    const records = scanSourceText(`const KEYS = ["FLAG_A", "FLAG_B"];
+function read(env: NodeJS.ProcessEnv, key: string) {
+  if (KEYS.some((item) => env[item])) return true;
+  return env[key];
+}`, "app/flags.server.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["FLAG_A", "FLAG_B"]);
+    expect(records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: null,
+        sourceKind: "dynamic-runtime-read",
+        expression: "env[key]",
+      }),
+    ]));
+  });
+
   test("resolves static aliases through an injected ProcessEnv parameter", () => {
     const records = scanSourceText(`const ALIASES = { endpoint: ["S3_ENDPOINT", "ENDPOINT"] };
 function read(env: NodeJS.ProcessEnv = process.env, setting = "endpoint") {
