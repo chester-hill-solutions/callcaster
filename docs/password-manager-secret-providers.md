@@ -17,6 +17,9 @@ They contain no secret values. Values must stay outside the repository, logs,
 diagnostics, and errors. A configured adapter must already have a
 non-interactive authentication method. The built-in contracts fail safely when
 no adapter is supplied; they never run a vendor CLI or open a prompt.
+Mappings that do not match the provider's environment and service plan, or that
+have an invalid vendor or empty reference, are rejected at construction with a
+stable redacted error.
 
 ## Adding an adapter
 

@@ -14,6 +14,7 @@ import {
   PasswordManagerSecretEmptyError,
   PasswordManagerSecretMissingError,
   PasswordManagerSecretProvider,
+  InvalidPasswordManagerMappingError,
   UnsupportedPasswordManagerAdapterError,
 } from "../config/password-manager-secret-provider";
 
@@ -53,7 +54,7 @@ describe("password-manager secret provider contracts", () => {
   it("validates access before it asks an adapter", async () => {
     const lookup = vi.fn<PasswordManagerAdapter["lookup"]>();
     const provider = new PasswordManagerSecretProvider("local", "worker", {
-      mappings: [mapping("bitwarden", SecretNameSchema.parse("OPENAI_API_KEY"))],
+      mappings: [{ ...mapping("bitwarden"), service: "worker" }],
       adapters: createPasswordManagerAdapterRegistry([{ vendor: "bitwarden", lookup }]),
     });
 
@@ -70,6 +71,38 @@ describe("password-manager secret provider contracts", () => {
 
     await expect(provider.get(secretName)).resolves.toBe("secret");
     expect(lookup).toHaveBeenCalledWith({ secretName, reference: `${vendor}:stable-reference` });
+  });
+
+  it("snapshots mappings and nested references at construction", async () => {
+    const original = mapping("bitwarden");
+    const lookup = vi.fn<PasswordManagerAdapter["lookup"]>().mockResolvedValue({ kind: "value", value: "secret" });
+    const provider = new PasswordManagerSecretProvider("local", "app", {
+      mappings: [original],
+      adapters: createPasswordManagerAdapterRegistry([{ vendor: "bitwarden", lookup }]),
+    });
+
+    (original as unknown as { reference: { reference: string } }).reference.reference = "changed-reference";
+    (original as unknown as { environment: string }).environment = "production";
+    await provider.get(secretName);
+    expect(lookup).toHaveBeenCalledWith({ secretName, reference: "bitwarden:stable-reference" });
+  });
+
+  it("rejects malformed and mismatched mappings without exposing references", () => {
+    const sensitiveReference = "stable-reference-with-secret-value";
+    const candidates = [
+      { ...mapping("doppler"), reference: { vendor: "doppler", reference: "   " } },
+      { ...mapping("doppler"), reference: { vendor: "unsupported" as never, reference: sensitiveReference } },
+      { ...mapping("doppler"), environment: "production" as const, reference: { vendor: "doppler", reference: sensitiveReference } },
+    ];
+    for (const candidate of candidates) {
+      try {
+        new PasswordManagerSecretProvider("local", "app", { mappings: [candidate] });
+        throw new Error("expected invalid mapping");
+      } catch (error) {
+        expect(error).toBeInstanceOf(InvalidPasswordManagerMappingError);
+        expect(String(error)).not.toContain(sensitiveReference);
+      }
+    }
   });
 
   it("normalizes missing, empty, and thrown adapter results", async () => {

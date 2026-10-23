@@ -1,4 +1,4 @@
-import type { EnvironmentName, SecretName } from "./schema";
+import { SecretNameSchema, type EnvironmentName, type SecretName } from "./schema";
 import { validateSecretRequest, type SecretServiceName } from "./secrets";
 import type { SecretProvider } from "./secret-provider";
 import {
@@ -62,6 +62,13 @@ export class PasswordManagerSecretDeniedError extends PasswordManagerSecretProvi
   }
 }
 
+export class InvalidPasswordManagerMappingError extends PasswordManagerSecretProviderError {
+  constructor() {
+    super("Password-manager mapping is invalid");
+    this.name = "InvalidPasswordManagerMappingError";
+  }
+}
+
 function freezeRegistry(adapters: readonly PasswordManagerAdapter[]): PasswordManagerAdapterRegistry {
   const entries = new Map<PasswordManagerVendor, PasswordManagerAdapter>();
   for (const adapter of adapters) {
@@ -86,6 +93,48 @@ export type PasswordManagerSecretProviderOptions = Readonly<{
   adapters?: PasswordManagerAdapterRegistry;
 }>;
 
+function snapshotMappings(
+  environment: EnvironmentName,
+  service: SecretServiceName,
+  mappings: readonly PasswordManagerSecretMapping[],
+): readonly PasswordManagerSecretMapping[] {
+  if (!Array.isArray(mappings)) throw new InvalidPasswordManagerMappingError();
+
+  const snapshots: PasswordManagerSecretMapping[] = [];
+  for (const candidate of mappings as readonly unknown[]) {
+    if (!candidate || typeof candidate !== "object") throw new InvalidPasswordManagerMappingError();
+    const mapping = candidate as Partial<PasswordManagerSecretMapping>;
+    const reference = mapping.reference;
+    const parsedSecretName = SecretNameSchema.safeParse(mapping.secretName);
+    if (mapping.environment !== environment || mapping.service !== service || !parsedSecretName.success) {
+      throw new InvalidPasswordManagerMappingError();
+    }
+    if (!reference || typeof reference !== "object") throw new InvalidPasswordManagerMappingError();
+    if (!(passwordManagerVendors as readonly string[]).includes(reference.vendor)) {
+      throw new InvalidPasswordManagerMappingError();
+    }
+    if (typeof reference.reference !== "string" || reference.reference.trim().length === 0) {
+      throw new InvalidPasswordManagerMappingError();
+    }
+
+    try {
+      validateSecretRequest({ environment, service, names: [parsedSecretName.data] });
+    } catch {
+      throw new InvalidPasswordManagerMappingError();
+    }
+
+    snapshots.push(
+      Object.freeze({
+        environment,
+        service,
+        secretName: parsedSecretName.data,
+        reference: Object.freeze({ vendor: reference.vendor, reference: reference.reference }),
+      }),
+    );
+  }
+  return Object.freeze(snapshots);
+}
+
 /** Resolve one approved secret through an injected, non-interactive adapter. */
 export class PasswordManagerSecretProvider implements SecretProvider {
   readonly name = "password-manager";
@@ -97,7 +146,7 @@ export class PasswordManagerSecretProvider implements SecretProvider {
   constructor(environment: EnvironmentName, service: SecretServiceName, options: PasswordManagerSecretProviderOptions) {
     this.environment = environment;
     this.service = service;
-    this.mappings = Object.freeze([...options.mappings]);
+    this.mappings = snapshotMappings(environment, service, options.mappings);
     this.adapters = options.adapters ?? createPasswordManagerAdapterRegistry();
   }
 
