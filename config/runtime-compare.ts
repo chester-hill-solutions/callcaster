@@ -47,6 +47,18 @@ type RuntimeModel = {
   "storage.urlStyle": "path" | "virtual" | undefined;
 };
 
+type RuntimeModelResult = {
+  values: RuntimeModel;
+  modeled: Record<RuntimeConfigPath, boolean>;
+};
+
+/**
+ * Comparison contract: only fields present in the typed project config are
+ * compared. Optional values supplied by deployment infrastructure but not
+ * modeled by an environment overlay are intentionally ignored. Modeled
+ * fields keep the missing, different, and unexpected mismatch categories.
+ */
+
 function canonicalUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const url = new URL(value);
@@ -55,19 +67,30 @@ function canonicalUrl(value: string | undefined): string | undefined {
   return url.toString().replace(/\/$/, "");
 }
 
-function expectedModel(config: ProjectConfig): RuntimeModel {
+function expectedModel(config: ProjectConfig): RuntimeModelResult {
   const endpoint = canonicalUrl(config.storage.endpoint);
+  const modeled = {
+    "urls.publicApp": Object.hasOwn(config.urls, "publicApp"),
+    "runtime.mode": Object.hasOwn(config.runtime, "mode"),
+    "storage.endpoint": Object.hasOwn(config.storage, "endpoint"),
+    "storage.region": Object.hasOwn(config.storage, "region"),
+    "storage.bucket": Object.hasOwn(config.storage, "bucket"),
+    "storage.urlStyle": Object.hasOwn(config.storage, "endpoint"),
+  } satisfies Record<RuntimeConfigPath, boolean>;
   return {
-    "urls.publicApp": canonicalUrl(config.urls.publicApp),
-    "runtime.mode": config.runtime.mode,
-    "storage.endpoint": endpoint,
-    "storage.region": config.storage.region,
-    "storage.bucket": config.storage.bucket,
-    "storage.urlStyle": endpoint
-      ? objectStorageUsesPathStyle(endpoint, {})
-        ? "path"
-        : "virtual"
-      : undefined,
+    values: {
+      "urls.publicApp": canonicalUrl(config.urls.publicApp),
+      "runtime.mode": config.runtime.mode,
+      "storage.endpoint": endpoint,
+      "storage.region": config.storage.region,
+      "storage.bucket": config.storage.bucket,
+      "storage.urlStyle": endpoint
+        ? objectStorageUsesPathStyle(endpoint, {})
+          ? "path"
+          : "virtual"
+        : undefined,
+    },
+    modeled,
   };
 }
 
@@ -119,19 +142,20 @@ export function compareRuntimeConfig(
   const expected = expectedModel(loadProjectConfig(environment));
   const observed = observedModel(env);
   const mismatches = paths.flatMap((path) => {
-    const category = mismatchCategory(expected[path], observed[path]);
+    if (!expected.modeled[path]) return [];
+    const category = mismatchCategory(expected.values[path], observed[path]);
     return category ? [{ path, category }] : [];
   });
 
   return {
     enabled: true,
     environment,
-    expectedFingerprint: stableFingerprint(expected as never),
+    expectedFingerprint: stableFingerprint(expected.values as never),
     observedFingerprint: stableFingerprint(observed as never),
     mismatches,
   };
 }
 
 export function runtimeConfigFingerprint(environment: DiagnosticEnvironment): string {
-  return stableFingerprint(expectedModel(loadProjectConfig(environment)) as never);
+  return stableFingerprint(expectedModel(loadProjectConfig(environment)).values as never);
 }
