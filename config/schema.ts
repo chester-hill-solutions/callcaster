@@ -38,6 +38,14 @@ export const environmentProviderCompatibility: Record<EnvironmentName, readonly 
   production: ["password-manager", "railway"],
 };
 
+const defaultSecretProviderByEnvironment: Record<EnvironmentName, SecretProviderName> = {
+  local: "dotenv",
+  "sai-local": "dotenv",
+  dev: "railway",
+  qa: "railway",
+  production: "railway",
+};
+
 /** A service receives a named, allowlisted slice of non-secret settings. */
 export const ServiceSliceSchema = z
   .object({
@@ -67,17 +75,12 @@ export const ServiceSliceSchema = z
   });
 export type ServiceSlice = z.infer<typeof ServiceSliceSchema>;
 
-export const ProjectConfigSchema = z
+const projectConfigObjectSchema = z
   .object({
     environment: EnvironmentNameSchema,
     parent: EnvironmentNameSchema.optional(),
-    secretProvider: z
-      .enum(secretProviderNames)
-      .default("dotenv"),
-    runtime: z
-      .object({ mode: z.enum(["development", "test", "production"]).default("development") })
-      .strict()
-      .default({}),
+    secretProvider: z.enum(secretProviderNames),
+    runtime: z.object({ mode: z.enum(["development", "test", "production"]).default("development") }).strict().default({ mode: "development" }),
     urls: z
       .object({ publicApp: z.string().url().optional() })
       .strict()
@@ -93,15 +96,31 @@ export const ProjectConfigSchema = z
       .default({}),
     services: z
       .object({
-        app: ServiceSliceSchema.default({}),
-        worker: ServiceSliceSchema.default({}),
-        "media-stream": ServiceSliceSchema.default({}),
-        sim: ServiceSliceSchema.default({}),
+        app: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
+        worker: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
+        "media-stream": ServiceSliceSchema.default({ enabled: true, secrets: [] }),
+        sim: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
       })
       .strict()
-      .default({}),
+      .default({
+        app: { enabled: true, secrets: [] },
+        worker: { enabled: true, secrets: [] },
+        "media-stream": { enabled: true, secrets: [] },
+        sim: { enabled: true, secrets: [] },
+      }),
   })
-  .strict()
+  .strict();
+
+/** Apply a provider that is valid for the config's environment when omitted. */
+export const ProjectConfigSchema = z
+  .preprocess((input) => {
+    if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+    const config = input as Record<string, unknown>;
+    if (config.secretProvider !== undefined) return input;
+    const environment = EnvironmentNameSchema.safeParse(config.environment);
+    if (!environment.success) return input;
+    return { ...config, secretProvider: defaultSecretProviderByEnvironment[environment.data] };
+  }, projectConfigObjectSchema)
   .superRefine((config, ctx) => {
     if (config.parent === config.environment) {
       ctx.addIssue({ code: "custom", path: ["parent"], message: "an environment cannot inherit from itself" });
@@ -180,7 +199,7 @@ export function validateInheritanceGraph(configs: ProjectConfigMap): void {
         );
       }
       visiting.add(current);
-      const next = parsed.get(current)?.parent;
+      const next: EnvironmentName | undefined = parsed.get(current)?.parent;
       if (next && !parsed.has(next)) {
         throw new ConfigValidationError(
           new z.ZodError([{ code: "custom", path: ["parent"], message: `parent environment '${next}' is not defined` }]),

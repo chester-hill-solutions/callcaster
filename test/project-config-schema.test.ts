@@ -24,7 +24,13 @@ describe("ProjectConfig schema", () => {
   it("parses strict config and applies safe defaults", () => {
     const config = parseProjectConfig(valid);
     expect(config.runtime.mode).toBe("development");
-    expect(config.services.worker.secrets).toEqual([]);
+    expect(config.secretProvider).toBe("dotenv");
+    expect(config.services).toEqual({
+      app: { enabled: true, secrets: [{ name: "DATABASE_URL" }] },
+      worker: { enabled: true, secrets: [] },
+      "media-stream": { enabled: true, secrets: [] },
+      sim: { enabled: true, secrets: [] },
+    });
   });
 
   it("rejects unknown keys, unlisted secret names, and secret values or providers", () => {
@@ -45,6 +51,9 @@ describe("ProjectConfig schema", () => {
   });
 
   it("matches providers to the local and Railway deployment topology", () => {
+    expect(parseProjectConfig({ ...valid, environment: "dev" }).secretProvider).toBe("railway");
+    expect(parseProjectConfig({ ...valid, environment: "qa" }).secretProvider).toBe("railway");
+    expect(parseProjectConfig({ ...valid, environment: "production" }).secretProvider).toBe("railway");
     expect(parseProjectConfig({ ...valid, environment: "dev", secretProvider: "railway" }).secretProvider).toBe("railway");
     expect(parseProjectConfig({ ...valid, environment: "qa", secretProvider: "railway" }).secretProvider).toBe("railway");
     expect(parseProjectConfig({ ...valid, environment: "production", secretProvider: "railway" }).secretProvider).toBe("railway");
