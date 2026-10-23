@@ -3,24 +3,968 @@
   "generatedBy": "tools:config:inventory",
   "keys": [
     {
-      "key": "APP_TRUSTED_ORIGINS",
+      "key": "--all",
       "sourceKinds": [
-        "runtime-read",
-        "test-input"
+        "cli-flag"
       ],
       "consumers": [
-        "app",
-        "test"
+        "script"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--apply",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--base",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--base-url",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--baseline",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--batch",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--body",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--check",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--check-only",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--docs-banner",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--dry-run",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--force",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--foreground",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--help",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--json",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--keep",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--keep-objects",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--limit",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--manifest",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--max-rounds",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--min-age-minutes",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--no-pages",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--only",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--print",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--relaxed",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--require-db",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--root",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--routes-dir",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--routes-json",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--skip-docker",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--skip-subaccounts",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--start",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--status",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--stop",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--strict",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--timeout",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--update",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--update-baseline",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--update-capability-baseline",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--verbose",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--workspace",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--workspace-id",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "--write-report",
+      "sourceKinds": [
+        "cli-flag"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "APP_COPY_VARS",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "APP_ID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "APP_SERVICE_ID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "APP_TRUSTED_ORIGINS",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
         "delete",
         "read",
         "write"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "APP_URL_REFERENCE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -30,6 +974,7 @@
       "key": "BASE_URL",
       "sourceKinds": [
         "env-example",
+        "make-variable",
         "railway-variable",
         "runtime-read",
         "script-input",
@@ -56,7 +1001,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 47,
+      "sourceCount": 49,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -98,22 +1043,26 @@
     {
       "key": "BETTER_AUTH_TRUSTED_ORIGINS",
       "sourceKinds": [
+        "env-example",
         "runtime-read",
         "test-input"
       ],
       "consumers": [
         "app",
+        "local-tooling",
         "test"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "read",
         "write"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -122,28 +1071,32 @@
     {
       "key": "BETTER_AUTH_URL",
       "sourceKinds": [
+        "env-example",
         "railway-variable",
         "script-input",
         "test-input"
       ],
       "consumers": [
+        "local-tooling",
         "railway",
         "script",
         "test"
       ],
       "environments": [
         "dev",
+        "local",
         "production",
         "qa",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "deployment",
         "read",
         "write"
       ],
-      "sourceCount": 11,
+      "sourceCount": 12,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -184,6 +1137,26 @@
         "declaration"
       ],
       "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BUCKET",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 5,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -276,18 +1249,22 @@
     {
       "key": "CLOUDFLARE_TUNNEL_DOMAIN",
       "sourceKinds": [
+        "env-example",
         "script-input"
       ],
       "consumers": [
+        "local-tooling",
         "script"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -296,18 +1273,22 @@
     {
       "key": "CLOUDFLARED_BIN",
       "sourceKinds": [
+        "env-example",
         "script-input"
       ],
       "consumers": [
+        "local-tooling",
         "script"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -336,18 +1317,22 @@
     {
       "key": "CLOUDFLARED_CONFIG_FILE",
       "sourceKinds": [
+        "env-example",
         "script-input"
       ],
       "consumers": [
+        "local-tooling",
         "script"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -374,30 +1359,94 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "COHERE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "COHERE_API_KEY",
       "sourceKinds": [
+        "env-example",
         "railway-variable",
         "runtime-read",
         "test-input"
       ],
       "consumers": [
+        "local-tooling",
         "media-stream",
         "railway",
         "test"
       ],
       "environments": [
         "dev",
+        "local",
         "production",
         "qa",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "deployment",
         "read",
         "write"
       ],
-      "sourceCount": 13,
+      "sourceCount": 14,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "COMPOSE",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 7,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CONFIRM_CLONE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -451,8 +1500,29 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "D",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "DATABASE_DIRECT_URL",
       "sourceKinds": [
+        "env-example",
         "railway-variable",
         "runtime-read",
         "script-input",
@@ -460,21 +1530,24 @@
       ],
       "consumers": [
         "app",
+        "local-tooling",
         "railway",
         "script",
         "test"
       ],
       "environments": [
+        "local",
         "production",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "deployment",
         "read",
         "write"
       ],
-      "sourceCount": 40,
+      "sourceCount": 41,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -484,7 +1557,8 @@
       "key": "DATABASE_PUBLIC_URL",
       "sourceKinds": [
         "railway-variable",
-        "script-input"
+        "script-input",
+        "shell-environment"
       ],
       "consumers": [
         "railway",
@@ -498,7 +1572,7 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 5,
+      "sourceCount": 11,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -513,6 +1587,7 @@
         "railway-variable",
         "runtime-read",
         "script-input",
+        "shell-environment",
         "test-input"
       ],
       "consumers": [
@@ -537,7 +1612,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 323,
+      "sourceCount": 324,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -546,52 +1621,34 @@
     {
       "key": "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
-      ],
-      "consumers": [
-        "app"
-      ],
-      "environments": [
-        "shared"
-      ],
-      "usages": [
-        "read"
-      ],
-      "sourceCount": 1,
-      "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
-    },
-    {
-      "key": "DB_STATEMENT_TIMEOUT_MS",
-      "sourceKinds": [
-        "runtime-read"
-      ],
-      "consumers": [
-        "app"
-      ],
-      "environments": [
-        "shared"
-      ],
-      "usages": [
-        "read"
-      ],
-      "sourceCount": 1,
-      "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
-    },
-    {
-      "key": "DESIGN_GALLERY_ENABLED",
-      "sourceKinds": [
-        "runtime-read",
-        "test-input"
       ],
       "consumers": [
         "app",
-        "test"
+        "local-tooling"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DB_REFERENCE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
       ],
       "environments": [
         "shared"
@@ -600,6 +1657,76 @@
         "read"
       ],
       "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DB_STATEMENT_TIMEOUT_MS",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DESIGN_GALLERY_ENABLED",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DEV_APP_ID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -633,26 +1760,30 @@
     {
       "key": "DISABLE_2FA_ENFORCEMENT",
       "sourceKinds": [
+        "env-example",
         "railway-variable",
         "runtime-read",
         "test-input"
       ],
       "consumers": [
         "app",
+        "local-tooling",
         "railway",
         "test"
       ],
       "environments": [
         "dev",
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "deployment",
         "read",
         "write"
       ],
-      "sourceCount": 12,
+      "sourceCount": 13,
       "dynamic": true,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -661,18 +1792,22 @@
     {
       "key": "DISABLE_AUTH_RATE_LIMIT",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
-        "app"
+        "app",
+        "local-tooling"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "write"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -693,6 +1828,26 @@
       ],
       "usages": [
         "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DUMP_FILE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
       ],
       "sourceCount": 3,
       "dynamic": false,
@@ -791,6 +1946,26 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "E2E_SEED_ON_BOOT",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "E2E_SKIP_BOOTSTRAP",
       "sourceKinds": [
         "script-input"
@@ -875,30 +2050,54 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "ELEVEN",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "ELEVENLABS_API_KEY",
       "sourceKinds": [
+        "env-example",
         "railway-variable",
         "runtime-read",
         "test-input"
       ],
       "consumers": [
         "app",
+        "local-tooling",
         "media-stream",
         "railway",
         "test"
       ],
       "environments": [
         "dev",
+        "local",
         "production",
         "qa",
         "shared"
       ],
       "usages": [
+        "declaration",
         "deployment",
         "read",
         "write"
       ],
-      "sourceCount": 6,
+      "sourceCount": 7,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1062,7 +2261,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 2,
+      "sourceCount": 3,
       "dynamic": true,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1082,7 +2281,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 2,
+      "sourceCount": 3,
       "dynamic": true,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1171,12 +2370,15 @@
     {
       "key": "HOST",
       "sourceKinds": [
+        "container-env",
         "railway-variable",
         "runtime-read",
-        "script-input"
+        "script-input",
+        "shell-environment"
       ],
       "consumers": [
         "app",
+        "container",
         "railway",
         "script"
       ],
@@ -1190,7 +2392,7 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 5,
+      "sourceCount": 8,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1297,6 +2499,46 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "MAKECMDGOALS",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "MAKEFILE_LIST",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "MEDIA_STREAM_HOST",
       "sourceKinds": [
         "env-example",
@@ -1327,18 +2569,22 @@
     {
       "key": "MEDIA_STREAM_MAX_PER_WORKSPACE",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
+        "local-tooling",
         "media-stream"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1347,18 +2593,22 @@
     {
       "key": "MEDIA_STREAM_PORT",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
+        "local-tooling",
         "media-stream"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1433,6 +2683,7 @@
     {
       "key": "NODE_ENV",
       "sourceKinds": [
+        "container-env",
         "railway-variable",
         "runtime-read",
         "script-input",
@@ -1440,6 +2691,7 @@
       ],
       "consumers": [
         "app",
+        "container",
         "railway",
         "script",
         "test"
@@ -1456,7 +2708,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 80,
+      "sourceCount": 82,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1503,6 +2755,66 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "ON_DEV_PROJECT_NUMBER",
+      "sourceKinds": [
+        "github-variable"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "ON_DEV_STATUS_FIELD",
+      "sourceKinds": [
+        "github-variable"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "ON_DEV_STATUS_VALUE",
+      "sourceKinds": [
+        "github-variable"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "OPENAI_API_KEY",
       "sourceKinds": [
         "railway-variable"
@@ -1525,18 +2837,22 @@
     {
       "key": "OPS_ALERT_EMAIL",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
-        "app"
+        "app",
+        "local-tooling"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1545,18 +2861,42 @@
     {
       "key": "OPS_ALERT_EMAILS_ENABLED",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
-        "app"
+        "app",
+        "local-tooling"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "write"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "OUT",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
-        "write"
+        "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 3,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1577,6 +2917,26 @@
         "declaration"
       ],
       "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "P",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 3,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1747,13 +3107,17 @@
     {
       "key": "PORT",
       "sourceKinds": [
+        "container-env",
+        "container-env-read",
         "railway-variable",
         "runtime-read",
         "script-input",
+        "shell-environment",
         "test-input"
       ],
       "consumers": [
         "app",
+        "container",
         "railway",
         "script",
         "test"
@@ -1769,7 +3133,7 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 10,
+      "sourceCount": 12,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1778,18 +3142,21 @@
     {
       "key": "POSTGRES_DB",
       "sourceKinds": [
+        "compose-environment",
         "railway-variable"
       ],
       "consumers": [
+        "local-compose",
         "railway"
       ],
       "environments": [
-        "dev"
+        "dev",
+        "shared"
       ],
       "usages": [
         "deployment"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1798,18 +3165,21 @@
     {
       "key": "POSTGRES_PASSWORD",
       "sourceKinds": [
+        "compose-environment",
         "railway-variable"
       ],
       "consumers": [
+        "local-compose",
         "railway"
       ],
       "environments": [
-        "dev"
+        "dev",
+        "shared"
       ],
       "usages": [
         "deployment"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1818,18 +3188,21 @@
     {
       "key": "POSTGRES_USER",
       "sourceKinds": [
+        "compose-environment",
         "railway-variable"
       ],
       "consumers": [
+        "local-compose",
         "railway"
       ],
       "environments": [
-        "dev"
+        "dev",
+        "shared"
       ],
       "usages": [
         "deployment"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -1998,18 +3371,22 @@
     {
       "key": "PROCESS_FATAL_ON_REJECTION",
       "sourceKinds": [
+        "env-example",
         "runtime-read"
       ],
       "consumers": [
-        "app"
+        "app",
+        "local-tooling"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "write"
       ],
-      "sourceCount": 2,
+      "sourceCount": 3,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2100,6 +3477,7 @@
     {
       "key": "RAILWAY_ENVIRONMENT_ID",
       "sourceKinds": [
+        "github-variable",
         "github-workflow-env"
       ],
       "consumers": [
@@ -2111,7 +3489,7 @@
       "usages": [
         "declaration"
       ],
-      "sourceCount": 3,
+      "sourceCount": 6,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2166,6 +3544,7 @@
     {
       "key": "RAILWAY_PROJECT_ID",
       "sourceKinds": [
+        "github-variable",
         "github-workflow-env"
       ],
       "consumers": [
@@ -2177,7 +3556,7 @@
       "usages": [
         "declaration"
       ],
-      "sourceCount": 3,
+      "sourceCount": 6,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2246,6 +3625,46 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "REQUESTED",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 6,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RESEND",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "RESEND_API_KEY",
       "sourceKinds": [
         "env-example",
@@ -2279,20 +3698,46 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "ROOT",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "RUN_CLIENT_MIGRATIONS_ON_BOOT",
       "sourceKinds": [
+        "env-example",
         "railway-variable"
       ],
       "consumers": [
+        "local-tooling",
         "railway"
       ],
       "environments": [
-        "production"
+        "dev",
+        "local",
+        "production",
+        "qa"
       ],
       "usages": [
+        "declaration",
         "deployment"
       ],
-      "sourceCount": 1,
+      "sourceCount": 4,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2365,6 +3810,66 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "S3_BUCKET_AUDIO",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_BUCKET_EXPORTS",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_BUCKET_MEDIA",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "S3_ENDPOINT",
       "sourceKinds": [
         "env-example",
@@ -2400,18 +3905,22 @@
     {
       "key": "S3_FORCE_PATH_STYLE",
       "sourceKinds": [
+        "env-example",
         "script-input"
       ],
       "consumers": [
+        "local-tooling",
         "script"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "write"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2484,6 +3993,26 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "S3_URL_STYLE",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "SCHEMA_DEFAULT_DRIFT_UPDATE",
       "sourceKinds": [
         "test-input"
@@ -2524,6 +4053,86 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "SECRET",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SELF_URL_REFERENCE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SENTRY_DSN",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SERVICES",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "SHA",
       "sourceKinds": [
         "github-workflow-env"
@@ -2538,6 +4147,26 @@
         "declaration"
       ],
       "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SIGNUP",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -2620,6 +4249,26 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "SOURCE_DATABASE_URL",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "SSL_CERT_DAYS",
       "sourceKinds": [
         "railway-variable"
@@ -2672,6 +4321,26 @@
       ],
       "usages": [
         "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STEPS",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
       ],
       "sourceCount": 1,
       "dynamic": false,
@@ -2857,6 +4526,26 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "STRIPE_SK",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "STRIPE_WEBHOOK_SECRET",
       "sourceKinds": [
         "env-example",
@@ -3010,12 +4699,12 @@
       "migrationTarget": "unassigned"
     },
     {
-      "key": "TWILIO_A2P_MESSAGING_POLICY_SID",
+      "key": "T_APP",
       "sourceKinds": [
-        "runtime-read"
+        "shell-environment"
       ],
       "consumers": [
-        "app"
+        "script"
       ],
       "environments": [
         "shared"
@@ -3024,6 +4713,130 @@
         "read"
       ],
       "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "T_AUTH",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "T_PHONE",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "T_SID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TARGET_DATABASE_URL",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TARGET_SERVICES",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_A2P_MESSAGING_POLICY_SID",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -3169,6 +4982,46 @@
       "migrationTarget": "unassigned"
     },
     {
+      "key": "TWILIO_EVENTS_SINK_SECRET",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_LOOKUP_ENABLED",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
       "key": "TWILIO_PHONE_NUMBER",
       "sourceKinds": [
         "env-example",
@@ -3239,18 +5092,22 @@
     {
       "key": "TWILIO_TEST_ACCOUNT_SID",
       "sourceKinds": [
+        "env-example",
         "test-input"
       ],
       "consumers": [
+        "local-tooling",
         "test"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
       ],
-      "sourceCount": 1,
+      "sourceCount": 2,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -3259,16 +5116,40 @@
     {
       "key": "TWILIO_TEST_AUTH_TOKEN",
       "sourceKinds": [
+        "env-example",
         "test-input"
       ],
       "consumers": [
+        "local-tooling",
         "test"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
       ],
       "sourceCount": 1,
       "dynamic": false,
@@ -3279,21 +5160,25 @@
     {
       "key": "TWILIO_VALIDATE_WEBHOOKS",
       "sourceKinds": [
+        "env-example",
         "script-input",
         "test-input"
       ],
       "consumers": [
+        "local-tooling",
         "script",
         "test"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "read",
         "write"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -3302,22 +5187,26 @@
     {
       "key": "TWO_FACTOR_ENABLED",
       "sourceKinds": [
+        "env-example",
         "runtime-read",
         "test-input"
       ],
       "consumers": [
         "app",
+        "local-tooling",
         "test"
       ],
       "environments": [
+        "local",
         "shared"
       ],
       "usages": [
+        "declaration",
         "delete",
         "read",
         "write"
       ],
-      "sourceCount": 21,
+      "sourceCount": 22,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -3338,6 +5227,26 @@
         "write"
       ],
       "sourceCount": 20,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "URL",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 3,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",
@@ -3464,6 +5373,86 @@
         "write"
       ],
       "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "WORKER_COPY_VARS",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "WORKER_ID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "WORKER_SERVICE_ID",
+      "sourceKinds": [
+        "shell-environment"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "WORKSPACE_ID",
+      "sourceKinds": [
+        "make-variable"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
       "dynamic": false,
       "classification": "unclassified",
       "owner": "unassigned",

@@ -1,0 +1,350 @@
+{
+  "version": 1,
+  "generatedBy": "tools:config:inventory",
+  "reads": [
+    {
+      "sourceFile": "app/lib/env.server.ts",
+      "line": 86,
+      "consumer": "app",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "e2e/sim/config.ts",
+      "line": 9,
+      "consumer": "sim",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/db/reconcile-stuck-calls.ts",
+      "line": 49,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/e2e/seed-database.mjs",
+      "line": 25,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/e2e/seed-database.mjs",
+      "line": 26,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[fallbackName]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/gen-wav-sidecars.ts",
+      "line": 34,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/local/cloudflared-utils.mjs",
+      "line": 17,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/local/cloudflared-utils.mjs",
+      "line": 32,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/local/prune-environment-twiml-apps.mjs",
+      "line": 112,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/local/sync-calling-dev.mjs",
+      "line": 200,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/local/sync-local-calling-dev.mjs",
+      "line": 64,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/migrate-media-namespaces.ts",
+      "line": 36,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "scripts/twilio-resource-prune-report.mjs",
+      "line": 408,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/design-gallery-gate.test.ts",
+      "line": 11,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/design-gallery-gate.test.ts",
+      "line": 12,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-results-counts.test.ts",
+      "line": 19,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-results-counts.test.ts",
+      "line": 126,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-results-counts.test.ts",
+      "line": 127,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-schedule-sync-dates.test.ts",
+      "line": 18,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-schedule-sync-dates.test.ts",
+      "line": 311,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/campaign-schedule-sync-dates.test.ts",
+      "line": 312,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/interactive-sender-cache.test.ts",
+      "line": 231,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/interactive-sender-cache.test.ts",
+      "line": 232,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[name]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-purchase-credits.test.ts",
+      "line": 95,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-regulatory-address.test.ts",
+      "line": 135,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-regulatory-address.test.ts",
+      "line": 136,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-release-credentials.test.ts",
+      "line": 136,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-release-credentials.test.ts",
+      "line": 137,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-release-recovery.test.ts",
+      "line": 275,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-release-recovery.test.ts",
+      "line": 276,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-rental-warning-reset.test.ts",
+      "line": 16,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-rental-warning-reset.test.ts",
+      "line": 113,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/number-rental-warning-reset.test.ts",
+      "line": 114,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-continuation.test.ts",
+      "line": 28,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-continuation.test.ts",
+      "line": 229,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-continuation.test.ts",
+      "line": 230,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-operation.test.ts",
+      "line": 25,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-operation.test.ts",
+      "line": 294,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/predictive-machine-operation.test.ts",
+      "line": 295,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/survey-optional-completion.test.ts",
+      "line": 109,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/survey-optional-completion.test.ts",
+      "line": 110,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/survey-required-answers.test.ts",
+      "line": 128,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    },
+    {
+      "sourceFile": "test/integration-db/survey-required-answers.test.ts",
+      "line": 129,
+      "consumer": "test",
+      "sourceKind": "dynamic-test-read",
+      "expression": "process.env[key]",
+      "status": "needs-review"
+    }
+  ]
+}

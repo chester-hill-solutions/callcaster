@@ -5,44 +5,101 @@
 
 | Key | Source kinds | Consumers | Environments | Usages | Sources | Classification | Owner | Migration target |
 |---|---|---|---|---|---:|---|---|---|
-| APP_TRUSTED_ORIGINS | runtime-read, test-input | app, test | shared | delete, read, write | 4 | unclassified | unassigned | unassigned |
-| BASE_URL | env-example, railway-variable, runtime-read, script-input, test-input | app, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 47 | unclassified | unassigned | unassigned |
+| --all | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --apply | cli-flag | script | shared | declaration | 3 | unclassified | unassigned | unassigned |
+| --base | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --base-url | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --baseline | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --batch | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --body | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --check | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --check-only | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --docs-banner | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --dry-run | cli-flag | script | shared | declaration | 5 | unclassified | unassigned | unassigned |
+| --force | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --foreground | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --help | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --json | cli-flag | script | shared | declaration | 5 | unclassified | unassigned | unassigned |
+| --keep | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --keep-objects | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --limit | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --manifest | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --max-rounds | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --min-age-minutes | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --no-pages | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --only | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --print | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --relaxed | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --require-db | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --root | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --routes-dir | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --routes-json | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --skip-docker | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --skip-subaccounts | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --start | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --status | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --stop | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --strict | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --timeout | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --update | cli-flag | script | shared | declaration | 4 | unclassified | unassigned | unassigned |
+| --update-baseline | cli-flag | script | shared | declaration | 3 | unclassified | unassigned | unassigned |
+| --update-capability-baseline | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --verbose | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --workspace | cli-flag | script | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| --workspace-id | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| --write-report | cli-flag | script | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| APP_COPY_VARS | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| APP_ID | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
+| APP_SERVICE_ID | shell-environment | script | shared | read | 5 | unclassified | unassigned | unassigned |
+| APP_TRUSTED_ORIGINS | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, delete, read, write | 5 | unclassified | unassigned | unassigned |
+| APP_URL_REFERENCE | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| BASE_URL | env-example, make-variable, railway-variable, runtime-read, script-input, test-input | app, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 49 | unclassified | unassigned | unassigned |
 | BETTER_AUTH_SECRET | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 27 | unclassified | unassigned | unassigned |
-| BETTER_AUTH_TRUSTED_ORIGINS | runtime-read, test-input | app, test | shared | delete, read, write | 4 | unclassified | unassigned | unassigned |
-| BETTER_AUTH_URL | railway-variable, script-input, test-input | railway, script, test | dev, production, qa, shared | delete, deployment, read, write | 11 | unclassified | unassigned | unassigned |
+| BETTER_AUTH_TRUSTED_ORIGINS | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, delete, read, write | 5 | unclassified | unassigned | unassigned |
+| BETTER_AUTH_URL | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 12 | unclassified | unassigned | unassigned |
 | BOARD_REVIEWED_COMMIT | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | BODY | github-workflow-env | ci | shared | declaration | 3 | unclassified | unassigned | unassigned |
+| BUCKET | shell-environment | script | shared | read | 5 | unclassified | unassigned | unassigned |
 | BUN_BINARY | test-input | test | shared | read | 2 | unclassified | unassigned | unassigned |
 | CALLCASTER_DEV_LOCAL_NODE_OK | script-input | script | shared | write | 1 | unclassified | unassigned | unassigned |
 | CC_VERDICT_GH_LOG | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
 | CI | github-workflow-env, script-input | ci, e2e, script | shared | declaration, read | 4 | unclassified | unassigned | unassigned |
-| CLOUDFLARE_TUNNEL_DOMAIN | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
-| CLOUDFLARED_BIN | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| CLOUDFLARE_TUNNEL_DOMAIN | env-example, script-input | local-tooling, script | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| CLOUDFLARED_BIN | env-example, script-input | local-tooling, script | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
 | CLOUDFLARED_CONFIG_DIR | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
-| CLOUDFLARED_CONFIG_FILE | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| CLOUDFLARED_CONFIG_FILE | env-example, script-input | local-tooling, script | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
 | CLOUDFLARED_CREDENTIALS_FILE | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
-| COHERE_API_KEY | railway-variable, runtime-read, test-input | media-stream, railway, test | dev, production, qa, shared | delete, deployment, read, write | 13 | unclassified | unassigned | unassigned |
+| COHERE | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| COHERE_API_KEY | env-example, railway-variable, runtime-read, test-input | local-tooling, media-stream, railway, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 14 | unclassified | unassigned | unassigned |
+| COMPOSE | make-variable | script | shared | read | 7 | unclassified | unassigned | unassigned |
+| CONFIRM_CLONE | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | COVERAGE_FULL | github-workflow-env | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
 | CRON_SECRET | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, read, write | 9 | unclassified | unassigned | unassigned |
-| DATABASE_DIRECT_URL | railway-variable, runtime-read, script-input, test-input | app, railway, script, test | production, shared | delete, deployment, read, write | 40 | unclassified | unassigned | unassigned |
-| DATABASE_PUBLIC_URL | railway-variable, script-input | railway, script | dev, shared | deployment, read | 5 | unclassified | unassigned | unassigned |
-| DATABASE_URL | env-example, github-secret, github-workflow-env, railway-variable, runtime-read, script-input, test-input | app, ci, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 323 | unclassified | unassigned | unassigned |
-| DB_IDLE_IN_TRANSACTION_TIMEOUT_MS | runtime-read | app | shared | read | 1 | unclassified | unassigned | unassigned |
-| DB_STATEMENT_TIMEOUT_MS | runtime-read | app | shared | read | 1 | unclassified | unassigned | unassigned |
-| DESIGN_GALLERY_ENABLED | runtime-read, test-input | app, test | shared | read | 2 | unclassified | unassigned | unassigned |
+| D | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| DATABASE_DIRECT_URL | env-example, railway-variable, runtime-read, script-input, test-input | app, local-tooling, railway, script, test | local, production, shared | declaration, delete, deployment, read, write | 41 | unclassified | unassigned | unassigned |
+| DATABASE_PUBLIC_URL | railway-variable, script-input, shell-environment | railway, script | dev, shared | deployment, read | 11 | unclassified | unassigned | unassigned |
+| DATABASE_URL | env-example, github-secret, github-workflow-env, railway-variable, runtime-read, script-input, shell-environment, test-input | app, ci, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 324 | unclassified | unassigned | unassigned |
+| DB_IDLE_IN_TRANSACTION_TIMEOUT_MS | env-example, runtime-read | app, local-tooling | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| DB_REFERENCE | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| DB_STATEMENT_TIMEOUT_MS | env-example, runtime-read | app, local-tooling | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| DESIGN_GALLERY_ENABLED | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, read | 3 | unclassified | unassigned | unassigned |
+| DEV_APP_ID | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | DEV_NAME | env-example, script-input | local-tooling, script | local, shared | declaration, read, write | 4 | unclassified | unassigned | unassigned |
-| DISABLE_2FA_ENFORCEMENT | railway-variable, runtime-read, test-input | app, railway, test | dev, shared | delete, deployment, read, write | 12 | unclassified | unassigned | unassigned |
-| DISABLE_AUTH_RATE_LIMIT | runtime-read | app | shared | write | 1 | unclassified | unassigned | unassigned |
+| DISABLE_2FA_ENFORCEMENT | env-example, railway-variable, runtime-read, test-input | app, local-tooling, railway, test | dev, local, shared | declaration, delete, deployment, read, write | 13 | unclassified | unassigned | unassigned |
+| DISABLE_AUTH_RATE_LIMIT | env-example, runtime-read | app, local-tooling | local, shared | declaration, write | 2 | unclassified | unassigned | unassigned |
 | DOCKERFILE | railway-variable | railway | dev, production, qa | deployment | 3 | unclassified | unassigned | unassigned |
+| DUMP_FILE | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
 | E2E_BASE_URL | script-input | e2e, script | shared | read | 6 | unclassified | unassigned | unassigned |
 | E2E_DISABLE_2FA_ENFORCEMENT | runtime-read, script-input, test-input | app, script, test | shared | delete, read, write | 8 | unclassified | unassigned | unassigned |
 | E2E_DISABLE_AUTH_RATE_LIMIT | runtime-read, script-input | app, script | shared | read, write | 2 | unclassified | unassigned | unassigned |
 | E2E_PORT | script-input | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| E2E_SEED_ON_BOOT | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
 | E2E_SKIP_BOOTSTRAP | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | E2E_SKIP_BUILD | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | E2E_STRIPE_SESSION | script-input | e2e | shared | write | 1 | unclassified | unassigned | unassigned |
 | E2E_TEST | runtime-read, test-input | app, test | shared | delete, read, write | 12 | unclassified | unassigned | unassigned |
-| ELEVENLABS_API_KEY | railway-variable, runtime-read, test-input | app, media-stream, railway, test | dev, production, qa, shared | deployment, read, write | 6 | unclassified | unassigned | unassigned |
+| ELEVEN | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| ELEVENLABS_API_KEY | env-example, railway-variable, runtime-read, test-input | app, local-tooling, media-stream, railway, test | dev, local, production, qa, shared | declaration, deployment, read, write | 7 | unclassified | unassigned | unassigned |
 | ENV | env-example, script-input | local-tooling, script | local, shared | declaration, read | 3 | unclassified | unassigned | unassigned |
 | FIXTURE_ARCHIVE | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
 | FIXTURE_CHECKSUM | test-input | test | shared | write | 1 | unclassified | unassigned | unassigned |
@@ -50,31 +107,38 @@
 | FIXTURE_EXECUTED | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
 | FIXTURE_EXTRACTIONS | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
 | FIXTURE_SUMS | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
-| FLAG_A | test-input | test | shared | read | 2 | unclassified | unassigned | unassigned |
-| FLAG_B | test-input | test | shared | read | 2 | unclassified | unassigned | unassigned |
+| FLAG_A | test-input | test | shared | read | 3 | unclassified | unassigned | unassigned |
+| FLAG_B | test-input | test | shared | read | 3 | unclassified | unassigned | unassigned |
 | GH_TOKEN | github-workflow-env | ci | shared | declaration | 3 | unclassified | unassigned | unassigned |
 | GITHUB_OUTPUT | script-input | script | shared | read | 2 | unclassified | unassigned | unassigned |
 | GITHUB_REPO | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | HOME | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
-| HOST | railway-variable, runtime-read, script-input | app, railway, script | dev, production, qa, shared | deployment, read | 5 | unclassified | unassigned | unassigned |
+| HOST | container-env, railway-variable, runtime-read, script-input, shell-environment | app, container, railway, script | dev, production, qa, shared | deployment, read | 8 | unclassified | unassigned | unassigned |
 | INTEGRATION_DB_URL | test-input | test | shared | read | 71 | unclassified | unassigned | unassigned |
 | LABEL | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | LABELS | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
 | LEDGER_CHECK_REQUIRE_DB | script-input | script | shared | write | 1 | unclassified | unassigned | unassigned |
 | LOCAL_APP_URL | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| MAKECMDGOALS | make-variable | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| MAKEFILE_LIST | make-variable | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | MEDIA_STREAM_HOST | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, delete, read, write | 17 | unclassified | unassigned | unassigned |
-| MEDIA_STREAM_MAX_PER_WORKSPACE | runtime-read | media-stream | shared | read | 1 | unclassified | unassigned | unassigned |
-| MEDIA_STREAM_PORT | runtime-read | media-stream | shared | read | 1 | unclassified | unassigned | unassigned |
+| MEDIA_STREAM_MAX_PER_WORKSPACE | env-example, runtime-read | local-tooling, media-stream | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| MEDIA_STREAM_PORT | env-example, runtime-read | local-tooling, media-stream | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
 | MEDIA_STREAM_SECRET | env-example, test-input | local-tooling, test | local, shared | declaration, write | 5 | unclassified | unassigned | unassigned |
 | NIXPACKS | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
 | NODE_AUTH_TOKEN | github-secret, github-workflow-env | ci | shared | declaration, deployment | 30 | unclassified | unassigned | unassigned |
-| NODE_ENV | railway-variable, runtime-read, script-input, test-input | app, railway, script, test | dev, production, qa, shared | delete, deployment, read, write | 80 | unclassified | unassigned | unassigned |
+| NODE_ENV | container-env, railway-variable, runtime-read, script-input, test-input | app, container, railway, script, test | dev, production, qa, shared | delete, deployment, read, write | 82 | unclassified | unassigned | unassigned |
 | NUMBERS | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
 | NVM_DIR | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| ON_DEV_PROJECT_NUMBER | github-variable | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| ON_DEV_STATUS_FIELD | github-variable | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| ON_DEV_STATUS_VALUE | github-variable | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
 | OPENAI_API_KEY | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
-| OPS_ALERT_EMAIL | runtime-read | app | shared | read | 1 | unclassified | unassigned | unassigned |
-| OPS_ALERT_EMAILS_ENABLED | runtime-read | app | shared | write | 1 | unclassified | unassigned | unassigned |
+| OPS_ALERT_EMAIL | env-example, runtime-read | app, local-tooling | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| OPS_ALERT_EMAILS_ENABLED | env-example, runtime-read | app, local-tooling | local, shared | declaration, write | 2 | unclassified | unassigned | unassigned |
+| OUT | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
 | OWNER | github-workflow-env | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| P | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
 | PARITY_DATABASE_URL | test-input | test | shared | read | 2 | unclassified | unassigned | unassigned |
 | PATH | script-input, test-input | script, test | shared | read | 2 | unclassified | unassigned | unassigned |
 | PGDATA | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
@@ -83,10 +147,10 @@
 | PGPASSWORD | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
 | PGPORT | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
 | PGUSER | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
-| PORT | railway-variable, runtime-read, script-input, test-input | app, railway, script, test | dev, production, qa, shared | delete, deployment, read | 10 | unclassified | unassigned | unassigned |
-| POSTGRES_DB | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
-| POSTGRES_PASSWORD | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
-| POSTGRES_USER | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
+| PORT | container-env, container-env-read, railway-variable, runtime-read, script-input, shell-environment, test-input | app, container, railway, script, test | dev, production, qa, shared | delete, deployment, read | 12 | unclassified | unassigned | unassigned |
+| POSTGRES_DB | compose-environment, railway-variable | local-compose, railway | dev, shared | deployment | 2 | unclassified | unassigned | unassigned |
+| POSTGRES_PASSWORD | compose-environment, railway-variable | local-compose, railway | dev, shared | deployment | 2 | unclassified | unassigned | unassigned |
+| POSTGRES_USER | compose-environment, railway-variable | local-compose, railway | dev, shared | deployment | 2 | unclassified | unassigned | unassigned |
 | PR_NUMBER | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
 | PR_URL | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
 | PREDICTIVE_RECOVERY_PROBE | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
@@ -95,35 +159,49 @@
 | PROBE_URL_LOCAL | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | PROBE_URL_PROD | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | PROBE_URL_QA | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
-| PROCESS_FATAL_ON_REJECTION | runtime-read | app | shared | write | 2 | unclassified | unassigned | unassigned |
+| PROCESS_FATAL_ON_REJECTION | env-example, runtime-read | app, local-tooling | local, shared | declaration, write | 3 | unclassified | unassigned | unassigned |
 | PROJECT | github-workflow-env | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
 | PROJECT_TOKEN | github-secret | ci | shared | deployment | 1 | unclassified | unassigned | unassigned |
 | RAILWAY_DEPLOYMENT_DRAINING_SECONDS | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
 | RAILWAY_DOCKERFILE_PATH | railway-variable | railway | dev, production, qa | deployment | 4 | unclassified | unassigned | unassigned |
-| RAILWAY_ENVIRONMENT_ID | github-workflow-env | ci | shared | declaration | 3 | unclassified | unassigned | unassigned |
+| RAILWAY_ENVIRONMENT_ID | github-variable, github-workflow-env | ci | shared | declaration | 6 | unclassified | unassigned | unassigned |
 | RAILWAY_ENVIRONMENT_NAME | runtime-read, script-input, test-input | app, script, test | shared | delete, read, write | 15 | unclassified | unassigned | unassigned |
 | RAILWAY_GIT_COMMIT_SHA | runtime-read | app | shared | read | 2 | unclassified | unassigned | unassigned |
-| RAILWAY_PROJECT_ID | github-workflow-env | ci | shared | declaration | 3 | unclassified | unassigned | unassigned |
+| RAILWAY_PROJECT_ID | github-variable, github-workflow-env | ci | shared | declaration | 6 | unclassified | unassigned | unassigned |
 | RAILWAY_TOKEN | github-secret, github-workflow-env | ci | shared | declaration, deployment | 6 | unclassified | unassigned | unassigned |
 | REGION | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | REPO | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| REQUESTED | make-variable | script | shared | read | 6 | unclassified | unassigned | unassigned |
+| RESEND | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
 | RESEND_API_KEY | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 14 | unclassified | unassigned | unassigned |
-| RUN_CLIENT_MIGRATIONS_ON_BOOT | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
+| ROOT | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
+| RUN_CLIENT_MIGRATIONS_ON_BOOT | env-example, railway-variable | local-tooling, railway | dev, local, production, qa | declaration, deployment | 4 | unclassified | unassigned | unassigned |
 | S3_ACCESS_KEY_ID | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 16 | unclassified | unassigned | unassigned |
 | S3_BUCKET | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 15 | unclassified | unassigned | unassigned |
+| S3_BUCKET_AUDIO | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
+| S3_BUCKET_EXPORTS | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
+| S3_BUCKET_MEDIA | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
 | S3_ENDPOINT | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 15 | unclassified | unassigned | unassigned |
-| S3_FORCE_PATH_STYLE | script-input | script | shared | write | 1 | unclassified | unassigned | unassigned |
+| S3_FORCE_PATH_STYLE | env-example, script-input | local-tooling, script | local, shared | declaration, write | 2 | unclassified | unassigned | unassigned |
 | S3_REGION | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 15 | unclassified | unassigned | unassigned |
 | S3_SECRET_ACCESS_KEY | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 16 | unclassified | unassigned | unassigned |
+| S3_URL_STYLE | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
 | SCHEMA_DEFAULT_DRIFT_UPDATE | test-input | test | shared | write | 1 | unclassified | unassigned | unassigned |
 | SCHEMA_DRIFT_UPDATE | test-input | test | shared | write | 1 | unclassified | unassigned | unassigned |
+| SECRET | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| SELF_URL_REFERENCE | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| SENTRY_DSN | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
+| SERVICES | make-variable | script | shared | read | 4 | unclassified | unassigned | unassigned |
 | SHA | github-workflow-env | ci | shared | declaration | 2 | unclassified | unassigned | unassigned |
+| SIGNUP | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | SIGNUP_OPEN | env-example, railway-variable, runtime-read, script-input, test-input | app, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 12 | unclassified | unassigned | unassigned |
 | SIM_SMS_MESSAGE | script-input | sim | shared | read | 1 | unclassified | unassigned | unassigned |
 | SMS_REPORT_PROOF_PATH | test-input | test | shared | read | 2 | unclassified | unassigned | unassigned |
+| SOURCE_DATABASE_URL | shell-environment | script | shared | read | 5 | unclassified | unassigned | unassigned |
 | SSL_CERT_DAYS | railway-variable | railway | dev | deployment | 1 | unclassified | unassigned | unassigned |
 | STATUS_FIELD | github-workflow-env | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
 | STATUS_VALUE | github-workflow-env | ci | shared | declaration | 1 | unclassified | unassigned | unassigned |
+| STEPS | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | STOW_BIN | script-input | script | shared | read | 2 | unclassified | unassigned | unassigned |
 | STOW_DATA_DIR | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | STOW_HOST | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
@@ -132,6 +210,7 @@
 | STOW_VERSION | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | STRIPE_API_KEY | railway-variable | railway | dev, production, qa | deployment | 3 | unclassified | unassigned | unassigned |
 | STRIPE_SECRET_KEY | env-example, railway-variable, runtime-read, script-input, test-input | app, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 20 | unclassified | unassigned | unassigned |
+| STRIPE_SK | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | STRIPE_WEBHOOK_SECRET | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 9 | unclassified | unassigned | unassigned |
 | SUPABASE_ANON_KEY | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
 | SUPABASE_PUBLISHABLE_KEY | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
@@ -139,22 +218,36 @@
 | SUPABASE_SERVICE_KEY | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
 | SUPABASE_SKEY | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
 | SUPABASE_URL | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
-| TWILIO_A2P_MESSAGING_POLICY_SID | runtime-read | app | shared | read | 1 | unclassified | unassigned | unassigned |
+| T_APP | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| T_AUTH | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| T_PHONE | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| T_SID | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| TARGET_DATABASE_URL | shell-environment | script | shared | read | 5 | unclassified | unassigned | unassigned |
+| TARGET_SERVICES | make-variable | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| TWILIO_A2P_MESSAGING_POLICY_SID | env-example, runtime-read | app, local-tooling | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
 | TWILIO_API_KEY | railway-variable | railway | dev, production, qa | deployment | 3 | unclassified | unassigned | unassigned |
 | TWILIO_API_SECRET | railway-variable | railway | dev, production, qa | deployment | 3 | unclassified | unassigned | unassigned |
 | TWILIO_APP_SID | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 13 | unclassified | unassigned | unassigned |
 | TWILIO_AUTH_TOKEN | env-example, github-workflow-env, railway-variable, script-input, test-input | ci, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, delete, deployment, read, write | 19 | unclassified | unassigned | unassigned |
 | TWILIO_COMPLIANCE_NOTIFY_EMAIL | env-example, test-input | local-tooling, test | local, shared | declaration, delete, read, write | 5 | unclassified | unassigned | unassigned |
+| TWILIO_EVENTS_SINK_SECRET | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
+| TWILIO_LOOKUP_ENABLED | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
 | TWILIO_PHONE_NUMBER | env-example, railway-variable, script-input, test-input | local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 13 | unclassified | unassigned | unassigned |
 | TWILIO_SID | env-example, github-workflow-env, railway-variable, script-input, test-input | ci, local-tooling, railway, script, test | dev, local, production, qa, shared | declaration, deployment, read, write | 17 | unclassified | unassigned | unassigned |
-| TWILIO_TEST_ACCOUNT_SID | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
-| TWILIO_TEST_AUTH_TOKEN | test-input | test | shared | read | 1 | unclassified | unassigned | unassigned |
-| TWILIO_VALIDATE_WEBHOOKS | script-input, test-input | script, test | shared | read, write | 4 | unclassified | unassigned | unassigned |
-| TWO_FACTOR_ENABLED | runtime-read, test-input | app, test | shared | delete, read, write | 21 | unclassified | unassigned | unassigned |
+| TWILIO_TEST_ACCOUNT_SID | env-example, test-input | local-tooling, test | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| TWILIO_TEST_AUTH_TOKEN | env-example, test-input | local-tooling, test | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
+| TWILIO_TRUSTHUB_SECONDARY_POLICY_SID | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
+| TWILIO_VALIDATE_WEBHOOKS | env-example, script-input, test-input | local-tooling, script, test | local, shared | declaration, read, write | 5 | unclassified | unassigned | unassigned |
+| TWO_FACTOR_ENABLED | env-example, runtime-read, test-input | app, local-tooling, test | local, shared | declaration, delete, read, write | 22 | unclassified | unassigned | unassigned |
 | TZ | test-input | test | shared | write | 20 | unclassified | unassigned | unassigned |
+| URL | shell-environment | script | shared | read | 3 | unclassified | unassigned | unassigned |
 | USERPROFILE | script-input | script | shared | read | 1 | unclassified | unassigned | unassigned |
 | V2 | railway-variable | railway | production | deployment | 1 | unclassified | unassigned | unassigned |
 | V3 | railway-variable | railway | dev, production, qa | deployment | 3 | unclassified | unassigned | unassigned |
 | VERIFICATION_PHONE_NUMBER | env-example, script-input | local-tooling, script | local, shared | declaration, read | 2 | unclassified | unassigned | unassigned |
 | VITE_DEV_HOST | env-example | local-tooling | local | declaration | 1 | unclassified | unassigned | unassigned |
 | VITEST | runtime-read | app | shared | write | 3 | unclassified | unassigned | unassigned |
+| WORKER_COPY_VARS | shell-environment | script | shared | read | 1 | unclassified | unassigned | unassigned |
+| WORKER_ID | shell-environment | script | shared | read | 2 | unclassified | unassigned | unassigned |
+| WORKER_SERVICE_ID | shell-environment | script | shared | read | 4 | unclassified | unassigned | unassigned |
+| WORKSPACE_ID | make-variable | script | shared | read | 1 | unclassified | unassigned | unassigned |

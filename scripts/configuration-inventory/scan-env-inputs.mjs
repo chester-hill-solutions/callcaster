@@ -37,6 +37,7 @@ function consumerFor(sourceFile) {
   if (sourceFile.startsWith("worker/")) return "worker";
   if (sourceFile.startsWith("services/")) return "media-stream";
   if (sourceFile.startsWith("test/")) return "test";
+  if (/^Dockerfile(?:\.|$)/.test(path.basename(sourceFile))) return "container";
   return "app";
 }
 
@@ -48,12 +49,13 @@ function environmentFor(sourceFile) {
 }
 
 function sourceKindForRead(sourceFile) {
+  if (/^Dockerfile(?:\.|$)/.test(path.basename(sourceFile))) return "container-env-read";
   if (sourceFile.startsWith("test/")) return "test-input";
   if (sourceFile.startsWith("scripts/") || sourceFile.startsWith("e2e/")) return "script-input";
   return "runtime-read";
 }
 
-function entry({ key = null, sourceKind, sourceFile, line, consumer, usage = "read", notes }) {
+function entry({ key = null, sourceKind, sourceFile, line, consumer, usage = "read", enabled = true, expression, service, notes }) {
   return {
     key,
     sourceKind,
@@ -62,6 +64,9 @@ function entry({ key = null, sourceKind, sourceFile, line, consumer, usage = "re
     consumer,
     environment: environmentFor(sourceFile),
     usage,
+    enabled,
+    ...(expression ? { expression } : {}),
+    ...(service ? { service } : {}),
     requiredness: "unknown",
     valueRedacted: true,
     classification: "unclassified",
@@ -167,7 +172,23 @@ export function scanSourceText(text, sourceFile) {
         sourceFile,
         line: lineNumberAt(text, match.index),
         consumer,
+        expression: `process.env[${match[1]}]`,
         notes: `Dynamic key expression: ${match[1]}. Manual key review is required.`,
+      }));
+    }
+  }
+
+  if (sourceFile.startsWith("scripts/") || sourceFile.startsWith("e2e/")) {
+    for (const match of text.matchAll(/(?:process\.argv|args|argv|flagValue|argValue)[^\n]{0,100}?["'](--[a-z][a-z0-9-]*)["']/g)) {
+      add(entry({
+        key: match[1],
+        sourceKind: "cli-flag",
+        sourceFile,
+        line: lineNumberAt(text, match.index),
+        consumer: "script",
+        usage: "declaration",
+        expression: match[1],
+        notes: "Command-line option declared by a script.",
       }));
     }
   }
@@ -206,15 +227,16 @@ export function scanSourceText(text, sourceFile) {
 
   if (sourceFile === ".env.example") {
     for (const [index, line] of text.split("\n").entries()) {
-      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*=/);
+      const match = line.match(/^\s*(#\s*)?([A-Z][A-Z0-9_]*)\s*=/);
       if (match) {
         add(entry({
-          key: match[1],
+          key: match[2],
           sourceKind: "env-example",
           sourceFile,
           line: index + 1,
           consumer: "local-tooling",
           usage: "declaration",
+          enabled: !match[1],
           notes: "Key name collected; example value was not collected.",
         }));
       }
@@ -222,6 +244,7 @@ export function scanSourceText(text, sourceFile) {
   }
 
   if (sourceFile.startsWith(".railway/")) {
+    const railwayServiceFor = (index) => text.slice(0, index).match(/const\s+(app|worker|database)Variables\s*=\s*\[[\s\S]*$/)?.[1];
     for (const match of text.matchAll(/['"]([A-Z][A-Z0-9_]*)['"]/g)) {
       add(entry({
         key: match[1],
@@ -230,8 +253,54 @@ export function scanSourceText(text, sourceFile) {
         line: lineNumberAt(text, match.index),
         consumer,
         usage: "deployment",
+        service: railwayServiceFor(match.index),
         notes: "Railway variable name collected; value is preserved and not read.",
       }));
+    }
+    for (const [index, line] of text.split("\n").entries()) {
+      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*:/);
+      if (match) add(entry({
+        key: match[1],
+        sourceKind: "railway-variable",
+        sourceFile,
+        line: index + 1,
+        consumer,
+        usage: "deployment",
+        notes: "Railway environment declaration; value was not collected.",
+      }));
+    }
+  }
+
+  if (/^Dockerfile(?:\.|$)/.test(path.basename(sourceFile))) {
+    for (const match of text.matchAll(/^\s*ENV\s+([A-Z][A-Z0-9_]*)\s*(?:=|\s)/gm)) {
+      add(entry({ key: match[1], sourceKind: "container-env", sourceFile, line: lineNumberAt(text, match.index), consumer: "container", usage: "deployment" }));
+    }
+  }
+
+  if (/^(?:docker-compose|compose).*\.(?:ya?ml)$/.test(path.basename(sourceFile))) {
+    let environmentIndent = null;
+    for (const [index, line] of text.split("\n").entries()) {
+      const indent = line.match(/^\s*/)[0].length;
+      if (/^\s*environment:\s*$/.test(line)) {
+        environmentIndent = indent;
+        continue;
+      }
+      if (environmentIndent !== null && line.trim() && indent <= environmentIndent) environmentIndent = null;
+      if (environmentIndent === null) continue;
+      const block = line.match(/^\s*(?:-\s*)?([A-Z][A-Z0-9_]*)\s*(?::|=)/);
+      if (block) add(entry({ key: block[1], sourceKind: "compose-environment", sourceFile, line: index + 1, consumer: "local-compose", usage: "deployment" }));
+    }
+  }
+
+  if (sourceFile === "Makefile" || sourceFile.endsWith(".mk")) {
+    for (const match of text.matchAll(/\$\(([A-Z][A-Z0-9_]*)\)|\$\{([A-Z][A-Z0-9_]*)\}/g)) {
+      add(entry({ key: match[1] ?? match[2], sourceKind: "make-variable", sourceFile, line: lineNumberAt(text, match.index), consumer: "script", usage: "read" }));
+    }
+  }
+
+  if (/\.sh$/.test(sourceFile)) {
+    for (const match of text.matchAll(/(?:export\s+|\$\{?)([A-Z][A-Z0-9_]*)(?:\}?\s*=|\}?\b)/g)) {
+      add(entry({ key: match[1], sourceKind: "shell-environment", sourceFile, line: lineNumberAt(text, match.index), consumer: "script", usage: "read" }));
     }
   }
 
@@ -246,6 +315,9 @@ export function scanSourceText(text, sourceFile) {
         usage: "deployment",
         notes: "GitHub secret name collected; secret value was not accessed.",
       }));
+    }
+    for (const match of text.matchAll(/(?:vars|github\.repository_owner)\.([A-Z][A-Z0-9_]*)/g)) {
+      add(entry({ key: match[1], sourceKind: "github-variable", sourceFile, line: lineNumberAt(text, match.index), consumer, usage: "declaration", notes: "GitHub variable name collected; value was not accessed." }));
     }
 
     let envIndent = null;
@@ -306,6 +378,11 @@ export async function collectSourceFiles(root) {
       if (error?.code !== "ENOENT") throw error;
     }
   }
+  for (const name of await readdir(root)) {
+    if (/^(?:docker-compose|compose).*\.(?:ya?ml)$/.test(name) || /^railway.*\.(?:toml|json)$/.test(name)) {
+      files.push(name);
+    }
+  }
   return [...new Set(files)].sort();
 }
 
@@ -357,8 +434,8 @@ export function summarizeInventory(records) {
   }));
 }
 
-export async function writeInventory(root, records) {
-  const outputDir = path.join(root, "docs/generated");
+export async function writeInventory(root, records, outputRoot = path.join(root, "docs/generated")) {
+  const outputDir = outputRoot.endsWith("docs/generated") ? outputRoot : path.join(outputRoot, "docs/generated");
   await mkdir(outputDir, { recursive: true });
   const redacted = records.map(redactRecord);
   const summaries = summarizeInventory(redacted);
@@ -399,11 +476,23 @@ export async function writeInventory(root, records) {
     ...summaries.map((r) => `| ${r.key} | ${r.sourceKinds.join(", ")} | ${r.consumers.join(", ")} | ${r.environments.join(", ")} | ${r.usages.join(", ")} | ${r.sourceCount} | ${r.classification} | ${r.owner} | ${r.migrationTarget} |`),
   ];
   await writeFile(path.join(outputDir, "configuration-key-summary.md"), `${summaryLines.join("\n")}\n`);
+  const dynamic = redacted.filter((record) => record.sourceKind === "dynamic-runtime-read" || record.sourceKind === "dynamic-test-read");
+  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.json"), `${JSON.stringify({ version: 1, generatedBy: "tools:config:inventory", reads: dynamic.map((record) => ({ sourceFile: record.sourceFile, line: record.line, consumer: record.consumer, sourceKind: record.sourceKind, expression: record.expression ?? record.notes, status: "needs-review" })) }, null, 2)}\n`);
+  const dynamicLines = [
+    "# Dynamic environment read review",
+    "",
+    "> Generated by `npm run tools:config:inventory`. Each row requires manual review.",
+    "",
+    "| Source | Line | Consumer | Kind | Expression | Status |",
+    "|---|---:|---|---|---|---|",
+    ...dynamic.map((record) => `| \`${record.sourceFile}\` | ${record.line} | ${record.consumer} | ${record.sourceKind} | ${(record.expression ?? record.notes ?? "").replaceAll("|", "\\|")} | needs-review |`),
+  ];
+  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.md"), `${dynamicLines.join("\n")}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
   const records = await scanRepository(root);
   await writeInventory(root, records);
-  console.log(`Configuration inventory: ${records.length} records, ${new Set(records.filter((r) => r.key).map((r) => r.key)).size} keys, ${records.filter((r) => !r.key).length} dynamic reads`);
+  console.log(`Configuration inventory: ${records.length} records, ${new Set(records.filter((r) => r.key).map((r) => r.key)).size} keys, ${records.filter((r) => r.sourceKind === "dynamic-runtime-read" || r.sourceKind === "dynamic-test-read").length} dynamic reads`);
 }

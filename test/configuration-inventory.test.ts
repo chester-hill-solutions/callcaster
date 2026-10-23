@@ -20,6 +20,7 @@ describe("configuration input inventory", () => {
         key: null,
         sourceKind: "dynamic-runtime-read",
         line: 3,
+        expression: "process.env[name]",
       }),
     ]));
     expect(JSON.stringify(records)).not.toContain("NOT_SCANNED_DYNAMIC");
@@ -42,8 +43,9 @@ describe("configuration input inventory", () => {
     expect(scanSourceText('dotenv.config({ path: ".env.local" });', "scripts/local/dev.mjs")).toEqual([
       expect.objectContaining({ sourceKind: "dotenv-load", sourceFile: "scripts/local/dev.mjs" }),
     ]);
-    expect(scanSourceText("DATABASE_URL=postgres://user:password@example/db", ".env.example")).toEqual([
+    expect(scanSourceText("DATABASE_URL=postgres://user:password@example/db\n# OPTIONAL_KEY=do-not-copy", ".env.example")).toEqual([
       expect.objectContaining({ key: "DATABASE_URL", sourceKind: "env-example", valueRedacted: true }),
+      expect.objectContaining({ key: "OPTIONAL_KEY", sourceKind: "env-example", enabled: false }),
     ]);
     expect(scanSourceText('const vars = ["DATABASE_URL"];\npreservedVariables(vars);', ".railway/environments/dev.ts")).toEqual([
       expect.objectContaining({ key: "DATABASE_URL", sourceKind: "railway-variable" }),
@@ -77,6 +79,28 @@ describe("configuration input inventory", () => {
       expect.objectContaining({ key: "DATABASE_URL", sourceKind: "github-workflow-env", usage: "declaration" }),
     ]));
     expect(records.some((record) => record.sourceKind === "runtime-read")).toBe(false);
+    expect(scanSourceText("value: ${{ vars.PUBLIC_URL }}", ".github/workflows/ci.yml")).toEqual([
+      expect.objectContaining({ key: "PUBLIC_URL", sourceKind: "github-variable" }),
+    ]);
+  });
+
+  test("collects deployment and script declarations without values", () => {
+    expect(scanSourceText("ENV PORT=3000\nENV HOST 0.0.0.0", "Dockerfile")).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "PORT", sourceKind: "container-env", usage: "deployment" }),
+      expect.objectContaining({ key: "HOST", sourceKind: "container-env", usage: "deployment" }),
+    ]));
+    expect(scanSourceText("environment:\n  POSTGRES_PASSWORD: secret", "docker-compose.dev.yml")).toEqual([
+      expect.objectContaining({ key: "POSTGRES_PASSWORD", sourceKind: "compose-environment" }),
+    ]);
+    expect(scanSourceText("echo $(WORKSPACE_ID)", "Makefile")).toEqual([
+      expect.objectContaining({ key: "WORKSPACE_ID", sourceKind: "make-variable" }),
+    ]);
+    expect(scanSourceText('const flag = args.includes("--workspace");', "scripts/tool.mjs")).toEqual([
+      expect.objectContaining({ key: "--workspace", sourceKind: "cli-flag" }),
+    ]);
+    expect(scanSourceText("UPPERCASE: value\nenvironment:\n  POSTGRES_DB: db\nnext: value", "docker-compose.dev.yml")).toEqual([
+      expect.objectContaining({ key: "POSTGRES_DB", sourceKind: "compose-environment" }),
+    ]);
   });
 
   test("summarizes sources without values", () => {
