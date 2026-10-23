@@ -21,7 +21,13 @@ export function workspaceMemberId(workspaceId: string, userId: string): string {
 
 /**
  * Map invite / product role strings onto CHS `role_id`.
- * Policy: `field_director` → `admin` (wave1-membership-migration §3).
+ *
+ * The legacy `field_director` → `admin` mapping (wave1-membership-migration §3)
+ * belonged to the one-off Supabase backfill and is applied there, in
+ * scripts/schema-transform/11-chs-membership-backfill.sql. It is deliberately
+ * NOT mapped here: this is the live membership write path, and resolving an
+ * unknown string to a privileged role let an unvalidated request role become
+ * `admin`.
  */
 export function memberRoleToRoleId(role: string): ProductRoleId {
   switch (role) {
@@ -33,8 +39,6 @@ export function memberRoleToRoleId(role: string): ProductRoleId {
       return "member";
     case "caller":
       return "caller";
-    case "field_director":
-      return "admin";
     default: {
       if (isProductRoleId(role)) {
         return role;

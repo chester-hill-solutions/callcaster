@@ -3,7 +3,7 @@ export { loader } from "./archive.loader.server";
 import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useFetcher, Link } from "react-router";
 
 import { Campaign } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
+import { CampaignStatusBadge } from "@/components/campaign/CampaignStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
@@ -57,19 +57,6 @@ function RestoreCampaignButton({
     </div>
   );
 }
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const badgeStyles: Record<string, string> = {
-    archived: "bg-muted text-muted-foreground",
-    complete: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200",
-  };
-
-  return (
-    <Badge className={`text-xxs mx-2 ${badgeStyles[status] || ""}`}>
-      {status ? status.charAt(0).toUpperCase() + status.slice(1) : "Archived"}
-    </Badge>
-  );
-};
 
 export default function ArchivedCampaigns() {
   const { archivedCampaigns } = useLoaderData();
@@ -145,7 +132,7 @@ export default function ArchivedCampaigns() {
                   <p className="line-clamp-2 font-medium">
                     {campaign.title || `Unnamed Campaign ${campaign.id}`}
                   </p>
-                  <StatusBadge status={campaign.status || "archived"} />
+                  <CampaignStatusBadge status={campaign.status || "archived"} />
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span>

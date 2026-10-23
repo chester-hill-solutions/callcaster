@@ -1,5 +1,4 @@
-import { Resend } from "resend";
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, isNotNull } from "drizzle-orm";
 import {
   workspace_number as workspaceNumberTable,
   workspace as workspaceTable,
@@ -9,7 +8,8 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { escapeHtml } from "@/lib/email-html";
+import { renderBrandedEmail, type BrandedEmailFact, type BrandedEmailTone } from "@/lib/email-layout.server";
+import { sendTransactionalEmail } from "@/lib/transactional-email.server";
 import { notifyOps } from "@/lib/ops-alert.server";
 import {
   rentalActionForUnpaidCycles,
@@ -117,30 +117,72 @@ function buildReminderEmail(args: {
   dueDate: Date;
   workspaceId: string;
   workspaceName: string;
+  /** The workspace's balance at send time, or null when it could not be read. */
+  credits: number | null;
 }) {
   const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
+  const settingsUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/settings`;
   const dueDateLabel = formatDueDate(args.dueDate);
-  const workspaceNameHtml = escapeHtml(args.workspaceName);
+  const cost = NUMBER_RENTAL_MONTHLY_CREDITS;
+
+  // The reminder used to announce the renewal and say the workspace "needs
+  // enough credits" without ever saying whether it HAD them — the balance was
+  // one call away and is the only question the reader actually has. Say the
+  // position, and say what happens if it goes unpaid, rather than leaving that
+  // to the warning email that only arrives once it is too late.
+  const facts: BrandedEmailFact[] = [
+    { label: "Number", value: args.phoneNumberLabel },
+    { label: "Renews", value: `${dueDateLabel} · in ${args.daysUntilDue} days` },
+    { label: "Cost", value: `${cost} credits` },
+  ];
+
+  const balance =
+    typeof args.credits === "number" && Number.isFinite(args.credits)
+      ? args.credits
+      : null;
+
+  let note: { text: string; tone: BrandedEmailTone };
+  let shortfall = 0;
+  if (balance === null) {
+    note = {
+      text: `We could not read your balance just now. This workspace needs ${cost} credits on ${dueDateLabel} to renew without interruption.`,
+      tone: "default",
+    };
+  } else {
+    const remaining = balance - cost;
+    shortfall = remaining < 0 ? -remaining : 0;
+    facts.push({ label: "Your balance", value: `${balance} credits` });
+    facts.push({
+      label: remaining >= 0 ? "After renewal" : "Short by",
+      value: remaining >= 0 ? `${remaining} credits` : `${shortfall} credits`,
+      tone: remaining >= 0 ? "good" : "warn",
+    });
+    note =
+      remaining >= 0
+        ? { text: "You are covered — no action is needed.", tone: "good" }
+        : {
+            text: `Add ${shortfall} credits before ${dueDateLabel} to keep ${args.phoneNumberLabel}. An unpaid renewal suspends the number for outbound use, and then releases it.`,
+            tone: "warn",
+          };
+  }
+
+  const { html, text } = renderBrandedEmail({
+    heading: `${args.workspaceName} number rental renews soon`,
+    intro: `The rental for ${args.phoneNumberLabel} renews on ${dueDateLabel}, in ${args.daysUntilDue} days.`,
+    facts,
+    note,
+    cta: { label: "Review billing", url: billingUrl },
+    footerLink: { label: "Notification settings", url: settingsUrl },
+  });
+
   return {
-    subject: `Your ${args.workspaceName} number rental renews in ${args.daysUntilDue} days`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your ${workspaceNameHtml} number rental renews soon</h2>
-        <p>The rental for <strong>${args.phoneNumberLabel}</strong> renews in
-        <strong>${args.daysUntilDue} days</strong>, on <strong>${dueDateLabel}</strong>, for
-        ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.</p>
-        <p>Your workspace, <strong>${workspaceNameHtml}</strong>, needs enough credits to avoid an unpaid renewal.</p>
-        <p><a href="${billingUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Review billing</a></p>
-      </div>
-    `,
-    text: `
-      Your ${args.workspaceName} number rental renews soon
-
-      The rental for ${args.phoneNumberLabel} renews in ${args.daysUntilDue} days, on ${dueDateLabel}, for ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.
-      Your workspace, ${args.workspaceName}, needs enough credits to avoid an unpaid renewal.
-
-      Review billing: ${billingUrl}
-    `,
+    // A shortfall is the actionable case, so it leads the subject line.
+    subject:
+      shortfall > 0
+        ? `${args.workspaceName}: ${shortfall} more credits needed to renew ${args.phoneNumberLabel}`
+        : `Your ${args.workspaceName} number rental renews in ${args.daysUntilDue} days`,
+    html,
+    text,
   };
 }
 
@@ -151,16 +193,11 @@ async function sendNumberRentalReminderEmail(args: {
   daysUntilDue: number;
   dueDate: Date;
   workspaceName: string;
-}): Promise<void> {
-  const resend = new Resend(env.RESEND_API_KEY());
-  const { subject, html, text } = buildReminderEmail(args);
-  await resend.emails.send({
-    from: "Callcaster <info@callcaster.ca>",
-    to: args.recipients,
-    subject,
-    html,
-    text,
-  });
+}): Promise<boolean> {
+  if (args.recipients.length === 0) return false;
+  const credits = await getWorkspaceCreditsBalance(args.workspaceId);
+  const { subject, html, text } = buildReminderEmail({ ...args, credits });
+  return sendTransactionalEmail({ to: args.recipients, subject, html, text });
 }
 
 /**
@@ -322,13 +359,15 @@ async function sendRentalLifecycleEmail(args: {
   }[args.action as "warn" | "suspend" | "release"];
   if (!copy) return;
 
-  const resend = new Resend(env.RESEND_API_KEY());
-  await resend.emails.send({
-    from: "Callcaster <info@callcaster.ca>",
+  const { html, text } = renderBrandedEmail({
+    heading: copy.subject,
+    intro: copy.body,
+  });
+  await sendTransactionalEmail({
     to: args.recipients,
     subject: copy.subject,
-    html: `<p>${escapeHtml(copy.body)}</p>`,
-    text: copy.body,
+    html,
+    text,
   });
 }
 
@@ -560,10 +599,17 @@ export async function runNumberRentalBilling(args: {
     workspaceId,
   );
 
+  // A `rented` row with no provider SID is a record, not a rental: it was
+  // never provisioned, or its release was skipped because there was nothing to
+  // release (release is deliberately skipped without a SID, so the row stays).
+  // Everything below this line derives from the selection - the reminder AND
+  // the charge - so an unfiltered row both announced a renewal that was not
+  // happening and billed a number the workspace does not have (#2931).
   const numbers = await tdb.workspace_number.findMany({
     where: and(
       eq(workspaceNumberTable.type, "rented"),
       gte(workspaceNumberTable.created_at, ROLLOUT_CUTOFF_DATE),
+      isNotNull(workspaceNumberTable.twilio_phone_number_sid),
     ),
   });
 
@@ -595,7 +641,7 @@ export async function runNumberRentalBilling(args: {
               workspaceId: number.workspace,
             });
           } else {
-            await sendNumberRentalReminderEmail({
+            const delivered = await sendNumberRentalReminderEmail({
               workspaceId: number.workspace,
               workspaceName,
               recipients,
@@ -603,7 +649,11 @@ export async function runNumberRentalBilling(args: {
               daysUntilDue,
               dueDate: nextDue,
             });
-            remindersSent++;
+            // Counted with expressions, not an if/else: a block here would be
+            // a sixth nesting level inside the sweep and trip the max-depth
+            // ratchet.
+            remindersSent += delivered ? 1 : 0;
+            remindersFailed += delivered ? 0 : 1;
           }
         } catch (error) {
           remindersFailed++;

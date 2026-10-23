@@ -115,6 +115,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
@@ -144,6 +145,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
@@ -197,6 +199,41 @@ describe("twilio-handler", () => {
     expect(sttMocks.openElevenLabsRealtimeStream).not.toHaveBeenCalled();
   });
 
+  // #2889: the #1514 check above only refused a *mismatch*. A frame that named
+  // no call at all was allowed, and the token's own SID was not required, so a
+  // start frame could pick the row key freely.
+  test("rejects a start frame that names no call (#2889)", async () => {
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const close = vi.fn();
+    const ws = {
+      data: {
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        userId: "user-1",
+        sessionId: "session-1",
+        callSid: "CA_token",
+        exp: Math.floor(Date.now() / 1000) + 60,
+        requestId: "req-1",
+      },
+      close,
+    } as unknown as import("bun").ServerWebSocket<MediaStreamSocketData>;
+
+    await handleTwilioStreamMessage(ws, {
+      event: "start",
+      streamSid: "MZstream",
+      start: {
+        streamSid: "MZstream",
+        accountSid: "AC123",
+        tracks: ["inbound"],
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+        customParameters: { direction: "outbound" },
+      },
+    });
+
+    expect(close).toHaveBeenCalledWith(1008, "call_sid_mismatch");
+    expect(sttMocks.openElevenLabsRealtimeStream).not.toHaveBeenCalled();
+  });
+
   test("accepts a start frame whose callSid matches the token (#1514)", async () => {
     const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
     const close = vi.fn();
@@ -237,6 +274,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
@@ -279,6 +317,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
@@ -342,6 +381,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
@@ -394,6 +434,9 @@ describe("twilio-handler", () => {
         filler_count: 1,
         is_final: true,
       }),
+      // The writer is told which workspace owns the call, so the unscoped
+      // insert can never land on another tenant's call SID.
+      "ws-1",
     );
     expect(dbWriterMocks.publishTranscriptSegmentEvent).toHaveBeenCalledWith(
       "ws-1",
@@ -409,6 +452,7 @@ describe("twilio-handler", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     });
