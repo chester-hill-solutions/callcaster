@@ -15,6 +15,8 @@ const generatedFiles = [
   "configuration-key-summary.md",
   "configuration-dynamic-read-review.json",
   "configuration-dynamic-read-review.md",
+  "test-configuration-inputs.json",
+  "test-configuration-inputs.md",
   "operational-inputs.json",
   "operational-inputs.md",
 ];

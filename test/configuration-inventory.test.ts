@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { scanSourceText, summarizeInventory, normalizeRailwayServiceName } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
+import { scanSourceText, summarizeInventory, normalizeRailwayServiceName, writeInventory } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
 
 describe("configuration input inventory", () => {
   test("finds literal runtime reads without collecting values", () => {
@@ -125,9 +125,58 @@ describe("configuration input inventory", () => {
   });
 
   test("keeps CLI flags out of the environment-key catalog", () => {
-    const records = scanSourceText('args.includes("--check");\nprocess.env.BASE_URL;', "scripts/tool.mjs");
+    const records = [
+      ...scanSourceText('args.includes("--check");\nprocess.env.BASE_URL;', "scripts/tool.mjs"),
+      ...scanSourceText("make $(WORKSPACE_ID)", "Makefile"),
+    ];
     expect(summarizeInventory(records).map((record) => record.key)).toEqual(["BASE_URL"]);
-    expect(records).toEqual(expect.arrayContaining([expect.objectContaining({ key: "--check", sourceKind: "cli-flag" })]));
+    expect(records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "--check", sourceKind: "cli-flag" }),
+      expect.objectContaining({ key: "WORKSPACE_ID", sourceKind: "make-variable" }),
+    ]));
+  });
+
+  test("keeps test-only inputs out of the main catalog and preserves shared runtime keys", () => {
+    const records = [
+      ...scanSourceText("process.env.SHARED_KEY;", "app/example.ts"),
+      ...scanSourceText("process.env.SHARED_KEY;\nprocess.env.TEST_ONLY;\nconst key = process.env[name];", "test/example.test.ts"),
+    ];
+
+    const main = records.filter((record) => !["test-input", "dynamic-test-read"].includes(record.sourceKind));
+    expect(summarizeInventory(main).map((record) => record.key)).toContain("SHARED_KEY");
+    expect(summarizeInventory(main).map((record) => record.key)).not.toContain("TEST_ONLY");
+    expect(records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "TEST_ONLY", sourceKind: "test-input" }),
+      expect.objectContaining({ sourceKind: "dynamic-test-read" }),
+    ]));
+  });
+
+  test("writes separate test and operational reports", async () => {
+    const root = resolve(".");
+    const outputRoot = resolve("/tmp/opencode/configuration-inventory-test-output");
+    const records = [
+      ...scanSourceText("process.env.RUNTIME_KEY;", "app/example.ts"),
+      ...scanSourceText("process.env.RUNTIME_KEY;\nprocess.env.TEST_KEY;", "test/example.test.ts"),
+      ...scanSourceText('args.includes("--check");', "scripts/tool.mjs"),
+      ...scanSourceText("echo $(MAKE_KEY)", "Makefile"),
+    ];
+    await writeInventory(root, records, outputRoot);
+    const runtimeReport = JSON.parse(readFileSync(resolve(outputRoot, "docs/generated/configuration-inventory.json"), "utf8"));
+    const testReport = JSON.parse(readFileSync(resolve(outputRoot, "docs/generated/test-configuration-inputs.json"), "utf8"));
+    const operationalReport = JSON.parse(readFileSync(resolve(outputRoot, "docs/generated/operational-inputs.json"), "utf8"));
+    const testMarkdown = readFileSync(resolve(outputRoot, "docs/generated/test-configuration-inputs.md"), "utf8");
+    expect(runtimeReport.entries.map((entry: { key: string }) => entry.key)).toContain("RUNTIME_KEY");
+    expect(runtimeReport.entries.map((entry: { key: string }) => entry.key)).not.toContain("TEST_KEY");
+    expect(testReport.entries).toEqual(expect.arrayContaining([expect.objectContaining({ key: "TEST_KEY" })]));
+    expect(testReport.entries).toEqual(expect.arrayContaining([expect.objectContaining({ key: "RUNTIME_KEY" })]));
+    expect(testReport.generatedBy).toBe("tools:config:test-source-input-observations");
+    expect(testReport.report).toBe("test-source-input-observations");
+    expect(testReport.description).toContain("may also be listed in the runtime catalog");
+    expect(testMarkdown).toContain("# Test-source configuration input observations");
+    expect(testMarkdown).toContain("observations from test source files");
+    expect(testMarkdown).toContain("may also be listed in the runtime catalog");
+    expect(operationalReport.entries.map((entry: { key: string }) => entry.key)).toEqual(expect.arrayContaining(["--check", "MAKE_KEY"]));
+    expect(testReport.provenance).toEqual(operationalReport.provenance);
   });
 
   test("assigns Railway variables to the exact service", () => {
@@ -168,6 +217,7 @@ service("PostgreSQL 18", { env: preservedVariables(databaseVariables) });`, ".ra
       "configuration-inventory.json",
       "configuration-key-summary.json",
       "configuration-dynamic-read-review.json",
+      "test-configuration-inputs.json",
       "operational-inputs.json",
     ];
     const provenance = reports.map((report) => JSON.parse(readFileSync(resolve("docs/generated", report), "utf8")).provenance);
