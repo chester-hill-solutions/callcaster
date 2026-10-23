@@ -109,7 +109,28 @@ jobs:
       - name: Ledger drift check (dev)
         # --require-db forces a hard failure if DATABASE_URL isn't set;
         # otherwise the script exits 0 with a warning and nothing gates.
-        run: node scripts/db/check-migration-ledger.mjs --require-db
+        run: |
+          # A push lands the migration file and the Railway deploy applies it
+          # minutes later, so checking immediately reports a drift that is only
+          # a deploy in flight. Measured on this repo, every failure was 3-7
+          # minutes BEFORE the migration was applied:
+          #   2026-10-22  guard 23:42:35  applied 23:46:55
+          #   2026-10-19  guard 04:15:27  applied 04:18:45
+          #   2026-10-08  guard 01:53:29  applied 02:00:56
+          #   2026-10-07  guard 17:49:19  applied 17:56:14
+          # Four failures, four migrations, the same gap each time. So wait for
+          # the deploy instead of reporting a false red. A migration that is
+          # genuinely never applied still fails, ten minutes later, and the
+          # nightly run has nothing in flight and is unaffected.
+          deadline=$(( $(date +%s) + 600 ))
+          until node scripts/db/check-migration-ledger.mjs --require-db; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error title=Ledger still drifting::no match 10 minutes after the push - the deploy did not apply a migration."
+              exit 1
+            fi
+            echo "Ledger not matching yet; waiting 60s for the deploy to apply migrations..."
+            sleep 60
+          done
       - name: Schema drift check (dev)
         # Object-level counterpart: the ledger can be complete while a required
         # table, column, enum value or function is absent (#1886).
@@ -140,7 +161,28 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Ledger drift check (QA)
-        run: node scripts/db/check-migration-ledger.mjs --require-db
+        run: |
+          # A push lands the migration file and the Railway deploy applies it
+          # minutes later, so checking immediately reports a drift that is only
+          # a deploy in flight. Measured on this repo, every failure was 3-7
+          # minutes BEFORE the migration was applied:
+          #   2026-10-22  guard 23:42:35  applied 23:46:55
+          #   2026-10-19  guard 04:15:27  applied 04:18:45
+          #   2026-10-08  guard 01:53:29  applied 02:00:56
+          #   2026-10-07  guard 17:49:19  applied 17:56:14
+          # Four failures, four migrations, the same gap each time. So wait for
+          # the deploy instead of reporting a false red. A migration that is
+          # genuinely never applied still fails, ten minutes later, and the
+          # nightly run has nothing in flight and is unaffected.
+          deadline=$(( $(date +%s) + 600 ))
+          until node scripts/db/check-migration-ledger.mjs --require-db; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error title=Ledger still drifting::no match 10 minutes after the push - the deploy did not apply a migration."
+              exit 1
+            fi
+            echo "Ledger not matching yet; waiting 60s for the deploy to apply migrations..."
+            sleep 60
+          done
       - name: Schema drift check (QA)
         run: node scripts/db/check-schema-drift.mjs --require-db
 
@@ -169,6 +211,27 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Ledger drift check (production)
-        run: node scripts/db/check-migration-ledger.mjs --require-db
+        run: |
+          # A push lands the migration file and the Railway deploy applies it
+          # minutes later, so checking immediately reports a drift that is only
+          # a deploy in flight. Measured on this repo, every failure was 3-7
+          # minutes BEFORE the migration was applied:
+          #   2026-10-22  guard 23:42:35  applied 23:46:55
+          #   2026-10-19  guard 04:15:27  applied 04:18:45
+          #   2026-10-08  guard 01:53:29  applied 02:00:56
+          #   2026-10-07  guard 17:49:19  applied 17:56:14
+          # Four failures, four migrations, the same gap each time. So wait for
+          # the deploy instead of reporting a false red. A migration that is
+          # genuinely never applied still fails, ten minutes later, and the
+          # nightly run has nothing in flight and is unaffected.
+          deadline=$(( $(date +%s) + 600 ))
+          until node scripts/db/check-migration-ledger.mjs --require-db; do
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error title=Ledger still drifting::no match 10 minutes after the push - the deploy did not apply a migration."
+              exit 1
+            fi
+            echo "Ledger not matching yet; waiting 60s for the deploy to apply migrations..."
+            sleep 60
+          done
       - name: Schema drift check (production)
         run: node scripts/db/check-schema-drift.mjs --require-db
