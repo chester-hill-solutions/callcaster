@@ -218,6 +218,38 @@ describe("WorkspaceSettingUtils", () => {
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: null });
   });
 
+  test("handleUpdateUser refuses a role outside the workspace role vocabulary", async () => {
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
+    const headers = new Headers();
+
+    // The legacy `field_director` alias used to reach the membership write
+    // unvalidated, where memberRoleToRoleId mapped it to `admin`.
+    const fd = new FormData();
+    fd.set("user_id", "u1");
+    fd.set("updated_workspace_role", "field_director");
+
+    const res = await asRouteResponse(mod.handleUpdateUser(fd, "w1", headers, "u1"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ data: null, error: "Invalid workspace role" });
+    expect(membersDbMocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
+  });
+
+  test("handleUpdateUser accepts each role in the workspace role vocabulary", async () => {
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
+    const headers = new Headers();
+
+    for (const role of ["owner", "admin", "member", "caller"]) {
+      const fd = new FormData();
+      fd.set("user_id", "u1");
+      fd.set("updated_workspace_role", role);
+
+      const res = await asRouteResponse(mod.handleUpdateUser(fd, "w1", headers, "u1"));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ data: { id: "u1" }, error: null });
+    }
+    expect(membersDbMocks.updateWorkspaceMemberRole).toHaveBeenCalledTimes(4);
+  });
+
   test("handleTransferWorkspace handles errors for each update and returns json on success", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();

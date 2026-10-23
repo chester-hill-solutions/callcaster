@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 
 const tdbMocks = vi.hoisted(() => ({
   workspace_number: {
@@ -511,6 +513,36 @@ describe("runNumberRentalBilling", () => {
         ),
       }),
     );
+  });
+
+  // #2931: a rented row with no provider SID is a record, not a rental.
+  // The harness replaces the query, so a row-level expectation here would be
+  // tautological - it would assert what the mock returned, not what the code
+  // asked for. The predicate is therefore rendered through Drizzle's own
+  // dialect: remove `isNotNull(...)` and this fails.
+  test("the sweep does not even consider a rented number with no provider SID", async () => {
+    tdbMocks.workspace_number.findMany.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([]);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    const [args] = tdbMocks.workspace_number.findMany.mock.calls.at(-1) as [
+      { where: unknown },
+    ];
+    const query = new PgDialect({
+      casing: { escapeName: (name: string) => `"${name}"` },
+    }).sqlToQuery(args.where as SQL);
+
+    expect(query.sql).toContain('"twilio_phone_number_sid"');
+    expect(query.sql).toContain("is not null");
+    // The rental type and rollout cutoff must remain: this narrows the sweep,
+    // it does not replace what it selects. Drizzle binds values, so the type
+    // is asserted on the params, not in the SQL text.
+    expect(query.sql).toContain('"workspace_number"."type" =');
+    expect(query.params).toContain("rented");
   });
 
   test("a number with no Twilio SID is never released", async () => {

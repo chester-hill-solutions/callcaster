@@ -7,6 +7,15 @@ export type RespondentTokenPayload = {
   survey_id: number;
   workspace: string;
   result_id: string;
+  /**
+   * The contact this session belongs to, or null for an anonymous respondent.
+   *
+   * This is the identity the submission may claim. `?contact=` is a bare
+   * integer on links already in the wild and proves nothing on its own, so the
+   * actions compare any submitted contact against THIS value rather than
+   * trusting the form. Absent on tokens minted before #2868 — read it as null.
+   */
+  contact_id: number | null;
   exp: number;
 };
 
@@ -40,18 +49,23 @@ async function sign(message: string): Promise<ArrayBuffer> {
 export async function createRespondentToken(
   surveyId: number,
   workspace: string,
-  options: { resultId?: string } = {},
+  options: { resultId?: string; contactId?: number | null } = {},
 ): Promise<{ token: string; resultId: string }> {
   // The legacy database uses bigint IDs, which postgres.js returns as strings.
   const numericSurveyId = Number(surveyId);
   if (!Number.isSafeInteger(numericSurveyId) || numericSurveyId <= 0) {
     throw new Error("Invalid survey identity");
   }
+  const contactId = options.contactId ?? null;
+  if (contactId !== null && (!Number.isSafeInteger(contactId) || contactId <= 0)) {
+    throw new Error("Invalid survey contact identity");
+  }
   const resultId = options.resultId ?? randomUUID();
   const payload: RespondentTokenPayload = {
     survey_id: numericSurveyId,
     workspace,
     result_id: resultId,
+    contact_id: contactId,
     exp: Math.floor((Date.now() + TOKEN_TTL_MS) / 1000),
   };
   const header = { alg: "HS256", typ: "JWT" };
@@ -59,6 +73,26 @@ export async function createRespondentToken(
   const signature = await sign(encoded);
   const token = `${encoded}.${Buffer.from(new Uint8Array(signature)).toString("base64url")}`;
   return { token, resultId };
+}
+
+/**
+ * The shape a decoded payload must have before it may be trusted. Extracted so
+ * `verifyRespondentToken` stays a straight line of checks rather than one
+ * branch per field (it was already at the complexity threshold).
+ */
+function isRespondentTokenPayload(value: unknown): value is RespondentTokenPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const payload = value as Partial<RespondentTokenPayload>;
+  const contactId = payload.contact_id ?? null;
+  return (
+    Number.isSafeInteger(payload.survey_id) && (payload.survey_id ?? 0) > 0 &&
+    typeof payload.workspace === "string" && payload.workspace.length > 0 &&
+    typeof payload.result_id === "string" && payload.result_id.length > 0 &&
+    (contactId === null ||
+      (Number.isSafeInteger(contactId) && contactId > 0)) &&
+    Number.isFinite(payload.exp) &&
+    (payload.exp ?? 0) > Math.floor(Date.now() / 1000)
+  );
 }
 
 export async function verifyRespondentToken(
@@ -78,13 +112,8 @@ export async function verifyRespondentToken(
     if (header.alg !== "HS256" || header.typ !== "JWT") {
       return null;
     }
-    const payload = JSON.parse(base64urlDecode(payloadB64)) as RespondentTokenPayload;
-    if (
-      !Number.isSafeInteger(payload.survey_id) || payload.survey_id <= 0 ||
-      typeof payload.workspace !== "string" || !payload.workspace ||
-      typeof payload.result_id !== "string" || !payload.result_id ||
-      !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)
-    ) {
+    const payload: unknown = JSON.parse(base64urlDecode(payloadB64));
+    if (!isRespondentTokenPayload(payload)) {
       return null;
     }
     const signed = `${headerB64}.${payloadB64}`;

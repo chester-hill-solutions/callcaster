@@ -109,6 +109,7 @@ describe("media-stream-service", () => {
       campaignId: "camp-1",
       userId: "user-1",
       sessionId,
+      callSid: "CA-service",
       exp: exp ?? Math.floor(Date.now() / 1000) + 60,
     });
   }

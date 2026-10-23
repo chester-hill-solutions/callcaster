@@ -76,6 +76,26 @@ describe("appendLiveTranscriptionStreamTwiml — flag matrix", () => {
     expect(appendWith({ liveCoaching: true }, { workspaceId: "" }).attached).toBe(false);
     expect(appendWith({ liveCoaching: true }, { userId: "" }).attached).toBe(false);
   });
+
+  // #2889: without a call SID the minted token could not be bound to a call, so
+  // it would authorize writes for a call it never named.
+  test("no <Stream> without a call SID", () => {
+    const { attached, xml } = appendWith({ liveCoaching: true }, { callSid: null });
+    expect(attached).toBe(false);
+    expect(xml).not.toContain("<Stream");
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("no call SID"),
+      expect.objectContaining({
+        guard: "media-stream-callsid-missing",
+        workspaceId: "ws-1",
+        direction: "outbound",
+      }),
+    );
+  });
+
+  test("no <Stream> for a blank call SID", () => {
+    expect(appendWith({ liveCoaching: true }, { callSid: "   " }).attached).toBe(false);
+  });
 });
 
 describe("appendLiveTranscriptionStreamTwiml — missing MEDIA_STREAM_HOST", () => {

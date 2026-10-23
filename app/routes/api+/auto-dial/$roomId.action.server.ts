@@ -104,10 +104,10 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: str
 const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
     const conferenceId = dbCall.conference_id?.toString() ?? '';
     const userId = resolveUserIdFromConferenceName(conferenceId);
-    return await addToConference(conferenceId, dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', userId);
+    return await addToConference(conferenceId, dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', userId, dbCall.sid ?? '');
 };
 
-async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string) {
+async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string, callSid: string) {
     const twiml = createVoiceResponse();
     const workspace = await getWorkspaceById(workspaceId);
     appendLiveTranscriptionStreamTwiml({
@@ -118,6 +118,9 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
             userId,
             direction: "predictive",
             campaignId,
+            // This leg's Call SID. Without it the token cannot be bound to the
+            // call, and the service's writes are keyed by call SID alone.
+            callSid,
             streamName: `conf-${conferenceId}`,
         },
     });

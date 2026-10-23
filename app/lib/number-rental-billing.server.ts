@@ -1,4 +1,4 @@
-import { eq, and, gte } from "drizzle-orm";
+import { eq, and, gte, isNotNull } from "drizzle-orm";
 import {
   workspace_number as workspaceNumberTable,
   workspace as workspaceTable,
@@ -599,10 +599,17 @@ export async function runNumberRentalBilling(args: {
     workspaceId,
   );
 
+  // A `rented` row with no provider SID is a record, not a rental: it was
+  // never provisioned, or its release was skipped because there was nothing to
+  // release (release is deliberately skipped without a SID, so the row stays).
+  // Everything below this line derives from the selection - the reminder AND
+  // the charge - so an unfiltered row both announced a renewal that was not
+  // happening and billed a number the workspace does not have (#2931).
   const numbers = await tdb.workspace_number.findMany({
     where: and(
       eq(workspaceNumberTable.type, "rented"),
       gte(workspaceNumberTable.created_at, ROLLOUT_CUTOFF_DATE),
+      isNotNull(workspaceNumberTable.twilio_phone_number_sid),
     ),
   });
 
