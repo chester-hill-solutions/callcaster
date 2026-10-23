@@ -91,11 +91,9 @@ describe("app/lib/low-credit-notify.server.ts", () => {
         to: ["owner@example.com"],
         subject: "Your Civic Action credits are running low",
         html: expect.stringContaining(
-          "Your workspace, <strong>Civic Action</strong>, balance is <strong>50</strong>",
+          "Your workspace, Civic Action, is below the",
         ),
-        text: expect.stringContaining(
-          "Your workspace, Civic Action, balance is 50",
-        ),
+        text: expect.stringContaining("Balance: 50 credits"),
       }),
     );
     expect(twilioDataMocks.patchWorkspaceTwilioData).toHaveBeenCalledWith(
@@ -132,15 +130,20 @@ describe("app/lib/low-credit-notify.server.ts", () => {
     const mod = await import("../app/lib/low-credit-notify.server");
     await mod.runLowCreditNotify();
 
-    expect(resendMocks.send).toHaveBeenCalledWith(
-      expect.objectContaining({
-        subject: "Your A & <B> credits are running low",
-        html: expect.stringContaining(
-          "Your workspace, <strong>A &amp; &lt;B&gt;</strong>",
-        ),
-        text: expect.stringContaining("Your workspace, A & <B>, balance is 50"),
-      }),
-    );
+    const sent = resendMocks.send.mock.calls[0]?.[0] as {
+      subject: string;
+      html: string;
+      text: string;
+    };
+    expect(sent.subject).toBe("Your A & <B> credits are running low");
+    // The HTML must escape the name everywhere it appears...
+    expect(sent.html).toContain("A &amp; &lt;B&gt;");
+    expect(sent.html).not.toContain("A & <B>");
+    // ...while the plain-text twin stays readable, not entity-escaped. Asserting
+    // the property rather than the surrounding markup: the shell owns the
+    // markup, and this test is about escaping.
+    expect(sent.text).toContain("A & <B>");
+    expect(sent.text).not.toContain("&amp;");
   });
 
   test("skips sending when a low-credit marker is already present", async () => {

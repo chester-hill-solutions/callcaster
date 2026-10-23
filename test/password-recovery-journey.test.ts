@@ -78,7 +78,11 @@ async function issuedLink() {
     typeof mail.text !== "string"
   )
     throw new Error("Reset email missing");
-  const link = mail.text.match(/Reset it here: (\S+)/)?.[1];
+  // The plain-text twin renders the CTA as "<label>: <url>". Match the URL
+  // itself rather than the button wording, so renaming the button does not
+  // break a journey test that has nothing to do with the copy. The reset email
+  // carries no other URL.
+  const link = mail.text.match(/https?:\/\/\S+/)?.[0];
   if (!link) throw new Error("Reset link missing");
   return link;
 }
