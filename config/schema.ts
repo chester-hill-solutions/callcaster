@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resolveSecretPlan, secretServiceNames } from "./secrets";
 import { secretNames } from "./secret-names";
 
 /** Environments supported by the shared project configuration. */
@@ -247,6 +248,18 @@ export const ProjectConfigSchema = z
         }
       } catch {
         // endpoint's own schema issue is the useful error.
+      }
+    }
+
+    for (const service of secretServiceNames) {
+      for (const reference of config.services[service].secrets) {
+        if (!resolveSecretPlan(config.environment, service).allowed.includes(reference.name)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["services", service, "secrets"],
+            message: `secret '${reference.name}' is not allowlisted for service '${service}'`,
+          });
+        }
       }
     }
   });
