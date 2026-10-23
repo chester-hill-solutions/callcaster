@@ -128,7 +128,10 @@ describe("password recovery through the actual issued email and installed Better
     const { loader } =
       await import("../app/routes/reset-password.loader.server");
     const page = await asRouteResponse(loader(routeArgs(new Request(url))));
-    await expect(page.json()).resolves.toEqual({ token: issuedToken });
+    await expect(page.json()).resolves.toEqual({
+      token: issuedToken,
+      error: null,
+    });
     const changed = await submitPassword(url.href);
     await expect(changed.json()).resolves.toEqual({
       success: true,
@@ -187,10 +190,51 @@ describe("password recovery through the actual issued email and installed Better
     expect(destination.pathname).toBe("/reset-password");
     expect(destination.searchParams.get("error")).toBe("INVALID_TOKEN");
     expect(destination.searchParams.has("token")).toBe(false);
+    // The page must say the link is unusable on arrival; it used to render a
+    // normal form that could only fail on submit with the same message (#2075).
+    const { loader } =
+      await import("../app/routes/reset-password.loader.server");
+    const page = await asRouteResponse(
+      loader(routeArgs(new Request(destination.toString()))),
+    );
+    await expect(page.json()).resolves.toEqual({
+      token: null,
+      error: "INVALID_TOKEN",
+    });
     expect(
       (await submitPassword("http://localhost/reset-password?token=invalid"))
         .status,
     ).toBe(400);
+  });
+
+  test("a password below the documented minimum names the password rule, not the link", async () => {
+    const link = await issuedLink();
+    const { loader: callbackLoader } =
+      await import("../app/routes/api+/auth/$.loader.server");
+    const callback = await asRouteResponse(
+      callbackLoader(routeArgs(new Request(link))),
+    );
+    const destination = callback.headers.get("Location");
+    if (!destination) throw new Error("Reset callback did not redirect");
+
+    const { action } =
+      await import("../app/routes/reset-password.action.server");
+    const form = new FormData();
+    form.set("password", "short1");
+    form.set("confirmPassword", "short1");
+    const response = await asRouteResponse(
+      action(routeArgs(new Request(destination, { method: "POST", body: form }))),
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as {
+      error: { message: string } | null;
+    };
+    // The token is valid here; the password is not. Telling the user the link
+    // expired sent them hunting for a new email (#2075).
+    expect(body.error?.message ?? "").not.toContain("invalid or has expired");
+    expect(body.error?.message ?? "").toMatch(/password/i);
+    expect(body.error?.message ?? "").toMatch(/8/);
   });
   test("reset request throttling stops additional email and token creation", async () => {
     for (let i = 0; i < 10; i++)

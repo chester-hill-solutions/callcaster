@@ -7,6 +7,7 @@ import { resolveAuthTrustedOrigins } from "@/lib/auth-trusted-origins.server";
 import { env, isTwoFactorFeatureEnabled } from "@/lib/env.server";
 import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
 import { sendResetPasswordEmail } from "@/lib/send-reset-password-email.server";
+import { MIN_PASSWORD_LENGTH } from "../../shared/auth-policy";
 
 let authInstance: ReturnType<typeof createAuth> | null = null;
 
@@ -20,6 +21,11 @@ function createAuth() {
     trustedOrigins: resolveAuthTrustedOrigins,
     emailAndPassword: {
       enabled: true,
+      // Stated rather than inherited: Better Auth's default happens to be 8 and
+      // the signup form and public API schema both declare 8. One shared
+      // constant keeps the reset form, signup, and the library in agreement
+      // (shared/auth-policy.ts).
+      minPasswordLength: MIN_PASSWORD_LENGTH,
       // Without this, Better Auth's requestPasswordReset endpoint throws
       // RESET_PASSWORD_DISABLED before ever writing an auth_verification
       // row — forgot-password was completely dead (P0-7). See
