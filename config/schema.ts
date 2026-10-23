@@ -111,6 +111,59 @@ const projectConfigObjectSchema = z
   })
   .strict();
 
+const serviceOverlaySchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    url: z.string().url().optional(),
+    host: z.string().min(1).optional(),
+    port: z.number().int().min(1).max(65535).optional(),
+    bucket: z.string().min(1).optional(),
+    region: z.string().min(1).optional(),
+    secrets: z.array(SecretReferenceSchema).optional(),
+  })
+  .strict()
+  .superRefine((service, ctx) => {
+    if (service.url && service.host) {
+      try {
+        if (new URL(service.url).hostname !== service.host) {
+          ctx.addIssue({ code: "custom", path: ["host"], message: "host must match the hostname in url" });
+        }
+      } catch {
+        // The URL schema issue is the useful error for an invalid URL.
+      }
+    }
+  });
+
+/** A checked-in environment entry. Defaults are applied only after inheritance. */
+export const ProjectConfigOverlaySchema = z
+  .object({
+    environment: EnvironmentNameSchema,
+    parent: EnvironmentNameSchema.optional(),
+    secretProvider: z.enum(secretProviderNames).optional(),
+    runtime: z.object({ mode: z.enum(["development", "test", "production"]).optional() }).strict().optional(),
+    urls: z.object({ publicApp: z.string().url().optional() }).strict().optional(),
+    storage: z
+      .object({
+        endpoint: z.string().url().optional(),
+        host: z.string().min(1).optional(),
+        bucket: z.string().min(1).optional(),
+        region: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+    services: z
+      .object({
+        app: serviceOverlaySchema.optional(),
+        worker: serviceOverlaySchema.optional(),
+        "media-stream": serviceOverlaySchema.optional(),
+        sim: serviceOverlaySchema.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type ProjectConfigOverlay = z.infer<typeof ProjectConfigOverlaySchema>;
+
 /** Apply a provider that is valid for the config's environment when omitted. */
 export const ProjectConfigSchema = z
   .preprocess((input) => {
@@ -171,11 +224,13 @@ export type ProjectConfigMap = Partial<Record<EnvironmentName, unknown>>;
 
 /** Validate parent links without resolving or merging environment overlays. */
 export function validateInheritanceGraph(configs: ProjectConfigMap): void {
-  const parsed = new Map<EnvironmentName, ProjectConfig>();
+  const parsed = new Map<EnvironmentName, ProjectConfigOverlay>();
   for (const [name, value] of Object.entries(configs)) {
     const environment = EnvironmentNameSchema.safeParse(name);
     if (!environment.success) throw new ConfigValidationError(environment.error);
-    const config = parseProjectConfig(value);
+    const result = ProjectConfigOverlaySchema.safeParse(value);
+    if (!result.success) throw new ConfigValidationError(result.error);
+    const config = result.data;
     if (config.environment !== environment.data) {
       throw new ConfigValidationError(
         new z.ZodError([{ code: "custom", path: ["environment"], message: "map key must match environment" }]),
@@ -185,6 +240,11 @@ export function validateInheritanceGraph(configs: ProjectConfigMap): void {
   }
 
   for (const [name, config] of parsed) {
+    if (config.parent === name) {
+      throw new ConfigValidationError(
+        new z.ZodError([{ code: "custom", path: ["parent"], message: "an environment cannot inherit from itself" }]),
+      );
+    }
     if (config.parent === "production" && name !== "production") {
       throw new ConfigValidationError(
         new z.ZodError([{ code: "custom", path: ["parent"], message: "production cannot be a parent of a non-production environment" }]),
