@@ -50,9 +50,12 @@ const safeProfileSegment = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must contain only lowercase letters, numbers, and single hyphens");
 
 /** URLs shown in diagnostics must not carry credentials or hidden components. */
-function parseUrl(value: string): URL | undefined {
+export function parseDiagnosticUrl(value: unknown): URL | undefined {
+  if (typeof value !== "string") return undefined;
   try {
-    return new URL(value);
+    const url = new URL(value);
+    if (url.username || url.password || url.search || url.hash) return undefined;
+    return url;
   } catch {
     return undefined;
   }
@@ -62,9 +65,13 @@ const diagnosticUrl = z
   .string()
   .url()
   .superRefine((value, ctx) => {
-    const url = parseUrl(value);
-    if (!url) return;
-    if (url.username || url.password || /[?#]/.test(value)) {
+    const url = parseDiagnosticUrl(value);
+    if (!url) {
+      try {
+        new URL(value);
+      } catch {
+        return;
+      }
       ctx.addIssue({ code: "custom", message: "must not include credentials, query strings, or fragments" });
     }
   });
@@ -76,7 +83,7 @@ export const LocalProfileInputSchema = z
     envName: z.literal("local"),
     publicUrl: diagnosticUrl
       .refine((value) => {
-        const url = parseUrl(value);
+        const url = parseDiagnosticUrl(value);
         return Boolean(url && (url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))));
       }, "must use https unless using local localhost")
       .optional(),

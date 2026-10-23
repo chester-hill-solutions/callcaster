@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   objectStorageUsesPathStyle,
   resolveObjectStorageEnv,
@@ -5,7 +6,7 @@ import {
 import { loadProjectConfig, resolveLocalProjectConfig } from "./load";
 import { readRuntimeEnvironment, runtimeEnvironmentToLocalProfile, RUNTIME_ENVIRONMENT_KEYS, type RuntimeEnvironmentSnapshot } from "./runtime-environment";
 import { stableFingerprint } from "./resolved";
-import type { EnvironmentName, ProjectConfig } from "./schema";
+import { ConfigValidationError, parseDiagnosticUrl, type EnvironmentName, type ProjectConfig } from "./schema";
 
 const diagnosticEnvironments = ["local", "dev", "qa"] as const;
 type DiagnosticEnvironment = (typeof diagnosticEnvironments)[number];
@@ -89,9 +90,24 @@ const paths = Object.keys({
  * fields keep the missing, different, and unexpected mismatch categories.
  */
 
-function canonicalUrl(value: string | undefined): string | undefined {
+const observedUrlKeys = ["BASE_URL", "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL"] as const;
+
+function invalidRuntimeUrl(path: string): never {
+  throw new ConfigValidationError(new z.ZodError([
+    { code: "custom", path: [path], message: "must be a valid URL without credentials, query strings, or fragments" },
+  ]));
+}
+
+function validateObservedRuntimeUrls(env: Readonly<Record<string, string | undefined>>): void {
+  for (const key of observedUrlKeys) {
+    if (env[key] !== undefined && !parseDiagnosticUrl(env[key])) invalidRuntimeUrl(key);
+  }
+}
+
+function canonicalUrl(value: string | undefined, path = "url"): string | undefined {
   if (!value) return undefined;
-  const url = new URL(value);
+  const url = parseDiagnosticUrl(value);
+  if (!url) invalidRuntimeUrl(path);
   url.hostname = url.hostname.toLowerCase();
   url.pathname = url.pathname.replace(/\/+$/, "");
   return url.toString().replace(/\/$/, "");
@@ -134,11 +150,11 @@ function expectedModel(config: ProjectConfig): RuntimeModelResult {
 }
 
 function observedModel(env: NodeJS.ProcessEnv): RuntimeModel {
-  const endpoint = canonicalUrl(resolveObjectStorageEnv("endpoint", env));
+  const endpoint = canonicalUrl(resolveObjectStorageEnv("endpoint", env), "storage.endpoint");
   const nodeEnv = env.NODE_ENV;
   const mode = nodeEnv === "production" ? "production" : nodeEnv === "test" ? "test" : nodeEnv === "development" ? "development" : undefined;
   return {
-    "urls.publicApp": canonicalUrl(env.BASE_URL),
+    "urls.publicApp": canonicalUrl(env.BASE_URL, "BASE_URL"),
     "runtime.mode": mode,
     "storage.endpoint": endpoint,
     "storage.region": resolveObjectStorageEnv("region", env),
@@ -179,6 +195,7 @@ export async function compareRuntimeConfig(
   const effectiveSnapshot = snapshot && options.localMode === "dev-local"
     ? applyDevLocalOverrides(snapshot)
     : snapshot;
+  validateObservedRuntimeUrls(effectiveSnapshot ?? env);
   const localInput = effectiveSnapshot ? runtimeEnvironmentToLocalProfile(effectiveSnapshot) : undefined;
   const expected = expectedModel(localInput ? resolveLocalProjectConfig(localInput).config : loadProjectConfig(environment));
   const observedEnv = effectiveSnapshot ?? env;

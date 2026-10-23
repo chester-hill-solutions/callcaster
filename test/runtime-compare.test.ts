@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyDevLocalOverrides, compareRuntimeConfig } from "../config/runtime-compare";
+import { ConfigValidationError } from "../config/schema";
 
 const localEnv = {
   DEV_NAME: "sai",
@@ -67,6 +68,43 @@ describe("runtime config comparison", () => {
     expect(result.enabled && result.mismatches).toEqual([]);
   });
 
+  it.each(["S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL"] as const)("retains comparison behavior for a safe %s", async (key) => {
+    const result = await compareRuntimeConfig("qa", {
+      BASE_URL: "https://qa.callcaster.ca",
+      NODE_ENV: "production",
+      [key]: "https://storage.railway.app/",
+      REGION: "iad",
+      BUCKET: "callcaster-staging",
+    });
+    expect(result).toMatchObject({ enabled: true, mismatches: [] });
+  });
+
+  it.each(["S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL"] as const)("rejects an unsafe %s before fingerprinting", async (key) => {
+    const value = "https://user:token@storage.example/path?secret=1#fragment";
+    const rejection = compareRuntimeConfig("qa", {
+      BASE_URL: "https://qa.callcaster.ca",
+      NODE_ENV: "production",
+      [key]: value,
+    });
+    await expect(rejection).rejects.toBeInstanceOf(ConfigValidationError);
+    await expect(rejection).rejects.toThrow("must be a valid URL without credentials");
+  });
+
+  it.each([
+    { key: "BASE_URL", value: "not a URL" },
+    { key: "BASE_URL", value: "https://user:token@qa.callcaster.ca" },
+    { key: "S3_ENDPOINT", value: "not a URL" },
+    { key: "ENDPOINT", value: "https://storage.example/path?secret=1" },
+    { key: "AWS_ENDPOINT_URL", value: "https://storage.example/path#fragment" },
+  ])("rejects malformed or unsafe observed $key without leaking its value", async ({ key, value }) => {
+    const rejection = compareRuntimeConfig("qa", {
+      NODE_ENV: "production",
+      [key]: value,
+    });
+    await expect(rejection).rejects.toThrow("Invalid project configuration");
+    await expect(rejection).rejects.not.toThrow(value);
+  });
+
   it("reports safe mismatch paths and categories without values", async () => {
     const result = await compareRuntimeConfig("qa", {
       BASE_URL: "https://wrong.example",
@@ -126,7 +164,7 @@ describe("runtime config comparison", () => {
     const secretEndpoint = "https://user:token@[bad.example.invalid";
     const result = spawnSync(
       "npx",
-      ["--no-install", "tsx", "--tsconfig", "tsconfig.json", resolve("scripts/compare-runtime-config.mjs"), "--environment", "qa"],
+      ["--no-install", "tsx", "--tsconfig", "tsconfig.json", resolve("scripts/compare-runtime-config.mjs"), "--environment", "qa", "--json"],
       {
         cwd: resolve("."),
         encoding: "utf8",
@@ -134,6 +172,7 @@ describe("runtime config comparison", () => {
       },
     );
     expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe("");
     expect(result.stderr).toBe("runtime config comparison failed\n");
     expect(result.stderr).not.toContain(secretEndpoint);
     expect(result.stderr).not.toContain("at ");
