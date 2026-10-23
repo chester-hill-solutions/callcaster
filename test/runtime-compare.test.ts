@@ -79,6 +79,19 @@ describe("runtime config comparison", () => {
     expect(result).toMatchObject({ enabled: true, mismatches: [] });
   });
 
+  it("validates only the selected endpoint alias", async () => {
+    const result = await compareRuntimeConfig("dev", {
+      BASE_URL: "https://dev.callcaster.ca",
+      NODE_ENV: "production",
+      S3_ENDPOINT: "https://safe.example.test",
+      ENDPOINT: "https://user:secret@unsafe.example.test",
+      AWS_ENDPOINT_URL: "not a URL",
+      REGION: "iad",
+      BUCKET: "callcaster-dev",
+    });
+    expect(result).toMatchObject({ enabled: true, mismatches: [] });
+  });
+
   it.each(["S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL"] as const)("rejects an unsafe %s before fingerprinting", async (key) => {
     const value = "https://user:token@storage.example/path?secret=1#fragment";
     const rejection = compareRuntimeConfig("qa", {

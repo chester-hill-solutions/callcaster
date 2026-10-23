@@ -90,8 +90,6 @@ const paths = Object.keys({
  * fields keep the missing, different, and unexpected mismatch categories.
  */
 
-const observedUrlKeys = ["BASE_URL", "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL"] as const;
-
 function invalidRuntimeUrl(path: string): never {
   throw new ConfigValidationError(new z.ZodError([
     { code: "custom", path: [path], message: "must be a valid URL without credentials, query strings, or fragments" },
@@ -99,9 +97,9 @@ function invalidRuntimeUrl(path: string): never {
 }
 
 function validateObservedRuntimeUrls(env: Readonly<Record<string, string | undefined>>): void {
-  for (const key of observedUrlKeys) {
-    if (env[key] !== undefined && !parseDiagnosticUrl(env[key])) invalidRuntimeUrl(key);
-  }
+  if (env.BASE_URL !== undefined && !parseDiagnosticUrl(env.BASE_URL)) invalidRuntimeUrl("BASE_URL");
+  const endpoint = resolveObjectStorageEnv("endpoint", env as NodeJS.ProcessEnv);
+  if (endpoint !== undefined && !parseDiagnosticUrl(endpoint)) invalidRuntimeUrl("storage.endpoint");
 }
 
 function canonicalUrl(value: string | undefined, path = "url"): string | undefined {
