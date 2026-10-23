@@ -41,10 +41,14 @@ function showReset(
   action: () =>
     | { success: boolean | null; error: { message: string } | null }
     | Promise<{ success: boolean | null; error: { message: string } | null }>,
+  loader: () => { token: string | null; error: string | null } = () => ({
+    token: "issued-token",
+    error: null,
+  }),
 ) {
   const router = createMemoryRouter(
     [
-      { path: "/reset-password", Component: ResetPassword, action },
+      { path: "/reset-password", Component: ResetPassword, action, loader },
       { path: "/signin", Component: SignIn },
     ],
     { initialEntries: ["/reset-password?token=issued-token"] },
@@ -59,6 +63,42 @@ function showReset(
 }
 
 describe("reset password feedback", () => {
+  // #2075: Better Auth's callback redirects with ?error=INVALID_TOKEN when the
+  // token is expired or unknown. The form used to render as if the link worked.
+  test("an unusable link says so up front and offers a new one", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/reset-password",
+          Component: ResetPassword,
+          action: vi.fn(),
+          loader: () => ({ token: null, error: "INVALID_TOKEN" }),
+        },
+        { path: "/remember", Component: () => <h1>Remember</h1> },
+      ],
+      { initialEntries: ["/reset-password?error=INVALID_TOKEN"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(
+      await screen.findByText(/reset link is invalid or has expired/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("New Password")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Request a new link" }),
+    ).toHaveAttribute("href", "/remember");
+  });
+
+  test("the form states the password rule it enforces", async () => {
+    showReset(() => ({ success: null, error: null }));
+
+    expect(await screen.findByText("At least 8 characters.")).toBeInTheDocument();
+    expect(screen.getByLabelText("New Password")).toHaveAttribute(
+      "minlength",
+      "8",
+    );
+  });
+
   test.each([
     "Passwords do not match",
     "This reset link is invalid or has expired. Request a new one from the sign-in page.",
@@ -68,6 +108,7 @@ describe("reset password feedback", () => {
       const user = userEvent.setup();
       const error = vi.spyOn(toast, "error");
       const router = showReset(() => ({ success: null, error: { message } }));
+      await screen.findByLabelText("New Password");
       await user.type(
         screen.getByLabelText("New Password"),
         "keep-my-password",
@@ -117,6 +158,7 @@ describe("reset password feedback", () => {
       })
       .mockReturnValueOnce(accepted);
     const router = showReset(action);
+    await screen.findByLabelText("New Password");
     await user.type(screen.getByLabelText("New Password"), "retry-password");
     await user.type(
       screen.getByLabelText("Confirm New Password"),

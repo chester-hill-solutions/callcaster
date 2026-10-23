@@ -32,7 +32,7 @@ describe("app/routes/reset-password", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ token: "abc123" });
+    await expect(response.json()).resolves.toEqual({ token: "abc123", error: null });
   });
 
   test("loader returns null token when missing", async () => {
@@ -41,7 +41,75 @@ describe("app/routes/reset-password", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ token: null });
+    await expect(response.json()).resolves.toEqual({ token: null, error: null });
+  });
+
+  // Better Auth's own callback redirects here with ?error=INVALID_TOKEN when the
+  // token is expired or unknown; the form must not pretend the link is usable.
+  test("loader surfaces the expired-link error from the query string", async () => {
+    const mod = await import("../app/routes/reset-password");
+    const response = await asRouteResponse(mod.loader(routeArgs(new Request("http://localhost/reset-password?error=INVALID_TOKEN"))),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      token: null,
+      error: "INVALID_TOKEN",
+    });
+  });
+
+  test("action names the password rule when Better Auth rejects a short password", async () => {
+    mocks.resetPassword.mockRejectedValueOnce({
+      body: { code: "PASSWORD_TOO_SHORT", message: "Password too short" },
+    });
+
+    const form = new FormData();
+    form.set("password", "short1");
+    form.set("confirmPassword", "short1");
+
+    const mod = await import("../app/routes/reset-password");
+    const response = await asRouteResponse(mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: null,
+      error: { message: "Password must be at least 8 characters." },
+    });
+  });
+
+  test("action still reports an unusable token as an invalid link", async () => {
+    mocks.resetPassword.mockRejectedValueOnce({
+      body: { code: "INVALID_TOKEN", message: "Invalid token" },
+    });
+
+    const form = new FormData();
+    form.set("password", "newPassword123");
+    form.set("confirmPassword", "newPassword123");
+
+    const mod = await import("../app/routes/reset-password");
+    const response = await asRouteResponse(mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: null,
+      error: { message: expect.stringContaining("invalid or has expired") },
+    });
   });
 
   test("action surfaces a rejected reset instead of claiming success", async () => {

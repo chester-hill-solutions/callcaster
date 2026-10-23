@@ -68,12 +68,14 @@ describe("password recovery feedback", () => {
           path: "/reset-password",
           Component: ResetPassword,
           action: () => ({ success: true, error: null }),
+          loader: () => ({ token: "issued-token", error: null }),
         },
         { path: "/signin", element: <div /> },
       ],
       { initialEntries: ["/reset-password?token=issued-token"] },
     );
     render(<RouterProvider router={router} />);
+    await screen.findByLabelText("New Password");
     fireEvent.change(screen.getByLabelText("New Password"), {
       target: { value: "new-password-2075" },
     });

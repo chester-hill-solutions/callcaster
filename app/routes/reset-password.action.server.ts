@@ -3,6 +3,23 @@ import { auth } from "@/server/auth-instance";
 import { logger } from "@/lib/logger.server";
 import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
+import { PASSWORD_MIN_LENGTH_MESSAGE } from "../../shared/password-policy";
+
+const INVALID_RESET_LINK_MESSAGE =
+  "This reset link is invalid or has expired. Request a new one from the sign-in page.";
+
+/**
+ * Better Auth reports why it refused: a short password, a long password, or a
+ * token it cannot consume. Collapsing every one of those into "the link is
+ * invalid" sent users hunting for a new email when the real problem was the
+ * password they had just typed (#2075).
+ */
+function resetRejectionMessage(error: unknown): string {
+  const code = (error as { body?: { code?: string } } | null)?.body?.code;
+  if (code === "PASSWORD_TOO_SHORT") return PASSWORD_MIN_LENGTH_MESSAGE;
+  if (code === "PASSWORD_TOO_LONG") return "Password is too long.";
+  return INVALID_RESET_LINK_MESSAGE;
+}
 
 export const action = defineAction({
   sideEffects: ["db-write"],
@@ -55,16 +72,15 @@ export const action = defineAction({
       // The token IS the credential here, so surfacing its failure leaks
       // nothing (unlike forgot-password, which stays generic to avoid account
       // enumeration). A silent "success" strands the user at sign-in.
+      const code = (error as { body?: { code?: string } } | null)?.body?.code;
       logger.warn("reset-password: reset rejected", {
+        code,
         error: error instanceof Error ? error.message : String(error),
       });
       return routeData(
         {
           success: null,
-          error: {
-            message:
-              "This reset link is invalid or has expired. Request a new one from the sign-in page.",
-          },
+          error: { message: resetRejectionMessage(error) },
         },
         { status: 400 },
       );
