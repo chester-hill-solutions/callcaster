@@ -16,12 +16,12 @@ async function handleSaveAnswer(request: Request) {
     return guard.response;
   }
 
-  const { formData, survey, resultId, token } = guard.value;
+  const { formData, survey, resultId, token, contactId } = guard.value;
   const questionId = formData.get("questionId") as string;
   const answerValue = formData.get("answerValue") as string;
   const pageId = formData.get("pageId") as string;
 
-  const contact = await resolvePublicSurveyContactId(formData, survey);
+  const contact = await resolvePublicSurveyContactId(formData, survey, contactId);
   if (!contact.ok) {
     return contact.response;
   }

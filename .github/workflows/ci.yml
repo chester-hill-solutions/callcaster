@@ -164,6 +164,7 @@ jobs:
       - run: npm run check:relative-redirects
       - run: npm run check:redirect-targets
       - run: npm run check:sheet-bodies
+      - run: npm run check:no-pii-exports
       - run: npm run check:pg-errors
       - run: npm run check:dry
       - run: npm run check:handlers

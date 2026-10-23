@@ -1,3 +1,5 @@
+import { eq } from "drizzle-orm";
+import { call as callTable } from "@/db/schema";
 import { transcript_segment, coaching_event, coaching_session } from "@/db/schema-transcription";
 import {
   COACHING_EVENT_TYPES,
@@ -9,6 +11,35 @@ import {
 import { insertWorkspaceEvent } from "@/lib/workspace-events.server";
 import { adminDb } from "@/server/admin-db";
 
+/**
+ * Defence in depth for the three writers below.
+ *
+ * The transcription tables carry no workspace column, so a row is attributable
+ * only through the call SID it is keyed by. The media-stream token binds that
+ * SID (app/lib/media-stream-token.server.ts), but these writers are the last
+ * place a future unbound-token path could write across tenants, so the call's
+ * owner is proven here as well.
+ *
+ * Tolerates a call row that does not exist yet, and one with no workspace:
+ * neither is owned by another tenant, so neither can put rows in front of a
+ * victim's coaching panel. Only a call owned by a DIFFERENT workspace is
+ * refused.
+ */
+async function assertCallOwnedByWorkspace(
+  callSid: string,
+  workspaceId: string,
+): Promise<void> {
+  const owner = await adminDb.query.call.findFirst({
+    where: eq(callTable.sid, callSid),
+    columns: { workspace: true },
+  });
+  if (owner?.workspace && owner.workspace !== workspaceId) {
+    throw new Error(
+      "media-stream write target call is owned by another workspace",
+    );
+  }
+}
+
 export type TranscriptSegmentInsert = typeof transcript_segment.$inferInsert;
 export type TranscriptSegmentRow = typeof transcript_segment.$inferSelect;
 export type CoachingEventInsert = typeof coaching_event.$inferInsert;
@@ -18,7 +49,9 @@ export type CoachingSessionRow = typeof coaching_session.$inferSelect;
 
 export async function writeTranscriptSegment(
   segment: TranscriptSegmentInsert,
+  workspaceId: string,
 ): Promise<TranscriptSegmentRow> {
+  await assertCallOwnedByWorkspace(segment.call_sid, workspaceId);
   const [row] = await adminDb.insert(transcript_segment).values(segment).returning();
   if (!row) {
     throw new Error("Failed to insert transcript segment");
@@ -28,7 +61,9 @@ export async function writeTranscriptSegment(
 
 export async function writeCoachingEvent(
   event: CoachingEventInsert,
+  workspaceId: string,
 ): Promise<CoachingEventRow> {
+  await assertCallOwnedByWorkspace(event.call_sid, workspaceId);
   const [row] = await adminDb.insert(coaching_event).values(event).returning();
   if (!row) {
     throw new Error("Failed to insert coaching event");
@@ -38,7 +73,9 @@ export async function writeCoachingEvent(
 
 export async function writeCoachingSessionFinal(
   session: CoachingSessionInsert,
+  workspaceId: string,
 ): Promise<CoachingSessionRow> {
+  await assertCallOwnedByWorkspace(session.call_sid, workspaceId);
   const [row] = await adminDb
     .insert(coaching_session)
     .values(session)

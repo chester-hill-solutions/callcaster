@@ -29,7 +29,7 @@ import { SaveBar } from "@/components/shared/SaveBar";
 import { Section } from "@/components/shared/Section";
 import { CampaignCostPanel } from "./CampaignCostPanel";
 import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { CampaignStatusBadge } from "@/components/campaign/CampaignStatusBadge";
 import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 import {
   formatCredits,
@@ -406,7 +406,7 @@ export const CampaignLaunch = ({
             <div className="space-y-4">
               {campaignData.status ? (
                 <div className="flex justify-end">
-                  <StatusBadge status={campaignData.status} />
+                  <CampaignStatusBadge status={campaignData.status} />
                 </div>
               ) : null}
               <CampaignLaunchActions

@@ -12,6 +12,7 @@ vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
   useWorkspaceEventSubscription: () => undefined,
 }));
 vi.mock("@/components/workspace/WorkspaceNav", () => ({ default: () => null }));
+vi.mock("@/components/campaign/CampaignSidebar", () => ({ default: () => null }));
 
 const warning = "Add the emergency service address before renting a voice number. Emergency voice readiness is incomplete.";
 const workspaceId = "00000000-0000-4000-8000-000000000001";

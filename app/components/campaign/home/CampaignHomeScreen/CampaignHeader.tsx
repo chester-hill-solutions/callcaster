@@ -1,7 +1,7 @@
 import { NavLink } from "react-router";
-import { Megaphone } from "lucide-react";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { CampaignStatusBadge } from "@/components/campaign/CampaignStatusBadge";
 import { Heading } from "@/components/ui/typography";
+import { CampaignTypeIcon } from "@/components/campaign/CampaignTypeIcon";
 import type { Enums } from "@/lib/db-types";
 import {
   CampaignQueueProgress,
@@ -12,6 +12,7 @@ type HeaderProps = {
   title: string;
   isDesktop: boolean;
   status: Enums<"campaign_status">;
+  campaignType?: string | null;
   queueProgress?: CampaignQueueProgressCounts | null;
 };
 
@@ -19,6 +20,7 @@ export const CampaignHeader = ({
   title,
   isDesktop = false,
   status,
+  campaignType,
   queueProgress,
 }: HeaderProps) => {
   return (
@@ -31,11 +33,13 @@ export const CampaignHeader = ({
         relative="path"
         end
       >
-        {isDesktop && <Megaphone className="h-[18px] w-[18px]" />}
+        {isDesktop ? (
+          <CampaignTypeIcon type={campaignType} className="h-4.5 w-4.5" />
+        ) : null}
         <Heading as="h3" level={3} branded={false} className="inline">
           {title}
         </Heading>
-        <StatusBadge status={status} className="ml-2" />
+        <CampaignStatusBadge status={status} className="ml-2" />
         {queueProgress?.totalCount ? (
           <CampaignQueueProgress
             completedCount={queueProgress.completedCount}

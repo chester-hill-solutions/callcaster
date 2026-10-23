@@ -166,7 +166,9 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
   });
 
   test("rejects contact outside survey workspace", async () => {
-    // Scoped at the query, so a contact in another workspace does not resolve.
+    // The token names the contact, so this exercises the workspace-scoped
+    // lookup itself: a contact in another workspace does not resolve.
+    const { token } = await createRespondentToken(1, "ws-1", { contactId: 100 });
     surveyDbMocks.loadSurveyRespondentContact.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/survey-complete");
     const res = await asRouteResponse(mod.action({
@@ -174,6 +176,7 @@ describe("app/routes/api+/survey-complete/route.tsx", () => {
         surveyId: "S1",
         completed: "true",
         contactId: "100",
+        respondent_token: token,
       }),
     } as any));
     expect(res.status).toBe(400);

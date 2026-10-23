@@ -34,6 +34,7 @@ describeDb("public survey respondent continuity (#2125)", () => {
   let answer: typeof import("@/routes/api+/survey-answer.action.server").action;
   let complete: typeof import("@/routes/api+/survey-complete.action.server").action;
   let resetLimits: () => void;
+  let proofs: typeof import("@/lib/survey-contact-proof.server");
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Missing isolated test database URL");
@@ -59,6 +60,7 @@ describeDb("public survey respondent continuity (#2125)", () => {
     ({ action: answer } = await import("@/routes/api+/survey-answer.action.server"));
     ({ action: complete } = await import("@/routes/api+/survey-complete.action.server"));
     ({ resetRateLimitsForTests: resetLimits } = await import("@/lib/platform-rate-limit.server"));
+    proofs = await import("@/lib/survey-contact-proof.server");
   });
   beforeEach(async () => {
     resetLimits();
@@ -71,13 +73,29 @@ describeDb("public survey respondent continuity (#2125)", () => {
     finally { await client.end({ timeout: 5 }); }
   });
 
+  /**
+   * The identity a contact's link actually produces: the id PLUS the proof this
+   * server mints for it (#2868). A bare `?contact=` id proves nothing and the
+   * loader ignores it, so contact context requires the proof a sent link
+   * carries.
+   */
   async function load(cookie?: string, id = publicId, contactId?: number) {
-    const request = new Request(`https://example.test/survey/${id}${contactId ? `?contact=${contactId}` : ""}`, { headers: cookie ? { Cookie: cookie } : {} });
+    const query = contactId
+      ? `?contact=${contactId}&proof=${encodeURIComponent(await proofs.createSurveyContactProof(surveyId, contactId))}`
+      : "";
+    const request = new Request(`https://example.test/survey/${id}${query}`, { headers: cookie ? { Cookie: cookie } : {} });
     const result = await normalizeRouteResult(await loader(routeArgs(request, { surveyId: id }) as never));
     expect(result, JSON.stringify(result.body)).toMatchObject({ status: 200 });
     const issuedCookie = result.headers.get("Set-Cookie");
     if (!issuedCookie) throw new Error("Survey loader did not issue its identity cookie");
     return { body: result.body as { resultId: string; respondentToken: string; existingAnswers: Record<string, string | string[]> }, cookie: issuedCookie.split(";")[0] };
+  }
+  /** A link with a contact id and no proof — the shape #2868 says proves nothing. */
+  async function loadBareContact(contactId: number) {
+    const request = new Request(`https://example.test/survey/${publicId}?contact=${contactId}`);
+    const result = await normalizeRouteResult(await loader(routeArgs(request, { surveyId: publicId }) as never));
+    expect(result, JSON.stringify(result.body)).toMatchObject({ status: 200 });
+    return result.body as { resultId: string; respondentToken: string };
   }
   async function post(action: typeof answer | typeof complete, fields: Record<string, string>) {
     const body = new FormData();
@@ -139,8 +157,17 @@ describeDb("public survey respondent continuity (#2125)", () => {
     expect(resumed.body.resultId).toBe(first.body.resultId);
     expect(resumed.body.respondentToken).toBe(first.body.respondentToken);
     expect(resumed.body.existingAnswers).toEqual({ [JSON.stringify([pageId, questions[0]])]: "Original response" });
-    const legacyResume = await load(undefined, publicId, contactId);
-    expect(legacyResume.body.resultId).toBe("newer-contact-attempt");
+    // A bare `?contact=` id carries no proof, so it must not select the
+    // contact's response: this load gets its own anonymous identity and the
+    // newer contact row is left alone (#2868).
+    const bare = await loadBareContact(contactId);
+    expect(bare.resultId).not.toBe("newer-contact-attempt");
+    expect(bare.resultId).not.toBe(first.body.resultId);
+    // ...and the anonymous identity must not be able to write as that contact
+    // either, even when the form names it explicitly.
+    expect(await post(answer, { surveyId: publicId, questionId: questions[0], pageId, answerValue: "Guessed", contactId: String(contactId), respondent_token: bare.respondentToken })).toMatchObject({ status: 200 });
+    const guessed = await client`select contact_id from survey_response where result_id = ${bare.resultId}`;
+    expect(guessed[0]?.contact_id ?? null).toBeNull();
   });
 
   test("reload keeps repeated labels, checkbox arrays and write-in text on their own page", async () => {

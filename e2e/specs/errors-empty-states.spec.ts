@@ -20,7 +20,9 @@ ownerTest.describe("Errors and empty states @authenticated", () => {
     const settings = new CampaignSettingsPage(page);
     await settings.gotoLaunch(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.message.id);
     await expect(settings.readinessPanel()).toBeVisible();
-    await expect(page.getByText(/contact|queue|add at least one/i).first()).toBeVisible();
+    await expect(
+      page.locator("main").getByText(/contact|queue|add at least one/i).first(),
+    ).toBeVisible();
   });
 
   ownerTest("ERR-07 empty workspace owner CTA", async ({ page }) => {

@@ -26,6 +26,8 @@ ownerTest.describe("Audience and contacts @authenticated", () => {
 
   ownerTest("AUD-04 contacts list", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "contacts"));
-    await expect(page.getByText(/Contact1|contacts/i).first()).toBeVisible();
+    await expect(
+      page.locator("main").getByText(/Contact1|contacts/i).first(),
+    ).toBeVisible();
   });
 });

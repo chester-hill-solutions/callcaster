@@ -7,6 +7,10 @@
  */
 
 import { Resend } from "resend";
+import {
+  renderBrandedEmail,
+  type BrandedEmailFact,
+} from "@/lib/email-layout.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -35,35 +39,23 @@ function buildComplianceAlertEmail(input: ComplianceAlertInput) {
       : input.reason === "geo_blocked"
         ? "Twilio geographic permissions blocked"
         : "Twilio compliance job failed";
-  const issues =
-    input.blockingIssues && input.blockingIssues.length > 0
-      ? `<ul>${input.blockingIssues
-          .map((issue) => `<li>${issue}</li>`)
-          .join("")}</ul>`
-      : "";
-  const issuesText =
-    input.blockingIssues && input.blockingIssues.length > 0
-      ? `\n      Issues:\n${input.blockingIssues.map((i) => `        - ${i}`).join("\n")}`
-      : "";
+  const facts: BrandedEmailFact[] = [
+    { label: "Workspace", value: input.workspaceId },
+    { label: "Compliance path", value: input.path },
+  ];
+  if (input.errorDetail) {
+    facts.push({ label: "Detail", value: input.errorDetail, tone: "warn" });
+  }
+  for (const issue of input.blockingIssues ?? []) {
+    facts.push({ label: "Blocking issue", value: issue, tone: "warn" });
+  }
   return {
     subject: `[CallCaster] ${heading} — workspace ${input.workspaceId}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>${heading}</h2>
-        <p>Workspace: <strong>${input.workspaceId}</strong></p>
-        <p>Compliance path: <strong>${input.path}</strong></p>
-        ${input.errorDetail ? `<p>Detail: ${input.errorDetail}</p>` : ""}
-        ${issues}
-        <p><a href="${adminUrl}">Open the workspace in the admin panel</a></p>
-      </div>
-    `,
-    text: `${heading}
-
-      Workspace: ${input.workspaceId}
-      Compliance path: ${input.path}${input.errorDetail ? `\n      Detail: ${input.errorDetail}` : ""}${issuesText}
-
-      Admin: ${adminUrl}
-    `,
+    ...renderBrandedEmail({
+      heading,
+      facts,
+      cta: { label: "Open the workspace in the admin panel", url: adminUrl },
+    }),
   };
 }
 

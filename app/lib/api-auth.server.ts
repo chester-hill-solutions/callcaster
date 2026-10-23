@@ -3,6 +3,8 @@ import { secureCompare } from "@/lib/secure-compare";
 import { getSession, resolveBearerSessionUser } from "./auth.server";
 import { jsonError } from "./platform-api.server";
 import type { ProductCapabilityId } from "@/lib/capabilities";
+import { scopesWithinRole } from "@/lib/capabilities";
+import { getUserRole } from "@/lib/workspace-membership.server";
 import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import {
   findWorkspaceApiKeyByPrefix,
@@ -102,6 +104,39 @@ export async function verifyBearerOrSession(
   return resolveCookieSession(request);
 }
 
+/**
+ * The scopes an API key still carries, re-derived from its creator's CURRENT
+ * role — or null when the key no longer stands for a live principal (#2894).
+ *
+ * A key is a bearer credential whose authority used to be frozen at mint time:
+ * the scope ceiling was applied once, against the creator's then-current role,
+ * and never re-derived. Removing or demoting the member therefore did nothing
+ * to the keys they had issued, while a session for the same member dies with
+ * the membership (`getUserRole` yields no row, so the guards answer 404).
+ *
+ * A key with no recorded creator cannot be bound to anyone, so it fails closed
+ * with the same 401 as a key whose creator is gone. That is a deliberate
+ * behaviour change for any key minted before `created_by` was populated.
+ */
+async function scopesForLiveCreator(args: {
+  workspaceId: string;
+  createdBy: string | null;
+  scopes: readonly string[];
+}): Promise<ProductCapabilityId[] | null> {
+  if (!args.createdBy) {
+    return null;
+  }
+  const membership = await getUserRole({
+    user: { id: args.createdBy },
+    workspaceId: args.workspaceId,
+  });
+  if (!membership) {
+    return null;
+  }
+  // A demotion narrows the key rather than leaving it at its minted width.
+  return scopesWithinRole(membership.role, args.scopes);
+}
+
 export async function verifyApiKeyOrSession(
   request: Request,
 ): Promise<VerifyApiKeyOrSessionResult> {
@@ -130,13 +165,24 @@ export async function verifyApiKeyOrSession(
       return { error: "Invalid API key", status: 401 };
     }
 
+    const scopes = await scopesForLiveCreator({
+      workspaceId: row.workspace_id,
+      createdBy: row.created_by ?? null,
+      scopes: row.scopes ?? [],
+    });
+    if (!scopes) {
+      // Same answer as an unknown key: the caller learns nothing about whether
+      // the key existed, only that it may not act for this workspace now.
+      return { error: "Invalid API key", status: 401 };
+    }
+
     void Promise.resolve(touchWorkspaceApiKeyLastUsed(row.id)).catch(() => undefined);
 
     return {
       authType: "api_key",
       workspaceId: row.workspace_id,
       keyId: row.id,
-      scopes: row.scopes ?? [],
+      scopes,
     };
   }
 

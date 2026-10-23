@@ -6,8 +6,13 @@ export type MediaStreamTokenPayload = {
   campaignId: string;
   userId: string;
   sessionId: string;
-  /** Twilio Call SID this stream is authorized for, when known at mint time. */
-  callSid?: string;
+  /**
+   * Twilio Call SID this stream is authorized for. Mandatory: every
+   * transcript and coaching row is keyed by it, and the service refuses a
+   * `start` frame that names any other call. A token without it authorizes
+   * writes for a resource it never named.
+   */
+  callSid: string;
   /** Unix timestamp (seconds) when the token expires. */
   exp: number;
 };
@@ -30,12 +35,18 @@ export function createMediaStreamToken({
   exp,
 }: CreateMediaStreamTokenInput): string {
   const nowSeconds = Math.floor(Date.now() / 1000);
+  // Fail closed rather than mint an unbound token: the call SID is the row key
+  // for the service's workspace-unscoped writes, so a token without it would
+  // let its holder name another tenant's call.
+  if (!callSid || !String(callSid).trim()) {
+    throw new Error("createMediaStreamToken: callSid is required");
+  }
   const payload: MediaStreamTokenPayload = {
     workspaceId,
     campaignId,
     userId,
     sessionId,
-    ...(callSid ? { callSid } : {}),
+    callSid: String(callSid),
     exp: exp ?? nowSeconds + 3600,
   };
 
