@@ -66,6 +66,7 @@ function createMockWebSocket(): import("bun").ServerWebSocket<MediaStreamSocketD
       campaignId: "camp-1",
       userId: "user-1",
       sessionId: "session-1",
+      callSid: "CA123",
       exp: Math.floor(Date.now() / 1000) + 60,
       requestId: "req-1",
     },

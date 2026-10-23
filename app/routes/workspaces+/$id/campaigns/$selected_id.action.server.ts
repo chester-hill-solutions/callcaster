@@ -52,7 +52,10 @@ export const action = defineAction({
       campaignRow.type === "robocall"
     ) {
       try {
-        const csvContent = await rpcGetCampaignAttemptsCsv(Number(campaign_id));
+        const csvContent = await rpcGetCampaignAttemptsCsv(
+          workspace_id,
+          Number(campaign_id),
+        );
         return routeData({
           csvContent,
           filename: `outreach_results_${campaign_id}.csv`,

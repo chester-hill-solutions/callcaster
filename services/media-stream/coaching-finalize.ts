@@ -30,7 +30,7 @@ export async function finalizeCoachingSession(
     long_pause_count: state.longPauseTotal,
     score,
     summary: summary || null,
-  });
+  }, state.workspaceId);
 
   await publishCoachingSessionFinalEvent(state.workspaceId, state.callSid, {
     sessionId: session.id,

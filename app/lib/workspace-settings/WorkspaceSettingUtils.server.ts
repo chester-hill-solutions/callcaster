@@ -72,12 +72,19 @@ export async function handleUpdateUser(
 ) {
   const userId = formData.get("user_id") as string;
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
+  // Validate the role against the current vocabulary before it is ranked or
+  // written. The addUser branch above already does this; without it here an
+  // unvalidated string (for example the legacy `field_director` alias) could
+  // reach the membership write.
+  if (!isMemberRole(updatedWorkspaceRole)) {
+    return routeData({ data: null, error: "Invalid workspace role" }, 400);
+  }
   try {
     const result = await updateWorkspaceMemberRole(
       actorUserId,
       workspaceId,
       userId,
-      updatedWorkspaceRole as "owner" | "member" | "caller" | "admin",
+      updatedWorkspaceRole,
     );
     if (!result.ok) {
       return routeData(
