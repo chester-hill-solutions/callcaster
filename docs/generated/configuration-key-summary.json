@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "7762ed383c7d056080765d94620e1cd3c847615d3d9045a8bb6849204571e1aa",
+    "recordDigest": "ba15d941ecf8eb82edc9cec56e13e877cb2e7e6f7486e8c8d6c8b5905d2a352b",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2643,7 +2643,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -2716,7 +2716,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 21,
+      "sourceCount": 22,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "app",
@@ -3595,7 +3595,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -5016,7 +5016,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 16,
+      "sourceCount": 17,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",

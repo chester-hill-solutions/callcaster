@@ -45,6 +45,22 @@ describe("configuration input inventory", () => {
     expect(records.some((record) => record.key === null)).toBe(false);
   });
 
+  test.each([
+    ["line comments", 'const KEYS = ["FIRST_KEY", // ] } )\n  "SECOND_KEY"];'],
+    ["block comments", 'const KEYS = ["FIRST_KEY", /* ] } ) */ "SECOND_KEY"];'],
+  ])("skips closing delimiters in %s while collecting static keys", (_commentType, declaration) => {
+    const records = scanSourceText(
+      `${declaration}\nif (KEYS.some((key) => process.env[key] === "1")) {}`,
+      "app/flags.server.ts",
+    );
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual([
+      "FIRST_KEY",
+      "SECOND_KEY",
+    ]);
+    expect(records.some((record) => record.key === null)).toBe(false);
+  });
+
   test("does not bleed a prior collection callback into an unrelated injected read", () => {
     const records = scanSourceText(`const KEYS = ["FLAG_A", "FLAG_B"];
 function read(env: NodeJS.ProcessEnv, key: string) {

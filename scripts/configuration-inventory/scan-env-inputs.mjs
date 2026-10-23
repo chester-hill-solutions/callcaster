@@ -97,11 +97,35 @@ function matchingDelimiter(text, start) {
   if (!closing) return -1;
   let depth = 0;
   let quote = null;
+  let lineComment = false;
+  let blockComment = false;
   for (let index = start; index < text.length; index += 1) {
     const character = text[index];
+    const next = text[index + 1];
+    if (lineComment) {
+      if (character === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === "*" && next === "/") {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
     if (quote) {
       if (character === "\\") index += 1;
       else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "/" && next === "/") {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      blockComment = true;
+      index += 1;
       continue;
     }
     if (character === "'" || character === '"' || character === "`") {
