@@ -8,30 +8,47 @@ import { scanRepository, writeInventory } from "./configuration-inventory/scan-e
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const records = await scanRepository(root);
 const check = process.argv.includes("--check");
+const generatedFiles = [
+  "configuration-inventory.json",
+  "configuration-inventory.md",
+  "configuration-key-summary.json",
+  "configuration-key-summary.md",
+  "configuration-dynamic-read-review.json",
+  "configuration-dynamic-read-review.md",
+  "operational-inputs.json",
+  "operational-inputs.md",
+];
+
 const outputRoot = check ? await mkdtemp(path.join(tmpdir(), "callcaster-config-inventory-")) : root;
-await writeInventory(root, records, check ? outputRoot : undefined);
 if (check) {
-  const files = [
-    "configuration-inventory.json",
-    "configuration-inventory.md",
-    "configuration-key-summary.json",
-    "configuration-key-summary.md",
-    "configuration-dynamic-read-review.json",
-    "configuration-dynamic-read-review.md",
-  ];
-  const differences = [];
-  for (const file of files) {
-    const expected = await readFile(path.join(root, "docs/generated", file), "utf8");
-    const actual = await readFile(path.join(outputRoot, "docs/generated", file), "utf8");
-    if (expected !== actual) differences.push(file);
+  try {
+    await writeInventory(root, records, outputRoot);
+    const differences = [];
+    for (const file of generatedFiles) {
+      let expected;
+      try {
+        expected = await readFile(path.join(root, "docs/generated", file), "utf8");
+      } catch (error) {
+        if (error.code === "ENOENT") {
+          differences.push(`${file} (missing)`);
+          continue;
+        }
+        throw error;
+      }
+      const actual = await readFile(path.join(outputRoot, "docs/generated", file), "utf8");
+      if (expected !== actual) differences.push(file);
+    }
+    if (differences.length) {
+      console.error(`Configuration inventory is stale: ${differences.join(", ")}`);
+      process.exitCode = 1;
+    } else {
+      console.log("Configuration inventory is current.");
+    }
+  } finally {
+    await rm(outputRoot, { recursive: true, force: true });
   }
-  await rm(outputRoot, { recursive: true, force: true });
-  if (differences.length) {
-    console.error(`Configuration inventory is stale: ${differences.join(", ")}`);
-    process.exitCode = 1;
-  } else {
-    console.log("Configuration inventory is current.");
-  }
+} else {
+  await writeInventory(root, records);
 }
 console.log(
   `Configuration inventory: ${records.length} records, ` +

@@ -1,4 +1,5 @@
 import { readdir, readFile, mkdir, writeFile, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +24,14 @@ const ROOTS = [
   "Dockerfile.worker", "Makefile", "docker-compose.dev.yml", "railway.toml",
   "railway.worker.toml", "railway.json",
 ];
+
+export function normalizeRailwayServiceName(name) {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === "app" || normalized === "callcaster") return "app";
+  if (normalized === "worker" || normalized === "callcaster-worker") return "worker";
+  if (normalized === "database" || /^(?:postgres|postgresql)(?:[-\s].*)?$/.test(normalized)) return "database";
+  return name;
+}
 
 function lineNumberAt(text, index) {
   return text.slice(0, index).split("\n").length;
@@ -98,6 +107,8 @@ export function scanSourceText(text, sourceFile) {
       records.push(record);
     }
   };
+
+  if (sourceFile !== ".env.example" && (/^(?:docs|examples)\//.test(sourceFile) || /(?:^|\/)(?:README|CHANGELOG)(?:\.|$)/i.test(sourceFile))) return records;
 
   if (!sourceFile.startsWith(".github/workflows/")) {
   for (const match of text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)(?![A-Z0-9_])(?!\s*(?:\?\?=|=))/g)) {
@@ -244,29 +255,43 @@ export function scanSourceText(text, sourceFile) {
   }
 
   if (sourceFile.startsWith(".railway/")) {
-    const railwayServiceFor = (index) => text.slice(0, index).match(/const\s+(app|worker|database)Variables\s*=\s*\[[\s\S]*$/)?.[1];
-    for (const match of text.matchAll(/['"]([A-Z][A-Z0-9_]*)['"]/g)) {
-      add(entry({
-        key: match[1],
-        sourceKind: "railway-variable",
-        sourceFile,
-        line: lineNumberAt(text, match.index),
-        consumer,
-        usage: "deployment",
-        service: railwayServiceFor(match.index),
-        notes: "Railway variable name collected; value is preserved and not read.",
-      }));
-    }
-    for (const [index, line] of text.split("\n").entries()) {
-      const match = line.match(/^\s*([A-Z][A-Z0-9_]*)\s*:/);
-      if (match) add(entry({
-        key: match[1],
-        sourceKind: "railway-variable",
-        sourceFile,
-        line: index + 1,
-        consumer,
-        usage: "deployment",
-        notes: "Railway environment declaration; value was not collected.",
+    const matchingClose = (openIndex, open, close) => {
+      let depth = 0; let quote = null; let lineComment = false; let blockComment = false;
+      for (let index = openIndex; index < text.length; index += 1) {
+        const character = text[index];
+        const next = text[index + 1];
+        if (lineComment) { if (character === "\n") lineComment = false; continue; }
+        if (blockComment) { if (character === "*" && next === "/") { blockComment = false; index += 1; } continue; }
+        if (quote) { if (character === quote && text[index - 1] !== "\\") quote = null; continue; }
+        if (character === "/" && next === "/") { lineComment = true; index += 1; continue; }
+        if (character === "/" && next === "*") { blockComment = true; index += 1; continue; }
+        if (character === "\"" || character === "'") { quote = character; continue; }
+        if (character === open) depth += 1;
+        if (character === close && --depth === 0) return index;
+      }
+      return text.length - 1;
+    };
+    const serviceRanges = [...text.matchAll(/(?:service|postgres)\(\s*["']([^"']+)["']\s*,\s*\{/g)].map((match) => {
+      const open = text.indexOf("{", match.index);
+      return { name: normalizeRailwayServiceName(match[1]), start: match.index, end: matchingClose(open, "{", "}") };
+    });
+    const variableArrays = [...text.matchAll(/const\s+([A-Za-z_$][\w$]*)\s*=\s*\[/g)].map((match) => {
+      const open = text.indexOf("[", match.index); const end = matchingClose(open, "[", "]");
+      const preservedUse = text.indexOf(`preservedVariables(${match[1]})`, match.index);
+      const owner = serviceRanges.find((range) => preservedUse >= range.start && preservedUse <= range.end)?.name;
+      return { start: open, end, owner };
+    });
+    for (const array of variableArrays) for (const match of text.slice(array.start, array.end + 1).matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)) add(entry({
+      key: match[1], sourceKind: "railway-variable", sourceFile,
+      line: lineNumberAt(text, array.start + match.index), consumer, usage: "deployment",
+      ...(array.owner ? { service: array.owner } : {}),
+      notes: "Railway variable name collected; value is preserved and not read.",
+    }));
+    for (const range of serviceRanges) for (const env of text.slice(range.start, range.end + 1).matchAll(/\benv\s*:\s*\{/g)) {
+      const envStart = range.start + env.index + env[0].lastIndexOf("{"); const envEnd = matchingClose(envStart, "{", "}");
+      for (const key of text.slice(envStart, envEnd + 1).matchAll(/(?:^|[\n,])\s*([A-Z][A-Z0-9_]*)\s*:/g)) add(entry({
+        key: key[1], sourceKind: "railway-variable", sourceFile, line: lineNumberAt(text, envStart + key.index), consumer,
+        usage: "deployment", service: range.name, notes: "Railway environment declaration; value was not collected.",
       }));
     }
   }
@@ -299,7 +324,10 @@ export function scanSourceText(text, sourceFile) {
   }
 
   if (/\.sh$/.test(sourceFile)) {
-    for (const match of text.matchAll(/(?:export\s+|\$\{?)([A-Z][A-Z0-9_]*)(?:\}?\s*=|\}?\b)/g)) {
+    for (const match of text.matchAll(/\bexport\s+([A-Z][A-Z0-9_]*)(?:\s*=|\b)/g)) {
+      add(entry({ key: match[1], sourceKind: "shell-environment", sourceFile, line: lineNumberAt(text, match.index), consumer: "script", usage: "read" }));
+    }
+    for (const match of text.matchAll(/\$\{([A-Z][A-Z0-9_]*)(?::[-+?=])/g)) {
       add(entry({ key: match[1], sourceKind: "shell-environment", sourceFile, line: lineNumberAt(text, match.index), consumer: "script", usage: "read" }));
     }
   }
@@ -404,6 +432,7 @@ export function redactRecord(record) {
 export function summarizeInventory(records) {
   const byKey = new Map();
   for (const record of records) {
+    if (record.sourceKind === "cli-flag") continue;
     if (!record.key) continue;
     const current = byKey.get(record.key) ?? {
       key: record.key,
@@ -437,9 +466,19 @@ export function summarizeInventory(records) {
 export async function writeInventory(root, records, outputRoot = path.join(root, "docs/generated")) {
   const outputDir = outputRoot.endsWith("docs/generated") ? outputRoot : path.join(outputRoot, "docs/generated");
   await mkdir(outputDir, { recursive: true });
-  const redacted = records.map(redactRecord);
+  const redacted = records.filter((record) => record.sourceKind !== "cli-flag").map(redactRecord);
+  const operational = records.filter((record) => record.sourceKind === "cli-flag").map(redactRecord);
   const summaries = summarizeInventory(redacted);
-  await writeFile(path.join(outputDir, "configuration-inventory.json"), `${JSON.stringify({ version: 1, generatedBy: "tools:config:inventory", entries: redacted }, null, 2)}\n`);
+  const scannedRoots = [...ROOTS].sort();
+  const scannedFiles = await collectSourceFiles(root);
+  const provenance = {
+    generator: "tools:config:inventory",
+    recordDigest: createHash("sha256").update(JSON.stringify(records.map(redactRecord))).digest("hex"),
+    scannedRoots,
+    scannedFiles,
+  };
+  const metadata = { version: 2, generatedBy: "tools:config:inventory", provenance };
+  await writeFile(path.join(outputDir, "configuration-inventory.json"), `${JSON.stringify({ ...metadata, entries: redacted }, null, 2)}\n`);
   const keyCount = new Set(redacted.filter((r) => r.key).map((r) => r.key)).size;
   const dynamicCount = redacted.filter((r) => r.sourceKind === "dynamic-runtime-read" || r.sourceKind === "dynamic-test-read").length;
   const byKind = Object.fromEntries([...new Set(redacted.map((r) => r.sourceKind))].sort().map((kind) => [kind, redacted.filter((r) => r.sourceKind === kind).length]));
@@ -448,6 +487,7 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
     "",
     "> Generated by `npm run tools:config:inventory`. Values are never collected.",
     "> Classification and ownership remain intentionally unassigned for ADR-0040 Phase 0.",
+    `> Provenance: \`${provenance.recordDigest}\``,
     "",
     `- ${redacted.length} source records`,
     `- ${keyCount} distinct key names`,
@@ -464,12 +504,13 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
     ...redacted.map((r) => `| ${r.key ?? "(dynamic)"} | ${r.sourceKind} | ${r.usage} | ${r.environment} | \`${r.sourceFile}\` | ${r.line} | ${r.consumer} | ${r.classification} | ${r.owner} | ${r.migrationTarget} | ${(r.notes ?? "").replaceAll("|", "\\|")} |`),
     ];
   await writeFile(path.join(outputDir, "configuration-inventory.md"), `${lines.join("\n")}\n`);
-  await writeFile(path.join(outputDir, "configuration-key-summary.json"), `${JSON.stringify({ version: 1, generatedBy: "tools:config:inventory", keys: summaries }, null, 2)}\n`);
+  await writeFile(path.join(outputDir, "configuration-key-summary.json"), `${JSON.stringify({ ...metadata, keys: summaries }, null, 2)}\n`);
   const summaryLines = [
     "# Configuration key summary",
     "",
     "> Generated by `npm run tools:config:inventory`. Values are never collected.",
     "> Classification and ownership remain intentionally unassigned for ADR-0040 Phase 0.",
+    `> Provenance: \`${provenance.recordDigest}\``,
     "",
     "| Key | Source kinds | Consumers | Environments | Usages | Sources | Classification | Owner | Migration target |",
     "|---|---|---|---|---|---:|---|---|---|",
@@ -477,17 +518,22 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
   ];
   await writeFile(path.join(outputDir, "configuration-key-summary.md"), `${summaryLines.join("\n")}\n`);
   const dynamic = redacted.filter((record) => record.sourceKind === "dynamic-runtime-read" || record.sourceKind === "dynamic-test-read");
-  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.json"), `${JSON.stringify({ version: 1, generatedBy: "tools:config:inventory", reads: dynamic.map((record) => ({ sourceFile: record.sourceFile, line: record.line, consumer: record.consumer, sourceKind: record.sourceKind, expression: record.expression ?? record.notes, status: "needs-review" })) }, null, 2)}\n`);
+  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.json"), `${JSON.stringify({ ...metadata, reads: dynamic.map((record) => ({ sourceFile: record.sourceFile, line: record.line, consumer: record.consumer, sourceKind: record.sourceKind, expression: record.expression ?? record.notes, status: "needs-review" })) }, null, 2)}\n`);
   const dynamicLines = [
     "# Dynamic environment read review",
     "",
     "> Generated by `npm run tools:config:inventory`. Each row requires manual review.",
+    `> Provenance: \`${provenance.recordDigest}\``,
     "",
     "| Source | Line | Consumer | Kind | Expression | Status |",
     "|---|---:|---|---|---|---|",
     ...dynamic.map((record) => `| \`${record.sourceFile}\` | ${record.line} | ${record.consumer} | ${record.sourceKind} | ${(record.expression ?? record.notes ?? "").replaceAll("|", "\\|")} | needs-review |`),
   ];
   await writeFile(path.join(outputDir, "configuration-dynamic-read-review.md"), `${dynamicLines.join("\n")}\n`);
+  const operationalMetadata = { version: 1, generatedBy: "tools:config:operational-inputs", provenance };
+  await writeFile(path.join(outputDir, "operational-inputs.json"), `${JSON.stringify({ ...operationalMetadata, entries: operational }, null, 2)}\n`);
+  const operationalLines = ["# Operational inputs", "", "> Generated by `npm run tools:config:inventory`. These are command-line inputs, not environment keys.", `> Provenance: \`${provenance.recordDigest}\``, "", "| Input | Source | Line | Consumer | Notes |", "|---|---|---:|---|---|", ...operational.map((record) => `| ${record.key} | \`${record.sourceFile}\` | ${record.line} | ${record.consumer} | ${(record.notes ?? "").replaceAll("|", "\\|")} |`)];
+  await writeFile(path.join(outputDir, "operational-inputs.md"), `${operationalLines.join("\n")}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
