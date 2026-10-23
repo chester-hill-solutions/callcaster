@@ -26,6 +26,33 @@ npm test            # vitest node + UI suites, plus bun server-runtime tests
 make e2e            # full Playwright run against compose Postgres + Stow
 ```
 
+## Configuration diagnostics
+
+Show the resolved, redacted configuration for a static environment:
+
+```bash
+npm run config:show -- --environment local
+npm run config:show -- --environment dev --json
+```
+
+The local profile is derived from `DEV_NAME` and `ENV`. Diagnostics read
+`.env.local` and `.env` without modifying either file. The local report includes
+the derived identity and a deterministic fingerprint. Compare local settings
+against the same safe snapshot, or compare deployment settings from the current
+process environment:
+
+```bash
+npm run config:compare-runtime -- --environment local
+npm run config:compare-runtime -- --environment local --local-mode dev-local
+npm run config:compare-runtime -- --environment dev --json
+npm run config:compare-runtime -- --environment qa --json
+```
+
+`standard` is the default local mode. Use `--local-mode dev-local` when checking
+the local S3 endpoint, region, bucket, path style, and localhost defaults used by
+`dev:local`. Deployment comparisons do not read dotenv files. Production
+comparison is disabled.
+
 ## Environment Setup
 
 ### Prerequisites

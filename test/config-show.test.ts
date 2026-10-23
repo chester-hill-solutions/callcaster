@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { environmentNames } from "../config/schema";
-import { loadResolvedConfig, redactResolvedConfig, stableFingerprint, stableJson } from "../config/resolved";
+import { loadResolvedConfig, loadResolvedLocalConfig, redactResolvedConfig, stableFingerprint, stableJson } from "../config/resolved";
 
 describe("resolved configuration output", () => {
   it.each(environmentNames)("resolves and reports %s", (environment) => {
@@ -48,6 +48,21 @@ describe("resolved configuration output", () => {
     expect(stableFingerprint(firstOrdering)).toBe(stableFingerprint(secondOrdering));
     expect(JSON.stringify(first)).toContain('"environment"');
     expect(JSON.stringify(first).indexOf('"environment"')).toBeLessThan(JSON.stringify(first).indexOf('"fingerprint"'));
+  });
+
+  it("reports dynamic local identity and fingerprints it deterministically", () => {
+    const input = { devName: "alex", envName: "local" as const };
+    const first = loadResolvedLocalConfig(input);
+    const second = loadResolvedLocalConfig(input);
+    expect(first.identity).toEqual({
+      devName: "alex",
+      envName: "local",
+      profileName: "alex-local",
+      hostname: "alex-local.callcaster.ca",
+      publicUrl: "https://alex-local.callcaster.ca",
+    });
+    expect(first).toEqual(second);
+    expect(JSON.stringify(first)).not.toMatch(/(do-not-print|token-value|password-value|postgres:\/\/)/i);
   });
 
   it("rejects invalid command input without printing configuration", () => {

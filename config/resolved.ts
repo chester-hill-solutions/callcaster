@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { environmentConfigs, loadProjectConfig } from "./load";
-import type { EnvironmentName, ProjectConfig } from "./schema";
+import { environmentConfigs, loadProjectConfig, resolveLocalProjectConfig } from "./load";
+import type { EnvironmentName, LocalProfileInput, ProjectConfig } from "./schema";
 
 export const PROJECT_CONFIG_SCHEMA_VERSION = 1;
 
@@ -77,6 +77,19 @@ export function loadResolvedConfig(environment: EnvironmentName) {
     inheritance: inheritance(environment),
     schemaVersion: PROJECT_CONFIG_SCHEMA_VERSION,
     config: redactResolvedConfig(config),
+  } satisfies JsonValue;
+  const fingerprint = stableFingerprint(reportWithoutFingerprint);
+  return { ...reportWithoutFingerprint, fingerprint };
+}
+
+export function loadResolvedLocalConfig(input: LocalProfileInput) {
+  const resolved = resolveLocalProjectConfig(input);
+  const reportWithoutFingerprint = {
+    environment: "local" as const,
+    identity: resolved.identity,
+    inheritance: inheritance("local"),
+    schemaVersion: PROJECT_CONFIG_SCHEMA_VERSION,
+    config: redactResolvedConfig(resolved.config),
   } satisfies JsonValue;
   const fingerprint = stableFingerprint(reportWithoutFingerprint);
   return { ...reportWithoutFingerprint, fingerprint };

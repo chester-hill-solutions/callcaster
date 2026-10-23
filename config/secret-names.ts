@@ -6,6 +6,7 @@
  * scripts/configuration-inventory/catalog.json.
  */
 export const secretNames = [
+  "ACCESS_KEY_ID",
   "BETTER_AUTH_SECRET",
   "CLOUDFLARED_CREDENTIALS_FILE",
   "COHERE_API_KEY",
@@ -24,7 +25,10 @@ export const secretNames = [
   "RAILWAY_TOKEN",
   "RESEND_API_KEY",
   "S3_ACCESS_KEY_ID",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
   "S3_SECRET_ACCESS_KEY",
+  "SECRET_ACCESS_KEY",
   "SOURCE_DATABASE_URL",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",

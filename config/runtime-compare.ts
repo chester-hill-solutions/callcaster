@@ -2,7 +2,8 @@ import {
   objectStorageUsesPathStyle,
   resolveObjectStorageEnv,
 } from "../app/lib/object-storage-config";
-import { loadProjectConfig } from "./load";
+import { loadProjectConfig, resolveLocalProjectConfig } from "./load";
+import { readRuntimeEnvironment, runtimeEnvironmentToLocalProfile, RUNTIME_ENVIRONMENT_KEYS, type RuntimeEnvironmentSnapshot } from "./runtime-environment";
 import { stableFingerprint } from "./resolved";
 import type { EnvironmentName, ProjectConfig } from "./schema";
 
@@ -51,6 +52,26 @@ type RuntimeModelResult = {
   values: RuntimeModel;
   modeled: Record<RuntimeConfigPath, boolean>;
 };
+
+export type LocalRuntimeMode = "standard" | "dev-local";
+
+/** Apply only the non-secret local infrastructure defaults used by dev-local. */
+export function applyDevLocalOverrides(
+  env: Readonly<Record<string, string | undefined>>,
+): RuntimeEnvironmentSnapshot {
+  const safe = Object.fromEntries(
+    RUNTIME_ENVIRONMENT_KEYS.flatMap((key) => env[key] === undefined ? [] : [[key, env[key]]]),
+  );
+  return Object.freeze({
+    ...safe,
+    S3_ENDPOINT: "http://127.0.0.1:9000",
+    S3_REGION: "us-east-1",
+    S3_BUCKET: "callcaster",
+    S3_FORCE_PATH_STYLE: "true",
+    ...(env.NODE_ENV === undefined ? { NODE_ENV: "development" } : {}),
+    ...(env.BASE_URL === undefined ? { BASE_URL: "http://localhost:3000" } : {}),
+  });
+}
 
 const paths = Object.keys({
   "urls.publicApp": true,
@@ -137,10 +158,14 @@ function mismatchCategory(expected: unknown, observed: unknown): RuntimeMismatch
   return "different";
 }
 
-export function compareRuntimeConfig(
+export async function compareRuntimeConfig(
   environment: EnvironmentName,
   env: NodeJS.ProcessEnv = process.env,
-): RuntimeComparison {
+  options: { localMode?: LocalRuntimeMode; cwd?: string; snapshot?: RuntimeEnvironmentSnapshot } = {},
+): Promise<RuntimeComparison> {
+  if (options.localMode && options.localMode !== "standard" && environment !== "local") {
+    throw new Error("--local-mode is supported only for local");
+  }
   if (environment === "production") {
     return { enabled: false, environment, reason: "disabled-for-production" };
   }
@@ -148,8 +173,19 @@ export function compareRuntimeConfig(
     throw new Error(`runtime comparison is not supported for '${environment}'`);
   }
 
-  const expected = expectedModel(loadProjectConfig(environment));
-  const observed = observedModel(env);
+  const snapshot = environment === "local"
+    ? options.snapshot ?? await readRuntimeEnvironment({ cwd: options.cwd, shellEnv: env })
+    : undefined;
+  const effectiveSnapshot = snapshot && options.localMode === "dev-local"
+    ? applyDevLocalOverrides(snapshot)
+    : snapshot;
+  const localInput = effectiveSnapshot ? runtimeEnvironmentToLocalProfile(effectiveSnapshot) : undefined;
+  const expected = expectedModel(localInput ? resolveLocalProjectConfig(localInput).config : loadProjectConfig(environment));
+  const observedEnv = effectiveSnapshot ?? env;
+  const observed = observedModel(observedEnv as NodeJS.ProcessEnv);
+  if (environment === "local" && effectiveSnapshot?.NODE_ENV === undefined && options.localMode !== "dev-local") {
+    observed["runtime.mode"] = "development";
+  }
   const mismatches = paths.flatMap((path) => {
     if (!expected.modeled[path]) return [];
     const category = mismatchCategory(expected.values[path], observed[path]);

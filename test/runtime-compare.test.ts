@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { compareRuntimeConfig } from "../config/runtime-compare";
+import { applyDevLocalOverrides, compareRuntimeConfig } from "../config/runtime-compare";
 
 const localEnv = {
+  DEV_NAME: "sai",
+  ENV: "local",
   BASE_URL: "http://localhost:3000/",
   NODE_ENV: "development",
   S3_ENDPOINT: "http://127.0.0.1:9000/",
@@ -12,13 +14,50 @@ const localEnv = {
 };
 
 describe("runtime config comparison", () => {
-  it("matches local values and canonicalizes URL slashes", () => {
-    const result = compareRuntimeConfig("local", localEnv);
+  it("applies dev-local defaults without secrets or process mutation", () => {
+    const input = { DEV_NAME: "sai", ENV: "local", DATABASE_URL: "secret" };
+    const result = applyDevLocalOverrides(input);
+    expect(result).toMatchObject({
+      DEV_NAME: "sai",
+      ENV: "local",
+      S3_ENDPOINT: "http://127.0.0.1:9000",
+      S3_REGION: "us-east-1",
+      S3_BUCKET: "callcaster",
+      S3_FORCE_PATH_STYLE: "true",
+      NODE_ENV: "development",
+      BASE_URL: "http://localhost:3000",
+    });
+    expect(result).not.toHaveProperty("DATABASE_URL");
+    expect(input).toEqual({ DEV_NAME: "sai", ENV: "local", DATABASE_URL: "secret" });
+  });
+
+  it("uses local defaults for an absent NODE_ENV in standard mode", async () => {
+    const result = await compareRuntimeConfig("local", {
+      DEV_NAME: "sai",
+      ENV: "local",
+      BASE_URL: "http://localhost:3000",
+      S3_ENDPOINT: "http://127.0.0.1:9000",
+      S3_REGION: "us-east-1",
+      S3_BUCKET: "callcaster",
+    });
     expect(result).toMatchObject({ enabled: true, mismatches: [] });
   });
 
-  it("uses S3 aliases before Railway and AWS-compatible aliases", () => {
-    const result = compareRuntimeConfig("local", {
+  it("makes dev-local defaults match a local profile without BASE_URL", async () => {
+    const result = await compareRuntimeConfig("local", {
+      DEV_NAME: "sai",
+      ENV: "local",
+    }, { localMode: "dev-local" });
+    expect(result).toMatchObject({ enabled: true, mismatches: [] });
+  });
+
+  it("matches local values and canonicalizes URL slashes", async () => {
+    const result = await compareRuntimeConfig("local", localEnv);
+    expect(result).toMatchObject({ enabled: true, mismatches: [] });
+  });
+
+  it("uses S3 aliases before Railway and AWS-compatible aliases", async () => {
+    const result = await compareRuntimeConfig("local", {
       ...localEnv,
       ENDPOINT: "https://storage.railway.app",
       REGION: "iad",
@@ -28,8 +67,8 @@ describe("runtime config comparison", () => {
     expect(result.enabled && result.mismatches).toEqual([]);
   });
 
-  it("reports safe mismatch paths and categories without values", () => {
-    const result = compareRuntimeConfig("qa", {
+  it("reports safe mismatch paths and categories without values", async () => {
+    const result = await compareRuntimeConfig("qa", {
       BASE_URL: "https://wrong.example",
       NODE_ENV: "development",
       ENDPOINT: "https://storage.railway.app",
@@ -46,8 +85,8 @@ describe("runtime config comparison", () => {
     expect(JSON.stringify(result)).not.toMatch(/wrong|callcaster-staging|https:\/\//);
   });
 
-  it("does not report unmodeled deployed endpoint values as drift", () => {
-    const result = compareRuntimeConfig("dev", {
+  it("does not report unmodeled deployed endpoint values as drift", async () => {
+    const result = await compareRuntimeConfig("dev", {
       BASE_URL: "https://dev.callcaster.ca",
       NODE_ENV: "production",
       ENDPOINT: "https://storage.railway.app",
@@ -71,8 +110,8 @@ describe("runtime config comparison", () => {
       baseUrl: "https://qa.callcaster.ca",
       bucket: "callcaster-staging",
     },
-  ])("matches modeled $environment values despite a Railway endpoint", ({ environment, baseUrl, bucket }) => {
-    const result = compareRuntimeConfig(environment, {
+  ])("matches modeled $environment values despite a Railway endpoint", async ({ environment, baseUrl, bucket }) => {
+    const result = await compareRuntimeConfig(environment, {
       BASE_URL: baseUrl,
       NODE_ENV: "production",
       ENDPOINT: "https://storage.railway.app",
@@ -112,9 +151,9 @@ describe("runtime config comparison", () => {
     expect(result.stderr).not.toContain("at ");
   });
 
-  it("does not read runtime values for production", () => {
+  it("does not read runtime values for production", async () => {
     const env = new Proxy({}, { get() { throw new Error("runtime env was read"); } }) as NodeJS.ProcessEnv;
-    expect(compareRuntimeConfig("production", env)).toEqual({
+    await expect(compareRuntimeConfig("production", env)).resolves.toEqual({
       enabled: false,
       environment: "production",
       reason: "disabled-for-production",

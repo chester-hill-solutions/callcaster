@@ -57,7 +57,10 @@ export const LocalProfileInputSchema = z
     publicUrl: z
       .string()
       .url()
-      .refine((value) => new URL(value).protocol === "https:", "must use https")
+      .refine((value) => {
+        const url = new URL(value);
+        return url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname));
+      }, "must use https unless using local localhost")
       .optional(),
   })
   .strict();
