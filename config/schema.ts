@@ -4,7 +4,6 @@ import { secretNames } from "./secret-names";
 /** Environments supported by the shared project configuration. */
 export const environmentNames = [
   "local",
-  "sai-local",
   "dev",
   "qa",
   "production",
@@ -32,7 +31,6 @@ export type SecretProviderName = (typeof secretProviderNames)[number];
  */
 export const environmentProviderCompatibility: Record<EnvironmentName, readonly SecretProviderName[]> = {
   local: ["dotenv", "password-manager"],
-  "sai-local": ["dotenv", "password-manager"],
   dev: ["password-manager", "railway"],
   qa: ["password-manager", "railway"],
   production: ["password-manager", "railway"],
@@ -40,10 +38,37 @@ export const environmentProviderCompatibility: Record<EnvironmentName, readonly 
 
 const defaultSecretProviderByEnvironment: Record<EnvironmentName, SecretProviderName> = {
   local: "dotenv",
-  "sai-local": "dotenv",
   dev: "railway",
   qa: "railway",
   production: "railway",
+};
+
+const safeProfileSegment = z
+  .string()
+  .min(1)
+  .max(63)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must contain only lowercase letters, numbers, and single hyphens");
+
+/** Input supplied by a local developer; it is not read from process.env. */
+export const LocalProfileInputSchema = z
+  .object({
+    devName: safeProfileSegment,
+    envName: z.literal("local"),
+    publicUrl: z
+      .string()
+      .url()
+      .refine((value) => new URL(value).protocol === "https:", "must use https")
+      .optional(),
+  })
+  .strict();
+export type LocalProfileInput = z.input<typeof LocalProfileInputSchema>;
+
+export type LocalProfileIdentity = {
+  devName: string;
+  envName: "local";
+  profileName: string;
+  hostname: string;
+  publicUrl: string;
 };
 
 /** A service receives a named, allowlisted slice of non-secret settings. */

@@ -39,8 +39,8 @@ describe("resolved configuration output", () => {
   });
 
   it("uses stable ordering and deterministic fingerprints", () => {
-    const first = loadResolvedConfig("sai-local");
-    const second = loadResolvedConfig("sai-local");
+    const first = loadResolvedConfig("local");
+    const second = loadResolvedConfig("local");
     expect(first).toEqual(second);
     const firstOrdering = { z: 1, a: { d: true, c: false } };
     const secondOrdering = { a: { c: false, d: true }, z: 1 };

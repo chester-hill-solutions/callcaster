@@ -18,7 +18,7 @@ describe("runtime config comparison", () => {
   });
 
   it("uses S3 aliases before Railway and AWS-compatible aliases", () => {
-    const result = compareRuntimeConfig("sai-local", {
+    const result = compareRuntimeConfig("local", {
       ...localEnv,
       ENDPOINT: "https://storage.railway.app",
       REGION: "iad",

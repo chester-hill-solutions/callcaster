@@ -2,7 +2,7 @@ import { loadResolvedConfig } from "../config/resolved";
 import { EnvironmentNameSchema } from "../config/schema";
 
 function usage(): never {
-  throw new Error("usage: npm run config:show -- --environment <local|sai-local|dev|qa|production> [--json]");
+  throw new Error("usage: npm run config:show -- --environment <local|dev|qa|production> [--json]");
 }
 
 function parseArgs(args: string[]): { environment: string; json: boolean } {

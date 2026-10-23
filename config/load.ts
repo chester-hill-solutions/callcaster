@@ -4,6 +4,9 @@ import { z } from "zod";
 import {
   ConfigValidationError,
   EnvironmentNameSchema,
+  LocalProfileInputSchema,
+  type LocalProfileIdentity,
+  type LocalProfileInput,
   parseProjectConfig,
   ProjectConfigOverlaySchema,
   type EnvironmentName,
@@ -78,6 +81,37 @@ export function loadProjectConfig(
   };
 
   return deepFreeze(resolve(requested.data));
+}
+
+export type LocalProjectConfigResolution = {
+  config: ProjectConfig;
+  identity: LocalProfileIdentity;
+};
+
+/** Resolve local configuration for one developer without reading dotenv or process.env. */
+export function resolveLocalProjectConfig(input: LocalProfileInput): LocalProjectConfigResolution {
+  const profile = LocalProfileInputSchema.parse(input);
+  const derivedHostname = `${profile.devName}-${profile.envName}.callcaster.ca`;
+  const publicUrl = profile.publicUrl ?? `https://${derivedHostname}`;
+  const hostname = new URL(publicUrl).hostname;
+  const config = loadProjectConfig("local", {
+    ...environmentConfigs,
+    local: {
+      ...environmentConfigs.local,
+      urls: { publicApp: publicUrl },
+    },
+  });
+
+  return {
+    config,
+    identity: deepFreeze({
+      devName: profile.devName,
+      envName: profile.envName,
+      profileName: `${profile.devName}-${profile.envName}`,
+      hostname,
+      publicUrl,
+    }),
+  };
 }
 
 export { environmentConfigs } from "./environments";

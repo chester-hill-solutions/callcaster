@@ -6,7 +6,7 @@ import { loadProjectConfig } from "./load";
 import { stableFingerprint } from "./resolved";
 import type { EnvironmentName, ProjectConfig } from "./schema";
 
-const diagnosticEnvironments = ["local", "sai-local", "dev", "qa"] as const;
+const diagnosticEnvironments = ["local", "dev", "qa"] as const;
 type DiagnosticEnvironment = (typeof diagnosticEnvironments)[number];
 
 export type RuntimeConfigPath =
