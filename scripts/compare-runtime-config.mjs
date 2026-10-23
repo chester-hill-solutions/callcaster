@@ -6,10 +6,14 @@ async function main() {
   let environment;
   let json = false;
   let localMode = "standard";
+  let localModeSupplied = false;
   for (let index = 0; index < process.argv.length - 2; index += 1) {
     const arg = process.argv[index + 2];
     if (arg === "--json") json = true;
-    else if (arg === "--local-mode" && process.argv[index + 3]) localMode = process.argv[++index + 2];
+    else if (arg === "--local-mode" && process.argv[index + 3]) {
+      localModeSupplied = true;
+      localMode = process.argv[++index + 2];
+    }
     else if (arg === "--environment" && process.argv[index + 3]) environment = process.argv[++index + 2];
     else throw new Error(usageMessage);
   }
@@ -17,6 +21,7 @@ async function main() {
   const parsed = EnvironmentNameSchema.safeParse(environment);
   if (!parsed.success) throw new Error("unknown environment");
   if (localMode !== "standard" && localMode !== "dev-local") throw new Error(usageMessage);
+  if (localModeSupplied && parsed.data !== "local") throw new Error(usageMessage);
 
   const report = await compareRuntimeConfig(parsed.data, process.env, { localMode });
   process.stdout.write(`${JSON.stringify(report, null, json ? 0 : 2)}\n`);

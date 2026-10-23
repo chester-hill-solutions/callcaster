@@ -151,6 +151,35 @@ describe("runtime config comparison", () => {
     expect(result.stderr).not.toContain("at ");
   });
 
+  it("rejects local mode for a deployment environment before comparison", () => {
+    const secretEndpoint = "https://user:token@[bad.example.invalid";
+    const result = spawnSync(
+      "npx",
+      [
+        "--no-install",
+        "tsx",
+        "--tsconfig",
+        "tsconfig.json",
+        resolve("scripts/compare-runtime-config.mjs"),
+        "--environment",
+        "dev",
+        "--local-mode",
+        "standard",
+      ],
+      {
+        cwd: resolve("."),
+        encoding: "utf8",
+        env: { ...process.env, S3_ENDPOINT: secretEndpoint, ENDPOINT: secretEndpoint },
+      },
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("usage: npm run config:compare-runtime");
+    expect(result.stderr).not.toContain(secretEndpoint);
+    expect(result.stderr).not.toContain("at ");
+    expect(result.stderr).not.toContain(process.cwd());
+  });
+
   it("does not read runtime values for production", async () => {
     const env = new Proxy({}, { get() { throw new Error("runtime env was read"); } }) as NodeJS.ProcessEnv;
     await expect(compareRuntimeConfig("production", env)).resolves.toEqual({
