@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ConfigValidationError,
@@ -6,6 +7,11 @@ import {
   SecretNameSchema,
   validateInheritanceGraph,
 } from "../config/schema";
+import { secretNames } from "../config/secret-names";
+
+const phaseZeroCatalog = JSON.parse(
+  readFileSync(new URL("../scripts/configuration-inventory/catalog.json", import.meta.url), "utf8"),
+) as { entries: Array<{ key: string; classification: string }> };
 
 const valid = {
   environment: "local",
@@ -27,6 +33,15 @@ describe("ProjectConfig schema", () => {
     expect(SecretNameSchema.safeParse("DATABASE_URL").success).toBe(true);
     expect(SecretReferenceSchema.safeParse({ name: "DATABASE_URL", value: "secret" }).success).toBe(false);
     expect(SecretReferenceSchema.safeParse({ name: "DATABASE_URL", provider: "dotenv" }).success).toBe(false);
+  });
+
+  it("keeps the typed secret-name catalog equal to the Phase 0 classification catalog", () => {
+    const classifiedSecretNames = phaseZeroCatalog.entries
+      .filter((entry) => entry.classification === "secret")
+      .map((entry) => entry.key);
+
+    expect(new Set(classifiedSecretNames).size).toBe(classifiedSecretNames.length);
+    expect(secretNames).toEqual(classifiedSecretNames);
   });
 
   it("matches providers to the local and Railway deployment topology", () => {
