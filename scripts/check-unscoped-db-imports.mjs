@@ -1,122 +1,178 @@
 #!/usr/bin/env node
 /**
- * ADR-0004 service-layer boundary: an unscoped database client is not
- * importable from `app/lib` by default.
- *
- * `adminDb` and the base `db` client both bypass workspace tenancy (there is no
- * RLS), so every import is a cross-workspace capability or a place where a
- * missing `.where(workspace)` leaks another tenant's rows. The route tree
- * already bans both in eslint (`eslint.config.mjs`); this guard extends the
- * rule to the service layer, where the actual tenant reads happen.
- *
- * Ratchet: existing importers are baselined in
- * scripts/baselines/unscoped-db-imports.txt (`<file>::<module>` lines). This
- * check fails on NEW offenders and on STALE baseline entries, so the list can
- * only shrink. Use `createTenantDb` from `@/server/tenant-db` for tenant data.
- *
- * Usage:
- *   node scripts/check-unscoped-db-imports.mjs            # gate
- *   node scripts/check-unscoped-db-imports.mjs --baseline # rewrite baseline
+ * ADR-0004: app/lib must use createTenantDb for tenant data. Existing direct
+ * database imports are counted in scripts/baselines/unscoped-db-imports.txt
+ * as <file>::<module><TAB><count>. New/increased debt and stale/reduced debt
+ * fail. After removing debt, rewrite with --baseline. --root=<fixture>
+ * applies to the scan and all baseline reads/writes for isolated CLI tests.
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
+import ts from "typescript";
 
-const ROOT = join(import.meta.dirname, "..");
-const LIB_DIR = join(ROOT, "app", "lib");
-const BASELINE = join(import.meta.dirname, "baselines", "unscoped-db-imports.txt");
+const BANNED_MODULES = new Set(["@/server/admin-db", "@/server/db"]);
+const SOURCE_EXTENSION = /\.(?:[cm]?[jt]s|[jt]sx)$/;
 
-/** Unscoped clients that bypass workspace tenancy. Extend as more are adopted. */
-const BANNED_MODULES = ["@/server/admin-db", "@/server/db"];
+function options() {
+  let root = resolve(import.meta.dirname, "..");
+  let rootSeen = false;
+  let rewrite = false;
+  for (const arg of process.argv.slice(2)) {
+    if (arg === "--baseline") rewrite = true;
+    else if (arg.startsWith("--root=") && arg.slice(7).trim() && !rootSeen) {
+      root = resolve(arg.slice(7));
+      rootSeen = true;
+    } else
+      throw new Error(
+        `Invalid option: ${arg}. Use --root=<directory> and/or --baseline.`,
+      );
+  }
+  return { root, rewrite };
+}
 
 function listSourceFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...listSourceFiles(full));
-    else if (entry.name.endsWith(".ts")) out.push(full);
+    else if (entry.isFile() && SOURCE_EXTENSION.test(entry.name))
+      out.push(full);
   }
   return out;
 }
 
-function importsBannedModule(source, moduleName) {
-  const escaped = moduleName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const staticImport = new RegExp(`\\bfrom\\s+["']${escaped}["']`);
-  const dynamicImport = new RegExp(`\\bimport\\(\\s*["']${escaped}["']\\s*\\)`);
-  return staticImport.test(source) || dynamicImport.test(source);
-}
-
-function readBaseline() {
-  try {
-    return new Set(
-      readFileSync(BASELINE, "utf8")
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line && !line.startsWith("#")),
-    );
-  } catch {
-    return new Set();
+function moduleArgument(node) {
+  if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
+    return node.moduleSpecifier;
+  if (
+    ts.isImportEqualsDeclaration(node) &&
+    ts.isExternalModuleReference(node.moduleReference)
+  ) {
+    return node.moduleReference.expression;
   }
+  if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument))
+    return node.argument.literal;
+  if (
+    ts.isCallExpression(node) &&
+    (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(node.expression) && node.expression.text === "require"))
+  )
+    return node.arguments[0];
+  return undefined;
 }
 
-function collectCurrent() {
-  const current = new Set();
-  for (const file of listSourceFiles(LIB_DIR)) {
-    const rel = relative(ROOT, file).split(sep).join("/");
-    const source = readFileSync(file, "utf8");
-    for (const moduleName of BANNED_MODULES) {
-      if (importsBannedModule(source, moduleName)) {
-        current.add(`${rel}::${moduleName}`);
+function collectCurrent(root) {
+  const current = new Map();
+  for (const file of listSourceFiles(join(root, "app/lib"))) {
+    const parsed = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    const rel = relative(root, file).split(sep).join("/");
+    function visit(node) {
+      let arg = moduleArgument(node);
+      while (arg && ts.isParenthesizedExpression(arg)) arg = arg.expression;
+      if (
+        arg &&
+        (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg)) &&
+        BANNED_MODULES.has(arg.text)
+      ) {
+        const key = `${rel}::${arg.text}`;
+        current.set(key, (current.get(key) ?? 0) + 1);
       }
+      ts.forEachChild(node, visit);
     }
+    visit(parsed);
   }
   return current;
 }
 
-function main() {
-  const current = collectCurrent();
-
-  if (process.argv.includes("--baseline")) {
-    writeFileSync(BASELINE, `${[...current].sort().join("\n")}\n`);
-    console.log(
-      `[check-unscoped-db-imports] baseline rewritten: ${current.size} entries`,
-    );
-    return;
+function readBaseline(file) {
+  let source;
+  try {
+    source = readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return new Map();
+    throw error;
   }
-
-  const baselined = readBaseline();
-  const fresh = [...current].filter((key) => !baselined.has(key)).sort();
-  const stale = [...baselined].filter((key) => !current.has(key)).sort();
-
-  if (fresh.length === 0 && stale.length === 0) {
-    console.log(
-      `check-unscoped-db-imports: ${current.size} baselined importer(s), no drift.`,
-    );
-    return;
+  const result = new Map();
+  for (const [index, line] of source.split("\n").entries()) {
+    if (!line.trim() || line.startsWith("#")) continue;
+    const [key, count, extra] = line.split("\t");
+    if (
+      !/^app\/lib\/.+::@\/server\/(?:admin-db|db)$/.test(key) ||
+      !/^[1-9]\d*$/.test(count ?? "") ||
+      !Number.isSafeInteger(Number(count)) ||
+      extra !== undefined ||
+      result.has(key)
+    ) {
+      throw new Error(
+        `Invalid baseline entry at ${file}:${index + 1}; expected a unique file::module<TAB>positive-count.`,
+      );
+    }
+    result.set(key, Number(count));
   }
-
-  if (fresh.length > 0) {
-    console.error(
-      `check-unscoped-db-imports FAILED — ${fresh.length} new import(s) of an unscoped client in app/lib:\n`,
-    );
-    for (const key of fresh) console.error(`  ${key}`);
-    console.error(
-      `\nUse createTenantDb from @/server/tenant-db, or add an entry to ` +
-        `${relative(ROOT, BASELINE)} and justify it in the PR.`,
-    );
-  }
-
-  if (stale.length > 0) {
-    console.error(
-      `\ncheck-unscoped-db-imports FAILED — ${stale.length} stale baseline ` +
-        `entr${stale.length === 1 ? "y" : "ies"} no longer importing:\n`,
-    );
-    for (const key of stale) console.error(`  ${key}`);
-    console.error(
-      "\nRemove them: node scripts/check-unscoped-db-imports.mjs --baseline",
-    );
-  }
-
-  process.exit(1);
+  return result;
 }
 
-main();
+function shellQuote(value) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function main() {
+  const { root, rewrite } = options();
+  const baseline = join(root, "scripts/baselines/unscoped-db-imports.txt");
+  const current = collectCurrent(root);
+  if (rewrite) {
+    mkdirSync(dirname(baseline), { recursive: true });
+    writeFileSync(
+      baseline,
+      [...current]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, count]) => `${key}\t${count}\n`)
+        .join(""),
+    );
+    console.log(
+      `check-unscoped-db-imports: baseline rewritten with ${current.size} importer/module entries.`,
+    );
+    return;
+  }
+  const allowed = readBaseline(baseline);
+  const keys = [...new Set([...current.keys(), ...allowed.keys()])].sort();
+  const drift = keys.filter(
+    (key) => (current.get(key) ?? 0) !== (allowed.get(key) ?? 0),
+  );
+  if (!drift.length) {
+    console.log(
+      `check-unscoped-db-imports: ${current.size} baselined importer/module entries, no drift.`,
+    );
+    return;
+  }
+  console.error(
+    "check-unscoped-db-imports FAILED — unscoped database import count drift:",
+  );
+  for (const key of drift)
+    console.error(
+      `  ${key}: current ${current.get(key) ?? 0}, permitted ${allowed.get(key) ?? 0}`,
+    );
+  console.error(
+    "Use createTenantDb from @/server/tenant-db for new tenant access. Do not increase the baseline to accept new debt.",
+  );
+  const rootArg =
+    root === resolve(import.meta.dirname, "..")
+      ? ""
+      : ` --root=${shellQuote(root)}`;
+  console.error(
+    `After removing debt, rewrite stale counts: node scripts/check-unscoped-db-imports.mjs${rootArg} --baseline`,
+  );
+  process.exitCode = 1;
+}
+
+try {
+  main();
+} catch (error) {
+  console.error(`check-unscoped-db-imports FAILED: ${error.message}`);
+  process.exitCode = 1;
+}
