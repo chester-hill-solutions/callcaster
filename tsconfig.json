@@ -8,6 +8,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "shared/**/*.ts",
+    "config/**/*.ts",
     "server/**/*.ts",
     "worker/**/*.ts",
     "services/**/*.ts",
