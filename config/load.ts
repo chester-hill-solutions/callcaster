@@ -32,6 +32,14 @@ function invalid(message: string): never {
   throw new ConfigValidationError(new z.ZodError([{ code: "custom", path: [], message }]));
 }
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
+  }
+  return value;
+}
+
 /** Resolve one environment after validating every overlay and parent link. */
 export function loadProjectConfig(
   environment: EnvironmentName,
@@ -69,7 +77,7 @@ export function loadProjectConfig(
     return config;
   };
 
-  return resolve(requested.data);
+  return deepFreeze(resolve(requested.data));
 }
 
 export { environmentConfigs } from "./environments";
