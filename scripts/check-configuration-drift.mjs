@@ -26,10 +26,11 @@ function catalogEntryMap(catalog) {
     .map((entry) => [entry.key, entry]));
 }
 
-export function buildDriftReport({ catalog, records, staleInventory = false }) {
+export function buildDriftReport({ catalog, records, staleInventory = false, catalogIssue = null }) {
   const findings = [];
   const entries = Array.isArray(catalog?.entries) ? catalog.entries : [];
   const boundaries = (Array.isArray(catalog?.dynamicBoundaries) ? catalog.dynamicBoundaries : []).filter(Boolean);
+  const allowedClassifications = Array.isArray(catalog?.allowedClassifications) ? catalog.allowedClassifications : [];
   const entryMap = catalogEntryMap(catalog);
   const mainRecords = records.filter((record) => !RUNTIME_KINDS.has(record.sourceKind));
   const mainKeys = new Set(mainRecords.filter((record) => record.key).map((record) => record.key));
@@ -38,10 +39,12 @@ export function buildDriftReport({ catalog, records, staleInventory = false }) {
     .map(boundaryId));
   const catalogBoundaryIds = new Set(boundaries.map((boundary) => `${boundary.sourceFile}:${boundary.line}:${boundary.expression ?? ""}`));
 
-  if (!catalog || catalog.version !== 1 || !Array.isArray(catalog.entries) || !Array.isArray(catalog.dynamicBoundaries)) {
+  if (catalogIssue) {
+    findings.push({ type: "invalid-catalog", detail: `Catalog is ${catalogIssue}.` });
+  } else if (!catalog || catalog.version !== 1 || !Array.isArray(catalog.entries) || !Array.isArray(catalog.dynamicBoundaries)) {
     findings.push({ type: "invalid-catalog", detail: "Catalog must contain version 1 entries and dynamicBoundaries arrays." });
   }
-  if (JSON.stringify(catalog?.allowedClassifications) !== JSON.stringify([
+  if (JSON.stringify(allowedClassifications) !== JSON.stringify([
     "non-secret-config", "secret", "generated-deployment-value", "obsolete",
   ])) {
     findings.push({ type: "invalid-catalog", detail: "Catalog classifications do not match the approved set." });
@@ -55,7 +58,7 @@ export function buildDriftReport({ catalog, records, staleInventory = false }) {
     }
     if (seenKeys.has(entry.key)) findings.push({ type: "invalid-catalog", key: entry.key, detail: "Duplicate catalog key." });
     seenKeys.add(entry.key);
-    if (!catalog.allowedClassifications?.includes(entry.classification)) findings.push({ type: "invalid-catalog", key: entry.key, detail: "Invalid classification." });
+    if (!allowedClassifications.includes(entry.classification)) findings.push({ type: "invalid-catalog", key: entry.key, detail: "Invalid classification." });
     if (typeof entry.owner !== "string" || !entry.owner || entry.owner === "unassigned") findings.push({ type: "invalid-catalog", key: entry.key, detail: "Missing owner." });
     if (typeof entry.migrationTarget !== "string" || !entry.migrationTarget || entry.migrationTarget === "unassigned") findings.push({ type: "invalid-catalog", key: entry.key, detail: "Missing migration target." });
   }
@@ -120,8 +123,21 @@ function markdown(report) {
   return `${lines.join("\n")}\n`;
 }
 
+async function loadCatalog(root) {
+  try {
+    const text = await readFile(path.join(root, "scripts/configuration-inventory/catalog.json"), "utf8");
+    try {
+      return { catalog: JSON.parse(text), catalogIssue: null };
+    } catch {
+      return { catalog: null, catalogIssue: "malformed" };
+    }
+  } catch {
+    return { catalog: null, catalogIssue: "missing-or-unreadable" };
+  }
+}
+
 export async function runConfigurationDriftCheck(root) {
-  const catalog = JSON.parse(await readFile(path.join(root, "scripts/configuration-inventory/catalog.json"), "utf8"));
+  const { catalog, catalogIssue } = await loadCatalog(root);
   const records = await scanRepository(root);
   let staleInventory = false;
   try {
@@ -129,7 +145,7 @@ export async function runConfigurationDriftCheck(root) {
   } catch {
     staleInventory = true;
   }
-  return buildDriftReport({ catalog, records, staleInventory });
+  return buildDriftReport({ catalog, records, staleInventory, catalogIssue });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

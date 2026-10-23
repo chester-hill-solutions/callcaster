@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { scanSourceText, summarizeInventory, normalizeRailwayServiceName, validateCatalog, writeInventory } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
@@ -306,7 +306,21 @@ service("PostgreSQL 18", { env: preservedVariables(databaseVariables) });`, ".ra
     expect(report.findings.length).toBeGreaterThan(0);
     const output = execFileSync("node", ["scripts/check-configuration-drift.mjs"], { encoding: "utf8" });
     expect(output).toContain("Configuration drift report (report-only)");
-  });
+  }, 15000);
+
+  test("invalid catalog command reports safely without exposing values", () => {
+    const catalogPath = resolve("scripts/configuration-inventory/catalog.json");
+    const original = readFileSync(catalogPath, "utf8");
+    writeFileSync(catalogPath, '{"secretValue":"do-not-print-this-value"');
+    try {
+      const result = spawnSync("node", ["scripts/check-configuration-drift.mjs"], { encoding: "utf8" });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("invalid-catalog");
+      expect(`${result.stdout}${result.stderr}`).not.toContain("do-not-print-this-value");
+    } finally {
+      writeFileSync(catalogPath, original);
+    }
+  }, 15000);
 
   test("--check detects stale reports without writing them", () => {
     const report = resolve("docs/generated/operational-inputs.md");

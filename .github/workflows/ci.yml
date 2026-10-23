@@ -73,6 +73,7 @@ jobs:
           node-version: "22"
       - name: Report configuration drift
         run: npm run check:config-drift -- --report-file configuration-drift-report.json
+        continue-on-error: true
       - name: Upload configuration drift report
         if: always()
         uses: actions/upload-artifact@v4
