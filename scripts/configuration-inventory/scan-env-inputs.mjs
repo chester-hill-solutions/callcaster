@@ -92,36 +92,66 @@ function entry({ key = null, sourceKind, sourceFile, line, consumer, usage = "re
   };
 }
 
-function collectKnownStringArrays(text) {
-  const values = new Map();
-  const pattern = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[([\s\S]*?)\]/g;
-  for (const match of text.matchAll(pattern)) {
-    const keys = [...match[2].matchAll(/['"]([A-Z][A-Z0-9_]+)['"]/g)].map((m) => m[1]);
-    if (keys.length) values.set(match[1], keys);
+function matchingDelimiter(text, start) {
+  const closing = { "[": "]", "{": "}", "(": ")" }[text[start]];
+  if (!closing) return -1;
+  let depth = 0;
+  let quote = null;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === text[start]) depth += 1;
+    if (character === closing && --depth === 0) return index;
   }
-  return values;
+  return -1;
 }
 
-function collectInjectedEnvironmentAliases(text) {
-  const environmentNames = new Set([
-    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*NodeJS\.ProcessEnv\b/g)].map((match) => match[1]),
-    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*process\.env\b/g)].map((match) => match[1]),
-  ]);
-  if (!environmentNames.size) return { environmentNames, keys: [] };
-
-  const keys = new Set();
-  for (const match of text.matchAll(/\[([\s\S]*?)\]/g)) {
-    for (const key of match[1].matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)) keys.add(key[1]);
+function collectKnownCollections(text) {
+  const collections = new Map();
+  for (const match of text.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*(\[|\{)/g)) {
+    const end = matchingDelimiter(text, match.index + match[0].length - 1);
+    if (end < 0) continue;
+    const values = [...text.slice(match.index, end + 1).matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((item) => item[1]);
+    if (values.length) collections.set(match[1], values);
   }
-  return { environmentNames, keys: [...keys] };
+  return collections;
+}
+
+function collectEnvironmentNames(text) {
+  return new Set([
+    "process.env",
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*NodeJS\.ProcessEnv\b/g)].map((match) => match[1]),
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*process\.env\b(?!\s*(?:\.|\[))/g)].map((match) => match[1]),
+  ]);
+}
+
+function collectionForAccess(text, collections, keyName, accessIndex) {
+  const prefix = text.slice(0, accessIndex);
+  const method = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\[[^\]\n]+\])?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)].at(-1);
+  if (method && method[2] === keyName && collections.has(method[1])) return method[1];
+  const loop = [...prefix.matchAll(/for\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+([A-Za-z_$][\w$]*)(?:\[[^\]\n]+\])?\s*\)\s*\{/g)].at(-1);
+  if (loop && loop[1] === keyName && collections.has(loop[2])) return loop[2];
+  if (method) {
+    const nested = [...prefix.matchAll(new RegExp(`\\b([A-Za-z_$][\\w$]*)\\s*\\.\\s*(?:some|every|filter|map|forEach)\\s*\\(\\s*\\(?\\s*${method[1]}\\s*\\)?\\s*=>`, "g"))].at(-1);
+    if (nested && collections.has(nested[1])) return nested[1];
+  }
+  return null;
 }
 
 export function scanSourceText(text, sourceFile) {
   const records = [];
   const consumer = consumerFor(sourceFile);
   if (sourceFile === "scripts/configuration-inventory/catalog.json") return records;
-  const knownArrays = collectKnownStringArrays(text);
-  const injectedEnvironmentAliases = collectInjectedEnvironmentAliases(text);
+  const knownCollections = collectKnownCollections(text);
+  const environmentNames = collectEnvironmentNames(text);
   const seen = new Set();
   const add = (record) => {
     const identity = JSON.stringify(record);
@@ -181,23 +211,17 @@ export function scanSourceText(text, sourceFile) {
   }
 
   if (!sourceFile.startsWith(".github/workflows/")) for (const match of text.matchAll(/process\.env\s*\[\s*([A-Za-z_$][\w$]*)\s*\]/g)) {
-    const keys = knownArrays.get(match[1]);
-    const inferredEntry = [...knownArrays.entries()].find(([arrayName]) =>
-      text.includes(`${arrayName}.some`) &&
-      text.includes(`process.env[${match[1]}]`),
-    );
-    const inferredKeys = inferredEntry?.[1];
-    if (keys?.length || inferredKeys?.length) {
-      for (const key of keys ?? inferredKeys) {
+    const collectionName = collectionForAccess(text, knownCollections, match[1], match.index);
+    const keys = collectionName ? knownCollections.get(collectionName) : null;
+    if (keys?.length) {
+      for (const key of keys) {
         add(entry({
           key,
           sourceKind: sourceKindForRead(sourceFile),
           sourceFile,
           line: lineNumberAt(text, match.index),
           consumer,
-          notes: keys
-            ? `Resolved from the ${match[1]} key list.`
-            : `Resolved from the ${inferredEntry[0]} key list.`,
+          notes: `Resolved from the ${collectionName} key collection.`,
         }));
       }
     } else {
@@ -212,17 +236,21 @@ export function scanSourceText(text, sourceFile) {
     }
   }
 
-  for (const environmentName of injectedEnvironmentAliases.environmentNames) {
+  for (const environmentName of environmentNames) {
+    if (environmentName === "process.env") continue;
     const escapedName = environmentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     for (const match of text.matchAll(new RegExp(`${escapedName}\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]`, "g"))) {
-      for (const key of injectedEnvironmentAliases.keys) {
+      const collectionName = collectionForAccess(text, knownCollections, match[1], match.index);
+      const keys = collectionName ? knownCollections.get(collectionName) : null;
+      if (!keys?.length) continue;
+      for (const key of keys) {
         add(entry({
           key,
           sourceKind: sourceKindForRead(sourceFile),
           sourceFile,
           line: lineNumberAt(text, match.index),
           consumer,
-          notes: `Resolved from static environment-key arrays used with ${environmentName}.`,
+          notes: `Resolved from the ${collectionName} key collection used with ${environmentName}.`,
         }));
       }
     }

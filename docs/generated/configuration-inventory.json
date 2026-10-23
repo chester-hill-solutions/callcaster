@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "ba3b33615ae38f6e5fc6c9253c807ac6336f9ff0c8d978ec0526b01e588e18ec",
+    "recordDigest": "fedf021d58f068e95538003a0b9d60571bc8bff264e4ac3052b6828fa748a04b",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -7645,214 +7645,6 @@
       ]
     },
     {
-      "key": "BETTER_AUTH_URL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "DATABASE_DIRECT_URL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "app",
-      "migrationTarget": "config.secrets.app",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "MEDIA_STREAM_HOST",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "app",
-      "migrationTarget": "config.services.app",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "MEDIA_STREAM_SECRET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "local-tooling",
-      "migrationTarget": "config.secrets.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "S3_BUCKET_AUDIO",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "S3_BUCKET_EXPORTS",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "S3_BUCKET_MEDIA",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "STRIPE_WEBHOOK_SECRET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "TWILIO_EVENTS_SINK_SECRET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "local-tooling",
-      "migrationTarget": "config.secrets.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "TWILIO_LOOKUP_ENABLED",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
-      "key": "TWILIO_VALIDATE_WEBHOOKS",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/env.server.ts",
-      "line": 86,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "scripts",
-      "migrationTarget": "config.services.scripts",
-      "notes": "Resolved from static environment-key arrays used with v."
-    },
-    {
       "key": "STRIPE_SECRET_KEY",
       "sourceKind": "runtime-read",
       "sourceFile": "app/lib/env.server.ts",
@@ -8061,7 +7853,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_ACCESS_KEY_ID",
@@ -8077,7 +7869,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_DEFAULT_REGION",
@@ -8093,7 +7885,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_ENDPOINT_URL",
@@ -8109,7 +7901,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_S3_BUCKET_NAME",
@@ -8125,7 +7917,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_SECRET_ACCESS_KEY",
@@ -8141,7 +7933,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "BUCKET",
@@ -8157,7 +7949,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "ENDPOINT",
@@ -8173,7 +7965,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "REGION",
@@ -8189,7 +7981,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_ACCESS_KEY_ID",
@@ -8205,7 +7997,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_BUCKET",
@@ -8221,7 +8013,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_ENDPOINT",
@@ -8237,7 +8029,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_REGION",
@@ -8253,7 +8045,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
@@ -8269,7 +8061,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "SECRET_ACCESS_KEY",
@@ -8285,7 +8077,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "ACCESS_KEY_ID",
@@ -8301,7 +8093,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_ACCESS_KEY_ID",
@@ -8317,7 +8109,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_DEFAULT_REGION",
@@ -8333,7 +8125,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_ENDPOINT_URL",
@@ -8349,7 +8141,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_S3_BUCKET_NAME",
@@ -8365,7 +8157,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "AWS_SECRET_ACCESS_KEY",
@@ -8381,7 +8173,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "BUCKET",
@@ -8397,7 +8189,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "ENDPOINT",
@@ -8413,7 +8205,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "REGION",
@@ -8429,7 +8221,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_ACCESS_KEY_ID",
@@ -8445,7 +8237,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_BUCKET",
@@ -8461,7 +8253,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_ENDPOINT",
@@ -8477,7 +8269,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_REGION",
@@ -8493,7 +8285,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
@@ -8509,7 +8301,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "SECRET_ACCESS_KEY",
@@ -8525,7 +8317,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the ENV_ALIASES key collection used with env."
     },
     {
       "key": "E2E_TEST",
@@ -8751,7 +8543,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_ACCESS_KEY_ID",
@@ -8767,7 +8559,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_DEFAULT_REGION",
@@ -8783,7 +8575,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_ENDPOINT_URL",
@@ -8799,7 +8591,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_S3_BUCKET_NAME",
@@ -8815,7 +8607,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "AWS_SECRET_ACCESS_KEY",
@@ -8831,39 +8623,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "BASE_URL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "app",
-      "migrationTarget": "config.services.app",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "BETTER_AUTH_SECRET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "BUCKET",
@@ -8879,23 +8639,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "DATABASE_URL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "app",
-      "migrationTarget": "config.secrets.app",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "ENDPOINT",
@@ -8911,7 +8655,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "REGION",
@@ -8927,23 +8671,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "RESEND_API_KEY",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_ACCESS_KEY_ID",
@@ -8959,7 +8687,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_BUCKET",
@@ -8975,7 +8703,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_ENDPOINT",
@@ -8991,7 +8719,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_REGION",
@@ -9007,7 +8735,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
@@ -9023,7 +8751,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "SECRET_ACCESS_KEY",
@@ -9039,183 +8767,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "STRIPE_SECRET_KEY",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "app",
-      "migrationTarget": "config.secrets.app",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "TWILIO_APP_SID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "TWILIO_AUTH_TOKEN",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "ci",
-      "migrationTarget": "config.secrets.ci",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "TWILIO_PHONE_NUMBER",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "TWILIO_SID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 24,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "ci",
-      "migrationTarget": "config.services.ci",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "ACCESS_KEY_ID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "AWS_ACCESS_KEY_ID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "AWS_DEFAULT_REGION",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "AWS_ENDPOINT_URL",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "AWS_S3_BUCKET_NAME",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "AWS_SECRET_ACCESS_KEY",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the OBJECT_STORAGE_GROUPS key collection used with env."
     },
     {
       "key": "BASE_URL",
@@ -9231,7 +8783,7 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "BETTER_AUTH_SECRET",
@@ -9247,23 +8799,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "BUCKET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "DATABASE_URL",
@@ -9279,39 +8815,7 @@
       "classification": "secret",
       "owner": "app",
       "migrationTarget": "config.secrets.app",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "ENDPOINT",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "REGION",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "RESEND_API_KEY",
@@ -9327,103 +8831,7 @@
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "S3_ACCESS_KEY_ID",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "S3_BUCKET",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "S3_ENDPOINT",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "S3_REGION",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "non-secret-config",
-      "owner": "deployment",
-      "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "S3_SECRET_ACCESS_KEY",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
-    },
-    {
-      "key": "SECRET_ACCESS_KEY",
-      "sourceKind": "runtime-read",
-      "sourceFile": "app/lib/required-env-keys.mjs",
-      "line": 55,
-      "consumer": "app",
-      "environment": "shared",
-      "usage": "read",
-      "enabled": true,
-      "requiredness": "unknown",
-      "valueRedacted": true,
-      "classification": "secret",
-      "owner": "deployment",
-      "migrationTarget": "config.secrets.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "STRIPE_SECRET_KEY",
@@ -9439,7 +8847,7 @@
       "classification": "secret",
       "owner": "app",
       "migrationTarget": "config.secrets.app",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "TWILIO_APP_SID",
@@ -9455,7 +8863,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "TWILIO_AUTH_TOKEN",
@@ -9471,7 +8879,7 @@
       "classification": "secret",
       "owner": "ci",
       "migrationTarget": "config.secrets.ci",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "TWILIO_PHONE_NUMBER",
@@ -9487,7 +8895,7 @@
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "TWILIO_SID",
@@ -9503,7 +8911,7 @@
       "classification": "non-secret-config",
       "owner": "ci",
       "migrationTarget": "config.services.ci",
-      "notes": "Resolved from static environment-key arrays used with env."
+      "notes": "Resolved from the REQUIRED_ENV_KEYS key collection used with env."
     },
     {
       "key": "RAILWAY_ENVIRONMENT_NAME",
@@ -9534,7 +8942,7 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app",
-      "notes": "Resolved from the DISABLE_2FA_ENV_KEYS key list."
+      "notes": "Resolved from the DISABLE_2FA_ENV_KEYS key collection."
     },
     {
       "key": "E2E_DISABLE_2FA_ENFORCEMENT",
@@ -9550,7 +8958,7 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app",
-      "notes": "Resolved from the DISABLE_2FA_ENV_KEYS key list."
+      "notes": "Resolved from the DISABLE_2FA_ENV_KEYS key collection."
     },
     {
       "key": "RAILWAY_ENVIRONMENT_NAME",
@@ -10047,7 +9455,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "scripts/configuration-inventory/scan-env-inputs.mjs",
-      "line": 268,
+      "line": 296,
       "consumer": "script",
       "environment": "shared",
       "usage": "read",
@@ -12934,7 +12342,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "test/configuration-inventory.test.ts",
-      "line": 80,
+      "line": 107,
       "consumer": "test",
       "environment": "shared",
       "usage": "loader",

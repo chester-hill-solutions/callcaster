@@ -47,12 +47,39 @@ describe("configuration input inventory", () => {
 
   test("resolves static aliases through an injected ProcessEnv parameter", () => {
     const records = scanSourceText(`const ALIASES = { endpoint: ["S3_ENDPOINT", "ENDPOINT"] };
-function read(env: NodeJS.ProcessEnv = process.env, key = "endpoint") {
-  return env[key];
+function read(env: NodeJS.ProcessEnv = process.env, setting = "endpoint") {
+  return ALIASES[setting].some((key) => env[key]);
 }`, "app/object-storage.ts");
 
     expect(records.map((record) => record.key)).toEqual(["S3_ENDPOINT", "ENDPOINT"]);
     expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test("does not cross-contaminate independent injected key collections", () => {
+    const source = readFileSync(resolve("app/lib/required-env-keys.mjs"), "utf8");
+    const records = scanSourceText(source, "app/lib/required-env-keys.mjs");
+
+    expect(records.filter((record) => record.line === 55).map((record) => record.key)).toEqual([
+      "DATABASE_URL", "BETTER_AUTH_SECRET", "TWILIO_SID", "TWILIO_AUTH_TOKEN",
+      "TWILIO_APP_SID", "TWILIO_PHONE_NUMBER", "BASE_URL", "STRIPE_SECRET_KEY", "RESEND_API_KEY",
+    ]);
+    expect(records.filter((record) => record.line === 24).map((record) => record.key)).toEqual(expect.arrayContaining([
+      "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL", "S3_BUCKET", "BUCKET", "AWS_S3_BUCKET_NAME",
+    ]));
+    expect(records.filter((record) => record.line === 55).map((record) => record.key)).not.toContain("S3_ENDPOINT");
+  });
+
+  test("does not mine unrelated uppercase fixture strings for an unresolved key", () => {
+    const records = scanSourceText(
+      'const FIXTURE_NAME = "UNRELATED_FIXTURE_KEY";\nconst key = getFixtureKey();\nconst value = process.env[key];',
+      "test/configuration-inventory.test.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-test-read",
+      expression: "process.env[key]",
+    })]);
   });
 
   test("inventories every object-storage environment alias with a catalog classification", () => {
