@@ -5,7 +5,7 @@
   "description": "Observations of configuration inputs found in test source files. A key may also be listed in the runtime catalog.",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "fedf021d58f068e95538003a0b9d60571bc8bff264e4ac3052b6828fa748a04b",
+    "recordDigest": "6b4d4818c3299f0f38ef358cf99803d7710939949b131a0495e9667159113c2c",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1406,6 +1406,7 @@
       "config/load.ts",
       "config/resolved.ts",
       "config/runtime-compare.ts",
+      "config/runtime-environment.ts",
       "config/schema.ts",
       "config/secret-names.ts",
       "docker-compose.dev.yml",
@@ -2164,6 +2165,7 @@
       "test/runtime-axios.test.ts",
       "test/runtime-compare.test.ts",
       "test/runtime-csv.test.ts",
+      "test/runtime-environment.test.ts",
       "test/runtime-postcss.test.ts",
       "test/runtime-proxy-addr.test.ts",
       "test/runtime-scalar-sdk.test.ts",

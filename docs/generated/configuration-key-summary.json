@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "fedf021d58f068e95538003a0b9d60571bc8bff264e4ac3052b6828fa748a04b",
+    "recordDigest": "6b4d4818c3299f0f38ef358cf99803d7710939949b131a0495e9667159113c2c",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1404,6 +1404,7 @@
       "config/load.ts",
       "config/resolved.ts",
       "config/runtime-compare.ts",
+      "config/runtime-environment.ts",
       "config/schema.ts",
       "config/secret-names.ts",
       "docker-compose.dev.yml",
@@ -2162,6 +2163,7 @@
       "test/runtime-axios.test.ts",
       "test/runtime-compare.test.ts",
       "test/runtime-csv.test.ts",
+      "test/runtime-environment.test.ts",
       "test/runtime-postcss.test.ts",
       "test/runtime-proxy-addr.test.ts",
       "test/runtime-scalar-sdk.test.ts",
@@ -2621,7 +2623,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 3,
+      "sourceCount": 4,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -2641,7 +2643,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 3,
+      "sourceCount": 4,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -2661,7 +2663,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 3,
+      "sourceCount": 4,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -2714,7 +2716,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 20,
+      "sourceCount": 21,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "app",
@@ -2862,7 +2864,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 3,
+      "sourceCount": 4,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -3287,9 +3289,11 @@
       "key": "DEV_NAME",
       "sourceKinds": [
         "env-example",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "script"
       ],
@@ -3302,8 +3306,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 4,
-      "dynamic": false,
+      "sourceCount": 5,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "scripts",
       "migrationTarget": "config.services.scripts"
@@ -3591,7 +3595,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 3,
+      "sourceCount": 4,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -3601,9 +3605,11 @@
       "key": "ENV",
       "sourceKinds": [
         "env-example",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "script"
       ],
@@ -3615,8 +3621,8 @@
         "declaration",
         "read"
       ],
-      "sourceCount": 3,
-      "dynamic": false,
+      "sourceCount": 4,
+      "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "scripts",
       "migrationTarget": "config.generated.env"
@@ -3970,8 +3976,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 25,
-      "dynamic": false,
+      "sourceCount": 26,
+      "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "app",
       "migrationTarget": "config.generated.node_env"
@@ -4773,7 +4779,7 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -4917,7 +4923,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 15,
+      "sourceCount": 16,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -5010,7 +5016,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 15,
+      "sourceCount": 16,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -5020,9 +5026,11 @@
       "key": "S3_FORCE_PATH_STYLE",
       "sourceKinds": [
         "env-example",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "script"
       ],
@@ -5032,10 +5040,11 @@
       ],
       "usages": [
         "declaration",
+        "read",
         "write"
       ],
-      "sourceCount": 2,
-      "dynamic": false,
+      "sourceCount": 3,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "scripts",
       "migrationTarget": "config.services.scripts"
@@ -5067,7 +5076,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 15,
+      "sourceCount": 16,
       "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
@@ -5109,19 +5118,23 @@
     {
       "key": "S3_URL_STYLE",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
