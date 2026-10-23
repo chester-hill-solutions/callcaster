@@ -50,6 +50,7 @@
     "tools:components:move-settings": "node scripts/move-component-settings.mjs",
     "tools:prune:hygiene": "node scripts/prune-repo-hygiene.mjs",
     "tools:issues:board": "node scripts/generate-open-issues-board.mjs",
+    "tools:config:inventory": "node scripts/generate-configuration-inventory.mjs",
     "tools:cull:report": "node scripts/cull-report.mjs",
     "tools:twilio:subaccounts": "node scripts/twilio-subaccount-inventory.mjs",
     "tools:twilio:prune-report": "bun ./scripts/twilio-resource-prune-report.mjs",

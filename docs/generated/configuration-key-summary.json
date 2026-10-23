@@ -1,0 +1,3473 @@
+{
+  "version": 1,
+  "generatedBy": "tools:config:inventory",
+  "keys": [
+    {
+      "key": "APP_TRUSTED_ORIGINS",
+      "sourceKinds": [
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BASE_URL",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 47,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BETTER_AUTH_SECRET",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 27,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BETTER_AUTH_TRUSTED_ORIGINS",
+      "sourceKinds": [
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BETTER_AUTH_URL",
+      "sourceKinds": [
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 11,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BOARD_REVIEWED_COMMIT",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BODY",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "BUN_BINARY",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CALLCASTER_DEV_LOCAL_NODE_OK",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CC_VERDICT_GH_LOG",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CI",
+      "sourceKinds": [
+        "github-workflow-env",
+        "script-input"
+      ],
+      "consumers": [
+        "ci",
+        "e2e",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CLOUDFLARE_TUNNEL_DOMAIN",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CLOUDFLARED_BIN",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CLOUDFLARED_CONFIG_DIR",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CLOUDFLARED_CONFIG_FILE",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CLOUDFLARED_CREDENTIALS_FILE",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "COHERE_API_KEY",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "media-stream",
+        "railway",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 13,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "COVERAGE_FULL",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "CRON_SECRET",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read",
+        "write"
+      ],
+      "sourceCount": 9,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DATABASE_DIRECT_URL",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "production",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 40,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DATABASE_PUBLIC_URL",
+      "sourceKinds": [
+        "railway-variable",
+        "script-input"
+      ],
+      "consumers": [
+        "railway",
+        "script"
+      ],
+      "environments": [
+        "dev",
+        "shared"
+      ],
+      "usages": [
+        "deployment",
+        "read"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DATABASE_URL",
+      "sourceKinds": [
+        "env-example",
+        "github-secret",
+        "github-workflow-env",
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "ci",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 323,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DB_STATEMENT_TIMEOUT_MS",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DESIGN_GALLERY_ENABLED",
+      "sourceKinds": [
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DEV_NAME",
+      "sourceKinds": [
+        "env-example",
+        "script-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "script"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read",
+        "write"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DISABLE_2FA_ENFORCEMENT",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "railway",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 12,
+      "dynamic": true,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DISABLE_AUTH_RATE_LIMIT",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "DOCKERFILE",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_BASE_URL",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "e2e",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 6,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_DISABLE_2FA_ENFORCEMENT",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 8,
+      "dynamic": true,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_DISABLE_AUTH_RATE_LIMIT",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read",
+        "write"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_PORT",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_SKIP_BOOTSTRAP",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_SKIP_BUILD",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_STRIPE_SESSION",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "e2e"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "E2E_TEST",
+      "sourceKinds": [
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 12,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "ELEVENLABS_API_KEY",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "media-stream",
+        "railway",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 6,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "ENV",
+      "sourceKinds": [
+        "env-example",
+        "script-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "script"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_ARCHIVE",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_CHECKSUM",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_DOWNLOADS",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_EXECUTED",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_EXTRACTIONS",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FIXTURE_SUMS",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FLAG_A",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": true,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "FLAG_B",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": true,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "GH_TOKEN",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "GITHUB_OUTPUT",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "GITHUB_REPO",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "HOME",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "HOST",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "railway",
+        "script"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "deployment",
+        "read"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "INTEGRATION_DB_URL",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 71,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "LABEL",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "LABELS",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "LEDGER_CHECK_REQUIRE_DB",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "LOCAL_APP_URL",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "MEDIA_STREAM_HOST",
+      "sourceKinds": [
+        "env-example",
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 17,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "MEDIA_STREAM_MAX_PER_WORKSPACE",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "media-stream"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "MEDIA_STREAM_PORT",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "media-stream"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "MEDIA_STREAM_SECRET",
+      "sourceKinds": [
+        "env-example",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "write"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "NIXPACKS",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "NODE_AUTH_TOKEN",
+      "sourceKinds": [
+        "github-secret",
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment"
+      ],
+      "sourceCount": 30,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "NODE_ENV",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 80,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "NUMBERS",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "NVM_DIR",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "OPS_ALERT_EMAIL",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "OPS_ALERT_EMAILS_ENABLED",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "OWNER",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PARITY_DATABASE_URL",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PATH",
+      "sourceKinds": [
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "script",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGDATA",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGDATABASE",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGHOST",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGPASSWORD",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGPORT",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PGUSER",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PORT",
+      "sourceKinds": [
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "deployment",
+        "read"
+      ],
+      "sourceCount": 10,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "POSTGRES_DB",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "POSTGRES_PASSWORD",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "POSTGRES_USER",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PR_NUMBER",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PR_URL",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PREDICTIVE_RECOVERY_PROBE",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROBE_BASE_URL",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROBE_URL_DEV",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROBE_URL_LOCAL",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROBE_URL_PROD",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROBE_URL_QA",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROCESS_FATAL_ON_REJECTION",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROJECT",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "PROJECT_TOKEN",
+      "sourceKinds": [
+        "github-secret"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_DEPLOYMENT_DRAINING_SECONDS",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_DOCKERFILE_PATH",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT_ID",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT_NAME",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 15,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_GIT_COMMIT_SHA",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_PROJECT_ID",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RAILWAY_TOKEN",
+      "sourceKinds": [
+        "github-secret",
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment"
+      ],
+      "sourceCount": 6,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "REGION",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "REPO",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 14,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "RUN_CLIENT_MIGRATIONS_ON_BOOT",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_ACCESS_KEY_ID",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 16,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_BUCKET",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 15,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_ENDPOINT",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 15,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_FORCE_PATH_STYLE",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_REGION",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 15,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "S3_SECRET_ACCESS_KEY",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 16,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SCHEMA_DEFAULT_DRIFT_UPDATE",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SCHEMA_DRIFT_UPDATE",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SHA",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SIGNUP_OPEN",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 12,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SIM_SMS_MESSAGE",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "sim"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SMS_REPORT_PROOF_PATH",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SSL_CERT_DAYS",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STATUS_FIELD",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STATUS_VALUE",
+      "sourceKinds": [
+        "github-workflow-env"
+      ],
+      "consumers": [
+        "ci"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_BIN",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_DATA_DIR",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_HOST",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_LAUNCH",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_PORT",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STOW_VERSION",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STRIPE_API_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "runtime-read",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 20,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 9,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_ANON_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_PUBLISHABLE_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_SECRET_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_SERVICE_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_SKEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "SUPABASE_URL",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_A2P_MESSAGING_POLICY_SID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_API_KEY",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_API_SECRET",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_APP_SID",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 13,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_AUTH_TOKEN",
+      "sourceKinds": [
+        "env-example",
+        "github-workflow-env",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "ci",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 19,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
+      "sourceKinds": [
+        "env-example",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "test"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 5,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_PHONE_NUMBER",
+      "sourceKinds": [
+        "env-example",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 13,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_SID",
+      "sourceKinds": [
+        "env-example",
+        "github-workflow-env",
+        "railway-variable",
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "ci",
+        "local-tooling",
+        "railway",
+        "script",
+        "test"
+      ],
+      "environments": [
+        "dev",
+        "local",
+        "production",
+        "qa",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "deployment",
+        "read",
+        "write"
+      ],
+      "sourceCount": 17,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_TEST_ACCOUNT_SID",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_TEST_AUTH_TOKEN",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWILIO_VALIDATE_WEBHOOKS",
+      "sourceKinds": [
+        "script-input",
+        "test-input"
+      ],
+      "consumers": [
+        "script",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read",
+        "write"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TWO_FACTOR_ENABLED",
+      "sourceKinds": [
+        "runtime-read",
+        "test-input"
+      ],
+      "consumers": [
+        "app",
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "delete",
+        "read",
+        "write"
+      ],
+      "sourceCount": 21,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "TZ",
+      "sourceKinds": [
+        "test-input"
+      ],
+      "consumers": [
+        "test"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 20,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "USERPROFILE",
+      "sourceKinds": [
+        "script-input"
+      ],
+      "consumers": [
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "V2",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "production"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "V3",
+      "sourceKinds": [
+        "railway-variable"
+      ],
+      "consumers": [
+        "railway"
+      ],
+      "environments": [
+        "dev",
+        "production",
+        "qa"
+      ],
+      "usages": [
+        "deployment"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "VERIFICATION_PHONE_NUMBER",
+      "sourceKinds": [
+        "env-example",
+        "script-input"
+      ],
+      "consumers": [
+        "local-tooling",
+        "script"
+      ],
+      "environments": [
+        "local",
+        "shared"
+      ],
+      "usages": [
+        "declaration",
+        "read"
+      ],
+      "sourceCount": 2,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "VITE_DEV_HOST",
+      "sourceKinds": [
+        "env-example"
+      ],
+      "consumers": [
+        "local-tooling"
+      ],
+      "environments": [
+        "local"
+      ],
+      "usages": [
+        "declaration"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    },
+    {
+      "key": "VITEST",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "write"
+      ],
+      "sourceCount": 3,
+      "dynamic": false,
+      "classification": "unclassified",
+      "owner": "unassigned",
+      "migrationTarget": "unassigned"
+    }
+  ]
+}
