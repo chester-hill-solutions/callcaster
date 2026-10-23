@@ -4,6 +4,7 @@ import {
   environmentProviderCompatibility,
   secretProviderNames,
   type EnvironmentName,
+  type SecretName,
   type SecretProviderName,
 } from "./schema";
 import { resolveSecretPlan, secretServiceNames, type SecretServiceName } from "./secrets";
@@ -14,16 +15,17 @@ export type SecretsRequiredInput = Readonly<{
   provider?: SecretProviderName;
 }>;
 
+/** A value-free plan. This command never retrieves or returns secret values. */
 export type SecretsRequiredPlan = Readonly<{
   environment: EnvironmentName;
   service: SecretServiceName;
   provider: SecretProviderName;
-  required: readonly string[];
-  optional: readonly string[];
-  requiredAlternatives: readonly (readonly string[])[];
+  required: readonly SecretName[];
+  optional: readonly SecretName[];
+  requiredAlternatives: readonly (readonly SecretName[])[];
 }>;
 
-const sorted = (names: readonly string[]): string[] => [...names].sort();
+const sorted = (names: readonly SecretName[]): SecretName[] => [...names].sort();
 
 export function planRequiredSecrets(input: SecretsRequiredInput): SecretsRequiredPlan {
   const provider = input.provider ?? defaultSecretProvider(input.environment);
