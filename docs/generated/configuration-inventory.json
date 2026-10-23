@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "ba15d941ecf8eb82edc9cec56e13e877cb2e7e6f7486e8c8d6c8b5905d2a352b",
+    "recordDigest": "dfb22af57378f7d323162befbe7abeb12059fb727c1110b4100dfcd90514c7aa",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -9782,7 +9782,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "scripts/configuration-inventory/scan-env-inputs.mjs",
-      "line": 377,
+      "line": 457,
       "consumer": "script",
       "environment": "shared",
       "usage": "read",
@@ -12690,7 +12690,7 @@
       "key": null,
       "sourceKind": "dotenv-load",
       "sourceFile": "test/configuration-inventory.test.ts",
-      "line": 173,
+      "line": 199,
       "consumer": "test",
       "environment": "shared",
       "usage": "loader",

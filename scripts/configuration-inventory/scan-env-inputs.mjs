@@ -138,13 +138,92 @@ function matchingDelimiter(text, start) {
   return -1;
 }
 
+function topLevelParts(text, start, end) {
+  const parts = [];
+  let partStart = start;
+  let depth = 0;
+  let quote = null;
+  for (let index = start; index < end; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "[" || character === "{" || character === "(") depth += 1;
+    else if (character === "]" || character === "}" || character === ")") depth -= 1;
+    else if (character === "," && depth === 0) {
+      parts.push([partStart, index]);
+      partStart = index + 1;
+    }
+  }
+  parts.push([partStart, end]);
+  return parts;
+}
+
+function staticArrayValues(text, start, end) {
+  return [...text.slice(start, end).matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((match) => match[1]);
+}
+
+function objectArrayValues(text, start, end) {
+  const values = [];
+  const properties = new Map();
+  let safe = true;
+  for (const [partStart, partEnd] of topLevelParts(text, start + 1, end)) {
+    const part = text.slice(partStart, partEnd);
+    const colon = part.indexOf(":");
+    if (colon < 0) {
+      if (part.trim()) safe = false;
+      continue;
+    }
+    let valueStart = partStart + colon + 1;
+    while (/\s/.test(text[valueStart] ?? "")) valueStart += 1;
+    const valueEnd = partEnd;
+    if (text[valueStart] === "[") {
+      const arrayEnd = matchingDelimiter(text, valueStart);
+      if (arrayEnd < 0 || arrayEnd > valueEnd) {
+        safe = false;
+      } else {
+        const propertyValues = staticArrayValues(text, valueStart, arrayEnd + 1);
+        const property = part.slice(0, colon).trim().match(/^(?:[A-Za-z_$][\w$]*|['"]([^'"]+)['"])$/)?.[1]
+          ?? part.slice(0, colon).trim();
+        properties.set(property, propertyValues);
+        values.push(...propertyValues);
+      }
+    } else if (text[valueStart] === "{") {
+      const objectEnd = matchingDelimiter(text, valueStart);
+      if (objectEnd < 0 || objectEnd > valueEnd) {
+        safe = false;
+      } else {
+        const nested = objectArrayValues(text, valueStart, objectEnd);
+        values.push(...nested.values);
+        safe = safe && nested.safe;
+      }
+    } else if (!/^['"`]/.test(text.slice(valueStart, valueEnd).trim())) {
+      const value = text.slice(valueStart, valueEnd).trim();
+      if (value) safe = false;
+    }
+  }
+  return { values, properties, safe };
+}
+
 function collectKnownCollections(text) {
   const collections = new Map();
   for (const match of text.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*(\[|\{)/g)) {
-    const end = matchingDelimiter(text, match.index + match[0].length - 1);
+    const start = match.index + match[0].length - 1;
+    const end = matchingDelimiter(text, start);
     if (end < 0) continue;
-    const values = [...text.slice(match.index, end + 1).matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((item) => item[1]);
-    if (values.length) collections.set(match[1], values);
+    const result = text[start] === "["
+      ? { values: staticArrayValues(text, start, end + 1), safe: true }
+      : objectArrayValues(text, start, end);
+    if (result.safe && result.values.length) {
+      collections.set(match[1], result.values);
+      for (const [property, values] of result.properties ?? []) collections.set(`${match[1]}.${property}`, values);
+    }
   }
   return collections;
 }
@@ -187,12 +266,13 @@ function expressionBodyEnd(text, start) {
 
 function collectionForAccess(text, collections, keyName, accessIndex) {
   const prefix = text.slice(0, accessIndex);
-  const methods = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:\[[^\]\n]+\])?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)]
-    .map((match) => {
+  const methods = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:(?:\[[^\]\n]+\])|(?:\.[A-Za-z_$][\w$]*))?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)]
+     .map((match) => {
       let bodyStart = match.index + match[0].length;
       while (/\s/.test(text[bodyStart] ?? "")) bodyStart += 1;
       const bodyEnd = text[bodyStart] === "{" ? matchingDelimiter(text, bodyStart) : expressionBodyEnd(text, bodyStart);
-      return { collection: match[1], key: match[2], bodyStart, bodyEnd };
+      const property = match[0].match(/^\w+\s*(?:\[\s*["']([^"']+)["']\s*\]|\.([A-Za-z_$][\w$]*))\s*\./)?.slice(1).find(Boolean);
+      return { collection: property ? `${match[1]}.${property}` : match[1], key: match[2], bodyStart, bodyEnd };
     })
     .filter((method) => method.bodyEnd >= 0 && accessIndex >= method.bodyStart && accessIndex < method.bodyEnd);
 

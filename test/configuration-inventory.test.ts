@@ -88,6 +88,32 @@ function read(env: NodeJS.ProcessEnv = process.env, setting = "endpoint") {
     expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
   });
 
+  test("does not infer unrelated uppercase object values as environment keys", () => {
+    const records = scanSourceText(`const SETTINGS = {
+  endpoint: ["KNOWN_ENDPOINT"],
+  label: "UNRELATED_UPPERCASE_VALUE",
+};
+function read(env: NodeJS.ProcessEnv, setting = "endpoint") {
+  return SETTINGS[setting].some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["KNOWN_ENDPOINT"]);
+    expect(records.some((record) => record.key === "UNRELATED_UPPERCASE_VALUE")).toBe(false);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test("uses only the statically selected object array property", () => {
+    const records = scanSourceText(`const SETTINGS = {
+  endpoint: ["ENDPOINT_KEY"],
+  region: ["REGION_KEY"],
+};
+function read(env: NodeJS.ProcessEnv) {
+  return SETTINGS.endpoint.some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["ENDPOINT_KEY"]);
+  });
+
   test("records unresolved injected environment reads as one dynamic boundary", () => {
     const records = scanSourceText(
       'function read(env: NodeJS.ProcessEnv, key: string) { return env[key]; }',
