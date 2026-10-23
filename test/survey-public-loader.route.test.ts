@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { routeArgs, asRouteResponse, normalizeRouteResult } from "./helpers/route-result";
 import { createRespondentToken, verifyRespondentToken } from "@/lib/survey-respondent-token.server";
 import { serializeRespondentCookie } from "@/lib/survey-respondent-cookie.server";
+import { createSurveyContactProof } from "@/lib/survey-contact-proof.server";
 import { resetRateLimitsForTests } from "@/lib/platform-rate-limit.server";
 
 vi.hoisted(() => {
@@ -48,6 +49,12 @@ function req(query = "") {
   return new Request(`http://x/survey/public-survey${query}`);
 }
 
+/** The link a contact is actually sent: the id PLUS the proof minted for it. */
+async function provenContactQuery(contactId: number, surveyId = 1) {
+  const proof = await createSurveyContactProof(surveyId, contactId);
+  return `?contact=${contactId}&proof=${encodeURIComponent(proof)}`;
+}
+
 describe("public survey loader", () => {
   beforeEach(() => {
     resetRateLimitsForTests();
@@ -57,7 +64,9 @@ describe("public survey loader", () => {
 
   test("scopes the contact lookup to the survey's workspace", async () => {
     const mod = await import("../app/routes/survey+/$surveyId.loader.server");
-    await mod.loader(routeArgs(req("?contact=100"), { surveyId: "public-survey" }) as never);
+    await mod.loader(
+      routeArgs(req(await provenContactQuery(100)), { surveyId: "public-survey" }) as never,
+    );
 
     // The workspace must come from the loaded survey, never from the request —
     // this is what makes a cross-tenant id unresolvable rather than merely
@@ -81,7 +90,7 @@ describe("public survey loader", () => {
   test("exposes only the fields the survey page renders", async () => {
     const mod = await import("../app/routes/survey+/$surveyId.loader.server");
     const result = await mod.loader(
-      routeArgs(req("?contact=100"), { surveyId: "public-survey" }) as never,
+      routeArgs(req(await provenContactQuery(100)), { surveyId: "public-survey" }) as never,
     );
 
     // This route is unauthenticated. Anything selected here is public, so the
@@ -134,13 +143,34 @@ describe("public survey loader", () => {
     expect(result.body).toMatchObject({ resultId: identity.resultId, respondentToken: identity.token, existingAnswers: { Q1: "Yes", Q2: ["a", "b"] } });
   });
 
-  test("signs a trusted legacy contact response ID and preserves its answers", async () => {
-    surveyDbMocks.loadExistingResponseWithAnswers.mockResolvedValueOnce({ response: { result_id: "legacy-contact-response", contact_id: 100 }, answers: { Q1: "No" } } as never);
+  // #2868: the whole finding. A bare `?contact=` id is a guessable integer, so
+  // it must not reach another respondent's response row or answers, and the
+  // token it mints must not authorise that row.
+  test("a bare ?contact= id does not resume another respondent's response", async () => {
+    surveyDbMocks.loadExistingResponseWithAnswers.mockResolvedValueOnce({ response: { result_id: "victim-response", contact_id: 100 }, answers: { Q1: "Private" } } as never);
     const { loader } = await import("../app/routes/survey+/$surveyId.loader.server");
     const result = await normalizeRouteResult(await loader(routeArgs(req("?contact=100&resultId=attacker"), { surveyId: "public-survey" }) as never));
+
+    // Not even the display contact is loaded, because the id proved nothing.
+    expect(surveyDbMocks.loadSurveyRespondentContact).not.toHaveBeenCalled();
+    expect(result.body).toMatchObject({ contact: null, existingResponse: null, existingAnswers: {} });
+    const body = result.body as { respondentToken: string; resultId: string };
+    expect(body.resultId).not.toBe("victim-response");
+    expect(await verifyRespondentToken(body.respondentToken, 1)).toMatchObject({ contact_id: null });
+    expect((await verifyRespondentToken(body.respondentToken, 1))?.result_id).not.toBe("victim-response");
+  });
+
+  test("a proof-bearing link resumes the contact's own response and answers", async () => {
+    surveyDbMocks.loadExistingResponseWithAnswers.mockResolvedValueOnce({ response: { result_id: "own-response", contact_id: 100 }, answers: { Q1: "No" } } as never);
+    const { loader } = await import("../app/routes/survey+/$surveyId.loader.server");
+    const result = await normalizeRouteResult(await loader(routeArgs(req(await provenContactQuery(100)), { surveyId: "public-survey" }) as never));
+
+    expect(result.body).toMatchObject({ resultId: "own-response", existingAnswers: { Q1: "No" } });
     const body = result.body as { respondentToken: string };
-    expect(result.body).toMatchObject({ resultId: "legacy-contact-response", existingAnswers: { Q1: "No" } });
-    expect(await verifyRespondentToken(body.respondentToken, 1)).toMatchObject({ result_id: "legacy-contact-response" });
+    expect(await verifyRespondentToken(body.respondentToken, 1)).toMatchObject({
+      result_id: "own-response",
+      contact_id: 100,
+    });
   });
 
   test("does not resume a response tied to a different contact context", async () => {

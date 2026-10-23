@@ -1,12 +1,11 @@
 # Imported Graphify snapshot
 
-These generated files preserve the graph supplied in PR #2301. They can help
-find related files. They do not prove the current code behavior.
+These generated files were updated from the current checkout. They can help
+find related files, but confirm each finding in current source before using it in an
+issue, code change, or review.
 
-The graph records commit `561541b0561a8c03f64522d721c3589de07c4169`. That commit
-does not resolve in this repository. The source provenance is unverified, and
-the graph predates recent changes on `dev`. Confirm each finding in current
-source before using it in an issue, code change, or review.
+The graph update used commit `e4bb8ac6067a49877426f93aa5288f60f8142729`. Semantic extraction usage was unavailable,
+and SQL parsing support was not installed; see the update summary for these limits.
 
 To build a current graph, use the optional Graphify skill in
 `../.opencode/skills/graphify/SKILL.md`. It uses a pinned, isolated Python install.

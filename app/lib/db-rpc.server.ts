@@ -540,11 +540,12 @@ export async function rpcGetCampaignMessagesCsv(
 }
 
 export async function rpcGetCampaignAttemptsCsv(
+  workspaceId: string,
   campaignId: number,
 ): Promise<string> {
   const rows = await queryRows<Record<string, unknown>>(
     db,
-    sql`select * from get_campaign_attempts(${campaignId})`,
+    sql`select * from get_campaign_attempts(${workspaceId}::uuid, ${campaignId})`,
   );
   return rowsToCsv(rows);
 }

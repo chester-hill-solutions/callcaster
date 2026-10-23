@@ -8,6 +8,22 @@ function isBetterAuthSignUpPath(url: URL): boolean {
   return url.pathname.includes("/sign-up");
 }
 
+/**
+ * Better Auth's own two-factor enable/disable endpoints change 2FA state
+ * without the application's prior-state and protected-user rules, so they must
+ * not be reachable directly: enableTwoFactor replaces the stored secret and
+ * the backup codes, and disableTwoFactor removes the factor. Both are governed
+ * by the application's own /account/security action instead.
+ *
+ * The TOTP challenge path stays open: the sign-in flow posts to it.
+ */
+function isAppManagedTwoFactorPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/api/auth/two-factor/enable") ||
+    pathname.startsWith("/api/auth/two-factor/disable")
+  );
+}
+
 /** Credential/TOTP guessing surfaces get the strict bucket; other POSTs the loose one. */
 function rateLimitScopeForAuthPath(url: URL): "auth:sign-in" | "auth:catch-all" {
   return url.pathname.includes("/sign-in") || url.pathname.includes("/two-factor")
@@ -25,6 +41,12 @@ async function handleAuthRequest(request: Request, url: URL) {
   }
   if (!isSignupOpen() && isBetterAuthSignUpPath(url)) {
     return jsonError("Registration is closed.", 403);
+  }
+  if (isAppManagedTwoFactorPath(url.pathname)) {
+    return jsonError(
+      "Change two-factor authentication from the account security page.",
+      403,
+    );
   }
   return auth.handler(request);
 }

@@ -64,6 +64,21 @@ export const action = defineAction({
         return rateLimited;
       }
 
+      // Server-side state check. The UI hides the enrolment form once the
+      // account is enrolled (account.security.tsx, account.tsx), but the action
+      // must refuse a re-enrolment too: Better Auth's enableTwoFactor REPLACES
+      // the stored secret and the backup codes, and the replacement inherits
+      // `verified` from the row it replaces. Without this check a caller
+      // holding only the password could swap a privileged account's second
+      // factor for one they control, bypassing the protected-user rule that
+      // the `disable` branch below applies.
+      if (await isTwoFactorEnabled(user.id)) {
+        return routeData(
+          { error: "Two-factor authentication is already enabled." },
+          { headers },
+        );
+      }
+
       const password = String(formData.get("password") ?? "");
       if (!password) {
         return routeData({ error: "Password is required" }, { headers });

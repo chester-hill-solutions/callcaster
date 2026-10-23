@@ -15,9 +15,10 @@
  *   node scripts/e2e/ensure-stow.mjs
  *   STOW_VERSION=v0.1.0 node scripts/e2e/ensure-stow.mjs
  */
-import { accessSync, chmodSync, constants } from "node:fs";
+import { accessSync, chmodSync, constants, createReadStream } from "node:fs";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -86,11 +87,11 @@ async function downloadRelease() {
   // We execute this binary on every test run and in CI, so the published
   // checksum is the only thing standing between a compromised release asset and
   // arbitrary code in the E2E job. Verify before extracting, never after.
-  const digest = spawnSync("sha256sum", [archive], { encoding: "utf8" });
-  if (digest.status !== 0) {
-    throw new Error("Could not compute sha256 of the download");
+  const digest = createHash("sha256");
+  for await (const chunk of createReadStream(archive)) {
+    digest.update(chunk);
   }
-  const actual = digest.stdout.trim().split(/\s+/)[0];
+  const actual = digest.digest("hex");
   if (actual !== expected) {
     await rm(archive, { force: true });
     throw new Error(

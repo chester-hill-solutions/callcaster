@@ -161,25 +161,6 @@
     "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
-    "issueNumber": 2503,
-    "verdict": "fix-now",
-    "summary": "Master removes the duplicated section headings on the campaign pages (the 'Setup' heading under the Setup/Content/Queue/Launch tab row, the 'Launch' section header and the 'Call/Message Campaign Results' h1), but the campaign title header and the 'Create campaign' page heading are still rendered.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
-    "lookIn": [
-      "app/components/campaign/settings/CampaignSettings.tsx",
-      "app/components/campaign/settings/CampaignLaunch.tsx",
-      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
-      "selected_id.route.tsx",
-      "id/campaigns/new.route.tsx"
-    ],
-    "existingTests": [
-      "test/ui/campaigns-new-caller-gating.test.tsx:37 — `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 — 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
-    ],
-    "acceptanceCriteria": [],
-    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate — the big 'Setup' heading under the Setup/Content/Queue/Launch tabs — is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
-  },
-  {
     "issueNumber": 2507,
     "verdict": "fix-now",
     "summary": "PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.",
@@ -227,19 +208,6 @@
     "trackerRecommendation": "Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master."
   },
   {
-    "issueNumber": 2686,
-    "verdict": "fix-now",
-    "summary": "The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
-    "lookIn": [
-      "docs/research/cms-platform-capabilities.md"
-    ],
-    "existingTests": [],
-    "acceptanceCriteria": [],
-    "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
-  },
-  {
     "issueNumber": 1938,
     "verdict": "fix-now",
     "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
@@ -271,5 +239,35 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified."
+  },
+  {
+    "issueNumber": 2760,
+    "verdict": "fix-now",
+    "recommendedTitle": "Detect dev-only fixes correctly in the issue verification planner",
+    "summary": "The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.",
+    "currentBehavior": "At dev@e4bb8ac6, hasDevOnlyFix returns false for the current origin/dev candidate even though the master check exits 1 and the dev check exits 0. PARTIAL and NOT_FIXED code verdicts consequently plan In progress instead of on-dev.",
+    "rootCause": "git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.",
+    "resolution": "Use a small Git ancestry helper that requires exit 1 against master and exit 0 against dev. Keep unknown refs and malformed candidates conservative. Exercise the actual dry-run CLI with temporary Git graphs and a GitHub boundary that rejects writes.",
+    "lookIn": [
+      ".opencode/tools/apply-issue-verdicts.mjs",
+      ".opencode/tools/lib/issue-verdict-git.mjs",
+      "test/apply-issue-verdicts.test.ts"
+    ],
+    "existingTests": [
+      "Ten real-CLI cases pass. Original source fails three dev-only cases while seven controls pass.",
+      "Controls cover already-released, unrelated, missing and malformed candidates; unavailable refs; and the remaining-person on-qa route.",
+      "Negative controls: inverted master ancestry fails four cases; treating an unavailable master as a confirmed miss fails one. The restored source passes all ten."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.",
+      "A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.",
+      "Remaining operator actions still plan on-qa.",
+      "The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks."
   }
 ]

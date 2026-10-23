@@ -70,92 +70,25 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1869,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify: test calls leave the campaign queue untouched",
-    "summary": "Fixed on dev in PR #1900 (2a2eb281, merged 2026-09-19, base dev). NOT in master, so dev-only.",
-    "currentBehavior": "On dev, the dequeue block in webhook-side-effects.server.ts is gated on outreachAttemptId != null.",
-    "rootCause": "The contact-keyed dequeue had no guard on the resolved outreach attempt, so any terminal callback with a contact_id could mutate the queue.",
-    "resolution": "No new code. Verify on the review environment, then close when promoted to master.",
-    "lookIn": [
-      "app/lib/worker/webhook-side-effects.server.ts",
-      "app/lib/campaign-test-call.server.ts",
-      "app/routes/api+/call-status.action.server.ts"
-    ],
-    "existingTests": [
-      "test/webhook-side-effects.test.ts"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A test call to a queued number leaves queue_state queued, queue_order unchanged, attempts unchanged and dequeued_at null"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
-  },
-  {
-    "issueNumber": 2039,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify rented-number success tone and routing spacing",
-    "summary": "PR #2071 changed the rented-number notice to success and removed the extra routing top padding. Source matches the recorded implementation plan.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The success tone and spacing change are present in dev.",
-    "rootCause": "The original default-tone and duplicate-padding defects are fixed by PR #2071. Dark/light visual checks remain.",
-    "resolution": "Verify the reported success state and spacing visually; no further source fix is established.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:388",
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:485",
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:387-400 (the Alert), :270 (space-y-6), :485 (border-t pt-6)",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash; success/destructive/warning/info exist)",
-      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))",
-      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx (sibling steps to sweep for the same missing variant)"
-    ],
-    "existingTests": [
-      "test/ui/onboarding-first-number-flow.test.tsx",
-      "test/ui/onboarding-first-number-groups.test.tsx"
-    ],
-    "missingTests": [
-      "Existing first-number UI tests cover number flows but do not prove tone and spacing in a real rendered theme. No browser check was performed."
-    ],
-    "acceptanceCriteria": [
-      "The rented-number confirmation reads as a success, not an error, in both light and dark themes",
-      "The gap under the banner matches the rest of the step's rhythm",
-      "The Alert primitive's default variant is unchanged",
-      "The rented-number confirmation uses the success tone. The wider default-Alert contract is tracked separately in #2061.",
-      "A test fails if a success-state Alert renders with the default variant"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Move to Verify and close pending browser confirmation. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2060,
     "verdict": "verify-close",
     "recommendedTitle": "Verify welcome-credit classification through the display and reconciliation adapters",
-    "summary": "The claimed purchase-classification defect is not present in the public adapters. Welcome and manual grant prefix buckets intentionally return other; the display adapter converts other+CREDIT to purchase, and reconciliation classifies every CREDIT as purchase.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. shared/billing-keys.ts returns other for welcome/manual grant prefixes, as explicitly tested in test/billing-keys.test.ts:28. app/lib/transaction-history-display.ts:30 maps other+CREDIT to purchase. shared/billing-reconciliation.ts:126 also maps every CREDIT to purchase. The reconciliation prefix classifier is duplicated, but that does not cause the claimed welcome-credit defect.",
-    "rootCause": "The issue mistakes the prefix-only bucket for the final event source. The adapters already use transaction type to identify credit purchases/grants. The shared key helper documentation overstates classifier reuse because reconciliation still has an inline classifier.",
-    "resolution": "Verify welcome CREDIT classification through getBillingEventSource and categorizeLedgerRow, then close the incorrect defect report. Any distinction between paid purchases and grants needs its own product decision and task; no welcome-prefix change is needed for the claimed behavior.",
+    "summary": "Both public adapters already classify welcome and manual CREDIT grants as purchase. Focused adapter tests now cover the displayed Purchase label, reconciliation category and unchanged prefix-only grant buckets.",
+    "currentBehavior": "At dev@e4bb8ac6, getBillingEventSource maps other+CREDIT to purchase, and categorizeLedgerRow maps CREDIT to purchase before reading the shared prefix classifier. Grant prefixes intentionally remain other.",
+    "rootCause": "The original report mistook the prefix-only bucket for the final credit reporting category. No application behavior change is needed.",
+    "resolution": "Verify the public display and reconciliation adapters with real helpers and debit controls. Keep the grant prefix classifier unchanged. Review the regression tests, then close the verified report.",
     "lookIn": [
-      "app/lib/transaction-history-display.ts:30",
-      "shared/billing-reconciliation.ts:126",
-      "test/billing-keys.test.ts:28",
-      "shared/billing-keys.ts:71",
-      "shared/billing-keys.ts:116",
-      "shared/billing-reconciliation.ts:3",
-      "shared/billing-keys.ts:24,72,106-129",
-      "app/lib/getBillingEventSource",
-      "shared/billing-keys.ts (categorizeLedgerRow)"
+      "app/lib/transaction-history-display.ts",
+      "shared/billing-reconciliation.ts",
+      "shared/billing-keys.ts",
+      "test/billing-grant-classification.test.ts"
     ],
     "existingTests": [
-      "test/billing-keys.test.ts:28 asserts welcome/manual grant prefix buckets are other.",
-      "test/transaction-history.server.test.ts",
-      "test/billing-reconciliation.test.ts"
+      "test/billing-keys.test.ts verifies the intentional other bucket for grant prefixes.",
+      "test/billing-grant-classification.test.ts verifies both public CREDIT adapters, the Purchase label and DEBIT controls using the real implementations.",
+      "17 focused cases pass. Wrong display classification fails two new cases; inverted reconciliation type handling fails all four. Source faults were restored before the passing run."
     ],
-    "missingTests": [
-      "A focused adapter-level welcome CREDIT test would pin the already-correct displayed/reconciliation behavior."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.",
       "The intentional prefix-only grant bucket remains other unless product semantics change.",
@@ -164,70 +97,7 @@
     "blockedBy": [],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Move to Verify and close. Public adapters already satisfy the claimed purchase classification; do not change intentional grant prefix buckets solely to satisfy the original incorrect premise."
-  },
-  {
-    "issueNumber": 2095,
-    "verdict": "verify-close",
-    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed",
-    "summary": "Predictive Leave waits for a confirmed conference stop and preserves the queue; deployed calling verification remains.",
-    "resolution": "Verify predictive Leave on deployed dev with browser and phone devices, pending calls and an idle conference. Confirm that the next turn stops, failed stops permit retry, other users remain connected and live Leave keeps its behavior. Promote the tested fix before closing.",
-    "lookIn": [
-      "app/components/call/CallScreen.Layout.tsx",
-      "app/lib/callscreenActions.ts",
-      "app/routes/api+/auto-dial/end.action.server.ts",
-      "app/lib/auto-dial.server.ts",
-      "test/ui/call-screen-leave.test.tsx",
-      "test/auto-dial-end.route.test.ts"
-    ],
-    "existingTests": [
-      "test/ui/call-screen-leave.test.tsx (seven cases using the real conference-end helper)",
-      "test/ui/callscreenActions.test.ts (server confirmation before agent hangup/state clearing)",
-      "test/auto-dial-end.route.test.ts (completion failures, idle discovery, explicit target, other-user rejection and SID/name deduplication)",
-      "test/auto-dial.server.test.ts (no claim, outreach attempt or call after the conference ended)"
-    ],
-    "missingTests": [
-      "Deployed browser/phone calling verification, including delayed and failed conference completion."
-    ],
-    "acceptanceCriteria": [
-      "With `campaign.dial_type === \"predictive\"`, clicking \"Leave Campaign\" posts `/api/auto-dial/end` and completes the conference.",
-      "No `DELETE /api/queues` requeue is issued when the campaign is being left in predictive mode.",
-      "The dialer stops placing calls within one turn after leave.",
-      "A non-predictive (live) campaign's Leave behaviour is unchanged.",
-      "The control is confirmed before it fires (see the related UX issue)."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "The source fix is in PR #2257. This board update travels with that fix; after merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
-    "currentBehavior": "PR #2257 implements #2095: Leave waits for the server stop, keeps the local device on failure and omits queue reset. The endpoint finds the current user's idle conferences and reports completion failures. All 57 focused UI and server cases passed; restoring the old Leave handler failed four regressions, and restoring the old endpoint failed twelve regressions with five controls passing."
-  },
-  {
-    "issueNumber": 1956,
-    "verdict": "verify-close",
-    "recommendedTitle": "Release PRs must close the issues they promote (Closes #N)",
-    "summary": "The gate shipped in PR #1960 was incomplete. It accepted a release body of `Closes #1, #2, #3` because its regex treated the comma list as a group of closing references. GitHub closes ONE issue per closing keyword, so only #1 closed. Release PR #2668 listed 17 issues that way and closed one: #2655 closed at the merge timestamp, #2663 and #2504 were closed by hand a day later, and #2605, #2503, #2513 and #2510 were never closed even though their fixes are in master. A sweep of the on-dev lane on 19 October 2026 found 57 open issues whose fix was already in production. The gate is now scripts/check-release-closing-references.mjs, which rejects the grouped form and names the numbers it would strand.",
-    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026, in PR #2735. Twelve cases cover the real release 2668 body, a body that gives every issue its own keyword, a bare mention, prose that mentions a fix, a sentence after a keyword, a list whose later numbers have no hash, and the command line. Breaking the list detection fails five of the twelve. The dev-branch gate is untouched.",
-    "rootCause": "The gate checked a shape GitHub does not honour. Its regex captured a comma list behind one keyword as a group of closing references, so the gate passed while GitHub ignored every number but the first.",
-    "resolution": "No source work remains. The next dev to master release PR must write one keyword per issue; the gate names the numbers it would otherwise strand. The issues that shipped without closing have been closed and moved to on-prod.",
-    "lookIn": [
-      "scripts/check-release-closing-references.mjs (the checker: one keyword per issue)",
-      "test/check-release-closing-references.test.ts (twelve cases, including the real release 2668 body)",
-      ".github/workflows/release-close-issues.yml (the gate that calls it)"
-    ],
-    "existingTests": [
-      "test/check-release-closing-references.test.ts: 12 cases over the grouped form, the correct form, prose false positives and the command line"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A release PR body that names an issue behind a single closing keyword fails the gate",
-      "A release PR body that gives every issue its own keyword passes and closes them all",
-      "A bare mention and prose that mentions a fix are not treated as closing references"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Lane is verify-close: the gate shipped and the checker is tested. Do not rebuild it. The next release must use the correct body shape; the gate names what it would strand."
+    "trackerRecommendation": "Bug; unassigned; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked PR at the start. Regression tests verify the existing behavior; no billing-rule change is proposed."
   },
   {
     "issueNumber": 1841,
@@ -249,25 +119,6 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "Fix commit 51240b0b 'fix(ivr): nest prompts inside Gather so key presses interrupt audio (#1841) (#1851)' — `git merge-base --is-ancestor 51240b0b origin/master` confirms it is in master. The TwiML snapshot tests prove the structural change (prompt inside Gather) but the barge-in itself is a Twilio platform behaviour heard on a live PSTN call, so manual: true: a person still has to place a call and press a key mid-prompt to confirm the audio actually stops. The issue's note about `speechTimeout`/`timeout` still behaving with a nested prompt is covered — the gather attributes are unchanged except for the DTMF-only/speech split (see #1856) and `numDigits` for single-key menus."
-  },
-  {
-    "issueNumber": 1856,
-    "verdict": "verify-close",
-    "summary": "The `<Gather>` now requests speech only when the step actually maps a spoken answer (a `vx-any` option); a keypad-only menu sends `input=\"dtmf\"`, so Twilio never collects speech there and speaking can no longer fall through to the linear next block.",
-    "currentBehavior": "The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.",
-    "resolution": "Run the verification on master, then close. No new code unless it fails.",
-    "lookIn": [
-      "app/lib/ivr-gather.server.ts",
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/lib/ivr-option-value.ts"
-    ],
-    "existingTests": [
-      "test/ivr-block.route.test.ts — 'gathers speech only when the step maps a spoken answer (#1856)' and the nested-Gather assertion `input=\"dtmf\" numDigits=\"1\"`; test/ivr-gather.test.ts covers `ivrGatherAttributes`/`ivrStepGathersSpeech` directly. Ran green: test/ivr-block.route.test.ts and test/ivr-block-response.route.test.ts passed in the earlier run (9 files / 90 tests)."
-    ],
-    "acceptanceCriteria": [
-      "A person confirms the reported symptom is gone on master."
-    ],
-    "rootCause": "Fix commit 725d77df 'fix(ivr): gather DTMF only on keypad-only steps (#1856) (#1872)' — confirmed an ancestor of origin/master. Note the ordering: this fix depends on #1841 (51240b0b) making the prompt nested inside the Gather, which is why the symptom became visible. manual: true because the acceptance criterion is phrased as a caller's experience ('Speaking at a DTMF menu does not advance the call') on a live phone line; the TwiML is provably DTMF-only, but a person still has to speak at a keypad menu on a real call to close it out."
   },
   {
     "issueNumber": 1857,
@@ -511,25 +362,6 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "PARTIAL, and manual. What is covered: the number is no longer an invisible, redeploy-only environment variable. It is a database row, it is visible and changeable in Admin, the decision is written in docs/adr/0038, and the route answers a clean 503 instead of failing. What is not covered: the number itself. The issue's screenshot is the Call settings modal showing 'Call-in verification is not configured', and that is exactly what production still shows after this release, because no row is active. The release guide for the same release says so in plain words. The remaining work is an operator action, not a code change: register and activate a number in Admin (or run scripts/configure-verification-number.mjs), then place a real verification call. manual: true because that last step is a real phone call to a real handset. The candidate commit 6c7c361a (PR #2726) is not an ancestor of origin/master by SHA, but its content is in master through the release merge 91c4409b."
-  },
-  {
-    "issueNumber": 2524,
-    "verdict": "verify-close",
-    "summary": "Leaving the call screen now releases the microphone: the hook stops every track of the MediaStream it owns when the stream is replaced or the hook unmounts, discards a getUserMedia result that resolves after unmount, and the leave handler awaits the hang-up before navigating, so the browser is no longer left holding a live capture and audio pipeline after the campaign is left.",
-    "currentBehavior": "The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.",
-    "resolution": "Run the verification on master, then close. No new code unless it fails.",
-    "lookIn": [
-      "app/hooks/call/useCallAudioControls.ts",
-      "app/components/call/CallScreen.Layout.tsx",
-      "app/hooks/call/useTwilioConnection.ts"
-    ],
-    "existingTests": [
-      "test/ui/audio-device-lifecycle.test.tsx — 'releases SDK microphone capture that resolves after unmount' (per exit mode: unmount, replacement, normal completion) asserts `stopMicrophoneTrack` is called for the owned stream; test/ui/call-screen-leave.test.tsx — 'live Leave waits for hangup before navigation and leaves device teardown to its hook' asserts `hangUp` is called once, `navigate(-1)` happens only after the hang-up promise resolves, and `device.destroy` is NOT called by the leave handler; plus the predictive/power-dial leave cases. These UI tests could NOT be executed in this checkout: every UI test fails with 'Cannot read properties of null (reading useContext)' raised from the vendored shad-cc copy of next-themes/react, and an unrelated control test (test/ui/debounce-owner-unmount.test.tsx) fails identically — a local node_modules artifact, not a code defect. Both files are part of CI."
-    ],
-    "acceptanceCriteria": [
-      "A person confirms the reported symptom is gone on master."
-    ],
-    "rootCause": "The fix is commit 3a139405 'Fix microphone track cleanup when leaving call screen (#2526)' (inner commit: 'Fix microphone track cleanup when leaving call screen (#2524)'), an ancestor of origin/master (first merged by f896b451 on 2026-10-13). manual: true — the symptom is a real browser CPU/RAM spike on a specific browser/OS combination (Helium on Windows 11) and a perceived crash. The code removes the leaked capture and the premature unmount, but only a person on that machine, watching task manager while leaving a dial session, can confirm the spike is gone."
   },
   {
     "issueNumber": 2592,

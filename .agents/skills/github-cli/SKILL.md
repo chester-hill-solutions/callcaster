@@ -29,6 +29,12 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 9. For branch and commit work, load the `git` skill in addition to this skill.
 10. When an error reveals missing reusable guidance, update the relevant skill in the same task. Do not create one-off incident logs.
 
+For batched issue creation, inventory exact proposed titles before the first
+mutation and record each created issue number immediately. If a command times
+out or is interrupted, re-read the live issue inventory and continue only with
+missing titles; never rerun the create batch blindly. Use `github-issues` to
+inspect duplicates and verify the final parent/child and blocking graph.
+
 In zsh, quote the full array field argument for GraphQL, such as
 `-f "prIds[]=$pr_id"`. Unquoted brackets are filename patterns and can reject
 the command before `gh` runs.

@@ -58,6 +58,9 @@ vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
 vi.mock("@/components/workspace/WorkspaceNav", () => ({
   default: () => <nav data-testid="workspace-nav">Sidebar</nav>,
 }));
+vi.mock("@/components/campaign/CampaignSidebar", () => ({
+  default: () => <aside data-testid="campaign-nav" />,
+}));
 
 vi.mock("@/components/workspace/WorkspaceToday", () => ({
   default: () => <div data-testid="page-content">Today</div>,

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 
 const tdbMocks = vi.hoisted(() => ({
   workspace_number: {
@@ -139,19 +141,53 @@ describe("runNumberRentalBilling", () => {
       expect(resendMocks.send).toHaveBeenCalledTimes(1);
       expect(resendMocks.send).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: "Callcaster <info@callcaster.ca>",
+          from: "CallCaster <info@callcaster.ca>",
           to: ["owner@example.com"],
           subject: `Your Civic Action number rental renews in ${daysUntilDue} days`,
-          html: expect.stringContaining(
-            "Your workspace, <strong>Civic Action</strong>, needs enough credits",
-          ),
-          text: expect.stringContaining(
-            "Your workspace, Civic Action, needs enough credits",
-          ),
+          html: expect.stringContaining("Civic Action number rental renews soon"),
+          text: expect.stringContaining("Civic Action number rental renews soon"),
         }),
       );
     },
   );
+
+  // The two cases the reminder previously could not express at all: it
+  // announced a renewal without saying whether the workspace could afford it.
+  test("a covered workspace is told the position and that nothing is needed", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-26" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(200);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    const call = resendMocks.send.mock.calls.at(-1)?.[0] as { subject: string; text: string };
+    expect(call.text).toContain("Your balance: 200 credits");
+    expect(call.text).toContain("After renewal: 100 credits");
+    expect(call.text).toContain("You are covered");
+        // Anchor day 26 against 2026-05-01: the next due date is 25 days out.
+    expect(call.subject).toBe("Your Civic Action number rental renews in 25 days");
+  });
+
+  test("a shortfall leads the subject and states the consequence", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-26" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(82);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    const call = resendMocks.send.mock.calls.at(-1)?.[0] as { subject: string; text: string };
+    expect(call.subject).toContain("18 more credits needed to renew");
+    expect(call.text).toContain("Short by: 18 credits");
+    expect(call.text).toContain("suspends the number for outbound use");
+  });
 
   test("does not send a reminder outside the -25/-15/-3 day windows", async () => {
     tdbMocks.workspace_number.findMany.mockResolvedValue([
@@ -477,6 +513,36 @@ describe("runNumberRentalBilling", () => {
         ),
       }),
     );
+  });
+
+  // #2931: a rented row with no provider SID is a record, not a rental.
+  // The harness replaces the query, so a row-level expectation here would be
+  // tautological - it would assert what the mock returned, not what the code
+  // asked for. The predicate is therefore rendered through Drizzle's own
+  // dialect: remove `isNotNull(...)` and this fails.
+  test("the sweep does not even consider a rented number with no provider SID", async () => {
+    tdbMocks.workspace_number.findMany.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([]);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    const [args] = tdbMocks.workspace_number.findMany.mock.calls.at(-1) as [
+      { where: unknown },
+    ];
+    const query = new PgDialect({
+      casing: { escapeName: (name: string) => `"${name}"` },
+    }).sqlToQuery(args.where as SQL);
+
+    expect(query.sql).toContain('"twilio_phone_number_sid"');
+    expect(query.sql).toContain("is not null");
+    // The rental type and rollout cutoff must remain: this narrows the sweep,
+    // it does not replace what it selects. Drizzle binds values, so the type
+    // is asserted on the params, not in the SQL text.
+    expect(query.sql).toContain('"workspace_number"."type" =');
+    expect(query.params).toContain("rented");
   });
 
   test("a number with no Twilio SID is never released", async () => {

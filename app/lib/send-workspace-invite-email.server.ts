@@ -1,3 +1,4 @@
+import { renderBrandedEmail } from "@/lib/email-layout.server";
 import { env } from "@/lib/env.server";
 import { sendTransactionalEmail } from "@/lib/transactional-email.server";
 
@@ -17,26 +18,14 @@ export async function sendWorkspaceInviteEmail(args: {
   const acceptUrl = `${baseUrl}/accept-invite?invitationId=${encodeURIComponent(args.invitationId)}&token=${encodeURIComponent(args.rawToken)}`;
 
   const subject = "You've been invited to a CallCaster workspace";
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2>You're invited</h2>
-      <p>You've been invited to join a CallCaster workspace as <strong>${args.role}</strong>.</p>
-      <p>
-        <a href="${acceptUrl}" style="background-color: #c91d25; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Accept invitation</a>
-      </p>
-      <p>If you don't have an account yet, you'll be asked to create one with this email address.</p>
-      <p>If you weren't expecting this invitation, you can ignore this email.</p>
-      <p style="color:#888;"><a href="${acceptUrl}">${acceptUrl}</a></p>
-    </div>
-  `;
-  const text = `
-    You've been invited to join a CallCaster workspace as ${args.role}.
-
-    Accept the invitation here: ${acceptUrl}
-
-    If you don't have an account yet, you'll be asked to create one with this email address.
-    If you weren't expecting this invitation, you can ignore this email.
-  `;
+  const { html, text } = renderBrandedEmail({
+    heading: "You're invited to a CallCaster workspace",
+    intro: `You've been invited to join a CallCaster workspace as ${args.role}.`,
+    note: {
+      text: "If you don't have an account yet, you'll be asked to create one with this email address.",
+    },
+    cta: { label: "Accept invitation", url: acceptUrl },
+  });
 
   // The invite row is already created and the sender saw success; a delivery
   // failure must not surface as an invite failure — log it and let the owner

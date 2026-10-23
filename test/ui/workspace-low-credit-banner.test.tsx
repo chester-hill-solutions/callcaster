@@ -46,6 +46,7 @@ vi.mock("@/hooks/realtime/useWorkspaceEventSubscription", () => ({
   useWorkspaceEventSubscription: () => undefined,
 }));
 vi.mock("@/components/workspace/WorkspaceNav", () => ({ default: () => <nav /> }));
+vi.mock("@/components/campaign/CampaignSidebar", () => ({ default: () => <aside /> }));
 vi.mock("@/components/workspace/WorkspaceToday", () => ({ default: () => <div /> }));
 
 describe("workspace zero-credit banner copy (#1069)", () => {
