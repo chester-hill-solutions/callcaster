@@ -109,9 +109,10 @@ or if it would require interactive input in CI.
 ## Secret rules
 
 - `.env.example` lists secret names and comments only.
-- Existing `.env` and ignored `.env.local` files hold local secret values only.
-  The dotenv provider reads them without mutation and never creates,
-  overwrites, or changes a user file.
+- Existing `.env` and `.env.local` files may contain mixed configuration. The
+  dotenv provider reads them without mutation and returns only requested,
+  declared, service-allowlisted secrets; it never creates, overwrites, or
+  changes a user file.
 - The password-manager provider maps the same `SecretName` values to items or
   fields. Its mapping is config-as-code; item values are not.
 - A future CI adapter may obtain secrets from protected GitHub environment
