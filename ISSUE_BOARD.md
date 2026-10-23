@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@35f9ce16` · 329 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@9dd31716` · 329 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -124,7 +124,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo.
 
 ### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
-- **IN PROGRESS** · Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-21
+- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
 - PARTIAL: middleware reuses the scoped tenant client, but the released import guard skips JavaScript modules. The candidate guard covers supported JavaScript/TypeScript extensions and counts every statically named import.
 - Current behavior: Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.
 - Root cause: The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.

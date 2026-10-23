@@ -42,9 +42,9 @@
       "app/root.tsx"
     ],
     "existingTests": [
-      "test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
-      "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching",
-      "Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode."
+      "test/ui/team-member-theme.test.tsx \u2014 both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
+      "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx \u2014 accessible names, member permissions and theme switching",
+      "Isolated browser verification \u2014 explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode."
     ],
     "acceptanceCriteria": [
       "Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.",
@@ -65,10 +65,10 @@
       "scripts/lib/live-environments.mjs"
     ],
     "existingTests": [
-      "test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)"
+      "test/twilio-resource-prune-policy.test.ts \u2014 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)"
     ],
     "acceptanceCriteria": [],
-    "rootCause": "PARTIAL, and manual. The report and both checks are in master, but the goal says \"Find and remove stale Twilio resources in development, review, and closed-preview environments\" and the removal half is only implemented for closed-preview TwiML Apps: the only `.remove()` call in the repo is in prune-environment-twiml-apps.mjs. There is no delete path for a stale messaging service, incoming phone number, or subaccount, and by design a workspace-owned resource can never be STALE (UNKNOWN), so dev/review-owned resources are never removed automatically — that matches the issue's own \"do not remove production resources automatically\" but leaves \"remove in development and review environments\" unbuilt. The report is a script against a live Twilio account with live credentials and a live database, so a human must run it and act on the STALE list to confirm the behaviour; the classification logic itself is machine-checked. Also note the candidate PR commit b4046027 is unrelated to this issue (it is a CI ledger-drift gate) — the real work is the 2026-10-19 release commit 91c4409b, which added the report, the policy module and the shared live-environment list."
+    "rootCause": "PARTIAL, and manual. The report and both checks are in master, but the goal says \"Find and remove stale Twilio resources in development, review, and closed-preview environments\" and the removal half is only implemented for closed-preview TwiML Apps: the only `.remove()` call in the repo is in prune-environment-twiml-apps.mjs. There is no delete path for a stale messaging service, incoming phone number, or subaccount, and by design a workspace-owned resource can never be STALE (UNKNOWN), so dev/review-owned resources are never removed automatically \u2014 that matches the issue's own \"do not remove production resources automatically\" but leaves \"remove in development and review environments\" unbuilt. The report is a script against a live Twilio account with live credentials and a live database, so a human must run it and act on the STALE list to confirm the behaviour; the classification logic itself is machine-checked. Also note the candidate PR commit b4046027 is unrelated to this issue (it is a CI ledger-drift gate) \u2014 the real work is the 2026-10-19 release commit 91c4409b, which added the report, the policy module and the shared live-environment list."
   },
   {
     "issueNumber": 1826,
@@ -99,7 +99,7 @@
       "None. There is no test or check that asserts a QA-specific Twilio account; `git grep -n \"qa.callcaster.ca\" origin/master -- .` returns only .railway/environments/qa.ts and docs/qa-rehearsal-runbook.md."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The issue has no symptom body — it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm."
+    "rootCause": "The issue has no symptom body \u2014 it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm."
   },
   {
     "issueNumber": 1846,
@@ -131,7 +131,7 @@
   {
     "issueNumber": 1875,
     "verdict": "fix-now",
-    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
+    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` \u2014 but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -140,15 +140,15 @@
       "app/lib/ivr-results.ts"
     ],
     "existingTests": [
-      "test/ivr-webhook-auth.server.test.ts — 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" → `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts — the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts — the export carries the structured answer and its confidence; test/ivr-gather.test.ts — the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
+      "test/ivr-webhook-auth.server.test.ts \u2014 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" \u2192 `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts \u2014 the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts \u2014 the export carries the structured answer and its confidence; test/ivr-gather.test.ts \u2014 the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false — everything that is implemented is machine-checkable."
+    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false \u2014 everything that is implemented is machine-checkable."
   },
   {
     "issueNumber": 1981,
     "verdict": "fix-now",
-    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name — so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
+    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name \u2014 so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -158,7 +158,7 @@
       "None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
+    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) \u2014 but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true \u2014 the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
     "issueNumber": 2507,
@@ -208,6 +208,36 @@
     "trackerRecommendation": "Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master."
   },
   {
+    "issueNumber": 2760,
+    "verdict": "fix-now",
+    "recommendedTitle": "Detect dev-only fixes correctly in the issue verification planner",
+    "summary": "The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.",
+    "currentBehavior": "At dev@e4bb8ac6, hasDevOnlyFix returns false for the current origin/dev candidate even though the master check exits 1 and the dev check exits 0. PARTIAL and NOT_FIXED code verdicts consequently plan In progress instead of on-dev.",
+    "rootCause": "git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.",
+    "resolution": "Use a small Git ancestry helper that requires exit 1 against master and exit 0 against dev. Keep unknown refs and malformed candidates conservative. Exercise the actual dry-run CLI with temporary Git graphs and a GitHub boundary that rejects writes.",
+    "lookIn": [
+      ".opencode/tools/apply-issue-verdicts.mjs",
+      ".opencode/tools/lib/issue-verdict-git.mjs",
+      "test/apply-issue-verdicts.test.ts"
+    ],
+    "existingTests": [
+      "Ten real-CLI cases pass. Original source fails three dev-only cases while seven controls pass.",
+      "Controls cover already-released, unrelated, missing and malformed candidates; unavailable refs; and the remaining-person on-qa route.",
+      "Negative controls: inverted master ancestry fails four cases; treating an unavailable master as a confirmed miss fails one. The restored source passes all ten."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.",
+      "A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.",
+      "Remaining operator actions still plan on-qa.",
+      "The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks."
+  },
+  {
     "issueNumber": 1938,
     "verdict": "fix-now",
     "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
@@ -239,35 +269,5 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified."
-  },
-  {
-    "issueNumber": 2760,
-    "verdict": "fix-now",
-    "recommendedTitle": "Detect dev-only fixes correctly in the issue verification planner",
-    "summary": "The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.",
-    "currentBehavior": "At dev@e4bb8ac6, hasDevOnlyFix returns false for the current origin/dev candidate even though the master check exits 1 and the dev check exits 0. PARTIAL and NOT_FIXED code verdicts consequently plan In progress instead of on-dev.",
-    "rootCause": "git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.",
-    "resolution": "Use a small Git ancestry helper that requires exit 1 against master and exit 0 against dev. Keep unknown refs and malformed candidates conservative. Exercise the actual dry-run CLI with temporary Git graphs and a GitHub boundary that rejects writes.",
-    "lookIn": [
-      ".opencode/tools/apply-issue-verdicts.mjs",
-      ".opencode/tools/lib/issue-verdict-git.mjs",
-      "test/apply-issue-verdicts.test.ts"
-    ],
-    "existingTests": [
-      "Ten real-CLI cases pass. Original source fails three dev-only cases while seven controls pass.",
-      "Controls cover already-released, unrelated, missing and malformed candidates; unavailable refs; and the remaining-person on-qa route.",
-      "Negative controls: inverted master ancestry fails four cases; treating an unavailable master as a confirmed miss fails one. The restored source passes all ten."
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.",
-      "A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.",
-      "Remaining operator actions still plan on-qa.",
-      "The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks."
   }
 ]
