@@ -96,7 +96,10 @@ async function handleCommittedTranscript(
   if (!state.callSid || !isCommittedTranscriptEvent(event)) return;
 
   const segmentInput = buildTranscriptSegment(state.callSid, event);
-  const segment = await writeTranscriptSegment(segmentInput);
+  const segment = await writeTranscriptSegment(
+    segmentInput,
+    ws.data.workspaceId,
+  );
   await publishTranscriptSegmentEvent(ws.data.workspaceId, state.callSid, segment);
 
   if (state.coaching) {
@@ -125,14 +128,14 @@ export async function handleTwilioStreamMessage(
       const params = msg.start.customParameters ?? {};
       const direction = params.direction ?? "outbound";
 
-      // The DB writes below are keyed only by call_sid, so a start frame is
-      // otherwise free to name another workspace's live call. When the token
-      // was minted for a specific call, bind to that trusted SID and refuse a
-      // mismatching frame instead of persisting rows against a foreign call.
+      // The DB writes below are keyed only by call_sid, so the call must come
+      // from the signed token. A frame that names a different call — or names
+      // none at all — is refused, and the frame's value is never used as the
+      // row key.
       const tokenCallSid = ws.data.callSid;
       if (
-        tokenCallSid &&
-        msg.start.callSid &&
+        !tokenCallSid ||
+        !msg.start.callSid ||
         msg.start.callSid !== tokenCallSid
       ) {
         ws.close(1008, "call_sid_mismatch");
@@ -141,7 +144,7 @@ export async function handleTwilioStreamMessage(
 
       state.phase = "streaming";
       state.streamSid = msg.start.streamSid ?? msg.streamSid;
-      state.callSid = tokenCallSid ?? msg.start.callSid;
+      state.callSid = tokenCallSid;
       state.direction = direction;
       state.startTime = Date.now();
 

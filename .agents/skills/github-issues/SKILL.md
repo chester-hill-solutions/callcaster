@@ -249,6 +249,28 @@ Set the edge once: `--blocking` on the blocker or `--blocked-by` on the blocked 
 
 ## Create
 
+### Mutation preflight and retry safety
+
+Before creating any issue, search the live repository for the exact proposed
+title and inspect every hit with `gh issue view` (including state, native Type,
+parent, children, blocked-by, and blocking relationships). Do this separately
+for every Epic, Feature, and Task in a batch. A title match is a duplicate until
+inspection proves it is a different concern.
+
+For a multi-issue graph, create a manifest first with one stable local key per
+intended issue, for example `adr-epic`, `adr-phase-0`, and `sim-step-1-task-3`.
+Record the created issue number immediately after each successful create. Before
+retrying a timed-out or interrupted command, reload the manifest from GitHub and
+map existing issues by exact title and intended parent. Continue only with
+missing issues. Never rerun a batch that contains create mutations without this
+reconciliation step.
+
+If duplicate issues were created, stop creating new issues. Inspect their
+relationships, keep the issue with the complete intended child graph as the
+canonical issue, and close the other issue with `--duplicate-of`. Do not delete
+or close an issue merely because its number is newer or older. Rebuild missing
+parent/child and blocking edges after duplicate cleanup, then verify the graph.
+
 Use native create flags to assign type and relationships at creation time:
 
 ```bash

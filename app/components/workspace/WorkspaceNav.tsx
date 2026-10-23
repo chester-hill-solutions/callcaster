@@ -1,16 +1,21 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink, useLocation } from "react-router";
 import {
   BarChart3,
+  Archive,
   CalendarDays,
   ClipboardList,
+  ContactRound,
   CreditCard,
   FileText,
   Headset,
   Megaphone,
   MessageSquare,
+  Menu,
   Phone,
+  Plus,
   Settings,
+  List,
   Upload,
   Users,
   AudioLines,
@@ -28,15 +33,22 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
-import {
-  CampaignQueueProgress,
-  type CampaignQueueProgressCounts,
-} from "@/components/campaign/CampaignQueueProgress";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { workspaceSidebarHeightClass } from "./workspace-panel-classes";
 
 function formatUnreadBadgeCount(count: number): string {
   return count > 99 ? "99+" : String(count);
+}
+
+function formatCollapsedCreditCount(count: number): string {
+  const absoluteCount = Math.abs(count);
+  if (absoluteCount >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (absoluteCount >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return String(count);
 }
 
 interface NavItem {
@@ -49,6 +61,7 @@ interface NavItem {
     name: string;
     path: string;
     minRole?: MemberRole;
+    icon: React.ComponentType<{ className?: string }>;
   }>;
 }
 
@@ -56,13 +69,6 @@ interface NavGroup {
   name: string;
   items: NavItem[];
 }
-
-type CampaignNavSubItem = {
-  name: string;
-  path: string;
-  status?: string | null;
-  campaignId?: string | number;
-};
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -78,8 +84,9 @@ const NAV_GROUPS: NavGroup[] = [
             name: "New Campaign",
             path: "campaigns/new",
             minRole: MemberRole.Admin,
+            icon: Plus,
           },
-          { name: "Archived Campaigns", path: "campaigns/archive" },
+          { name: "Archived Campaigns", path: "campaigns/archive", icon: Archive },
         ],
       },
       { name: "Messages", path: "chats", icon: MessageSquare },
@@ -115,8 +122,8 @@ const NAV_GROUPS: NavGroup[] = [
         minRole: MemberRole.Member,
         icon: Users,
         subItems: [
-          { name: "Call lists", path: "audiences" },
-          { name: "Contacts", path: "contacts" },
+          { name: "Call lists", path: "audiences", icon: List },
+          { name: "Contacts", path: "contacts", icon: ContactRound },
         ],
       },
     ],
@@ -153,24 +160,17 @@ interface WorkspaceNavProps {
     name: string;
     credits: number;
   };
-  campaigns: Array<{
-    id: string | number;
-    title?: string | null;
-    status?: string | null;
-  }>;
-  campaignQueueProgress?: Record<string, CampaignQueueProgressCounts>;
   userRole: MemberRole;
   className?: string;
 }
 
 const WorkspaceNav = ({
   workspace,
-  campaigns,
-  campaignQueueProgress = {},
   userRole,
   className = "",
 }: WorkspaceNavProps) => {
   const location = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const unreadChatsCount = useUnreadConversationsCount(workspace.id);
   const isAdmin = hasMinRole(userRole, MemberRole.Admin);
   const baseUrl = `/workspaces/${workspace.id}`;
@@ -179,58 +179,32 @@ const WorkspaceNav = ({
     items: group.items.filter((item) => hasMinRole(userRole, item.minRole)),
   })).filter((group) => group.items.length > 0);
 
+  const desktopLabelClass = isCollapsed ? "lg:sr-only" : "";
+  const collapsedPrimaryClass = isCollapsed ? "lg:mx-auto lg:w-8 lg:justify-center lg:px-0" : "";
+  const utilityCollapsedClass = isCollapsed
+    ? "lg:justify-center lg:gap-0"
+    : "";
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${
+    `group flex h-auto items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors lg:h-9 lg:text-sm ${collapsedPrimaryClass} ${
       isActive
         ? "border-brand-primary bg-brand-primary/10 text-brand-primary dark:border-brand-secondary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "border-transparent text-foreground/85 hover:border-border hover:bg-muted"
     }`;
 
   const utilityLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between rounded-lg px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${
+    `flex h-auto items-center rounded-lg px-3 py-1 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${utilityCollapsedClass} ${
       isActive
         ? "bg-secondary text-secondary-foreground"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
   const subLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${
+    `flex h-auto items-center gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors lg:h-9 ${
       isActive
         ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
-  const campaignStatusClass = (status: string) => {
-    switch (status) {
-      case "active":
-      case "running":
-      case "waiting":
-      case "in_progress":
-        return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
-      case "scheduled":
-      case "queued":
-        return "bg-amber-500/20 text-amber-700 dark:text-amber-300";
-      case "complete":
-      case "completed":
-      case "archived":
-        return "bg-slate-500/20 text-slate-700 dark:text-slate-300";
-      case "failed":
-      case "error":
-        return "bg-red-500/20 text-red-700 dark:text-red-300";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
-  };
-
-  const formatCampaignStatus = (status: string) => {
-    const normalized = status.replaceAll("_", " ").trim();
-    if (normalized.length === 0) return "Unknown";
-    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-  };
-
-  const isCampaignsParentActive =
-    location.pathname === `${baseUrl}/campaigns` ||
-    location.pathname.startsWith(`${baseUrl}/campaigns/`);
   const isPeopleParentActive =
     location.pathname === `${baseUrl}/audiences` ||
     location.pathname.startsWith(`${baseUrl}/audiences/`) ||
@@ -239,123 +213,94 @@ const WorkspaceNav = ({
 
   const navBody = (
     <>
-      {/* px-6 = body px-3 + item px-3, so this text lines up with nav item text. */}
-      <div className="border-b border-border/60 px-6 py-4">
-        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-          Workspace
-        </p>
-        <h2 className="mt-1 truncate font-Tabac-Slab text-xl font-black text-brand-primary dark:text-brand-secondary">
-          {workspace.name}
-        </h2>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-0 px-3 py-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className={isCollapsed ? "w-full justify-center" : "w-full justify-start"}
+          aria-label={
+            isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"
+          }
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? "Expand workspace sidebar" : "Collapse workspace sidebar"}
+          onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+        >
+          <Menu className="h-5 w-5 lg:h-4 lg:w-4" aria-hidden="true" />
+          <span className={desktopLabelClass}>Workspace menu</span>
+        </Button>
         <nav
           aria-label="Workspace sections"
-          className="min-h-0 space-y-5 overflow-y-auto pr-1"
+          className="-mx-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3"
         >
           {visibleGroups.map((group) => (
             <section key={group.name} aria-label={group.name}>
-              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                {group.name}
-              </h3>
+              {group.name !== "Work" ? (
+                <h3
+                  className={`flex h-9 items-center px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground ${
+                    isCollapsed ? "lg:invisible" : ""
+                  }`}
+                >
+                  {group.name}
+                </h3>
+              ) : null}
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
-                  const isCampaignsItem = item.path === "campaigns";
                   const isPeopleItem = item.name === "People";
-                  const showCampaignSubNav =
-                    isCampaignsItem && isCampaignsParentActive;
-                  const showSubNav =
-                    showCampaignSubNav || isPeopleItem;
+                  const showSubNav = isPeopleItem;
                   const visibleStaticSubItems = (item.subItems ?? []).filter(
                     (subItem) => hasMinRole(userRole, subItem.minRole),
                   );
-                  const campaignSubItems: CampaignNavSubItem[] =
-                    isCampaignsItem
-                      ? [
-                          ...visibleStaticSubItems,
-                          // Archived campaigns live in the dedicated Archive
-                          // view; keep them out of the everyday nav (#1072).
-                          ...campaigns
-                            .filter((campaign) => campaign.status !== "archived")
-                            .map((campaign) => ({
-                            name:
-                              campaign.title?.trim() ||
-                              `Campaign ${String(campaign.id)}`,
-                            path: `campaigns/${campaign.id}`,
-                            status: campaign.status,
-                            campaignId: campaign.id,
-                          })),
-                        ]
-                      : visibleStaticSubItems;
 
                   return (
-                    <div key={item.name} className="space-y-1">
+                    <div
+                      key={item.name}
+                      className={`space-y-1 ${isPeopleItem ? "lg:group/people lg:relative" : ""}`}
+                    >
                       <NavLink
                         to={itemTo}
                         className={(navState) =>
                           primaryLinkClass({
-                            isActive: isCampaignsItem
-                              ? isCampaignsParentActive
-                              : isPeopleItem
+                            isActive: isPeopleItem
                                 ? isPeopleParentActive
                               : navState.isActive,
                           })
                         }
                         end={item.end}
+                        title={item.name}
                       >
-                        <Icon className="h-5 w-5" />
-                        <span>{item.name}</span>
+                        <Icon className="h-5 w-5 shrink-0 lg:h-4 lg:w-4" />
+                        <span className={desktopLabelClass}>{item.name}</span>
                         {item.path === "chats" && unreadChatsCount > 0 ? (
                           <span
                             data-testid="chats-unread-badge"
-                            className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                            className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground ${isCollapsed ? "lg:hidden" : ""}`}
                           >
                             {formatUnreadBadgeCount(unreadChatsCount)}
                           </span>
                         ) : null}
                       </NavLink>
-                      {campaignSubItems.length > 0 && showSubNav ? (
-                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
-                          {campaignSubItems.map((subItem) => {
+                      {visibleStaticSubItems.length > 0 && showSubNav ? (
+                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3 lg:absolute lg:left-full lg:top-0 lg:z-50 lg:ml-2 lg:hidden lg:w-48 lg:rounded-lg lg:border lg:bg-card lg:p-2 lg:shadow-lg lg:group-hover/people:block lg:group-focus-within/people:block">
+                          {visibleStaticSubItems.map((subItem) => {
                             const subItemTo = subItem.path
                               ? `${baseUrl}/${subItem.path}`
                               : baseUrl;
-                            const progress =
-                              subItem.campaignId != null
-                                ? campaignQueueProgress[String(subItem.campaignId)]
-                                : undefined;
                             return (
                               <NavLink
                                 key={subItem.path || subItem.name}
                                 to={subItemTo}
                                 className={subLinkClass}
+                                title={subItem.name}
                               >
-                                <span className="min-w-0 truncate">
+                                <subItem.icon className="h-4 w-4 shrink-0" />
+                                <span
+                                  className={`min-w-0 truncate ${isCollapsed ? "lg:not-sr-only" : ""}`}
+                                >
                                   {subItem.name}
                                 </span>
-                                {progress?.totalCount || subItem.status ? (
-                                  <span className="flex shrink-0 items-center gap-1.5">
-                                    {progress?.totalCount ? (
-                                      <CampaignQueueProgress
-                                        completedCount={progress.completedCount}
-                                        totalCount={progress.totalCount}
-                                        className="text-[10px] font-semibold uppercase tracking-wide"
-                                      />
-                                    ) : null}
-                                    {subItem.status ? (
-                                      <span
-                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
-                                          subItem.status,
-                                        )}`}
-                                      >
-                                        {formatCampaignStatus(subItem.status)}
-                                      </span>
-                                    ) : null}
-                                  </span>
-                                ) : null}
                               </NavLink>
                             );
                           })}
@@ -370,14 +315,19 @@ const WorkspaceNav = ({
         </nav>
 
         {isAdmin ? (
-          <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
-            <NavLink to={`${baseUrl}/billing`} className={utilityLinkClass}>
+          <div className="relative z-10 mt-1 shrink-0 border-0 bg-brand-secondary/40 p-0 after:pointer-events-none after:absolute after:-bottom-3 after:left-0 after:h-3 after:w-full after:bg-brand-secondary/40 lg:-mx-3 lg:-mb-4 lg:w-auto lg:pb-1">
+            <NavLink
+              to={`${baseUrl}/billing`}
+              className={utilityLinkClass}
+              aria-label={`Credits: ${workspace.credits}`}
+              title={`Credits: ${workspace.credits}`}
+            >
               <span className="inline-flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Credits
-              </span>
-              <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground">
-                {workspace.credits}
+                <CreditCard className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className={desktopLabelClass}>Credits</span>
+                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1 text-xs font-bold leading-none text-foreground">
+                  {isCollapsed ? formatCollapsedCreditCount(workspace.credits) : workspace.credits}
+                </span>
               </span>
             </NavLink>
           </div>
@@ -389,20 +339,15 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-        className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
+          className={`hidden ${workspaceSidebarHeightClass} w-full shrink-0 overflow-hidden rounded-none border-y-0 border-l-0 border-r border-border/80 bg-card shadow-sm lg:sticky lg:top-0 lg:flex ${isCollapsed ? "lg:w-18 lg:max-w-18" : "lg:w-63 lg:max-w-63"} ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
 
       <div className="mb-2 flex items-center justify-between gap-2 lg:hidden">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            Workspace
-          </p>
-          <h2 className="line-clamp-2 break-words font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
-            {workspace.name}
-          </h2>
-        </div>
+        <p className="min-w-0 font-Zilla-Slab text-sm font-semibold text-muted-foreground">
+          Workspace navigation
+        </p>
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="font-Zilla-Slab font-semibold">

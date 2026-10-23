@@ -15,10 +15,10 @@ async function handleCompleteSurvey(request: Request) {
     return guard.response;
   }
 
-  const { formData, survey, resultId, token } = guard.value;
+  const { formData, survey, resultId, token, contactId } = guard.value;
   const completed = formData.get("completed") as string;
 
-  const contact = await resolvePublicSurveyContactId(formData, survey);
+  const contact = await resolvePublicSurveyContactId(formData, survey, contactId);
   if (!contact.ok) {
     return contact.response;
   }

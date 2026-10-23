@@ -25,6 +25,14 @@ pnpm-debug.log*
 /public/exports/
 .local/
 .repl/
+
+# Campaign data exports (PII: contact names, phone numbers, SMS message bodies).
+# Anchored to the repo root so the tracked e2e fixtures under
+# e2e/fixtures/files/ are unaffected. These are written by
+# .opencode/tools/campaign-sms-report.sh, which puts them in the repo root by
+# default; never commit them.
+/*.csv
+/*.pdf
 /graphify-out/cost.json
 /graphify-out/cache/
 /graphify-out/.graphify_python

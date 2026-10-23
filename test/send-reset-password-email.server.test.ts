@@ -50,7 +50,7 @@ describe("sendResetPasswordEmail (Better Auth emailAndPassword.sendResetPassword
       from: string;
     };
     expect(call.to).toEqual(["owner@e2e.test"]);
-    expect(call.from).toBe("Callcaster <info@callcaster.ca>");
+    expect(call.from).toBe("CallCaster <info@callcaster.ca>");
     expect(call.html).toContain(
       "http://localhost:3100/api/auth/reset-password/tok-123?callbackURL=%2Freset-password",
     );
