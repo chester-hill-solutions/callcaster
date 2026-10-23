@@ -26,7 +26,7 @@ function parseArgs(args: string[]): { environment: string; json: boolean } {
 async function main() {
   const { environment, json } = parseArgs(process.argv.slice(2));
   const parsed = EnvironmentNameSchema.safeParse(environment);
-  if (!parsed.success) throw new Error(`unknown environment '${environment}'`);
+  if (!parsed.success) throw new Error("unknown environment");
   const report = parsed.data === "local"
     ? loadResolvedLocalConfig(runtimeEnvironmentToLocalProfile(await readRuntimeEnvironment()))
     : loadResolvedConfig(parsed.data);

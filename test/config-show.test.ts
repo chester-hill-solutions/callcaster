@@ -73,14 +73,18 @@ describe("resolved configuration output", () => {
     expect(() => loadResolvedLocalConfig({ devName: "alex", envName: "local", publicUrl })).toThrow();
   });
 
-  it("rejects invalid command input without printing configuration", () => {
+  it("rejects invalid command input without echoing supplied values", () => {
+    const environment = "https://operator:super-secret-token@example.test/path?api_key=secret";
     const result = spawnSync(
       "npx",
-      ["--no-install", "tsx", resolve("scripts/config-show.ts"), "--environment", "unknown"],
+      ["--no-install", "tsx", resolve("scripts/config-show.ts"), "--environment", environment],
       { cwd: resolve("."), encoding: "utf8" },
     );
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("unknown environment");
-    expect(result.stdout).not.toContain("fingerprint");
+    expect(result.stderr).toBe("config:show: unknown environment\n");
+    for (const part of environment.split(/[^a-zA-Z0-9._=-]+/).filter(Boolean)) {
+      expect(result.stderr).not.toContain(part);
+    }
+    expect(result.stdout).toBe("");
   });
 });
