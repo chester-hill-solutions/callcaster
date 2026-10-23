@@ -1,4 +1,5 @@
 export { loader } from "./reset-password.loader.server";
+export type { ResetPasswordLoaderData } from "./reset-password.loader.server";
 export { action } from "./reset-password.action.server";
 
 import { Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
@@ -8,15 +9,20 @@ import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
-import { MIN_PASSWORD_LENGTH } from "../../shared/password-policy";
+import {
+  INVALID_RESET_LINK_MESSAGE,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_MIN_LENGTH_MESSAGE,
+} from "../../shared/auth-policy";
+import type { ResetPasswordLoaderData } from "./reset-password.loader.server";
 
 export default function ResetPassword() {
   const actionData = useActionData();
-  const { error: linkError } = useLoaderData() as {
-    token: string | null;
-    error: string | null;
-  };
+  const { error } = useLoaderData<ResetPasswordLoaderData>();
   const navigate = useNavigate();
+  // Only the token failure code means the link is unusable. Any other value is
+  // not a reason to hide the form.
+  const linkIsUnusable = error === "INVALID_TOKEN";
 
   useActionFeedback(actionData, {
     getError: (data) => data?.error?.message,
@@ -32,15 +38,12 @@ export default function ResetPassword() {
         title="Choose New Password"
         description="Set a new password for your account to complete recovery."
       >
-        {linkError ? (
-          // The link Better Auth sent cannot be used. Say so on arrival instead
-          // of rendering a form that can only fail on submit (#2075).
+        {linkIsUnusable ? (
+          // Say the link cannot be used on arrival, instead of rendering a form
+          // that can only fail on submit (#2075).
           <div className="flex w-full flex-col gap-4">
             <Alert variant="destructive">
-              <AlertDescription>
-                This reset link is invalid or has expired. Request a new one to
-                continue.
-              </AlertDescription>
+              <AlertDescription>{INVALID_RESET_LINK_MESSAGE}</AlertDescription>
             </Alert>
             <Button asChild className="min-h-[48px] w-full">
               <Link to="/remember">Request a new link</Link>
@@ -55,7 +58,7 @@ export default function ResetPassword() {
             <FormField
               htmlFor="password"
               label="New Password"
-              description={`At least ${MIN_PASSWORD_LENGTH} characters.`}
+              description={PASSWORD_MIN_LENGTH_MESSAGE}
             >
               <Input
                 autoComplete="new-password"

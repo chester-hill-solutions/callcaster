@@ -92,11 +92,35 @@ describe("reset password feedback", () => {
   test("the form states the password rule it enforces", async () => {
     showReset(() => ({ success: null, error: null }));
 
-    expect(await screen.findByText("At least 8 characters.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Password must be at least 8 characters."),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("New Password")).toHaveAttribute(
       "minlength",
       "8",
     );
+  });
+
+  // Only the token failure code hides the form. Any other error value is not a
+  // reason to tell the user their link is unusable.
+  test("an unrecognised error code still shows the form", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/reset-password",
+          Component: ResetPassword,
+          action: vi.fn(),
+          loader: () => ({ token: "issued-token", error: "SOMETHING_ELSE" }),
+        },
+      ],
+      { initialEntries: ["/reset-password?error=SOMETHING_ELSE"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByLabelText("New Password")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/reset link is invalid or has expired/i),
+    ).not.toBeInTheDocument();
   });
 
   test.each([

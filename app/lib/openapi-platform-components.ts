@@ -3,6 +3,7 @@
  * for Platform / agent-friendly CaaS routes. Split from openapi-platform.ts
  * for the app file-size gate (#1048).
  */
+import { MIN_PASSWORD_LENGTH } from "../../shared/auth-policy";
 export const errorResponse = (description: string) => ({
   description,
   content: {
@@ -42,7 +43,7 @@ export const platformOpenApiComponents = {
       required: ["email", "password"] as const,
       properties: {
         email: { type: "string" as const, format: "email" },
-        password: { type: "string" as const, minLength: 8 },
+        password: { type: "string" as const, minLength: MIN_PASSWORD_LENGTH },
         first_name: { type: "string" as const },
         last_name: { type: "string" as const },
       },

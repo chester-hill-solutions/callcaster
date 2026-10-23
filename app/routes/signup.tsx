@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MIN_PASSWORD_LENGTH } from "../../shared/auth-policy";
 
 // Neutral on purpose: this page is registration when signup is open and a
 // request-access form when it is closed, and meta cannot read loader data here.
@@ -118,7 +119,7 @@ const RegistrationForm = ({ isBusy }: RegistrationFormProps) => (
             name="password"
             id="password"
             required
-            minLength={8}
+            minLength={MIN_PASSWORD_LENGTH}
           />
         </FormField>
       </Form>

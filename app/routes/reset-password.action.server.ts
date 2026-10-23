@@ -3,22 +3,31 @@ import { auth } from "@/server/auth-instance";
 import { logger } from "@/lib/logger.server";
 import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
-import { PASSWORD_MIN_LENGTH_MESSAGE } from "../../shared/password-policy";
+import {
+  INVALID_RESET_LINK_MESSAGE,
+  PASSWORD_MIN_LENGTH_MESSAGE,
+  PASSWORD_TOO_LONG_MESSAGE,
+} from "../../shared/auth-policy";
 
-const INVALID_RESET_LINK_MESSAGE =
-  "This reset link is invalid or has expired. Request a new one from the sign-in page.";
+const REJECTION_MESSAGES = new Map<string, string>([
+  ["PASSWORD_TOO_SHORT", PASSWORD_MIN_LENGTH_MESSAGE],
+  ["PASSWORD_TOO_LONG", PASSWORD_TOO_LONG_MESSAGE],
+]);
+
+/** Better Auth reports why it refused on the APIError body. */
+function rejectionCode(error: unknown): string | undefined {
+  return (error as { body?: { code?: string } } | null)?.body?.code;
+}
 
 /**
- * Better Auth reports why it refused: a short password, a long password, or a
- * token it cannot consume. Collapsing every one of those into "the link is
- * invalid" sent users hunting for a new email when the real problem was the
- * password they had just typed (#2075).
+ * Name the reason Better Auth refused (#2075). Collapsing every refusal into
+ * "the link is invalid" sent users hunting for a new email when the token was
+ * fine and the password was the problem.
  */
-function resetRejectionMessage(error: unknown): string {
-  const code = (error as { body?: { code?: string } } | null)?.body?.code;
-  if (code === "PASSWORD_TOO_SHORT") return PASSWORD_MIN_LENGTH_MESSAGE;
-  if (code === "PASSWORD_TOO_LONG") return "Password is too long.";
-  return INVALID_RESET_LINK_MESSAGE;
+function rejectionMessage(code: string | undefined): string {
+  return (
+    (code ? REJECTION_MESSAGES.get(code) : undefined) ?? INVALID_RESET_LINK_MESSAGE
+  );
 }
 
 export const action = defineAction({
@@ -72,7 +81,7 @@ export const action = defineAction({
       // The token IS the credential here, so surfacing its failure leaks
       // nothing (unlike forgot-password, which stays generic to avoid account
       // enumeration). A silent "success" strands the user at sign-in.
-      const code = (error as { body?: { code?: string } } | null)?.body?.code;
+      const code = rejectionCode(error);
       logger.warn("reset-password: reset rejected", {
         code,
         error: error instanceof Error ? error.message : String(error),
@@ -80,7 +89,7 @@ export const action = defineAction({
       return routeData(
         {
           success: null,
-          error: { message: resetRejectionMessage(error) },
+          error: { message: rejectionMessage(code) },
         },
         { status: 400 },
       );
