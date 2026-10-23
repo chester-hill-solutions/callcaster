@@ -28,7 +28,7 @@ async function resolveRespondentToken(
   formData: FormData,
   survey: SurveyRecord,
 ): Promise<
-  | { ok: true; resultId: string; token: string }
+  | { ok: true; resultId: string; token: string; contactId: number | null }
   | { ok: false; response: ErrorResponse }
 > {
   const token = getRespondentToken(request, formData);
@@ -43,7 +43,12 @@ async function resolveRespondentToken(
         ),
       };
     }
-    return { ok: true, resultId: payload.result_id, token };
+    return {
+      ok: true,
+      resultId: payload.result_id,
+      token,
+      contactId: payload.contact_id ?? null,
+    };
   }
   return {
     ok: false,
@@ -56,6 +61,11 @@ export type PublicSurveySubmission = {
   survey: SurveyRecord;
   resultId: string;
   token: string;
+  /**
+   * The contact this token belongs to, or null when the respondent is
+   * anonymous. The only thing that may name the contact a submission acts as.
+   */
+  contactId: number | null;
 };
 
 export type PublicSurveyGuard =
@@ -130,6 +140,7 @@ export async function guardPublicSurveySubmission(
       survey,
       resultId: tokenResult.resultId,
       token: tokenResult.token,
+      contactId: tokenResult.contactId,
     },
   };
 }
@@ -138,31 +149,49 @@ export type PublicSurveyContact =
   | { ok: true; contactId: number | null }
   | { ok: false; response: ErrorResponse };
 
-/** Parses and validates the optional `contactId` field for a submission. */
+/**
+ * Resolves the contact a public submission may act as.
+ *
+ * `tokenContactId` is the contact the respondent token was minted for, or null
+ * for an anonymous session. The token is the only thing that names that
+ * contact, so a submitted `contactId` field is never trusted: a value that
+ * disagrees with the token is IGNORED, and the response is recorded against the
+ * token's contact — unattributed when the token names none.
+ *
+ * Rejecting a disagreeing id instead would 400 a submission the product used to
+ * accept. A link carrying a bare `?contact=` id and no proof now loads
+ * anonymously (#2868), and the page then posts the id it was given, so the
+ * disagreement is the normal case rather than an attack. Only a value that is
+ * not a number at all is a client error, because that is malformed input rather
+ * than a stale link.
+ */
 export async function resolvePublicSurveyContactId(
   formData: FormData,
   survey: Pick<SurveyRecord, "workspace">,
+  tokenContactId: number | null = null,
 ): Promise<PublicSurveyContact> {
-  const contactId = formData.get("contactId") as string;
-  const contactIdNum = contactId ? parseInt(contactId, 10) : null;
-  if (contactIdNum !== null && Number.isNaN(contactIdNum)) {
+  const submitted = formData.get("contactId") as string | null;
+  if (submitted && Number.isNaN(parseInt(submitted, 10))) {
     return {
       ok: false,
       response: routeData({ error: "Invalid contact ID" }, { status: 400 }),
     };
   }
-  if (contactIdNum !== null) {
-    // Scoped to the survey's workspace, so a foreign id simply does not resolve.
-    const contact = await loadSurveyRespondentContact(
-      contactIdNum,
-      survey.workspace,
-    );
-    if (!contact) {
-      return {
-        ok: false,
-        response: routeData({ error: "Invalid contact" }, { status: 400 }),
-      };
-    }
+
+  if (tokenContactId === null) {
+    return { ok: true, contactId: null };
   }
-  return { ok: true, contactId: contactIdNum };
+
+  // Scoped to the survey's workspace, so a foreign id simply does not resolve.
+  const contact = await loadSurveyRespondentContact(
+    tokenContactId,
+    survey.workspace,
+  );
+  if (!contact) {
+    return {
+      ok: false,
+      response: routeData({ error: "Invalid contact" }, { status: 400 }),
+    };
+  }
+  return { ok: true, contactId: tokenContactId };
 }

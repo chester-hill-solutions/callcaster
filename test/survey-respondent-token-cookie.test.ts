@@ -25,7 +25,7 @@ describe("signed survey resume cookies", () => {
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("Secure");
     expect(cookie).toContain(`Expires=${new Date(payload.exp * 1000).toUTCString()}`);
-    expect(await readRespondentCookie({ ...context, request: new Request(request.url, { headers: { Cookie: cookie.split(";")[0] } }) })).toEqual(identity);
+    expect(await readRespondentCookie({ ...context, request: new Request(request.url, { headers: { Cookie: cookie.split(";")[0] } }) })).toEqual({ ...identity, contactId: null });
   });
   test.each(["contact", "survey", "workspace", "expired"])("a %s mismatch cannot resume", async (kind) => {
     const identity = await createRespondentToken(1, "ws-1");

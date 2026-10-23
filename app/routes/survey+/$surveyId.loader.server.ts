@@ -5,6 +5,7 @@ import {
 } from "@/lib/survey-db.server";
 import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
 import { createRespondentToken } from "@/lib/survey-respondent-token.server";
+import { verifySurveyContactProof } from "@/lib/survey-contact-proof.server";
 import { readRespondentCookie, serializeRespondentCookie } from "@/lib/survey-respondent-cookie.server";
 import {
   checkRateLimit,
@@ -35,6 +36,7 @@ export const loader = defineLoader({
   handler: async ({ request, params, url }) => {
     const { surveyId } = params;
     const contactIdParam = url.searchParams.get("contact");
+    const proofParam = url.searchParams.get("proof");
 
     if (!surveyId) {
       throw new Response("Survey ID is required", { status: 400 });
@@ -56,9 +58,16 @@ export const loader = defineLoader({
         if (!rate.ok) {
           throw rateLimitResponse(rate.retryAfterSeconds);
         }
-        // Scoped to the survey's workspace: a contact from any other tenant
-        // resolves to null rather than being returned to an anonymous caller.
-        contact = await loadSurveyRespondentContact(contactId, survey.workspace);
+        // A `?contact=` id is a bare integer and proves nothing, so it may only
+        // select a contact when the link also carries the proof this server
+        // minted for that exact survey and contact (#2868). Without it the id
+        // is ignored and the session is anonymous, so a guessed id cannot load
+        // another respondent's identity, answers or response row.
+        if (await verifySurveyContactProof(survey.id, contactId, proofParam)) {
+          // Scoped to the survey's workspace: a contact from any other tenant
+          // resolves to null rather than being returned to an anonymous caller.
+          contact = await loadSurveyRespondentContact(contactId, survey.workspace);
+        }
       }
     }
 
@@ -83,17 +92,34 @@ export const loader = defineLoader({
         existingResponse = existing.response;
         existingAnswers = existing.answers;
       }
-    }
-    if (!identity && contact?.id) {
+    } else if (contact) {
+      // `contact` is only ever set when the link carried a proof this server
+      // minted for exactly this survey and contact, which is the other thing
+      // that licenses resuming an existing response. A bare `?contact=` id
+      // reaches neither branch, so it cannot select another respondent's row.
       const existing = await loadExistingResponseWithAnswers({
         surveyInternalId: survey.id, contactId: contact.id,
       });
       existingResponse = existing.response;
       existingAnswers = existing.answers;
     }
-    identity ??= await createRespondentToken(survey.id, survey.workspace, {
-      resultId: existingResponse?.result_id,
-    });
+    // Ownership of an existing response is proven by the signed link proof
+    // (which is what selects the contact above) or by the respondent cookie it
+    // was issued with. Never by the id alone: the `?contact=` lookup that ran
+    // here is exactly what let a guessed id mint a credential for another
+    // respondent's response row (#2868).
+    if (!identity) {
+      const sessionContactId = contact?.id ?? null;
+      const minted = await createRespondentToken(survey.id, survey.workspace, {
+        resultId: existingResponse?.result_id,
+        contactId: sessionContactId,
+      });
+      identity = {
+        token: minted.token,
+        resultId: minted.resultId,
+        contactId: sessionContactId,
+      };
+    }
     const cookie = await serializeRespondentCookie({ ...identityArgs, token: identity.token });
     return routeData<PublicSurveyLoaderData>({
       survey,

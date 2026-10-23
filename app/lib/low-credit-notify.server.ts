@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { LOW_CREDIT_THRESHOLD } from "../../shared/pricing";
-import { escapeHtml } from "@/lib/email-html";
+import { renderBrandedEmail } from "@/lib/email-layout.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
@@ -47,26 +47,27 @@ function buildEmail(args: {
   balance: number;
 }) {
   const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
-  const workspaceNameHtml = escapeHtml(args.workspaceName);
+  const { html, text } = renderBrandedEmail({
+    heading: `Your ${args.workspaceName} credits are running low`,
+    intro: `Your workspace, ${args.workspaceName}, is below the ${LOW_CREDIT_THRESHOLD}-credit warning threshold.`,
+    facts: [
+      { label: "Balance", value: `${args.balance} credits`, tone: "warn" },
+      { label: "Warning threshold", value: `${LOW_CREDIT_THRESHOLD} credits` },
+    ],
+    note: {
+      text: "Top up now to avoid interruptions to campaigns, calls, and number rentals.",
+      tone: "warn",
+    },
+    cta: { label: "Add credits", url: billingUrl },
+    footerLink: {
+      label: "Open workspace",
+      url: `${env.BASE_URL()}/workspaces/${args.workspaceId}`,
+    },
+  });
   return {
     subject: `Your ${args.workspaceName} credits are running low`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your ${workspaceNameHtml} credits are running low</h2>
-        <p>Your workspace, <strong>${workspaceNameHtml}</strong>, balance is <strong>${args.balance}</strong> credits, below the
-        ${LOW_CREDIT_THRESHOLD}-credit warning threshold.</p>
-        <p>Top up now to avoid interruptions to campaigns, calls, and number rentals.</p>
-        <p><a href="${billingUrl}" style="background-color: #c91d25; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Add credits</a></p>
-      </div>
-    `,
-    text: `
-      Your ${args.workspaceName} credits are running low
-
-      Your workspace, ${args.workspaceName}, balance is ${args.balance} credits, below the ${LOW_CREDIT_THRESHOLD}-credit warning threshold.
-      Top up now to avoid interruptions to campaigns, calls, and number rentals.
-
-      Add credits: ${billingUrl}
-    `,
+    html,
+    text,
   };
 }
 

@@ -35,7 +35,7 @@ async function emitCue(state: CoachingState, cue: CueIntent): Promise<void> {
     type: cue.type,
     severity: cue.severity,
     payload: cue.payload,
-  });
+  }, state.workspaceId);
 
   await publishCoachingCueEvent(state.workspaceId, state.callSid, {
     eventId: row.id,

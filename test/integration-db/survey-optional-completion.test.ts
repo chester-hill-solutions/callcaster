@@ -34,6 +34,7 @@ describeDb("blank optional-only public survey completion (#2418)", () => {
   let loader: typeof import("@/routes/survey+/$surveyId.loader.server").loader;
   let tokens: typeof import("@/lib/survey-respondent-token.server");
   let service: typeof import("@/lib/survey-db.server");
+  let proofs: typeof import("@/lib/survey-contact-proof.server");
   let resetLimits: () => void;
   const workspace = randomUUID();
   const foreignWorkspace = randomUUID();
@@ -82,6 +83,7 @@ describeDb("blank optional-only public survey completion (#2418)", () => {
     ({ loader } = await import("@/routes/survey+/$surveyId.loader.server"));
     tokens = await import("@/lib/survey-respondent-token.server");
     service = await import("@/lib/survey-db.server");
+    proofs = await import("@/lib/survey-contact-proof.server");
     ({ resetRateLimitsForTests: resetLimits } =
       await import("@/lib/platform-rate-limit.server"));
   });
@@ -110,9 +112,20 @@ describeDb("blank optional-only public survey completion (#2418)", () => {
     }
   });
 
+  /**
+   * The identity a contact's link actually produces: the id PLUS the proof this
+   * server mints for it (#2868). A bare `?contact=` id proves nothing and is
+   * ignored by the loader, so a test that wants contact context must carry the
+   * proof the product puts in a sent link.
+   */
   async function identity(contact?: number) {
+    const proofQuery = contact
+      ? `?contact=${contact}&proof=${encodeURIComponent(
+          await proofs.createSurveyContactProof(surveyId, contact),
+        )}`
+      : "";
     const request = new Request(
-      `https://example.test/survey/${publicId}${contact ? `?contact=${contact}` : ""}`,
+      `https://example.test/survey/${publicId}${proofQuery}`,
     );
     const result = await normalizeRouteResult(
       await loader(routeArgs(request, { surveyId: publicId }) as never),
@@ -277,7 +290,7 @@ describeDb("blank optional-only public survey completion (#2418)", () => {
     expect(await responses()).toHaveLength(0);
   });
 
-  test("a contact from another workspace cannot create a response", async () => {
+  test("a contact from another workspace cannot create a response as that contact", async () => {
     const issued = await identity();
     expect(
       (
@@ -285,8 +298,13 @@ describeDb("blank optional-only public survey completion (#2418)", () => {
           contactId: String(foreignContactId),
         })
       ).status,
-    ).toBe(400);
-    expect(await responses()).toHaveLength(0);
+    ).toBe(200);
+    // The id names no contact this session may act as, so it is ignored: the
+    // response lands unattributed instead of being stamped with a foreign
+    // contact. The cross-tenant guarantee is about attribution, not status.
+    const rows = await responses();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].contact_id ?? null).toBeNull();
   });
 
   test("an inactive survey creates no response", async () => {

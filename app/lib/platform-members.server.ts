@@ -148,7 +148,17 @@ function assertNoRoleEscalation(
   assignedRole: string,
 ): { ok: true } | { ok: false; error: string; status: number } {
   const actorRank = WORKSPACE_ROLE_RANK[actorRole] ?? 0;
-  const assignedRank = WORKSPACE_ROLE_RANK[assignedRole] ?? 0;
+  const assignedRank = WORKSPACE_ROLE_RANK[assignedRole];
+  // Fail closed on a role outside the current vocabulary. Ranking an unknown
+  // role as 0 would let any string through this guard, including one that a
+  // later component maps onto a privileged role.
+  if (assignedRank === undefined) {
+    return {
+      ok: false,
+      error: "Invalid workspace role",
+      status: 400,
+    };
+  }
   if (assignedRank > actorRank) {
     return {
       ok: false,

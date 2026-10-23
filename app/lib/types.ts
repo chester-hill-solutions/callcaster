@@ -791,8 +791,9 @@ export interface UseWorkspaceRealtimeProps {
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
 
-// Utility function to generate survey links
-export function generateSurveyLink(contactId: number, surveyId: string, baseUrl: string): string {
-  const encoded = btoa(`${contactId}:${surveyId}`);
-  return `${baseUrl}/?q=${encoded}`;
+// `proof` (createSurveyContactProof) is what makes a link per-contact (#2868).
+export function generateSurveyLink(
+  contactId: number, surveyId: string, baseUrl: string, proof?: string,
+): string {
+  return `${baseUrl}/?q=${btoa(proof ? `${contactId}:${surveyId}:${proof}` : `${contactId}:${surveyId}`)}`;
 }
