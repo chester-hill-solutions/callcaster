@@ -30,6 +30,14 @@ request.
 - Push with `git push -u origin <branch>`.
 - After pushing, verify the remote branch and open a PR into `dev`.
 
+## Scripted Git predicates
+
+`git merge-base --is-ancestor` reports through its exit status: 0 is true,
+1 is false, and other results are errors. Its empty stdout is not a boolean.
+Handle each predicate separately so a normal non-ancestor result does not skip
+the next check. Keep unknown refs conservative rather than treating an error as
+proof that a commit is absent from a branch.
+
 ## Rebase with local changes
 
 Git cannot rebase a dirty worktree. Do not discard tested changes to satisfy the
