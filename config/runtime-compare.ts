@@ -52,6 +52,15 @@ type RuntimeModelResult = {
   modeled: Record<RuntimeConfigPath, boolean>;
 };
 
+const paths = Object.keys({
+  "urls.publicApp": true,
+  "runtime.mode": true,
+  "storage.endpoint": true,
+  "storage.region": true,
+  "storage.bucket": true,
+  "storage.urlStyle": true,
+}) as RuntimeConfigPath[];
+
 /**
  * Comparison contract: only fields present in the typed project config are
  * compared. Optional values supplied by deployment infrastructure but not
@@ -65,6 +74,15 @@ function canonicalUrl(value: string | undefined): string | undefined {
   url.hostname = url.hostname.toLowerCase();
   url.pathname = url.pathname.replace(/\/+$/, "");
   return url.toString().replace(/\/$/, "");
+}
+
+function projectModeledValues(
+  values: RuntimeModel,
+  modeled: Record<RuntimeConfigPath, boolean>,
+): Partial<RuntimeModel> {
+  return Object.fromEntries(
+    paths.filter((path) => modeled[path]).map((path) => [path, values[path]]),
+  );
 }
 
 function expectedModel(config: ProjectConfig): RuntimeModelResult {
@@ -112,15 +130,6 @@ function observedModel(env: NodeJS.ProcessEnv): RuntimeModel {
   };
 }
 
-const paths = Object.keys({
-  "urls.publicApp": true,
-  "runtime.mode": true,
-  "storage.endpoint": true,
-  "storage.region": true,
-  "storage.bucket": true,
-  "storage.urlStyle": true,
-}) as RuntimeConfigPath[];
-
 function mismatchCategory(expected: unknown, observed: unknown): RuntimeMismatchCategory | undefined {
   if (expected === observed) return undefined;
   if (expected === undefined) return "unexpected";
@@ -150,8 +159,8 @@ export function compareRuntimeConfig(
   return {
     enabled: true,
     environment,
-    expectedFingerprint: stableFingerprint(expected.values as never),
-    observedFingerprint: stableFingerprint(observed as never),
+    expectedFingerprint: stableFingerprint(projectModeledValues(expected.values, expected.modeled) as never),
+    observedFingerprint: stableFingerprint(projectModeledValues(observed, expected.modeled) as never),
     mismatches,
   };
 }

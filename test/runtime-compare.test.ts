@@ -60,15 +60,38 @@ describe("runtime config comparison", () => {
     ]));
   });
 
+  it.each([
+    {
+      environment: "dev" as const,
+      baseUrl: "https://dev.callcaster.ca",
+      bucket: "callcaster-dev",
+    },
+    {
+      environment: "qa" as const,
+      baseUrl: "https://qa.callcaster.ca",
+      bucket: "callcaster-staging",
+    },
+  ])("matches modeled $environment values despite a Railway endpoint", ({ environment, baseUrl, bucket }) => {
+    const result = compareRuntimeConfig(environment, {
+      BASE_URL: baseUrl,
+      NODE_ENV: "production",
+      ENDPOINT: "https://storage.railway.app",
+      REGION: "iad",
+      BUCKET: bucket,
+    });
+    expect(result).toMatchObject({ enabled: true, mismatches: [] });
+    if (result.enabled) expect(result.expectedFingerprint).toBe(result.observedFingerprint);
+  });
+
   it("reports CLI failures without values, stacks, or machine paths", () => {
-    const secretEndpoint = "https://user:token@bad.example.invalid/[";
+    const secretEndpoint = "https://user:token@[bad.example.invalid";
     const result = spawnSync(
       "npx",
       ["--no-install", "tsx", "--tsconfig", "tsconfig.json", resolve("scripts/compare-runtime-config.mjs"), "--environment", "qa"],
       {
         cwd: resolve("."),
         encoding: "utf8",
-        env: { ...process.env, ENDPOINT: secretEndpoint },
+        env: { ...process.env, S3_ENDPOINT: secretEndpoint, ENDPOINT: secretEndpoint },
       },
     );
     expect(result.status).not.toBe(0);
