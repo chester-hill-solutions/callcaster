@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   ConfigValidationError,
   parseProjectConfig,
+  ProjectConfigOverlaySchema,
   SecretReferenceSchema,
   SecretNameSchema,
+  ServiceSliceSchema,
 } from "../config/schema";
 import { secretNames } from "../config/secret-names";
 
@@ -74,6 +76,27 @@ describe("ProjectConfig schema", () => {
       port: 8080,
       secrets: [],
     });
+  });
+
+  it.each([
+    ["credentials", "https://user:token@example.test/path"],
+    ["query strings", "https://example.test/path?api_key=secret"],
+    ["fragments", "https://example.test/path#frag"],
+  ])("rejects %s in every resolved URL field", (_component, value) => {
+    expect(() => parseProjectConfig({ ...valid, urls: { publicApp: value } })).toThrow(ConfigValidationError);
+    expect(() => parseProjectConfig({ ...valid, storage: { endpoint: value } })).toThrow(ConfigValidationError);
+    expect(() => parseProjectConfig({ ...valid, services: { app: { url: value } } })).toThrow(ConfigValidationError);
+    expect(ProjectConfigOverlaySchema.safeParse({ environment: "local", urls: { publicApp: value } }).success).toBe(false);
+    expect(ProjectConfigOverlaySchema.safeParse({ environment: "local", storage: { endpoint: value } }).success).toBe(false);
+    expect(ProjectConfigOverlaySchema.safeParse({ environment: "local", services: { app: { url: value } } }).success).toBe(false);
+  });
+
+  it("rejects unsafe service URLs and keeps valid path URLs", () => {
+    expect(ServiceSliceSchema.safeParse({ url: "https://example.test/path" }).success).toBe(true);
+    expect(ServiceSliceSchema.safeParse({ url: "https://user:token@example.test/path?api_key=secret#frag" }).success).toBe(false);
+    expect(parseProjectConfig({ ...valid, urls: { publicApp: "https://example.test/path" } }).urls.publicApp).toBe(
+      "https://example.test/path",
+    );
   });
 
 });

@@ -66,6 +66,17 @@ describe("loadProjectConfig", () => {
     const resolved = resolveLocalProjectConfig({ devName: "sai", envName: "local", publicUrl: "https://tunnel.example.test/path" });
     expect(resolved.identity.hostname).toBe("tunnel.example.test");
     expect(resolved.config.urls.publicApp).toBe("https://tunnel.example.test/path");
+    expect(resolveLocalProjectConfig({ devName: "sai", envName: "local", publicUrl: "http://localhost:3000/path" }).identity.publicUrl).toBe(
+      "http://localhost:3000/path",
+    );
+    for (const publicUrl of [
+      "https://user:token@example.test/path",
+      "https://example.test/path?api_key=secret",
+      "https://example.test/path#frag",
+      "http://example.test/path",
+    ]) {
+      expect(() => resolveLocalProjectConfig({ devName: "sai", envName: "local", publicUrl })).toThrow();
+    }
   });
 
   it("rejects local profiles whose derived DNS label exceeds 63 characters", () => {

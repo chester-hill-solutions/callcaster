@@ -47,6 +47,9 @@ describe("runtime environment snapshot", () => {
     expect(() => runtimeEnvironmentToLocalProfile({ DEV_NAME: "Sai Local", ENV: "local" })).toThrow("invalid");
     expect(() => runtimeEnvironmentToLocalProfile({ DEV_NAME: "sai", ENV: "dev" })).toThrow("invalid");
     expect(() => runtimeEnvironmentToLocalProfile({ DEV_NAME: "sai", ENV: "local", BASE_URL: "not-a-url" })).toThrow("invalid");
+    expect(() =>
+      runtimeEnvironmentToLocalProfile({ DEV_NAME: "sai", ENV: "local", BASE_URL: "https://user:secret@example.test/path?api_key=secret#frag" }),
+    ).toThrow("invalid");
   });
 
   it("does not require real dotenv files when cwd is injected", async () => {

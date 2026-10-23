@@ -49,14 +49,23 @@ const safeProfileSegment = z
   .max(63)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must contain only lowercase letters, numbers, and single hyphens");
 
+/** URLs shown in diagnostics must not carry credentials or hidden components. */
+const diagnosticUrl = z
+  .string()
+  .url()
+  .superRefine((value, ctx) => {
+    const url = new URL(value);
+    if (url.username || url.password || /[?#]/.test(value)) {
+      ctx.addIssue({ code: "custom", message: "must not include credentials, query strings, or fragments" });
+    }
+  });
+
 /** Input supplied by a local developer; it is not read from process.env. */
 export const LocalProfileInputSchema = z
   .object({
     devName: safeProfileSegment,
     envName: z.literal("local"),
-    publicUrl: z
-      .string()
-      .url()
+    publicUrl: diagnosticUrl
       .refine((value) => {
         const url = new URL(value);
         return url.protocol === "https:" || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname));
@@ -78,7 +87,7 @@ export type LocalProfileIdentity = {
 export const ServiceSliceSchema = z
   .object({
     enabled: z.boolean().default(true),
-    url: z.string().url().optional(),
+    url: diagnosticUrl.optional(),
     host: z.string().min(1).optional(),
     port: z.number().int().min(1).max(65535).optional(),
     bucket: z.string().min(1).optional(),
@@ -110,12 +119,12 @@ const projectConfigObjectSchema = z
     secretProvider: z.enum(secretProviderNames),
     runtime: z.object({ mode: z.enum(["development", "test", "production"]).default("development") }).strict().default({ mode: "development" }),
     urls: z
-      .object({ publicApp: z.string().url().optional() })
+      .object({ publicApp: diagnosticUrl.optional() })
       .strict()
       .default({}),
     storage: z
       .object({
-        endpoint: z.string().url().optional(),
+        endpoint: diagnosticUrl.optional(),
         host: z.string().min(1).optional(),
         bucket: z.string().min(1).optional(),
         region: z.string().min(1).optional(),
@@ -142,7 +151,7 @@ const projectConfigObjectSchema = z
 const serviceOverlaySchema = z
   .object({
     enabled: z.boolean().optional(),
-    url: z.string().url().optional(),
+    url: diagnosticUrl.optional(),
     host: z.string().min(1).optional(),
     port: z.number().int().min(1).max(65535).optional(),
     bucket: z.string().min(1).optional(),
@@ -169,10 +178,10 @@ export const ProjectConfigOverlaySchema = z
     parent: EnvironmentNameSchema.optional(),
     secretProvider: z.enum(secretProviderNames).optional(),
     runtime: z.object({ mode: z.enum(["development", "test", "production"]).optional() }).strict().optional(),
-    urls: z.object({ publicApp: z.string().url().optional() }).strict().optional(),
+    urls: z.object({ publicApp: diagnosticUrl.optional() }).strict().optional(),
     storage: z
       .object({
-        endpoint: z.string().url().optional(),
+        endpoint: diagnosticUrl.optional(),
         host: z.string().min(1).optional(),
         bucket: z.string().min(1).optional(),
         region: z.string().min(1).optional(),

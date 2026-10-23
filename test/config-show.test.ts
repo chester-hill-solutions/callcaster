@@ -65,6 +65,14 @@ describe("resolved configuration output", () => {
     expect(JSON.stringify(first)).not.toMatch(/(do-not-print|token-value|password-value|postgres:\/\/)/i);
   });
 
+  it.each([
+    "https://user:token@example.test/path",
+    "https://example.test/path?api_key=secret",
+    "https://example.test/path#frag",
+  ])("does not produce a report or fingerprint for unsafe local URL %s", (publicUrl) => {
+    expect(() => loadResolvedLocalConfig({ devName: "alex", envName: "local", publicUrl })).toThrow();
+  });
+
   it("rejects invalid command input without printing configuration", () => {
     const result = spawnSync(
       "npx",
