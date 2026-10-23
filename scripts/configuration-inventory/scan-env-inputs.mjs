@@ -242,15 +242,25 @@ export function scanSourceText(text, sourceFile) {
     for (const match of text.matchAll(new RegExp(`${escapedName}\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]`, "g"))) {
       const collectionName = collectionForAccess(text, knownCollections, match[1], match.index);
       const keys = collectionName ? knownCollections.get(collectionName) : null;
-      if (!keys?.length) continue;
-      for (const key of keys) {
+      if (keys?.length) {
+        for (const key of keys) {
+          add(entry({
+            key,
+            sourceKind: sourceKindForRead(sourceFile),
+            sourceFile,
+            line: lineNumberAt(text, match.index),
+            consumer,
+            notes: `Resolved from the ${collectionName} key collection used with ${environmentName}.`,
+          }));
+        }
+      } else {
         add(entry({
-          key,
-          sourceKind: sourceKindForRead(sourceFile),
+          sourceKind: sourceFile.startsWith("test/") ? "dynamic-test-read" : "dynamic-runtime-read",
           sourceFile,
           line: lineNumberAt(text, match.index),
           consumer,
-          notes: `Resolved from the ${collectionName} key collection used with ${environmentName}.`,
+          expression: `${environmentName}[${match[1]}]`,
+          notes: `Dynamic key expression: ${environmentName}[${match[1]}]. Manual key review is required.`,
         }));
       }
     }

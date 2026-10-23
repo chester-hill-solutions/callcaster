@@ -55,6 +55,39 @@ function read(env: NodeJS.ProcessEnv = process.env, setting = "endpoint") {
     expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
   });
 
+  test("records unresolved injected environment reads as one dynamic boundary", () => {
+    const records = scanSourceText(
+      'function read(env: NodeJS.ProcessEnv, key: string) { return env[key]; }',
+      "app/config-reader.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-runtime-read",
+      sourceFile: "app/config-reader.ts",
+      line: 1,
+      expression: "env[key]",
+      notes: "Dynamic key expression: env[key]. Manual key review is required.",
+    })]);
+  });
+
+  test("records unresolved injected test reads without exposing literal values", () => {
+    const records = scanSourceText(
+      'const secret = "SUPER_SECRET_VALUE";\nfunction read(env: NodeJS.ProcessEnv, key: string) { return env[key]; }',
+      "test/config-reader.test.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-test-read",
+      sourceFile: "test/config-reader.test.ts",
+      line: 2,
+      expression: "env[key]",
+      notes: "Dynamic key expression: env[key]. Manual key review is required.",
+    })]);
+    expect(JSON.stringify(records)).not.toContain("SUPER_SECRET_VALUE");
+  });
+
   test("does not cross-contaminate independent injected key collections", () => {
     const source = readFileSync(resolve("app/lib/required-env-keys.mjs"), "utf8");
     const records = scanSourceText(source, "app/lib/required-env-keys.mjs");

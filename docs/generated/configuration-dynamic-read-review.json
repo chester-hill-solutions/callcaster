@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "6b4d4818c3299f0f38ef358cf99803d7710939949b131a0495e9667159113c2c",
+    "recordDigest": "cc620d585049524cc69a185b303b9bdb2d8502d811c0bc90a034e3ed8dec036c",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2585,6 +2585,17 @@
       ]
     },
     {
+      "sourceFile": "config/runtime-compare.ts",
+      "line": 63,
+      "consumer": "app",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "env[key]",
+      "status": "approved",
+      "owner": "app",
+      "migrationTarget": "config.app.dynamicEnvironmentAccess",
+      "keys": []
+    },
+    {
       "sourceFile": "e2e/sim/config.ts",
       "line": 9,
       "consumer": "sim",
@@ -2644,6 +2655,17 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[key]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
+    },
+    {
+      "sourceFile": "scripts/lib/app-db-objects.mjs",
+      "line": 62,
+      "consumer": "script",
+      "sourceKind": "dynamic-runtime-read",
+      "expression": "env[requireEnvVar]",
       "status": "approved",
       "owner": "scripts",
       "migrationTarget": "config.scripts.dynamicEnvironmentAccess",

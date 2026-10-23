@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "6b4d4818c3299f0f38ef358cf99803d7710939949b131a0495e9667159113c2c",
+    "recordDigest": "cc620d585049524cc69a185b303b9bdb2d8502d811c0bc90a034e3ed8dec036c",
     "scannedRoots": [
       ".env.example",
       ".github/actions",

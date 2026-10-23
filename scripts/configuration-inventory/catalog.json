@@ -953,6 +953,26 @@
   ],
   "dynamicBoundaries": [
     {
+      "sourceFile": "config/runtime-compare.ts",
+      "line": 63,
+      "expression": "env[key]",
+      "status": "approved",
+      "owner": "app",
+      "migrationTarget": "config.app.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an environment object and external key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/lib/app-db-objects.mjs",
+      "line": 62,
+      "expression": "env[requireEnvVar]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an environment object and external key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
       "sourceFile": "app/lib/env.server.ts",
       "line": 86,
       "expression": "process.env[key]",
