@@ -3,6 +3,7 @@ import { environmentConfigs } from "./environments";
 import { z } from "zod";
 import {
   ConfigValidationError,
+  assertProjectConfigMap,
   EnvironmentNameSchema,
   LocalProfileInputSchema,
   type LocalProfileIdentity,
@@ -48,6 +49,7 @@ export function loadProjectConfig(
   environment: EnvironmentName,
   overlays: ProjectConfigMap = environmentConfigs,
 ): ProjectConfig {
+  assertProjectConfigMap(overlays);
   const requested = EnvironmentNameSchema.safeParse(environment);
   if (!requested.success) invalid(`unknown environment '${String(environment)}'`);
 

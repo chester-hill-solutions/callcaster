@@ -110,4 +110,9 @@ describe("loadProjectConfig", () => {
     expect(() => validateInheritanceGraph({ local: { environment: "local", parent: "qa" } })).toThrow(/not defined/);
     expect(() => validateInheritanceGraph({ local: { environment: "local", parent: "production" } })).toThrow(/production cannot/);
   });
+
+  it.each([null, [], "invalid"])("rejects %j overlay maps", (overlays) => {
+    expect(() => loadProjectConfig("local", overlays as never)).toThrow(ConfigValidationError);
+    expect(() => validateInheritanceGraph(overlays as never)).toThrow(ConfigValidationError);
+  });
 });

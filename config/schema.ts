@@ -275,8 +275,17 @@ export function safeParseProjectConfig(input: unknown) {
 
 export type ProjectConfigMap = Partial<Record<EnvironmentName, unknown>>;
 
+export function assertProjectConfigMap(input: unknown): asserts input is ProjectConfigMap {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new ConfigValidationError(
+      new z.ZodError([{ code: "custom", path: [], message: "overlay map must be a non-null object" }]),
+    );
+  }
+}
+
 /** Validate parent links without resolving or merging environment overlays. */
 export function validateInheritanceGraph(configs: ProjectConfigMap): void {
+  assertProjectConfigMap(configs);
   const parsed = new Map<EnvironmentName, ProjectConfigOverlay>();
   for (const [name, value] of Object.entries(configs)) {
     const environment = EnvironmentNameSchema.safeParse(name);
