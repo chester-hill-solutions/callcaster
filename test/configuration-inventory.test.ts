@@ -102,6 +102,29 @@ function read(env: NodeJS.ProcessEnv, setting = "endpoint") {
     expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
   });
 
+  test.each([
+    ["line comments", `const SETTINGS = {
+  endpoint: ["SAFE_ENDPOINT" /* , ] */], // , ]
+  label: "NOT_A_KEY",
+};`],
+    ["block comments", `const SETTINGS = {
+  endpoint: ["SAFE_ENDPOINT", /* , ] */ "SAFE_ENDPOINT_TWO"], /* , ] */
+  label: "NOT_A_KEY",
+};`],
+  ])("keeps object collection values concrete around %s", (_commentType, declaration) => {
+    const records = scanSourceText(`${declaration}
+function read(env: NodeJS.ProcessEnv, setting = "endpoint") {
+  return SETTINGS[setting].some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(
+      expect.arrayContaining(["SAFE_ENDPOINT"]),
+    );
+    expect(records.some((record) => record.key === "SAFE_ENDPOINT_TWO")).toBe(_commentType === "block comments");
+    expect(records.some((record) => record.key === "NOT_A_KEY")).toBe(false);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
   test("uses only the statically selected object array property", () => {
     const records = scanSourceText(`const SETTINGS = {
   endpoint: ["ENDPOINT_KEY"],
