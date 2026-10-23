@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { scanSourceText, summarizeInventory, normalizeRailwayServiceName, writeInventory } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
+import { scanSourceText, summarizeInventory, normalizeRailwayServiceName, validateCatalog, writeInventory } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
+
+const catalog = JSON.parse(readFileSync(resolve("scripts/configuration-inventory/catalog.json"), "utf8"));
 
 describe("configuration input inventory", () => {
   test("finds literal runtime reads without collecting values", () => {
@@ -232,6 +234,36 @@ service("PostgreSQL 18", { env: preservedVariables(databaseVariables) });`, ".ra
     expect(provenance[0]).toEqual(provenance[1]);
     expect(provenance[0]).toEqual(provenance[2]);
     expect(provenance[0]).toEqual(provenance[3]);
+  });
+
+  test("requires exactly one valid catalog entry for every runtime key", () => {
+    const records = [
+      ...scanSourceText("process.env.RUNTIME_KEY;", "app/example.ts"),
+      ...scanSourceText("const key = process.env[name];", "scripts/example.mjs"),
+    ];
+    const valid = {
+      version: 1,
+      allowedClassifications: ["non-secret-config", "secret", "generated-deployment-value", "obsolete"],
+      entries: [{ key: "RUNTIME_KEY", classification: "non-secret-config", owner: "app", migrationTarget: "config.services.app" }],
+      dynamicBoundaries: [{ sourceFile: "scripts/example.mjs", line: 1, expression: "process.env[name]", status: "approved", owner: "scripts", migrationTarget: "config.scripts.dynamicEnvironmentAccess", keys: [], boundaryReason: "External key-name boundary." }],
+    };
+    expect(validateCatalog(valid, records)).toBe(true);
+    expect(() => validateCatalog({ ...valid, entries: [...valid.entries, { ...valid.entries[0] }] }, records)).toThrow(/duplicate key/);
+    expect(() => validateCatalog({ ...valid, entries: [] }, records)).toThrow(/missing key/);
+    expect(() => validateCatalog({ ...valid, entries: [{ ...valid.entries[0], classification: "unknown" }] }, records)).toThrow(/Invalid classification/);
+    expect(() => validateCatalog({ ...valid, entries: [{ ...valid.entries[0], key: "UNKNOWN_KEY" }] }, records)).toThrow(/missing key|unknown key/);
+  });
+
+  test("checked-in catalog covers generated runtime summary and approves every dynamic read", () => {
+    const inventory = JSON.parse(readFileSync(resolve("docs/generated/configuration-inventory.json"), "utf8"));
+    const summary = JSON.parse(readFileSync(resolve("docs/generated/configuration-key-summary.json"), "utf8"));
+    expect(catalog.entries).toHaveLength(summary.keys.length);
+    expect(new Set(catalog.entries.map((entry: { key: string }) => entry.key)).size).toBe(catalog.entries.length);
+    expect(summary.keys.every((entry: { classification: string; owner: string; migrationTarget: string }) =>
+      entry.classification !== "unclassified" && entry.owner !== "unassigned" && entry.migrationTarget !== "unassigned")).toBe(true);
+    expect(inventory.entries.filter((entry: { sourceKind: string }) => entry.sourceKind === "dynamic-runtime-read")
+      .every((entry: { dynamicBoundary: string }) => entry.dynamicBoundary === "approved")).toBe(true);
+    expect(JSON.stringify(inventory)).not.toContain("process.env[secret");
   });
 
   test("does not infer shell inputs from arbitrary uppercase variables", () => {

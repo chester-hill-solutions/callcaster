@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "2979d05cf1c87669cf32ae9720ee400d31be933d286c218e3aa673412d6c8719",
+    "recordDigest": "071e7bbba366afe16837fe286cce86e2c18f0661cfe2d4e686f91dce19a614fd",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1520,6 +1520,7 @@
       "scripts/check-vendor-dist-drift.mjs",
       "scripts/check-workspace-projection.mjs",
       "scripts/ci-changes.mjs",
+      "scripts/configuration-inventory/catalog.json",
       "scripts/configuration-inventory/scan-env-inputs.mjs",
       "scripts/configure-verification-number.mjs",
       "scripts/consolidate-route-modules.mjs",
@@ -2529,7 +2530,38 @@
       "consumer": "app",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[key]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "app",
+      "migrationTarget": "config.app.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_URL",
+        "DATABASE_DIRECT_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BASE_URL",
+        "S3_ENDPOINT",
+        "S3_REGION",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+        "S3_BUCKET",
+        "S3_BUCKET_AUDIO",
+        "S3_BUCKET_MEDIA",
+        "S3_BUCKET_EXPORTS",
+        "TWILIO_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_APP_SID",
+        "TWILIO_PHONE_NUMBER",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "RESEND_API_KEY",
+        "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
+        "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
+        "TWILIO_VALIDATE_WEBHOOKS",
+        "TWILIO_EVENTS_SINK_SECRET",
+        "TWILIO_LOOKUP_ENABLED",
+        "MEDIA_STREAM_SECRET",
+        "MEDIA_STREAM_HOST"
+      ]
     },
     {
       "sourceFile": "e2e/sim/config.ts",
@@ -2537,7 +2569,15 @@
       "consumer": "sim",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "sim",
+      "migrationTarget": "config.sim.dynamicEnvironmentAccess",
+      "keys": [
+        "SIM_SENDER_EMAIL",
+        "SIM_SENDER_PASSWORD",
+        "SIM_RECIPIENT_NAME",
+        "SIM_RECIPIENT_PHONE"
+      ]
     },
     {
       "sourceFile": "scripts/db/reconcile-stuck-calls.ts",
@@ -2545,7 +2585,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[key]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/e2e/seed-database.mjs",
@@ -2553,7 +2596,13 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_URL",
+        "DATABASE_PUBLIC_URL"
+      ]
     },
     {
       "sourceFile": "scripts/e2e/seed-database.mjs",
@@ -2561,7 +2610,12 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[fallbackName]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_PUBLIC_URL"
+      ]
     },
     {
       "sourceFile": "scripts/gen-wav-sidecars.ts",
@@ -2569,7 +2623,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[key]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/local/cloudflared-utils.mjs",
@@ -2577,7 +2634,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/local/cloudflared-utils.mjs",
@@ -2585,7 +2645,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/local/prune-environment-twiml-apps.mjs",
@@ -2593,7 +2656,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/local/sync-calling-dev.mjs",
@@ -2601,7 +2667,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/local/sync-local-calling-dev.mjs",
@@ -2609,7 +2678,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/migrate-media-namespaces.ts",
@@ -2617,7 +2689,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[key]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     },
     {
       "sourceFile": "scripts/twilio-resource-prune-report.mjs",
@@ -2625,7 +2700,10 @@
       "consumer": "script",
       "sourceKind": "dynamic-runtime-read",
       "expression": "process.env[name]",
-      "status": "needs-review"
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": []
     }
   ]
 }

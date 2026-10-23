@@ -1,0 +1,1060 @@
+{
+  "version": 1,
+  "generatedBy": "manual-review:issue-2792",
+  "allowedClassifications": [
+    "non-secret-config",
+    "secret",
+    "generated-deployment-value",
+    "obsolete"
+  ],
+  "entries": [
+    {
+      "key": "APP_TRUSTED_ORIGINS",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "BASE_URL",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "BETTER_AUTH_SECRET",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "BETTER_AUTH_TRUSTED_ORIGINS",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "BETTER_AUTH_URL",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "BOARD_REVIEWED_COMMIT",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "BODY",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.body"
+    },
+    {
+      "key": "CALLCASTER_DEV_LOCAL_NODE_OK",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "CI",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.ci"
+    },
+    {
+      "key": "CLOUDFLARE_TUNNEL_DOMAIN",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "CLOUDFLARED_BIN",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "CLOUDFLARED_CONFIG_DIR",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "CLOUDFLARED_CONFIG_FILE",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "CLOUDFLARED_CREDENTIALS_FILE",
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
+    },
+    {
+      "key": "COHERE_API_KEY",
+      "classification": "secret",
+      "owner": "media-stream",
+      "migrationTarget": "config.secrets.media-stream"
+    },
+    {
+      "key": "CONFIRM_CLONE",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "COVERAGE_FULL",
+      "classification": "non-secret-config",
+      "owner": "ci",
+      "migrationTarget": "config.services.ci"
+    },
+    {
+      "key": "CRON_SECRET",
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
+    },
+    {
+      "key": "DATABASE_DIRECT_URL",
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
+    },
+    {
+      "key": "DATABASE_PUBLIC_URL",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "DATABASE_URL",
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
+    },
+    {
+      "key": "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "DB_STATEMENT_TIMEOUT_MS",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "DESIGN_GALLERY_ENABLED",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "DEV_NAME",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "DISABLE_2FA_ENFORCEMENT",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "DISABLE_AUTH_RATE_LIMIT",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "E2E_BASE_URL",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "E2E_DISABLE_2FA_ENFORCEMENT",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "E2E_DISABLE_AUTH_RATE_LIMIT",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "E2E_PORT",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.e2e_port"
+    },
+    {
+      "key": "E2E_SEED_ON_BOOT",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "E2E_SKIP_BOOTSTRAP",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "E2E_SKIP_BUILD",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "E2E_STRIPE_SESSION",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "E2E_TEST",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "ELEVENLABS_API_KEY",
+      "classification": "secret",
+      "owner": "media-stream",
+      "migrationTarget": "config.secrets.media-stream"
+    },
+    {
+      "key": "ENV",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.env"
+    },
+    {
+      "key": "GH_TOKEN",
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
+    },
+    {
+      "key": "GITHUB_OUTPUT",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.github_output"
+    },
+    {
+      "key": "GITHUB_REPO",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.github_repo"
+    },
+    {
+      "key": "HOME",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.home"
+    },
+    {
+      "key": "HOST",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.host"
+    },
+    {
+      "key": "LABEL",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.label"
+    },
+    {
+      "key": "LABELS",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.labels"
+    },
+    {
+      "key": "LEDGER_CHECK_REQUIRE_DB",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "LOCAL_APP_URL",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "MEDIA_STREAM_HOST",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "MEDIA_STREAM_MAX_PER_WORKSPACE",
+      "classification": "non-secret-config",
+      "owner": "media-stream",
+      "migrationTarget": "config.services.media-stream"
+    },
+    {
+      "key": "MEDIA_STREAM_PORT",
+      "classification": "non-secret-config",
+      "owner": "media-stream",
+      "migrationTarget": "config.services.media-stream"
+    },
+    {
+      "key": "MEDIA_STREAM_SECRET",
+      "classification": "secret",
+      "owner": "local-tooling",
+      "migrationTarget": "config.secrets.local-tooling"
+    },
+    {
+      "key": "NODE_AUTH_TOKEN",
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
+    },
+    {
+      "key": "NODE_ENV",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.node_env"
+    },
+    {
+      "key": "NUMBERS",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.numbers"
+    },
+    {
+      "key": "NVM_DIR",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.nvm_dir"
+    },
+    {
+      "key": "ON_DEV_PROJECT_NUMBER",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_project_number"
+    },
+    {
+      "key": "ON_DEV_STATUS_FIELD",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_status_field"
+    },
+    {
+      "key": "ON_DEV_STATUS_VALUE",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_status_value"
+    },
+    {
+      "key": "OPENAI_API_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "OPS_ALERT_EMAIL",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "OPS_ALERT_EMAILS_ENABLED",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "OWNER",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.owner"
+    },
+    {
+      "key": "PATH",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.path"
+    },
+    {
+      "key": "PGDATA",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgdata"
+    },
+    {
+      "key": "PGDATABASE",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgdatabase"
+    },
+    {
+      "key": "PGHOST",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pghost"
+    },
+    {
+      "key": "PGPASSWORD",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "PGPORT",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgport"
+    },
+    {
+      "key": "PGUSER",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pguser"
+    },
+    {
+      "key": "PORT",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.port"
+    },
+    {
+      "key": "POSTGRES_DB",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.postgres_db"
+    },
+    {
+      "key": "POSTGRES_PASSWORD",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "POSTGRES_USER",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.postgres_user"
+    },
+    {
+      "key": "PR_NUMBER",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.pr_number"
+    },
+    {
+      "key": "PR_URL",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.pr_url"
+    },
+    {
+      "key": "PROBE_BASE_URL",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "PROBE_URL_DEV",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "PROBE_URL_LOCAL",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "PROBE_URL_PROD",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "PROBE_URL_QA",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "PROCESS_FATAL_ON_REJECTION",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "PROJECT",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.project"
+    },
+    {
+      "key": "PROJECT_TOKEN",
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
+    },
+    {
+      "key": "RAILWAY_DEPLOYMENT_DRAINING_SECONDS",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.railway_deployment_draining_seconds"
+    },
+    {
+      "key": "RAILWAY_DOCKERFILE_PATH",
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.railway_dockerfile_path"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT_ID",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.railway_environment_id"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT_NAME",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment_name"
+    },
+    {
+      "key": "RAILWAY_GIT_COMMIT_SHA",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_git_commit_sha"
+    },
+    {
+      "key": "RAILWAY_PROJECT_ID",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.railway_project_id"
+    },
+    {
+      "key": "RAILWAY_TOKEN",
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
+    },
+    {
+      "key": "REGION",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.region"
+    },
+    {
+      "key": "REPO",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.repo"
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "RUN_CLIENT_MIGRATIONS_ON_BOOT",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "S3_ACCESS_KEY_ID",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "S3_BUCKET",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "S3_BUCKET_AUDIO",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "S3_BUCKET_EXPORTS",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "S3_BUCKET_MEDIA",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "S3_ENDPOINT",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "S3_FORCE_PATH_STYLE",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "S3_REGION",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "S3_SECRET_ACCESS_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "S3_URL_STYLE",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "SENTRY_DSN",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "SHA",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.sha"
+    },
+    {
+      "key": "SIGNUP_OPEN",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "SIM_SMS_MESSAGE",
+      "classification": "non-secret-config",
+      "owner": "sim",
+      "migrationTarget": "config.services.sim"
+    },
+    {
+      "key": "SOURCE_DATABASE_URL",
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
+    },
+    {
+      "key": "SSL_CERT_DAYS",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "STATUS_FIELD",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.status_field"
+    },
+    {
+      "key": "STATUS_VALUE",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.status_value"
+    },
+    {
+      "key": "STOW_BIN",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STOW_DATA_DIR",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STOW_HOST",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STOW_LAUNCH",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STOW_PORT",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STOW_VERSION",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "STRIPE_API_KEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "SUPABASE_ANON_KEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "SUPABASE_PUBLISHABLE_KEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "SUPABASE_SECRET_KEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "SUPABASE_SERVICE_KEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "SUPABASE_SKEY",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "SUPABASE_URL",
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "TARGET_DATABASE_URL",
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
+    },
+    {
+      "key": "TWILIO_A2P_MESSAGING_POLICY_SID",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "TWILIO_API_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "TWILIO_API_SECRET",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "TWILIO_APP_SID",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "TWILIO_AUTH_TOKEN",
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
+    },
+    {
+      "key": "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "TWILIO_EVENTS_SINK_SECRET",
+      "classification": "secret",
+      "owner": "local-tooling",
+      "migrationTarget": "config.secrets.local-tooling"
+    },
+    {
+      "key": "TWILIO_LOOKUP_ENABLED",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "TWILIO_PHONE_NUMBER",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "TWILIO_SID",
+      "classification": "non-secret-config",
+      "owner": "ci",
+      "migrationTarget": "config.services.ci"
+    },
+    {
+      "key": "TWILIO_TEST_ACCOUNT_SID",
+      "classification": "obsolete",
+      "owner": "local-tooling",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "TWILIO_TEST_AUTH_TOKEN",
+      "classification": "obsolete",
+      "owner": "local-tooling",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
+    },
+    {
+      "key": "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "TWILIO_VALIDATE_WEBHOOKS",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "TWO_FACTOR_ENABLED",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "USERPROFILE",
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.userprofile"
+    },
+    {
+      "key": "VERIFICATION_PHONE_NUMBER",
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "VITE_DEV_HOST",
+      "classification": "generated-deployment-value",
+      "owner": "local-tooling",
+      "migrationTarget": "config.generated.vite_dev_host"
+    },
+    {
+      "key": "VITEST",
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
+    }
+  ],
+  "dynamicBoundaries": [
+    {
+      "sourceFile": "app/lib/env.server.ts",
+      "line": 86,
+      "expression": "process.env[key]",
+      "status": "approved",
+      "owner": "app",
+      "migrationTarget": "config.app.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_URL",
+        "DATABASE_DIRECT_URL",
+        "BETTER_AUTH_SECRET",
+        "BETTER_AUTH_URL",
+        "BASE_URL",
+        "S3_ENDPOINT",
+        "S3_REGION",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+        "S3_BUCKET",
+        "S3_BUCKET_AUDIO",
+        "S3_BUCKET_MEDIA",
+        "S3_BUCKET_EXPORTS",
+        "TWILIO_SID",
+        "TWILIO_AUTH_TOKEN",
+        "TWILIO_APP_SID",
+        "TWILIO_PHONE_NUMBER",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "RESEND_API_KEY",
+        "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
+        "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
+        "TWILIO_VALIDATE_WEBHOOKS",
+        "TWILIO_EVENTS_SINK_SECRET",
+        "TWILIO_LOOKUP_ENABLED",
+        "MEDIA_STREAM_SECRET",
+        "MEDIA_STREAM_HOST"
+      ]
+    },
+    {
+      "sourceFile": "e2e/sim/config.ts",
+      "line": 9,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "sim",
+      "migrationTarget": "config.sim.dynamicEnvironmentAccess",
+      "keys": [
+        "SIM_SENDER_EMAIL",
+        "SIM_SENDER_PASSWORD",
+        "SIM_RECIPIENT_NAME",
+        "SIM_RECIPIENT_PHONE"
+      ]
+    },
+    {
+      "sourceFile": "scripts/db/reconcile-stuck-calls.ts",
+      "line": 49,
+      "expression": "process.env[key]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/e2e/seed-database.mjs",
+      "line": 25,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_URL",
+        "DATABASE_PUBLIC_URL"
+      ]
+    },
+    {
+      "sourceFile": "scripts/e2e/seed-database.mjs",
+      "line": 26,
+      "expression": "process.env[fallbackName]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [
+        "DATABASE_PUBLIC_URL"
+      ]
+    },
+    {
+      "sourceFile": "scripts/gen-wav-sidecars.ts",
+      "line": 34,
+      "expression": "process.env[key]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/local/cloudflared-utils.mjs",
+      "line": 17,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/local/cloudflared-utils.mjs",
+      "line": 32,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/local/prune-environment-twiml-apps.mjs",
+      "line": 112,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/local/sync-calling-dev.mjs",
+      "line": 200,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/local/sync-local-calling-dev.mjs",
+      "line": 64,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/migrate-media-namespaces.ts",
+      "line": 36,
+      "expression": "process.env[key]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    },
+    {
+      "sourceFile": "scripts/twilio-resource-prune-report.mjs",
+      "line": 408,
+      "expression": "process.env[name]",
+      "status": "approved",
+      "owner": "scripts",
+      "migrationTarget": "config.scripts.dynamicEnvironmentAccess",
+      "keys": [],
+      "boundaryReason": "The helper receives an external environment key name; the key set is not statically available at this call site. The compatibility adapter is the migration target."
+    }
+  ]
+}

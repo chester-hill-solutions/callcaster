@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:operational-inputs",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "2979d05cf1c87669cf32ae9720ee400d31be933d286c218e3aa673412d6c8719",
+    "recordDigest": "071e7bbba366afe16837fe286cce86e2c18f0661cfe2d4e686f91dce19a614fd",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1520,6 +1520,7 @@
       "scripts/check-vendor-dist-drift.mjs",
       "scripts/check-workspace-projection.mjs",
       "scripts/ci-changes.mjs",
+      "scripts/configuration-inventory/catalog.json",
       "scripts/configuration-inventory/scan-env-inputs.mjs",
       "scripts/configure-verification-number.mjs",
       "scripts/consolidate-route-modules.mjs",
@@ -2864,9 +2865,9 @@
       "enabled": true,
       "requiredness": "unknown",
       "valueRedacted": true,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "WORKSPACE_ID",

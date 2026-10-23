@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "2979d05cf1c87669cf32ae9720ee400d31be933d286c218e3aa673412d6c8719",
+    "recordDigest": "071e7bbba366afe16837fe286cce86e2c18f0661cfe2d4e686f91dce19a614fd",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1520,6 +1520,7 @@
       "scripts/check-vendor-dist-drift.mjs",
       "scripts/check-workspace-projection.mjs",
       "scripts/ci-changes.mjs",
+      "scripts/configuration-inventory/catalog.json",
       "scripts/configuration-inventory/scan-env-inputs.mjs",
       "scripts/configure-verification-number.mjs",
       "scripts/consolidate-route-modules.mjs",
@@ -2543,9 +2544,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "BASE_URL",
@@ -2576,9 +2577,9 @@
       ],
       "sourceCount": 19,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "BETTER_AUTH_SECRET",
@@ -2607,9 +2608,9 @@
       ],
       "sourceCount": 12,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "BETTER_AUTH_TRUSTED_ORIGINS",
@@ -2631,9 +2632,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "BETTER_AUTH_URL",
@@ -2662,9 +2663,9 @@
       ],
       "sourceCount": 9,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "BOARD_REVIEWED_COMMIT",
@@ -2682,9 +2683,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "BODY",
@@ -2702,9 +2703,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.body"
     },
     {
       "key": "CALLCASTER_DEV_LOCAL_NODE_OK",
@@ -2722,9 +2723,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "CI",
@@ -2746,9 +2747,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.ci"
     },
     {
       "key": "CLOUDFLARE_TUNNEL_DOMAIN",
@@ -2770,9 +2771,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "CLOUDFLARED_BIN",
@@ -2794,9 +2795,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "CLOUDFLARED_CONFIG_DIR",
@@ -2814,9 +2815,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "CLOUDFLARED_CONFIG_FILE",
@@ -2838,9 +2839,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "CLOUDFLARED_CREDENTIALS_FILE",
@@ -2858,9 +2859,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
     },
     {
       "key": "COHERE_API_KEY",
@@ -2888,9 +2889,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "media-stream",
+      "migrationTarget": "config.secrets.media-stream"
     },
     {
       "key": "CONFIRM_CLONE",
@@ -2908,9 +2909,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "COVERAGE_FULL",
@@ -2928,9 +2929,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "ci",
+      "migrationTarget": "config.services.ci"
     },
     {
       "key": "CRON_SECRET",
@@ -2952,9 +2953,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
     },
     {
       "key": "DATABASE_DIRECT_URL",
@@ -2983,9 +2984,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
     },
     {
       "key": "DATABASE_PUBLIC_URL",
@@ -3008,9 +3009,9 @@
       ],
       "sourceCount": 7,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "DATABASE_URL",
@@ -3045,9 +3046,9 @@
       ],
       "sourceCount": 37,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
     },
     {
       "key": "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
@@ -3069,9 +3070,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "DB_STATEMENT_TIMEOUT_MS",
@@ -3093,9 +3094,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "DESIGN_GALLERY_ENABLED",
@@ -3117,9 +3118,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "DEV_NAME",
@@ -3142,9 +3143,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "DISABLE_2FA_ENFORCEMENT",
@@ -3170,9 +3171,9 @@
       ],
       "sourceCount": 3,
       "dynamic": true,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "DISABLE_AUTH_RATE_LIMIT",
@@ -3194,9 +3195,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "E2E_BASE_URL",
@@ -3215,9 +3216,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "E2E_DISABLE_2FA_ENFORCEMENT",
@@ -3237,9 +3238,9 @@
       ],
       "sourceCount": 3,
       "dynamic": true,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "E2E_DISABLE_AUTH_RATE_LIMIT",
@@ -3260,9 +3261,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "E2E_PORT",
@@ -3280,9 +3281,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.e2e_port"
     },
     {
       "key": "E2E_SEED_ON_BOOT",
@@ -3300,9 +3301,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "E2E_SKIP_BOOTSTRAP",
@@ -3320,9 +3321,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "E2E_SKIP_BUILD",
@@ -3340,9 +3341,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "E2E_STRIPE_SESSION",
@@ -3360,9 +3361,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "E2E_TEST",
@@ -3380,9 +3381,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "ELEVENLABS_API_KEY",
@@ -3411,9 +3412,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "media-stream",
+      "migrationTarget": "config.secrets.media-stream"
     },
     {
       "key": "ENV",
@@ -3435,9 +3436,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.env"
     },
     {
       "key": "GH_TOKEN",
@@ -3455,9 +3456,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
     },
     {
       "key": "GITHUB_OUTPUT",
@@ -3475,9 +3476,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.github_output"
     },
     {
       "key": "GITHUB_REPO",
@@ -3495,9 +3496,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.github_repo"
     },
     {
       "key": "HOME",
@@ -3515,9 +3516,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.home"
     },
     {
       "key": "HOST",
@@ -3545,9 +3546,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.host"
     },
     {
       "key": "LABEL",
@@ -3565,9 +3566,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.label"
     },
     {
       "key": "LABELS",
@@ -3585,9 +3586,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.labels"
     },
     {
       "key": "LEDGER_CHECK_REQUIRE_DB",
@@ -3605,9 +3606,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "LOCAL_APP_URL",
@@ -3625,9 +3626,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "MEDIA_STREAM_HOST",
@@ -3649,9 +3650,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "MEDIA_STREAM_MAX_PER_WORKSPACE",
@@ -3673,9 +3674,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "media-stream",
+      "migrationTarget": "config.services.media-stream"
     },
     {
       "key": "MEDIA_STREAM_PORT",
@@ -3697,9 +3698,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "media-stream",
+      "migrationTarget": "config.services.media-stream"
     },
     {
       "key": "MEDIA_STREAM_SECRET",
@@ -3717,9 +3718,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "local-tooling",
+      "migrationTarget": "config.secrets.local-tooling"
     },
     {
       "key": "NODE_AUTH_TOKEN",
@@ -3739,9 +3740,9 @@
       ],
       "sourceCount": 30,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
     },
     {
       "key": "NODE_ENV",
@@ -3770,9 +3771,9 @@
       ],
       "sourceCount": 25,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.node_env"
     },
     {
       "key": "NUMBERS",
@@ -3790,9 +3791,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.numbers"
     },
     {
       "key": "NVM_DIR",
@@ -3810,9 +3811,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.nvm_dir"
     },
     {
       "key": "ON_DEV_PROJECT_NUMBER",
@@ -3830,9 +3831,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_project_number"
     },
     {
       "key": "ON_DEV_STATUS_FIELD",
@@ -3850,9 +3851,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_status_field"
     },
     {
       "key": "ON_DEV_STATUS_VALUE",
@@ -3870,9 +3871,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.on_dev_status_value"
     },
     {
       "key": "OPENAI_API_KEY",
@@ -3890,9 +3891,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "OPS_ALERT_EMAIL",
@@ -3914,9 +3915,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "OPS_ALERT_EMAILS_ENABLED",
@@ -3938,9 +3939,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "OWNER",
@@ -3958,9 +3959,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.owner"
     },
     {
       "key": "PATH",
@@ -3978,9 +3979,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.path"
     },
     {
       "key": "PGDATA",
@@ -3998,9 +3999,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgdata"
     },
     {
       "key": "PGDATABASE",
@@ -4018,9 +4019,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgdatabase"
     },
     {
       "key": "PGHOST",
@@ -4038,9 +4039,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pghost"
     },
     {
       "key": "PGPASSWORD",
@@ -4058,9 +4059,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "PGPORT",
@@ -4078,9 +4079,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pgport"
     },
     {
       "key": "PGUSER",
@@ -4098,9 +4099,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.pguser"
     },
     {
       "key": "PORT",
@@ -4129,9 +4130,9 @@
       ],
       "sourceCount": 9,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.port"
     },
     {
       "key": "POSTGRES_DB",
@@ -4152,9 +4153,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.postgres_db"
     },
     {
       "key": "POSTGRES_PASSWORD",
@@ -4175,9 +4176,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "POSTGRES_USER",
@@ -4198,9 +4199,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.postgres_user"
     },
     {
       "key": "PR_NUMBER",
@@ -4218,9 +4219,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.pr_number"
     },
     {
       "key": "PR_URL",
@@ -4238,9 +4239,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.pr_url"
     },
     {
       "key": "PROBE_BASE_URL",
@@ -4258,9 +4259,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "PROBE_URL_DEV",
@@ -4278,9 +4279,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "PROBE_URL_LOCAL",
@@ -4298,9 +4299,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "PROBE_URL_PROD",
@@ -4318,9 +4319,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "PROBE_URL_QA",
@@ -4338,9 +4339,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "PROCESS_FATAL_ON_REJECTION",
@@ -4362,9 +4363,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "PROJECT",
@@ -4382,9 +4383,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.project"
     },
     {
       "key": "PROJECT_TOKEN",
@@ -4402,9 +4403,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
     },
     {
       "key": "RAILWAY_DEPLOYMENT_DRAINING_SECONDS",
@@ -4422,9 +4423,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.railway_deployment_draining_seconds"
     },
     {
       "key": "RAILWAY_DOCKERFILE_PATH",
@@ -4444,9 +4445,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "deployment",
+      "migrationTarget": "config.generated.railway_dockerfile_path"
     },
     {
       "key": "RAILWAY_ENVIRONMENT_ID",
@@ -4465,9 +4466,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.railway_environment_id"
     },
     {
       "key": "RAILWAY_ENVIRONMENT_NAME",
@@ -4488,9 +4489,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment_name"
     },
     {
       "key": "RAILWAY_GIT_COMMIT_SHA",
@@ -4508,9 +4509,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_git_commit_sha"
     },
     {
       "key": "RAILWAY_PROJECT_ID",
@@ -4529,9 +4530,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.railway_project_id"
     },
     {
       "key": "RAILWAY_TOKEN",
@@ -4551,9 +4552,9 @@
       ],
       "sourceCount": 6,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
     },
     {
       "key": "REGION",
@@ -4571,9 +4572,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.region"
     },
     {
       "key": "REPO",
@@ -4591,9 +4592,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.repo"
     },
     {
       "key": "RESEND_API_KEY",
@@ -4621,9 +4622,9 @@
       ],
       "sourceCount": 10,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "RUN_CLIENT_MIGRATIONS_ON_BOOT",
@@ -4647,9 +4648,9 @@
       ],
       "sourceCount": 4,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "S3_ACCESS_KEY_ID",
@@ -4678,9 +4679,9 @@
       ],
       "sourceCount": 13,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "S3_BUCKET",
@@ -4709,9 +4710,9 @@
       ],
       "sourceCount": 12,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "S3_BUCKET_AUDIO",
@@ -4729,9 +4730,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "S3_BUCKET_EXPORTS",
@@ -4749,9 +4750,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "S3_BUCKET_MEDIA",
@@ -4769,9 +4770,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "S3_ENDPOINT",
@@ -4800,9 +4801,9 @@
       ],
       "sourceCount": 12,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "S3_FORCE_PATH_STYLE",
@@ -4824,9 +4825,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "S3_REGION",
@@ -4855,9 +4856,9 @@
       ],
       "sourceCount": 12,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
@@ -4886,9 +4887,9 @@
       ],
       "sourceCount": 13,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "S3_URL_STYLE",
@@ -4906,9 +4907,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "SENTRY_DSN",
@@ -4926,9 +4927,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "SHA",
@@ -4946,9 +4947,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.sha"
     },
     {
       "key": "SIGNUP_OPEN",
@@ -4978,9 +4979,9 @@
       ],
       "sourceCount": 7,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "SIM_SMS_MESSAGE",
@@ -4998,9 +4999,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "sim",
+      "migrationTarget": "config.services.sim"
     },
     {
       "key": "SOURCE_DATABASE_URL",
@@ -5018,9 +5019,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
     },
     {
       "key": "SSL_CERT_DAYS",
@@ -5038,9 +5039,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "STATUS_FIELD",
@@ -5058,9 +5059,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.status_field"
     },
     {
       "key": "STATUS_VALUE",
@@ -5078,9 +5079,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.status_value"
     },
     {
       "key": "STOW_BIN",
@@ -5098,9 +5099,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STOW_DATA_DIR",
@@ -5118,9 +5119,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STOW_HOST",
@@ -5138,9 +5139,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STOW_LAUNCH",
@@ -5158,9 +5159,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STOW_PORT",
@@ -5178,9 +5179,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STOW_VERSION",
@@ -5198,9 +5199,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "STRIPE_API_KEY",
@@ -5220,9 +5221,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "STRIPE_SECRET_KEY",
@@ -5252,9 +5253,9 @@
       ],
       "sourceCount": 13,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "app",
+      "migrationTarget": "config.secrets.app"
     },
     {
       "key": "STRIPE_WEBHOOK_SECRET",
@@ -5282,9 +5283,9 @@
       ],
       "sourceCount": 8,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "SUPABASE_ANON_KEY",
@@ -5302,9 +5303,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "SUPABASE_PUBLISHABLE_KEY",
@@ -5322,9 +5323,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "SUPABASE_SECRET_KEY",
@@ -5342,9 +5343,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "SUPABASE_SERVICE_KEY",
@@ -5362,9 +5363,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "SUPABASE_SKEY",
@@ -5382,9 +5383,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "SUPABASE_URL",
@@ -5402,9 +5403,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "deployment",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "TARGET_DATABASE_URL",
@@ -5422,9 +5423,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "scripts",
+      "migrationTarget": "config.secrets.scripts"
     },
     {
       "key": "TWILIO_A2P_MESSAGING_POLICY_SID",
@@ -5446,9 +5447,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "TWILIO_API_KEY",
@@ -5468,9 +5469,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "TWILIO_API_SECRET",
@@ -5490,9 +5491,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "TWILIO_APP_SID",
@@ -5520,9 +5521,9 @@
       ],
       "sourceCount": 10,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "TWILIO_AUTH_TOKEN",
@@ -5552,9 +5553,9 @@
       ],
       "sourceCount": 13,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "ci",
+      "migrationTarget": "config.secrets.ci"
     },
     {
       "key": "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
@@ -5572,9 +5573,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "TWILIO_EVENTS_SINK_SECRET",
@@ -5592,9 +5593,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "secret",
+      "owner": "local-tooling",
+      "migrationTarget": "config.secrets.local-tooling"
     },
     {
       "key": "TWILIO_LOOKUP_ENABLED",
@@ -5612,9 +5613,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "TWILIO_PHONE_NUMBER",
@@ -5642,9 +5643,9 @@
       ],
       "sourceCount": 10,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "TWILIO_SID",
@@ -5674,9 +5675,9 @@
       ],
       "sourceCount": 13,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "ci",
+      "migrationTarget": "config.services.ci"
     },
     {
       "key": "TWILIO_TEST_ACCOUNT_SID",
@@ -5694,9 +5695,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "local-tooling",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "TWILIO_TEST_AUTH_TOKEN",
@@ -5714,9 +5715,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "obsolete",
+      "owner": "local-tooling",
+      "migrationTarget": "remove-after-adr-0040-phase-6"
     },
     {
       "key": "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
@@ -5734,9 +5735,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "local-tooling",
+      "migrationTarget": "config.services.local-tooling"
     },
     {
       "key": "TWILIO_VALIDATE_WEBHOOKS",
@@ -5758,9 +5759,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "TWO_FACTOR_ENABLED",
@@ -5782,9 +5783,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     },
     {
       "key": "USERPROFILE",
@@ -5802,9 +5803,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "scripts",
+      "migrationTarget": "config.generated.userprofile"
     },
     {
       "key": "VERIFICATION_PHONE_NUMBER",
@@ -5826,9 +5827,9 @@
       ],
       "sourceCount": 2,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "scripts",
+      "migrationTarget": "config.services.scripts"
     },
     {
       "key": "VITE_DEV_HOST",
@@ -5846,9 +5847,9 @@
       ],
       "sourceCount": 1,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "generated-deployment-value",
+      "owner": "local-tooling",
+      "migrationTarget": "config.generated.vite_dev_host"
     },
     {
       "key": "VITEST",
@@ -5866,9 +5867,9 @@
       ],
       "sourceCount": 3,
       "dynamic": false,
-      "classification": "unclassified",
-      "owner": "unassigned",
-      "migrationTarget": "unassigned"
+      "classification": "non-secret-config",
+      "owner": "app",
+      "migrationTarget": "config.services.app"
     }
   ]
 }

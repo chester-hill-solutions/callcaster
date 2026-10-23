@@ -3,6 +3,13 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+export const ALLOWED_CLASSIFICATIONS = [
+  "non-secret-config",
+  "secret",
+  "generated-deployment-value",
+  "obsolete",
+];
+
 const TEXT_EXTENSIONS = new Set([
   ".cjs", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".json", ".md",
   ".yml", ".yaml", ".sh", ".toml", ".mk",
@@ -98,6 +105,7 @@ function collectKnownStringArrays(text) {
 export function scanSourceText(text, sourceFile) {
   const records = [];
   const consumer = consumerFor(sourceFile);
+  if (sourceFile === "scripts/configuration-inventory/catalog.json") return records;
   const knownArrays = collectKnownStringArrays(text);
   const seen = new Set();
   const add = (record) => {
@@ -442,9 +450,9 @@ export function summarizeInventory(records) {
       usages: new Set(),
       sourceCount: 0,
       dynamic: false,
-      classification: "unclassified",
-      owner: "unassigned",
-      migrationTarget: "unassigned",
+      classification: record.classification ?? "unclassified",
+      owner: record.owner ?? "unassigned",
+      migrationTarget: record.migrationTarget ?? "unassigned",
     };
     current.sourceKinds.add(record.sourceKind);
     current.consumers.add(record.consumer);
@@ -463,7 +471,69 @@ export function summarizeInventory(records) {
   }));
 }
 
+export function validateCatalog(catalog, records = null) {
+  if (!catalog || catalog.version !== 1 || !Array.isArray(catalog.entries) || !Array.isArray(catalog.dynamicBoundaries)) {
+    throw new Error("Configuration catalog must contain version 1 entries and dynamicBoundaries arrays.");
+  }
+  if (JSON.stringify(catalog.allowedClassifications) !== JSON.stringify(ALLOWED_CLASSIFICATIONS)) {
+    throw new Error("Configuration catalog classifications do not match the allowed set.");
+  }
+
+  const entryKeys = new Set();
+  for (const entry of catalog.entries) {
+    if (!entry || typeof entry.key !== "string" || !entry.key) throw new Error("Configuration catalog has an entry without a key.");
+    if (entryKeys.has(entry.key)) throw new Error(`Configuration catalog has duplicate key: ${entry.key}`);
+    entryKeys.add(entry.key);
+    if (!ALLOWED_CLASSIFICATIONS.includes(entry.classification)) throw new Error(`Invalid classification for ${entry.key}: ${entry.classification}`);
+    if (typeof entry.owner !== "string" || !entry.owner || entry.owner === "unassigned") throw new Error(`Missing owner for ${entry.key}`);
+    if (typeof entry.migrationTarget !== "string" || !entry.migrationTarget || entry.migrationTarget === "unassigned") throw new Error(`Missing migration target for ${entry.key}`);
+  }
+
+  const boundaryIds = new Set();
+  for (const boundary of catalog.dynamicBoundaries) {
+    const id = `${boundary.sourceFile}:${boundary.line}:${boundary.expression}`;
+    if (boundaryIds.has(id)) throw new Error(`Configuration catalog has duplicate dynamic boundary: ${id}`);
+    boundaryIds.add(id);
+    if (boundary.status !== "approved") throw new Error(`Dynamic boundary is not approved: ${id}`);
+    if (typeof boundary.owner !== "string" || !boundary.owner || boundary.owner === "unassigned") throw new Error(`Missing owner for dynamic boundary: ${id}`);
+    if (typeof boundary.migrationTarget !== "string" || !boundary.migrationTarget || boundary.migrationTarget === "unassigned") throw new Error(`Missing migration target for dynamic boundary: ${id}`);
+    if (!Array.isArray(boundary.keys) || boundary.keys.some((key) => typeof key !== "string" || !key)) throw new Error(`Invalid key list for dynamic boundary: ${id}`);
+    if (!boundary.keys.length && typeof boundary.boundaryReason !== "string") throw new Error(`Unresolved dynamic boundary needs an explicit reason: ${id}`);
+  }
+
+  if (records) {
+    const mainKeys = new Set(records
+      .filter((record) => !["cli-flag", "make-variable", "test-input", "dynamic-test-read"].includes(record.sourceKind) && record.key)
+      .map((record) => record.key));
+    for (const key of mainKeys) if (!entryKeys.has(key)) throw new Error(`Configuration catalog is missing key: ${key}`);
+    for (const key of entryKeys) if (!mainKeys.has(key)) throw new Error(`Configuration catalog contains unknown key: ${key}`);
+    const dynamicIds = new Set(records
+      .filter((record) => record.sourceKind === "dynamic-runtime-read")
+      .map((record) => `${record.sourceFile}:${record.line}:${record.expression ?? ""}`));
+    for (const id of dynamicIds) if (!boundaryIds.has(id)) throw new Error(`Configuration catalog is missing dynamic boundary: ${id}`);
+    for (const id of boundaryIds) if (!dynamicIds.has(id)) throw new Error(`Configuration catalog contains unknown dynamic boundary: ${id}`);
+  }
+  return true;
+}
+
+function catalogRecord(record, catalog) {
+  if (record.key) {
+    const entry = catalog.entries.find((candidate) => candidate.key === record.key);
+    if (entry) return { ...record, classification: entry.classification, owner: entry.owner, migrationTarget: entry.migrationTarget };
+  }
+  if (record.sourceKind === "dynamic-runtime-read") {
+    const boundary = catalog.dynamicBoundaries.find((candidate) => candidate.sourceFile === record.sourceFile && candidate.line === record.line && candidate.expression === record.expression);
+    if (boundary) return { ...record, dynamicBoundary: boundary.status, dynamicBoundaryOwner: boundary.owner, dynamicBoundaryMigrationTarget: boundary.migrationTarget, dynamicBoundaryKeys: boundary.keys };
+  }
+  return record;
+}
+
 export async function writeInventory(root, records, outputRoot = path.join(root, "docs/generated")) {
+  const catalog = JSON.parse(await readFile(path.join(root, "scripts/configuration-inventory/catalog.json"), "utf8"));
+  // Small synthetic inputs are used by unit tests. Full repository scans include
+  // the Railway environment file and receive the complete catalog check.
+  if (records.some((record) => record.sourceFile === ".railway/environments/dev.ts")) validateCatalog(catalog, records);
+  records = records.map((record) => catalogRecord(record, catalog));
   const outputDir = outputRoot.endsWith("docs/generated") ? outputRoot : path.join(outputRoot, "docs/generated");
   await mkdir(outputDir, { recursive: true });
   const operational = records.filter((record) => record.sourceKind === "cli-flag" || record.sourceKind === "make-variable").map(redactRecord);
@@ -487,12 +557,12 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
     "# Configuration input inventory",
     "",
     "> Generated by `npm run tools:config:inventory`. Values are never collected.",
-    "> Classification and ownership remain intentionally unassigned for ADR-0040 Phase 0.",
+    "> Classification and ownership come from the checked-in ADR-0040 Phase 0 catalog.",
     `> Provenance: \`${provenance.recordDigest}\``,
     "",
     `- ${redacted.length} source records`,
     `- ${keyCount} distinct key names`,
-    `- ${dynamicCount} unresolved dynamic reads`,
+    `- ${dynamicCount} approved dynamic boundaries`,
     "",
     "## Source kinds",
     "",
@@ -510,7 +580,7 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
     "# Configuration key summary",
     "",
     "> Generated by `npm run tools:config:inventory`. Values are never collected.",
-    "> Classification and ownership remain intentionally unassigned for ADR-0040 Phase 0.",
+    "> Classification and ownership come from the checked-in ADR-0040 Phase 0 catalog.",
     `> Provenance: \`${provenance.recordDigest}\``,
     "",
     "| Key | Source kinds | Consumers | Environments | Usages | Sources | Classification | Owner | Migration target |",
@@ -519,16 +589,16 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
   ];
   await writeFile(path.join(outputDir, "configuration-key-summary.md"), `${summaryLines.join("\n")}\n`);
   const dynamic = redacted.filter((record) => record.sourceKind === "dynamic-runtime-read" || record.sourceKind === "dynamic-test-read");
-  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.json"), `${JSON.stringify({ ...metadata, reads: dynamic.map((record) => ({ sourceFile: record.sourceFile, line: record.line, consumer: record.consumer, sourceKind: record.sourceKind, expression: record.expression ?? record.notes, status: "needs-review" })) }, null, 2)}\n`);
+  await writeFile(path.join(outputDir, "configuration-dynamic-read-review.json"), `${JSON.stringify({ ...metadata, reads: dynamic.map((record) => ({ sourceFile: record.sourceFile, line: record.line, consumer: record.consumer, sourceKind: record.sourceKind, expression: record.expression ?? record.notes, status: record.dynamicBoundary ?? "needs-review", owner: record.dynamicBoundaryOwner ?? "unassigned", migrationTarget: record.dynamicBoundaryMigrationTarget ?? "unassigned", keys: record.dynamicBoundaryKeys ?? [] })) }, null, 2)}\n`);
   const dynamicLines = [
     "# Dynamic environment read review",
     "",
-    "> Generated by `npm run tools:config:inventory`. Each row requires manual review.",
+    "> Generated by `npm run tools:config:inventory`. Approved boundaries are explicit migration seams; no dynamic read is unreviewed.",
     `> Provenance: \`${provenance.recordDigest}\``,
     "",
-    "| Source | Line | Consumer | Kind | Expression | Status |",
-    "|---|---:|---|---|---|---|",
-    ...dynamic.map((record) => `| \`${record.sourceFile}\` | ${record.line} | ${record.consumer} | ${record.sourceKind} | ${(record.expression ?? record.notes ?? "").replaceAll("|", "\\|")} | needs-review |`),
+    "| Source | Line | Consumer | Kind | Expression | Status | Owner | Migration target | Known keys |",
+    "|---|---:|---|---|---|---|---|---|---|",
+    ...dynamic.map((record) => `| \`${record.sourceFile}\` | ${record.line} | ${record.consumer} | ${record.sourceKind} | ${(record.expression ?? record.notes ?? "").replaceAll("|", "\\|")} | ${record.dynamicBoundary ?? "needs-review"} | ${record.dynamicBoundaryOwner ?? "unassigned"} | ${record.dynamicBoundaryMigrationTarget ?? "unassigned"} | ${(record.dynamicBoundaryKeys ?? []).join(", ")} |`),
   ];
   await writeFile(path.join(outputDir, "configuration-dynamic-read-review.md"), `${dynamicLines.join("\n")}\n`);
   const testMetadata = {
