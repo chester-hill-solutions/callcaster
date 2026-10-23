@@ -11,7 +11,7 @@ function sortValue(value: JsonValue): JsonValue {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
         .map(([key, child]) => [key, sortValue(child)]),
     );
   }
@@ -20,6 +20,10 @@ function sortValue(value: JsonValue): JsonValue {
 
 export function stableJson(value: JsonValue): string {
   return JSON.stringify(sortValue(value));
+}
+
+export function stableFingerprint(value: JsonValue): string {
+  return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
 function modeledService(service: ProjectConfig["services"]["app"]): JsonValue {
@@ -74,6 +78,6 @@ export function loadResolvedConfig(environment: EnvironmentName) {
     schemaVersion: PROJECT_CONFIG_SCHEMA_VERSION,
     config: redactResolvedConfig(config),
   } satisfies JsonValue;
-  const fingerprint = createHash("sha256").update(stableJson(reportWithoutFingerprint)).digest("hex");
+  const fingerprint = stableFingerprint(reportWithoutFingerprint);
   return { ...reportWithoutFingerprint, fingerprint };
 }

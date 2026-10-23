@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { environmentNames } from "../config/schema";
-import { loadResolvedConfig, redactResolvedConfig, stableJson } from "../config/resolved";
+import { loadResolvedConfig, redactResolvedConfig, stableFingerprint, stableJson } from "../config/resolved";
 
 describe("resolved configuration output", () => {
   it.each(environmentNames)("resolves and reports %s", (environment) => {
@@ -42,7 +42,10 @@ describe("resolved configuration output", () => {
     const first = loadResolvedConfig("sai-local");
     const second = loadResolvedConfig("sai-local");
     expect(first).toEqual(second);
-    expect(stableJson({ z: 1, a: { d: true, c: false } })).toBe(stableJson({ a: { c: false, d: true }, z: 1 }));
+    const firstOrdering = { z: 1, a: { d: true, c: false } };
+    const secondOrdering = { a: { c: false, d: true }, z: 1 };
+    expect(stableJson(firstOrdering)).toBe(stableJson(secondOrdering));
+    expect(stableFingerprint(firstOrdering)).toBe(stableFingerprint(secondOrdering));
     expect(JSON.stringify(first)).toContain('"environment"');
     expect(JSON.stringify(first).indexOf('"environment"')).toBeLessThan(JSON.stringify(first).indexOf('"fingerprint"'));
   });
