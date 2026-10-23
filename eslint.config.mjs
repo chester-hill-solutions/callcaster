@@ -64,6 +64,7 @@ export default [
       ".railway/**",
       ".repl/**",
       ".cache/**",
+      ".local/**",
       ".vite/**",
       ".react-router/**",
       "app/lib/api-generated/**",
