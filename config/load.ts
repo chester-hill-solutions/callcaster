@@ -91,7 +91,9 @@ export type LocalProjectConfigResolution = {
 /** Resolve local configuration for one developer without reading dotenv or process.env. */
 export function resolveLocalProjectConfig(input: LocalProfileInput): LocalProjectConfigResolution {
   const profile = LocalProfileInputSchema.parse(input);
-  const derivedHostname = `${profile.devName}-${profile.envName}.callcaster.ca`;
+  const profileName = `${profile.devName}-${profile.envName}`;
+  if (profileName.length > 63) invalid(`derived local profile name '${profileName}' exceeds the 63-character DNS label limit`);
+  const derivedHostname = `${profileName}.callcaster.ca`;
   const publicUrl = profile.publicUrl ?? `https://${derivedHostname}`;
   const hostname = new URL(publicUrl).hostname;
   const config = loadProjectConfig("local", {
@@ -107,7 +109,7 @@ export function resolveLocalProjectConfig(input: LocalProfileInput): LocalProjec
     identity: deepFreeze({
       devName: profile.devName,
       envName: profile.envName,
-      profileName: `${profile.devName}-${profile.envName}`,
+      profileName,
       hostname,
       publicUrl,
     }),

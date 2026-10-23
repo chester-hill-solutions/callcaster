@@ -68,6 +68,20 @@ describe("loadProjectConfig", () => {
     expect(resolved.config.urls.publicApp).toBe("https://tunnel.example.test/path");
   });
 
+  it("rejects local profiles whose derived DNS label exceeds 63 characters", () => {
+    const safeDevName = "a".repeat(57);
+    const safe = resolveLocalProjectConfig({ devName: safeDevName, envName: "local" });
+    expect(safe.identity.profileName).toHaveLength(63);
+
+    expect(() =>
+      resolveLocalProjectConfig({
+        devName: "a".repeat(58),
+        envName: "local",
+        publicUrl: "https://tunnel.example.test",
+      }),
+    ).toThrow(/63-character DNS label limit/);
+  });
+
   it("rejects invalid inheritance graphs", () => {
     expect(() => validateInheritanceGraph({ local: { environment: "local", parent: "local" } })).toThrow(/itself/);
     expect(() =>
