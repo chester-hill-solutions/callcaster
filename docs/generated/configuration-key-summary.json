@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "b6aeca72baf078c09251ae533cf5298abafc594782e55878168fed208449fb83",
+    "recordDigest": "ba3b33615ae38f6e5fc6c9253c807ac6336f9ff0c8d978ec0526b01e588e18ec",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -13,6 +13,7 @@
       "Dockerfile.worker",
       "Makefile",
       "app",
+      "config",
       "docker-compose.dev.yml",
       "drizzle.config.ts",
       "e2e",
@@ -1394,6 +1395,17 @@
       "app/server/tenant-db.ts",
       "app/sessions.server.tsx",
       "app/twilio.server.ts",
+      "config/base.ts",
+      "config/environments/dev.ts",
+      "config/environments/index.ts",
+      "config/environments/local.ts",
+      "config/environments/production.ts",
+      "config/environments/qa.ts",
+      "config/load.ts",
+      "config/resolved.ts",
+      "config/runtime-compare.ts",
+      "config/schema.ts",
+      "config/secret-names.ts",
       "docker-compose.dev.yml",
       "drizzle.config.ts",
       "e2e/.auth/admin.json",
@@ -1521,6 +1533,8 @@
       "scripts/check-vendor-dist-drift.mjs",
       "scripts/check-workspace-projection.mjs",
       "scripts/ci-changes.mjs",
+      "scripts/compare-runtime-config.mjs",
+      "scripts/config-show.ts",
       "scripts/configuration-inventory/catalog.json",
       "scripts/configuration-inventory/scan-env-inputs.mjs",
       "scripts/configure-verification-number.mjs",
@@ -1839,6 +1853,7 @@
       "test/coaching-events.shared.test.ts",
       "test/coaching-llm.test.ts",
       "test/coaching-rules.test.ts",
+      "test/config-show.test.ts",
       "test/configuration-inventory.test.ts",
       "test/confirm-payment.route.test.ts",
       "test/connect-campaign-conference.route.test.ts",
@@ -2121,6 +2136,8 @@
       "test/platform-rate-limit.test.ts",
       "test/pricing.test.ts",
       "test/processing-watchdog.test.ts",
+      "test/project-config-load.test.ts",
+      "test/project-config-schema.test.ts",
       "test/public-pricing.test.ts",
       "test/public-queue-order-contract.test.ts",
       "test/questions.route.test.ts",
@@ -2143,6 +2160,7 @@
       "test/route-read-role-floor.test.ts",
       "test/routing-preset-write.server.test.ts",
       "test/runtime-axios.test.ts",
+      "test/runtime-compare.test.ts",
       "test/runtime-csv.test.ts",
       "test/runtime-postcss.test.ts",
       "test/runtime-proxy-addr.test.ts",
@@ -2526,6 +2544,26 @@
   },
   "keys": [
     {
+      "key": "ACCESS_KEY_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
       "key": "APP_TRUSTED_ORIGINS",
       "sourceKinds": [
         "env-example",
@@ -2548,6 +2586,106 @@
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
+    },
+    {
+      "key": "AWS_ACCESS_KEY_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "AWS_DEFAULT_REGION",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "AWS_ENDPOINT_URL",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "AWS_S3_BUCKET_NAME",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "AWS_SECRET_ACCESS_KEY",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "BASE_URL",
@@ -2576,8 +2714,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 19,
-      "dynamic": false,
+      "sourceCount": 21,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
@@ -2587,9 +2725,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -2607,8 +2747,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 12,
-      "dynamic": false,
+      "sourceCount": 14,
+      "dynamic": true,
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
@@ -2642,9 +2782,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -2662,8 +2804,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 9,
-      "dynamic": false,
+      "sourceCount": 10,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -2707,6 +2849,26 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.body"
+    },
+    {
+      "key": "BUCKET",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "CALLCASTER_DEV_LOCAL_NODE_OK",
@@ -2983,8 +3145,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 4,
-      "dynamic": false,
+      "sourceCount": 5,
+      "dynamic": true,
       "classification": "secret",
       "owner": "app",
       "migrationTarget": "config.secrets.app"
@@ -3045,8 +3207,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 37,
-      "dynamic": false,
+      "sourceCount": 39,
+      "dynamic": true,
       "classification": "secret",
       "owner": "app",
       "migrationTarget": "config.secrets.app"
@@ -3418,6 +3580,26 @@
       "migrationTarget": "config.secrets.media-stream"
     },
     {
+      "key": "ENDPOINT",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
       "key": "ENV",
       "sourceKinds": [
         "env-example",
@@ -3669,8 +3851,8 @@
         "declaration",
         "read"
       ],
-      "sourceCount": 2,
-      "dynamic": false,
+      "sourceCount": 3,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "app",
       "migrationTarget": "config.services.app"
@@ -3726,19 +3908,23 @@
     {
       "key": "MEDIA_STREAM_SECRET",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "secret",
       "owner": "local-tooling",
       "migrationTarget": "config.secrets.local-tooling"
@@ -4580,9 +4766,11 @@
     {
       "key": "REGION",
       "sourceKinds": [
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "script"
       ],
       "environments": [
@@ -4591,11 +4779,11 @@
       "usages": [
         "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
-      "classification": "generated-deployment-value",
-      "owner": "scripts",
-      "migrationTarget": "config.generated.region"
+      "sourceCount": 5,
+      "dynamic": true,
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "REPO",
@@ -4622,9 +4810,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4641,8 +4831,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 10,
-      "dynamic": false,
+      "sourceCount": 12,
+      "dynamic": true,
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
@@ -4678,9 +4868,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4698,8 +4890,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 13,
-      "dynamic": false,
+      "sourceCount": 17,
+      "dynamic": true,
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
@@ -4709,9 +4901,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4729,8 +4923,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 12,
-      "dynamic": false,
+      "sourceCount": 16,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -4738,19 +4932,23 @@
     {
       "key": "S3_BUCKET_AUDIO",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -4758,19 +4956,23 @@
     {
       "key": "S3_BUCKET_EXPORTS",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -4778,19 +4980,23 @@
     {
       "key": "S3_BUCKET_MEDIA",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -4800,9 +5006,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4820,8 +5028,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 12,
-      "dynamic": false,
+      "sourceCount": 16,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -4855,9 +5063,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4875,8 +5085,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 12,
-      "dynamic": false,
+      "sourceCount": 16,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -4886,9 +5096,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -4906,8 +5118,8 @@
         "read",
         "write"
       ],
-      "sourceCount": 13,
-      "dynamic": false,
+      "sourceCount": 17,
+      "dynamic": true,
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
@@ -4931,6 +5143,26 @@
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
+    },
+    {
+      "key": "SECRET_ACCESS_KEY",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": true,
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
     },
     {
       "key": "SENTRY_DSN",
@@ -5272,8 +5504,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 13,
-      "dynamic": false,
+      "sourceCount": 15,
+      "dynamic": true,
       "classification": "secret",
       "owner": "app",
       "migrationTarget": "config.secrets.app"
@@ -5283,9 +5515,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -5302,8 +5536,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 8,
-      "dynamic": false,
+      "sourceCount": 9,
+      "dynamic": true,
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
@@ -5521,9 +5755,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -5540,8 +5776,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 10,
-      "dynamic": false,
+      "sourceCount": 12,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -5552,9 +5788,11 @@
         "env-example",
         "github-workflow-env",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "ci",
         "local-tooling",
         "railway",
@@ -5572,8 +5810,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 13,
-      "dynamic": false,
+      "sourceCount": 15,
+      "dynamic": true,
       "classification": "secret",
       "owner": "ci",
       "migrationTarget": "config.secrets.ci"
@@ -5581,19 +5819,23 @@
     {
       "key": "TWILIO_COMPLIANCE_NOTIFY_EMAIL",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -5601,19 +5843,23 @@
     {
       "key": "TWILIO_EVENTS_SINK_SECRET",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "secret",
       "owner": "local-tooling",
       "migrationTarget": "config.secrets.local-tooling"
@@ -5621,19 +5867,23 @@
     {
       "key": "TWILIO_LOOKUP_ENABLED",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -5643,9 +5893,11 @@
       "sourceKinds": [
         "env-example",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "railway",
         "script"
@@ -5662,8 +5914,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 10,
-      "dynamic": false,
+      "sourceCount": 12,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "deployment",
       "migrationTarget": "config.services.deployment"
@@ -5674,9 +5926,11 @@
         "env-example",
         "github-workflow-env",
         "railway-variable",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "ci",
         "local-tooling",
         "railway",
@@ -5694,8 +5948,8 @@
         "deployment",
         "read"
       ],
-      "sourceCount": 13,
-      "dynamic": false,
+      "sourceCount": 15,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "ci",
       "migrationTarget": "config.services.ci"
@@ -5743,19 +5997,23 @@
     {
       "key": "TWILIO_TRUSTHUB_SECONDARY_POLICY_SID",
       "sourceKinds": [
-        "env-example"
+        "env-example",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "local-tooling"
       ],
       "environments": [
-        "local"
+        "local",
+        "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 1,
-      "dynamic": false,
+      "sourceCount": 2,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "local-tooling",
       "migrationTarget": "config.services.local-tooling"
@@ -5764,9 +6022,11 @@
       "key": "TWILIO_VALIDATE_WEBHOOKS",
       "sourceKinds": [
         "env-example",
+        "runtime-read",
         "script-input"
       ],
       "consumers": [
+        "app",
         "local-tooling",
         "script"
       ],
@@ -5778,8 +6038,8 @@
         "declaration",
         "read"
       ],
-      "sourceCount": 2,
-      "dynamic": false,
+      "sourceCount": 3,
+      "dynamic": true,
       "classification": "non-secret-config",
       "owner": "scripts",
       "migrationTarget": "config.services.scripts"

@@ -25,7 +25,7 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 
 const ROOTS = [
-  "app", "server", "worker", "services", "scripts", "e2e", "test",
+  "app", "config", "server", "worker", "services", "scripts", "e2e", "test",
   ".railway", ".github/workflows", ".env.example", "package.json",
   ".github/actions", "drizzle.config.ts", "vite.config.ts", "Dockerfile",
   "Dockerfile.worker", "Makefile", "docker-compose.dev.yml", "railway.toml",
@@ -102,11 +102,26 @@ function collectKnownStringArrays(text) {
   return values;
 }
 
+function collectInjectedEnvironmentAliases(text) {
+  const environmentNames = new Set([
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*NodeJS\.ProcessEnv\b/g)].map((match) => match[1]),
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*process\.env\b/g)].map((match) => match[1]),
+  ]);
+  if (!environmentNames.size) return { environmentNames, keys: [] };
+
+  const keys = new Set();
+  for (const match of text.matchAll(/\[([\s\S]*?)\]/g)) {
+    for (const key of match[1].matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)) keys.add(key[1]);
+  }
+  return { environmentNames, keys: [...keys] };
+}
+
 export function scanSourceText(text, sourceFile) {
   const records = [];
   const consumer = consumerFor(sourceFile);
   if (sourceFile === "scripts/configuration-inventory/catalog.json") return records;
   const knownArrays = collectKnownStringArrays(text);
+  const injectedEnvironmentAliases = collectInjectedEnvironmentAliases(text);
   const seen = new Set();
   const add = (record) => {
     const identity = JSON.stringify(record);
@@ -194,6 +209,22 @@ export function scanSourceText(text, sourceFile) {
         expression: `process.env[${match[1]}]`,
         notes: `Dynamic key expression: ${match[1]}. Manual key review is required.`,
       }));
+    }
+  }
+
+  for (const environmentName of injectedEnvironmentAliases.environmentNames) {
+    const escapedName = environmentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const match of text.matchAll(new RegExp(`${escapedName}\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]`, "g"))) {
+      for (const key of injectedEnvironmentAliases.keys) {
+        add(entry({
+          key,
+          sourceKind: sourceKindForRead(sourceFile),
+          sourceFile,
+          line: lineNumberAt(text, match.index),
+          consumer,
+          notes: `Resolved from static environment-key arrays used with ${environmentName}.`,
+        }));
+      }
     }
   }
 

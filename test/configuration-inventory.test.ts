@@ -45,6 +45,37 @@ describe("configuration input inventory", () => {
     expect(records.some((record) => record.key === null)).toBe(false);
   });
 
+  test("resolves static aliases through an injected ProcessEnv parameter", () => {
+    const records = scanSourceText(`const ALIASES = { endpoint: ["S3_ENDPOINT", "ENDPOINT"] };
+function read(env: NodeJS.ProcessEnv = process.env, key = "endpoint") {
+  return env[key];
+}`, "app/object-storage.ts");
+
+    expect(records.map((record) => record.key)).toEqual(["S3_ENDPOINT", "ENDPOINT"]);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test("inventories every object-storage environment alias with a catalog classification", () => {
+    const source = readFileSync(resolve("app/lib/object-storage-config.ts"), "utf8");
+    const records = scanSourceText(source, "app/lib/object-storage-config.ts");
+    const aliases = [
+      "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL",
+      "S3_REGION", "REGION", "AWS_DEFAULT_REGION",
+      "S3_ACCESS_KEY_ID", "ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY",
+      "S3_BUCKET", "BUCKET", "AWS_S3_BUCKET_NAME",
+    ];
+
+    for (const key of aliases) {
+      expect(records.some((record) => record.key === key)).toBe(true);
+      expect(catalog.entries.find((entry: { key: string }) => entry.key === key)).toEqual(expect.objectContaining({
+        classification: expect.not.stringMatching(/^unclassified$/),
+        owner: "deployment",
+        migrationTarget: expect.stringMatching(/^config\.(?:services|secrets)\.deployment$/),
+      }));
+    }
+  });
+
   test("collects dotenv loads, example keys, Railway variables, and GitHub secrets", () => {
     expect(scanSourceText('dotenv.config({ path: ".env.local" });', "scripts/local/dev.mjs")).toEqual([
       expect.objectContaining({ sourceKind: "dotenv-load", sourceFile: "scripts/local/dev.mjs" }),

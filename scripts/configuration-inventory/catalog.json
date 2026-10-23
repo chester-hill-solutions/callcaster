@@ -9,6 +9,12 @@
   ],
   "entries": [
     {
+      "key": "ACCESS_KEY_ID",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
       "key": "APP_TRUSTED_ORIGINS",
       "classification": "non-secret-config",
       "owner": "app",
@@ -49,6 +55,12 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.body"
+    },
+    {
+      "key": "BUCKET",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "CALLCASTER_DEV_LOCAL_NODE_OK",
@@ -97,6 +109,12 @@
       "classification": "secret",
       "owner": "media-stream",
       "migrationTarget": "config.secrets.media-stream"
+    },
+    {
+      "key": "ENDPOINT",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "CONFIRM_CLONE",
@@ -556,9 +574,9 @@
     },
     {
       "key": "REGION",
-      "classification": "generated-deployment-value",
-      "owner": "scripts",
-      "migrationTarget": "config.generated.region"
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
     },
     {
       "key": "REPO",
@@ -615,6 +633,36 @@
       "migrationTarget": "config.services.deployment"
     },
     {
+      "key": "AWS_ENDPOINT_URL",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "AWS_DEFAULT_REGION",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
+      "key": "AWS_ACCESS_KEY_ID",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "AWS_SECRET_ACCESS_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "AWS_S3_BUCKET_NAME",
+      "classification": "non-secret-config",
+      "owner": "deployment",
+      "migrationTarget": "config.services.deployment"
+    },
+    {
       "key": "S3_FORCE_PATH_STYLE",
       "classification": "non-secret-config",
       "owner": "scripts",
@@ -628,6 +676,12 @@
     },
     {
       "key": "S3_SECRET_ACCESS_KEY",
+      "classification": "secret",
+      "owner": "deployment",
+      "migrationTarget": "config.secrets.deployment"
+    },
+    {
+      "key": "SECRET_ACCESS_KEY",
       "classification": "secret",
       "owner": "deployment",
       "migrationTarget": "config.secrets.deployment"
