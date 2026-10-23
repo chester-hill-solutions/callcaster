@@ -311,6 +311,7 @@ After create or edit, fetch the issue with the JSON fields above and confirm the
 ## Pull Requests And Issue Comments
 
 - One issue, one concern, one pull request. Keep a PR's scope as small as it can be while still shipping a complete unit; a fix that touches a shared file does not get bundled with the neighbouring cleanup. Split before opening, not after review.
-- Close issues from the PR, never by hand: put `Closes #<n>` in the PR body (commit messages may carry it too). The issue closes when the PR reaches the default branch; a PR into `dev` does not close anything until the dev → master release lands, and that is expected.
+- Close new implementation work from the PR: put `Closes #<n>` in the PR body (commit messages may carry it too). The issue closes when the PR reaches the default branch; a PR into `dev` does not close anything until the dev → master release lands, and that is expected.
+- For Verify and close work whose fix is already in `origin/master`, read [issue-fix-verification](../issue-fix-verification/SKILL.md) before changing state. Record the code-backed verdict and manual-test flag, then apply its closure and Project Status rules. Release ancestry alone is not verification.
 - Do not comment on an issue to say a PR is fixing or closing it, and do not narrate what went wrong on the issue after the fact. That explanation belongs in the PR description, which the closing link already ties to the issue.
 - Issue comments are for the issue itself: questions, findings, plans, trade-offs, and decisions that change the scope. If a comment would only restate the PR, leave it out.

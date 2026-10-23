@@ -161,25 +161,6 @@
     "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
-    "issueNumber": 2503,
-    "verdict": "fix-now",
-    "summary": "Master removes the duplicated section headings on the campaign pages (the 'Setup' heading under the Setup/Content/Queue/Launch tab row, the 'Launch' section header and the 'Call/Message Campaign Results' h1), but the campaign title header and the 'Create campaign' page heading are still rendered.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
-    "lookIn": [
-      "app/components/campaign/settings/CampaignSettings.tsx",
-      "app/components/campaign/settings/CampaignLaunch.tsx",
-      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
-      "selected_id.route.tsx",
-      "id/campaigns/new.route.tsx"
-    ],
-    "existingTests": [
-      "test/ui/campaigns-new-caller-gating.test.tsx:37 — `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 — 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
-    ],
-    "acceptanceCriteria": [],
-    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate — the big 'Setup' heading under the Setup/Content/Queue/Launch tabs — is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
-  },
-  {
     "issueNumber": 2507,
     "verdict": "fix-now",
     "summary": "PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.",
@@ -227,17 +208,37 @@
     "trackerRecommendation": "Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master."
   },
   {
-    "issueNumber": 2686,
+    "issueNumber": 1938,
     "verdict": "fix-now",
-    "summary": "The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
+    "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
+    "summary": "PARTIAL: middleware reuses the scoped tenant client, but the released import guard skips JavaScript modules. The candidate guard covers supported JavaScript/TypeScript extensions and counts every statically named import.",
+    "currentBehavior": "Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.",
+    "rootCause": "The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.",
+    "resolution": "Parse supported JavaScript/TypeScript files with the existing TypeScript parser. Count static imports, re-exports, dynamic imports, require calls and type imports. Migrate only the pinned base debt and reject new, increased, reduced or stale counts.",
     "lookIn": [
-      "docs/research/cms-platform-capabilities.md"
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "test/unscoped-db-imports-guard.test.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts"
     ],
-    "existingTests": [],
-    "acceptanceCriteria": [],
-    "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
+    "existingTests": [
+      "test/unscoped-db-imports-guard.test.ts: 46 actual CLI cases; 39 fail and 7 controls pass on the original guard. All 46 pass with the fix.",
+      "Pinned dev baseline: the same 84 file/module keys, 85 syntax occurrences; no new source exceptions. Separate fault injections exercise extension coverage, module syntax, counts, stale debt and fixture-root safety."
+    ],
+    "missingTests": [
+      "Review and merge the candidate, then verify the exact promoted guard before closing."
+    ],
+    "acceptanceCriteria": [
+      "Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.",
+      "A new app/lib module cannot import an unscoped database client without a counted baseline exception.",
+      "Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.",
+      "npm run ci:local is green."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified."
   },
   {
     "issueNumber": 2760,
