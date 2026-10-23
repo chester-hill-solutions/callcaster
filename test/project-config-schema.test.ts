@@ -2,11 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   ConfigValidationError,
+  LocalProfileInputSchema,
   parseProjectConfig,
   ProjectConfigOverlaySchema,
   SecretReferenceSchema,
   SecretNameSchema,
   ServiceSliceSchema,
+  safeParseProjectConfig,
 } from "../config/schema";
 import { secretNames } from "../config/secret-names";
 
@@ -97,6 +99,20 @@ describe("ProjectConfig schema", () => {
     expect(parseProjectConfig({ ...valid, urls: { publicApp: "https://example.test/path" } }).urls.publicApp).toBe(
       "https://example.test/path",
     );
+  });
+
+  it("returns failed parses instead of throwing for malformed diagnostic URLs", () => {
+    const malformed = "not-a-url";
+    for (const parse of [
+      () => LocalProfileInputSchema.safeParse({ devName: "sai", envName: "local", publicUrl: malformed }),
+      () => ServiceSliceSchema.safeParse({ url: malformed }),
+      () => ProjectConfigOverlaySchema.safeParse({ environment: "local", urls: { publicApp: malformed } }),
+      () => safeParseProjectConfig({ ...valid, urls: { publicApp: malformed } }),
+    ]) {
+      expect(() => parse()).not.toThrow();
+      expect(parse().success).toBe(false);
+    }
+    expect(() => parseProjectConfig({ ...valid, urls: { publicApp: malformed } })).toThrow(ConfigValidationError);
   });
 
 });

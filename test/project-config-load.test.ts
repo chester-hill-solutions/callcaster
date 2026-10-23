@@ -79,6 +79,12 @@ describe("loadProjectConfig", () => {
     }
   });
 
+  it("reports malformed local profile URLs as configuration errors", () => {
+    expect(() => resolveLocalProjectConfig({ devName: "sai", envName: "local", publicUrl: "not-a-url" })).toThrow(
+      ConfigValidationError,
+    );
+  });
+
   it("rejects local profiles whose derived DNS label exceeds 63 characters", () => {
     const safeDevName = "a".repeat(57);
     const safe = resolveLocalProjectConfig({ devName: safeDevName, envName: "local" });

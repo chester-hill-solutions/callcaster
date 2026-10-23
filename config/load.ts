@@ -90,7 +90,9 @@ export type LocalProjectConfigResolution = {
 
 /** Resolve local configuration for one developer without reading dotenv or process.env. */
 export function resolveLocalProjectConfig(input: LocalProfileInput): LocalProjectConfigResolution {
-  const profile = LocalProfileInputSchema.parse(input);
+  const parsedProfile = LocalProfileInputSchema.safeParse(input);
+  if (!parsedProfile.success) throw new ConfigValidationError(parsedProfile.error);
+  const profile = parsedProfile.data;
   const profileName = `${profile.devName}-${profile.envName}`;
   if (profileName.length > 63) invalid(`derived local profile name '${profileName}' exceeds the 63-character DNS label limit`);
   const derivedHostname = `${profileName}.callcaster.ca`;
