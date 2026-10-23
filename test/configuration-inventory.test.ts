@@ -45,6 +45,179 @@ describe("configuration input inventory", () => {
     expect(records.some((record) => record.key === null)).toBe(false);
   });
 
+  test.each([
+    ["line comments", 'const KEYS = ["FIRST_KEY", // ] } )\n  "SECOND_KEY"];'],
+    ["block comments", 'const KEYS = ["FIRST_KEY", /* ] } ) */ "SECOND_KEY"];'],
+  ])("skips closing delimiters in %s while collecting static keys", (_commentType, declaration) => {
+    const records = scanSourceText(
+      `${declaration}\nif (KEYS.some((key) => process.env[key] === "1")) {}`,
+      "app/flags.server.ts",
+    );
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual([
+      "FIRST_KEY",
+      "SECOND_KEY",
+    ]);
+    expect(records.some((record) => record.key === null)).toBe(false);
+  });
+
+  test("does not bleed a prior collection callback into an unrelated injected read", () => {
+    const records = scanSourceText(`const KEYS = ["FLAG_A", "FLAG_B"];
+function read(env: NodeJS.ProcessEnv, key: string) {
+  if (KEYS.some((item) => env[item])) return true;
+  return env[key];
+}`, "app/flags.server.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["FLAG_A", "FLAG_B"]);
+    expect(records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        key: null,
+        sourceKind: "dynamic-runtime-read",
+        expression: "env[key]",
+      }),
+    ]));
+  });
+
+  test("resolves static aliases through an injected ProcessEnv parameter", () => {
+    const records = scanSourceText(`const ALIASES = { endpoint: ["S3_ENDPOINT", "ENDPOINT"] };
+function read(env: NodeJS.ProcessEnv = process.env, setting = "endpoint") {
+  return ALIASES[setting].some((key) => env[key]);
+}`, "app/object-storage.ts");
+
+    expect(records.map((record) => record.key)).toEqual(["S3_ENDPOINT", "ENDPOINT"]);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test("does not infer unrelated uppercase object values as environment keys", () => {
+    const records = scanSourceText(`const SETTINGS = {
+  endpoint: ["KNOWN_ENDPOINT"],
+  label: "UNRELATED_UPPERCASE_VALUE",
+};
+function read(env: NodeJS.ProcessEnv, setting = "endpoint") {
+  return SETTINGS[setting].some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["KNOWN_ENDPOINT"]);
+    expect(records.some((record) => record.key === "UNRELATED_UPPERCASE_VALUE")).toBe(false);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test.each([
+    ["line comments", `const SETTINGS = {
+  endpoint: ["SAFE_ENDPOINT" /* , ] */], // , ]
+  label: "NOT_A_KEY",
+};`],
+    ["block comments", `const SETTINGS = {
+  endpoint: ["SAFE_ENDPOINT", /* , ] */ "SAFE_ENDPOINT_TWO"], /* , ] */
+  label: "NOT_A_KEY",
+};`],
+  ])("keeps object collection values concrete around %s", (_commentType, declaration) => {
+    const records = scanSourceText(`${declaration}
+function read(env: NodeJS.ProcessEnv, setting = "endpoint") {
+  return SETTINGS[setting].some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(
+      expect.arrayContaining(["SAFE_ENDPOINT"]),
+    );
+    expect(records.some((record) => record.key === "SAFE_ENDPOINT_TWO")).toBe(_commentType === "block comments");
+    expect(records.some((record) => record.key === "NOT_A_KEY")).toBe(false);
+    expect(records.some((record) => record.sourceKind === "dynamic-runtime-read")).toBe(false);
+  });
+
+  test("uses only the statically selected object array property", () => {
+    const records = scanSourceText(`const SETTINGS = {
+  endpoint: ["ENDPOINT_KEY"],
+  region: ["REGION_KEY"],
+};
+function read(env: NodeJS.ProcessEnv) {
+  return SETTINGS.endpoint.some((key) => env[key]);
+}`, "app/settings.ts");
+
+    expect(records.filter((record) => record.key).map((record) => record.key)).toEqual(["ENDPOINT_KEY"]);
+  });
+
+  test("records unresolved injected environment reads as one dynamic boundary", () => {
+    const records = scanSourceText(
+      'function read(env: NodeJS.ProcessEnv, key: string) { return env[key]; }',
+      "app/config-reader.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-runtime-read",
+      sourceFile: "app/config-reader.ts",
+      line: 1,
+      expression: "env[key]",
+      notes: "Dynamic key expression: env[key]. Manual key review is required.",
+    })]);
+  });
+
+  test("records unresolved injected test reads without exposing literal values", () => {
+    const records = scanSourceText(
+      'const secret = "SUPER_SECRET_VALUE";\nfunction read(env: NodeJS.ProcessEnv, key: string) { return env[key]; }',
+      "test/config-reader.test.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-test-read",
+      sourceFile: "test/config-reader.test.ts",
+      line: 2,
+      expression: "env[key]",
+      notes: "Dynamic key expression: env[key]. Manual key review is required.",
+    })]);
+    expect(JSON.stringify(records)).not.toContain("SUPER_SECRET_VALUE");
+  });
+
+  test("does not cross-contaminate independent injected key collections", () => {
+    const source = readFileSync(resolve("app/lib/required-env-keys.mjs"), "utf8");
+    const records = scanSourceText(source, "app/lib/required-env-keys.mjs");
+
+    expect(records.filter((record) => record.line === 55).map((record) => record.key)).toEqual([
+      "DATABASE_URL", "BETTER_AUTH_SECRET", "TWILIO_SID", "TWILIO_AUTH_TOKEN",
+      "TWILIO_APP_SID", "TWILIO_PHONE_NUMBER", "BASE_URL", "STRIPE_SECRET_KEY", "RESEND_API_KEY",
+    ]);
+    expect(records.filter((record) => record.line === 24).map((record) => record.key)).toEqual(expect.arrayContaining([
+      "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL", "S3_BUCKET", "BUCKET", "AWS_S3_BUCKET_NAME",
+    ]));
+    expect(records.filter((record) => record.line === 55).map((record) => record.key)).not.toContain("S3_ENDPOINT");
+  });
+
+  test("does not mine unrelated uppercase fixture strings for an unresolved key", () => {
+    const records = scanSourceText(
+      'const FIXTURE_NAME = "UNRELATED_FIXTURE_KEY";\nconst key = getFixtureKey();\nconst value = process.env[key];',
+      "test/configuration-inventory.test.ts",
+    );
+
+    expect(records).toEqual([expect.objectContaining({
+      key: null,
+      sourceKind: "dynamic-test-read",
+      expression: "process.env[key]",
+    })]);
+  });
+
+  test("inventories every object-storage environment alias with a catalog classification", () => {
+    const source = readFileSync(resolve("app/lib/object-storage-config.ts"), "utf8");
+    const records = scanSourceText(source, "app/lib/object-storage-config.ts");
+    const aliases = [
+      "S3_ENDPOINT", "ENDPOINT", "AWS_ENDPOINT_URL",
+      "S3_REGION", "REGION", "AWS_DEFAULT_REGION",
+      "S3_ACCESS_KEY_ID", "ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID",
+      "S3_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY",
+      "S3_BUCKET", "BUCKET", "AWS_S3_BUCKET_NAME",
+    ];
+
+    for (const key of aliases) {
+      expect(records.some((record) => record.key === key)).toBe(true);
+      expect(catalog.entries.find((entry: { key: string }) => entry.key === key)).toEqual(expect.objectContaining({
+        classification: expect.not.stringMatching(/^unclassified$/),
+        owner: "deployment",
+        migrationTarget: expect.stringMatching(/^config\.(?:services|secrets)\.deployment$/),
+      }));
+    }
+  });
+
   test("collects dotenv loads, example keys, Railway variables, and GitHub secrets", () => {
     expect(scanSourceText('dotenv.config({ path: ".env.local" });', "scripts/local/dev.mjs")).toEqual([
       expect.objectContaining({ sourceKind: "dotenv-load", sourceFile: "scripts/local/dev.mjs" }),

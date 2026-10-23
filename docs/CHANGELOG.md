@@ -5,6 +5,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ## [Unreleased]
 
 - Fixed: Password recovery reports the real problem when a reset is refused. A password shorter than the 8-character minimum no longer reads as an expired link, and an expired link says so as soon as the page opens ([PR #2944](https://github.com/chester-hill-solutions/callcaster/pull/2944), [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075)).
+- Fixed: Configuration diagnostics reject URL credentials, query strings, and fragments before they can appear in reports or fingerprints.
+- Added: `config:show` prints a redacted resolved configuration with a deterministic fingerprint ([#2796](https://github.com/chester-hill-solutions/callcaster/issues/2796)).
 - Fixed: Local Stow setup verifies downloads on macOS and Linux without GNU checksum tools, and still rejects missing or incorrect checksums ([PR #2766](https://github.com/chester-hill-solutions/callcaster/pull/2766), [#2493](https://github.com/chester-hill-solutions/callcaster/issues/2493)).
 - Fixed: The call screen identifies Predictive Dialer and Power Dialer campaigns with the correct dialing mode ([PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698)).
 - Fixed: Workspace member rows use small role dots and compact action icons that stay visible when the theme follows the system setting ([PR #2753](https://github.com/chester-hill-solutions/callcaster/pull/2753), [#100](https://github.com/chester-hill-solutions/callcaster/issues/100)).

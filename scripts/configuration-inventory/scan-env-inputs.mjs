@@ -25,7 +25,7 @@ const IGNORED_DIRECTORIES = new Set([
 ]);
 
 const ROOTS = [
-  "app", "server", "worker", "services", "scripts", "e2e", "test",
+  "app", "config", "server", "worker", "services", "scripts", "e2e", "test",
   ".railway", ".github/workflows", ".env.example", "package.json",
   ".github/actions", "drizzle.config.ts", "vite.config.ts", "Dockerfile",
   "Dockerfile.worker", "Makefile", "docker-compose.dev.yml", "railway.toml",
@@ -92,21 +92,241 @@ function entry({ key = null, sourceKind, sourceFile, line, consumer, usage = "re
   };
 }
 
-function collectKnownStringArrays(text) {
-  const values = new Map();
-  const pattern = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[([\s\S]*?)\]/g;
-  for (const match of text.matchAll(pattern)) {
-    const keys = [...match[2].matchAll(/['"]([A-Z][A-Z0-9_]+)['"]/g)].map((m) => m[1]);
-    if (keys.length) values.set(match[1], keys);
+function matchingDelimiter(text, start) {
+  const closing = { "[": "]", "{": "}", "(": ")" }[text[start]];
+  if (!closing) return -1;
+  let depth = 0;
+  let quote = null;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
+    if (lineComment) {
+      if (character === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === "*" && next === "/") {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "/" && next === "/") {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === text[start]) depth += 1;
+    if (character === closing && --depth === 0) return index;
   }
-  return values;
+  return -1;
+}
+
+function topLevelParts(text, start, end) {
+  const parts = [];
+  let partStart = start;
+  let depth = 0;
+  let quote = null;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = start; index < end; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
+    if (lineComment) {
+      if (character === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (character === "*" && next === "/") {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "/" && next === "/") {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "/" && next === "*") {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "[" || character === "{" || character === "(") depth += 1;
+    else if (character === "]" || character === "}" || character === ")") depth -= 1;
+    else if (character === "," && depth === 0) {
+      parts.push([partStart, index]);
+      partStart = index + 1;
+    }
+  }
+  parts.push([partStart, end]);
+  return parts;
+}
+
+function staticArrayValues(text, start, end) {
+  return [...text.slice(start, end).matchAll(/["']([A-Z][A-Z0-9_]*)["']/g)].map((match) => match[1]);
+}
+
+function objectArrayValues(text, start, end) {
+  const values = [];
+  const properties = new Map();
+  let safe = true;
+  for (const [partStart, partEnd] of topLevelParts(text, start + 1, end)) {
+    const part = text.slice(partStart, partEnd);
+    const colon = part.indexOf(":");
+    if (colon < 0) {
+      if (part.trim()) safe = false;
+      continue;
+    }
+    let valueStart = partStart + colon + 1;
+    while (/\s/.test(text[valueStart] ?? "")) valueStart += 1;
+    const valueEnd = partEnd;
+    if (text[valueStart] === "[") {
+      const arrayEnd = matchingDelimiter(text, valueStart);
+      if (arrayEnd < 0 || arrayEnd > valueEnd) {
+        safe = false;
+      } else {
+        const propertyValues = staticArrayValues(text, valueStart, arrayEnd + 1);
+        const property = part.slice(0, colon).trim().match(/^(?:[A-Za-z_$][\w$]*|['"]([^'"]+)['"])$/)?.[1]
+          ?? part.slice(0, colon).trim();
+        properties.set(property, propertyValues);
+        values.push(...propertyValues);
+      }
+    } else if (text[valueStart] === "{") {
+      const objectEnd = matchingDelimiter(text, valueStart);
+      if (objectEnd < 0 || objectEnd > valueEnd) {
+        safe = false;
+      } else {
+        const nested = objectArrayValues(text, valueStart, objectEnd);
+        values.push(...nested.values);
+        safe = safe && nested.safe;
+      }
+    } else if (!/^['"`]/.test(text.slice(valueStart, valueEnd).trim())) {
+      const value = text.slice(valueStart, valueEnd).trim();
+      if (value) safe = false;
+    }
+  }
+  return { values, properties, safe };
+}
+
+function collectKnownCollections(text) {
+  const collections = new Map();
+  for (const match of text.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*(\[|\{)/g)) {
+    const start = match.index + match[0].length - 1;
+    const end = matchingDelimiter(text, start);
+    if (end < 0) continue;
+    const result = text[start] === "["
+      ? { values: staticArrayValues(text, start, end + 1), safe: true }
+      : objectArrayValues(text, start, end);
+    if (result.safe && result.values.length) {
+      collections.set(match[1], result.values);
+      for (const [property, values] of result.properties ?? []) collections.set(`${match[1]}.${property}`, values);
+    }
+  }
+  return collections;
+}
+
+function collectEnvironmentNames(text) {
+  return new Set([
+    "process.env",
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*:\s*NodeJS\.ProcessEnv\b/g)].map((match) => match[1]),
+    ...[...text.matchAll(/\b([A-Za-z_$][\w$]*)\s*=\s*process\.env\b(?!\s*(?:\.|\[))/g)].map((match) => match[1]),
+  ]);
+}
+
+function expressionBodyEnd(text, start) {
+  let depth = 0;
+  let quote = null;
+  for (let index = start; index < text.length; index += 1) {
+    const character = text[index];
+    if (quote) {
+      if (character === "\\") index += 1;
+      else if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"' || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "(" || character === "[" || character === "{") {
+      depth += 1;
+      continue;
+    }
+    if (character === ")" || character === "]" || character === "}") {
+      if (depth === 0) return index;
+      depth -= 1;
+      continue;
+    }
+    if (depth === 0 && character === ",") return index;
+  }
+  return text.length;
+}
+
+function collectionForAccess(text, collections, keyName, accessIndex) {
+  const prefix = text.slice(0, accessIndex);
+  const methods = [...prefix.matchAll(/\b([A-Za-z_$][\w$]*)\s*(?:(?:\[[^\]\n]+\])|(?:\.[A-Za-z_$][\w$]*))?\s*\.\s*(?:some|every|filter|map|forEach)\s*\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>/g)]
+     .map((match) => {
+      let bodyStart = match.index + match[0].length;
+      while (/\s/.test(text[bodyStart] ?? "")) bodyStart += 1;
+      const bodyEnd = text[bodyStart] === "{" ? matchingDelimiter(text, bodyStart) : expressionBodyEnd(text, bodyStart);
+      const property = match[0].match(/^\w+\s*(?:\[\s*["']([^"']+)["']\s*\]|\.([A-Za-z_$][\w$]*))\s*\./)?.slice(1).find(Boolean);
+      return { collection: property ? `${match[1]}.${property}` : match[1], key: match[2], bodyStart, bodyEnd };
+    })
+    .filter((method) => method.bodyEnd >= 0 && accessIndex >= method.bodyStart && accessIndex < method.bodyEnd);
+
+  const loops = [...prefix.matchAll(/for\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+([A-Za-z_$][\w$]*)(?:\[[^\]\n]+\])?\s*\)\s*\{/g)]
+    .map((match) => {
+      const bodyStart = match.index + match[0].length - 1;
+      return { collection: match[2], key: match[1], bodyStart, bodyEnd: matchingDelimiter(text, bodyStart) };
+    })
+    .filter((loop) => loop.bodyEnd >= 0 && accessIndex >= loop.bodyStart && accessIndex < loop.bodyEnd);
+
+  for (const scope of [...methods, ...loops].reverse()) {
+    if (scope.key === keyName && collections.has(scope.collection)) return scope.collection;
+    if (scope.key !== keyName) continue;
+    let parent = methods.find((candidate) => candidate.key === scope.collection
+      && candidate.bodyStart <= scope.bodyStart && candidate.bodyEnd >= scope.bodyEnd);
+    while (parent) {
+      if (collections.has(parent.collection)) return parent.collection;
+      parent = methods.find((candidate) => candidate.key === parent.collection
+        && candidate.bodyStart <= parent.bodyStart && candidate.bodyEnd >= parent.bodyEnd);
+    }
+  }
+  return null;
 }
 
 export function scanSourceText(text, sourceFile) {
   const records = [];
   const consumer = consumerFor(sourceFile);
   if (sourceFile === "scripts/configuration-inventory/catalog.json") return records;
-  const knownArrays = collectKnownStringArrays(text);
+  const knownCollections = collectKnownCollections(text);
+  const environmentNames = collectEnvironmentNames(text);
   const seen = new Set();
   const add = (record) => {
     const identity = JSON.stringify(record);
@@ -166,23 +386,17 @@ export function scanSourceText(text, sourceFile) {
   }
 
   if (!sourceFile.startsWith(".github/workflows/")) for (const match of text.matchAll(/process\.env\s*\[\s*([A-Za-z_$][\w$]*)\s*\]/g)) {
-    const keys = knownArrays.get(match[1]);
-    const inferredEntry = [...knownArrays.entries()].find(([arrayName]) =>
-      text.includes(`${arrayName}.some`) &&
-      text.includes(`process.env[${match[1]}]`),
-    );
-    const inferredKeys = inferredEntry?.[1];
-    if (keys?.length || inferredKeys?.length) {
-      for (const key of keys ?? inferredKeys) {
+    const collectionName = collectionForAccess(text, knownCollections, match[1], match.index);
+    const keys = collectionName ? knownCollections.get(collectionName) : null;
+    if (keys?.length) {
+      for (const key of keys) {
         add(entry({
           key,
           sourceKind: sourceKindForRead(sourceFile),
           sourceFile,
           line: lineNumberAt(text, match.index),
           consumer,
-          notes: keys
-            ? `Resolved from the ${match[1]} key list.`
-            : `Resolved from the ${inferredEntry[0]} key list.`,
+          notes: `Resolved from the ${collectionName} key collection.`,
         }));
       }
     } else {
@@ -194,6 +408,36 @@ export function scanSourceText(text, sourceFile) {
         expression: `process.env[${match[1]}]`,
         notes: `Dynamic key expression: ${match[1]}. Manual key review is required.`,
       }));
+    }
+  }
+
+  for (const environmentName of environmentNames) {
+    if (environmentName === "process.env") continue;
+    const escapedName = environmentName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    for (const match of text.matchAll(new RegExp(`${escapedName}\\s*\\[\\s*([A-Za-z_$][\\w$]*)\\s*\\]`, "g"))) {
+      const collectionName = collectionForAccess(text, knownCollections, match[1], match.index);
+      const keys = collectionName ? knownCollections.get(collectionName) : null;
+      if (keys?.length) {
+        for (const key of keys) {
+          add(entry({
+            key,
+            sourceKind: sourceKindForRead(sourceFile),
+            sourceFile,
+            line: lineNumberAt(text, match.index),
+            consumer,
+            notes: `Resolved from the ${collectionName} key collection used with ${environmentName}.`,
+          }));
+        }
+      } else {
+        add(entry({
+          sourceKind: sourceFile.startsWith("test/") ? "dynamic-test-read" : "dynamic-runtime-read",
+          sourceFile,
+          line: lineNumberAt(text, match.index),
+          consumer,
+          expression: `${environmentName}[${match[1]}]`,
+          notes: `Dynamic key expression: ${environmentName}[${match[1]}]. Manual key review is required.`,
+        }));
+      }
     }
   }
 
