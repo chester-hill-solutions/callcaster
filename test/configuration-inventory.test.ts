@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { scanSourceText, summarizeInventory, normalizeRailwayServiceName, validateCatalog, writeInventory } from "../scripts/configuration-inventory/scan-env-inputs.mjs";
+import { buildDriftReport } from "../scripts/check-configuration-drift.mjs";
 
 const catalog = JSON.parse(readFileSync(resolve("scripts/configuration-inventory/catalog.json"), "utf8"));
 
@@ -274,6 +275,37 @@ service("PostgreSQL 18", { env: preservedVariables(databaseVariables) });`, ".ra
 
   test("does not scan documentation examples as runtime inputs", () => {
     expect(scanSourceText("process.env.SECRET; args.includes('--flag');", "docs/example.md")).toEqual([]);
+  });
+
+  test("reports drift categories without exposing values", () => {
+    const records = [
+      { key: "NEW_SECRET", sourceKind: "runtime-read", sourceFile: "app/new.ts", line: 4, service: "worker", value: "do-not-print" },
+      { key: "DATABASE_URL", sourceKind: "railway-variable", sourceFile: ".railway/environments/dev.ts", line: 8, service: "worker" },
+      { key: null, sourceKind: "dynamic-runtime-read", sourceFile: "app/new.ts", line: 9, expression: "process.env[name]" },
+    ];
+    const report = buildDriftReport({
+      catalog: {
+        version: 1,
+        allowedClassifications: ["non-secret-config", "secret", "generated-deployment-value", "obsolete"],
+        entries: [{ key: "DATABASE_URL", classification: "secret", owner: "app", migrationTarget: "config.secrets.app" }],
+        dynamicBoundaries: [],
+      },
+      records,
+      staleInventory: true,
+    });
+
+    expect(report.findings.map((finding) => finding.type)).toEqual(expect.arrayContaining([
+      "unknown-key", "railway-owner-mismatch", "unresolved-dynamic-boundary", "stale-generated-inventory",
+    ]));
+    expect(JSON.stringify(report)).not.toContain("do-not-print");
+  });
+
+  test("drift reports are explicitly non-blocking", () => {
+    const report = buildDriftReport({ catalog: null, records: [], staleInventory: true });
+    expect(report.reportOnly).toBe(true);
+    expect(report.findings.length).toBeGreaterThan(0);
+    const output = execFileSync("node", ["scripts/check-configuration-drift.mjs"], { encoding: "utf8" });
+    expect(output).toContain("Configuration drift report (report-only)");
   });
 
   test("--check detects stale reports without writing them", () => {

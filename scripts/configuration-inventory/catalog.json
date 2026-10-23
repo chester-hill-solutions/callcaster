@@ -249,6 +249,12 @@
       "migrationTarget": "config.generated.github_output"
     },
     {
+      "key": "GITHUB_STEP_SUMMARY",
+      "classification": "generated-deployment-value",
+      "owner": "ci",
+      "migrationTarget": "config.generated.github_step_summary"
+    },
+    {
       "key": "GITHUB_REPO",
       "classification": "generated-deployment-value",
       "owner": "scripts",

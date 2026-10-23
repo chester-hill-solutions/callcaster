@@ -63,6 +63,24 @@ jobs:
         if: github.event_name == 'pull_request' && github.base_ref == 'master'
         run: node scripts/check-changelog.mjs --base "${{ github.event.pull_request.base.sha }}"
 
+  configuration-drift:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Report configuration drift
+        run: npm run check:config-drift -- --report-file configuration-drift-report.json
+      - name: Upload configuration drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: configuration-drift-report
+          path: configuration-drift-report.json
+          if-no-files-found: warn
+
   # These jobs intentionally repeat checkout/install. GitHub-hosted runners do
   # not share node_modules, and the parallel critical path is shorter than one
   # serial quality wrapper. Keep the expensive test suites independent.
