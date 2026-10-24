@@ -1,5 +1,6 @@
 import { resolveSimRuntimeProfile } from "../e2e/sim/runtime-context";
-import { checkSimProfileAccessInDatabase, SIM_CAPABILITIES } from "../app/lib/sim-profile-status.server";
+import { checkSimProfileAccessInDatabase } from "../app/server/sim-profile-status.server";
+import { SIM_CAPABILITIES } from "../app/lib/sim-profile-status.server";
 
 const args = process.argv.slice(2);
 if (args.length !== 4 || args[0] !== "--persona" || !args[1] || args[1].startsWith("--") || args[2] !== "--capability" || !args[3] || args[3].startsWith("--")) {

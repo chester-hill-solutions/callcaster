@@ -705,7 +705,6 @@ export interface CampaignSchedule {
 }
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
-
 export interface BaseUser {
   id: string;
   username: string;

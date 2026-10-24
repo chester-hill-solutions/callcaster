@@ -9,7 +9,8 @@ if (args.length !== 2 || args[0] !== "--persona" || !args[1] || args[1].startsWi
 let context: Awaited<ReturnType<typeof createSimRuntimeContext>> | undefined;
 try {
   context = await createSimRuntimeContext({ personaKey: args[1] });
-  const { reconcileSimProfileInDatabase, SimReconciliationError } = await import("../app/lib/sim-profile-reconciliation.server");
+  const { reconcileSimProfileInDatabase } = await import("../app/server/sim-profile-reconciliation.server");
+  const { SimReconciliationError } = await import("../app/lib/sim-profile-reconciliation.server");
   const result = await reconcileSimProfileInDatabase(context.profile);
   console.log(JSON.stringify(result));
 } catch (error) {

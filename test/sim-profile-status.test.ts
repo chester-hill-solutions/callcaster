@@ -2,9 +2,9 @@ import { describe, expect, test, vi } from "vitest";
 import {
   checkSimProfileAccess,
   getSimProfileStatus,
-  getSimProfileStatusInDatabase,
   type SimProfileStatusRepository,
 } from "@/lib/sim-profile-status.server";
+import { getSimProfileStatusInDatabase } from "@/server/sim-profile-status.server";
 
 vi.mock("@/server/db", () => {
   throw new Error("database repository must not be constructed");

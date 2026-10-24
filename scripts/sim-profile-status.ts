@@ -1,5 +1,5 @@
 import { resolveSimRuntimeProfile } from "../e2e/sim/runtime-context";
-import { getSimProfileStatusInDatabase } from "../app/lib/sim-profile-status.server";
+import { getSimProfileStatusInDatabase } from "../app/server/sim-profile-status.server";
 
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== "--persona" || !args[1] || args[1].startsWith("--")) {

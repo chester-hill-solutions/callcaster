@@ -1,6 +1,6 @@
 import { resolveSimRuntimeProfile } from "../e2e/sim/runtime-context";
 import { simPersonas } from "../e2e/sim/personas";
-import { getSimProfileStatusInDatabase } from "../app/lib/sim-profile-status.server";
+import { getSimProfileStatusInDatabase } from "../app/server/sim-profile-status.server";
 
 const args = process.argv.slice(2);
 if (args.length !== 0) {

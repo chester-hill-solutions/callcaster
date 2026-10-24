@@ -3,7 +3,7 @@ import {
   getSimProfileStatusInDatabase,
   type SimProfileAccessResult,
   type SimProfileStatusResult,
-} from "../../app/lib/sim-profile-status.server";
+} from "../../app/server/sim-profile-status.server";
 import type { SimRuntimeContext } from "./runtime-context";
 import { createSimTaskContext, simTaskDefinitions, type SimTaskContext } from "./task-context";
 
