@@ -81,18 +81,24 @@ jobs:
       # ffmpeg normalises workspace audio uploads (see the production image).
       # Bounded + retried: apt mirror hangs stalled three runs for 20+ min
       # each on 2026-08-18/19; a dead mirror must fail fast, not wedge CI.
+      # 15 minutes, not 5 (#2239): the download is 62.8 MB and its speed is the
+      # mirror's, not ours. Measured 2026-10-23/24, two PR runs lost the whole
+      # 5-minute budget mid-download — `libcodec2` alone took 3.5 minutes in one
+      # of them — and needed a rerun. The job's own 45-minute limit, the three
+      # apt attempts and the HTTP timeouts still bound a dead mirror, and the
+      # budget grows for this one step only.
       # This step used to install postgresql-client too. Nothing in this job
       # needs it: the compose bootstrap applies drizzle/ + client/migrations
       # over the `postgres` driver since #2227.
       - name: Install ffmpeg
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           # The guard below does NOT short-circuit in practice. Measured on
           # ubuntu-latest 2026-10-01: the image ships neither tool, so apt
           # runs on every build, and `ffmpeg` alone is 62.8 MB across 87
-          # packages. The 5-minute budget is therefore spent almost entirely
-          # downloading ffmpeg — which is why a slow mirror fails here and
-          # why removing psql does not make this step fast.
+          # packages. The budget is therefore almost entirely one download,
+          # which is why a slow mirror fails here and why removing psql does
+          # not make this step fast.
           if command -v ffmpeg >/dev/null; then
             ffmpeg -version | head -1
             exit 0
