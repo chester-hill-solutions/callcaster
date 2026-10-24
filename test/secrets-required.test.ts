@@ -36,6 +36,21 @@ describe("secrets:required", () => {
     expect(JSON.parse(run("--environment", "qa", "--service", "sim").stdout).provider).toBe("railway");
   });
 
+  it("reports SIM credential names without values in supported environments", () => {
+    for (const environment of ["local", "dev", "qa"] as const) {
+      const plan = planRequiredSecrets({ environment, service: "sim" });
+      expect(plan).toEqual({
+        environment,
+        service: "sim",
+        provider: environment === "local" ? "dotenv" : "railway",
+        required: ["SIM_PERSON_A_PASSWORD", "SIM_PERSON_B_PASSWORD", "SIM_PERSON_C_PASSWORD"],
+        optional: [],
+        requiredAlternatives: [],
+      });
+    }
+    expect(planRequiredSecrets({ environment: "production", service: "sim" }).required).toEqual([]);
+  });
+
   it("proves local dotenv and password-manager plans are identical", () => {
     for (const service of ["app", "worker", "media-stream", "sim"] as const) {
       const dotenv = planRequiredSecrets({ environment: "local", service, provider: "dotenv" });

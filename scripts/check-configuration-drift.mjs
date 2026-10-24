@@ -66,8 +66,8 @@ export function buildDriftReport({ catalog, records, staleInventory = false, cat
   for (const record of mainRecords) {
     if (record.key && !entryMap.has(record.key)) findings.push(finding("unknown-key", record));
   }
-  for (const key of entryMap.keys()) {
-    if (!mainKeys.has(key)) findings.push({ type: "catalog-key-not-observed", key });
+  for (const [key, entry] of entryMap) {
+    if (!mainKeys.has(key) && !entry.declarationOnly) findings.push({ type: "catalog-key-not-observed", key });
   }
 
   for (const record of records.filter((candidate) => candidate.sourceKind === "dynamic-runtime-read")) {

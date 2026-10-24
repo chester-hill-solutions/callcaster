@@ -750,7 +750,11 @@ export function validateCatalog(catalog, records = null) {
       .filter((record) => !["cli-flag", "make-variable", "test-input", "dynamic-test-read"].includes(record.sourceKind) && record.key)
       .map((record) => record.key));
     for (const key of mainKeys) if (!entryKeys.has(key)) throw new Error(`Configuration catalog is missing key: ${key}`);
-    for (const key of entryKeys) if (!mainKeys.has(key)) throw new Error(`Configuration catalog contains unknown key: ${key}`);
+    for (const entry of catalog.entries) {
+      if (!mainKeys.has(entry.key) && !entry.declarationOnly) {
+        throw new Error(`Configuration catalog contains unknown key: ${entry.key}`);
+      }
+    }
     const dynamicIds = new Set(records
       .filter((record) => record.sourceKind === "dynamic-runtime-read")
       .map((record) => `${record.sourceFile}:${record.line}:${record.expression ?? ""}`));
@@ -777,7 +781,19 @@ export async function writeInventory(root, records, outputRoot = path.join(root,
   // Small synthetic inputs are used by unit tests. Full repository scans include
   // the Railway environment file and receive the complete catalog check.
   if (records.some((record) => record.sourceFile === ".railway/environments/dev.ts")) validateCatalog(catalog, records);
-  records = records.map((record) => catalogRecord(record, catalog));
+  const observedKeys = new Set(records.map((record) => record.key).filter(Boolean));
+  const declarations = catalog.entries
+    .filter((catalogEntry) => catalogEntry.declarationOnly && !observedKeys.has(catalogEntry.key))
+    .map((catalogEntry) => entry({
+      key: catalogEntry.key,
+      sourceKind: "config-declaration",
+      sourceFile: "config/secret-names.ts",
+      line: 1,
+      consumer: "sim",
+      usage: "declaration",
+      service: "sim",
+    }));
+  records = [...records, ...declarations].map((record) => catalogRecord(record, catalog));
   const outputDir = outputRoot.endsWith("docs/generated") ? outputRoot : path.join(outputRoot, "docs/generated");
   await mkdir(outputDir, { recursive: true });
   const operational = records.filter((record) => record.sourceKind === "cli-flag" || record.sourceKind === "make-variable").map(redactRecord);

@@ -44,6 +44,7 @@ const applicationOptional = [
 const productionApplicationOptional = ["OPENAI_API_KEY"] as const;
 const workerOptional = ["STRIPE_WEBHOOK_SECRET"] as const;
 const mediaStreamOptional = ["COHERE_API_KEY", "ELEVENLABS_API_KEY"] as const;
+const simRequired = ["SIM_PERSON_A_PASSWORD", "SIM_PERSON_B_PASSWORD", "SIM_PERSON_C_PASSWORD"] as const;
 
 function asSecretNameGroups(groups: readonly (readonly string[])[]): readonly (readonly SecretName[])[] {
   return Object.freeze(groups.map((group) => Object.freeze(asSecretNames(group))));
@@ -86,19 +87,19 @@ const environmentPolicies: Readonly<Record<EnvironmentName, Readonly<Record<Secr
       app: applicationPolicy("local"),
       worker: workerPolicy(),
       "media-stream": makePolicy([], mediaStreamOptional),
-      sim: emptyPolicy,
+      sim: makePolicy(simRequired, []),
     }),
     dev: Object.freeze({
       app: applicationPolicy("dev"),
       worker: workerPolicy(),
       "media-stream": makePolicy([], mediaStreamOptional),
-      sim: emptyPolicy,
+      sim: makePolicy(simRequired, []),
     }),
     qa: Object.freeze({
       app: applicationPolicy("qa"),
       worker: workerPolicy(),
       "media-stream": makePolicy([], mediaStreamOptional),
-      sim: emptyPolicy,
+      sim: makePolicy(simRequired, []),
     }),
     production: Object.freeze({
       app: applicationPolicy("production"),

@@ -92,9 +92,29 @@ describe("typed secret catalog", () => {
       optional: [],
       requiredAlternatives: [],
     });
+    for (const environment of ["local", "dev", "qa"] as const) {
+      expect(resolveSecretPlan(environment, "sim").required).toEqual([
+        "SIM_PERSON_A_PASSWORD",
+        "SIM_PERSON_B_PASSWORD",
+        "SIM_PERSON_C_PASSWORD",
+      ]);
+      expect(resolveSecretPlan(environment, "sim").allowed).toEqual([
+        "SIM_PERSON_A_PASSWORD",
+        "SIM_PERSON_B_PASSWORD",
+        "SIM_PERSON_C_PASSWORD",
+      ]);
+    }
+    for (const environment of ["local", "dev", "qa", "production"] as const) {
+      for (const service of ["app", "worker", "media-stream"] as const) {
+        const plan = resolveSecretPlan(environment, service);
+        expect(plan.allowed).not.toEqual(expect.arrayContaining(["SIM_PERSON_A_PASSWORD", "SIM_PERSON_B_PASSWORD", "SIM_PERSON_C_PASSWORD"]));
+        expect(plan.required).not.toEqual(expect.arrayContaining(["SIM_PERSON_A_PASSWORD", "SIM_PERSON_B_PASSWORD", "SIM_PERSON_C_PASSWORD"]));
+      }
+    }
     expect(secretCatalog.OPENAI_API_KEY.services).toEqual(["app"]);
     expect(secretCatalog.MEDIA_STREAM_SECRET.services).toEqual(["app"]);
     expect(secretCatalog.TWILIO_EVENTS_SINK_SECRET.services).toEqual(["app"]);
+    expect(secretCatalog.SIM_PERSON_A_PASSWORD.services).toEqual(["sim"]);
   });
 
   it("resolves environment-specific application required and optional plans", () => {
@@ -159,6 +179,12 @@ describe("typed secret catalog", () => {
     ]);
     expect(JSON.stringify(secretCatalog)).not.toContain("sk_live_value");
     expect(JSON.stringify(secretCatalog)).not.toContain("value");
+    expect(() => validateSecretRequest({ environment: "production", service: "app", names: ["SIM_PERSON_A_PASSWORD"] })).toThrow(
+      "not allowlisted for service 'app'",
+    );
+    expect(() => validateSecretRequest({ environment: "production", service: "sim", names: ["SIM_PERSON_A_PASSWORD"] })).toThrow(
+      "not allowlisted for service 'sim'",
+    );
   });
 
   it("validates configured service references through ProjectConfig", () => {

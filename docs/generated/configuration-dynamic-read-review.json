@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "759ffde5f7c873af78d11da9b381874421aae15d4ba3c41c24b77ed250a77fba",
+    "recordDigest": "6457d1741d73471f611e3930cbabb8e3e85aa864eb3f9783e812e79190cb852e",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2202,6 +2202,7 @@
       "test/safe-redirect.test.ts",
       "test/schedule-intervals.test.ts",
       "test/schedule-timezone.test.ts",
+      "test/schema-contact-timestamps.test.ts",
       "test/schema-drift-enums.test.ts",
       "test/schema-enum-values.test.ts",
       "test/schema-outreach-timestamps.test.ts",
