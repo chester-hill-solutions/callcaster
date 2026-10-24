@@ -12,7 +12,7 @@ import {
   pickRawTwilioSmsStatus,
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
-import { recheckCampaignCompletion } from "@/lib/campaign-settle-recheck.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
@@ -345,6 +345,7 @@ export async function runSmsStatusSideEffects(args: {
     workspaceId: messageData.workspace,
     campaignId: messageData.campaign_id,
     reason: `sms_status:${messageStatus}`,
+    exec: createTenantDb(messageData.workspace),
   });
 
   if (billingFailure) throw billingFailure.error;

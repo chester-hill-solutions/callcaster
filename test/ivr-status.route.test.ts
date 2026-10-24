@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
       BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "test",
     },
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
   };
 });
 
@@ -53,7 +53,10 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 }));
 vi.mock("@/twilio.server", () => ({ validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: mocks.logger,
+}));
 vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
   upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
@@ -432,7 +435,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.logger.info).toHaveBeenCalledWith(
-      "campaign.completed_on_settled_call",
+      "campaign.completed",
       expect.objectContaining({ campaignId: 1 }),
     );
   });
@@ -446,9 +449,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(mocks.logger.error).toHaveBeenCalledWith(
-      "campaign.complete_on_settled_call_failed",
-      expect.objectContaining({ campaignId: 1 }),
+    expect(mocks.logger.warn).toHaveBeenCalledWith(
+      "campaign.completion_failed",
+      { campaignId: 1, workspaceId: "w1", reason: "ivr_status:completed", error: "gate-down" },
     );
   });
 });

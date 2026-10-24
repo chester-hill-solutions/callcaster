@@ -7,7 +7,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => false),
   rpcCampaignIdsWithUnsettledMessages: vi.fn(async (): Promise<number[]> => []),
-  createTenantDb: vi.fn(() => ({ kind: "tenant-db" })),
+  createTenantDb: vi.fn(() => ({ kind: "tenant-db", execute: vi.fn(async () => []) })),
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
@@ -58,17 +58,18 @@ describe("campaign settle re-check (#2048)", () => {
     vi.clearAllMocks();
     mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
     mocks.rpcCampaignIdsWithUnsettledMessages.mockResolvedValue([]);
-    mocks.createTenantDb.mockReturnValue({ kind: "tenant-db" });
+    mocks.createTenantDb.mockReturnValue({ kind: "tenant-db", execute: vi.fn(async () => []) });
   });
 
   describe("recheckCampaignCompletion", () => {
     test("asks the gate about a campaign and reports completion", async () => {
       mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(true);
       const { recheckCampaignCompletion } = await import(
-        "@/lib/campaign-settle-recheck.server"
+        "@/lib/campaign-completion.server"
       );
 
       const completed = await recheckCampaignCompletion({
+        exec: mocks.createTenantDb(),
         workspaceId: "w1",
         campaignId: 42,
         reason: "sms_status:delivered",
@@ -85,10 +86,11 @@ describe("campaign settle re-check (#2048)", () => {
       // Inbound replies have campaign_id NULL (#2046). There is nothing to ask
       // about and no RPC call to make.
       const { recheckCampaignCompletion } = await import(
-        "@/lib/campaign-settle-recheck.server"
+        "@/lib/campaign-completion.server"
       );
 
       const completed = await recheckCampaignCompletion({
+        exec: mocks.createTenantDb(),
         workspaceId: "w1",
         campaignId: null,
         reason: "sms_status:received",
@@ -105,17 +107,21 @@ describe("campaign settle re-check (#2048)", () => {
         new Error("completion rpc unavailable"),
       );
       const { recheckCampaignCompletion } = await import(
-        "@/lib/campaign-settle-recheck.server"
+        "@/lib/campaign-completion.server"
       );
 
       await expect(
         recheckCampaignCompletion({
+          exec: mocks.createTenantDb(),
           workspaceId: "w1",
           campaignId: 42,
           reason: "sms_status:delivered",
         }),
       ).resolves.toBe(false);
-      expect(mocks.logger.warn).toHaveBeenCalled();
+      expect(mocks.logger.warn).toHaveBeenCalledWith(
+        "campaign.completion_failed",
+        { campaignId: 42, workspaceId: "w1", reason: "sms_status:delivered", error: "completion rpc unavailable" },
+      );
     });
   });
 
@@ -167,6 +173,24 @@ describe("campaign settle re-check (#2048)", () => {
         9,
       );
       expect(completed).toBe(1);
+    });
+
+    test("a failed campaign check does not stop the recovery sweep", async () => {
+      mocks.rpcCampaignIdsWithUnsettledMessages.mockResolvedValue([7, 9]);
+      mocks.rpcTryCompleteCampaignIfDrained
+        .mockRejectedValueOnce(new Error("gate-down"))
+        .mockResolvedValueOnce(true);
+      const { recheckCampaignsWithUnsettledMessages } = await import(
+        "@/lib/campaign-settle-recheck.server"
+      );
+
+      await expect(recheckCampaignsWithUnsettledMessages({
+        workspaceId: "w1", reason: "twilio_open_sync",
+      })).resolves.toBe(1);
+      expect(mocks.rpcTryCompleteCampaignIfDrained).toHaveBeenNthCalledWith(2, expect.anything(), 9);
+      expect(mocks.logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
+        campaignId: 7, workspaceId: "w1", reason: "twilio_open_sync", error: "gate-down",
+      });
     });
 
     test("does no RPC work when nothing is unsettled", async () => {

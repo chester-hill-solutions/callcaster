@@ -25,7 +25,7 @@ import {
   findCampaignInWorkspace,
   updateCampaignStatusInWorkspace,
 } from "@/lib/campaign-ivr.server";
-import { rpcTryCompleteCampaignIfDrained } from "@/lib/db-rpc.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS } from "@/lib/throughput-config";
 import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
@@ -554,13 +554,12 @@ async function continueOrCompleteDispatch(
       delayMs: DISPATCH_TICK_MS,
     });
   } else {
-    const completed = await rpcTryCompleteCampaignIfDrained(
-      createTenantDb(workspaceId),
+    await recheckCampaignCompletion({
+      workspaceId,
       campaignId,
-    );
-    if (completed) {
-      logger.info("campaign_dispatch.completed", { campaignId, workspaceId });
-    }
+      reason: "campaign_dispatch",
+      exec: createTenantDb(workspaceId),
+    });
   }
 }
 

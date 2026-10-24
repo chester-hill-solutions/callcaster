@@ -9,8 +9,8 @@ import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
   rpcResetStaleCampaignQueueClaims,
-  rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import {
   claimNextQueueContact,
@@ -471,15 +471,12 @@ export async function runAutoDialerTurn(
     // entire queue displayed "Running" forever and a customer had no way to
     // tell it had finished. The RPC re-checks pending work, so an
     // out-of-window release does not complete a campaign early.
-    // Best-effort: failing to update a label must never fail a dial turn.
-    try {
-      const completed = await rpcTryCompleteCampaignIfDrained(db, campaign_id);
-      if (completed) {
-        logger.info("campaign.completed_on_drain", { campaignId: campaign_id });
-      }
-    } catch (error) {
-      logger.error("Failed to mark campaign complete after queue drain", error);
-    }
+    await recheckCampaignCompletion({
+      campaignId: campaign_id,
+      workspaceId: workspace_id,
+      exec: tdb,
+      reason: "auto_dial_drain",
+    });
 
     return {
       success: true,

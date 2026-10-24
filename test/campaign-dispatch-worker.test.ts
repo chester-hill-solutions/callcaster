@@ -85,6 +85,7 @@ import {
   campaignDispatchHandler as realCampaignDispatchHandler,
   type CampaignDispatchParams,
 } from "@/lib/worker/handlers/campaign.server";
+import { logger } from "@/lib/logger.server";
 import { kickoffCampaign, launchCampaign } from "@/lib/campaign-execution.server";
 import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
@@ -141,6 +142,17 @@ describe("campaignDispatchHandler", () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(runningMessageCampaign());
     mocks.dispatchCampaignSmsBatch.mockResolvedValue(dispatchedOutcome());
     mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
+  });
+
+  test("a completion failure does not retry an already dispatched batch (#2052)", async () => {
+    mocks.rpcTryCompleteCampaignIfDrained.mockRejectedValueOnce(new Error("gate-down"));
+
+    await expect(campaignDispatchHandler(makeJob())).resolves.toMatchObject({ ok: true });
+    expect(logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
+      campaignId: 42, workspaceId: WORKSPACE_ID, reason: "campaign_dispatch", error: "gate-down",
+    });
+    expect(mocks.dispatchCampaignSmsBatch).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
   });
 
   test("throws when no launching user is attributed", async () => {

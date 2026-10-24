@@ -7,10 +7,10 @@
  * empty queue. Kept out of campaign-queue-db.server.ts to stay under the
  * file-size guard.
  */
+import type { RpcExecutor } from "@/lib/db-rpc.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
-import { rpcTryCompleteCampaignIfDrained, type RpcExecutor } from "@/lib/db-rpc.server";
-import { logger } from "@/lib/logger.server";
 
 type DequeuedRow = { campaign_id: number | null; workspace?: string | null };
 
@@ -37,24 +37,16 @@ export async function completeCampaignsDrainedByDequeue(
   await tryCompleteDrainedCampaigns(
     rows.map((row) => row.campaign_id).filter((id): id is number => id != null),
     exec,
+    workspaceId,
   );
 }
 
 export async function tryCompleteDrainedCampaigns(
   campaignIds: Iterable<number>,
   exec: RpcExecutor,
+  workspaceId?: string | null,
 ): Promise<void> {
   for (const campaignId of new Set(campaignIds)) {
-    try {
-      const completed = await rpcTryCompleteCampaignIfDrained(exec, campaignId);
-      if (completed) {
-        logger.info("campaign.completed_on_last_dequeue", { campaignId });
-      }
-    } catch (error) {
-      logger.warn("campaign.complete_on_dequeue_failed", {
-        campaignId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    await recheckCampaignCompletion({ campaignId, workspaceId, exec, reason: "queue_dequeue" });
   }
 }

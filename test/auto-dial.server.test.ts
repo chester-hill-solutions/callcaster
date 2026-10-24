@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { logger } from "@/lib/logger.server";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
@@ -306,6 +307,9 @@ describe("auto-dial.server", () => {
 
       // Losing a status label must never take down dialing.
       await expect(runAutoDialerTurn(turnInput)).resolves.toMatchObject({ success: true });
+      expect(logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
+        campaignId: 5, workspaceId: "ws-1", reason: "auto_dial_drain", error: "db down",
+      });
     });
 
     test("requeues out-of-window contacts and stops without dialing", async () => {

@@ -309,5 +309,73 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified."
+  },
+  {
+    "issueNumber": 2503,
+    "verdict": "fix-now",
+    "summary": "Master removes the duplicated section headings on the campaign pages (the 'Setup' heading under the Setup/Content/Queue/Launch tab row, the 'Launch' section header and the 'Call/Message Campaign Results' h1), but the campaign title header and the 'Create campaign' page heading are still rendered.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignSettings.tsx",
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
+      "selected_id.route.tsx",
+      "id/campaigns/new.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaigns-new-caller-gating.test.tsx:37 \u2014 `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 \u2014 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate \u2014 the big 'Setup' heading under the Setup/Content/Queue/Launch tabs \u2014 is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
+  },
+  {
+    "issueNumber": 2686,
+    "verdict": "fix-now",
+    "summary": "The deliverable is the findings document, and it is not in master: it exists on origin/research/cms-platform-capabilities (2cca9b5a) and nowhere else. Its Decisions section contradicts a decision that was already closed.",
+    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
+    "resolution": "Implement the missing mechanism named in the root cause.",
+    "lookIn": [
+      "docs/research/cms-platform-capabilities.md"
+    ],
+    "existingTests": [],
+    "acceptanceCriteria": [],
+    "rootCause": "The research was done, but the artifact never landed, and what it says would override two decisions that are already closed. It needs correcting against those resolutions before it lands."
+  },
+  {
+    "issueNumber": 2052,
+    "verdict": "fix-now",
+    "recommendedTitle": "Give the completion RPC one best-effort owner",
+    "summary": "The dispatch worker still propagates a completion RPC error after a successful batch. The dialer now catches this error, but queue, dialer, IVR and settlement paths have separate logging and catch policies.",
+    "currentBehavior": "The source fix sends all completion requests through campaign-completion.server.ts. It logs a consistent event, returns false on failure and keeps an explicit transaction executor.",
+    "rootCause": "Completion error handling was repeated at call sites. The dispatch tail had no guard, so a label update failure could retry finished work.",
+    "resolution": "Use recheckCampaignCompletion as the one best-effort owner. Keep SQL candidate selection in the settlement sweep and deduplication in the dequeue adapter. Remove per-site catches and preserve transaction-bound completion writes.",
+    "lookIn": [
+      "app/lib/campaign-completion.server.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/campaign-settle-recheck.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts"
+    ],
+    "existingTests": [
+      "136 focused Node cases cover dispatch, dialer, dequeue, IVR, SMS settlement and recovery sweep, with common failure event fields.",
+      "52 real-Postgres cases cover completion gates and dequeue scope, including transaction rollback.",
+      "Original source fails the new dispatch case; 42 control cases pass.",
+      "Full ci:local passes at source commit 88bf3518: 5,577 Node, 34 Bun and 1,490 UI cases. Rethrowing completion failures breaks seven caller cases; losing the transaction executor breaks the real-Postgres rollback case."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Exactly one code path owns the best-effort completion call",
+      "All five call sites use it with no local try/catch",
+      "A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep",
+      "One log event name and field set from every surface",
+      "Failure path tested at each call site, not only at the owner"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification."
   }
 ]

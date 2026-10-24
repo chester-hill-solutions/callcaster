@@ -2,10 +2,10 @@ import { Call, OutreachAttempt } from "@/lib/types";
 import { fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
-import { rpcTryCompleteCampaignIfDrained } from "@/lib/db-rpc.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
+import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
-import { createTenantDb } from "@/server/tenant-db";
 import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
@@ -133,24 +133,12 @@ export const action = defineAction({
             // is the last-settle trigger — the RPC itself re-checks the queue
             // and the call table, so an early callback (e.g. a failed dial
             // while others ring) is a no-op.
-            // Best-effort: failing to mark a label must never fail the webhook.
-            try {
-              const completed = await rpcTryCompleteCampaignIfDrained(
-                createTenantDb(String(dbCall.workspace)),
-                dbCall.campaign_id,
-              );
-              if (completed) {
-                logger.info("campaign.completed_on_settled_call", {
-                  campaignId: dbCall.campaign_id,
-                  callSid,
-                });
-              }
-            } catch (error) {
-              logger.error("campaign.complete_on_settled_call_failed", {
-                campaignId: dbCall.campaign_id,
-                error: error instanceof Error ? error.message : String(error),
-              });
-            }
+            await recheckCampaignCompletion({
+              workspaceId: String(dbCall.workspace),
+              campaignId: dbCall.campaign_id,
+              reason: `ivr_status:${callStatus}`,
+              exec: createTenantDb(String(dbCall.workspace)),
+            });
         }
     } catch (error) {
         logger.error("Error processing IVR status:", error);

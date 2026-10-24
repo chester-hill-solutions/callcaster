@@ -29,8 +29,7 @@ const mocks = vi.hoisted(() => ({
   persistCallRecordingToStorage: vi.fn(),
   isBatchTranscriptionEnabled: vi.fn(),
   enqueueJob: vi.fn(),
-  recheckCampaignCompletion: vi.fn(async () => false),
-  recheckCampaignsWithUnsettledMessages: vi.fn(async () => 0),
+  rpcTryCompleteCampaignIfDrained: vi.fn(async () => false),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
@@ -118,12 +117,9 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-vi.mock("@/lib/campaign-settle-recheck.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/campaign-settle-recheck.server")>()),
-  recheckCampaignCompletion: (...args: unknown[]) =>
-    mocks.recheckCampaignCompletion(...args),
-  recheckCampaignsWithUnsettledMessages: (...args: unknown[]) =>
-    mocks.recheckCampaignsWithUnsettledMessages(...args),
+vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/db-rpc.server")>()),
+  rpcTryCompleteCampaignIfDrained: (...args: unknown[]) => mocks.rpcTryCompleteCampaignIfDrained(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -136,6 +132,7 @@ vi.mock("@/lib/call-recording-storage.server", () => ({
 describe("webhook side-effect handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA1",
       workspace: "w1",
@@ -396,9 +393,7 @@ describe("webhook side-effect handlers", () => {
       twilioParams: { SmsSid: "SM1", SmsStatus: "delivered" },
     });
 
-    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
-      { workspaceId: "w1", campaignId: 7, reason: "sms_status:delivered" },
-    );
+    expect(mocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(mocks.tenantDb, 7);
   });
 
   test("runSmsStatusSideEffects re-checks on a non-terminal status too (#2048)", async () => {
@@ -414,9 +409,7 @@ describe("webhook side-effect handlers", () => {
       twilioParams: { SmsSid: "SM1", SmsStatus: "sending" },
     });
 
-    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
-      { workspaceId: "w1", campaignId: 7, reason: "sms_status:sending" },
-    );
+    expect(mocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(mocks.tenantDb, 7);
   });
 
   test("runSmsStatusSideEffects does not re-check completion for an inbound reply (#2048)", async () => {
@@ -439,9 +432,20 @@ describe("webhook side-effect handlers", () => {
       twilioParams: { SmsSid: "SM4", SmsStatus: "received" },
     });
 
-    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
-      expect.objectContaining({ campaignId: null }),
-    );
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+  });
+
+  test("a completion error does not retry settled SMS side effects", async () => {
+    mocks.rpcTryCompleteCampaignIfDrained.mockRejectedValueOnce(new Error("gate-down"));
+    const { runSmsStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+
+    await expect(runSmsStatusSideEffects({
+      messageSid: "SM1", twilioParams: { SmsSid: "SM1", SmsStatus: "delivered" },
+    })).resolves.toEqual({ ok: true });
+    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
+    expect(mocks.logger.warn).toHaveBeenCalledWith("campaign.completion_failed", {
+      campaignId: 7, workspaceId: "w1", reason: "sms_status:delivered", error: "gate-down",
+    });
   });
 
   test("runSmsStatusSideEffects bills terminal SMS", async () => {
