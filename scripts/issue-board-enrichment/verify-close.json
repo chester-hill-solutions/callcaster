@@ -344,5 +344,34 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "The capability predates the issue: the hangup option landed in 0dc620be (PR #1992) and the terminal-target validation in 1c9d1306 (PR #1991), both before the issue was raised on 2026-10-15. The issue was closed the same day with state_reason duplicate and was then reopened on 2026-10-19. No commit or document mentions #2592 itself, so the verdict rests on the code, not on a linked change. manual: true because 'safe terminal behavior at runtime' means a real call must end cleanly, which only a person on a handset can confirm; the code stops at the TwiML."
+  },
+  {
+    "issueNumber": 2292,
+    "verdict": "verify-close",
+    "recommendedTitle": "Assess fragmented public survey responses",
+    "summary": "The read-only production assessment is complete: zero surveys, responses and answers. No stored rows are available for repair in the inspected database.",
+    "currentBehavior": "Production app and Postgres-jAO4 database identities matched. The repeatable-read, read-only snapshot at 2026-10-21T06:04:48Z returned zero in each anonymous, contact-backed and unlinked-contact population; RLS does not hide rows.",
+    "rootCause": "The confirmed tokenless identity defect occurs in retained production source from the August 21 deployment until the fixed October 8 replacement. Missing-row completions leave no stored response and cannot be reconstructed from an empty table.",
+    "resolution": "Review and land docs/assessments/2292-survey-response-history.md and its aggregate-only SQL. Do not repair or merge rows in this empty target database. A separate legacy data source needs its own scoped read and identity evidence.",
+    "lookIn": [
+      "docs/assessments/2292-survey-response-history.md",
+      "docs/assessments/2292-survey-response-history.sql"
+    ],
+    "existingTests": [
+      "The aggregate SQL executed in a server-enforced read-only production transaction with a 15-second statement limit.",
+      "All three synthetic controls passed through the same aggregation: legitimate same-contact repeats, separate anonymous visits and ambiguous partial attempts stay distinct.",
+      "Released source and retained deployment metadata establish pre-fix and fixed boundaries; exact traffic switch times remain unavailable."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Record the inspected environment, revision/deployment interval and aggregate counts.",
+      "Separate anonymous, contact-backed and unlinked-contact populations; distinguish missing evidence from zero stored rows.",
+      "Keep legitimate repeated-attempt controls and explain limits of attribution.",
+      "State a repair/no-repair recommendation without changing or exporting respondent rows."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released."
   }
 ]
