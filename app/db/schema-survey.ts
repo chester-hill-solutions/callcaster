@@ -9,9 +9,9 @@
  *
  * Import from "@/db/schema" as before; this module is re-exported there.
  */
-import { pgTable, text, integer, boolean, uuid, serial, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, uuid, serial, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { textTimestamps } from "./schema-timestamps";
+import { isoTimestamps } from "./schema-timestamps";
 
 // ─── Survey ──────────────────────────────────────
 
@@ -21,7 +21,7 @@ export const survey = pgTable("survey", {
   title: text().notNull().default("unnamed survey"),
   workspace: uuid().notNull(),
   is_active: boolean().notNull().default(false),
-  ...textTimestamps(),
+  ...isoTimestamps(),
 });
 
 export const survey_page = pgTable("survey_page", {
@@ -30,7 +30,7 @@ export const survey_page = pgTable("survey_page", {
   page_id: uuid().notNull(),
   title: text().notNull(),
   page_order: integer().notNull(),
-  ...textTimestamps(),
+  ...isoTimestamps(),
 });
 
 export const survey_question = pgTable("survey_question", {
@@ -41,7 +41,7 @@ export const survey_question = pgTable("survey_question", {
   question_type: text().notNull(),
   is_required: boolean().notNull().default(false),
   question_order: integer().notNull(),
-  ...textTimestamps(),
+  ...isoTimestamps(),
 });
 
 export const question_option = pgTable("question_option", {
@@ -50,7 +50,7 @@ export const question_option = pgTable("question_option", {
   option_value: text().notNull(),
   option_label: text().notNull(),
   option_order: integer().notNull(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
 
 export const survey_response = pgTable(
@@ -60,10 +60,10 @@ export const survey_response = pgTable(
     survey_id: serial().notNull(),
     result_id: text().notNull(),
     contact_id: serial(),
-    started_at: text().notNull().default(sql`now()`),
-    completed_at: text(),
+    started_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
+    completed_at: timestamp({ withTimezone: true, mode: "string" }),
     last_page_completed: text(),
-    ...textTimestamps(),
+    ...isoTimestamps(),
   },
   (table) => [uniqueIndex("survey_response_survey_result_unique").on(table.survey_id, table.result_id)],
 );
@@ -73,6 +73,6 @@ export const response_answer = pgTable("response_answer", {
   response_id: serial().notNull(),
   question_id: serial().notNull(),
   answer_value: text().notNull(),
-  answered_at: text().notNull().default(sql`now()`),
-  created_at: text().notNull().default(sql`now()`),
+  answered_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
 });
