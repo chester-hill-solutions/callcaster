@@ -191,11 +191,13 @@ export async function claimNextQueueContact(
       .where(eq(contactTable.id, row.contact_id))
       .limit(1);
     if (contactRow?.opt_out) {
+      // Nothing to dequeue if the row can no longer be read.
+      if (!queueRow) continue;
       await dequeueCampaignQueueById({
         queueId: row.queue_id,
         userId,
         reason: "Contact opted out",
-        workspaceId: queueRow?.workspace,
+        workspaceId: queueRow.workspace,
       });
       continue;
     }
@@ -397,14 +399,16 @@ async function dequeueCampaignQueueById(args: {
   queueId: number;
   userId: string;
   reason: string;
-  workspaceId?: string;
+  workspaceId: string;
   exec?: QueueWriteExecutor;
   deferEmit?: DeferredEmit;
 }) {
-  const conditions: SQL[] = [eq(campaignQueueTable.id, args.queueId)];
-  if (args.workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
-  }
+  // The workspace predicate belongs to the helper: `campaign_queue` is a
+  // workspace-scoped table, so a write without it can reach another tenant.
+  const conditions: SQL[] = [
+    eq(campaignQueueTable.id, args.queueId),
+    eq(campaignQueueTable.workspace, args.workspaceId),
+  ];
 
   return updateCampaignQueueAndEmit({
     conditions,
@@ -536,7 +540,7 @@ type DequeueQueueEntryByIdArgs = {
   by: { id: number };
   userId: string;
   reason: string;
-  workspaceId?: string;
+  workspaceId: string;
   household?: undefined;
   /** Run in the caller's transaction, and hold the publish until it commits. */
   exec?: QueueWriteExecutor;
@@ -600,10 +604,14 @@ function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdA
 export async function recordQueueAttemptFailure(args: {
   queueId: number;
   error: string;
-  workspaceId?: string;
+  workspaceId: string;
 }): Promise<void> {
   await updateCampaignQueueAndEmit({
-    conditions: [eq(campaignQueueTable.id, args.queueId), isNull(campaignQueueTable.dequeued_at)],
+    conditions: [
+      eq(campaignQueueTable.id, args.queueId),
+      eq(campaignQueueTable.workspace, args.workspaceId),
+      isNull(campaignQueueTable.dequeued_at),
+    ],
     set: {
       attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
       last_attempt_at: new Date(),
@@ -617,6 +625,14 @@ export async function dequeueQueueEntry(
   args: DequeueQueueEntryArgs,
 ): Promise<DequeueQueueEntryResult> {
   if (isByIdArgs(args)) {
+    // Defence in depth behind the type: a by-id dequeue without a workspace
+    // would select a row of any tenant, because the row id alone is not a
+    // tenant boundary.
+    if (!args.workspaceId) {
+      throw new Error(
+        "dequeueQueueEntry: workspaceId is required for a by-id dequeue",
+      );
+    }
     const rows = await dequeueCampaignQueueById({
       queueId: args.by.id,
       userId: args.userId,

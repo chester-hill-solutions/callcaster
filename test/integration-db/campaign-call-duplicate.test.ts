@@ -113,7 +113,12 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
       expect(result).toMatchObject({ kind: "dispatched", counts: { called: 1, dequeued: 0, failed: 0 } });
       expect(adapters.callsCreate).toHaveBeenCalledWith(expect.objectContaining({ to }));
       expect(adapters.insertCall).toHaveBeenCalledWith(workspaceId, expect.objectContaining({ outreach_attempt_id: 777 }));
-      expect(adapters.dequeue).toHaveBeenCalledWith({ by: { id: 501 }, userId: "u1", reason: "IVR dial dispatched" });
+      expect(adapters.dequeue).toHaveBeenCalledWith({
+        by: { id: 501 },
+        userId: "u1",
+        workspaceId,
+        reason: "IVR dial dispatched",
+      });
     });
   });
 
@@ -131,7 +136,12 @@ suite("campaign duplicate history against Postgres (#2093)", () => {
       const result = await dispatchCampaignIvrBatch({ workspaceId, campaignId: "42", userId: "u1" });
       expect(result).toMatchObject({ kind: "dispatched", counts: { called: 0, dequeued: 1, failed: 0 } });
       expect(adapters.callsCreate).not.toHaveBeenCalled();
-      expect(adapters.dequeue).toHaveBeenCalledWith({ by: { id: 501 }, userId: "u1", reason: "Duplicate IVR call prevented" });
+      expect(adapters.dequeue).toHaveBeenCalledWith({
+        by: { id: 501 },
+        userId: "u1",
+        workspaceId,
+        reason: "Duplicate IVR call prevented",
+      });
     });
   });
 

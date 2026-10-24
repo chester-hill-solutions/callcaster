@@ -256,6 +256,7 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     dequeueQueueEntry({
       by: { id: Number(queue_id) },
       userId: user_id,
+      workspaceId: workspace,
       reason: "SMS message sent",
     }),
   ]);

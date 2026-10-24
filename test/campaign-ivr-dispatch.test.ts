@@ -303,6 +303,7 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 501 },
       userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
       reason: "IVR dial dispatched",
     });
     expect(outcome.kind).toBe("dispatched");
@@ -330,6 +331,7 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 502 },
       userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
       reason: "Duplicate IVR call prevented",
     });
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 1, deferred: 0, exhausted: 0 });
@@ -393,6 +395,7 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 501 },
       userId: USER_ID,
+      workspaceId: WORKSPACE_ID,
       reason: "Contact opted out",
     });
     expect(outcome.counts).toEqual({ called: 0, failed: 0, dequeued: 1, deferred: 0, exhausted: 0 });
