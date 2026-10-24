@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: A password reset link with no token no longer shows a password form. The page says the link is incomplete and offers a new one ([PR #2950](https://github.com/chester-hill-solutions/callcaster/pull/2950), [#2661](https://github.com/chester-hill-solutions/callcaster/issues/2661)).
 - Fixed: Password recovery reports the real problem when a reset is refused. A password shorter than the 8-character minimum no longer reads as an expired link, and an expired link says so as soon as the page opens ([PR #2944](https://github.com/chester-hill-solutions/callcaster/pull/2944), [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075)).
 - Fixed: Configuration diagnostics reject URL credentials, query strings, and fragments before they can appear in reports or fingerprints.
 - Added: `config:show` prints a redacted resolved configuration with a deterministic fingerprint ([#2796](https://github.com/chester-hill-solutions/callcaster/issues/2796)).

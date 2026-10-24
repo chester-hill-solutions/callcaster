@@ -20,6 +20,35 @@ vi.mock("@/server/auth-instance", () => ({
   },
 }));
 
+describe("resetLinkProblem", () => {
+  // Literal copy on purpose: the constants are the source under test, so
+  // asserting against them would only prove the module equals itself.
+  test("a refused token outranks a missing one", async () => {
+    const { resetLinkProblem } = await import("../shared/auth-policy");
+    expect(resetLinkProblem(null, "INVALID_TOKEN")).toBe(
+      "This reset link is invalid or has expired. Request a new one from the sign-in page.",
+    );
+    expect(resetLinkProblem("tok", "INVALID_TOKEN")).toBe(
+      "This reset link is invalid or has expired. Request a new one from the sign-in page.",
+    );
+  });
+
+  test("a missing, empty or blank token is an incomplete link", async () => {
+    const { resetLinkProblem } = await import("../shared/auth-policy");
+    const incomplete =
+      "This reset link is incomplete. Request a new link to continue.";
+    expect(resetLinkProblem(null, null)).toBe(incomplete);
+    expect(resetLinkProblem("", null)).toBe(incomplete);
+    expect(resetLinkProblem("   ", null)).toBe(incomplete);
+  });
+
+  test("a present token whose error is not a refusal keeps the form", async () => {
+    const { resetLinkProblem } = await import("../shared/auth-policy");
+    expect(resetLinkProblem("tok", null)).toBeNull();
+    expect(resetLinkProblem("tok", "SOMETHING_ELSE")).toBeNull();
+  });
+});
+
 describe("app/routes/reset-password", () => {
   beforeEach(async () => {
     await resetRateLimitsForTests();
