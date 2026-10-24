@@ -337,6 +337,39 @@ export default function WorkspaceSettings() {
           </AccordionItem>
         </Accordion>
       ) : null}
+
+      {userRole === MemberRole.Owner ? (
+        <Section variant="flat">
+          <SectionHeader
+            branded={false}
+            compact
+            title="Archive this workspace"
+            description="Archiving releases every phone number first, then hides this workspace and its people from your account. Calls, contacts and campaigns are kept."
+          />
+          <Form method="POST" className="flex flex-col gap-3">
+            <input type="hidden" name="formName" value="deleteWorkspace" />
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="confirmArchive"
+                required
+                className="mt-1"
+              />
+              <span>
+                I understand the numbers will be released and the workspace will
+                disappear from my account.
+              </span>
+            </label>
+            <Button
+              type="submit"
+              variant="destructive"
+              className="w-full sm:w-auto"
+            >
+              Archive workspace
+            </Button>
+          </Form>
+        </Section>
+      ) : null}
     </div>
   );
 }

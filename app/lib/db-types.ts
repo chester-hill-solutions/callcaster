@@ -81,6 +81,7 @@ export type WorkspaceRole = (typeof workspace_role.enumValues)[number];
 
 /** Workspace permission strings (not yet modeled as pgEnum in Drizzle schema). */
 export const WORKSPACE_PERMISSION_VALUES = [
+  "workspace.archive",
   "workspace.delete",
   "workspace.addUser",
   "workspace.removeUser",

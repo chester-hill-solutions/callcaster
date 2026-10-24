@@ -1,6 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import type { MiddlewareFunction } from "react-router";
 import { getUserRole } from "@/lib/database/workspace.server";
+import { isWorkspaceArchived } from "@/lib/workspace-archive.server";
 import { getSession } from "@/lib/auth.server";
 import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
 import {
@@ -43,6 +44,12 @@ export const workspaceMiddleware: MiddlewareFunction = async (
   if (!userRoleRow || !VALID_ROLES.includes(userRoleRow.role)) {
     // Non-members land back on the workspace picker (RBAC-17). A redirect
     // also avoids leaking whether the workspace exists.
+    throw redirect("/workspaces", { headers });
+  }
+
+  // Archived workspaces keep their data but are hidden from the people who used
+  // them (#2732). A redirect, not a 403, so the archived state is not inferable.
+  if (await isWorkspaceArchived(workspaceId)) {
     throw redirect("/workspaces", { headers });
   }
 

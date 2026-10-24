@@ -372,12 +372,24 @@ export async function insertWorkspaceMembership(args: {
   return { ...row, role: row.role_id };
 }
 
-export async function deleteWorkspaceById(workspaceId: string) {
+/** Mark a workspace archived (#2732). The row and all of its data stay. */
+export async function archiveWorkspaceById(workspaceId: string, archivedAt: Date) {
   const rows = await adminDb
-    .delete(workspaceTable)
+    .update(workspaceTable)
+    .set({ archived_at: archivedAt })
     .where(eq(workspaceTable.id, workspaceId))
-    .returning();
-  return rows;
+    .returning({ id: workspaceTable.id });
+  return rows[0] ?? null;
+}
+
+/** Whether a workspace is archived (#2732). */
+export async function isWorkspaceArchivedById(workspaceId: string): Promise<boolean> {
+  const [row] = await adminDb
+    .select({ archived_at: workspaceTable.archived_at })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
+  return Boolean(row?.archived_at);
 }
 
 export async function listAllWorkspacesOrdered() {
