@@ -49,6 +49,13 @@ const ALL_AUDIENCES_VALUE = "all";
 const ALL_STATUSES_VALUE = "all";
 const ALL_DISPOSITIONS_VALUE = "all";
 
+function getContactSelectionLabel(item: QueueItem): string {
+    const contact = item.contact;
+    const name = [contact?.firstname?.trim(), contact?.surname?.trim()].filter(Boolean).join(" ");
+    const identity = name || contact?.phone?.trim() || contact?.email?.trim();
+    return `Select ${identity ? `${identity}, ` : ""}contact ${item.contact_id}`;
+}
+
 /**
  * The chevron is the only visible content, so the column name has to come
  * through `aria-label` — see DESIGN.md ("Icon-only buttons require aria-label").
@@ -314,7 +321,7 @@ export function QueueTable({
                                 onSelectAllFiltered(false);
                             }
                         }}
-                        aria-label="Select all"
+                        aria-label="Select all contacts shown on this page"
                         className="h-3 w-3"
                     />
                 </div>
@@ -329,7 +336,7 @@ export function QueueTable({
                                 onSelectAllFiltered(false);
                             }
                         }}
-                        aria-label="Select row"
+                        aria-label={getContactSelectionLabel(row.original)}
                         className="h-3 w-3"
                     />
                 </div>
