@@ -109,12 +109,15 @@ or if it would require interactive input in CI.
 ## Secret rules
 
 - `.env.example` lists secret names and comments only.
-- Ignored `.env.local` files hold local secret values only. The loader never
-  creates, overwrites, or changes an existing user file.
+- Existing `.env` and `.env.local` files may contain mixed configuration. The
+  dotenv provider reads them without mutation and returns only requested,
+  declared, service-allowlisted secrets; it never creates, overwrites, or
+  changes a user file.
 - The password-manager provider maps the same `SecretName` values to items or
   fields. Its mapping is config-as-code; item values are not.
-- CI obtains secrets from protected GitHub environment secrets through the same
-  `SecretProvider` contract.
+- A future CI adapter may obtain secrets from protected GitHub environment
+  secrets through the same `SecretProvider` contract; Phase 2 does not provide
+  that adapter.
 - Railway receives values through its normal protected-variable mechanism. The
   IaC model preserves only names approved by the service allowlist.
 - No command prints secret values. Errors identify a secret name and provider
@@ -154,22 +157,31 @@ production behavior has changed.
 ### Phase 2 — secret provider foundation
 
 1. Define the secret-name catalog and service allowlists.
-2. Add the local dotenv provider. It reads a selected ignored secret-only file
-   without changing it.
-3. Add `secrets:required -- --environment <name> --service <name>` to list
-   required secret *names* only.
-4. Add the password-manager provider and its non-interactive CI mode. Use the
-   same secret names as dotenv.
-5. Move one low-risk service secret through the provider with a compatibility
-   fallback, then remove the fallback after its deployment verification.
+2. Add the local dotenv provider. It reads existing `.env` and `.env.local`
+   files read-only, with shell environment values taking precedence over
+   `.env.local`, which takes precedence over `.env`. It returns only declared,
+   service-allowlisted secret names; it does not edit or create either file.
+3. Add `secrets:required -- --environment <name> --service <name>` as a
+   plan-only command that lists required secret *names* without retrieving
+   values.
+4. Add the pluggable password-manager provider core and document contracts for
+   Bitwarden, HashiCorp Vault, AWS Secrets Manager, and Doppler. Use the same
+   secret names as dotenv. Phase 2 does not ship CI support or live external
+   adapters.
 
-**Exit:** one service starts successfully through either provider, produces no
-secret output, and has the same effective secret-name contract in local and CI.
+**Exit:** the catalog, allowlists, read-only dotenv provider, plan-only command,
+and password-manager provider contracts are covered by tests. No service secret
+has moved providers in Phase 2, and no secret value is printed.
 
 ### Phase 3 — service-by-service adoption
 
-Migrate one service boundary per atomic change: app, worker, media stream, then
-scripts and browser suites. For each boundary:
+First task: adopt one low-risk service secret through the provider with a
+compatibility fallback under [#2948](https://github.com/chester-hill-solutions/callcaster/issues/2948).
+Remove the fallback only after deployment verification. This is the gate before
+broader service-by-service adoption.
+
+After that gate, migrate one service boundary per atomic change: app, worker,
+media stream, then scripts and browser suites. For each boundary:
 
 1. Move its non-secret settings to the typed service slice.
 2. Move its secrets to named provider lookups.

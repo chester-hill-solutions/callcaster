@@ -53,6 +53,18 @@ the local S3 endpoint, region, bucket, path style, and localhost defaults used b
 `dev:local`. Deployment comparisons do not read dotenv files. Production
 comparison is disabled.
 
+Plan required secrets without reading values or contacting a provider:
+
+```bash
+npm run secrets:required -- --environment local --service app
+npm run secrets:required -- --environment production --service worker --provider password-manager
+```
+
+The command prints JSON with independent `required` names, `optional` names, and
+`requiredAlternatives` (complete groups where any one group is sufficient).
+Provider choice is checked against the environment. The default is dotenv for
+local and Railway for deployed environments. GitHub is reserved for CI.
+
 ## Environment Setup
 
 ### Prerequisites
