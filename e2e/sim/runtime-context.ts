@@ -12,6 +12,26 @@ export type SimRuntimeContext = Readonly<{
   getCredential: (name?: SimCredentialName) => Promise<string>;
 }>;
 
+export async function resolveSimRuntimeProfile(options: CreateSimRuntimeContextOptions): Promise<ResolvedSimProfile> {
+  const effectiveOptions = options.environment === "local" || options.environment === undefined
+    ? {
+        ...options,
+        runtimeEnvironment: options.runtimeEnvironment ?? (await readRuntimeEnvironment()),
+      }
+    : options;
+  const { config, localIdentity } = resolveConfig(effectiveOptions);
+
+  if (config.environment === "production") {
+    throw new SimRuntimeContextError("SIM runtime context is not allowed for production");
+  }
+
+  return resolveSimProfile({
+    personaKey: options.personaKey,
+    config,
+    ...(localIdentity === undefined ? {} : { localIdentity }),
+  });
+}
+
 export type SimSecretProviderFactory = (input: Readonly<{
   config: ProjectConfig;
   environment: EnvironmentName;
@@ -61,23 +81,11 @@ function resolveConfig(options: CreateSimRuntimeContextOptions): { config: Proje
  * production refusal check.
  */
 export async function createSimRuntimeContext(options: CreateSimRuntimeContextOptions): Promise<SimRuntimeContext> {
+  const profile = await resolveSimRuntimeProfile(options);
   const effectiveOptions = options.environment === "local" || options.environment === undefined
-    ? {
-        ...options,
-        runtimeEnvironment: options.runtimeEnvironment ?? (await readRuntimeEnvironment()),
-      }
+    ? { ...options, runtimeEnvironment: options.runtimeEnvironment ?? (await readRuntimeEnvironment()) }
     : options;
-  const { config, localIdentity } = resolveConfig(effectiveOptions);
-
-  if (config.environment === "production") {
-    throw new SimRuntimeContextError("SIM runtime context is not allowed for production");
-  }
-
-  const profile = resolveSimProfile({
-    personaKey: options.personaKey,
-    config,
-    ...(localIdentity === undefined ? {} : { localIdentity }),
-  });
+  const { config } = resolveConfig(effectiveOptions);
   const providerName = profile.selectedProviderName;
   const factory = options.secretProviderFactory ?? defaultSecretProviderFactory(options);
   const provider = factory({ config, environment: profile.environment, providerName });

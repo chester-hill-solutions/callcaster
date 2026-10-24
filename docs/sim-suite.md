@@ -4,6 +4,20 @@ The `sim` suite is separate from normal Playwright E2E. It is for explicit,
 paid provider checks against a selected environment. `npm run test:e2e` and
 local CI do not include it.
 
+Read-only profile checks are available before any browser or task flow:
+
+```bash
+npm run sim:profile:list
+npm run sim:profile:status -- --persona person-a
+npm run sim:profile:check-access -- --persona person-a --capability simulation.manage
+```
+
+These commands use only catalog personas and shared configuration, and query
+the exact derived user email, marked workspace name, and canonical membership.
+They never reconcile, repair, audit, create resources, or read credentials.
+Catalog capabilities are a SIM allowlist. The canonical workspace role matrix
+is the real authorization floor: owner-only capabilities deny members.
+
 ## Sai-local SMS flow
 
 `npm run test:sim` currently runs the `sai-local` SMS proof only when these
