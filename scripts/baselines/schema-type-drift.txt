@@ -1,7 +1,3 @@
-agent_status.last_heartbeat_at: text -> timestamp with time zone
-agent_status.status_started_at: text -> timestamp with time zone
-agent_status.updated_at: text -> timestamp with time zone
-agent_status_event.created_at: text -> timestamp with time zone
 audience.created_at: text -> timestamp with time zone
 audience.processed_at: text -> timestamp with time zone
 audience_upload.created_at: text -> timestamp with time zone
