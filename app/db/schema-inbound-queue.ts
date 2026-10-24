@@ -13,17 +13,17 @@ export const queue_entry_state = pgEnum("queue_entry_state", ["queued","offered"
 // ─── Inbound Queue ──────────────────────────────────────
 
 export const inbound_queue = pgTable("inbound_queue", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   description: text(),
   hold_audio: text(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   name: text().notNull(),
-  updated_at: text().notNull().default(sql`now()`),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   workspace_id: uuid().notNull(),
 });
 
 export const inbound_queue_member = pgTable("inbound_queue_member", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   queue_id: bigint({ mode: "number" }).notNull(),
   user_id: uuid().notNull(),
@@ -31,19 +31,19 @@ export const inbound_queue_member = pgTable("inbound_queue_member", {
 });
 
 export const inbound_queue_entry = pgTable("inbound_queue_entry", {
-  abandoned_at: text(),
-  accepted_at: text(),
+  abandoned_at: timestamp({ withTimezone: true, mode: "date" }),
+  accepted_at: timestamp({ withTimezone: true, mode: "date" }),
   call_sid: text(),
   caller_number: text(),
-  completed_at: text(),
-  created_at: text().notNull().default(sql`now()`),
+  completed_at: timestamp({ withTimezone: true, mode: "date" }),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  offered_at: text(),
+  offered_at: timestamp({ withTimezone: true, mode: "date" }),
   offered_to_user_id: text(),
   queue_id: bigint({ mode: "number" }).notNull(),
   status: queue_entry_state().notNull().default("queued"),
   twilio_queue_sid: text(),
-  updated_at: text().notNull().default(sql`now()`),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   workspace_id: uuid().notNull(),
 }, (table) => [
   uniqueIndex("inbound_queue_entry_queue_call_sid_active_uidx")

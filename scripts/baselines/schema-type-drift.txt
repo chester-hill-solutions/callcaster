@@ -16,15 +16,6 @@ handset_session.expires_at: text -> timestamp with time zone
 households.created_at: text -> timestamp with time zone
 households.last_contacted_at: text -> timestamp with time zone
 households.updated_at: text -> timestamp with time zone
-inbound_queue.created_at: text -> timestamp with time zone
-inbound_queue.updated_at: text -> timestamp with time zone
-inbound_queue_entry.abandoned_at: text -> timestamp with time zone
-inbound_queue_entry.accepted_at: text -> timestamp with time zone
-inbound_queue_entry.completed_at: text -> timestamp with time zone
-inbound_queue_entry.created_at: text -> timestamp with time zone
-inbound_queue_entry.offered_at: text -> timestamp with time zone
-inbound_queue_entry.updated_at: text -> timestamp with time zone
-inbound_queue_member.created_at: text -> timestamp with time zone
 outreach_attempt.answered_at: text -> timestamp with time zone
 outreach_attempt.created_at: text -> timestamp with time zone
 outreach_attempt.ended_at: text -> timestamp with time zone

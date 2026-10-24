@@ -59,7 +59,7 @@ export async function createInboundQueue(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const now = new Date().toISOString();
+  const now = new Date();
   const [queue] = await tdb.inbound_queue.insert({
     name: args.name,
     description: args.description ?? null,
@@ -81,7 +81,7 @@ export async function updateInboundQueue(args: {
   tdb?: TenantDb;
 }) {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const set: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const set: Record<string, unknown> = { updated_at: new Date() };
   if (args.updates.name !== undefined) set.name = args.updates.name;
   if (args.updates.description !== undefined) set.description = args.updates.description;
   if (args.updates.hold_audio !== undefined) set.hold_audio = args.updates.hold_audio;
@@ -130,7 +130,7 @@ export async function addInboundQueueMember(args: {
   if (users.length === 0) {
     handleValidationError("User does not exist.");
   }
-  const now = new Date().toISOString();
+  const now = new Date();
   await tdb.inbound_queue_member.insert({
     queue_id: args.queueId,
     user_id: args.userId,
