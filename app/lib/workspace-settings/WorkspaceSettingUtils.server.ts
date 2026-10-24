@@ -3,6 +3,7 @@ import { AuthzError } from "@chester-hill-solutions/auth";
 import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { isMemberRole } from "@/lib/member-role";
+import { archiveWorkspace } from "@/lib/workspace-archive.server";
 import { logger } from "@/lib/logger.server";
 import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
 import {
@@ -12,7 +13,6 @@ import {
   updateWorkspaceMemberRole,
 } from "@/lib/platform-members.server";
 import {
-  deleteWorkspaceById,
   transferWorkspaceOwnership,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
@@ -156,6 +156,11 @@ export async function handleTransferWorkspace(
   }
 }
 
+/**
+ * "Delete workspace" is an archive (#2732): the row and its data stay, the
+ * numbers are released at the provider first so the owner stops paying rent, and
+ * the workspace disappears from every user-facing surface.
+ */
 export async function handleDeleteWorkspace({
   workspaceId,
 }: {
@@ -163,10 +168,13 @@ export async function handleDeleteWorkspace({
   headers: Headers;
 }) {
   try {
-    await deleteWorkspaceById(workspaceId);
+    const result = await archiveWorkspace(workspaceId);
+    if (!result.ok) {
+      return { data: null, error: result.error };
+    }
     return redirect("/workspaces");
   } catch (deleteWorkspaceError) {
-    logger.error("Error deleting workspace: ", deleteWorkspaceError);
+    logger.error("Error archiving workspace: ", deleteWorkspaceError);
     return {
       data: null,
       error: deleteWorkspaceError instanceof Error ? deleteWorkspaceError.message : deleteWorkspaceError,

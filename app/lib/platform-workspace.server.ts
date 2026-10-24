@@ -149,7 +149,7 @@ export async function deleteWorkspaceApi(
     workspaceId,
     actorType: "session",
     actorId: userId,
-    action: "workspace.delete",
+    action: "workspace.archive",
     targetType: "workspace",
     targetId: workspaceId,
     outcome: "success",

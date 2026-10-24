@@ -34,7 +34,6 @@ const membersDbMocks = vi.hoisted(() => ({
   updateWorkspaceMemberRole: vi.fn(async () => ({ ok: true, member: { id: "u1" } } as any)),
   removeWorkspaceMember: vi.fn(async () => ({ ok: true, member: { id: "u1" } } as any)),
   transferWorkspaceOwnership: vi.fn(async () => ({ previousOwner: { id: "owner" } } as any)),
-  deleteWorkspaceById: vi.fn(async () => ({ id: "w1" } as any)),
   removeWorkspaceInviteForUser: vi.fn(async () => [{ ok: 1 }] as any),
   upsertWorkspaceWebhookRow: vi.fn(async () => ({ id: 1 }) as any),
   getWorkspaceWebhookRow: vi.fn(async () => null as any),
@@ -50,10 +49,18 @@ vi.mock("@/lib/platform-members.server", () => ({
   inviteWorkspaceMemberAsPlatformAdmin: (...args: unknown[]) =>
     membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin(...args),
 }));
+const archiveMocks = vi.hoisted(() => ({
+  archiveWorkspace: vi.fn(async () => ({ ok: true, archivedAt: new Date(), releasedNumbers: 0 })),
+}));
+
 const inviteMocks = vi.hoisted(() => ({
   cancelWorkspaceInvitationById: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/lib/workspace-archive.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-archive.server")>()),
+  archiveWorkspace: (...args: unknown[]) => archiveMocks.archiveWorkspace(...args),
+}));
 vi.mock("@/lib/workspace-invitations.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/workspace-invitations.server")>()),
   cancelWorkspaceInvitationById: (...args: unknown[]) =>
@@ -63,7 +70,6 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
   findUserIdByUsername: (...args: unknown[]) => membersDbMocks.findUserIdByUsername(...args),
   findWorkspaceInviteForUser: (...args: unknown[]) => membersDbMocks.findWorkspaceInviteForUser(...args),
   transferWorkspaceOwnership: (...args: unknown[]) => membersDbMocks.transferWorkspaceOwnership(...args),
-  deleteWorkspaceById: (...args: unknown[]) => membersDbMocks.deleteWorkspaceById(...args),
   removeWorkspaceInviteForUser: (...args: unknown[]) => membersDbMocks.removeWorkspaceInviteForUser(...args),
   upsertWorkspaceWebhookRow: (...args: unknown[]) => membersDbMocks.upsertWorkspaceWebhookRow(...args),
   getWorkspaceWebhookRow: (...args: unknown[]) => membersDbMocks.getWorkspaceWebhookRow(...args),
@@ -84,7 +90,6 @@ function resetMembersDbMocks() {
   membersDbMocks.updateWorkspaceMemberRole.mockReset();
   membersDbMocks.removeWorkspaceMember.mockReset();
   membersDbMocks.transferWorkspaceOwnership.mockReset();
-  membersDbMocks.deleteWorkspaceById.mockReset();
   membersDbMocks.removeWorkspaceInviteForUser.mockReset();
   membersDbMocks.upsertWorkspaceWebhookRow.mockReset();
   membersDbMocks.getWorkspaceWebhookRow.mockReset();
@@ -98,7 +103,6 @@ function resetMembersDbMocks() {
   membersDbMocks.updateWorkspaceMemberRole.mockResolvedValue({ ok: true, member: { id: "u1" } });
   membersDbMocks.removeWorkspaceMember.mockResolvedValue({ ok: true, member: { id: "u1" } });
   membersDbMocks.transferWorkspaceOwnership.mockResolvedValue({ previousOwner: { id: "owner" } });
-  membersDbMocks.deleteWorkspaceById.mockResolvedValue({ id: "w1" });
   membersDbMocks.removeWorkspaceInviteForUser.mockResolvedValue([{ ok: 1 }]);
   membersDbMocks.upsertWorkspaceWebhookRow.mockResolvedValue({ id: 1 });
   membersDbMocks.getWorkspaceWebhookRow.mockResolvedValue(null);
@@ -273,15 +277,31 @@ describe("WorkspaceSettingUtils", () => {
     expect(await res3.json()).toEqual({ data: { id: "owner" }, error: null });
   });
 
-  test("handleDeleteWorkspace returns error object on failure and redirects on success", async () => {
+  test("handleDeleteWorkspace archives, refuses a failed archive, and redirects on success", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
-    membersDbMocks.deleteWorkspaceById.mockRejectedValueOnce(new Error("del ws"));
+    archiveMocks.archiveWorkspace.mockRejectedValueOnce(new Error("del ws"));
     const err = await mod.handleDeleteWorkspace({ workspaceId: "w1", headers });
     expect(err).toEqual({ data: null, error: "del ws" });
 
-    membersDbMocks.deleteWorkspaceById.mockResolvedValueOnce([{ id: "w1" }]);
+    // A number that could not be released stops the archive and is reported.
+    archiveMocks.archiveWorkspace.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      error: "Could not release +15550000012. The workspace was not archived — try again.",
+    });
+    const refused = await mod.handleDeleteWorkspace({ workspaceId: "w1", headers });
+    expect(refused).toEqual({
+      data: null,
+      error: "Could not release +15550000012. The workspace was not archived — try again.",
+    });
+
+    archiveMocks.archiveWorkspace.mockResolvedValueOnce({
+      ok: true,
+      archivedAt: new Date(),
+      releasedNumbers: 1,
+    });
     const res = await asRouteResponse(mod.handleDeleteWorkspace({ workspaceId: "w1", headers }));
     expect(res.status).toBe(302);
   });

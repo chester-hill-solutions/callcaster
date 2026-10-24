@@ -96,8 +96,8 @@ export const voter_list_source = pgEnum("voter_list_source", ["liberalist","van"
 export const workspace_role = pgEnum("workspace_users_role", ["owner","member","caller","admin"]);
 
 // ─── Workspace ──────────────────────────────────────
-
 export const workspace = pgTable("workspace", {
+  archived_at: timestamp({ withTimezone: true, mode: "date" }),
   created_at: text().notNull().default(sql`now()`),
   credits: integer().notNull(),
   disabled: boolean().notNull().default(false),

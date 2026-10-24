@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Changed: Deleting a workspace now archives it. Its phone numbers are released at the provider first, so the owner stops paying rent for them, and then the workspace and its people disappear from the account; calls, contacts and campaigns are kept. A release that fails stops the archive and names the number, so nothing is stranded ([#2732](https://github.com/chester-hill-solutions/callcaster/issues/2732)).
 - Fixed: The Twilio resource audit includes all account pages and subaccount Messaging Services, and stops when a resource list cannot be read ([PR #2758](https://github.com/chester-hill-solutions/callcaster/pull/2758), [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757)).
 - Fixed: Campaign completion checks share one failure handler so a temporary database error does not retry finished dispatch work ([PR #2759](https://github.com/chester-hill-solutions/callcaster/pull/2759), [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052)).
 - Added: Callers can write notes in both dialing modes; notes save with the call result and stay with the selected contact, and desktop call panels have equal heights ([PR #2755](https://github.com/chester-hill-solutions/callcaster/pull/2755), [#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531)).
