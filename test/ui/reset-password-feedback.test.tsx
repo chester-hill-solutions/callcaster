@@ -89,6 +89,33 @@ describe("reset password feedback", () => {
     ).toHaveAttribute("href", "/remember");
   });
 
+  // #2661: opened without a token at all, the page must not ask for a password.
+  test("an incomplete link says so up front and offers a new one", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/reset-password",
+          Component: ResetPassword,
+          action: vi.fn(),
+          loader: () => ({ token: null, error: null }),
+        },
+        { path: "/remember", Component: () => <h1>Remember</h1> },
+      ],
+      { initialEntries: ["/reset-password"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(
+      await screen.findByText(
+        "This reset link is incomplete. Request a new link to continue.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("New Password")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Request a new link" }),
+    ).toHaveAttribute("href", "/remember");
+  });
+
   test("the form states the password rule it enforces", async () => {
     showReset(() => ({ success: null, error: null }));
 

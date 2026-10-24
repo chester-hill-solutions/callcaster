@@ -10,19 +10,19 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import {
-  INVALID_RESET_LINK_MESSAGE,
   MIN_PASSWORD_LENGTH,
   PASSWORD_MIN_LENGTH_MESSAGE,
+  resetLinkProblem,
 } from "../../shared/auth-policy";
 import type { ResetPasswordLoaderData } from "./reset-password.loader.server";
 
 export default function ResetPassword() {
   const actionData = useActionData();
-  const { error } = useLoaderData<ResetPasswordLoaderData>();
+  const { token, error } = useLoaderData<ResetPasswordLoaderData>();
   const navigate = useNavigate();
-  // Only the token failure code means the link is unusable. Any other value is
-  // not a reason to hide the form.
-  const linkIsUnusable = error === "INVALID_TOKEN";
+  // A refused token and a missing token read differently to a user; both hide
+  // the form, and any other error value does not (#2661).
+  const resetLinkMessage = resetLinkProblem(token, error);
 
   useActionFeedback(actionData, {
     getError: (data) => data?.error?.message,
@@ -38,12 +38,13 @@ export default function ResetPassword() {
         title="Choose New Password"
         description="Set a new password for your account to complete recovery."
       >
-        {linkIsUnusable ? (
+        {resetLinkMessage ? (
           // Say the link cannot be used on arrival, instead of rendering a form
-          // that can only fail on submit (#2075).
+          // that can only fail on submit (#2075, #2661). The title still says
+          // "Choose New Password" above, so the state is stated, not implied.
           <div className="flex w-full flex-col gap-4">
             <Alert variant="destructive">
-              <AlertDescription>{INVALID_RESET_LINK_MESSAGE}</AlertDescription>
+              <AlertDescription>{resetLinkMessage}</AlertDescription>
             </Alert>
             <Button asChild className="min-h-[48px] w-full">
               <Link to="/remember">Request a new link</Link>
