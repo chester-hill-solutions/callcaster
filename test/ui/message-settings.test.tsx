@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -199,14 +199,15 @@ describe("app/components/MessageSettings.tsx", () => {
     const tagBtn = container.querySelector(
       'button[title="Insert template tags"]',
     ) as HTMLButtonElement;
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    act(() => {
+      textarea.focus();
+      textarea.setSelectionRange(0, 0);
+    });
     fireEvent.click(tagBtn);
     expect(screen.getByText("Template Tags")).toBeInTheDocument();
     const dropdown = screen.getByText("Template Tags").closest("div")
       ?.parentElement as HTMLElement;
-
-    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
-    textarea.focus();
-    textarea.setSelectionRange(0, 0);
 
     // Insert a template tag
     fireEvent.click(within(dropdown).getByText("{{firstname}}"));
@@ -215,7 +216,9 @@ describe("app/components/MessageSettings.tsx", () => {
     // dropdown closes
     expect(screen.queryByText("Template Tags")).toBeNull();
 
-    await vi.runAllTimersAsync(); // selection focus timeout
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
 
     // reopen and insert a function example
     fireEvent.click(tagBtn);
@@ -233,7 +236,9 @@ describe("app/components/MessageSettings.tsx", () => {
     );
     expect(screen.queryByText("Template Tags")).toBeNull();
 
-    await vi.runAllTimersAsync();
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
   });
 
   test("template preview renders the body for a sample contact and hides when there are no tags", async () => {
