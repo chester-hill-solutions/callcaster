@@ -1,4 +1,4 @@
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import {
   Select,
   SelectContent,
@@ -29,6 +29,7 @@ export function CampaignSmsSendMode({
   return (
     <FormField
       label="Send using"
+      htmlFor="sms_send_mode"
       description={
         smsSendContext && !smsSendContext.messagingServiceReady
           ? "Messaging Service needs a configured SID and at least one sender. Finish onboarding or choose Phone number."
@@ -53,9 +54,11 @@ export function CampaignSmsSendMode({
         }}
         disabled={isBusy}
       >
-        <SelectTrigger id="sms_send_mode" className="max-w-md">
-          <SelectValue placeholder="Delivery mode" />
-        </SelectTrigger>
+        <FormFieldControl>
+          <SelectTrigger id="sms_send_mode" className="max-w-md">
+            <SelectValue placeholder="Delivery mode" />
+          </SelectTrigger>
+        </FormFieldControl>
         <SelectContent>
           <SelectItem
             value="messaging_service"
