@@ -13,13 +13,14 @@
  * definitions. Each call builds fresh columns — which also means a caller can
  * spread the pair and then override one half.
  *
- * Three variants, because the schema really does have three:
+ * Two variants, because the schema really does have two:
  *
- *   `textTimestamps()`       a `text()` column. Still #2213 drift — every real
- *                            database has `timestamp with time zone` — and kept
- *                            as its own factory so #2213's slicing has one place
- *                            per variant to change rather than every table.
- *   `isoTimestamps()`        `timestamp with time zone` as a string.
+ *   `isoTimestamps()`        `timestamp with time zone` as a string. This
+ *                            replaced `textTimestamps()`, the last variant that
+ *                            declared a `text()` column for a database column
+ *                            that is `timestamp with time zone` (#2213). Its
+ *                            callers already wrote ISO strings, so the mode kept
+ *                            every one of them working unchanged.
  *   `timestampTimestamps()`  `timestamp with time zone` as a Date, no timezone.
  *
  * A fourth pair uses `timestamp({ withTimezone: true, mode: "date" })` on a
@@ -27,23 +28,6 @@
  */
 import { sql } from "drizzle-orm";
 import { text, timestamp } from "drizzle-orm/pg-core";
-
-/**
- * `created_at` / `updated_at` as `text()` with a `now()` default.
- *
- * The database supplies `now()` for both, so the model declares it and an insert
- * may omit them (`test/integration-db/schema-default-drift.test.ts`).
- *
- * The type is still `text()`, which no real database agrees with. That is #2213's
- * work, not this file's — see
- * `scripts/baselines/schema-type-drift.txt` for the columns involved.
- */
-export function textTimestamps() {
-  return {
-    created_at: text().notNull().default(sql`now()`),
-    updated_at: text().notNull().default(sql`now()`),
-  };
-}
 
 /** `created_at` / `updated_at` as `timestamp with time zone`, mode `string`. */
 export function isoTimestamps() {

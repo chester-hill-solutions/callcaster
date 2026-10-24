@@ -22,7 +22,7 @@ export { workspace_number_release } from "./schema-number-release";
 export { predictive_machine_operation } from "./schema-predictive-machine";
 export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
-import { isoTimestamps, textTimestamps, timestampTimestamps } from "./schema-timestamps";
+import { isoTimestamps, timestampTimestamps } from "./schema-timestamps";
 // Type-only import; the cycle with db-types (which type-imports this module)
 // is erased at compile time and carries no runtime modules.
 import type { Json } from "@/lib/db-types";
@@ -391,8 +391,8 @@ export const households = pgTable("households", {
   province: text(),
   postal: text(),
   do_not_knock: boolean().notNull().default(false),
-  last_contacted_at: text(),
-  ...textTimestamps(),
+  last_contacted_at: timestamp({ withTimezone: true, mode: "string" }),
+  ...isoTimestamps(),
 });
 
 // ─── Telephony ──────────────────────────────────────
