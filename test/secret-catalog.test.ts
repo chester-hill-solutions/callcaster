@@ -191,6 +191,9 @@ describe("typed secret catalog", () => {
     expect(() =>
       parseProjectConfig({
         environment: "production",
+        emailDomain: "callcaster.ca",
+        urls: { publicApp: "https://app.example.test" },
+        storage: { endpoint: "https://storage.example.test", host: "storage.example.test" },
         services: { worker: { secrets: [{ name: "OPENAI_API_KEY" }] } },
       }),
     ).toThrow(/not allowlisted for service 'worker'/);

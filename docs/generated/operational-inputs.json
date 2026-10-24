@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:operational-inputs",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "fbef514f22d22dca892efa273ae3c954208281b141778f61da6d4a4a5f8b890d",
+    "recordDigest": "90b43acd82fc6c2958c824712d7a8dcf231af3e8ef15e8be44091240b3f9c731",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2242,6 +2242,8 @@
       "test/sheet-body-contract.test.ts",
       "test/signout.route.test.ts",
       "test/signup.route.test.ts",
+      "test/sim-browser-context-options.test.ts",
+      "test/sim-contact-list.test.ts",
       "test/sim-persona-catalog-validation.test.ts",
       "test/sim-persona-profile.test.ts",
       "test/sim-personas.test.ts",
