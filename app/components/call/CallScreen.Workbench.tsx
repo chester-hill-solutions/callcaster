@@ -16,8 +16,8 @@ interface CallWorkbenchProps {
  * Desktop (xl+): three columns — queue rail (left), script/questionnaire
  * (center, min 420px reading surface), action column (right: call panel
  * with status, contact, controls, disposition, and household-member
- * switcher). The action column and queue rail stay sticky below the top
- * chrome while long scripts scroll.
+ * switcher). Panel frames stretch to the same height; queue and call
+ * controls stay sticky inside their frames while long scripts scroll.
  *
  * Below xl: single stacked column in task order — incoming, call panel
  * (with disposition), household, script. The queue rail is hidden; the
@@ -34,7 +34,7 @@ export function CallWorkbench({
   return (
     <section
       className={cn(
-        "grid w-full grid-cols-1 items-start gap-4 pb-20 sm:pb-6",
+        "grid w-full grid-cols-1 items-start gap-4 pb-20 sm:pb-6 xl:items-stretch",
         // #1343: xl activates at 1280px viewport, but after the workspace
         // nav rail (252px), page padding (48px), and panel padding (48px),
         // the actual grid container on a 13" MacBook is ~916px. The
@@ -49,7 +49,7 @@ export function CallWorkbench({
       aria-label="Call workspace"
     >
       {incoming ? <div className="xl:col-span-3">{incoming}</div> : null}
-      <div className="order-1 flex min-w-0 flex-col gap-4 xl:sticky xl:top-20 xl:order-3">
+      <div className="order-1 flex min-w-0 flex-col gap-4 xl:order-3">
         {call}
         {household}
       </div>
@@ -57,7 +57,7 @@ export function CallWorkbench({
         {script}
       </div>
       {queue ? (
-        <div className="order-3 hidden xl:sticky xl:top-20 xl:order-1 xl:block">
+        <div className="order-3 hidden min-w-0 xl:order-1 xl:flex xl:flex-col">
           {queue}
         </div>
       ) : null}

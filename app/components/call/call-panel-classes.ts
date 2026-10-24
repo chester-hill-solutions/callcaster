@@ -14,6 +14,10 @@
 export const callPanelShellClass =
   "flex min-h-[300px] flex-col overflow-hidden rounded-2xl border-2 border-brand-secondary/40 bg-card shadow-sm";
 
+// Cap the sticky content, not its frame, so controls stay reachable beside long scripts.
+export const callPanelRailContentClass =
+  "flex flex-1 flex-col xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)]";
+
 export const callPanelHeaderSecondaryClass =
   "flex items-center justify-center bg-brand-secondary px-4 py-3 font-Tabac-Slab text-lg text-foreground";
 

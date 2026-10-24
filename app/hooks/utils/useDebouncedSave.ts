@@ -98,6 +98,10 @@ const useDebouncedSave = ({
     const previousUpdateRef = useRef<Record<string, unknown> | null>(update);
     const previousDispositionRef = useRef<string | null>(disposition);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const targetKey = `${workspaceId}/${campaign?.id ?? ""}/${questionContact?.contact?.id ?? ""}`;
+    const previousTargetRef = useRef(targetKey);
+    const currentTargetRef = useRef(targetKey);
+    currentTargetRef.current = targetKey;
   
     // A save is meaningful when the agent has answered something or chosen a
     // real outcome. "idle" is the between-calls sentinel derived from a null
@@ -113,6 +117,12 @@ const useDebouncedSave = ({
             return;
         }
         if (questionContact?.contact?.id) {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+            }
+            previousUpdateRef.current = update;
+            previousDispositionRef.current = disposition;
             // JSON on purpose: the route parses JSON natively, and FormData's
             // urlencoded serialization was 400ing at the JSON-only parser.
             const payload: Record<string, unknown> = {
@@ -139,15 +149,20 @@ const useDebouncedSave = ({
     }, [fetcher, update, recentAttempt?.id, workspaceId, questionContact, campaign?.id, disposition, toast]);
   
     /**
-     * @effect Debounce saveData() by 2s after `update`/`disposition` change, skipping no-op edits.
-     * @effect-deps update, disposition, questionContact (only schedules a save when a contact is
+     * @effect Debounce saveData() by 2s after edits. Flush a pending save to its original contact on target changes; treat the next contact's loaded result as its baseline.
+     * @effect-deps targetKey, update, disposition, questionContact (only schedules a save when a contact is
      *   under review and the value actually changed vs. the previous* refs), saveData
-     * @effect-side-effects timer (setTimeout; cleared on re-schedule/unmount) — saveData() itself
-     *   submits via fetcher.submit (fetch), but that call happens inside the timer callback, not here
+     * @effect-side-effects timer (setTimeout; cleared on re-schedule/unmount) and fetcher.submit (fetch) from the timer or a contact-change cleanup
      * @effect-why-not-loader Debounced auto-save on local edits needs a client timer; it's a mutation
      *   (fetcher.submit) triggered by user input, not something a loader can express.
      */
     useEffect(() => {
+        if (previousTargetRef.current !== targetKey) {
+            previousTargetRef.current = targetKey;
+            previousUpdateRef.current = update;
+            previousDispositionRef.current = disposition;
+            return;
+        }
         const shouldUpdate = questionContact && isMeaningful &&
             (!deepEqual(update, previousUpdateRef.current) ||
              !deepEqual(disposition, previousDispositionRef.current));
@@ -158,9 +173,8 @@ const useDebouncedSave = ({
             }
 
             timeoutRef.current = setTimeout(() => {
+                timeoutRef.current = null;
                 saveData();
-                previousUpdateRef.current = update;
-                previousDispositionRef.current = disposition;
             }, 2000);
         }
 
@@ -168,9 +182,10 @@ const useDebouncedSave = ({
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
                 timeoutRef.current = null;
+                if (currentTargetRef.current !== targetKey) saveData();
             }
         };
-    }, [update, disposition, questionContact, saveData, isMeaningful]);
+    }, [targetKey, update, disposition, questionContact, saveData, isMeaningful]);
   
     /**
      * @effect CANDIDATE-REMOVE Toast success/failure once the save fetcher settles.

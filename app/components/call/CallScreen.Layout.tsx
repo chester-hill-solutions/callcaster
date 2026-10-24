@@ -478,7 +478,7 @@ export function CallScreenLayout({
             key={questionContact?.contact_id ?? "none"}
             isBusy={isBusy}
             handleResponse={(response: {
-              pageId: string;
+              pageId?: string;
               blockId: string;
               value: string | number | boolean | string[] | null | undefined;
             }) => {
@@ -520,15 +520,7 @@ export function CallScreenLayout({
                 };
               }
             }
-            update={
-              (update || {}) as Record<
-                string,
-                Record<
-                  string,
-                  string | number | boolean | string[] | null | undefined
-                >
-              >
-            }
+            update={update ?? {}}
             nextRecipient={questionContact}
             handleQuickSave={saveData}
             disabled={!questionContact}

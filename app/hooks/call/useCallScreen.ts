@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import {
   useFetcher,
   useLoaderData,
@@ -66,12 +66,29 @@ import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
 import { useCreditReconciliation } from "@/hooks/billing/useCreditReconciliation";
 import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
+import { isObject } from "@/lib/type-safety-utils";
 import type {
   AppUser,
   LoaderData,
+  OutreachAttempt,
   QueueItem,
   UseWorkspaceRealtimeProps,
 } from "@/lib/types";
+
+function getSavedCallResult(
+  attempt: OutreachAttempt | null,
+  contact: QueueItem | null,
+  campaignId: number | undefined,
+  workspaceId: string,
+): Record<string, unknown> | null {
+  if (
+    attempt?.contact_id !== contact?.contact.id ||
+    attempt?.campaign_id !== campaignId ||
+    attempt?.workspace !== workspaceId ||
+    !isObject(attempt?.result)
+  ) return null;
+  return attempt.result;
+}
 
 export function useCallScreen() {
   useOutletContext<{ }>();
@@ -126,8 +143,22 @@ export function useCallScreen() {
     return () => clearInterval(interval);
   }, [revalidator]);
 
-  const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
-  const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
+  const [{ questionContact, update }, setQuestionnaire] = useState<{
+    questionContact: QueueItem | null;
+    update: Record<string, unknown> | null;
+  }>({ questionContact: initialNextRecipient, update: null });
+  const setQuestionContact = useCallback((contact: QueueItem | null) => {
+    setQuestionnaire((current) => current.questionContact === contact ? current : {
+      questionContact: contact,
+      update: current.questionContact?.contact.id === contact?.contact.id ? current.update : null,
+    });
+  }, []);
+  const setUpdate = useCallback((next: SetStateAction<Record<string, unknown> | null>) => {
+    setQuestionnaire((current) => {
+      const nextUpdate = typeof next === "function" ? next(current.update) : next;
+      return current.update === nextUpdate ? current : { ...current, update: nextUpdate };
+    });
+  }, []);
   const groupByHousehold = campaign?.group_household_queue || false;
 
   const dialogs = useCallScreenDialogs({
@@ -344,8 +375,11 @@ export function useCallScreen() {
     setQueue,
   });
 
+  const currentUpdate = update ?? getSavedCallResult(
+    recentAttempt, questionContact, campaign?.id, workspaceId,
+  );
   const { saveData, isSaving } = useDebouncedSave({
-    update,
+    update: currentUpdate,
     recentAttempt,
     questionContact,
     campaign,
@@ -363,9 +397,9 @@ export function useCallScreen() {
 
   const handleResponse = useCallback(
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
-      setUpdate((curr) => ({ ...curr, [blockId]: value }));
+      setUpdate((curr) => ({ ...(curr ?? currentUpdate), [blockId]: value }));
     },
-    [],
+    [currentUpdate, setUpdate],
   );
 
   const handleDialButton = useCampaignDialActions({
@@ -558,7 +592,7 @@ export function useCallScreen() {
     questionContact,
     attemptList,
     handleResponse,
-    update,
+    update: currentUpdate,
     saveData,
     isSaving,
   };

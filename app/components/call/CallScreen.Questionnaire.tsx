@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   callPanelHeaderPrimaryClass,
   callPanelShellClass,
@@ -24,7 +27,7 @@ interface Script {
 
 interface CallQuestionnaireProps {
   handleResponse: (response: {
-    pageId: string;
+    pageId?: string;
     blockId: string;
     value: string | boolean | string[];
   }) => void;
@@ -51,6 +54,7 @@ const CallQuestionnaire = ({
     pageKeys[0] || undefined,
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
+  const notesId = useId();
 
 
   const handleBlockResponse = (
@@ -101,10 +105,10 @@ const CallQuestionnaire = ({
 
   return (
     <div className={`${callPanelShellClass} min-w-0 flex-1`}>
-      <div className={callPanelHeaderPrimaryClass}>
+      <div className={cn(callPanelHeaderPrimaryClass, "flex-none")}>
         Script & Questionnaire{contactLabel}
       </div>
-      <div className="flex flex-col p-4">
+      <div className="flex flex-1 flex-col p-4">
         <div className="flex flex-col gap-4">
           {(scriptSteps?.pages?.[currentPageId || ""]?.blocks ?? []).map(renderBlock)}
         </div>
@@ -138,7 +142,20 @@ const CallQuestionnaire = ({
             </Button>
           </div>
         ) : null}
-        <div className="flex justify-end p-2">
+        <FormField htmlFor={notesId} label="Notes" className="mt-4">
+          <Textarea
+            id={notesId}
+            name="notes"
+            rows={4}
+            value={typeof update?.notes === "string" ? update.notes : ""}
+            disabled={disabled}
+            onChange={(event) => {
+              const value = event.target.value;
+              handleResponse({ blockId: "notes", value });
+            }}
+          />
+        </FormField>
+        <div className="mt-auto flex justify-end p-2">
           <Button type="button" onClick={handleQuickSave} disabled={isBusy}>
             Save
           </Button>
