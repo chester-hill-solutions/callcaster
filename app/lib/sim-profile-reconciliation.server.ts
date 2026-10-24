@@ -28,7 +28,6 @@ type ReconcileRepo = {
   findUsers(email: string): Promise<Array<{ id: string; email: string; simMarker: string | null }>>;
   createUser(input: { id: string; email: string; marker: string }): Promise<void>;
   findWorkspaces(name: string, marker: string): Promise<Array<{ id: string; name: string; simMarker: string | null }>>;
-  findWorkspacesByMarker(marker: string): Promise<Array<{ id: string; name: string; simMarker: string | null }>>;
   createWorkspace(input: { id: string; name: string; marker: string }): Promise<void>;
   findMembership(workspaceId: string, userId: string): Promise<{ role: string; marker: string | null } | null>;
   countOwners(workspaceId: string): Promise<number>;
@@ -79,10 +78,7 @@ export async function reconcileSimProfile(profile: ResolvedSimProfile, transacti
 
       const markedWorkspaces = await repo.findWorkspaces(profile.workspaceName, profile.workspaceMarker);
       const sameName = await repo.findWorkspaces(profile.workspaceName, "");
-      const markerWorkspaces = await repo.findWorkspacesByMarker(profile.workspaceMarker);
-      if (sameName.some((row) => row.simMarker !== profile.workspaceMarker) ||
-          markerWorkspaces.some((row) => row.name !== profile.workspaceName) ||
-          markedWorkspaces.length > 1) {
+      if (sameName.some((row) => row.simMarker === null) || markedWorkspaces.length > 1) {
         throw new SimReconciliationError("blocked", "SIM workspace identity collision");
       }
       const workspaceRow = markedWorkspaces[0];
@@ -142,7 +138,6 @@ export async function reconcileSimProfileInDatabase(profile: ResolvedSimProfile)
       await tx.insert(user).values({ id, username: email, access_level: "standard", sim_marker: marker });
     },
     findWorkspaces: async (name, marker) => tx.select({ id: workspace.id, name: workspace.name, simMarker: workspace.sim_marker }).from(workspace).where(marker ? and(eq(workspace.name, name), eq(workspace.sim_marker, marker)) : eq(workspace.name, name)),
-    findWorkspacesByMarker: async (marker) => tx.select({ id: workspace.id, name: workspace.name, simMarker: workspace.sim_marker }).from(workspace).where(eq(workspace.sim_marker, marker)),
     createWorkspace: async ({ id, name, marker }) => { await tx.insert(workspace).values({ id, name, sim_marker: marker, credits: 0, twilio_data: "{}" }); },
     findMembership: async (workspaceId, userId) => { const [row] = await tx.select({ role: workspace_member.role_id, marker: workspace_member.sim_marker }).from(workspace_member).where(and(eq(workspace_member.workspace_id, workspaceId), eq(workspace_member.user_id, userId))); return row ?? null; },
     countOwners: async (workspaceId) => { const rows = await tx.select({ id: workspace_member.id }).from(workspace_member).where(and(eq(workspace_member.workspace_id, workspaceId), eq(workspace_member.role_id, "owner"))); return rows.length; },

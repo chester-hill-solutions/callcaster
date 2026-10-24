@@ -7,14 +7,14 @@ type State = {
   memberships: Array<{ workspaceId: string; userId: string; role: string; marker: string | null }>;
 };
 
-const profile = (role: "owner" | "member" = "owner", environment = "dev") => ({
-  personaKey: "person-a",
-  environment,
+const profile = (options: Partial<{ role: "owner" | "member"; environment: string; personaKey: string; email: string; workspaceName: string; workspaceMarker: string }> = {}) => ({
+  personaKey: options.personaKey ?? "person-a",
+  environment: options.environment ?? "dev",
   runtimeIdentity: "dev",
-  email: "person.a@dev.callcaster.ca",
-  workspaceName: "SIM Workspace A",
-  workspaceMarker: "sim:dev",
-  expectedRole: role,
+  email: options.email ?? "person.a@dev.callcaster.ca",
+  workspaceName: options.workspaceName ?? "SIM Workspace A",
+  workspaceMarker: options.workspaceMarker ?? "sim:dev",
+  expectedRole: options.role ?? "owner",
   capabilities: [],
   allowedFlows: [],
   ownedManifests: [],
@@ -28,7 +28,6 @@ function repoFor(state: State) {
     findUsers: async (email: string) => state.users.filter((row) => row.email === email),
     createUser: async (row: { id: string; email: string; marker: string }) => { state.users.push({ id: row.id, email: row.email, simMarker: row.marker }); },
     findWorkspaces: async (name: string, marker: string) => state.workspaces.filter((row) => row.name === name && (marker ? row.simMarker === marker : true)),
-    findWorkspacesByMarker: async (marker: string) => state.workspaces.filter((row) => row.simMarker === marker),
     createWorkspace: async (row: { id: string; name: string; marker: string }) => { state.workspaces.push({ id: row.id, name: row.name, simMarker: row.marker }); },
     findMembership: async (workspaceId: string, userId: string) => state.memberships.find((row) => row.workspaceId === workspaceId && row.userId === userId) ?? null,
     countOwners: async (workspaceId: string) => state.memberships.filter((row) => row.workspaceId === workspaceId && row.role === "owner").length,
@@ -51,28 +50,64 @@ describe("SIM profile reconciliation", () => {
     expect(state.memberships).toHaveLength(1);
   });
 
-  test("blocks unmarked and foreign workspace collisions", async () => {
+  test("blocks an unmarked workspace but allows a different marked workspace", async () => {
     const unmarked: State = { users: [], workspaces: [{ id: "w", name: "SIM Workspace A", simMarker: null }], memberships: [] };
     await expect(reconcileSimProfile(profile(), repoFor(unmarked))).rejects.toMatchObject({ status: "blocked" });
     const foreign: State = { users: [], workspaces: [{ id: "w", name: "SIM Workspace A", simMarker: "sim:other" }], memberships: [] };
-    await expect(reconcileSimProfile(profile(), repoFor(foreign))).rejects.toMatchObject({ status: "blocked" });
+    expect((await reconcileSimProfile(profile(), repoFor(foreign))).status).toBe("created");
+    expect(foreign.workspaces).toEqual([
+      { id: "w", name: "SIM Workspace A", simMarker: "sim:other" },
+      expect.objectContaining({ name: "SIM Workspace A", simMarker: "sim:dev" }),
+    ]);
+  });
+
+  test("keeps different workspace names isolated under one marker", async () => {
+    const state: State = { users: [], workspaces: [], memberships: [] };
+    expect((await reconcileSimProfile(profile(), repoFor(state))).status).toBe("created");
+    expect((await reconcileSimProfile(profile({ personaKey: "person-c", email: "person.c@dev.callcaster.ca", workspaceName: "SIM Workspace B" }), repoFor(state))).status).toBe("created");
+    expect((await reconcileSimProfile(profile({ personaKey: "person-c", email: "person.c@dev.callcaster.ca", workspaceName: "SIM Workspace B" }), repoFor(state))).status).toBe("reused");
+    expect(state.workspaces).toHaveLength(2);
+  });
+
+  test("keeps the same workspace name isolated across runtime markers", async () => {
+    const state: State = { users: [], workspaces: [], memberships: [] };
+    expect((await reconcileSimProfile(profile({ workspaceMarker: "sim:sai-local", email: "person.a@sai.local" }), repoFor(state))).status).toBe("created");
+    expect((await reconcileSimProfile(profile({ workspaceMarker: "sim:alex-local", email: "person.a@alex.local" }), repoFor(state))).status).toBe("created");
+    expect((await reconcileSimProfile(profile({ workspaceMarker: "sim:sai-local", email: "person.a@sai.local" }), repoFor(state))).status).toBe("reused");
+    expect((await reconcileSimProfile(profile({ workspaceMarker: "sim:alex-local", email: "person.a@alex.local" }), repoFor(state))).status).toBe("reused");
+    expect(state.workspaces).toEqual([
+      { id: expect.any(String), name: "SIM Workspace A", simMarker: "sim:sai-local" },
+      { id: expect.any(String), name: "SIM Workspace A", simMarker: "sim:alex-local" },
+    ]);
+  });
+
+  test("blocks duplicate exact workspace identities defensively", async () => {
+    const state: State = {
+      users: [{ id: "u", email: profile().email, simMarker: "sim:dev" }],
+      workspaces: [
+        { id: "w1", name: "SIM Workspace A", simMarker: "sim:dev" },
+        { id: "w2", name: "SIM Workspace A", simMarker: "sim:dev" },
+      ],
+      memberships: [],
+    };
+    await expect(reconcileSimProfile(profile(), repoFor(state))).rejects.toMatchObject({ status: "blocked" });
   });
 
   test("repairs marked role drift but preserves the sole owner", async () => {
     const state: State = {
-      users: [{ id: "u", email: profile("member").email, simMarker: "sim:dev" }],
+      users: [{ id: "u", email: profile({ role: "member" }).email, simMarker: "sim:dev" }],
       workspaces: [{ id: "w", name: "SIM Workspace A", simMarker: "sim:dev" }],
       memberships: [{ workspaceId: "w", userId: "u", role: "member", marker: "sim:dev" }],
     };
-    expect((await reconcileSimProfile(profile("owner"), repoFor(state))).status).toBe("repaired");
+    expect((await reconcileSimProfile(profile(), repoFor(state))).status).toBe("repaired");
     state.memberships[0].role = "owner";
-    expect((await reconcileSimProfile(profile("member"), repoFor(state))).status).toBe("drifted");
+    expect((await reconcileSimProfile(profile({ role: "member" }), repoFor(state))).status).toBe("drifted");
     expect(state.memberships[0].role).toBe("owner");
   });
 
   test("rejects production before opening a transaction", async () => {
     const transaction = vi.fn();
-    await expect(reconcileSimProfile(profile("owner", "production"), transaction)).rejects.toMatchObject({ status: "blocked" });
+    await expect(reconcileSimProfile(profile({ environment: "production" }), transaction)).rejects.toMatchObject({ status: "blocked" });
     expect(transaction).not.toHaveBeenCalled();
   });
 
