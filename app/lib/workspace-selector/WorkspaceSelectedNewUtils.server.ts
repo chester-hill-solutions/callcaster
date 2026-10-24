@@ -269,13 +269,21 @@ export async function handleNewCampaign({formData,
 
   const tdb = createTenantDb(workspaceId);
   try {
+    // #2501: one default window feeds both the call schedule and a text
+    // campaign's SMS window. A text campaign previously received no window at
+    // all, so its setup page opened on "No send window set" and the
+    // unrestricted-SMS warning, while voice campaigns were given the weekday
+    // default. The SMS window stays campaign-only (chat sends are never gated by
+    // it) and an operator can clear or narrow it.
+    const defaultWeekdayWindow = buildWeekdayCallingSchedule();
     const rows = await tdb.campaign.insert({
       title: newCampaignName,
       status: "draft",
       type: newCampaignType,
       start_date,
       end_date,
-      schedule: buildWeekdayCallingSchedule(),
+      schedule: defaultWeekdayWindow,
+      ...(newCampaignType === "message" ? { sms_send_window: defaultWeekdayWindow } : {}),
       caller_id,
       created_at: new Date().toISOString(),
       dial_ratio: 1,

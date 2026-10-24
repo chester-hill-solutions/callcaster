@@ -289,6 +289,47 @@ describe("WorkspaceSelectedNewUtils", () => {
     },
   );
 
+  // #2501: a text campaign used to be created with no send window at all, so its
+  // setup page showed "No send window set" and the unrestricted-SMS warning
+  // while voice campaigns were given the weekday default.
+  test("handleNewCampaign gives a text campaign the same weekday window as a call campaign", async () => {
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+    const headers = new Headers();
+    tenantDbState.campaignInsertError = null;
+
+    tenantDbState.campaignId = 71;
+    const text = new FormData();
+    text.set("campaign-name", "Text campaign");
+    text.set("campaign-type", "message");
+    expect(
+      (await asRouteResponse(mod.handleNewCampaign({ formData: text, workspaceId: "w1", headers }))).status,
+    ).toBe(302);
+
+    const textCampaign = tenantDbState.insertedCampaign;
+    expect(textCampaign).toMatchObject({
+      type: "message",
+      sms_send_window: expect.objectContaining({
+        monday: expect.objectContaining({ active: true }),
+        saturday: expect.objectContaining({ active: false }),
+        sunday: expect.objectContaining({ active: false }),
+      }),
+    });
+    // The SMS window must be the same default the call schedule uses, not a
+    // second copy that can drift from it.
+    expect(textCampaign?.sms_send_window).toEqual(textCampaign?.schedule);
+
+    // A call campaign carries no SMS window: the column is campaign-SMS only.
+    tenantDbState.campaignId = 72;
+    const call = new FormData();
+    call.set("campaign-name", "Call campaign");
+    call.set("campaign-type", "live_call");
+    expect(
+      (await asRouteResponse(mod.handleNewCampaign({ formData: call, workspaceId: "w1", headers }))).status,
+    ).toBe(302);
+    expect(tenantDbState.insertedCampaign?.sms_send_window).toBeUndefined();
+    expect(tenantDbState.insertedCampaign?.schedule).toBeTruthy();
+  });
+
   test("handleNewCampaign accepts legacy campaign-type posts and rejects invalid goals", async () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const legacy = new FormData();
