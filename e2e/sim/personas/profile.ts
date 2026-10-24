@@ -89,6 +89,10 @@ function resolveRuntimeIdentity(environment: Exclude<EnvironmentName, "productio
     if (!localIdentity || localIdentity.envName !== "local" || !localIdentity.profileName) {
       fail("local identity is required");
     }
+    const expectedProfileName = `${localIdentity.devName}-${localIdentity.envName}`;
+    if (localIdentity.profileName !== expectedProfileName) {
+      fail("local identity is inconsistent");
+    }
     return localIdentity.profileName;
   }
   return environment;

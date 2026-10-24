@@ -34,6 +34,15 @@ describe("resolveSimProfile", () => {
     expect(saiProfile.workspaceMarker).not.toBe(alexProfile.workspaceMarker);
   });
 
+  it("rejects a local identity whose profile name belongs to another developer", () => {
+    const local = resolveLocalProjectConfig({ devName: "sai", envName: "local" });
+    expect(() => resolveSimProfile({
+      personaKey: "person-a",
+      config: local.config,
+      localIdentity: { ...local.identity, profileName: "alex-local" },
+    })).toThrow("SIM profile resolution failed: local identity is inconsistent");
+  });
+
   it("propagates catalog data and is deeply immutable", () => {
     const profile = resolveSimProfile({
       personaKey: "person-b",
