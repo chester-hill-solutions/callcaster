@@ -62,6 +62,7 @@ describe("SIM persona catalog validator", () => {
 
   it("validates email local-parts and duplicate local-parts", () => {
     expect(invalidCode((catalog) => { catalog["person-a"].emailLocalPart = "bad..local"; })).toContain("email-local-part");
+    expect(invalidCode((catalog) => { catalog["person-a"].emailLocalPart = "123e4567-e89b-12d3-a456-426614174000"; })).toContain("email-local-part");
     expect(invalidCode((catalog) => { catalog["person-b"].emailLocalPart = "person.a"; })).toContain("duplicate-email-local-part");
   });
 

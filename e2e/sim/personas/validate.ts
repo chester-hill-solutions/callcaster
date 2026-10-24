@@ -91,6 +91,16 @@ function containsUnsafeLogicalValue(value: string): boolean {
   );
 }
 
+function isValidEmailLocalPart(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 64 &&
+    /^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]*[a-z0-9])?$/.test(value) &&
+    !value.includes("..") &&
+    !containsUnsafeLogicalValue(value)
+  );
+}
+
 function addIssue(
   issues: SimPersonaCatalogValidationIssue[],
   code: ValidationCode,
@@ -108,12 +118,7 @@ function validatePersonaFields(
   if (!hasOnlyKeys(persona, personaFields)) addIssue(issues, "persona-fields", personaIndex);
 
   const emailLocalPart = persona.emailLocalPart;
-  if (
-    typeof emailLocalPart !== "string" ||
-    emailLocalPart.length > 64 ||
-    !/^[a-z0-9](?:[a-z0-9.!#$%&'*+/=?^_`{|}~-]*[a-z0-9])?$/.test(emailLocalPart) ||
-    emailLocalPart.includes("..")
-  ) {
+  if (!isValidEmailLocalPart(emailLocalPart)) {
     addIssue(issues, "email-local-part", personaIndex);
   } else if (emailLocalParts.has(emailLocalPart)) {
     addIssue(issues, "duplicate-email-local-part", personaIndex);
