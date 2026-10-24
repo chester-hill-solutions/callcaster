@@ -69,6 +69,17 @@ describe("SIM persona catalog validator", () => {
     expect(invalidCode((catalog) => { catalog["person-a"].workspaceName = "   "; })).toContain("workspace-name");
   });
 
+  it("rejects unsafe values in allowed workspace fields", () => {
+    for (const value of [
+      "https://example.test/workspace",
+      "+15555550100",
+      "123e4567-e89b-12d3-a456-426614174000",
+      "workspace-password-secret",
+    ]) {
+      expect(invalidCode((catalog) => { catalog["person-a"].workspaceName = value; })).toContain("workspace-name");
+    }
+  });
+
   it("allows only owner and member roles", () => {
     expect(invalidCode((catalog) => { catalog["person-b"].role = "agent"; })).toContain("role");
   });

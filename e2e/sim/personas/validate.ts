@@ -82,6 +82,15 @@ function hasDuplicate(value: readonly string[]): boolean {
   return new Set(value).size !== value.length;
 }
 
+function containsUnsafeLogicalValue(value: string): boolean {
+  return (
+    /https?:\/\//i.test(value) ||
+    /(?:password|passwd|secret|token|api[\s_-]*key|provider[\s_-]*ref)/i.test(value) ||
+    /\b[0-9a-f]{8}-[0-9a-f-]{27,}\b/i.test(value) ||
+    /\+?[0-9][0-9().\s-]{6,}[0-9]/.test(value)
+  );
+}
+
 function addIssue(
   issues: SimPersonaCatalogValidationIssue[],
   code: ValidationCode,
@@ -112,7 +121,11 @@ function validatePersonaFields(
     emailLocalParts.add(emailLocalPart);
   }
 
-  if (typeof persona.workspaceName !== "string" || persona.workspaceName.trim() === "") {
+  if (
+    typeof persona.workspaceName !== "string" ||
+    persona.workspaceName.trim() === "" ||
+    containsUnsafeLogicalValue(persona.workspaceName)
+  ) {
     addIssue(issues, "workspace-name", personaIndex);
   }
   if (!simPersonaRoles.includes(persona.role as (typeof simPersonaRoles)[number])) {
