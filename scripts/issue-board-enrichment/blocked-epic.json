@@ -1,29 +1,5 @@
 [
   {
-    "issueNumber": 1165,
-    "verdict": "blocked-epic",
-    "summary": "The preview-app cleanup shipped in PR #2733. Remaining cleanup needs the accurate inventory in #2757 and the retention decision in #2029; a suspended subaccount currently rejects Messaging Services reads.",
-    "currentBehavior": "A live read-only check finds a suspended subaccount whose Messaging Services API returns HTTP 401 with both listed and fetched credentials. The existing report hid those failures as empty service lists and capped account enumeration at 200.",
-    "resolution": "Complete the report repair in #2757. Keep unreadable or unverified resources protected, then apply the approved retention rule from #2029 before further cleanup.",
-    "lookIn": [
-      "scripts/twilio-resource-prune-report.mjs",
-      "scripts/lib/twilio-resource-prune-policy.mjs",
-      "scripts/local/prune-environment-twiml-apps.mjs",
-      "scripts/lib/live-environments.mjs"
-    ],
-    "existingTests": [
-      "test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)",
-      "Parent-only live audit: 206 inventory entries, 12 KEEP, 0 STALE and 194 UNKNOWN. This includes 192 subaccount metadata rows but excludes their resource lists; it is not a complete account audit. An active subaccount probe reads a Messaging Service successfully, while the full scan identifies a suspended subaccount and exits with failure."
-    ],
-    "acceptanceCriteria": [],
-    "rootCause": "The collector used a nonexistent v2010 Messaging Services path and suppressed read errors. Resource release also needs the existing policy decision; a missing database owner or an unreadable subaccount does not prove that a resource is unused.",
-    "blockedBy": [
-      2757,
-      2029
-    ],
-    "trackerRecommendation": "Feature; Priority Urgent; Effort Medium; environment unset; assigned to wra-sol. Project Status In progress was read in the issue sidebar. Parent #1158 is closed; existing closed dependencies #1164 and #1212 remain. Open dependencies #2757 and #2029 are now linked natively. Do not change a suspended account or release numbers as part of the report repair."
-  },
-  {
     "issueNumber": 1157,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
@@ -50,7 +26,7 @@
     ],
     "size": "L-XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic; #1328 landed, so the block is gone. Split before assignment — this is not single-agent work.",
+    "trackerRecommendation": "Parent epic; #1328 landed, so the block is gone. Split before assignment \u2014 this is not single-agent work.",
     "blockedBy": []
   },
   {
@@ -199,7 +175,7 @@
     "issueNumber": 1802,
     "verdict": "blocked-epic",
     "summary": "Runtime security is a native Epic with separate package Tasks. Six source fixes are merged: Axios #2336, csv-parse #2338, Scalar SDK #2339, ws #2343, Twilio JWS #2345 and PostCSS #2346. Deployed acceptance and release promotion remain open. At dev@befe20fa, npm production audit is clear and the independently resolved Bun runtime graph has zero affected nodes.",
-    "resolution": "Complete each child’s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.",
+    "resolution": "Complete each child\u2019s applicable deployed acceptance and release promotion. Verify fresh audits and the live default-branch alert state before closing the Epic. Do not repeat completed package source work or treat package exposure as a proved app exploit.",
     "lookIn": [
       "package.json",
       "package-lock.json",
@@ -320,7 +296,7 @@
     "summary": "Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.",
     "currentBehavior": "PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.",
     "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet, and #1829 (the account) closed as not planned on 2026-10-17 while #1357 (the qa DNS/IaC half) closed as completed.",
-    "resolution": "Re-scope rather than wait: #1829 closed as not planned, so first decide the QA credential path, then add the QA acceptance workflow and specs — sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials. #1157 (smart test audiences) still gates the audience half.",
+    "resolution": "Re-scope rather than wait: #1829 closed as not planned, so first decide the QA credential path, then add the QA acceptance workflow and specs \u2014 sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials. #1157 (smart test audiences) still gates the audience half.",
     "lookIn": [
       ".github/workflows/e2e.yml",
       ".github/workflows/ci.yml",
@@ -385,7 +361,7 @@
     "summary": "Six filed sign-in/sign-up issues (#2010, #2011, #2012, #2013, #2014, #2015) are one piece of work on one pair of pages. Filed as loose tickets they guarantee a churn loop: fix alignment (#2013), the scrollbar returns (#2010), add the mural (#2011), and the box is off-centre again. Created 2026-09-25 during board triage, when all six sat unenriched in Needs triage.",
     "currentBehavior": "The two pages drift independently: different centring, different form width, different padding, one has a mural and the other does not, and two different copy treatments.",
     "rootCause": "No shared form container between the pages, so every layout change is made twice and any one change can undo the other.",
-    "resolution": "Land #2013 first as the shared baseline. Then treat #2010 as a probable symptom rather than a separate defect — a mis-sized container is the usual cause of a scrollbar on a page that should fit — and close it if it resolves instead of carrying a fix for a symptom that is gone. #2011 and #2012 land after #2013 so the final visual pass sees final copy. #2014 keeps the sign-in page fix; its codebase-wide half is #2058. #2015 is business logic, independent of all of it, and is the one with real diagnostic value.",
+    "resolution": "Land #2013 first as the shared baseline. Then treat #2010 as a probable symptom rather than a separate defect \u2014 a mis-sized container is the usual cause of a scrollbar on a page that should fit \u2014 and close it if it resolves instead of carrying a fix for a symptom that is gone. #2011 and #2012 land after #2013 so the final visual pass sees final copy. #2014 keeps the sign-in page fix; its codebase-wide half is #2058. #2015 is business logic, independent of all of it, and is the one with real diagnostic value.",
     "lookIn": [
       "app/routes/account.sign-in.*",
       "app/routes/account.sign-up.*",
@@ -414,7 +390,7 @@
     "issueNumber": 2002,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(authz): permission-based authorization instead of role checks",
-    "summary": "Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
+    "summary": "Parent of the authorization cluster. The product currently gates on three broad roles \u2014 Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns \u2014 and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
     "currentBehavior": "Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.",
     "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape.",
     "resolution": "#2030 reported on 2026-10-19 (docs/adr/0039-role-checks-become-capability-checks.md): extend the capability layer that already exists in app/lib/capabilities.ts and the shared CHS auth packages, and do not adopt the better-auth admin or organization plugins. The vocabulary is therefore settled, so #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
@@ -492,8 +468,8 @@
     "recommendedTitle": "Agent ABAC: adding an Agent to a campaign unlocks that campaign type for them",
     "summary": "The attribute-based half of the cluster. Adding an Agent to a specific campaign should also unlock their broader ability to see and act on that campaign type: added to a live-call campaign, it appears on their list and is callable if open; added to an SMS campaign, its numbers become visible on the chats page.",
     "currentBehavior": "Campaign membership is a relation, but it does not appear to confer the broader capability, and the broader capability does not appear to be scoped back down to the campaigns they are actually on.",
-    "rootCause": "Two separate concerns — which campaign types you may touch, and which campaigns within a type — are not expressed in the same model, so membership cannot imply the first.",
-    "resolution": "Blocked by #2008, which defines the type-level capability set this refines. Two distinct grants are needed and they must not be conflated: a type-level capability from the role defaults, and a campaign-level grant from membership. The test that matters is negative — an Agent with access to one SMS campaign must not see another campaign's numbers.",
+    "rootCause": "Two separate concerns \u2014 which campaign types you may touch, and which campaigns within a type \u2014 are not expressed in the same model, so membership cannot imply the first.",
+    "resolution": "Blocked by #2008, which defines the type-level capability set this refines. Two distinct grants are needed and they must not be conflated: a type-level capability from the role defaults, and a campaign-level grant from membership. The test that matters is negative \u2014 an Agent with access to one SMS campaign must not see another campaign's numbers.",
     "lookIn": [
       "app/db/schema.ts (campaign membership relation)",
       "app/lib/workspace-middleware.server.ts",
@@ -516,16 +492,16 @@
     ],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Blocked by #2008 on purpose — the two are easy to conflate and building this first would bake in the wrong model. The negative test is the one that proves it; without it a permissive implementation looks correct."
+    "trackerRecommendation": "Blocked by #2008 on purpose \u2014 the two are easy to conflate and building this first would bake in the wrong model. The negative test is the one that proves it; without it a permissive implementation looks correct."
   },
   {
     "issueNumber": 2031,
     "verdict": "blocked-epic",
     "recommendedTitle": "Sweep: authorization checks a permission, not a broad role",
-    "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.",
+    "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own \u2014 it is a consequence of the model, not a design.",
     "currentBehavior": "Checks are inconsistent, comparing roles in some places and something narrower in others.",
     "rootCause": "Each check was written locally against whatever was convenient at the time.",
-    "resolution": "#2030 is done (docs/adr/0039-role-checks-become-capability-checks.md). The sweep still waits on the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
+    "resolution": "#2030 is done (docs/adr/0039-role-checks-become-capability-checks.md). The sweep still waits on the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone \u2014 check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
     "lookIn": [
       "app/lib/**-middleware.server.ts",
       "scripts/checks/check-route-authz.mjs",
