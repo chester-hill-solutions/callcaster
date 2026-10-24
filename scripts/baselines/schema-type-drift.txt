@@ -6,10 +6,6 @@ campaign.created_at: text -> timestamp with time zone
 campaign.end_date: text -> timestamp with time zone
 campaign.start_date: text -> timestamp with time zone
 campaign_audience.created_at: text -> timestamp with time zone
-contact.created_at: text -> timestamp with time zone
-contact.date_updated: text -> timestamp with time zone
-contact.voter_list_expires_at: text -> timestamp with time zone
-contact.voter_list_imported_at: text -> timestamp with time zone
 contact_audience.created_at: text -> timestamp with time zone
 handset_session.created_at: text -> timestamp with time zone
 handset_session.expires_at: text -> timestamp with time zone
