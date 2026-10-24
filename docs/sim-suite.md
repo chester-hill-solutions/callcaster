@@ -24,15 +24,15 @@ is the real authorization floor: owner-only capabilities deny members.
 environment variables are set in the calling shell or secret manager:
 
 ```text
-SIM_SENDER_EMAIL=<sender account email>
-SIM_SENDER_PASSWORD=<sender account password>
 SIM_RECIPIENT_NAME="Saihaan Syed"
 SIM_RECIPIENT_PHONE=+16478657844
 # Optional; defaults to "CallCaster SIM SMS check".
 SIM_SMS_MESSAGE="<unique test message>"
 ```
 
-The suite rejects a missing or changed sai-local workspace or recipient value.
+The temporary compatibility adapter rejects a missing or changed approved
+recipient value. The sender email is derived from the resolved SIM persona;
+the password is retrieved only by the sign-in task through the runtime context.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
 
@@ -41,6 +41,9 @@ The planned inherited configuration and secret-provider migration is defined in
 Phase 5 migrates SIM, this page describes the current interface. Do not add new
 SIM-specific variables; new SIM work uses the compatibility boundary until the
 shared loader is available.
+
+`e2e/sim/config.ts` is the temporary #2812 compatibility adapter. It is only
+used at SIM bootstrap to build typed task input. Task modules do not import it.
 
 The flow does these tasks through the product UI:
 
