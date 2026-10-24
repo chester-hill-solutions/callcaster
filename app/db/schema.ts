@@ -98,7 +98,7 @@ export const workspace_role = pgEnum("workspace_users_role", ["owner","member","
 // ─── Workspace ──────────────────────────────────────
 export const workspace = pgTable("workspace", {
   archived_at: timestamp({ withTimezone: true, mode: "date" }),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   credits: integer().notNull(),
   disabled: boolean().notNull().default(false),
   feature_flags: jsonb().notNull().default({
@@ -147,9 +147,9 @@ export const workspace = pgTable("workspace", {
 });
 
 export const workspace_users = pgTable("workspace_users", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  last_accessed: text().default(sql`now()`),
+  last_accessed: timestamp({ withTimezone: true, mode: "string" }).default(sql`now()`),
   role: text().notNull().default("caller"),
   user_id: uuid().notNull(),
   workspace_id: uuid().notNull(),
@@ -237,8 +237,8 @@ export const workspace_api_key = pgTable(
     key_prefix: text().notNull(),
     key_hash: text().notNull(),
     created_by: uuid(),
-    created_at: text().notNull().default(sql`now()`),
-    last_used_at: text(),
+    created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
+    last_used_at: timestamp({ withTimezone: true, mode: "string" }),
     /** ProductCapabilityId allowlist; empty = deny-all for capability-gated routes. */
     scopes: text().array().notNull().default([]),
     /** ISO-8601 expiry; null only for pre-SEC-07 legacy keys. */
@@ -248,7 +248,7 @@ export const workspace_api_key = pgTable(
 );
 
 export const workspace_invite = pgTable("workspace_invite", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   id: text().notNull().primaryKey().default(sql`gen_random_uuid()`),
   isNew: boolean().notNull().default(true),
   role: text().notNull().default("member"),
@@ -258,7 +258,7 @@ export const workspace_invite = pgTable("workspace_invite", {
 
 export const workspace_number = pgTable("workspace_number", {
   capabilities: jsonb(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   friendly_name: text(),
   handset_enabled: boolean().notNull().default(false),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
@@ -497,13 +497,13 @@ export const workspace_events = pgTable("workspace_events", {
   workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
   event_type: text().notNull(),
   payload: jsonb().notNull(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
 });
 
 export const workspace_audit_event = pgTable("workspace_audit_event", {
   id: bigserial({ mode: "number" }).notNull().primaryKey(),
   workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   actor_type: text().notNull(),
   actor_id: text(),
   api_key_id: bigint({ mode: "number" }),

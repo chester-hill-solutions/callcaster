@@ -14,12 +14,3 @@ verification_session.created_at: text -> timestamp with time zone
 verification_session.expires_at: text -> timestamp with time zone
 webhook.created_at: text -> timestamp with time zone
 webhook.updated_at: text -> timestamp with time zone
-workspace.created_at: text -> timestamp with time zone
-workspace_api_key.created_at: text -> timestamp with time zone
-workspace_api_key.last_used_at: text -> timestamp with time zone
-workspace_audit_event.created_at: text -> timestamp with time zone
-workspace_events.created_at: text -> timestamp with time zone
-workspace_invite.created_at: text -> timestamp with time zone
-workspace_number.created_at: text -> timestamp with time zone
-workspace_users.created_at: text -> timestamp with time zone
-workspace_users.last_accessed: text -> timestamp with time zone
