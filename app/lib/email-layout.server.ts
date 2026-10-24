@@ -28,10 +28,20 @@ const SURFACE = "#fafafa";
 const GOOD = "#15803d";
 const WARN = "#b45309";
 
-/** `--font-heading` with the fallbacks an email client can actually resolve. */
-const FONT_HEADING = '"Zilla Slab", Georgia, "Times New Roman", serif';
+/**
+ * `--font-heading` with the fallbacks an email client can actually resolve.
+ *
+ * Single quotes here are load-bearing, not a style choice. These values are
+ * interpolated into double-quoted `style="…"` attributes, and a double-quoted
+ * family name inside one ends the attribute at that quote: every rule after it
+ * is dropped. That is what shipped — the reset email's button lost its padding,
+ * colour and `text-decoration` and rendered as a plain underlined link on the
+ * bare red pill, while the intro, facts table and footer fell back to the
+ * client's own type (#2943).
+ */
+const FONT_HEADING = "'Zilla Slab', Georgia, 'Times New Roman', serif";
 const FONT_BODY =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 const PRODUCT_NAME = "CallCaster";
 const SENDER_ADDRESS = "info@callcaster.ca";
@@ -182,7 +192,8 @@ function renderText(input: BrandedEmailInput): string {
   if (input.cta) lines.push("", `${input.cta.label}: ${input.cta.url}`);
   lines.push("", `${PRODUCT_NAME} · ${SENDER_ADDRESS}`);
   lines.push(footerAddress());
-  if (input.footerLink) lines.push(`${input.footerLink.label}: ${input.footerLink.url}`);
+  if (input.footerLink)
+    lines.push(`${input.footerLink.label}: ${input.footerLink.url}`);
   return lines.join("\n");
 }
 
