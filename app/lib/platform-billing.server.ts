@@ -129,7 +129,7 @@ export async function createBillingCheckoutSession(args: {
     minRole: MemberRole.Admin,
   });
 
-  if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
+  if (!Number.isInteger(amount) || amount < MIN_CREDITS) {
     return {
       ok: false as const,
       error: `Choose at least ${formatCredits(MIN_CREDITS)} credits (${formatCurrency(MIN_PURCHASE_CAD)} minimum).`,
@@ -145,7 +145,7 @@ export async function createBillingCheckoutSession(args: {
   try {
     const baseUrl = new URL(requestUrl).origin;
     const stripe = createStripeClient();
-    const priceInCents = Math.round(amount * CREDIT_PRICE_CAD * 100);
+    const priceInCents = Math.round(CREDIT_PRICE_CAD * 100);
     const session = await stripe.checkout.sessions.create({
       customer: customerResult.stripeCustomerId,
       payment_method_types: ["card"],
@@ -154,16 +154,12 @@ export async function createBillingCheckoutSession(args: {
           price_data: {
             currency: "cad",
             product_data: {
-              // The count is in the line name, not the quantity (#1981): the
-              // receipt then reads "12,500 workspace credits" instead of
-              // "Workspace credits × 1", and no Stripe Checkout quantity
-              // ceiling is ever hit (packages go up to 25,000 credits).
-              name: `${formatCredits(amount)} workspace credits`,
+              name: "Workspace credits",
             },
             unit_amount: priceInCents,
             tax_behavior: "exclusive",
           },
-          quantity: 1,
+          quantity: amount,
         },
       ],
       mode: "payment",

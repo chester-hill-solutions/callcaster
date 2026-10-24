@@ -69,31 +69,32 @@ describe("createBillingCheckoutSession line item", () => {
     });
   });
 
-  test("names the line item with the bought credit count", async () => {
-    const result = await checkout(2500);
+  test.each([
+    { amount: 500, totalInCents: 1000 },
+    { amount: 2500, totalInCents: 5000 },
+    { amount: 25000, totalInCents: 50000 },
+  ])(
+    "uses credits as the Stripe quantity ($amount credits)",
+    async ({ amount, totalInCents }) => {
+      const result = await checkout(amount);
 
-    expect(result).toMatchObject({ ok: true });
-    const lineItem = sessionsCreate.mock.calls[0][0].line_items[0];
-    const name = lineItem.price_data.product_data.name;
-    // formatCredits renders in the machine locale; parse the count back out
-    // rather than pinning a separator style.
-    expect(Number(name.split(" ")[0].replace(/[^\d]/g, ""))).toBe(2500);
-    expect(name.endsWith(" workspace credits")).toBe(true);
-    expect(lineItem.quantity).toBe(1);
-    // quantity × unit = 2500 × $0.02 CAD — the total is unchanged.
-    expect(lineItem.price_data.unit_amount).toBe(5000);
-    expect(sessionsCreate.mock.calls[0][0].metadata).toEqual({
-      workspaceId: WORKSPACE_ID,
-      creditAmount: "2500",
-    });
-  });
+      expect(result).toMatchObject({ ok: true });
+      const lineItem = sessionsCreate.mock.calls[0][0].line_items[0];
+      expect(lineItem.price_data.product_data.name).toBe("Workspace credits");
+      expect(lineItem.quantity).toBe(amount);
+      expect(lineItem.price_data.unit_amount).toBe(2);
+      expect(lineItem.quantity * lineItem.price_data.unit_amount).toBe(totalInCents);
+      expect(sessionsCreate.mock.calls[0][0].metadata).toEqual({
+        workspaceId: WORKSPACE_ID,
+        creditAmount: String(amount),
+      });
+    },
+  );
 
-  test("keeps the full bought count for large packages", async () => {
-    await checkout(12500);
+  test("rejects fractional credit quantities before creating Checkout", async () => {
+    const result = await checkout(500.5);
 
-    const lineItem = sessionsCreate.mock.calls[0][0].line_items[0];
-    expect(
-      Number(lineItem.price_data.product_data.name.split(" ")[0].replace(/[^\d]/g, "")),
-    ).toBe(12500);
+    expect(result).toMatchObject({ ok: false, status: 400 });
+    expect(sessionsCreate).not.toHaveBeenCalled();
   });
 });
