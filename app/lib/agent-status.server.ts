@@ -36,9 +36,7 @@ export async function getAgentStatus(
 ): Promise<AgentStatusResult> {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   const row = (await tdb.agent_status.findFirst({
-    where: and(
-      eq(agentStatusTable.user_id, userId),
-    ),
+    where: and(eq(agentStatusTable.user_id, userId)),
   })) as AgentStatusRow | undefined;
   return row ?? null;
 }
@@ -49,10 +47,14 @@ async function upsertAgentStatusRow(args: {
   userId: string;
   to: AgentState;
   reason?: string | null;
-  statusStartedAt: string;
-  now: string;
+  statusStartedAt: Date;
+  now: Date;
 }): Promise<AgentStatusRow | { error: string }> {
-  const existing = await getAgentStatus(args.workspaceId, args.userId, args.tdb);
+  const existing = await getAgentStatus(
+    args.workspaceId,
+    args.userId,
+    args.tdb,
+  );
   const rowValues = {
     user_id: args.userId,
     status: args.to,
@@ -85,12 +87,13 @@ export async function updateAgentStatus(
   reason?: string | null,
   tdbIn?: TenantDb,
 ): Promise<
-  { status: AgentStatusRow; transition: AgentStatusTransition } | { error: string }
+  | { status: AgentStatusRow; transition: AgentStatusTransition }
+  | { error: string }
 > {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   const current = await getAgentStatus(workspaceId, userId, tdb);
   const from = (current?.status ?? "offline") as AgentState;
-  const now = new Date().toISOString();
+  const now = new Date();
 
   if (from === to) {
     if (!current) {
@@ -142,7 +145,7 @@ export async function heartbeatAgentStatus(
 ): Promise<void> {
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   await tdb.agent_status.update({
-    set: { last_heartbeat_at: new Date().toISOString() },
+    set: { last_heartbeat_at: new Date() },
     where: and(eq(agentStatusTable.user_id, userId)),
   });
 }

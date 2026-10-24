@@ -5,7 +5,7 @@
  * tables use it. Import from "@/db/schema" as before; everything is
  * re-exported there, and the relations stay in schema.ts.
  */
-import { bigint, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const queue_entry_state = pgEnum("queue_entry_state", ["queued","offered","accepted","declined","timed_out","abandoned","completed"]);
@@ -56,10 +56,10 @@ export const agent_status = pgTable("agent_status", {
   user_id: uuid().notNull(),
   status: text().notNull().default("offline"),
   status_reason: text(),
-  status_started_at: text().notNull().default(sql`now()`),
+  status_started_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   current_queue_entry_id: bigint({ mode: "number" }),
-  last_heartbeat_at: text(),
-  updated_at: text().notNull().default(sql`now()`),
+  last_heartbeat_at: timestamp({ withTimezone: true, mode: "date" }),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
 export const agent_status_event = pgTable("agent_status_event", {
@@ -69,5 +69,5 @@ export const agent_status_event = pgTable("agent_status_event", {
   from_status: text().notNull(),
   to_status: text().notNull(),
   reason: text(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
