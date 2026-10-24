@@ -3,9 +3,9 @@
     "issueNumber": 2531,
     "verdict": "fix-now",
     "summary": "PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.",
-    "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact\u2019s answers.",
+    "currentBehavior": "Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact’s answers.",
     "rootCause": "The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.",
-    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt\u2019s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact\u2019s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.",
+    "resolution": "Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.",
     "lookIn": [
       "app/components/call/CallScreen.Questionnaire.tsx",
       "app/hooks/call/useCallScreen.ts",
@@ -82,33 +82,15 @@
       "app/root.tsx"
     ],
     "existingTests": [
-      "test/ui/team-member-theme.test.tsx \u2014 both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
-      "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx \u2014 accessible names, member permissions and theme switching",
-      "Isolated browser verification \u2014 explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode."
+      "test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component",
+      "test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching",
+      "Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode."
     ],
     "acceptanceCriteria": [
       "Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.",
       "Icons render without waiting for a JavaScript theme value; theme switching and member actions remain available."
     ],
     "rootCause": "TeamMember compares the raw next-themes theme with dark and supplies black otherwise. System mode keeps theme equal to system even when resolvedTheme is dark. An undefined value before hydration is expected from next-themes, so changing the provider default would conceal the wrong dependency. CSS currentColor and the existing theme tokens remove that dependency. The default button variant also supplies a dark primary background despite bg-transparent; the ghost variant supplies the intended transparent icon control and readable hover colours."
-  },
-  {
-    "issueNumber": 1165,
-    "verdict": "fix-now",
-    "summary": "A read-only dry-run Twilio prune report exists in master (scripts/twilio-resource-prune-report.mjs) driven by a shared policy module that classifies every resource as KEEP / STALE / UNKNOWN with an environment check and an owner check, and the only deletion path (scripts/local/prune-environment-twiml-apps.mjs) deletes nothing but closed pull-request preview TwiML Apps, dry-run by default.",
-    "currentBehavior": "The claimed fix does not resolve the reported symptom.",
-    "resolution": "Implement the missing mechanism named in the root cause.",
-    "lookIn": [
-      "scripts/twilio-resource-prune-report.mjs",
-      "scripts/lib/twilio-resource-prune-policy.mjs",
-      "scripts/local/prune-environment-twiml-apps.mjs",
-      "scripts/lib/live-environments.mjs"
-    ],
-    "existingTests": [
-      "test/twilio-resource-prune-policy.test.ts \u2014 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)"
-    ],
-    "acceptanceCriteria": [],
-    "rootCause": "PARTIAL, and manual. The report and both checks are in master, but the goal says \"Find and remove stale Twilio resources in development, review, and closed-preview environments\" and the removal half is only implemented for closed-preview TwiML Apps: the only `.remove()` call in the repo is in prune-environment-twiml-apps.mjs. There is no delete path for a stale messaging service, incoming phone number, or subaccount, and by design a workspace-owned resource can never be STALE (UNKNOWN), so dev/review-owned resources are never removed automatically \u2014 that matches the issue's own \"do not remove production resources automatically\" but leaves \"remove in development and review environments\" unbuilt. The report is a script against a live Twilio account with live credentials and a live database, so a human must run it and act on the STALE list to confirm the behaviour; the classification logic itself is machine-checked. Also note the candidate PR commit b4046027 is unrelated to this issue (it is a CI ledger-drift gate) \u2014 the real work is the 2026-10-19 release commit 91c4409b, which added the report, the policy module and the shared live-environment list."
   },
   {
     "issueNumber": 1826,
@@ -139,7 +121,7 @@
       "None. There is no test or check that asserts a QA-specific Twilio account; `git grep -n \"qa.callcaster.ca\" origin/master -- .` returns only .railway/environments/qa.ts and docs/qa-rehearsal-runbook.md."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The issue has no symptom body \u2014 it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm."
+    "rootCause": "The issue has no symptom body — it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm."
   },
   {
     "issueNumber": 1846,
@@ -171,7 +153,7 @@
   {
     "issueNumber": 1875,
     "verdict": "fix-now",
-    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` \u2014 but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
+    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -180,15 +162,15 @@
       "app/lib/ivr-results.ts"
     ],
     "existingTests": [
-      "test/ivr-webhook-auth.server.test.ts \u2014 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" \u2192 `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts \u2014 the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts \u2014 the export carries the structured answer and its confidence; test/ivr-gather.test.ts \u2014 the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
+      "test/ivr-webhook-auth.server.test.ts — 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" → `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts — the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts — the export carries the structured answer and its confidence; test/ivr-gather.test.ts — the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false \u2014 everything that is implemented is machine-checkable."
+    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false — everything that is implemented is machine-checkable."
   },
   {
     "issueNumber": 1981,
     "verdict": "fix-now",
-    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name \u2014 so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
+    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name — so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -198,7 +180,7 @@
       "None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) \u2014 but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true \u2014 the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
+    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
     "issueNumber": 2507,
@@ -324,10 +306,10 @@
       "id/campaigns/new.route.tsx"
     ],
     "existingTests": [
-      "test/ui/campaigns-new-caller-gating.test.tsx:37 \u2014 `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 \u2014 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
+      "test/ui/campaigns-new-caller-gating.test.tsx:37 — `await screen.findByRole(\"heading\", { name: \"Create campaign\" });` asserts the create-page heading is still present; e2e/specs/errors-empty-states.spec.ts:58-65 — 'The campaign header title is the hub's own heading; the \"Call Campaign Results\" section heading was removed as a duplicate in #2670.'"
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate \u2014 the big 'Setup' heading under the Setup/Content/Queue/Launch tabs \u2014 is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
+    "rootCause": "The two changes that addressed the issue title directly were later undone: 92422d92 (PR #2579) removed the create-page h1 and 709ea3b6 (PR #2602) removed the campaign title header, but #2602 reverted #2579 and cca3f1be (PR #2670) restored the campaign title header. What the issue screenshot shows as the redundant duplicate — the big 'Setup' heading under the Setup/Content/Queue/Launch tabs — is gone in master; the page title header ('Student Send') is not. Because the residue is a visual/layout judgment, a person should look at the campaign pages in a browser to confirm the remaining header is acceptable (docs/release-test-guide-2026-10-15.md:62 still asks for that manual check)."
   },
   {
     "issueNumber": 2686,
@@ -384,7 +366,7 @@
     "summary": "The report repair uses the Messaging Services API with subaccount credentials, scans all SDK pages and stops on unreadable lists. The keep-list and deletion policy stay unchanged.",
     "currentBehavior": "At dev@e4bb8ac6, the CLI silently reports no subaccount Messaging Services after a failed request and can truncate accounts at 200 or resources at 1,000.",
     "rootCause": "The subaccount lookup used /2010-04-01/Accounts/{sid}/Messaging/Services.json, ignored the raw response shape and caught every error as an empty list. SDK limit options capped the total inventory instead of setting a page size.",
-    "resolution": "Extract the resource collector for SDK transport tests. Use messaging.v1.services.list with each subaccount\u2019s credentials, use pageSize without a total limit and preserve a failed read with its account context.",
+    "resolution": "Extract the resource collector for SDK transport tests. Use messaging.v1.services.list with each subaccount’s credentials, use pageSize without a total limit and preserve a failed read with its account context.",
     "lookIn": [
       "scripts/twilio-resource-prune-report.mjs",
       "scripts/lib/twilio-prune-resources.mjs",
@@ -399,7 +381,7 @@
     ],
     "missingTests": [],
     "acceptanceCriteria": [
-      "Include Messaging Services with the subaccount\u2019s own credentials.",
+      "Include Messaging Services with the subaccount’s own credentials.",
       "Enumerate all account and resource pages.",
       "Fail unreadable lists with account context instead of reporting an empty successful scan.",
       "Keep the report read-only and preserve all keep-list and environment/owner decisions."
