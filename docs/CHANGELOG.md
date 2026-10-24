@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign image attachments have named Add and Remove controls for keyboard and touch, with pending locks and retry after a failed upload ([#2656](https://github.com/chester-hill-solutions/callcaster/issues/2656)).
 - Fixed: Campaign queue checkboxes identify each contact, including unnamed contacts and duplicate names, and state the current page selection scope ([#2641](https://github.com/chester-hill-solutions/callcaster/issues/2641)).
 - Changed: Text campaigns start with the same weekday send window as call campaigns, so a new campaign no longer opens on "No send window set" with the unrestricted-SMS warning ([PR #2952](https://github.com/chester-hill-solutions/callcaster/pull/2952), [#2501](https://github.com/chester-hill-solutions/callcaster/issues/2501)).
 - Fixed: A password reset link with no token no longer shows a password form. The page says the link is incomplete and offers a new one ([PR #2950](https://github.com/chester-hill-solutions/callcaster/pull/2950), [#2661](https://github.com/chester-hill-solutions/callcaster/issues/2661)).

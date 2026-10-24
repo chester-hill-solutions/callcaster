@@ -299,6 +299,12 @@ boundary through the route's reader. Bun can derive a parsed File's MIME type
 from its filename; `Response(FormData).formData()` can take a different path.
 Check the parsed file's policy in both runtimes, not only a hand-built File.
 
+A jsdom `File` passed through Node `Request.formData()` can retain its bytes but
+lose its filename. For UI payload checks, inspect the original `FormData` at the
+fetcher submission boundary while retaining real router transitions. Use a native
+browser `File` through the multipart reader for wire-filename claims. Do not
+change application upload code to compensate for this fixture conversion.
+
 Use object rows when a `test.each` case contains an array input, for example
 `[{ ids: [] }, { ids: ["id"] }]`. Vitest spreads a bare array row into positional
 arguments; an empty row supplies no argument. Check the fixed positive cases
@@ -797,3 +803,8 @@ Test this with a real router fetcher action, including delayed event delivery.
 A stale loader can also arrive after SSE resolution: discard incoming intents
 whose identity is already resolved. Historical rows without a client reference
 must never consume a server intent through content matching.
+
+Keep throwaway browser fixtures outside the repository checkout. A Git-ignored
+`.local/` file can still enter the full ESLint scan and lint ratchet. Point the
+fixture's aliases at the owned worktree, and keep its dependencies and cache in
+its own temporary directory.

@@ -54,7 +54,7 @@ describe("app/components/MessageSettings.tsx", () => {
     vi.useRealTimers();
   });
 
-  test("renders media, toggles erase on hover, and removes image via DELETE submit", async () => {
+  test("renders media and removes an image without hover via DELETE submit", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
     const props = baseProps();
 
@@ -63,19 +63,11 @@ describe("app/components/MessageSettings.tsx", () => {
     // Media renders via Await
     expect(screen.getByAltText("Campaign media 1")).toBeInTheDocument();
 
-    // Hover shows remove button for a real imageId
-    fireEvent.mouseEnter(
-      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
-    );
-    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove attachment 1" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove attachment 1" }));
     expect(mocks.submit).toHaveBeenCalled();
     expect(props.onChange).not.toHaveBeenCalledWith("message_media", ["b.png"]);
-
-    fireEvent.mouseLeave(
-      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
-    );
   });
 
   test("removeImage still submits when details.message_media becomes null", async () => {
@@ -96,20 +88,17 @@ describe("app/components/MessageSettings.tsx", () => {
       />,
     );
 
-    fireEvent.mouseEnter(
-      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
-    );
-    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove attachment 1" })).toBeInTheDocument();
 
     // mutate prop object before click; remove flow should still submit
     details.message_media = null;
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove attachment 1" }));
 
     expect(mocks.submit).toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalledWith("message_media", []);
   });
 
-  test("media render returns null when message_media is missing; hover guards when imageId missing", async () => {
+  test("media render returns null when message_media is missing and omits Remove for a missing imageId", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props = baseProps({
@@ -123,15 +112,13 @@ describe("app/components/MessageSettings.tsx", () => {
     const { container } = render(<MessageSettings {...props} />);
     expect(container.querySelector("img")).toBeFalsy();
 
-    // Mismatch lengths => undefined imageId branch (no show/hide)
     const props2 = baseProps({
       details: { ...baseProps().details, message_media: [null as any] },
       mediaLinks: ["https://cdn.example/a.png", "https://cdn.example/b.png"],
     });
     render(<MessageSettings {...props2} />);
-    const img = screen.getByAltText("Campaign media 1");
-    fireEvent.mouseEnter(img.closest("div") as HTMLElement);
-    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
+    expect(screen.getByAltText("Campaign media 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Remove attachment/ })).toBeNull();
   });
 
   test("updates body_text immediately and syncs when details.body_text prop changes", async () => {
@@ -378,9 +365,8 @@ describe("app/components/MessageSettings.tsx", () => {
     }
 
     const view = render(<ControlledMessageSettings />);
-    const image = screen.getByAltText("Campaign media 1");
-    fireEvent.mouseEnter(image.closest("div") as HTMLElement);
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(screen.getByAltText("Campaign media 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove attachment 1" }));
 
     mocks.fetcherState = "submitting";
     view.rerender(<ControlledMessageSettings />);

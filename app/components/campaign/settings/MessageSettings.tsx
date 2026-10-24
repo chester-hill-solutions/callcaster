@@ -1,4 +1,5 @@
-import { MdAddAPhoto , MdTag } from "react-icons/md";
+import { MdAddAPhoto, MdTag } from "react-icons/md";
+import { X } from "lucide-react";
 import { useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
@@ -7,6 +8,7 @@ import { useFetcherOnIdle } from "@/hooks/utils";
 import { hasTemplateSyntax, processTemplateTags, SAMPLE_TEMPLATE_CONTACT } from "@/lib/message-templates";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 // Available template tags based on contact fields
 const TEMPLATE_TAGS = [
@@ -75,7 +77,6 @@ function getErrorMessage(error: MessageMediaActionData["error"]) {
 
 export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettingsProps) => {
     const displayText = details?.body_text || '';
-    const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [tagsMenuOpen, setTagsMenuOpen] = useState(false);
     const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
     const mediaLinksSignature = JSON.stringify(mediaLinks);
@@ -85,7 +86,9 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
         setResolvedMediaLinks(mediaLinks);
     }
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const mediaInputRef = useRef<HTMLInputElement>(null);
     const mediaFetcher = useFetcher<MessageMediaActionData>();
+    const isMediaPending = mediaFetcher.state !== "idle";
     const segmentInfo = getSmsSegmentInfo(displayText);
     const hasMedia = resolvedMediaLinks.length > 0;
     const creditEstimate = estimateMessageCredits({ body: displayText, hasMedia });
@@ -131,20 +134,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
             }
         }
     });
-    const showErase = (imageId: string) => {
-        setEraseVisible((prevState) => ({
-            ...prevState,
-            [imageId]: true,
-        }));
-    };
-
-    const hideErase = (imageId: string) => {
-        setEraseVisible((prevState) => ({
-            ...prevState,
-            [imageId]: false,
-        }));
-    };
-
     const removeImage = (imageId: string) => {
         const formData = new FormData();
         formData.append("fileName", imageId);
@@ -220,8 +209,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
                             key={imageId ?? i}
                             className="relative mb-2 rounded-lg"
                             style={{ width: "45%" }}
-                            onMouseEnter={() => imageId && showErase(imageId)}
-                            onMouseLeave={() => imageId && hideErase(imageId)}
                         >
                             <img
                                 id={imageId ?? String(i)}
@@ -229,13 +216,19 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
                                 alt={`Campaign media ${i + 1}`}
                                 className="w-full rounded-lg"
                             />
-                            {imageId && eraseVisible[imageId] && (
-                                <button
-                                    className="absolute right-2 top-2 rounded-md bg-foreground/70 px-2 py-4 text-background"
+                            {imageId && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="icon-lg"
+                                    className="absolute right-2 top-2"
+                                    aria-label={`Remove attachment ${i + 1}`}
+                                    title={`Remove attachment ${i + 1}`}
+                                    disabled={isMediaPending}
                                     onClick={() => removeImage(imageId)}
                                 >
-                                    Remove
-                                </button>
+                                    <X aria-hidden />
+                                </Button>
                             )}
                         </div>
                     );
@@ -390,20 +383,34 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
                                     </PopoverContent>
                                 </Popover>
 
-                                <label htmlFor="add-image" className="cursor-pointer text-muted-foreground">
-                                    <MdAddAPhoto size={24} />
-                                </label>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-lg"
+                                    aria-label="Add image"
+                                    title="Add image"
+                                    disabled={isMediaPending}
+                                    onClick={() => {
+                                        const input = mediaInputRef.current;
+                                        if (!input) return;
+                                        input.value = "";
+                                        input.click();
+                                    }}
+                                >
+                                    <MdAddAPhoto aria-hidden />
+                                </Button>
                                 <input
+                                    ref={mediaInputRef}
                                     type="file"
                                     name="image"
                                     id="add-image"
                                     hidden
                                     onChange={handleAddMedia}
-                                    disabled={mediaFetcher.state !== "idle"}
+                                    disabled={isMediaPending}
                                 />
                             </div>
                         </div>
-                        {mediaFetcher.state !== "idle" && (
+                        {isMediaPending && (
                             <div className="text-xs text-muted-foreground">
                                 Updating media...
                             </div>
