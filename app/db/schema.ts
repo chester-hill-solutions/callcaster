@@ -298,14 +298,14 @@ export const workspace_number_purchase = pgTable("workspace_number_purchase", {
 export const script = pgTable(
   "script",
   {
-    created_at: text().notNull().default(sql`now()`),
+    created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
     created_by: uuid(),
     id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
     is_sample: boolean().notNull().default(false),
     name: text().notNull().default(""),
     steps: jsonb(),
     type: text(),
-    updated_at: text(),
+    updated_at: timestamp({ withTimezone: true, mode: "string" }),
     updated_by: text(),
     workspace: uuid(),
   },
@@ -346,11 +346,11 @@ export const contact = pgTable("contact", {
 export const contact_audience = pgTable("contact_audience", {
   audience_id: bigint({ mode: "number" }).notNull(),
   contact_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
 });
 
 export const audience = pgTable("audience", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   is_conditional: boolean().notNull().default(false),
   name: text(),
@@ -358,7 +358,7 @@ export const audience = pgTable("audience", {
   status: text().default("pending"),
   total_contacts: numeric({ mode: "number" }),
   processed_contacts: numeric({ mode: "number" }),
-  processed_at: text(),
+  processed_at: timestamp({ withTimezone: true, mode: "string" }),
   error_message: text(),
 });
 
@@ -368,13 +368,13 @@ export const audience_upload = pgTable("audience_upload", {
   audience_id: bigint({ mode: "number" }).notNull(),
   workspace: uuid().notNull(),
   created_by: uuid(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   status: text().notNull(),
   file_name: text(),
   file_size: bigint({ mode: "number" }),
   total_contacts: bigint({ mode: "number" }).notNull(),
   processed_contacts: bigint({ mode: "number" }).notNull(),
-  processed_at: text(),
+  processed_at: timestamp({ withTimezone: true, mode: "string" }),
   error_message: text(),
   header_mapping: jsonb().default({}),
   split_name_column: text(),
@@ -555,15 +555,15 @@ export const handset_session = pgTable("handset_session", {
   workspace_id: uuid().notNull(),
   client_identity: text().notNull(),
   status: text().notNull().default("active"),
-  created_at: text().notNull().default(sql`now()`),
-  expires_at: text().notNull(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
+  expires_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
 });
 
 // ─── Billing ──────────────────────────────────────
 
 export const transaction_history = pgTable("transaction_history", {
   amount: integer().notNull(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   idempotency_key: text(),
   note: text(),
@@ -581,15 +581,15 @@ export const verification_session = pgTable("verification_session", {
   user_id: uuid().notNull(),
   expected_caller: text().notNull(),
   status: text().notNull().default("pending"),
-  expires_at: text().notNull(),
-  created_at: text().notNull().default(sql`now()`),
+  expires_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
 });
 
 export { verification_number } from "./schema-verification-number";
 
 export const user = pgTable("user", {
   access_level: text().default("standard"),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   first_name: text(),
   id: text().notNull().primaryKey(),
   last_name: text(),
@@ -598,13 +598,13 @@ export const user = pgTable("user", {
 });
 
 export const webhook = pgTable("webhook", {
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
   custom_headers: jsonb().notNull().default({}),
   destination_url: text().notNull(),
   events: jsonb().default({}),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   type: text().default("outreach_attempt"),
-  updated_at: text(),
+  updated_at: timestamp({ withTimezone: true, mode: "string" }),
   updated_by: text(),
   workspace: uuid().notNull(),
 });
