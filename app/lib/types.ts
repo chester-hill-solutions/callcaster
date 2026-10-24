@@ -714,6 +714,7 @@ export interface BaseUser {
   access_level: string | null;
   created_at: string;
   verified_audio_numbers: string[] | null;
+  sim_marker: string | null;
 }
 
 export interface AppUser extends BaseUser {}

@@ -131,6 +131,7 @@ export const workspace = pgTable("workspace", {
   id: uuid().notNull().primaryKey().default(sql`gen_random_uuid()`),
   key: text(),
   name: text().notNull(),
+  sim_marker: text(),
   owner: text(),
   stripe_id: text(),
   stripe_customer_creation: jsonb().$type<{
@@ -163,6 +164,7 @@ export const workspace_member = pgTable(
     workspace_id: uuid().notNull().references(() => workspace.id, { onDelete: "cascade" }),
     user_id: text().notNull(),
     role_id: text().notNull(),
+    sim_marker: text(),
     invited_by: text(),
     created_at: timestamp().notNull().defaultNow(),
   },
@@ -594,6 +596,7 @@ export const user = pgTable("user", {
   id: text().notNull().primaryKey(),
   last_name: text(),
   username: text().notNull(),
+  sim_marker: text(),
   verified_audio_numbers: text().array().default([]),
 });
 

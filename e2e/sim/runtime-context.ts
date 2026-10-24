@@ -4,11 +4,12 @@ import { readRuntimeEnvironment, runtimeEnvironmentToLocalProfile, type RuntimeE
 import type { SecretProvider } from "../../config/secret-provider";
 import type { EnvironmentName, LocalProfileIdentity, ProjectConfig, SecretName, SecretProviderName } from "../../config/schema";
 import { resolveSimProfile, type ResolvedSimProfile } from "./personas";
+import type { SimCredentialName } from "./personas/types";
 
 export type SimRuntimeContext = Readonly<{
   profile: ResolvedSimProfile;
   providerName: SecretProviderName;
-  getCredential: (name?: string) => Promise<string>;
+  getCredential: (name?: SimCredentialName) => Promise<string>;
 }>;
 
 export type SimSecretProviderFactory = (input: Readonly<{

@@ -16,6 +16,7 @@ export const authUser = pgTable("auth_user", {
   emailVerified: boolean("email_verified").default(false).notNull(),
   twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
   image: text("image"),
+  simMarker: text("sim_marker"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
