@@ -73,7 +73,7 @@
       "app/lib/platform-workspace-numbers.server.ts"
     ],
     "existingTests": [
-      "n/a — operational"
+      "n/a \u2014 operational"
     ],
     "missingTests": [
       "before/after evidence, rollback steps"
@@ -92,7 +92,7 @@
     "issueNumber": 1345,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide and add a CHS-managed toll-free SMS verification path",
-    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.",
+    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path \u2014 but only after a compliance/ownership decision.",
     "currentBehavior": "Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.",
     "rootCause": "No managed-sponsorship model; CHS BN must not be stored as customer identity.",
     "resolution": "Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.",
@@ -177,7 +177,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1709,
@@ -191,7 +191,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1710,
@@ -205,7 +205,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1722,
@@ -219,12 +219,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1723,
     "verdict": "needs-decision",
-    "summary": "Feature request (template-tag → contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
+    "summary": "Feature request (template-tag \u2192 contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -233,7 +233,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1724,
@@ -247,12 +247,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1729,
     "verdict": "needs-decision",
-    "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
+    "summary": "Auto-disposition mapping needs a spec (which outcome \u2192 which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -261,7 +261,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1732,
@@ -275,15 +275,15 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1815,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide TWO_FACTOR_ENABLED kill-switch state per environment",
-    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.",
+    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 \u2014 the #1569 kill-switch default.",
     "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The code half shipped: commit 27277319 (feat(auth): turn two-factor authentication off behind a TWO_FACTOR_ENABLED kill switch (#1569)) registers the Better Auth twoFactor plugin only when the flag is true, and every privileged-role mandate is off with it. test/two-factor-kill-switch.route.test.ts, test/two-factor.server.test.ts and test/auth-instance.server.test.ts cover it. What is missing is the state, not the code: .env.example:159 still has TWO_FACTOR_ENABLED commented out, no Railway environment model sets it, and no ADR records whether 2FA is meant to be off.",
-    "rootCause": "None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
+    "rootCause": "None \u2014 MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
     "resolution": "Decide and record the per-environment state, then set the flag to match. The code is done and tested, so this is a decision plus configuration, not an implementation. A short ADR next to the existing ones is the right record, because the current position - 2FA off everywhere by default - is only correct if it is intended.",
     "lookIn": [
       "app/lib/env.server.ts:262-271 (isTwoFactorFeatureEnabled)",
@@ -420,8 +420,8 @@
     "issueNumber": 2036,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide the scope of flattening the call screen: the call screen only, or the shared workspace panel every page uses",
-    "summary": "The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen — it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.",
-    "currentBehavior": "The live calling screen stacks three card treatments — the workspace panel, the sticky top bar, and inner section cards — and the invisible ones still cost padding.",
+    "summary": "The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen \u2014 it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.",
+    "currentBehavior": "The live calling screen stacks three card treatments \u2014 the workspace panel, the sticky top bar, and inner section cards \u2014 and the invisible ones still cost padding.",
     "rootCause": "The workspace panel treatment is a single shared className with no per-surface override, and the top bar re-states rounded/border/shadow locally. Two owners for the same visual concept, so the call screen cannot opt out.",
     "resolution": "Decide the scope, then it is a small edit either way. Option A (call screen only): add an isCallScreen branch next to the existing isChatsScreen branch at app/routes/workspaces+/$id.tsx:204-207 that drops rounded-2xl, border and shadow-sm and reduces p-6 for the call route, and flatten the sticky header at CallScreen.Header.tsx:239. Nothing else on the product changes; the risk is that the call screen now looks different from every page beside it. Option B (whole product): flatten the shared panel for all workspace routes, so the page is a flat canvas and cards mean something when they appear. Bigger visual diff, needs a pass over every workspace page to check what depended on the panel's padding, but it is the version that actually establishes 'a card is a deliberate container'. Option C (middle): keep the panel as-is and change the top bar only, which fixes the half the reporter named twice but leaves the outer card. Whichever is chosen, express it as a variant on the panel rather than a route-conditional className string, so the next surface can opt out without editing a ternary. Also decide the padding: the reporter asks to 'punch back' the padding the invisible cards were creating, which means auditing the space-* classes between the panel and the first inner card as part of the change, not just deleting rounded and shadow.",
     "lookIn": [
@@ -442,7 +442,7 @@
       "The chosen scope is written down, and the panel treatment is a named variant rather than a route-conditional className string",
       "The named surfaces (outer card, top bar) have no curved edges or drop shadow",
       "The padding the removed cards were creating is punched back, verified by measuring the gap at the top of the call screen",
-      "Inner section cards keep their treatment — they are the containers that should still read as cards",
+      "Inner section cards keep their treatment \u2014 they are the containers that should still read as cards",
       "No other workspace page changed unintentionally, or changed deliberately and listed"
     ],
     "blockedBy": [],
@@ -454,7 +454,7 @@
     "issueNumber": 2029,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide the release list and the retention policy for unused dev-environment Twilio numbers",
-    "summary": "An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check — a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.",
+    "summary": "An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check \u2014 a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.",
     "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. The read-only tooling now exists: scripts/twilio-resource-prune-report.mjs scans the account for TwiML Apps, Messaging Services, phone numbers and subaccounts, classifies each one, and prints the accounts it found with their last activity. The keep-list scripts/twilio-resource-prune-keep-list.mjs holds the Chester Hill Solutions business line. The three numbers this issue names are NOT in that keep-list, and the keep-list is the place a decision like this belongs.",
     "rootCause": "Dev numbers accumulate because renting is cheap and there is no reaper. The list of what is safe to release is held in people's heads and in Slack, not in the repo or the database.",
     "resolution": "The tooling to make the decision is in place. Two decisions remain and both are human: which of the unused dev numbers are released, and what the retention rule is. Put the survivors in scripts/twilio-resource-prune-keep-list.mjs, then release the rest. Twilio has no API delete for a subaccount, so each release is a console action; a rented phone number is released through the workspace number release path.",
@@ -485,16 +485,16 @@
     "issueNumber": 2043,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide how far to expand the campaign-split feature: promote it, widen its trigger, or automate the copy variation it asks for by hand",
-    "summary": "This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works — SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.",
+    "summary": "This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works \u2014 SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.",
     "currentBehavior": "A working but single-purpose warning-path tool: one entry point, one trigger condition, manual copy variation.",
     "rootCause": "The feature was scoped as a safeguard inside the bulk-send warning rather than as a campaign operation, so its reach and its automation were never designed.",
-    "resolution": "Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment — a per-segment message variant, or a merge field carrying the segment index — instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.",
+    "resolution": "Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment \u2014 a per-segment message variant, or a merge field carrying the segment index \u2014 instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.",
     "lookIn": [
       "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx (the whole feature: the alert, the sheet, the checklist, the split submit)",
       "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:211-226 (the only render site)",
       "app/lib/throughput-config.ts:102-108 (isBulkSmsSenderMisaligned: ca_local and >= 500)",
       "test/ui/split-campaign-override.test.tsx (existing coverage of the override path)",
-      "app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment — locate it before scoping any change)"
+      "app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment \u2014 locate it before scoping any change)"
     ],
     "existingTests": [
       "test/ui/split-campaign-override.test.tsx (the bulk-on-local override and its acknowledgement)"
@@ -531,12 +531,12 @@
       "app/lib/worker/handlers.server.ts:107-237 (the handler registry, no backup handler)"
     ],
     "existingTests": [
-      "test/job-registry.test.ts (guards registry drift — a new job type must be registered here)",
+      "test/job-registry.test.ts (guards registry drift \u2014 a new job type must be registered here)",
       "test/worker-cron-handlers.server.test.ts (the pattern for handler tests)",
       "test/call-recording-storage.server.test.ts and test/object-storage-upsert.test.ts (the pattern for storage-adapter tests)"
     ],
     "missingTests": [
-      "no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES — a new tenant table would silently not be backed up",
+      "no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES \u2014 a new tenant table would silently not be backed up",
       "no test asserts the daily dedupe key prevents a second run on the same UTC day",
       "no test asserts that one workspace failing does not error the whole job",
       "no test asserts the manifest is written and lists the files it claims to",
@@ -562,9 +562,9 @@
     "issueNumber": 2139,
     "verdict": "needs-decision",
     "recommendedTitle": "Member-level role management is server-permitted but UI-invisible, so the Member floor on updateUser/deleteUser is dead code",
-    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" — for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
+    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" \u2014 for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
     "currentBehavior": "One side of the permission model is implemented and the other is not, and the user-visible message is on the wrong side. A test that asserts the server permits it and a UI that asserts the user cannot do it are both green, which is why this survived.",
-    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` → `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
+    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` \u2192 `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
     "lookIn": [
       "app/components/workspace/TeamMember.tsx:78,139-141",
       "app/routes/workspaces+/$id/settings.action.server.ts:44-53",
@@ -595,7 +595,7 @@
     "recommendedTitle": "workspace.disabled does not block sign-in or API access, so the platform suspension lever does not suspend",
     "summary": "Disabling a workspace stops money moving out (rental DEBITs, billing_reconcile, twilio_open_sync) but does not stop anyone using the product. `disabled` is read in only three places and no auth path reads it, so a suspended workspace's members still sign in and still use the API.",
     "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. No auth path reads the flag. app/lib/workspace-middleware.server.ts and app/lib/data-plane-middleware.server.ts both resolve the session and set their context without looking at workspace.disabled, and app/lib/cron-workspace-fanout.server.ts says so in prose: the lever does NOT block members from signing in, so skipping the billing is the whole of what it buys today. app/db/schema.ts:103 still declares disabled with no comment recording the intended meaning, and the admin panel still shows a bare Disabled badge. No test asserts any access behaviour for a disabled workspace.",
-    "rootCause": "`disabled` was specified and implemented as a billing lever only. It was never given an auth meaning, so the name implies a kill switch it does not provide. Not a missing check — a missing decision.",
+    "rootCause": "`disabled` was specified and implemented as a billing lever only. It was never given an auth meaning, so the name implies a kill switch it does not provide. Not a missing check \u2014 a missing decision.",
     "resolution": "Two decisions. First, is workspace.disabled meant to be an access kill switch or only a billing lever? The current behaviour is the billing lever and the code says so. Second, if it is meant to suspend access, the suspension has to be enforced in the workspace middleware and the data-plane middleware, the schema column needs a comment recording the intended meaning, and the admin badge needs to stop over-promising. Decide before building, because a half-enforced suspension is worse than an honest billing lever.",
     "lookIn": [
       "app/db/schema.ts:103 (the disabled column, uncommented)",
@@ -628,14 +628,14 @@
     "verdict": "needs-decision",
     "recommendedTitle": "No product analytics exists anywhere, so every product decision is an untested guess",
     "summary": "No product analytics in the codebase. A scan of app/, shared/, services/, worker/ and server/ for PostHog, Segment, Mixpanel, Amplitude, Google Analytics, gtag and Plausible returns nothing. Sentry is wired for errors only, at 8 call sites (app/entry.server.tsx:133, app/lib/errors.server.ts:118, app/lib/ops-alert.server.ts:141, app/lib/worker/poll-jobs.server.ts:365,390, server/bun.ts:449,471,536,543,622, worker/index.ts:28). The two tables that look like usage data are not: workspace_events (app/db/schema.ts:443) is an SSE feed whose rows are deleted past a retention window by app/lib/worker/job-retention.server.ts:67-90, and workspace_audit_event (app/db/schema.ts:451) is a security log gated behind the owner-only audit.read capability.",
-    "currentBehavior": "Nothing about product usage is measurable. There is no funnel across the five steps a new workspace must pass (signup, workspace creation, first rented number, first campaign, first accepted send), no cohort or retention measure, and no acquisition attribution. The build is far wider than the revealed product — 53 tables, 542 route modules, and 90 days of commits at 355 fix against 134 feat — and nothing in the code indicates which parts anyone walks. NEW_WORKSPACE_WELCOME_CREDITS = 100 (app/lib/database/workspace-provisioning.server.ts:33) is an untested guess at whether $2 of free usage is enough to convert.",
-    "rootCause": "Analytics was never treated as a product surface. The codebase has an unusually deliberate answer for most other concerns — tenancy is enforced by a scoped client, billing by one idempotent RPC, compliance by one shared predicate table — and each of those was a decision. Instrumentation was left to default, and the default was none. There is also no team-time argument that resolves it: adding a vendor is a privacy and data-sharing decision on a product that holds Canadian political contact data, and that decision has not been made rather than been deferred.",
-    "resolution": "Answer the sink question first, deliberately. Do not start by adding a vendor. A first-party event table behind the existing tenant client is more consistent with how everything else in this codebase works, costs no third-party data-sharing decision on a product holding voter and contact data, and inherits the tenancy enforcement that already exists. A vendor is faster to stand up and is the right answer if the team wants cohorts and funnels without building them. Either is defensible; picking by default is not. THEN, in order: (1) define the activation event and measure that alone — a workspace that has completed a first accepted send is the closest thing to a north-star metric this product has; (2) instrument the five-step funnel; (3) keep the data tenant-scoped and role-gated from day one, copying the audit.log model (workspace_audit_event plus the owner-only audit.read capability in app/lib/capabilities.ts:47-78), because looser access than that would be a regression in a codebase that deliberately went the other way; (4) keep the analytics client out of the session route's hot path and off check:client-bundle's denylist, sampling if volume requires it.",
+    "currentBehavior": "Nothing about product usage is measurable. There is no funnel across the five steps a new workspace must pass (signup, workspace creation, first rented number, first campaign, first accepted send), no cohort or retention measure, and no acquisition attribution. The build is far wider than the revealed product \u2014 53 tables, 542 route modules, and 90 days of commits at 355 fix against 134 feat \u2014 and nothing in the code indicates which parts anyone walks. NEW_WORKSPACE_WELCOME_CREDITS = 100 (app/lib/database/workspace-provisioning.server.ts:33) is an untested guess at whether $2 of free usage is enough to convert.",
+    "rootCause": "Analytics was never treated as a product surface. The codebase has an unusually deliberate answer for most other concerns \u2014 tenancy is enforced by a scoped client, billing by one idempotent RPC, compliance by one shared predicate table \u2014 and each of those was a decision. Instrumentation was left to default, and the default was none. There is also no team-time argument that resolves it: adding a vendor is a privacy and data-sharing decision on a product that holds Canadian political contact data, and that decision has not been made rather than been deferred.",
+    "resolution": "Answer the sink question first, deliberately. Do not start by adding a vendor. A first-party event table behind the existing tenant client is more consistent with how everything else in this codebase works, costs no third-party data-sharing decision on a product holding voter and contact data, and inherits the tenancy enforcement that already exists. A vendor is faster to stand up and is the right answer if the team wants cohorts and funnels without building them. Either is defensible; picking by default is not. THEN, in order: (1) define the activation event and measure that alone \u2014 a workspace that has completed a first accepted send is the closest thing to a north-star metric this product has; (2) instrument the five-step funnel; (3) keep the data tenant-scoped and role-gated from day one, copying the audit.log model (workspace_audit_event plus the owner-only audit.read capability in app/lib/capabilities.ts:47-78), because looser access than that would be a regression in a codebase that deliberately went the other way; (4) keep the analytics client out of the session route's hot path and off check:client-bundle's denylist, sampling if volume requires it.",
     "lookIn": [
-      "app/db/schema.ts:443 (workspace_events — an SSE feed, not usage analytics)",
-      "app/db/schema.ts:451 (workspace_audit_event — a security log, the access model to copy)",
+      "app/db/schema.ts:443 (workspace_events \u2014 an SSE feed, not usage analytics)",
+      "app/db/schema.ts:451 (workspace_audit_event \u2014 a security log, the access model to copy)",
       "app/lib/workspace-events.server.ts:26 (the insert path a first-party event table would mirror)",
-      "app/lib/capabilities.ts:47-78 (audit.read is owner-only — the model to copy)",
+      "app/lib/capabilities.ts:47-78 (audit.read is owner-only \u2014 the model to copy)",
       "app/lib/worker/job-retention.server.ts:67-90 (workspace_events rows are pruned, so it is a feed and not a record)",
       "app/lib/database/workspace-provisioning.server.ts:33 (the untested welcome-credit guess)"
     ],
@@ -646,7 +646,7 @@
       "Analytics routes are covered by check:route-authz and gated at least as tightly as the audit log"
     ],
     "acceptanceCriteria": [
-      "A written decision exists in the repo on the sink, stating why — vendor or first-party",
+      "A written decision exists in the repo on the sink, stating why \u2014 vendor or first-party",
       "The activation event is defined in writing and is queryable",
       "The five funnel steps emit one event each, each asserted",
       "Analytics data sits behind the same or tighter role gate than the audit log"
@@ -654,7 +654,7 @@
     "blockedBy": [],
     "size": "M",
     "risk": "low",
-    "trackerRecommendation": "Needs decision, not fix-now, because the first task is a product and privacy choice rather than code: whether a product holding Canadian voter and contact data may send events to a third party. That choice changes the implementation substantially, so implementing before it is made risks doing the work twice. This is the largest gap between what the code does and what the business needs, and it is the reason the other open decisions in this batch are hard to answer — several of them (welcome-credit sizing, which features to keep, whether the product is one vertical or two) are product questions that measurement would settle and that currently rest on intuition. Not a duplicate of #1185, which was a narrower credit-variance cross-reference and is closed completed."
+    "trackerRecommendation": "Needs decision, not fix-now, because the first task is a product and privacy choice rather than code: whether a product holding Canadian voter and contact data may send events to a third party. That choice changes the implementation substantially, so implementing before it is made risks doing the work twice. This is the largest gap between what the code does and what the business needs, and it is the reason the other open decisions in this batch are hard to answer \u2014 several of them (welcome-credit sizing, which features to keep, whether the product is one vertical or two) are product questions that measurement would settle and that currently rest on intuition. Not a duplicate of #1185, which was a narrower credit-variance cross-reference and is closed completed."
   },
   {
     "issueNumber": 2218,
@@ -662,10 +662,10 @@
     "recommendedTitle": "No recurring revenue exists: there is no plan, subscription or invoice table, and the only pay path is a one-time credit top-up",
     "summary": "There is no plan, subscription or invoice table anywhere in the schema or in any migration. The only pay path is a one-time credit purchase with a $10 minimum (shared/pricing.ts:9) at $0.02 per credit (shared/pricing.ts:8). Half the plumbing already exists: createNewWorkspace creates a Stripe customer at provisioning (app/lib/database/workspace-provisioning.server.ts:138-145), workspace.stripe_id is stored (app/db/schema.ts:106), and a webhook is handled (app/routes/api+/stripe-webhook.action.server.ts). What is missing is the product: what a customer subscribes to, and what a lapse does.",
     "currentBehavior": "Revenue stops when a customer's credits run out and someone tops up manually. For the revealed buyer this is a structural problem rather than a pricing one: the contact schema is political campaign outreach (voter_list_source holds elections_canada and elections_ontario at app/db/schema.ts:89; contact carries voter_id and support_level at app/db/schema.ts:285-290), and a campaign runs a season then stops. A platform funded only by usage therefore earns less the better a customer does, and no customer can budget against it.",
-    "rootCause": "The credit ledger was built first and well — one idempotent plpgsql RPC for ledger insert plus balance update, a single shared rate card, shared idempotency-key builders per billing kind, and a reconciliation path using the same terminal-status set as the debit gate (shared/pricing.ts:84-99). That is a metered-billing foundation, and it was mistaken for a finished billing product. What is absent is the layer above it: a plan, a period, and a lapse behaviour. Note that a recurring charge already exists in everything but name — number rental bills on a cycle (app/lib/number-rental-billing.server.ts) with a suspension lifecycle (workspace_number.suspended_at, rental_warned_cycle; client/migrations/20260731160000_workspace_number_rental_lifecycle.sql). The gap is a plan that bundles that with metered usage, not the absence of recurring machinery.",
-    "resolution": "This is a product decision before it is an engineering task. Answer these five before writing code, because each changes the schema rather than just the checkout: (1) WHAT IS SOLD — a plan with included minutes and credits, metered overage, or a hybrid. Number rental is the natural anchor because it already recurs. (2) PERIOD — monthly, and whether annual exists. (3) LAPSE BEHAVIOUR — suspend sending at zero credits as today, or something softer; the rental lifecycle above is a working precedent for the whole workspace. (4) CREDIT SEMANTICS — whether credits become a grant that refreshes each period or remain a prepaid balance drawn down by a subscription. This is the core modelling question and it changes the ledger, not just checkout. (5) CURRENCY — CAD or USD or both; CREDIT_PRICE_CAD and formatCadFromCredits are CAD-only today (shared/pricing.ts:8,144-149). Once 1-5 are answered the schema work is a subscription table with a Stripe id, status and period, plus a plan table if plans are configurable. Everything else reuses the existing ledger, which is the asset here.",
+    "rootCause": "The credit ledger was built first and well \u2014 one idempotent plpgsql RPC for ledger insert plus balance update, a single shared rate card, shared idempotency-key builders per billing kind, and a reconciliation path using the same terminal-status set as the debit gate (shared/pricing.ts:84-99). That is a metered-billing foundation, and it was mistaken for a finished billing product. What is absent is the layer above it: a plan, a period, and a lapse behaviour. Note that a recurring charge already exists in everything but name \u2014 number rental bills on a cycle (app/lib/number-rental-billing.server.ts) with a suspension lifecycle (workspace_number.suspended_at, rental_warned_cycle; client/migrations/20260731160000_workspace_number_rental_lifecycle.sql). The gap is a plan that bundles that with metered usage, not the absence of recurring machinery.",
+    "resolution": "This is a product decision before it is an engineering task. Answer these five before writing code, because each changes the schema rather than just the checkout: (1) WHAT IS SOLD \u2014 a plan with included minutes and credits, metered overage, or a hybrid. Number rental is the natural anchor because it already recurs. (2) PERIOD \u2014 monthly, and whether annual exists. (3) LAPSE BEHAVIOUR \u2014 suspend sending at zero credits as today, or something softer; the rental lifecycle above is a working precedent for the whole workspace. (4) CREDIT SEMANTICS \u2014 whether credits become a grant that refreshes each period or remain a prepaid balance drawn down by a subscription. This is the core modelling question and it changes the ledger, not just checkout. (5) CURRENCY \u2014 CAD or USD or both; CREDIT_PRICE_CAD and formatCadFromCredits are CAD-only today (shared/pricing.ts:8,144-149). Once 1-5 are answered the schema work is a subscription table with a Stripe id, status and period, plus a plan table if plans are configurable. Everything else reuses the existing ledger, which is the asset here.",
     "lookIn": [
-      "shared/pricing.ts:8-10 (price per credit and minimum purchase — the whole current pay model)",
+      "shared/pricing.ts:8-10 (price per credit and minimum purchase \u2014 the whole current pay model)",
       "shared/pricing.ts:84-99 (terminal billable status sets, shared by debit and reconciliation)",
       "app/db/schema.ts:106 (workspace.stripe_id, currently the only billing identity on the tenant)",
       "app/lib/database/workspace-provisioning.server.ts:138-145 (Stripe customer created at provisioning)",
@@ -683,14 +683,14 @@
       "The five questions above are answered in writing, in the repo",
       "A subscription table exists with an idempotent write path",
       "A lapsed subscription produces a defined, tested workspace state",
-      "Refunds and disputes are handled — #1521 is the open decision and it blocks this"
+      "Refunds and disputes are handled \u2014 #1521 is the open decision and it blocks this"
     ],
     "blockedBy": [
       1521
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Needs decision, and the five questions are the deliverable, not a preamble to them. The single most consequential answer is credit semantics: if a subscription grants credits that refresh, the existing ledger's meaning changes and the reconciliation logic that shares the debit gate has to be reworked rather than extended. Do not start implementation before that is settled. This issue is blocked by #1521 (whether refunds and disputes reverse credits), which is a narrower decision about the same ledger. Sequence it AFTER the open credit-ledger defects are fixed rather than before — a subscription layered onto a ledger that drops out-of-order rows or mis-bills MMS makes those bugs more expensive and harder to attribute, and it is worth saying plainly that the ledger is currently correct by design and only its callers and schema are not."
+    "trackerRecommendation": "Needs decision, and the five questions are the deliverable, not a preamble to them. The single most consequential answer is credit semantics: if a subscription grants credits that refresh, the existing ledger's meaning changes and the reconciliation logic that shares the debit gate has to be reworked rather than extended. Do not start implementation before that is settled. This issue is blocked by #1521 (whether refunds and disputes reverse credits), which is a narrower decision about the same ledger. Sequence it AFTER the open credit-ledger defects are fixed rather than before \u2014 a subscription layered onto a ledger that drops out-of-order rows or mis-bills MMS makes those bugs more expensive and harder to attribute, and it is worth saying plainly that the ledger is currently correct by design and only its callers and schema are not."
   },
   {
     "issueNumber": 2046,

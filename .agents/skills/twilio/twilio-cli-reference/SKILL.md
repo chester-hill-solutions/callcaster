@@ -49,6 +49,13 @@ twilio api:core:messages:list --account-sid ACxxx_SUBACCOUNT
 
 **Credential priority:** explicit `-p`/`--account-sid` flag > env vars (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`) > active profile.
 
+Parent credentials can scope a subaccount only for v2010 resources. APIs on
+subdomains, including Messaging Services at `messaging.twilio.com/v1/Services`,
+require that subaccount’s own credentials. Use the SDK’s resource list method;
+do not invent a v2010 path. For complete SDK inventories, set `pageSize` and
+leave `limit` unset: `limit` caps the total count. An unreadable list must fail
+the audit rather than become an empty result. See [subaccount authentication](https://www.twilio.com/docs/iam/api/subaccounts#authentication).
+
 ---
 
 ## Phone Numbers

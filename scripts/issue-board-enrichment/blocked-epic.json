@@ -941,5 +941,29 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "The parent tracks two independent child outcomes. #2329 closed as completed on 2026-10-17; #2330 trusted client identity remains open."
+  },
+  {
+    "issueNumber": 1165,
+    "verdict": "blocked-epic",
+    "summary": "The preview-app cleanup shipped in PR #2733. Remaining cleanup needs the accurate inventory in #2757 and the retention decision in #2029; a suspended subaccount currently rejects Messaging Services reads.",
+    "currentBehavior": "A live read-only check finds a suspended subaccount whose Messaging Services API returns HTTP 401 with both listed and fetched credentials. The existing report hid those failures as empty service lists and capped account enumeration at 200.",
+    "resolution": "Complete the report repair in #2757. Keep unreadable or unverified resources protected, then apply the approved retention rule from #2029 before further cleanup.",
+    "lookIn": [
+      "scripts/twilio-resource-prune-report.mjs",
+      "scripts/lib/twilio-resource-prune-policy.mjs",
+      "scripts/local/prune-environment-twiml-apps.mjs",
+      "scripts/lib/live-environments.mjs"
+    ],
+    "existingTests": [
+      "test/twilio-resource-prune-policy.test.ts — 31 policy cases (environment check, owner check, keep list, assertPrunable guard); no test exercises a real delete (there is no delete path for workspace-owned resources)",
+      "Parent-only live audit: 206 inventory entries, 12 KEEP, 0 STALE and 194 UNKNOWN. This includes 192 subaccount metadata rows but excludes their resource lists; it is not a complete account audit. An active subaccount probe reads a Messaging Service successfully, while the full scan identifies a suspended subaccount and exits with failure."
+    ],
+    "acceptanceCriteria": [],
+    "rootCause": "The collector used a nonexistent v2010 Messaging Services path and suppressed read errors. Resource release also needs the existing policy decision; a missing database owner or an unreadable subaccount does not prove that a resource is unused.",
+    "blockedBy": [
+      2757,
+      2029
+    ],
+    "trackerRecommendation": "Feature; Priority Urgent; Effort Medium; environment unset; assigned to wra-sol. Project Status In progress was read in the issue sidebar. Parent #1158 is closed; existing closed dependencies #1164 and #1212 remain. Open dependencies #2757 and #2029 are now linked natively. Do not change a suspended account or release numbers as part of the report repair."
   }
 ]
