@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6d0ab90c` · 331 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@82169950` · 331 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -620,9 +620,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 14
+## Verify and close — 15
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2292](https://github.com/chester-hill-solutions/callcaster/issues/2292) Assess fragmented public survey responses
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-24
+- The read-only production assessment is complete: zero surveys, responses and answers. No stored rows are available for repair in the inspected database.
+- Current behavior: Production app and Postgres-jAO4 database identities matched. The repeatable-read, read-only snapshot at 2026-10-21T06:04:48Z returned zero in each anonymous, contact-backed and unlinked-contact population; RLS does not hide rows.
+- Root cause: The confirmed tokenless identity defect occurs in retained production source from the August 21 deployment until the fixed October 8 replacement. Missing-row completions leave no stored response and cannot be reconstructed from an empty table.
+- Resolution: Review and land docs/assessments/2292-survey-response-history.md and its aggregate-only SQL. Do not repair or merge rows in this empty target database. A separate legacy data source needs its own scoped read and identity evidence.
+- Look in: `docs/assessments/2292-survey-response-history.md`, `docs/assessments/2292-survey-response-history.sql`
+- Existing tests: The aggregate SQL executed in a server-enforced read-only production transaction with a 15-second statement limit.; All three synthetic controls passed through the same aggregation: legitimate same-contact repeats, separate anonymous visits and ambiguous partial attempts stay distinct.; Released source and retained deployment metadata establish pre-fix and fixed boundaries; exact traffic switch times remain unavailable.
+- Done when: Record the inspected environment, revision/deployment interval and aggregate counts.; Separate anonymous, contact-backed and unlinked-contact populations; distinguish missing evidence from zero stored rows.; Keep legitimate repeated-attempt controls and explain limits of attribution.; State a repair/no-repair recommendation without changing or exporting respondent rows.
+- Tracker: Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released.
 
 ### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) STOP and START text remains visible to operators but no system information messages
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-10-24
@@ -770,7 +781,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 17
+## Needs reproduction — 16
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -904,18 +915,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Existing tests: The source-visible half was reproduced in an OS-enforced sandbox with no external network.
 - Missing tests: Run the recorded deployment observation; the verdict depends on it, not on more code.
 
-### [#2292](https://github.com/chester-hill-solutions/callcaster/issues/2292) Assess fragmented public survey responses
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-21
-- The historic impact of per-request respondent IDs has not been measured on deployed data.
-- Current behavior: The source defect is confirmed under #2125. No production survey-row query or repair has been performed in this audit.
-- Root cause: Tokenless writes could fragment one visit across response rows, but anonymous records may not permit reliable attribution.
-- Resolution: Identify deployment interval and intended database. Run read-only aggregate counts with controls for legitimate separate attempts and anonymous/contact-backed respondents. Record attribution limits and a concrete repair or no-repair recommendation. If justified, create an atomic repair task with exact selection and rollback; perform no repair in this assessment.
-- Look in: `app/lib/survey-db.server.ts`, `app/lib/survey-responses.server.ts`, `app/db/schema-survey.ts`
-- Existing tests: test/integration-db/survey-respondent-identity.test.ts
-- Missing tests: Read-only aggregate deployed-data assessment with reliable identity controls.
-- Done when: Identify affected revision/deployment interval and database.; Measure aggregate fragmented-response/answer/no-row-completion patterns without exporting respondent rows.; Separate anonymous/contact-backed groups and legitimate multiple attempts.; Record attribution limits and repair/no-repair recommendation.; Do not update, delete, merge or backfill stored rows in this task.
-- Tracker: Independent read-only historical assessment; it does not block the source fix.
-
 ### [#1718](https://github.com/chester-hill-solutions/callcaster/issues/1718) contact has opted out message should be dynamic
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-10-19
 - Screenshot only, no repro or expected copy; generic opt-out banner is intentional per #1333 evidence. Needs the specific scenario before coding.
@@ -945,6 +944,18 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 ## Needs decision — 42
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) Implement TWO_FACTOR_ENABLED kill-switch state per environment
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
+- Recommended title: **Decide TWO_FACTOR_ENABLED kill-switch state per environment**
+- Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.
+- Current behavior: Verified on dev@20f59d0e, 19 October 2026. The code half shipped: commit 27277319 (feat(auth): turn two-factor authentication off behind a TWO_FACTOR_ENABLED kill switch (#1569)) registers the Better Auth twoFactor plugin only when the flag is true, and every privileged-role mandate is off with it. test/two-factor-kill-switch.route.test.ts, test/two-factor.server.test.ts and test/auth-instance.server.test.ts cover it. What is missing is the state, not the code: .env.example:159 still has TWO_FACTOR_ENABLED commented out, no Railway environment model sets it, and no ADR records whether 2FA is meant to be off.
+- Root cause: None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.
+- Resolution: Decide and record the per-environment state, then set the flag to match. The code is done and tested, so this is a decision plus configuration, not an implementation. A short ADR next to the existing ones is the right record, because the current position - 2FA off everywhere by default - is only correct if it is intended.
+- Look in: `app/lib/env.server.ts:262-271 (isTwoFactorFeatureEnabled)`, `app/server/auth-instance.ts:59-67 (the plugin is registered only when the flag is on)`, `.env.example:159 (the flag, still commented out)`, `test/two-factor-kill-switch.route.test.ts (the kill switch is tested)`
+- Existing tests: test/two-factor-kill-switch.route.test.ts; test/two-factor.server.test.ts
+- Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
+- Tracker: Keeps blocking #1316 until the state is decided.
 
 ### [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216) Email verification is half-wired: a verify-email route and a "verify your email" prompt both exist, but no verification email is ever sent
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24
@@ -1076,18 +1087,6 @@ Product, security, or operations decision required before implementation can be 
 - Missing tests: Env validation / precedence for layered secrets; A guard that fails on an undocumented or unused required key
 - Done when: Every env var has a documented purpose and secret/config classification; Unused or duplicated variables removed; Secret precedence defined and easy to swap to a secrets manager; Non-sensitive config handled as config, not env values
 - Tracker: Decision (secrets/config policy) before edits. Coordinate with #1329. Do not touch the user's live .env.
-
-### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) Implement TWO_FACTOR_ENABLED kill-switch state per environment
-- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-19
-- Recommended title: **Decide TWO_FACTOR_ENABLED kill-switch state per environment**
-- Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.
-- Current behavior: Verified on dev@20f59d0e, 19 October 2026. The code half shipped: commit 27277319 (feat(auth): turn two-factor authentication off behind a TWO_FACTOR_ENABLED kill switch (#1569)) registers the Better Auth twoFactor plugin only when the flag is true, and every privileged-role mandate is off with it. test/two-factor-kill-switch.route.test.ts, test/two-factor.server.test.ts and test/auth-instance.server.test.ts cover it. What is missing is the state, not the code: .env.example:159 still has TWO_FACTOR_ENABLED commented out, no Railway environment model sets it, and no ADR records whether 2FA is meant to be off.
-- Root cause: None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.
-- Resolution: Decide and record the per-environment state, then set the flag to match. The code is done and tested, so this is a decision plus configuration, not an implementation. A short ADR next to the existing ones is the right record, because the current position - 2FA off everywhere by default - is only correct if it is intended.
-- Look in: `app/lib/env.server.ts:262-271 (isTwoFactorFeatureEnabled)`, `app/server/auth-instance.ts:59-67 (the plugin is registered only when the flag is on)`, `.env.example:159 (the flag, still commented out)`, `test/two-factor-kill-switch.route.test.ts (the kill switch is tested)`
-- Existing tests: test/two-factor-kill-switch.route.test.ts; test/two-factor.server.test.ts
-- Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
-- Tracker: Keeps blocking #1316 until the state is decided.
 
 ### [#1724](https://github.com/chester-hill-solutions/callcaster/issues/1724) What happens if we use template tags on a contact that doesn't have that piece of information?
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: none · Updated: 2026-10-19
