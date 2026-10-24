@@ -472,14 +472,14 @@ export const message = pgTable("message", {
 });
 
 export const outreach_attempt = pgTable("outreach_attempt", {
-  answered_at: text(),
+  answered_at: timestamp({ withTimezone: true, mode: "string" }),
   campaign_id: bigint({ mode: "number" }).notNull(),
   callback_audit: boolean(),
   contact_id: bigint({ mode: "number" }).notNull(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
   current_step: text(),
   disposition: text(),
-  ended_at: text(),
+  ended_at: timestamp({ withTimezone: true, mode: "string" }),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   issue_tags: text().array(),
   lawn_sign: boolean(),
