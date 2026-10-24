@@ -29,6 +29,8 @@ const commonApplicationRequired = [
   "STRIPE_SECRET_KEY",
   "TWILIO_AUTH_TOKEN",
 ] as const;
+const productionApplicationRequired = ["MEDIA_STREAM_SECRET"] as const;
+const nonProductionApplicationOptional = ["MEDIA_STREAM_SECRET"] as const;
 const applicationOptional = [
   "COHERE_API_KEY",
   "CRON_SECRET",
@@ -37,6 +39,7 @@ const applicationOptional = [
   "STRIPE_WEBHOOK_SECRET",
   "TWILIO_API_KEY",
   "TWILIO_API_SECRET",
+  "TWILIO_EVENTS_SINK_SECRET",
 ] as const;
 const productionApplicationOptional = ["OPENAI_API_KEY"] as const;
 const workerOptional = ["STRIPE_WEBHOOK_SECRET"] as const;
@@ -64,8 +67,11 @@ const emptyPolicy = makePolicy([], []);
 
 function applicationPolicy(environment: EnvironmentName): SecretPolicy {
   return makePolicy(
-    commonApplicationRequired,
-    [...applicationOptional, ...(environment === "production" ? productionApplicationOptional : [])],
+    [...commonApplicationRequired, ...(environment === "production" ? productionApplicationRequired : [])],
+    [
+      ...applicationOptional,
+      ...(environment === "production" ? productionApplicationOptional : nonProductionApplicationOptional),
+    ],
     objectStorageCredentialAlternatives,
   );
 }

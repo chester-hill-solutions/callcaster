@@ -28,6 +28,7 @@ describe("typed secret catalog", () => {
         "RESEND_API_KEY",
         "STRIPE_SECRET_KEY",
         "TWILIO_AUTH_TOKEN",
+        "MEDIA_STREAM_SECRET",
         "COHERE_API_KEY",
         "CRON_SECRET",
         "DATABASE_DIRECT_URL",
@@ -35,6 +36,7 @@ describe("typed secret catalog", () => {
         "STRIPE_WEBHOOK_SECRET",
         "TWILIO_API_KEY",
         "TWILIO_API_SECRET",
+        "TWILIO_EVENTS_SINK_SECRET",
         "OPENAI_API_KEY",
         "S3_ACCESS_KEY_ID",
         "S3_SECRET_ACCESS_KEY",
@@ -43,7 +45,14 @@ describe("typed secret catalog", () => {
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
       ],
-      required: ["BETTER_AUTH_SECRET", "DATABASE_URL", "RESEND_API_KEY", "STRIPE_SECRET_KEY", "TWILIO_AUTH_TOKEN"],
+      required: [
+        "BETTER_AUTH_SECRET",
+        "DATABASE_URL",
+        "RESEND_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "TWILIO_AUTH_TOKEN",
+        "MEDIA_STREAM_SECRET",
+      ],
       optional: [
         "COHERE_API_KEY",
         "CRON_SECRET",
@@ -52,6 +61,7 @@ describe("typed secret catalog", () => {
         "STRIPE_WEBHOOK_SECRET",
         "TWILIO_API_KEY",
         "TWILIO_API_SECRET",
+        "TWILIO_EVENTS_SINK_SECRET",
         "OPENAI_API_KEY",
       ],
       requiredAlternatives: [
@@ -83,9 +93,11 @@ describe("typed secret catalog", () => {
       requiredAlternatives: [],
     });
     expect(secretCatalog.OPENAI_API_KEY.services).toEqual(["app"]);
+    expect(secretCatalog.MEDIA_STREAM_SECRET.services).toEqual(["app"]);
+    expect(secretCatalog.TWILIO_EVENTS_SINK_SECRET.services).toEqual(["app"]);
   });
 
-  it("resolves the same conservative required/optional plan in each environment", () => {
+  it("resolves environment-specific application required and optional plans", () => {
     for (const environment of ["local", "dev", "qa", "production"] as const) {
       expect(resolveSecretPlan(environment, "app").required).toEqual([
         "BETTER_AUTH_SECRET",
@@ -93,6 +105,7 @@ describe("typed secret catalog", () => {
         "RESEND_API_KEY",
         "STRIPE_SECRET_KEY",
         "TWILIO_AUTH_TOKEN",
+        ...(environment === "production" ? ["MEDIA_STREAM_SECRET"] : []),
       ]);
       expect(resolveSecretPlan(environment, "app").optional).toEqual([
         "COHERE_API_KEY",
@@ -102,8 +115,14 @@ describe("typed secret catalog", () => {
         "STRIPE_WEBHOOK_SECRET",
         "TWILIO_API_KEY",
         "TWILIO_API_SECRET",
+        "TWILIO_EVENTS_SINK_SECRET",
+        ...(environment === "production" ? [] : ["MEDIA_STREAM_SECRET"]),
         ...(environment === "production" ? ["OPENAI_API_KEY"] : []),
       ]);
+      expect(resolveSecretPlan(environment, "app").allowed).toContain("MEDIA_STREAM_SECRET");
+      expect(resolveSecretPlan(environment, "app").allowed).toContain("TWILIO_EVENTS_SINK_SECRET");
+      expect(resolveSecretPlan(environment, "media-stream").allowed).not.toContain("MEDIA_STREAM_SECRET");
+      expect(resolveSecretPlan(environment, "media-stream").allowed).not.toContain("TWILIO_EVENTS_SINK_SECRET");
     }
   });
 
