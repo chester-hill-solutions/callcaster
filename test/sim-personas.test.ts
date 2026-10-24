@@ -64,6 +64,8 @@ describe("initial SIM persona catalog", () => {
     expect(simPersonas["person-b"].role).toBe("member");
     expect(simPersonas["person-b"].capabilities).toContain("message.send");
     expect(simPersonas["person-a"].capabilities).toContain("billing.purchaseTestCredits");
+    expect(simPersonas["person-a"].capabilities).not.toContain("audience.write");
+    expect(simPersonas["person-a"].capabilities).not.toContain("message.send");
     expect(simPersonas["person-c"].workspaceName).toBe("SIM Workspace B");
     expect(simPersonas["person-c"].workspaceName).not.toBe(simPersonas["person-a"].workspaceName);
     expect(simPersonas["person-c"].role).toBe("owner");

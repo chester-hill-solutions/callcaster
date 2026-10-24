@@ -7,6 +7,13 @@ import {
 import type { SimRuntimeContext } from "./runtime-context";
 import { createSimTaskContext, simTaskDefinitions, type SimTaskContext } from "./task-context";
 
+export type SimSmsTaskName = keyof typeof simTaskDefinitions;
+
+export type SimSmsTaskContexts = Readonly<{
+  owner: SimTaskContext;
+  member: SimTaskContext;
+}>;
+
 type ReadOnlyChecks = Readonly<{
   status: (profile: SimRuntimeContext["profile"]) => Promise<SimProfileStatusResult>;
   access: (
@@ -21,9 +28,10 @@ const databaseChecks: ReadOnlyChecks = {
   access: (profile, capability, flow) => checkSimProfileAccessInDatabase(profile, capability, flow),
 };
 
-/** Resolve and validate the complete SMS flow before any browser navigation. */
-export async function prepareSimSmsTaskContext(
+/** Resolve and validate one persona's assigned tasks before browser navigation. */
+export async function prepareSimTaskContext(
   runtime: SimRuntimeContext,
+  taskNames: readonly SimSmsTaskName[],
   checks: ReadOnlyChecks = databaseChecks,
 ): Promise<SimTaskContext> {
   if (runtime.profile.environment === "production") {
@@ -38,7 +46,8 @@ export async function prepareSimSmsTaskContext(
     throw new Error(`SIM profile is not ready (${status.status})`);
   }
 
-  for (const definition of Object.values(simTaskDefinitions)) {
+  for (const taskName of taskNames) {
+    const definition = simTaskDefinitions[taskName];
     for (const capability of definition.requires.capabilities) {
       const result = await checks.access(runtime.profile, capability, "sms-send");
       if (!result.allowed) {
@@ -48,4 +57,19 @@ export async function prepareSimSmsTaskContext(
   }
 
   return createSimTaskContext({ runtime, workspaceId: status.workspaceId });
+}
+
+/** Preflight the owner and member sides of SMS without sharing a login session. */
+export async function prepareSimSmsTaskContexts(
+  runtimes: Readonly<{ owner: SimRuntimeContext; member: SimRuntimeContext }>,
+  checks: ReadOnlyChecks = databaseChecks,
+): Promise<SimSmsTaskContexts> {
+  const [owner, member] = await Promise.all([
+    prepareSimTaskContext(runtimes.owner, ["signIn", "credits"], checks),
+    prepareSimTaskContext(runtimes.member, ["signIn", "contactList", "sms"], checks),
+  ]);
+  if (owner.workspaceId !== member.workspaceId) {
+    throw new Error("SIM SMS personas must resolve to the same workspace");
+  }
+  return Object.freeze({ owner, member });
 }

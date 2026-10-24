@@ -1,44 +1,55 @@
 import { expect, test } from "@playwright/test";
 import { loadSimSmsCompatibilityInput } from "./config";
 import { createSimRuntimeContext } from "./runtime-context";
-import { prepareSimSmsTaskContext } from "./preflight";
+import { prepareSimSmsTaskContexts } from "./preflight";
 import { uploadSimContactList } from "./tasks/contact-list";
 import { ensureSmsCredits, smsCreditsRequired } from "./tasks/credits";
 import { signInForSim } from "./tasks/sign-in";
 import { sendSmsFromChats } from "./tasks/sms";
 
 test.describe("SIM SMS @sim", () => {
-  test("SIM-SMS-01 uploads the contact list, funds only the required credits, and sends through Chats", async ({ page }, testInfo) => {
-    const runtime = await createSimRuntimeContext({ personaKey: "person-a" });
-    const context = await prepareSimSmsTaskContext(runtime);
+  test("SIM-SMS-01 uploads the contact list, funds only the required credits, and sends through Chats", async ({ browser }, testInfo) => {
+    const [ownerRuntime, memberRuntime] = await Promise.all([
+      createSimRuntimeContext({ personaKey: "person-a" }),
+      createSimRuntimeContext({ personaKey: "person-b" }),
+    ]);
+    const contexts = await prepareSimSmsTaskContexts({ owner: ownerRuntime, member: memberRuntime });
     const input = loadSimSmsCompatibilityInput();
-    await signInForSim(page, { ...context, runtime });
-    await uploadSimContactList({
-      page,
-      testInfo,
-      context,
+    const ownerBrowserContext = await browser.newContext();
+    const ownerPage = await ownerBrowserContext.newPage();
+    await signInForSim(ownerPage, { ...contexts.owner, runtime: ownerRuntime });
+    await ensureSmsCredits({
+      page: ownerPage,
+      context: contexts.owner,
       input,
     });
-    await ensureSmsCredits({
-      page,
-      context,
+    await ownerBrowserContext.close();
+
+    const memberBrowserContext = await browser.newContext();
+    const memberPage = await memberBrowserContext.newPage();
+    await signInForSim(memberPage, { ...contexts.member, runtime: memberRuntime });
+    await uploadSimContactList({
+      page: memberPage,
+      testInfo,
+      context: contexts.member,
       input,
     });
     await sendSmsFromChats({
-      page,
-      context,
+      page: memberPage,
+      context: contexts.member,
       input,
     });
 
     await testInfo.attach("sim-evidence.json", {
       body: JSON.stringify({
-        environment: context.profile.runtimeIdentity,
-        workspaceId: context.workspaceId,
+        environment: contexts.member.profile.runtimeIdentity,
+        workspaceId: contexts.member.workspaceId,
         recipient: { alias: "approved-sim-recipient", phoneLast4: input.recipient.phone.slice(-4) },
         requiredCredits: smsCreditsRequired(input.message),
       }),
       contentType: "application/json",
     });
-    await expect(page.getByText(input.message).last()).toBeVisible();
+    await expect(memberPage.getByText(input.message).last()).toBeVisible();
+    await memberBrowserContext.close();
   });
 });

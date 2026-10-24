@@ -15,7 +15,7 @@ export const simPersonas = deepFreeze({
     emailLocalPart: "person.a",
     workspaceName: "SIM Workspace A",
     role: "owner",
-    capabilities: ["workspace.read", "billing.purchaseTestCredits", "simulation.manage", "audience.write", "message.send"],
+    capabilities: ["workspace.read", "billing.purchaseTestCredits", "simulation.manage"],
     allowedFlows: ["sms-send"],
     ownsManifests: ["persona-a"],
     credentialName: "SIM_PERSON_A_PASSWORD",

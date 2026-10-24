@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { prepareSimSmsTaskContext } from "../e2e/sim/preflight";
+import { prepareSimSmsTaskContexts, prepareSimTaskContext } from "../e2e/sim/preflight";
 import { assertTaskRequirement, createSimTaskContext, simTaskDefinitions } from "../e2e/sim/task-context";
 import { signInForSim } from "../e2e/sim/tasks/sign-in";
 
@@ -15,7 +15,7 @@ const profile = (overrides: Record<string, unknown> = {}) => ({
   workspaceName: "SIM Workspace A",
   workspaceMarker: "sim:sai-local",
   expectedRole: "owner",
-  capabilities: ["workspace.read", "billing.purchaseTestCredits", "audience.write", "message.send"],
+  capabilities: ["workspace.read", "billing.purchaseTestCredits"],
   allowedFlows: ["sms-send"],
   ownedManifests: ["persona-a"],
   selectedProviderName: "dotenv",
@@ -65,14 +65,14 @@ describe("typed SIM task boundary", () => {
   it("refuses an unsafe policy before task context creation", async () => {
     const context = runtime({ trafficPolicy: "disabled" });
     const status = vi.fn();
-    await expect(prepareSimSmsTaskContext(context, { status, access: vi.fn() })).rejects.toThrow(/disabled/);
+    await expect(prepareSimTaskContext(context, ["signIn"], { status, access: vi.fn() })).rejects.toThrow(/disabled/);
     expect(status).not.toHaveBeenCalled();
   });
 
   it("stops on profile status failure before any access check", async () => {
     const status = vi.fn().mockResolvedValue({ status: "blocked" });
     const access = vi.fn();
-    await expect(prepareSimSmsTaskContext(runtime(), { status, access })).rejects.toThrow(/not ready/);
+    await expect(prepareSimTaskContext(runtime(), ["signIn"], { status, access })).rejects.toThrow(/not ready/);
     expect(access).not.toHaveBeenCalled();
   });
 
@@ -80,10 +80,47 @@ describe("typed SIM task boundary", () => {
     const context = runtime();
     const status = vi.fn().mockResolvedValue({ status: "ready", workspaceId: "workspace-id" });
     const access = vi.fn().mockResolvedValue({ allowed: true, status: "ready", reason: "ready" });
-    const taskContext = await prepareSimSmsTaskContext(context, { status, access });
+    const taskContext = await prepareSimTaskContext(context, ["signIn", "contactList", "credits", "sms"], { status, access });
     expect(status).toHaveBeenCalledOnce();
     expect(access).toHaveBeenCalledTimes(4);
     expect(taskContext.workspaceId).toBe("workspace-id");
     expect(Object.isFrozen(taskContext)).toBe(true);
+  });
+
+  it("preflights owner billing and member SMS work as separate contexts", async () => {
+    const status = vi.fn().mockResolvedValue({ status: "ready", workspaceId: "shared-workspace" });
+    const access = vi.fn().mockResolvedValue({ allowed: true, status: "ready", reason: "ready" });
+    const owner = runtime();
+    const member = runtime({
+      personaKey: "person-b",
+      expectedRole: "member",
+      email: "person.b@sai-local.callcaster.ca",
+      capabilities: ["workspace.read", "audience.write", "message.send"],
+      credentialName: "SIM_PERSON_B_PASSWORD",
+    });
+
+    const contexts = await prepareSimSmsTaskContexts({ owner, member }, { status, access });
+
+    expect(contexts.owner.profile.personaKey).toBe("person-a");
+    expect(contexts.owner.profile.expectedRole).toBe("owner");
+    expect(contexts.member.profile.personaKey).toBe("person-b");
+    expect(contexts.member.profile.expectedRole).toBe("member");
+    expect(access.mock.calls.map(([profile, capability]) => [profile.personaKey, capability]).sort((a, b) => a.join().localeCompare(b.join()))).toEqual([
+      ["person-a", "billing.purchaseTestCredits"],
+      ["person-b", "audience.write"],
+      ["person-b", "message.send"],
+      ["person-a", "workspace.read"],
+      ["person-b", "workspace.read"],
+    ].sort((a, b) => a.join().localeCompare(b.join())));
+  });
+
+  it("rejects owner and member contexts that resolve different workspaces", async () => {
+    const status = vi.fn()
+      .mockResolvedValueOnce({ status: "ready", workspaceId: "owner-workspace" })
+      .mockResolvedValueOnce({ status: "ready", workspaceId: "member-workspace" });
+    const access = vi.fn().mockResolvedValue({ allowed: true, status: "ready", reason: "ready" });
+
+    await expect(prepareSimSmsTaskContexts({ owner: runtime(), member: runtime({ personaKey: "person-b", expectedRole: "member" }) }, { status, access }))
+      .rejects.toThrow(/same workspace/);
   });
 });
