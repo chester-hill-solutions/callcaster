@@ -1128,7 +1128,7 @@
     },
     {
       "sourceFile": "scripts/twilio-resource-prune-report.mjs",
-      "line": 408,
+      "line": 274,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "scripts",
