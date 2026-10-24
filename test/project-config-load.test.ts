@@ -23,7 +23,7 @@ describe("loadProjectConfig", () => {
       local: { environment: "local", storage: { endpoint: "https://storage.example.test", host: "storage.example.test" } },
     });
     expect(config.storage).toMatchObject({ endpoint: "https://storage.example.test", host: "storage.example.test" });
-    expect(config.services.app).toEqual({ enabled: true, secrets: [] });
+    expect(config.services.app).toEqual({ enabled: true, trafficPolicy: "disabled", secrets: [] });
   });
 
   it("returns a deeply immutable resolved configuration", () => {
@@ -37,7 +37,7 @@ describe("loadProjectConfig", () => {
   });
 
   it("keeps overlays minimal and rejects strict or secret-bearing overlays", () => {
-    expect(Object.keys(environmentConfigs.local)).toEqual(["environment", "urls", "storage"]);
+    expect(Object.keys(environmentConfigs.local)).toEqual(["environment", "emailDomain", "services", "urls", "storage"]);
     expect(() => loadProjectConfig("local", { local: { environment: "local", typo: true } })).toThrow(ConfigValidationError);
     const serialized = JSON.stringify(environmentConfigs);
     expect(serialized).not.toMatch(/(SECRET|TOKEN|PASSWORD|KEY|DATABASE_URL)/i);

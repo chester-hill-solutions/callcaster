@@ -13,6 +13,9 @@ export const environmentNames = [
 export const EnvironmentNameSchema = z.enum(environmentNames);
 export type EnvironmentName = z.infer<typeof EnvironmentNameSchema>;
 
+export const simTrafficPolicies = ["local-only", "paid-test-only", "disabled"] as const;
+export type SimTrafficPolicy = (typeof simTrafficPolicies)[number];
+
 /** Secret names are references only. Secret values and providers are not config. */
 export const SecretNameSchema = z.enum(secretNames).brand<"SecretName">();
 export type SecretName = z.infer<typeof SecretNameSchema>;
@@ -53,6 +56,12 @@ const safeProfileSegment = z
   .min(1)
   .max(63)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "must contain only lowercase letters, numbers, and single hyphens");
+
+const emailDomain = z
+  .string()
+  .min(1)
+  .max(253)
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/, "must be a DNS email domain");
 
 /** URLs shown in diagnostics must not carry credentials or hidden components. */
 export function parseDiagnosticUrl(value: unknown): URL | undefined {
@@ -113,6 +122,7 @@ export const ServiceSliceSchema = z
     port: z.number().int().min(1).max(65535).optional(),
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
+    trafficPolicy: z.enum(simTrafficPolicies).default("disabled"),
     secrets: z.array(SecretReferenceSchema).default([]),
   })
   .strict()
@@ -137,6 +147,7 @@ const projectConfigObjectSchema = z
   .object({
     environment: EnvironmentNameSchema,
     parent: EnvironmentNameSchema.optional(),
+    emailDomain,
     secretProvider: z.enum(secretProviderNames),
     runtime: z.object({ mode: z.enum(["development", "test", "production"]).default("development") }).strict().default({ mode: "development" }),
     urls: z
@@ -154,17 +165,17 @@ const projectConfigObjectSchema = z
       .default({}),
     services: z
       .object({
-        app: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
-        worker: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
-        "media-stream": ServiceSliceSchema.default({ enabled: true, secrets: [] }),
-        sim: ServiceSliceSchema.default({ enabled: true, secrets: [] }),
+        app: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        worker: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        "media-stream": ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
+        sim: ServiceSliceSchema.default({ enabled: true, trafficPolicy: "disabled", secrets: [] }),
       })
       .strict()
       .default({
-        app: { enabled: true, secrets: [] },
-        worker: { enabled: true, secrets: [] },
-        "media-stream": { enabled: true, secrets: [] },
-        sim: { enabled: true, secrets: [] },
+        app: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        worker: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        "media-stream": { enabled: true, trafficPolicy: "disabled", secrets: [] },
+        sim: { enabled: true, trafficPolicy: "disabled", secrets: [] },
       }),
   })
   .strict();
@@ -177,6 +188,7 @@ const serviceOverlaySchema = z
     port: z.number().int().min(1).max(65535).optional(),
     bucket: z.string().min(1).optional(),
     region: z.string().min(1).optional(),
+    trafficPolicy: z.enum(simTrafficPolicies).optional(),
     secrets: z.array(SecretReferenceSchema).optional(),
   })
   .strict()
@@ -197,6 +209,7 @@ export const ProjectConfigOverlaySchema = z
   .object({
     environment: EnvironmentNameSchema,
     parent: EnvironmentNameSchema.optional(),
+    emailDomain: emailDomain.optional(),
     secretProvider: z.enum(secretProviderNames).optional(),
     runtime: z.object({ mode: z.enum(["development", "test", "production"]).optional() }).strict().optional(),
     urls: z.object({ publicApp: diagnosticUrl.optional() }).strict().optional(),

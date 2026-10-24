@@ -16,3 +16,9 @@ export {
   type SimPersonaKey,
   type SimPersonaRole,
 } from "./types";
+export {
+  resolveSimProfile,
+  SimProfileResolutionError,
+  type ResolveSimProfileInput,
+  type ResolvedSimProfile,
+} from "./profile";
