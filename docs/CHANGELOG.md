@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Transactional emails render with their own type and button styling. A quoted font name inside an inline `style` attribute cut every rule after it, so the reset email's button showed as a bare underlined link on a plain red pill and the body, facts and footer fell back to the mail client's defaults ([#2943](https://github.com/chester-hill-solutions/callcaster/issues/2943)).
 - Fixed: Both audio editor return links open the same workspace's Audio Library and preserve browser Back navigation ([#2642](https://github.com/chester-hill-solutions/callcaster/issues/2642)).
 - Fixed: The Text campaign Send using selector has an accessible label and announces its help text ([#2654](https://github.com/chester-hill-solutions/callcaster/issues/2654)).
 - Fixed: Call list Edit, Download and Delete actions identify their target by name and list ID for assistive technology ([#2647](https://github.com/chester-hill-solutions/callcaster/issues/2647)).
