@@ -1,4 +1,11 @@
+import type { TestInfo } from "@playwright/test";
 import type { SimSmsTaskInput } from "./task-context";
+
+export const SIM_BASE_URL_FALLBACK = "http://127.0.0.1:3000";
+
+export function createSimBrowserContextOptions(testInfo: Pick<TestInfo, "project">): { baseURL: string } {
+  return { baseURL: testInfo.project.use.baseURL ?? SIM_BASE_URL_FALLBACK };
+}
 
 const APPROVED_RECIPIENT = {
   recipientName: "Saihaan Syed",

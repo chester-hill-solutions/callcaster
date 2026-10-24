@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { loadSimSmsCompatibilityInput } from "./config";
+import { createSimBrowserContextOptions, loadSimSmsCompatibilityInput } from "./config";
 import { createSimRuntimeContext } from "./runtime-context";
 import { prepareSimSmsTaskContexts } from "./preflight";
 import { uploadSimContactList } from "./tasks/contact-list";
@@ -15,7 +15,8 @@ test.describe("SIM SMS @sim", () => {
     ]);
     const contexts = await prepareSimSmsTaskContexts({ owner: ownerRuntime, member: memberRuntime });
     const input = loadSimSmsCompatibilityInput();
-    const ownerBrowserContext = await browser.newContext();
+    const browserContextOptions = createSimBrowserContextOptions(testInfo);
+    const ownerBrowserContext = await browser.newContext(browserContextOptions);
     const ownerPage = await ownerBrowserContext.newPage();
     await signInForSim(ownerPage, { ...contexts.owner, runtime: ownerRuntime });
     await ensureSmsCredits({
@@ -25,7 +26,7 @@ test.describe("SIM SMS @sim", () => {
     });
     await ownerBrowserContext.close();
 
-    const memberBrowserContext = await browser.newContext();
+    const memberBrowserContext = await browser.newContext(browserContextOptions);
     const memberPage = await memberBrowserContext.newPage();
     await signInForSim(memberPage, { ...contexts.member, runtime: memberRuntime });
     await uploadSimContactList({
