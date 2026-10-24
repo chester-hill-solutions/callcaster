@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:operational-inputs",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "43e9746cc5f43d359ba972188c35d50a7486eb3bde2e6d2bec4f57f206923baf",
+    "recordDigest": "734900d5969530b1c2ee813b729148ca530e65fa97a9cbabbe4adb33fab5362f",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -1464,6 +1464,7 @@
       "e2e/sim/personas/profile.ts",
       "e2e/sim/personas/types.ts",
       "e2e/sim/personas/validate.ts",
+      "e2e/sim/runtime-context.ts",
       "e2e/sim/sms-send.sim.spec.ts",
       "e2e/sim/tasks/contact-list.ts",
       "e2e/sim/tasks/credits.ts",
@@ -2203,6 +2204,7 @@
       "test/safe-redirect.test.ts",
       "test/schedule-intervals.test.ts",
       "test/schedule-timezone.test.ts",
+      "test/schema-campaign-timestamps.test.ts",
       "test/schema-contact-timestamps.test.ts",
       "test/schema-drift-enums.test.ts",
       "test/schema-enum-values.test.ts",
@@ -2234,6 +2236,7 @@
       "test/sim-persona-catalog-validation.test.ts",
       "test/sim-persona-profile.test.ts",
       "test/sim-personas.test.ts",
+      "test/sim-runtime-context.test.ts",
       "test/sms-action.route.test.ts",
       "test/sms-campaign-send-mode.test.ts",
       "test/sms-recipient-identity.test.ts",
