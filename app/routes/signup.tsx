@@ -14,6 +14,7 @@ import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { AuthPage } from "@/components/shared/AuthPage";
+import { EmailVerificationNotice } from "@/components/shared/EmailVerificationNotice";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ type FetcherData =
 
 type ActionData = {
   error?: string;
+  verificationSent?: { email: string };
 };
 
 type LoaderData = {
@@ -57,7 +59,9 @@ export default function SignUp() {
 
   return (
     <AuthPage>
-      {signupOpen ? (
+      {actionData?.verificationSent ? (
+        <VerificationSent email={actionData.verificationSent.email} />
+      ) : signupOpen ? (
         <RegistrationForm isBusy={state !== "idle"} />
       ) : (
         <ContactForm
@@ -70,12 +74,28 @@ export default function SignUp() {
   );
 }
 
+/**
+ * The account exists but the address does not, yet. Nothing here links back to
+ * /workspaces: there is no session to spend until the emailed link is opened
+ * (#2216).
+ */
+const VerificationSent = ({ email }: { email: string }) => (
+  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab w-full max-w-xl">
+    <AuthCard
+      title="Check your email"
+      description="Follow the link in the email to continue."
+    >
+      <EmailVerificationNotice email={email} />
+    </AuthCard>
+  </div>
+);
+
 interface RegistrationFormProps {
   isBusy: boolean;
 }
 
 const RegistrationForm = ({ isBusy }: RegistrationFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 w-full max-w-xl font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab w-full max-w-xl">
     <AuthCard
       title="Sign Up"
       description="Sign up to create a workspace and start calling."
@@ -149,7 +169,7 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 w-full max-w-xl font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab w-full max-w-xl">
     <AuthCard
       title="Request Access"
       description="Registration is currently available by invitation. Contact us to let us know you're interested."

@@ -43,6 +43,14 @@ vi.mock("@/lib/send-reset-password-email.server", () => ({
   sendResetPasswordEmail: vi.fn(),
 }));
 
+vi.mock("@/lib/send-verification-email.server", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/send-verification-email.server")
+  >()),
+  sendVerificationEmail: vi.fn(),
+  sendAccountExistsEmail: vi.fn(),
+}));
+
 describe("app/server/auth-instance.ts", () => {
   test("registers the twoFactor plugin only when TWO_FACTOR_ENABLED is set", async () => {
     const saved = process.env.TWO_FACTOR_ENABLED;
@@ -50,7 +58,9 @@ describe("app/server/auth-instance.ts", () => {
       process.env.TWO_FACTOR_ENABLED = "1";
       let mod = await import("../app/server/auth-instance");
       void mod.auth.api;
-      let options = mocks.betterAuth.mock.calls.at(-1)?.[0] as { plugins?: unknown[] };
+      let options = mocks.betterAuth.mock.calls.at(-1)?.[0] as {
+        plugins?: unknown[];
+      };
       expect(options.plugins).toHaveLength(1);
 
       vi.resetModules();
@@ -58,7 +68,9 @@ describe("app/server/auth-instance.ts", () => {
       delete process.env.TWO_FACTOR_ENABLED;
       mod = await import("../app/server/auth-instance");
       void mod.auth.api;
-      options = mocks.betterAuth.mock.calls.at(-1)?.[0] as { plugins?: unknown[] };
+      options = mocks.betterAuth.mock.calls.at(-1)?.[0] as {
+        plugins?: unknown[];
+      };
       // No plugin means sign-in never issues a twoFactorRedirect, for anyone.
       expect(options.plugins).toEqual([]);
     } finally {
@@ -82,7 +94,7 @@ describe("app/server/auth-instance.ts", () => {
     void auth.api;
 
     expect(mocks.betterAuth).toHaveBeenCalledTimes(1);
-    const options = mocks.betterAuth.mock.calls[0]![0] as {
+    const options = mocks.betterAuth.mock.calls[0]?.[0] as {
       emailAndPassword?: {
         enabled?: boolean;
         sendResetPassword?: unknown;
@@ -92,10 +104,53 @@ describe("app/server/auth-instance.ts", () => {
     expect(options.emailAndPassword?.enabled).toBe(true);
     expect(typeof options.emailAndPassword?.sendResetPassword).toBe("function");
 
-    const { sendResetPasswordEmail } = await import(
-      "../app/lib/send-reset-password-email.server"
+    const { sendResetPasswordEmail } =
+      await import("../app/lib/send-reset-password-email.server");
+    expect(options.emailAndPassword?.sendResetPassword).toBe(
+      sendResetPasswordEmail,
     );
-    expect(options.emailAndPassword?.sendResetPassword).toBe(sendResetPasswordEmail);
+  });
+
+  test("requires email verification, and delivers it, so the verify-email route is not dead (#2216)", async () => {
+    // Two halves that must move together: the requirement without a sender is a
+    // lockout, and the sender without the requirement leaves the "verify your
+    // email" prompt and the /api/auth/verify-email route unreachable. This
+    // asserts the module's own configuration; test/email-verification-journey
+    // asserts the behaviour that configuration produces.
+    const { auth } = await import("../app/server/auth-instance");
+    void auth.api;
+
+    const options = mocks.betterAuth.mock.calls.at(-1)?.[0] as {
+      emailAndPassword?: {
+        requireEmailVerification?: boolean;
+        onExistingUserSignUp?: unknown;
+      };
+      emailVerification?: {
+        sendVerificationEmail?: unknown;
+        sendOnSignUp?: boolean;
+        sendOnSignIn?: boolean;
+        autoSignInAfterVerification?: boolean;
+      };
+    };
+
+    expect(options.emailAndPassword?.requireEmailVerification).toBe(true);
+
+    const { sendVerificationEmail, sendAccountExistsEmail } =
+      await import("../app/lib/send-verification-email.server");
+    expect(options.emailVerification?.sendVerificationEmail).toBe(
+      sendVerificationEmail,
+    );
+    // A duplicate sign-up is answered with a synthetic user and no mail by
+    // Better Auth, so without this the pending state would promise an email
+    // that never arrives.
+    expect(options.emailAndPassword?.onExistingUserSignUp).toBe(
+      sendAccountExistsEmail,
+    );
+    expect(options.emailVerification?.sendOnSignUp).toBe(true);
+    // The resend path: sign-in re-sends once the password verifies.
+    expect(options.emailVerification?.sendOnSignIn).toBe(true);
+    // Confirming signs the user in, so the pending state has an exit.
+    expect(options.emailVerification?.autoSignInAfterVerification).toBe(true);
   });
 
   test("a password reset revokes every existing session for the user", async () => {

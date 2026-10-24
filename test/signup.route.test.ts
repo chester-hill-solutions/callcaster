@@ -55,7 +55,8 @@ describe("app/routes/signup/route.tsx", () => {
     form.set("password", "secret123");
 
     const mod = await import("../app/routes/signup");
-    const response = await asRouteResponse(mod.action({
+    const response = await asRouteResponse(
+      mod.action({
         request: new Request("http://localhost/signup", {
           method: "POST",
           body: form,
@@ -74,6 +75,42 @@ describe("app/routes/signup/route.tsx", () => {
     );
   });
 
+  // #2216: requireEmailVerification denies signUpEmail a session, so
+  // registerUser answers with a message and no token. Redirecting to
+  // /workspaces there would land an unauthenticated browser on a protected
+  // route; the form must park on the pending state instead.
+  test("parks on the verification-pending state when no session was issued", async () => {
+    mocks.registerUser.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers(),
+      data: {
+        user: { id: "u1" },
+        message:
+          "Registration successful. Check your inbox for a verification link before signing in.",
+      },
+    });
+
+    const form = new FormData();
+    form.set("email", "user@example.com");
+    form.set("password", "secret123");
+
+    const mod = await import("../app/routes/signup");
+    const response = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/signup", {
+          method: "POST",
+          body: form,
+        }),
+      } as any),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      verificationSent: { email: "user@example.com" },
+    });
+    expect(response.headers.get("Location")).toBeNull();
+  });
+
   test("returns 403 for form signup when registration is closed", async () => {
     mocks.isSignupOpen.mockReturnValue(false);
 
@@ -82,7 +119,8 @@ describe("app/routes/signup/route.tsx", () => {
     form.set("password", "secret123");
 
     const mod = await import("../app/routes/signup");
-    const response = await asRouteResponse(mod.action({
+    const response = await asRouteResponse(
+      mod.action({
         request: new Request("http://localhost/signup", {
           method: "POST",
           body: form,
@@ -151,7 +189,10 @@ describe("app/routes/signup/route.tsx", () => {
           request: new Request("http://localhost/signup", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ email: "user@example.com", password: "secret123" }),
+            body: JSON.stringify({
+              email: "user@example.com",
+              password: "secret123",
+            }),
           }),
         } as any),
       );

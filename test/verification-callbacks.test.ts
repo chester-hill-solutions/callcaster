@@ -51,7 +51,7 @@ for (const { name, path, load } of callbacks)
     });
     test("successful verification keeps cookies and a safe return path", async () => {
       boundary.verifyEmail.mockResolvedValue({
-        response: { user: { id: "verified-user" } },
+        response: { status: true, user: null },
         headers: new Headers({
           "Set-Cookie": "session=verified; HttpOnly; Path=/",
         }),

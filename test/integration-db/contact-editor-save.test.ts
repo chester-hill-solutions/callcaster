@@ -147,13 +147,19 @@ describe.skipIf(!databaseUrl)(
       const context = await auth.$context;
       for (const actor of ["member", "caller", "outsider"]) {
         const email = `owned-2127-${actor}-${randomUUID()}@example.test`;
+        const password = "OwnedContact2127Password!";
         ownedEmails.push(email);
-        const result = await auth.api.signUpEmail({
-          body: {
-            name: `Owned ${actor}`,
-            email,
-            password: "OwnedContact2127Password!",
-          },
+        await auth.api.signUpEmail({
+          body: { name: `Owned ${actor}`, email, password },
+          headers: new Headers({ Origin: "http://127.0.0.1:3038" }),
+          returnHeaders: true,
+        });
+        // requireEmailVerification denies signup a session (#2216). This fixture
+        // is about contact scoping, not verification — that journey has its own
+        // test — so confirm the address directly, then sign in for a real cookie.
+        await sql`update auth_user set email_verified = true where email = ${email}`;
+        const result = await auth.api.signInEmail({
+          body: { email, password },
           headers: new Headers({ Origin: "http://127.0.0.1:3038" }),
           returnHeaders: true,
         });

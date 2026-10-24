@@ -28,9 +28,17 @@ import type {
 } from "@/lib/schemas/api/platform-auth";
 import type { z } from "zod";
 import { getSession, revokeSessionByToken } from "@/lib/auth.server";
+import {
+  consumeVerificationToken,
+  cookieHeaderFrom,
+} from "@/lib/verification-token.server";
 
 // Types for better-auth API responses (library doesn't export these)
-type BetterAuthApiUser = { id: string; email?: string | null; name?: string | null };
+type BetterAuthApiUser = {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+};
 type BetterAuthApiResponse<T> = {
   response?: T;
   headers?: Record<string, string>;
@@ -59,8 +67,18 @@ export type AuthTokensResponse = {
 };
 
 export type PasswordLoginResult =
-  | { ok: true; token: string; user: AuthTokensResponse["user"]; headers: Headers }
-  | { ok: true; twoFactorRedirect: true; twoFactorMethods?: string[]; headers: Headers }
+  | {
+      ok: true;
+      token: string;
+      user: AuthTokensResponse["user"];
+      headers: Headers;
+    }
+  | {
+      ok: true;
+      twoFactorRedirect: true;
+      twoFactorMethods?: string[];
+      headers: Headers;
+    }
   | { ok: false; error: string };
 
 function splitName(name: string | null | undefined): {
@@ -107,9 +125,21 @@ function mapTokenResponse(args: {
 
 const INVALID_CREDENTIALS_MESSAGE = "Invalid email or password.";
 
-const PASSWORD_LOGIN_ERRORS: Readonly<Record<string, { status: number; message: string }>> = {
-  INVALID_EMAIL_OR_PASSWORD: { status: 401, message: INVALID_CREDENTIALS_MESSAGE },
-  EMAIL_NOT_VERIFIED: { status: 403, message: "Verify your email before signing in." },
+const PASSWORD_LOGIN_ERRORS: Readonly<
+  Record<string, { status: number; message: string }>
+> = {
+  INVALID_EMAIL_OR_PASSWORD: {
+    status: 401,
+    message: INVALID_CREDENTIALS_MESSAGE,
+  },
+  // Reachable only after the password verifies. Better Auth re-sends the
+  // verification link on this path (emailVerification.sendOnSignIn), so the
+  // message can promise one without a second request (#2216).
+  EMAIL_NOT_VERIFIED: {
+    status: 403,
+    message:
+      "Your email address isn't verified yet. We just sent a new verification link — check your inbox.",
+  },
 };
 
 function passwordLoginErrorMessage(error: unknown): string {
@@ -118,7 +148,10 @@ function passwordLoginErrorMessage(error: unknown): string {
       return "Too many sign-in attempts. Wait a minute and try again.";
     }
     const code = error.body?.code;
-    if (typeof code === "string" && Object.hasOwn(PASSWORD_LOGIN_ERRORS, code)) {
+    if (
+      typeof code === "string" &&
+      Object.hasOwn(PASSWORD_LOGIN_ERRORS, code)
+    ) {
       const known = PASSWORD_LOGIN_ERRORS[code];
       if (known && error.statusCode === known.status) return known.message;
     }
@@ -171,14 +204,23 @@ export async function registerUser(
   request: Request,
   body: RegisterBody,
 ): Promise<
-  | { ok: true; data: AuthTokensResponse | { user: AuthTokensResponse["user"]; message: string }; headers?: Headers }
+  | {
+      ok: true;
+      data:
+        | AuthTokensResponse
+        | { user: AuthTokensResponse["user"]; message: string };
+      headers?: Headers;
+    }
   | { ok: false; error: string; status: number }
 > {
   if (!isSignupOpen()) {
     return { ok: false, error: "Registration is closed.", status: 403 };
   }
 
-  const displayName = [body.first_name, body.last_name].filter(Boolean).join(" ").trim();
+  const displayName = [body.first_name, body.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
   try {
     const result = await auth.api.signUpEmail({
@@ -206,12 +248,16 @@ export async function registerUser(
     }
 
     if (payload?.user) {
+      // requireEmailVerification is on, so this branch is the live one: a
+      // token is null until the address is confirmed, and the caller has to
+      // show a pending state rather than a session (#2216).
       return {
         ok: true,
         headers,
         data: {
           user: mapUserProfile(payload.user),
-          message: "Registration successful. Verify your email before signing in.",
+          message:
+            "Registration successful. Check your inbox for a verification link before signing in.",
         },
       };
     }
@@ -241,7 +287,11 @@ export async function tokenLogin(
   }
 
   if ("twoFactorRedirect" in login) {
-    return { ok: false, error: "Two-factor verification required", status: 401 };
+    return {
+      ok: false,
+      error: "Two-factor verification required",
+      status: 401,
+    };
   }
 
   return {
@@ -264,7 +314,10 @@ export async function refreshTokens(
       body: { refreshToken: body.refresh_token },
       headers: request.headers,
     });
-    const payload = (result?.response ?? result) as { accessToken?: string; user?: BetterAuthApiUser };
+    const payload = (result?.response ?? result) as {
+      accessToken?: string;
+      user?: BetterAuthApiUser;
+    };
     if (!payload?.accessToken || !payload?.user) {
       return { ok: false, error: "Invalid refresh token", status: 401 };
     }
@@ -362,40 +415,29 @@ export async function verifyEmailOtp(
   | { ok: true; data: AuthTokensResponse }
   | { ok: false; error: string; status: number }
 > {
-  try {
-    const result = await auth.api.verifyEmail({
-      query: { token: body.token_hash },
-      headers: request.headers,
-      returnHeaders: true,
-    });
-    const payload = (result?.response ?? result) as { user?: BetterAuthApiUser };
-    if (!payload?.user) {
-      return { ok: false, error: "Verification failed", status: 400 };
-    }
-    const session = await getSession(request);
-    if (!session.session?.token) {
-      return {
-        ok: true,
-        data: mapTokenResponse({
-          token: "",
-          user: mapUserProfile(payload.user),
-        }),
-      };
-    }
-    return {
-      ok: true,
-      data: mapTokenResponse({
-        token: session.session.token,
-        user: mapUserProfile(payload.user),
-      }),
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Verification failed",
-      status: 400,
-    };
+  const outcome = await consumeVerificationToken(request, body.token_hash);
+  if (!outcome.ok) {
+    return { ok: false, error: "Verification failed", status: 400 };
   }
+
+  // The session Better Auth created lives on the verification response, not on
+  // the request that carried the token, so read it back through the cookie it
+  // just set. This API answers with a bearer token instead of that cookie.
+  const sessionRequest = new Request(request.url, {
+    headers: { cookie: cookieHeaderFrom(outcome.headers) },
+  });
+  const { session, user } = await getSession(sessionRequest);
+  if (!session?.token || !user) {
+    return { ok: false, error: "Verification failed", status: 400 };
+  }
+
+  return {
+    ok: true,
+    data: mapTokenResponse({
+      token: session.token,
+      user: { id: user.id, email: user.email, ...splitName(user.name) },
+    }),
+  };
 }
 
 export async function getMeProfile(userId: string) {
@@ -446,7 +488,10 @@ export async function updateMeProfile(
       headers: request.headers,
       returnHeaders: true,
     });
-    const payload = (result?.response ?? result) as { user?: BetterAuthApiUser; status?: boolean };
+    const payload = (result?.response ?? result) as {
+      user?: BetterAuthApiUser;
+      status?: boolean;
+    };
     const user =
       payload?.user ??
       (payload?.status === true
@@ -478,9 +523,15 @@ export async function updateMeProfile(
     const profile = await updateOwnUserProfile({
       userId,
       first_name:
-        body.first_name ?? mappedUser.first_name ?? currentProfile?.first_name ?? null,
+        body.first_name ??
+        mappedUser.first_name ??
+        currentProfile?.first_name ??
+        null,
       last_name:
-        body.last_name ?? mappedUser.last_name ?? currentProfile?.last_name ?? null,
+        body.last_name ??
+        mappedUser.last_name ??
+        currentProfile?.last_name ??
+        null,
       username: mappedUser.email ?? currentProfile?.username ?? userId,
     });
     if (!profile) {
@@ -525,7 +576,11 @@ export async function listPendingInvites(userId: string) {
 export async function acceptInvites(userId: string, body: AcceptInvitesBody) {
   const email = await userEmailById(userId);
   if (!email) {
-    return { ok: false as const, errors: ["No account email found"], status: 400 };
+    return {
+      ok: false as const,
+      errors: ["No account email found"],
+      status: 400,
+    };
   }
   const result = await redeemWorkspaceInvitation({
     invitationId: body.invitation_id,
@@ -534,7 +589,11 @@ export async function acceptInvites(userId: string, body: AcceptInvitesBody) {
     verifiedEmail: email,
   });
   if (!result.ok) {
-    return { ok: false as const, errors: [result.error], status: result.status };
+    return {
+      ok: false as const,
+      errors: [result.error],
+      status: result.status,
+    };
   }
   return { ok: true as const, accepted: 1 };
 }

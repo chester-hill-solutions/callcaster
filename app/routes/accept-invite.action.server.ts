@@ -1,6 +1,11 @@
 import { appendInvitationAcceptedFlash } from "@/lib/invitation-flash.server";
 import { getSession } from "@/lib/auth.server";
-import { AuthzError, emailsMatch, InviteError, normalizeEmail } from "@chester-hill-solutions/auth";
+import {
+  AuthzError,
+  emailsMatch,
+  InviteError,
+  normalizeEmail,
+} from "@chester-hill-solutions/auth";
 import { isSignupOpen } from "@/lib/env.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { auth } from "@/server/auth-instance";
@@ -15,10 +20,7 @@ import {
   resendWorkspaceInvitation,
   getWorkspaceInvitationById,
 } from "@/lib/workspace-invitations.server";
-import type {
-  AcceptInviteAction,
-  ActionData,
-} from "./accept-invite.types";
+import type { AcceptInviteAction, ActionData } from "./accept-invite.types";
 import { acceptInviteActionSchema } from "./accept-invite.types";
 
 type ActionContext<
@@ -99,7 +101,10 @@ async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
       invitationId: invitation.id,
       rawToken,
     });
-    return routeData<ActionData>({ status: "resend_sent" }, { headers: requestHeaders });
+    return routeData<ActionData>(
+      { status: "resend_sent" },
+      { headers: requestHeaders },
+    );
   } catch (error) {
     if (error instanceof AuthzError && error.status === 404) {
       return routeData<ActionData>(
@@ -130,8 +135,12 @@ async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
  */
 async function signUpAndClaimAction(ctx: ActionContext<"updateUser">) {
   const { body, requestHeaders } = ctx;
-  const { email: emailValue, password: passwordValue, invitationId, token } =
-    body;
+  const {
+    email: emailValue,
+    password: passwordValue,
+    invitationId,
+    token,
+  } = body;
   if (!isSignupOpen()) {
     return routeData<ActionData>(
       { status: "error", error: "Registration is closed." },
@@ -164,8 +173,9 @@ async function signUpAndClaimAction(ctx: ActionContext<"updateUser">) {
     );
 
     // The invite is claimed unconditionally. When this fails the account was
-    // still created, so the response carries Better Auth's set-cookie and the
-    // user lands signed-in on a page that can explain what happened.
+    // still created, so the response carries whatever session Better Auth
+    // issued — which is none until the address is verified — and the user lands
+    // on a page that can explain what happened.
     const result = await redeemWorkspaceInvitation({
       invitationId,
       rawToken: token,
@@ -178,8 +188,21 @@ async function signUpAndClaimAction(ctx: ActionContext<"updateUser">) {
         { headers: responseHeaders, status: result.status },
       );
     }
+    // requireEmailVerification: the account is created and the invitation is
+    // claimed, but signUpEmail returns token: null, so there is no session to
+    // spend on /workspaces. The user confirms the address, the link signs them
+    // in, and the membership they already have is waiting (#2216).
+    if (!payload?.token) {
+      return routeData<ActionData>(
+        { status: "verification_pending", email: emailValue },
+        { headers: responseHeaders },
+      );
+    }
     return redirect("/workspaces", {
-      headers: await appendInvitationAcceptedFlash(ctx.request, responseHeaders),
+      headers: await appendInvitationAcceptedFlash(
+        ctx.request,
+        responseHeaders,
+      ),
     });
   } catch (error) {
     logger.error("Error in signUpEmail:", error);
@@ -220,7 +243,12 @@ export const action = defineAction({
       return invalidSubmission(headers);
     }
     const body = parsed.data;
-    const ctx = { body, session, request, requestHeaders: headers } as ActionContext;
+    const ctx = {
+      body,
+      session,
+      request,
+      requestHeaders: headers,
+    } as ActionContext;
 
     switch (body.actionType) {
       case "redeemInvitation":

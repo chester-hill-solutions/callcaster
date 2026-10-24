@@ -56,12 +56,26 @@ const workspaceId = "550e8400-e29b-41d4-a716-446655440000";
 async function issueSession() {
   const { auth } = await import("@/server/auth-instance");
   const context = await auth.$context;
-  const result = await auth.api.signUpEmail({
-    body: {
-      name: "Cookie Owner",
-      email: "cookie-owner@example.com",
-      password: "cookie-test-password-2100",
-    },
+  const credentials = {
+    email: "cookie-owner@example.com",
+    password: "cookie-test-password-2100",
+  };
+  // requireEmailVerification denies signUpEmail a session (#2216). This contract
+  // is about the cookie, not about verification — test/email-verification-journey
+  // covers that — so confirm the address the way a completed verification would,
+  // then sign in for real.
+  await auth.api.signUpEmail({
+    body: { name: "Cookie Owner", ...credentials },
+    headers: new Headers({ Origin: fixtures.baseUrl }),
+  });
+  const account = fixtures.database.auth_user.find(
+    (row) => row.email === credentials.email,
+  );
+  if (!account) throw new Error("Signup created no user row");
+  account.emailVerified = true;
+
+  const result = await auth.api.signInEmail({
+    body: credentials,
     headers: new Headers({ Origin: fixtures.baseUrl }),
     returnHeaders: true,
   });
