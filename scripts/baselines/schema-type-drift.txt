@@ -2,9 +2,6 @@ audience.created_at: text -> timestamp with time zone
 audience.processed_at: text -> timestamp with time zone
 audience_upload.created_at: text -> timestamp with time zone
 audience_upload.processed_at: text -> timestamp with time zone
-campaign.created_at: text -> timestamp with time zone
-campaign.end_date: text -> timestamp with time zone
-campaign.start_date: text -> timestamp with time zone
 campaign_audience.created_at: text -> timestamp with time zone
 contact_audience.created_at: text -> timestamp with time zone
 handset_session.created_at: text -> timestamp with time zone
