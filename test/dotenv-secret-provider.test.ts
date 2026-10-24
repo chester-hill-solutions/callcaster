@@ -72,16 +72,26 @@ describe("DotenvSecretProvider", () => {
     expect(JSON.stringify(error)).not.toContain("do-not-report");
   });
 
-  it("rejects malformed and unreadable selected files safely", async () => {
+  it("accepts parser-supported multiline values and ignores unknown entries", async () => {
+    const cwd = await temporaryCwd();
+    await writeFile(path.join(cwd, ".env"), 'UNRELATED="first\nsecond"\nDATABASE_URL=from-env\n');
+    const provider = new DotenvSecretProvider("local", "app", { cwd, shellEnv: {} });
+    await expect(provider.get("DATABASE_URL")).resolves.toBe("from-env");
+
+    await writeFile(path.join(cwd, ".env.local"), 'UNRELATED="local first\nlocal second"\nDATABASE_URL=from-local\n');
+    await expect(provider.get("DATABASE_URL")).resolves.toBe("from-local");
+  });
+
+  it("does not claim parser-ignored input is a malformed file", async () => {
     const cwd = await temporaryCwd();
     await writeFile(path.join(cwd, ".env"), "this is not dotenv\n");
     const provider = new DotenvSecretProvider("local", "app", { cwd, shellEnv: {} });
-    await expect(provider.get("DATABASE_URL")).rejects.toMatchObject({ kind: "malformed", fileName: ".env" });
+    await expect(provider.get("DATABASE_URL")).rejects.toMatchObject({
+      name: "DotenvSecretMissingError",
+      secretName: "DATABASE_URL",
+    });
 
-    await writeFile(path.join(cwd, ".env"), "DATABASE_URL=ok\n");
-    await writeFile(path.join(cwd, ".env.local"), "not dotenv\n");
-    await expect(provider.get("DATABASE_URL")).rejects.toMatchObject({ kind: "malformed", fileName: ".env.local" });
-
+    await writeFile(path.join(cwd, ".env.local"), "DATABASE_URL=ok\n");
     await rm(path.join(cwd, ".env.local"));
     await mkdir(path.join(cwd, ".env.local"));
     await expect(provider.get("DATABASE_URL")).rejects.toMatchObject({ kind: "unreadable", fileName: ".env.local" });

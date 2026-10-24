@@ -10,7 +10,7 @@ export type DotenvSecretProviderOptions = Readonly<{
   shellEnv?: Readonly<Record<string, string | undefined>>;
 }>;
 
-export type SecretFileErrorKind = "unreadable" | "malformed";
+export type SecretFileErrorKind = "unreadable";
 
 export class DotenvSecretProviderError extends Error {
   constructor(message: string) {
@@ -51,19 +51,9 @@ export class DotenvSecretEmptyError extends DotenvSecretProviderError {
   }
 }
 
-const dotenvAssignment = /^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=/;
-
-function isMalformedDotenv(contents: string): boolean {
-  return contents.split(/\r?\n/u).some((line) => {
-    const trimmed = line.trim();
-    return trimmed.length > 0 && !trimmed.startsWith("#") && !dotenvAssignment.test(trimmed);
-  });
-}
-
 async function readDotenvFile(cwd: string, fileName: ".env" | ".env.local"): Promise<Record<string, string>> {
   try {
     const contents = await readFile(path.join(cwd, fileName), "utf8");
-    if (isMalformedDotenv(contents)) throw new DotenvSecretFileError(fileName, "malformed");
     return parse(contents);
   } catch (error) {
     if (error instanceof DotenvSecretFileError) throw error;
