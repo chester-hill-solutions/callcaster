@@ -118,8 +118,14 @@ describe.skipIf(!databaseUrl)("platform membership safety with real sessions and
     const context = await auth.$context;
     for (const actor of actors) {
       const email = `owned-2138-${actor}-${randomUUID()}@example.test`;
+      const password = "OwnedFixture2138Password!";
       ownedEmails.push(email);
-      const result = await auth.api.signUpEmail({ body: { name: `Owned ${actor}`, email, password: "OwnedFixture2138Password!" },
+      // requireEmailVerification denies signup a session (#2216), so confirm the
+      // address the way the emailed link would, then sign in for a real cookie.
+      await auth.api.signUpEmail({ body: { name: `Owned ${actor}`, email, password },
+        headers: new Headers({ Origin: "http://127.0.0.1:3038" }), returnHeaders: true });
+      await sql`update auth_user set email_verified = true where email = ${email}`;
+      const result = await auth.api.signInEmail({ body: { email, password },
         headers: new Headers({ Origin: "http://127.0.0.1:3038" }), returnHeaders: true });
       const cookie = result.headers.getSetCookie().find(value => value.startsWith(context.authCookies.sessionToken.name + "="));
       if (!cookie) throw new Error("Real auth did not issue the fixture session cookie");

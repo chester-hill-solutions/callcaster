@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
@@ -80,5 +80,44 @@ describe("app/routes/signup.tsx", () => {
     // The form uses one centered max-w-xl wrapper, matching the sign-in page.
     expect(container.querySelector(".max-w-md")).toBeNull();
     expect(container.querySelector("main .max-w-xl")).not.toBeNull();
+  });
+
+  // #2216: with requireEmailVerification, registration issues no session. The
+  // page must say a link was sent to the address and stop offering the form,
+  // because nothing the user can click there would sign them in.
+  test("states that a verification link was sent instead of leaving the form up", async () => {
+    const mod = await import("../../app/routes/signup");
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/signup",
+          Component: mod.default,
+          loader: () => ({ signupOpen: true }),
+          action: () => ({ verificationSent: { email: "new@example.com" } }),
+        },
+      ],
+      { initialEntries: ["/signup"] },
+    );
+    render(createElement(RouterProvider, { router }));
+
+    fireEvent.change(await screen.findByLabelText("Email"), {
+      target: { value: "new@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "secret123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign Up" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Check your email",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/new@example\.com/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Go to sign in" }),
+    ).toBeInTheDocument();
   });
 });

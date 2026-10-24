@@ -11,6 +11,8 @@ import { defineAction } from "@/lib/handler.server";
 
 type ActionData = {
   error?: string;
+  /** The account exists, but the address still needs confirming (#2216). */
+  verificationSent?: { email: string };
 };
 
 export const action = defineAction({
@@ -85,7 +87,21 @@ export const action = defineAction({
       );
     }
 
-    const headers = mergeBetterAuthSetCookieHeaders(result.headers, sessionHeaders);
+    // requireEmailVerification: signUpEmail returns a user and no session until
+    // the address is confirmed. Redirecting to /workspaces here would land an
+    // unauthenticated browser on a protected route and bounce it to sign-in
+    // with no explanation (#2216).
+    if (!("token" in result.data)) {
+      return routeData<ActionData>(
+        { verificationSent: { email } },
+        { headers: sessionHeaders, status: 200 },
+      );
+    }
+
+    const headers = mergeBetterAuthSetCookieHeaders(
+      result.headers,
+      sessionHeaders,
+    );
     return redirect("/workspaces", { headers });
   },
 });

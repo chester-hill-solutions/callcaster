@@ -49,7 +49,9 @@ vi.mock("@/lib/database/workspace-provisioning.server", () => ({
 }));
 
 vi.mock("@/lib/platform-auth-rate-limit.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/platform-auth-rate-limit.server")>()),
+  ...(await importOriginal<
+    typeof import("@/lib/platform-auth-rate-limit.server")
+  >()),
   enforceAuthRateLimit: mocks.enforceAuthRateLimit,
 }));
 
@@ -113,7 +115,10 @@ describe("platform-auth.server.ts", () => {
 
     test("an empty provider result has the same safe credentials message", async () => {
       const mod = await import("../app/lib/platform-auth.server");
-      mocks.signInEmail.mockResolvedValue({ user: undefined, token: undefined });
+      mocks.signInEmail.mockResolvedValue({
+        user: undefined,
+        token: undefined,
+      });
 
       const result = await mod.loginWithPassword(
         new Request("http://localhost/signin", { headers: new Headers() }),
@@ -121,56 +126,122 @@ describe("platform-auth.server.ts", () => {
         "wrong-password",
       );
 
-      expect(result).toEqual({ ok: false, error: "Invalid email or password." });
+      expect(result).toEqual({
+        ok: false,
+        error: "Invalid email or password.",
+      });
     });
   });
 
   describe("password login feedback", () => {
     test.each([
-      { status: "UNAUTHORIZED", code: "INVALID_EMAIL_OR_PASSWORD", expected: "Invalid email or password." },
-      { status: "FORBIDDEN", code: "EMAIL_NOT_VERIFIED", expected: "Verify your email before signing in." },
-      { status: "TOO_MANY_REQUESTS", code: undefined, expected: "Too many sign-in attempts. Wait a minute and try again." },
-      { status: "BAD_REQUEST", code: "UNKNOWN_PROVIDER_ERROR", expected: "We couldn't sign you in. Try again shortly." },
-      { status: "INTERNAL_SERVER_ERROR", code: "INVALID_EMAIL_OR_PASSWORD", expected: "We couldn't sign you in. Try again shortly." },
-    ] as const)("maps $status / $code for browser and token login without provider text", async ({ status, code, expected }) => {
-      const failure = new APIError(status, { code, message: "private provider and database details" });
-      mocks.signInEmail.mockRejectedValue(failure);
-      const mod = await import("../app/lib/platform-auth.server");
-      const request = new Request("http://localhost/api/auth/token");
-      await expect(mod.tokenLogin(request, { email: "nobody@example.test", password: "wrong-password" }))
-        .resolves.toEqual({ ok: false, error: expected, status: 401 });
+      {
+        status: "UNAUTHORIZED",
+        code: "INVALID_EMAIL_OR_PASSWORD",
+        expected: "Invalid email or password.",
+      },
+      {
+        status: "FORBIDDEN",
+        code: "EMAIL_NOT_VERIFIED",
+        expected:
+          "Your email address isn't verified yet. We just sent a new verification link — check your inbox.",
+      },
+      {
+        status: "TOO_MANY_REQUESTS",
+        code: undefined,
+        expected: "Too many sign-in attempts. Wait a minute and try again.",
+      },
+      {
+        status: "BAD_REQUEST",
+        code: "UNKNOWN_PROVIDER_ERROR",
+        expected: "We couldn't sign you in. Try again shortly.",
+      },
+      {
+        status: "INTERNAL_SERVER_ERROR",
+        code: "INVALID_EMAIL_OR_PASSWORD",
+        expected: "We couldn't sign you in. Try again shortly.",
+      },
+    ] as const)(
+      "maps $status / $code for browser and token login without provider text",
+      async ({ status, code, expected }) => {
+        const failure = new APIError(status, {
+          code,
+          message: "private provider and database details",
+        });
+        mocks.signInEmail.mockRejectedValue(failure);
+        const mod = await import("../app/lib/platform-auth.server");
+        const request = new Request("http://localhost/api/auth/token");
+        await expect(
+          mod.tokenLogin(request, {
+            email: "nobody@example.test",
+            password: "wrong-password",
+          }),
+        ).resolves.toEqual({ ok: false, error: expected, status: 401 });
 
-      const signin = await import("../app/routes/signin.action.server");
-      const response = await asRouteResponse(signin.action({
-        request: new Request("http://localhost/signin", {
-          method: "POST",
-          body: new URLSearchParams({ email: "nobody@example.test", password: "wrong-password" }),
-        }),
-        url: new URL("http://localhost/signin"),
-        params: {},
-        context: {},
-      } as never));
-      await expect(response.json()).resolves.toEqual({ error: expected });
-    });
+        const signin = await import("../app/routes/signin.action.server");
+        const response = await asRouteResponse(
+          signin.action({
+            request: new Request("http://localhost/signin", {
+              method: "POST",
+              body: new URLSearchParams({
+                email: "nobody@example.test",
+                password: "wrong-password",
+              }),
+            }),
+            url: new URL("http://localhost/signin"),
+            params: {},
+            context: {},
+          } as never),
+        );
+        await expect(response.json()).resolves.toEqual({ error: expected });
+      },
+    );
 
     test("does not accept a provider code on an ordinary driver error", async () => {
-      mocks.signInEmail.mockRejectedValue(Object.assign(new Error("private SQL details"), {
-        statusCode: 401, body: { code: "INVALID_EMAIL_OR_PASSWORD" },
-      }));
+      mocks.signInEmail.mockRejectedValue(
+        Object.assign(new Error("private SQL details"), {
+          statusCode: 401,
+          body: { code: "INVALID_EMAIL_OR_PASSWORD" },
+        }),
+      );
       const mod = await import("../app/lib/platform-auth.server");
-      await expect(mod.loginWithPassword(new Request("http://localhost/signin"), "a@example.test", "wrong"))
-        .resolves.toEqual({ ok: false, error: "We couldn't sign you in. Try again shortly." });
+      await expect(
+        mod.loginWithPassword(
+          new Request("http://localhost/signin"),
+          "a@example.test",
+          "wrong",
+        ),
+      ).resolves.toEqual({
+        ok: false,
+        error: "We couldn't sign you in. Try again shortly.",
+      });
     });
 
     test("retains successful profile and session cookies", async () => {
       mocks.signInEmail.mockResolvedValue({
-        response: { token: "session-token", user: { id: "u1", email: "a@example.test", name: "First Last" } },
-        headers: new Headers({ "set-cookie": "better-auth.session_token=session-token; HttpOnly; Path=/" }),
+        response: {
+          token: "session-token",
+          user: { id: "u1", email: "a@example.test", name: "First Last" },
+        },
+        headers: new Headers({
+          "set-cookie":
+            "better-auth.session_token=session-token; HttpOnly; Path=/",
+        }),
       });
       const mod = await import("../app/lib/platform-auth.server");
-      const result = await mod.loginWithPassword(new Request("http://localhost/signin"), "a@example.test", "correct");
-      expect(result).toMatchObject({ ok: true, token: "session-token", user: { id: "u1", first_name: "First", last_name: "Last" } });
-      expect(result.ok && result.headers.get("set-cookie")).toContain("better-auth.session_token=session-token");
+      const result = await mod.loginWithPassword(
+        new Request("http://localhost/signin"),
+        "a@example.test",
+        "correct",
+      );
+      expect(result).toMatchObject({
+        ok: true,
+        token: "session-token",
+        user: { id: "u1", first_name: "First", last_name: "Last" },
+      });
+      expect(result.ok && result.headers.get("set-cookie")).toContain(
+        "better-auth.session_token=session-token",
+      );
     });
   });
 

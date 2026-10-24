@@ -1,9 +1,16 @@
 export { loader } from "./accept-invite.loader.server";
 export { action } from "./accept-invite.action.server";
 
-import { useActionData, useLoaderData, useNavigation, NavLink, Form } from "react-router";
+import {
+  useActionData,
+  useLoaderData,
+  useNavigation,
+  NavLink,
+  Form,
+} from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { EmailVerificationNotice } from "@/components/shared/EmailVerificationNotice";
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
@@ -23,9 +30,14 @@ function SignInRequired({
   const next = `/accept-invite?invitationId=${encodeURIComponent(invitationId)}&token=${encodeURIComponent(token)}`;
   return (
     <div className="flex flex-col gap-2">
-      <p>You already have an account for the invited email. Sign in to accept the invitation to <strong>{workspaceName}</strong>.</p>
+      <p>
+        You already have an account for the invited email. Sign in to accept the
+        invitation to <strong>{workspaceName}</strong>.
+      </p>
       <Button asChild>
-        <NavLink to={`/signin?next=${encodeURIComponent(next)}`}>Sign in</NavLink>
+        <NavLink to={`/signin?next=${encodeURIComponent(next)}`}>
+          Sign in
+        </NavLink>
       </Button>
     </div>
   );
@@ -44,7 +56,10 @@ function RedeemReady({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <p>You're invited to join <strong>{workspaceName}</strong>. Accept to get started.</p>
+      <p>
+        You're invited to join <strong>{workspaceName}</strong>. Accept to get
+        started.
+      </p>
       <Form method="POST">
         <input type="hidden" name="actionType" value="redeemInvitation" />
         <input type="hidden" name="invitationId" value={invitationId} />
@@ -75,64 +90,77 @@ export default function AcceptInvite() {
   });
 
   return (
-    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
+    <main className="text-foreground relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12">
       <AuthCard
         title="Accept your invitation"
         description="Review and accept workspace invitations sent to your email."
         id="accept-invite-hero"
       >
-        {loaderData.status === "invalid_link" && (
-          <div>{loaderData.error}</div>
-        )}
-        {loaderData.status === "not_signed_in" && (
-          <div className="flex flex-col gap-2">
-            <p className="">Sign in to see your available invitations.</p>
-            <Button asChild className="font-Zilla-Slab text-lg">
-              <NavLink to="/signin?next=/accept-invite">Sign in</NavLink>
-            </Button>
-          </div>
-        )}
-        {loaderData.status === "create_account" && (
+        {actionData?.status === "verification_pending" ? (
+          <EmailVerificationNotice
+            email={actionData.email}
+            detail="Open the link to verify your address. Your invitation is already accepted."
+          />
+        ) : (
           <>
-            <p>
-              Create an account with <strong>{loaderData.email}</strong> to accept the invitation to{" "}
-              <strong>{loaderData.workspaceName}</strong>.
-            </p>
-            <NewUserSignup
-              email={loaderData.email}
-              state={state}
-              invitationId={loaderData.invitationId}
-              token={loaderData.token}
-            />
+            {loaderData.status === "invalid_link" && (
+              <div>{loaderData.error}</div>
+            )}
+            {loaderData.status === "not_signed_in" && (
+              <div className="flex flex-col gap-2">
+                <p className="">Sign in to see your available invitations.</p>
+                <Button asChild className="font-Zilla-Slab text-lg">
+                  <NavLink to="/signin?next=/accept-invite">Sign in</NavLink>
+                </Button>
+              </div>
+            )}
+            {loaderData.status === "create_account" && (
+              <>
+                <p>
+                  Create an account with <strong>{loaderData.email}</strong> to
+                  accept the invitation to{" "}
+                  <strong>{loaderData.workspaceName}</strong>.
+                </p>
+                <NewUserSignup
+                  email={loaderData.email}
+                  state={state}
+                  invitationId={loaderData.invitationId}
+                  token={loaderData.token}
+                />
+              </>
+            )}
+            {loaderData.status === "sign_in_required" && (
+              <SignInRequired
+                workspaceName={loaderData.workspaceName}
+                invitationId={loaderData.invitationId}
+                token={loaderData.token}
+              />
+            )}
+            {loaderData.status === "redeem_ready" && (
+              <RedeemReady
+                workspaceName={loaderData.workspaceName}
+                invitationId={loaderData.invitationId}
+                token={loaderData.token}
+                state={state}
+              />
+            )}
+            {loaderData.status === "existing_user" &&
+              (loaderData.invites.length === 0 ? (
+                <div className="flex flex-col gap-2">
+                  <p>No new invitations.</p>
+                  <Button asChild>
+                    <NavLink to="/workspaces">Workspaces</NavLink>
+                  </Button>
+                </div>
+              ) : (
+                <ExistingUserInvites
+                  invites={loaderData.invites}
+                  state={state}
+                />
+              ))}
+            {loaderData.status === "error" && <div>{loaderData.error}</div>}
           </>
         )}
-        {loaderData.status === "sign_in_required" && (
-          <SignInRequired
-            workspaceName={loaderData.workspaceName}
-            invitationId={loaderData.invitationId}
-            token={loaderData.token}
-          />
-        )}
-        {loaderData.status === "redeem_ready" && (
-          <RedeemReady
-            workspaceName={loaderData.workspaceName}
-            invitationId={loaderData.invitationId}
-            token={loaderData.token}
-            state={state}
-          />
-        )}
-        {loaderData.status === "existing_user" &&
-          (loaderData.invites.length === 0 ? (
-            <div className="flex flex-col gap-2">
-              <p>No new invitations.</p>
-              <Button asChild>
-                <NavLink to="/workspaces">Workspaces</NavLink>
-              </Button>
-            </div>
-          ) : (
-            <ExistingUserInvites invites={loaderData.invites} state={state} />
-          ))}
-        {loaderData.status === "error" && <div>{loaderData.error}</div>}
       </AuthCard>
     </main>
   );

@@ -87,6 +87,15 @@ export type ActionData =
       status: "resend_sent";
     }
   | {
+      /**
+       * requireEmailVerification: the account was created and the invitation was
+       * claimed, but no session is issued until the address is confirmed
+       * (#2216). The browser must not be sent to /workspaces from here.
+       */
+      status: "verification_pending";
+      email: string;
+    }
+  | {
       status: "accept_failed";
       error: string;
     }

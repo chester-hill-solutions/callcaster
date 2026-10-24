@@ -35,16 +35,23 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
   test("redirects to next on successful OTP verification and appends Set-Cookie", async () => {
     authApiMocks.verifyEmail.mockResolvedValue({
-      response: { user: { id: "u1" } },
-      headers: new Headers([["Set-Cookie", "a=1"], ["Set-Cookie", "b="]]),
+      response: { status: true, user: null },
+      headers: new Headers([
+        ["Set-Cookie", "a=1"],
+        ["Set-Cookie", "b="],
+      ]),
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(mod.loader(withRouteUrl({
-      request: new Request(
-        "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
+    const res = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
+          ),
+        } as any),
       ),
-    } as any)));
+    );
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/ok");
@@ -63,11 +70,15 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
     const { logger } = await import("@/lib/logger.server");
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(mod.loader(withRouteUrl({
-      request: new Request(
-        "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
+    const res = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
+          ),
+        } as any),
       ),
-    } as any)));
+    );
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/signin");
@@ -76,16 +87,20 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
 
   test("falls back to root for absolute next URLs", async () => {
     authApiMocks.verifyEmail.mockResolvedValue({
-      response: { user: { id: "u1" } },
+      response: { status: true, user: null },
       headers: new Headers(),
     });
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res = await asRouteResponse(mod.loader(withRouteUrl({
-      request: new Request(
-        "http://localhost/api/auth/callback?token_hash=th&type=signup&next=https%3A%2F%2Fevil.example",
+    const res = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api/auth/callback?token_hash=th&type=signup&next=https%3A%2F%2Fevil.example",
+          ),
+        } as any),
       ),
-    } as any)));
+    );
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/");
@@ -99,15 +114,26 @@ describe("app/routes/api+/auth/callback/route.tsx", () => {
     }));
 
     const mod = await import("../app/routes/api+/auth/callback.route");
-    const res1 = await asRouteResponse(mod.loader(withRouteUrl({
-      request: new Request("http://localhost/api/auth/callback?type=signup"),
-    } as any)));
+    const res1 = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api/auth/callback?type=signup",
+          ),
+        } as any),
+      ),
+    );
     expect(res1.headers.get("Location")).toBe("/signin");
 
-    const res2 = await asRouteResponse(mod.loader(withRouteUrl({
-      request: new Request("http://localhost/api/auth/callback?token_hash=th"),
-    } as any)));
+    const res2 = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api/auth/callback?token_hash=th",
+          ),
+        } as any),
+      ),
+    );
     expect(res2.headers.get("Location")).toBe("/signin");
   });
 });
-

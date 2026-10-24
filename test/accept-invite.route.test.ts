@@ -28,12 +28,16 @@ vi.mock("@/lib/auth.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+  ...(await importOriginal<
+    typeof import("@/lib/workspace-members-db.server")
+  >()),
   listUserPendingInvitationsByEmail: mocks.listPending,
 }));
 
 vi.mock("@/lib/workspace-invitations.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace-invitations.server")>()),
+  ...(await importOriginal<
+    typeof import("@/lib/workspace-invitations.server")
+  >()),
   listUserPendingInvitationsByEmail: mocks.listPending,
   redeemWorkspaceInvitation: mocks.redeemInvitation,
   resendWorkspaceInvitation: vi.fn(),
@@ -109,9 +113,8 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     });
 
     const mod = await import("../app/routes/accept-invite.action.server");
-    const { acceptInviteActionSchema } = await import(
-      "../app/routes/accept-invite.types"
-    );
+    const { acceptInviteActionSchema } =
+      await import("../app/routes/accept-invite.types");
     // A deliberately tokenless shape, as an earlier revision of the schema
     // could have declared.
     const weakSchema = z.discriminatedUnion("actionType", [
@@ -128,7 +131,8 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     );
     // The shipped schema rejects the same input, and that is the gate.
     expect(
-      acceptInviteActionSchema.safeParse(Object.fromEntries(signupForm())).success,
+      acceptInviteActionSchema.safeParse(Object.fromEntries(signupForm()))
+        .success,
     ).toBe(false);
 
     const response = await asRouteResponse(
@@ -191,12 +195,23 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     expect(mocks.listPending).not.toHaveBeenCalled();
   });
 
-  test("claims an emailed invite right after signup", async () => {
+  test("claims an emailed invite right after signup and keeps the session cookies it issued", async () => {
+    // requireEmailVerification normally denies signUpEmail a session (#2216), so
+    // the live path is the pending state pinned by the next test. This keeps the
+    // tolerant branch honest: when Better Auth does issue a session, the redeem
+    // redirect must still carry its cookies and its flash receipt through.
     mocks.signUpEmail.mockResolvedValueOnce({
       response: {
+        token: "session-token",
         user: { id: "u-new", email: "new@example.com", name: "First Last" },
       },
-      headers: new Headers([["Set-Cookie", "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT"], ["Set-Cookie", "session-data=cached; Path=/"]]),
+      headers: new Headers([
+        [
+          "Set-Cookie",
+          "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT",
+        ],
+        ["Set-Cookie", "session-data=cached; Path=/"],
+      ]),
     });
     mocks.redeemInvitation.mockResolvedValueOnce({
       ok: true,
@@ -231,35 +246,102 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("/workspaces");
     // The registration session must survive the redeem redirect.
-    expect(response.headers.getSetCookie()).toEqual(expect.arrayContaining([
-      "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT",
-      "session-data=cached; Path=/",
-    ]));
+    expect(response.headers.getSetCookie()).toEqual(
+      expect.arrayContaining([
+        "session=abc; Path=/; Expires=Wed, 21 Oct 2030 07:28:00 GMT",
+        "session-data=cached; Path=/",
+      ]),
+    );
     expect(response.headers.getSetCookie()).toHaveLength(3);
-    const flashCookie = response.headers.getSetCookie().find((cookie) => cookie.startsWith("cc.flash="));
-    const receipt = await consumeInvitationFlash(new Request("http://localhost/workspaces", { headers: { Cookie: flashCookie ?? "" } }));
+    const flashCookie = response.headers
+      .getSetCookie()
+      .find((cookie) => cookie.startsWith("cc.flash="));
+    const receipt = await consumeInvitationFlash(
+      new Request("http://localhost/workspaces", {
+        headers: { Cookie: flashCookie ?? "" },
+      }),
+    );
     expect(receipt.flash).toMatchObject({ code: "invite_accepted" });
+  });
+
+  test("holds a new invited account on the verification-pending state without losing the claim", async () => {
+    // #2216: signUpEmail returns token: null under requireEmailVerification.
+    // Sending that browser to /workspaces would bounce it to sign-in with no
+    // explanation, so the action parks it here — and the invitation is claimed
+    // anyway, so the membership is waiting once the link is opened.
+    mocks.signUpEmail.mockResolvedValueOnce({
+      response: {
+        token: null,
+        user: { id: "u-new", email: "new@example.com", name: "First Last" },
+      },
+      headers: new Headers(),
+    });
+    mocks.redeemInvitation.mockResolvedValueOnce({
+      ok: true,
+      workspaceId: "w1",
+      alreadyAccepted: false,
+    });
+
+    const mod = await import("../app/routes/accept-invite.action.server");
+    const response = await asRouteResponse(
+      mod.action({
+        request: post(
+          signupForm({ invitationId: "wi_invite_1", token: "raw-token" }),
+        ),
+      } as any),
+    );
+
+    expect(mocks.redeemInvitation).toHaveBeenCalledWith({
+      invitationId: "wi_invite_1",
+      rawToken: "raw-token",
+      userId: "u-new",
+      verifiedEmail: "new@example.com",
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "verification_pending",
+      email: "new@example.com",
+    });
+    expect(response.headers.get("Location")).toBeNull();
   });
 
   test("existing-user redemption preserves refreshed auth cookies and a signed success receipt", async () => {
     mocks.getSession.mockResolvedValueOnce({
       user: { id: "existing-user", email: "invited@example.test" },
-      headers: new Headers([["Set-Cookie", "session=refreshed; Path=/"], ["Set-Cookie", "session-data=current; Path=/"]]),
+      headers: new Headers([
+        ["Set-Cookie", "session=refreshed; Path=/"],
+        ["Set-Cookie", "session-data=current; Path=/"],
+      ]),
     });
-    mocks.redeemInvitation.mockResolvedValueOnce({ ok: true, workspaceId: "w1", alreadyAccepted: false });
+    mocks.redeemInvitation.mockResolvedValueOnce({
+      ok: true,
+      workspaceId: "w1",
+      alreadyAccepted: false,
+    });
     const form = new FormData();
     form.set("actionType", "redeemInvitation");
     form.set("invitationId", "wi_invite_1");
     form.set("token", "raw-token");
     const mod = await import("../app/routes/accept-invite.action.server");
-    const response = await asRouteResponse(mod.action({ request: post(form) } as never));
+    const response = await asRouteResponse(
+      mod.action({ request: post(form) } as never),
+    );
     expect(response.headers.get("Location")).toBe("/workspaces");
-    expect(response.headers.getSetCookie()).toEqual(expect.arrayContaining([
-      "session=refreshed; Path=/", "session-data=current; Path=/",
-    ]));
+    expect(response.headers.getSetCookie()).toEqual(
+      expect.arrayContaining([
+        "session=refreshed; Path=/",
+        "session-data=current; Path=/",
+      ]),
+    );
     expect(response.headers.getSetCookie()).toHaveLength(3);
-    const cookie = response.headers.getSetCookie().find((value) => value.startsWith("cc.flash="));
-    const receipt = await consumeInvitationFlash(new Request("http://localhost/workspaces", { headers: { Cookie: cookie ?? "" } }));
+    const cookie = response.headers
+      .getSetCookie()
+      .find((value) => value.startsWith("cc.flash="));
+    const receipt = await consumeInvitationFlash(
+      new Request("http://localhost/workspaces", {
+        headers: { Cookie: cookie ?? "" },
+      }),
+    );
     expect(receipt.flash).toMatchObject({ code: "invite_accepted" });
   });
 
