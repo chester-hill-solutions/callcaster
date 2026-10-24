@@ -120,7 +120,7 @@ export const campaign = pgTable("campaign", {
 export const campaign_audience = pgTable("campaign_audience", {
   audience_id: bigint({ mode: "number" }).notNull(),
   campaign_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
-  created_at: text().notNull().default(sql`now()`),
+  created_at: timestamp({ withTimezone: true, mode: "string" }).notNull().default(sql`now()`),
 });
 
 export const campaign_queue = pgTable(
