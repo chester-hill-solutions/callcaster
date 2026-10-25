@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@b99ad0ff` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@7e3b0229` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 28
+## Fix now — 24
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -162,36 +162,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A route should read a request body only through a reader that caps the bytes it will consume and rejects an oversized body with 413, so that a field-level limit (MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH, a honeypot) bounds the work rather than being validated after the fact. readBoundedFormData(request, maxBytes) already does exactly this and is used by the media surfaces for a ~10 MiB body, with the repository's own test suite (test/bounded-form-data.test.ts) asserting the 413 and the early stream cancellation. The public and authenticated multipart routes should use the same reader with a cap sized for their own fields, and the transport should carry an explicit maxRequestBodySize as a backstop.
 
-### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it
-- Verdict: **Fix now** · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-10-20
-- No dedicated CallCaster-qa Twilio account exists and qa.callcaster.ca is not pointed at one: the QA Railway environment still copies the dev/shared Twilio credentials and there is no Twilio account provisioning in the IaC model or in any script.
-- Current behavior: The claimed fix does not resolve the reported symptom.
-- Root cause: The issue has no symptom body — it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm.
-- Resolution: Implement the missing mechanism named in the root cause.
-- Look in: `.railway/environments/qa.ts`, `ISSUE_BOARD.md`
-- Existing tests: None. There is no test or check that asserts a QA-specific Twilio account; `git grep -n "qa.callcaster.ca" origin/master -- .` returns only .railway/environments/qa.ts and docs/qa-rehearsal-runbook.md.
-
-### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
-- Verdict: **Fix now** · Labels: none · Assignee: @manstephen, @wra-sol · Updated: 2026-10-20
-- Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.
-- Current behavior: Confirmed on the dev source in an isolated browser fixture with real components and app CSS; the live dev workspace had no eligible member rows. PR #2753 (https://github.com/chester-hill-solutions/callcaster/pull/2753) is awaiting review and merge.
-- Root cause: TeamMember compares the raw next-themes theme with dark and supplies black otherwise. System mode keeps theme equal to system even when resolvedTheme is dark. An undefined value before hydration is expected from next-themes, so changing the provider default would conceal the wrong dependency. CSS currentColor and the existing theme tokens remove that dependency. The default button variant also supplies a dark primary background despite bg-transparent; the ghost variant supplies the intended transparent icon control and readable hover colours.
-- Resolution: Use the compact icon-xs ghost buttons and inherit their themed foreground for both icons. Browser measurements confirm 12 px icons in 28 px buttons and 8 px role dots; preserve the next-themes provider and system default.
-- Look in: `app/components/shared/theme-provider.tsx`, `app/components/workspace/TeamMember.tsx`, `app/components/shared/mode-toggle.tsx`, `app/root.tsx`
-- Existing tests: test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component; test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching; Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode.
-- Done when: Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.; Icons render without waiting for a JavaScript theme value; theme switching and member actions remain available.
-
-### [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) Decide the CORS policy for the public API
-- Verdict: **Fix now** · Labels: wayfinder:grilling · Assignee: @wra-sol · Updated: 2026-10-20
-- This change states the existing server-to-server CORS policy in both quickstarts and the public error reference, and replaces the overview's stale Express wording. Review and merge remain.
-- Current behavior: Production documentation has the policy only in the overview's final CORS section. The candidate puts the backend requirement before the examples and explains browser preflight failures separately from API HTTP errors.
-- Root cause: The earlier closure recorded the policy decision but left its promised quickstart and error-reference guidance unwritten. Only the overview's final CORS section mentioned the constraint, and it still named the retired Express layer.
-- Resolution: Review and merge the documentation completion. Keep CORS disabled and retain the decision; no API runtime or schema change is required.
-- Look in: `docs/api-overview.md`, `docs/api-agent-quickstart.md`
-- Existing tests: Manual documentation check: all six added local links resolve to their target headings; Source review: the Bun server and public API auth add no CORS allow headers; the MDN CORS guide confirms the distinction between a blocked preflight request and a blocked response
-- Done when: The overview, quickstarts and error reference state that public integrator calls are server-to-server and workspace API keys stay on the backend; The error reference explains that failed preflight blocks the intended request, while a request without preflight can reach the server but its response remains blocked in browser JavaScript; Same-origin browser session access remains documented and CORS remains disabled
-- Tracker: Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master.
-
 ### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) IVR: store speech answers as { value, raw, inputType } (slice B)
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-19
 - Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.
@@ -218,18 +188,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Implement the missing mechanism named in the root cause.
 - Look in: `app/lib/platform-billing.server.ts`
 - Existing tests: None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo.
-
-### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
-- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
-- PARTIAL: middleware reuses the scoped tenant client, but the released import guard skips JavaScript modules. The candidate guard covers supported JavaScript/TypeScript extensions and counts every statically named import.
-- Current behavior: Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.
-- Root cause: The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.
-- Resolution: Parse supported JavaScript/TypeScript files with the existing TypeScript parser. Count static imports, re-exports, dynamic imports, require calls and type imports. Migrate only the pinned base debt and reject new, increased, reduced or stale counts.
-- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `test/unscoped-db-imports-guard.test.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`
-- Existing tests: test/unscoped-db-imports-guard.test.ts: 46 actual CLI cases; 39 fail and 7 controls pass on the original guard. All 46 pass with the fix.; Pinned dev baseline: the same 84 file/module keys, 85 syntax occurrences; no new source exceptions. Separate fault injections exercise extension coverage, module syntax, counts, stale debt and fixture-root safety.
-- Missing tests: Review and merge the candidate, then verify the exact promoted guard before closing.
-- Done when: Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.; A new app/lib module cannot import an unscoped database client without a counted baseline exception.; Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.; npm run ci:local is green.
-- Tracker: Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified.
 
 ### [#2888](https://github.com/chester-hill-solutions/callcaster/issues/2888) API error responses return raw database error text, disclosing the failed statement's internal table and column…
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -352,7 +310,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 38
+## Verify and close — 40
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -657,6 +615,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Predictive Dialer campaigns show Predictive dialing; Power Dialer campaigns show Power dialing; Existing campaign call and leave behavior stays covered
 - Tracker: Review [PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), then verify on dev. Keep the issue open until default-branch promotion and release acceptance.
 
+### [#100](https://github.com/chester-hill-solutions/callcaster/issues/100) "Theme" value from ThemeProvider is undefined by default
+- Verdict: **Verify and close** · Labels: none · Assignee: @manstephen, @wra-sol · Updated: 2026-10-20
+- Browser verification confirms that both workspace member icons use black in system-dark mode. The candidate fix uses the themed button foreground, including before the theme is resolved.
+- Current behavior: Fixed on dev. Workspace member icons inherit the themed button foreground instead of hard-coding black, so they stay visible in system-dark mode.
+- Root cause: TeamMember compares the raw next-themes theme with dark and supplies black otherwise. System mode keeps theme equal to system even when resolvedTheme is dark. An undefined value before hydration is expected from next-themes, so changing the provider default would conceal the wrong dependency. CSS currentColor and the existing theme tokens remove that dependency. The default button variant also supplies a dark primary background despite bg-transparent; the ghost variant supplies the intended transparent icon control and readable hover colours.
+- Resolution: Fixed in #2753 (`d0972882`): the icons use the compact icon-xs ghost buttons and inherit their themed foreground (`app/components/workspace/TeamMember.tsx`).
+- Look in: `app/components/shared/theme-provider.tsx`, `app/components/workspace/TeamMember.tsx`, `app/components/shared/mode-toggle.tsx`, `app/root.tsx`
+- Existing tests: test/ui/team-member-theme.test.tsx
+- Done when: Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.; Icons render without waiting for a JavaScript theme value; theme switching and member actions remain available.
+
 ### [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507) CSV Upload success should not have a toast (or be a simple success toast that goes away).
 - Verdict: **Verify and close** · Labels: ux · Assignee: @sai-sy, @wra-sol · Updated: 2026-10-20
 - PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.
@@ -667,6 +635,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ui/audience-import-report-handoff.test.tsx
 - Done when: CSV upload success does not create a root toast or a toast download prompt.; Inline completion feedback and the saved row report link remain available.; Embedded and standalone completion callbacks still run once.
 - Tracker: Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. PR #2749 targets dev and has the verified Development link. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified.
+
+### [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) Decide the CORS policy for the public API
+- Verdict: **Verify and close** · Labels: wayfinder:grilling · Assignee: @wra-sol · Updated: 2026-10-20
+- This change states the existing server-to-server CORS policy in both quickstarts and the public error reference, and replaces the overview's stale Express wording. Review and merge remain.
+- Current behavior: Answered on dev. The server-only CORS policy is stated in the integration quickstarts and the public error reference; CORS stays disabled and no runtime change is required.
+- Root cause: The earlier closure recorded the policy decision but left its promised quickstart and error-reference guidance unwritten. Only the overview's final CORS section mentioned the constraint, and it still named the retired Express layer.
+- Resolution: Answered in #2751 (`b19922ad`): the policy is documented in the quickstarts and error guidance, replacing the overview's stale Express wording.
+- Look in: `docs/api-overview.md`, `docs/api-agent-quickstart.md`
+- Done when: The overview, quickstarts and error reference state that public integrator calls are server-to-server and workspace API keys stay on the backend; The error reference explains that failed preflight blocks the intended request, while a request without preflight can reach the server but its response remains blocked in browser JavaScript; Same-origin browser session access remains documented and CORS remains disabled
+- Tracker: Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master.
 
 ### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Pass the live caller-ID verification status to the onboarding verification sheet
 - Verdict: **Verify and close** · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-20
@@ -921,7 +899,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 42
+## Needs decision — 43
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -1043,6 +1021,15 @@ Product, security, or operations decision required before implementation can be 
 - Major UX redesign of the workspace/campaign sidebar; interaction model (per-campaign sidebar with status/completion/quick controls) needs a product decision before scoping.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it
+- Verdict: **Needs decision** · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-10-20
+- Provisioning a dedicated CallCaster-qa Twilio account and pointing qa.callcaster.ca at it is an operations decision: it needs spend, credentials and a DNS change, not a code change.
+- Current behavior: The claimed fix does not resolve the reported symptom.
+- Root cause: The issue has no symptom body — it is an infrastructure provisioning task. The repo's own board records that it 'closed as not planned on 2026-10-17' (ISSUE_BOARD.md:865, scripts/issue-board-enrichment/blocked-epic.json:298), and the related #1828 QA acceptance suite was re-scoped because of it. The DNS/IaC half (#1357) did land (docs/qa-rehearsal-runbook.md, .railway/environments/qa.ts), but the Twilio-account half did not. manual: true because creating a Twilio account and repointing a live domain is a console/ops action a human performs, not something a code change or test can confirm.
+- Resolution: Implement the missing mechanism named in the root cause.
+- Look in: `.railway/environments/qa.ts`, `ISSUE_BOARD.md`
+- Existing tests: None. There is no test or check that asserts a QA-specific Twilio account; `git grep -n "qa.callcaster.ca" origin/master -- .` returns only .railway/environments/qa.ts and docs/qa-rehearsal-runbook.md.
 
 ### [#2036](https://github.com/chester-hill-solutions/callcaster/issues/2036) Decide the scope of flattening the call screen: the call screen only, or the shared workspace panel every page uses
 - Verdict: **Needs decision** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-19
@@ -1337,7 +1324,7 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 30
+## Blocked / split first — 31
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
@@ -1352,6 +1339,18 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Missing tests: Guard exists. Each slice needs behavior tests at Date/write/wire boundaries plus real-Postgres verification; no fresh database count performed here.
 - Done when: The temporal drift baseline reaches zero in small table-specific changes.; The existing guard rejects both new drift and stale baseline entries.
 - Tracker: Move to Blocked / split first as a multi-table parent. Create table-specific tasks; do not re-implement the guard or completed slices. Related PR evidence: #2231, #2233, #2241, #2244. A PR reference alone does not prove deployed behavior.
+
+### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
+- Verdict: **Blocked / split first** · Size: S-M · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
+- Epic: the middleware reuses the scoped tenant client, but the released import guard still skips part of the boundary. It needs splitting into the remaining enforcement slices before any one can be picked up.
+- Current behavior: Verified against master@91c4409b and dev@e4bb8ac6 on 2026-10-21. A new app/lib JavaScript module importing @/server/admin-db passes the released guard; equivalent TypeScript probes fail. The old baseline stores file/module presence and cannot detect an extra import in an existing exception.
+- Root cause: The guard scans only .ts and uses regular expressions plus a Set. It misses supported module forms and collapses repeated imports into one baseline key.
+- Resolution: Parse supported JavaScript/TypeScript files with the existing TypeScript parser. Count static imports, re-exports, dynamic imports, require calls and type imports. Migrate only the pinned base debt and reject new, increased, reduced or stale counts.
+- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `test/unscoped-db-imports-guard.test.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`
+- Existing tests: test/unscoped-db-imports-guard.test.ts: 46 actual CLI cases; 39 fail and 7 controls pass on the original guard. All 46 pass with the fix.; Pinned dev baseline: the same 84 file/module keys, 85 syntax occurrences; no new source exceptions. Separate fault injections exercise extension coverage, module syntax, counts, stale debt and fixture-root safety.
+- Missing tests: Review and merge the candidate, then verify the exact promoted guard before closing.
+- Done when: Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.; A new app/lib module cannot import an unscoped database client without a counted baseline exception.; Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.; npm run ci:local is green.
+- Tracker: Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified.
 
 ### [#1165](https://github.com/chester-hill-solutions/callcaster/issues/1165) Prune stale non-production Twilio resources safely
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-19
