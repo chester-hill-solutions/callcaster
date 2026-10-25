@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   listen: vi.fn(),
   getSession: vi.fn(),
   getUserRole: vi.fn(),
+  findApiKey: vi.fn(),
 }));
 
 vi.mock("@/lib/workspace-membership.server", () => ({
@@ -53,6 +54,17 @@ vi.mock("@/server/db", () => ({
 
 vi.mock("@/lib/auth.server", () => ({
   getSession: (...args: unknown[]) => mocks.getSession(...args),
+  resolveBearerSessionUser: async () => ({ id: "u1" }),
+}));
+
+// The re-check re-reads an API key's row, because a key can be deleted, expire
+// or be narrowed after the connection opened (#2892).
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    workspace_api_key: {
+      findFirst: (...args: unknown[]) => mocks.findApiKey(...args),
+    },
+  }),
 }));
 
 describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
@@ -67,6 +79,11 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     mocks.fetchWorkspaceEventsAfter.mockResolvedValue([]);
     mocks.listen.mockRejectedValue(new Error("LISTEN unavailable"));
     mocks.getUserRole.mockReset();
+    mocks.findApiKey.mockReset();
+    mocks.findApiKey.mockResolvedValue({
+      scopes: ["audit.read"],
+      expires_at: null,
+    });
     // `owner`, not `member`. The loader now gates on `audit.read`, which the
     // role→capability matrix grants to owners alone (app/lib/capabilities.ts:43),
     // so a `member` default is refused with 403 before the stream opens. The
@@ -434,6 +451,88 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
         .mockResolvedValue([]);
       await vi.advanceTimersByTimeAsync(10_000);
       expect(sse.text).not.toContain("after-revocation");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("stops streaming when an owner is demoted mid-stream", async () => {
+    vi.useFakeTimers();
+    try {
+      const mod = await import(
+        "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+      );
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs({
+          request: new Request("http://localhost/api/workspaces/ws-1/events"),
+          params: { workspaceId: "ws-1" },
+        }),
+      );
+      const sse = drain(response as Response);
+
+      // Ownership transfer demotes the previous owner to admin, which does not
+      // hold audit.read. Membership survives, so the old membership-only check
+      // kept the transcript feed open (#2892).
+      mocks.getUserRole.mockResolvedValue({ role: "admin" });
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(sse.text).toContain("access_revoked");
+      expect(sse.done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("stops streaming when the API key is deleted mid-stream", async () => {
+    vi.useFakeTimers();
+    try {
+      const mod = await import(
+        "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+      );
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request("http://localhost/api/workspaces/ws-1/events"),
+            params: { workspaceId: "ws-1" },
+          },
+          { userId: null, apiKey: { keyId: "key-1", scopes: ["audit.read"] } } as never,
+        ),
+      );
+      const sse = drain(response as Response);
+
+      // The row is gone: the key that opened the stream no longer exists.
+      mocks.findApiKey.mockResolvedValue(null);
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(sse.text).toContain("access_revoked");
+      expect(sse.done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("stops streaming when the API key's scopes are narrowed mid-stream", async () => {
+    vi.useFakeTimers();
+    try {
+      const mod = await import(
+        "../app/routes/api+/workspaces+/$workspaceId/events.loader.server"
+      );
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs(
+          {
+            request: new Request("http://localhost/api/workspaces/ws-1/events"),
+            params: { workspaceId: "ws-1" },
+          },
+          { userId: null, apiKey: { keyId: "key-1", scopes: ["audit.read"] } } as never,
+        ),
+      );
+      const sse = drain(response as Response);
+
+      mocks.findApiKey.mockResolvedValue({ scopes: ["campaigns.read"], expires_at: null });
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect(sse.text).toContain("access_revoked");
+      expect(sse.done).toBe(true);
     } finally {
       vi.useRealTimers();
     }
