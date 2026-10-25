@@ -43,9 +43,14 @@ export const action = defineAction({
         if (typeof workspace_id !== "string" || !workspace_id) {
           throw new Error("Campaign and workspace are required");
         }
+        // The voicedrop audio belongs to a campaign, so it takes the role floor
+        // the rest of the media family applies (`uploadWorkspaceAudioApi`, the
+        // clip editor). Membership alone admitted `caller`, which the capability
+        // matrix denies campaigns.write (#2890).
         await requireWorkspaceAccess({
           user: auth.user,
           workspaceId: workspace_id,
+          minRole: "member",
         });
         const validation = validateMediaFile(file, "audio");
         if (!validation.ok) {

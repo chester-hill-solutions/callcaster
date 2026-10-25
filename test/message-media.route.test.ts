@@ -243,6 +243,60 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
+  test("a campaign POST requires the member role", async () => {
+    const mod = await import("../app/routes/api+/message_media");
+    const fd = new FormData();
+    fd.set("workspaceId", "w1");
+    fd.set("image", new File(["x"], "a.png"));
+    fd.set("fileName", "a.png");
+    fd.set("campaignId", "1");
+
+    postgresServerMocks.headers = new Headers();
+    queueDualAuthSession(authSession());
+    makeDbClient({ campaign: { id: 1, message_media: [] } });
+    await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
+
+    // Campaign media is campaigns.write work; `caller` does not hold it (#2890).
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: "u1" }, workspaceId: "w1", minRole: "member" }),
+    );
+  });
+
+  test("a campaign-less POST stays open to every member", async () => {
+    const mod = await import("../app/routes/api+/message_media");
+    const fd = new FormData();
+    fd.set("workspaceId", "w1");
+    fd.set("image", new File(["x"], "a.png"));
+    fd.set("fileName", "a.png");
+
+    postgresServerMocks.headers = new Headers();
+    queueDualAuthSession(authSession());
+    await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
+
+    // The chat composer's image upload has no role floor anywhere else either.
+    const [call] = mocks.requireWorkspaceAccess.mock.calls[0] as [Record<string, unknown>];
+    expect(call).not.toHaveProperty("minRole");
+  });
+
+  test("an API key without campaigns.write is refused on campaign media", async () => {
+    const mod = await import("../app/routes/api+/message_media");
+    const fd = new FormData();
+    fd.set("workspaceId", "w1");
+    fd.set("image", new File(["x"], "a.png"));
+    fd.set("fileName", "a.png");
+    fd.set("campaignId", "1");
+
+    postgresServerMocks.headers = new Headers();
+    // No `user` key at all is what makes the helper build an API-key actor.
+    queueDualAuthSession({
+      apiKey: { workspaceId: "w1", scopes: ["campaigns.read"] },
+    });
+    const res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
+
+    expect(res.status).toBe(403);
+    expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
+  });
+
   test("POST without campaignId returns signed URL or error", async () => {
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
