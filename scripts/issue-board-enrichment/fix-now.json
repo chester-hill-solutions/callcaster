@@ -170,35 +170,6 @@
     "risk": "medium"
   },
   {
-    "issueNumber": 2861,
-    "verdict": "fix-now",
-    "recommendedTitle": "Legacy flat PATCH /api/contacts authorizes on membership alone, so a `caller` can rewrite any contact in its workspace and clear the opt_out consent flag the…",
-    "summary": "The legacy flat contact route under app/routes/api+ authorizes POST and PATCH /api/contacts on workspace MEMBERSHIP alone: the body workspace_id is taken from the request, requireWorkspaceAccess is called with no minRole, and no product…",
-    "currentBehavior": "The legacy flat contact route under app/routes/api+ authorizes POST and PATCH /api/contacts on workspace MEMBERSHIP alone: the body workspace_id is taken from the request, requireWorkspaceAccess is called with no minRole, and no product capability is ever checked (app/routes/api+/contacts.action.server.ts:41). requireWorkspaceAccess admits every role in WORKSPACE_MEMBERSHIP_ROLES - including `caller` - whenever minRole is omitted, because hasMinRole returns true for an undefined floor (app/lib/workspace-membership.server.ts:183). Because updateContact builds its UPDATE column set from every request-body entry except audience_id (app/lib/database/contact.server.ts:266), a `caller` can…",
-    "rootCause": "app/routes/api+/contacts.action.server.ts performs the authorization decision with a bare membership check (requireWorkspaceAccess({ user, workspaceId }) at line 41) and never calls a capability or role guard, while the canonical contact create/update route gates the same state change on the `member` role (app/routes/workspaces+/$id/contacts/$contactId.action.server.ts:37). The legacy route then hands the whole request body to updateContact, which uses it verbatim as the UPDATE column set (app/lib/database/contact.server.ts:266), so a column the product deliberately excludes from its own editor - opt_out, the consent flag - becomes caller-controlled.",
-    "resolution": "Close the legacy flat contact UPDATE path behind the same rule the product already applies to its canonical contact editor: the `member` role floor and the campaigns.write capability, and stop treating the raw request body as the column set. Gate PATCH /api/contacts on campaigns.write plus a `member` role floor, and replace the blanket body-to-column mapping in updateContact with an explicit allowlist of the fields the contact editor is allowed to change (dropping opt_out, created_by and id from caller input entirely). Leave POST /api/contacts membership-only, because contact CREATION by callers is deliberate product behaviour (chat composer, queue picker); the same allowlist should be…",
-    "lookIn": [
-      "app/routes/api+/contacts.action.server.ts",
-      "app/routes/workspaces+/$id/contacts/$contactId.action.server.ts",
-      "app/server/contact-editor.server.ts",
-      "app/lib/database/contact.server.ts",
-      "app/lib/workspace-membership.server.ts",
-      "app/lib/capabilities.ts"
-    ],
-    "existingTests": [
-      "All 5 local checks passed in the audit sandbox (private Postgres 18 with the full migration chain bootstrapped inside the same command; no network egress). PATCH /api/contacts with a `caller` membership returned HTTP 200, and re-reading the row from the database showed opt_out flipped from true to false and phone…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "A workspace member holding the lowest role (`caller`) must not be able to mutate an existing contact record, and no role may set the opt_out consent flag through the generic contact-update endpoint. The product already enforces both rules on its canonical contact editor route: the write action requires the `member` role and answers 403 to a `caller` (app/routes/workspaces+/$id/contacts/$contactId.action.server.ts:37), and it writes a fixed field set that excludes opt_out (app/server/contact-editor.server.ts:8). Contact deletion is `campaigns.write` plus a `member` floor (app/routes/api+/contacts/$contactId.action.server.ts:24), and `caller` does not hold campaigns.write (app/lib/capabilities.ts:76). The legacy flat route should apply the same capability and role floor to PATCH /api/contacts and accept a fixed column set rather than the raw request body. Contact CREATION via POST /api/contacts must stay membership-only, because the chat composer and the queue picker legitimately create contacts as a `caller` (app/routes/api+/contacts.loader.server.ts:33)."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2862,
     "verdict": "fix-now",
     "recommendedTitle": "Public api+ multipart routes buffer the whole request body with no byte cap",
@@ -484,35 +455,6 @@
     ],
     "acceptanceCriteria": [
       "A suspended workspace's money must not move. app/lib/cron-workspace-fanout.server.ts:44 states the rule - 'A job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended: it keeps debiting a balance nobody will pay and keeps reconciling an account that should be frozen' - and line 92 implements it by skipping a disabled workspace unless the job opts in. billing_reconcile and twilio_open_sync deliberately do not opt in (the includeDisabled field is absent at app/lib/worker/handlers/cron.server.ts:141 and :99), and the repo's own test asserts that (test/worker-cron-handlers.server.test.ts:213, :222, and :228-238, which pins number_rental_billing as the only job that opts in). The intended behaviour is therefore that a suspended tenant is skipped on BOTH branches of withOptionalWorkspaceFanout."
-    ],
-    "size": "XS",
-    "risk": "low"
-  },
-  {
-    "issueNumber": 2896,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/jobs/twilio-open-sync stores unbounded sweep limits: a negative limit silently removes the sweep's LIMIT and a non-positive maxAgeMinutes collapses…",
-    "summary": "POST /api/jobs/twilio-open-sync narrows callLimit, messageLimit and maxAgeMinutes with a bare `typeof body.X === \"number\"` check, and the job's params schema (legacyNumericParam) keeps any finite number, negative and zero included",
-    "currentBehavior": "POST /api/jobs/twilio-open-sync narrows callLimit, messageLimit and maxAgeMinutes with a bare `typeof body.X === \"number\"` check, and the job's params schema (legacyNumericParam) keeps any finite number, negative and zero included. A negative limit is neither rejected nor clamped: Drizzle 0.45.2 emits the LIMIT clause only when the limit is an object or a number greater than or equal to zero (node_modules/drizzle-orm/pg-core/dialect.js:286), so the sweep's 'bounded' SELECT silently becomes an unbounded read of every open call/message row of that tenant (Postgres itself would have answered 'LIMIT must not be negative'), and the same negative value is forwarded verbatim to the provider call…",
-    "rootCause": "The per-route body narrowing (app/routes/api+/jobs+/twilio-open-sync.action.server.ts:15) accepts any number and the registered params schema (app/lib/worker/job-params.server.ts:68 -> legacyNumericParam, app/lib/worker/job-registry.server.ts:124-132) has no lower bound, so an out-of-range value is stored as job.params and later used both as a SQL row bound and as a provider page size. withReschedule (app/lib/worker/handlers/cron.server.ts:91) then copies the parsed params verbatim into the chain successor, so whenever a workspace-less job carries such a value it becomes the chain's permanent configuration instead of one run's parameter.",
-    "resolution": "Bound the three numbers at the route so a negative or zero value can never be stored: a limit must be a positive integer and maxAgeMinutes must be at least 1, so the 404 grace window can never collapse. Add the same lower bound to the registered params schema as defence in depth, and stop the chain from inheriting an unvalidated parameter: have the handler pass the sweep's own defaults to withReschedule rather than the job's parsed params, so one bad row cannot reconfigure the chain. Note the ordering hazard when adding the schema bound: the params are parsed in the registry wrapper (app/lib/worker/job-registry.server.ts:106) BEFORE the handler's withReschedule runs, so a schema that…",
-    "lookIn": [
-      "app/routes/api+/jobs+/twilio-open-sync.action.server.ts",
-      "app/lib/worker/job-registry.server.ts",
-      "app/lib/worker/job-params.server.ts",
-      "app/lib/worker/handlers/cron.server.ts",
-      "app/lib/worker/handlers/shared.server.ts",
-      "app/lib/worker/cron-job-enqueue-route.server.ts"
-    ],
-    "existingTests": [
-      "Route: the workspace-scoped POST returned {\"ok\":true,\"enqueued\":true,\"deduped\":false,\"jobId\":5} and the stored row read back as params {\"callLimit\":-1,\"messageLimit\":-1,\"maxAgeMinutes\":-1} with workspace_id set to the named tenant -- the negative limits were stored unchanged. The workspace-less POST against the live…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The three numbers are the sweep's budgets, not free-form input: callLimit/messageLimit bound how many open rows one run may touch, and maxAgeMinutes is the grace window that decides when a call the provider does not know yet may be terminalized ('Terminalize it as failed once it is old enough that a race with call creation is impossible', app/lib/twilio-open-sync.server.ts:234). A limit must be a positive integer and maxAgeMinutes must be at least 1, so a negative or zero value can never be stored; and the chain successor must not inherit an unvalidated parameter, because the successor is the platform's only scheduler for this job ('These chains are the only scheduler: there is no pg_cron and no external trigger', app/lib/worker/handlers/shared.server.ts:8), so a bad value there is permanent."
     ],
     "size": "XS",
     "risk": "low"
