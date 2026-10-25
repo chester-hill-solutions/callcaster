@@ -5,11 +5,15 @@ import { getAdminUser, updateAdminUser } from "@/lib/platform-admin.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import { z } from "zod";
 
+import { ACCESS_LEVELS } from "../../../../../shared/access-levels";
+
 const updateUserSchema = z.object({
   first_name: z.string().nullable().optional(),
   last_name: z.string().nullable().optional(),
   username: z.string().min(1),
-  access_level: z.string().optional(),
+  // Constrain to the levels the admin console offers. An omitted level stays
+  // omitted: the write is a partial update, so a rename no longer demotes.
+  access_level: z.enum(ACCESS_LEVELS).optional(),
 });
 
 async function requireSudoWithUserId({
@@ -59,6 +63,9 @@ export const action = defineAction({
       return jsonError(result.error, 500);
     }
 
-    return jsonResponse({ success: true, message: "User updated successfully" });
+    return jsonResponse({
+      success: true,
+      message: "User updated successfully",
+    });
   },
 });
