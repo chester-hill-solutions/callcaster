@@ -457,7 +457,13 @@ export async function updateMeProfile(
   userId: string,
   body: UpdateMeBody,
 ): Promise<
-  | { ok: true; data: AuthTokensResponse["user"]; headers: Headers }
+  | {
+      ok: true;
+      data: AuthTokensResponse["user"];
+      headers: Headers;
+      /** Replacement bearer token, present only when this call changed the password. */
+      session_token: string | null;
+    }
   | { ok: false; error: string; status: number }
 > {
   const currentProfile = await getUserById(userId);
@@ -509,14 +515,31 @@ export async function updateMeProfile(
       return { ok: false, error: "Update failed", status: 400 };
     }
 
+    let sessionToken: string | null = null;
+    let passwordHeaders: Headers | undefined;
     if (body.password && body.current_password) {
-      await auth.api.changePassword({
+      const changed = (await auth.api.changePassword({
         body: {
           newPassword: body.password,
           currentPassword: body.current_password,
+          // A password change is what a user does after suspected compromise, so
+          // it must evict the sessions that already exist - otherwise the owner
+          // cannot remove an attacker who holds a copied cookie or bearer token.
+          // Better Auth does that only when asked, and it issues a replacement
+          // session for the caller: hand it back, or the caller logs itself out.
+          revokeOtherSessions: true,
         },
         headers: request.headers,
-      });
+        returnHeaders: true,
+      })) as
+        | {
+            response?: { token?: string | null };
+            headers?: Headers;
+            token?: string | null;
+          }
+        | undefined;
+      sessionToken = changed?.response?.token ?? changed?.token ?? null;
+      passwordHeaders = changed?.headers;
     }
 
     const mappedUser = mapUserProfile(user);
@@ -541,7 +564,11 @@ export async function updateMeProfile(
     return {
       ok: true,
       data: mappedUser,
-      headers: mergeBetterAuthSetCookieHeaders(result?.headers),
+      headers: mergeBetterAuthSetCookieHeaders(
+        passwordHeaders,
+        mergeBetterAuthSetCookieHeaders(result?.headers),
+      ),
+      session_token: sessionToken,
     };
   } catch (error) {
     return {

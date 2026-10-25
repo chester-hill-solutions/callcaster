@@ -309,9 +309,62 @@ describe("platform-auth.server.ts", () => {
         body: {
           newPassword: "newPassword123",
           currentPassword: "oldPassword123",
+          // The control the reset path already applies: a password change must
+          // evict the sessions that already exist (#2891).
+          revokeOtherSessions: true,
         },
         headers: expect.any(Headers),
+        returnHeaders: true,
       });
+    });
+
+    test("a password change hands back the replacement session", async () => {
+      const mod = await import("../app/lib/platform-auth.server");
+      mocks.updateUser.mockResolvedValueOnce({
+        response: { user: { id: "u1", email: "a@b.com", name: "First Last" } },
+      });
+      mocks.changePassword.mockResolvedValueOnce({
+        response: { token: "replacement-token", user: { id: "u1" } },
+        headers: new Headers({
+          "set-cookie": "better-auth.session_token=replacement; Path=/",
+        }),
+      });
+
+      const result = await mod.updateMeProfile(
+        new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
+        {
+          password: "newPassword123",
+          current_password: "oldPassword123",
+        } as any,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // The caller's own bearer token was revoked with the rest, so the
+      // replacement must come back in the body and as a cookie.
+      expect(result.session_token).toBe("replacement-token");
+      expect(result.headers.getSetCookie()).toContain(
+        "better-auth.session_token=replacement; Path=/",
+      );
+    });
+
+    test("a profile edit without a password returns no replacement session", async () => {
+      const mod = await import("../app/lib/platform-auth.server");
+      mocks.updateUser.mockResolvedValueOnce({
+        response: { user: { id: "u1", email: "a@b.com", name: "First Last" } },
+      });
+
+      const result = await mod.updateMeProfile(
+        new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
+        { first_name: "New" } as any,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.session_token).toBeNull();
+      expect(mocks.changePassword).not.toHaveBeenCalled();
     });
 
     test("does not change password when omitted", async () => {

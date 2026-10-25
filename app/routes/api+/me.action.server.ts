@@ -1,5 +1,4 @@
-import { requireJsonAuth,
-} from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
   acceptInvitesBodySchema,
@@ -18,8 +17,7 @@ export const loader = defineLoader({
   auth: ({ request }) => requireJsonAuth(request),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
-    const profile = await getMeProfile(    auth.user.id,
-    );
+    const profile = await getMeProfile(auth.user.id);
     return jsonResponse(profile, 200);
   },
 });
@@ -36,7 +34,19 @@ export const action = defineAction({
       if (!result.ok) {
         return jsonError(result.error, result.status);
       }
-      return jsonResponse({ user: result.data }, 200, result.headers);
+      return jsonResponse(
+        {
+          user: result.data,
+          // A password change revokes every session, including the caller's own
+          // bearer token. Hand back the replacement so a bearer client can keep
+          // working without signing in again.
+          ...(result.session_token
+            ? { session_token: result.session_token }
+            : {}),
+        },
+        200,
+        result.headers,
+      );
     }
 
     return jsonError("Method not allowed", 405);
