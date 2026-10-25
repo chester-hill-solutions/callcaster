@@ -156,6 +156,23 @@ describe("cron handler self-reschedule gating", () => {
     );
   });
 
+  test("a poisoned sweep limit is not inherited by the successor", async () => {
+    await twilioOpenSyncHandler(
+      makeJob({
+        type: "twilio_open_sync",
+        params: { callLimit: -1, messageLimit: 0, maxAgeMinutes: -5 },
+      }),
+    );
+
+    // One bad row must not reconfigure the chain (#2896).
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "twilio_open_sync",
+        params: { callLimit: 50, messageLimit: 50, maxAgeMinutes: 120 },
+      }),
+    );
+  });
+
   test("workspace-scoped twilio_open_sync does not self-reschedule", async () => {
     await twilioOpenSyncHandler(
       makeJob({

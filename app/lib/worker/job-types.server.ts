@@ -39,3 +39,16 @@ export const PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE =
   "predictive_machine_continue";
 export const PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE =
   "predictive_machine_reconcile";
+
+/**
+ * Defaults for the Twilio open-sync sweep (#2896), shared by the HTTP cron
+ * route, the stored params schema and the handler's successor job so the three
+ * cannot drift apart. It lives here, not in job-params.server.ts, because the
+ * handler must not import that module: it pulls the job registry, which imports
+ * the handlers.
+ */
+export const TWILIO_OPEN_SYNC_DEFAULTS = {
+  callLimit: 50,
+  messageLimit: 50,
+  maxAgeMinutes: 120,
+} as const;

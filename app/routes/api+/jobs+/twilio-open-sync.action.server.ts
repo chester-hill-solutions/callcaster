@@ -1,5 +1,19 @@
 import { defineAction } from "@/lib/handler.server";
+import { TWILIO_OPEN_SYNC_DEFAULTS } from "@/lib/worker/job-types.server";
 import { createCronEnqueueAction } from "@/lib/worker/cron-job-enqueue-route.server";
+
+/**
+ * A sweep limit must be a positive integer. Anything else falls back to the
+ * sweep's default rather than being stored: Drizzle emits LIMIT only for a number
+ * >= 0, so a negative limit silently turned the "bounded" sweep into an unbounded
+ * read of every open row, and a non-positive maxAgeMinutes collapsed the 404
+ * grace window so every unknown open call was terminalized as failed (#2896).
+ */
+function sweepNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1
+    ? value
+    : fallback;
+}
 
 /**
  * Legacy HTTP cron entry for twilio-open-sync.
@@ -12,11 +26,18 @@ export const action = defineAction(
     // top-level `workspaceId` (passed by `createCronEnqueueAction` alongside
     // these params) is what `resolveWorkspaceId` reads.
     buildParams: (body) => ({
-      callLimit: typeof body.callLimit === "number" ? body.callLimit : 50,
-      messageLimit:
-        typeof body.messageLimit === "number" ? body.messageLimit : 50,
-      maxAgeMinutes:
-        typeof body.maxAgeMinutes === "number" ? body.maxAgeMinutes : 120,
+      callLimit: sweepNumber(
+        body.callLimit,
+        TWILIO_OPEN_SYNC_DEFAULTS.callLimit,
+      ),
+      messageLimit: sweepNumber(
+        body.messageLimit,
+        TWILIO_OPEN_SYNC_DEFAULTS.messageLimit,
+      ),
+      maxAgeMinutes: sweepNumber(
+        body.maxAgeMinutes,
+        TWILIO_OPEN_SYNC_DEFAULTS.maxAgeMinutes,
+      ),
     }),
   }),
 );

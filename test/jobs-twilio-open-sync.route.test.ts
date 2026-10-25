@@ -73,6 +73,36 @@ describe("app/routes/api+/jobs+/twilio-open-sync.action.server.ts", () => {
     });
   });
 
+  test("a negative or zero sweep limit falls back to the default", async () => {
+    const res = await callAction(
+      { workspaceId: "ws-1", callLimit: -5, messageLimit: 0, maxAgeMinutes: -1 },
+      CRON_SECRET,
+    );
+
+    expect(res.status).toBe(200);
+    // A negative limit makes Drizzle drop the LIMIT clause (unbounded read) and a
+    // non-positive maxAgeMinutes collapses the 404 grace window (#2896).
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({
+          callLimit: 50,
+          messageLimit: 50,
+          maxAgeMinutes: 120,
+        }),
+      }),
+    );
+  });
+
+  test("a positive integer limit is stored as given", async () => {
+    await callAction({ workspaceId: "ws-1", callLimit: 200 }, CRON_SECRET);
+
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ callLimit: 200 }),
+      }),
+    );
+  });
+
   test("enqueues coordinator job when workspaceId is absent", async () => {
     const res = await callAction({}, CRON_SECRET);
 

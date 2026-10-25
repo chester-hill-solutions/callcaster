@@ -24,6 +24,7 @@ import {
   RECORDING_REPAIR_SWEEP_JOB_TYPE,
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
+  TWILIO_OPEN_SYNC_DEFAULTS,
   TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
   WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
@@ -64,10 +65,28 @@ export const predictiveMachineReconcileParams = predictiveMachineParams.extend({
  * `test/job-registry.test.ts` for the guard that keeps the two lists in sync.
  */
 
+/**
+ * Clamp a sweep parameter to its lower bound instead of rejecting it (#2896).
+ *
+ * A negative or zero limit silently became an unbounded read (Drizzle emits
+ * LIMIT only for a number >= 0), and a non-positive maxAgeMinutes collapsed the
+ * 404 grace window so every unknown open call was terminalized as failed.
+ *
+ * Clamp rather than reject: the value may already be stored on a live chain, and
+ * the registry parses params BEFORE the handler enqueues a successor, so a schema
+ * that threw here would abort the tick and stall the chain until the watchdog
+ * reseeded it.
+ */
+function boundedSweepNumber(fallback: number) {
+  return legacyNumericParam(fallback).transform((value) =>
+    Number.isInteger(value) && value >= 1 ? value : fallback,
+  );
+}
+
 export const twilioOpenSyncParams = z.object({
-  callLimit: legacyNumericParam(50),
-  messageLimit: legacyNumericParam(50),
-  maxAgeMinutes: legacyNumericParam(120),
+  callLimit: boundedSweepNumber(TWILIO_OPEN_SYNC_DEFAULTS.callLimit),
+  messageLimit: boundedSweepNumber(TWILIO_OPEN_SYNC_DEFAULTS.messageLimit),
+  maxAgeMinutes: boundedSweepNumber(TWILIO_OPEN_SYNC_DEFAULTS.maxAgeMinutes),
 });
 
 export const billingReconcileParams = z.object({
