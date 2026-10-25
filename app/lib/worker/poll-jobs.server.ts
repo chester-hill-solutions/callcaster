@@ -72,16 +72,22 @@ export function getWorkerId(): string {
 }
 
 /**
- * Rows affected by a write, across drivers: postgres.js exposes `count`, pg
- * returns an array-like `{ rows }`. Read defensively rather than casting at
- * each call site.
+ * Rows affected by a write, across drivers: postgres.js resolves `db.execute()`
+ * to a `Result` that IS an Array and carries the affected-row count on `count`,
+ * while the unit tier hands back plain rows.
+ *
+ * `count` must be read BEFORE the array length. An UPDATE without RETURNING
+ * resolves to an empty array with a non-zero `count`, so testing
+ * `Array.isArray` first read length 0 and every caller concluded that the write
+ * changed nothing - which silenced the stale-claim and dead-letter alerts.
+ * The array length stays as the fallback for plain rows.
  */
-function affectedRowCount(result: unknown): number {
-  if (Array.isArray(result)) return result.length;
+export function affectedRowCount(result: unknown): number {
   if (result && typeof result === "object" && "count" in result) {
     const { count } = result as { count?: unknown };
-    return typeof count === "number" ? count : 0;
+    if (typeof count === "number") return count;
   }
+  if (Array.isArray(result)) return result.length;
   return 0;
 }
 
