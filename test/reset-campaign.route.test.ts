@@ -71,7 +71,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "bad" });
+    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error resetting campaign:", { message: "bad" });
   }, 30000);
 

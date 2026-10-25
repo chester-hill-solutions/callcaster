@@ -216,6 +216,6 @@ describe("admin workspace credits route", () => {
 
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toMatchObject({ error: "Admin context missing" });
+    expect(body).toMatchObject({ error: "An error occurred" });
   });
 });

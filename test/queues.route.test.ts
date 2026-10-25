@@ -128,7 +128,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any)));
 
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "rpc fail" });
+    await expect(res.json()).resolves.toMatchObject({ error: "Queue action failed" });
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
@@ -296,7 +296,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any)));
 
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "update fail" });
+    await expect(res.json()).resolves.toMatchObject({ error: "Queue action failed" });
   });
 
   test("action DELETE returns affected_rows on success", async () => {

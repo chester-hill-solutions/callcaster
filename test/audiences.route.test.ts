@@ -255,7 +255,7 @@ describe("api.audiences route", () => {
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resErr.status).toBe(500);
-    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
+    await expect(resErr.json()).resolves.toMatchObject({ error: "An error occurred" });
   }, 30000);
 
   test("resolveDeps fallbacks are covered via module mocks", async () => {
@@ -315,7 +315,7 @@ describe("api.audiences route", () => {
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any));
     expect(resErr.status).toBe(500);
-    await expect(resErr.json()).resolves.toMatchObject({ error: "q" });
+    await expect(resErr.json()).resolves.toMatchObject({ error: "An error occurred" });
   }, 30000);
 
   test("API keys cannot access audiences outside their workspace", async () => {

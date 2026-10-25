@@ -285,7 +285,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       } as any),
     );
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Admin context missing" });
+    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
   });
 
   test("action updates Twilio portal settings", async () => {

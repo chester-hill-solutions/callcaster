@@ -291,7 +291,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "No users found for workspace",
+      error: "Failed to register number",
     });
   });
 

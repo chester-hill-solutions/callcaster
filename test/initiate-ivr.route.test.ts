@@ -87,7 +87,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     const mod = await import("../app/routes/api+/initiate-ivr");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "rpc" });
+    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
   });
 
   test("returns creditsError when ivr endpoint reports creditsError", async () => {
