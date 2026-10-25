@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@82169950` · 331 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@95f742c8` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,124 +29,20 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 51
+## Fix now — 37
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-### [#2865](https://github.com/chester-hill-solutions/callcaster/issues/2865) The optional workspaceId on the campaign_queue write helpers is never applied to the WHERE clause, so POST…
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-24
-- Recommended title: **The optional workspaceId on the campaign_queue write helpers is never applied to the WHERE clause, so POST /api/ivr lets a member of one workspace dequeue…**
-- app/lib/campaign-queue-db.server.ts performs its campaign_queue UPDATEs on the unscoped `db` client from `@/server/db` and builds the WHERE clause entirely from a caller-assembled `conditions` array, so the tenant predicate is an *optional…
-- Current behavior: app/lib/campaign-queue-db.server.ts performs its campaign_queue UPDATEs on the unscoped `db` client from `@/server/db` and builds the WHERE clause entirely from a caller-assembled `conditions` array, so the tenant predicate is an *optional argument* instead of a property of the helper. `dequeueCampaignQueueById` appends `eq(campaignQueueTable.workspace, args.workspaceId)` only when a workspaceId was supplied (lines 404-407) and `recordQueueAttemptFailure` accepts a `workspaceId` it never puts in the predicate at all (lines 605-613) - it forwards it only to the SSE emit. `POST /api/ivr` (declared API surface, `requireJsonAuth`, no capability, no minimum role) reads `queue_id` straight out of…
-- Root cause: The tenancy of a `campaign_queue` write is delegated to the caller as an optional `workspaceId` argument instead of being enforced by the helper. `updateCampaignQueueAndEmit` runs on the unscoped `db` client (`const exec = args.exec ?? db`, campaign-queue-db.server.ts:106) and applies exactly the predicates the caller assembled. `dequeueCampaignQueueById` adds the workspace term only `if (args.workspaceId)` (lines 404-407), and `recordQueueAttemptFailure` never adds it (lines 605-613) even though it takes the argument. `campaign_queue` is a registered workspace-scoped table (app/db/workspace-scoped-tables.ts:50), so ADR-0004's `createTenantDb(workspaceId)` (app/server/tenant-db.ts:32-35)…
-- Resolution: Make the tenant predicate a property of the helper, not an optional argument, and stop using the unscoped client for tenant writes. (1) `dequeueCampaignQueueById` must take a required `workspaceId` and always add `eq(campaignQueueTable.workspace, workspaceId)` to its conditions; `DequeueQueueEntryByIdArgs.workspaceId` becomes `workspaceId: string` so the compiler rejects a workspace-less by-id dequeue. (2) `recordQueueAttemptFailure` must add the same predicate to its `conditions` instead of only forwarding the argument to the SSE emit. (3) `POST /api/ivr` must pass the authenticated workspace through to `dequeueQueueEntry`. (4) The remaining by-id call sites (campaign-sms-dispatch,…
-- Look in: `app/lib/campaign-queue-db.server.ts`, `app/routes/api+/ivr.action.server.ts`, `app/lib/api-surface-generated.ts`, `test/ivr.route.test.ts`, `client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql`, `app/server/tenant-db.ts`
-- Existing tests: 8/8 checks passed against a real Postgres 18. Control (workspaceId supplied): `dequeueQueueEntry` returned `{ dequeuedPrimary: false }`, the victim row stayed `queue_state='queued'` with `dequeued_at=null`, and the victim campaign stayed 'running'; the executed statement was `update "campaign_queue" set ... where…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A write to a workspace-scoped table must be bound to the authenticated workspace before it is issued. ADR-0004 (`app/server/tenant-db.ts:32-35`, `app/db/workspace-scoped-tables.ts`) makes `createTenantDb(workspaceId)` the only tenant-data accessor for route code precisely because the base `db` client bypasses tenancy, and the audit's architecture summary names `createTenantDb` as the strongest source-visible control on the tenant-to-tenant boundary with no RLS behind it. The repository already applied exactly this discipline to the plpgsql equivalents in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql, which added a mandatory workspace parameter to `dequeue_contact` and `create_outreach_attempt` and named /api/dial, /api/hangup and /api/questions as the exposed callers. The TypeScript by-id dequeue path was not covered by that fix, and /api/ivr is not among the callers it named.
-
-### [#2868](https://github.com/chester-hill-solutions/callcaster/issues/2868) Public survey answer/complete accept a contact-derived respondent token, letting an anonymous caller overwrite…
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Public survey answer/complete accept a contact-derived respondent token, letting an anonymous caller overwrite another respondent's answers and completion state**
-- POST /api/survey-answer and POST /api/survey-complete treat the signed respondent token as the sole authority for which survey_response row a submission may touch, and the token's result_id - the identity of that row - is minted by the…
-- Current behavior: POST /api/survey-answer and POST /api/survey-complete treat the signed respondent token as the sole authority for which survey_response row a submission may touch, and the token's result_id - the identity of that row - is minted by the public survey page from a caller-supplied `?contact=<id>` parameter with no proof that the caller is that contact. Because contact.id is a sequential integer, an anonymous caller holding any survey link for a tenant can request GET /survey/<publicId>?contact=<n>, receive a signed token whose result_id is an existing respondent's response row, and then use the two public actions to overwrite that respondent's stored answers, change their recorded progress and…
-- Root cause: app/routes/survey+/$surveyId.loader.server.ts:87-96 resolves an existing response row from the caller-supplied `?contact=` integer and reuses that row's result_id when minting the respondent token, so the minted credential carries the authority to mutate a response the caller never owned. app/lib/survey-public-action.server.ts:36-46 then accepts that credential as sufficient: verifyRespondentToken binds it to survey_id and workspace only, and result_id is copied out of the payload with no check that the caller controls the contact the response belongs to. resolvePublicSurveyContactId (app/lib/survey-public-action.server.ts:142-167) repeats the pattern on the write path by taking the…
-- Resolution: Stop treating a guessable contact id as proof of ownership of a response row. (1) Require proof of possession for the contact before a respondent token may authorise an existing response: the survey link must carry a per-contact signed proof (HMAC over contact id + survey id + expiry, verified with the same app secret), and the loader may only reuse an existing response's result_id when that proof verifies or when the caller presents the signed respondent cookie it was issued with. A bare legacy `?contact=<id>` may still start a new response but must not mint a credential that authorises an existing one - and, as the cookie branch of the same loader already does at lines 76-81, the…
-- Look in: `app/lib/survey-public-action.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/lib/survey-db.server.ts`, `app/server/survey-completion.ts`, `app/lib/survey-respondent.server.ts`, `drizzle/0000_baseline.sql`
-- Existing tests: Independent run in the parent-approved sandbox (private Postgres 18, real route modules, commit 67d40abb). Step 1: an anonymous GET /survey/<publicId>?contact=1 with no Cookie and no Authorization header returned 200 and a respondent token whose decoded payload was {survey_id:1, workspace:<probe workspace>,…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: Only the respondent who owns a response row may answer for it or change its completion state. The respondent token is the designed proof of that ownership ('Signed respondent token bound to survey id, workspace, result id, and expiry'), the contact lookup is a workspace-scoped read whose stated job is to make a cross-tenant read impossible (app/lib/survey-respondent.server.ts:14-26), and the loader states that the contact id is a bare legacy integer whose only protection is a rate limit (app/routes/survey+/$surveyId.loader.server.ts:25-31). A guessable identifier that is not proof of possession must not select another respondent's response row or another respondent's identity on a write.
-
-### [#2894](https://github.com/chester-hill-solutions/callcaster/issues/2894) Workspace API keys keep their full scope set after the member who minted them is removed or demoted
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- A workspace API key is a bearer credential whose authority comes exclusively from the `scopes` array on the key row
-- Current behavior: A workspace API key is a bearer credential whose authority comes exclusively from the `scopes` array on the key row. `verifyApiKeyOrSession` (app/lib/api-auth.server.ts:112) resolves the row by `key_prefix`, checks only `expires_at` and the SHA-256 hash, and returns the stored scopes; `created_by` is never selected and `workspace_member` is never consulted. `apiKeyActorFromScopes` (app/lib/capability-actor.server.ts:39) turns those scopes into the principal's capability set and produces an actor with no user identity, so no later stage of the request can bind it to a live member. `resolveDataPlaneAuthorizationActor` (app/lib/capability-guard.server.ts:42) and `resolveDataPlaneAuth`…
-- Root cause: The API-key principal model records the creator (`created_by`) but never binds the key to a live workspace principal, and no cascade exists between a membership change and the key rows. `created_by` has no surviving foreign key (dropped in client/migrations/20260919120000_drop_legacy_auth_users_fks.sql:16) and is read by no runtime path; the scope ceiling `assertScopesWithinActorRole` (app/lib/platform-members.server.ts:120) is applied once at mint time against the creator's then-current role and, as the code comment at app/lib/platform-members.server.ts:80-89 states, is never re-derived. The session path re-resolves the role on every request (app/lib/capability-guard.server.ts:54,…
-- Resolution: Bind every workspace API key to a live membership and cascade membership changes onto the key rows. Two independent halves are required. (1) At authentication, resolve the key creator's current workspace membership and role, refuse the key when the creator is no longer a member, and re-intersect the stored scopes with the creator's CURRENT role so a demotion narrows the key instead of leaving it intact. (2) At the membership-change writers, revoke the affected user's keys in the same transaction as the membership change, using an explicit `revoked_at` column rather than deletion so the audit trail survives; for a demotion, scope-reduce rather than blanket-revoke. Restore the `created_by`…
-- Look in: `app/lib/platform-members.server.ts`, `app/lib/capability-actor.server.ts`, `app/lib/api-auth.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/db/schema.ts`
-- Existing tests: 7/7 tests passed (vitest 4.1.11, integration-db tier, real PostgreSQL 18 inside the sandbox). After removeWorkspaceMember returned ok:true and the membership row was deleted, getUserRole(minter) was null, yet verifyApiKeyOrSession returned { authType: 'api_key', workspaceId: <workspace>, scopes: [campaigns.read,…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: Removing or demoting a workspace member ends that member's effective authority over the workspace, including through credentials the member issued. The platform already implements that for sessions: the membership lookup in `requireWorkspaceAccess` / `getUserRole` yields 404 'Workspace not found' for a non-member, so the session dies with the membership. A key should either be bound to a live membership - with its capability set re-checked against the creator's current role - or be revoked automatically when that membership is removed or reduced. The platform's chosen compensations for key durability are admin-only minting, a mint-time role cap and mandatory expiry; a membership-driven cascade is the missing one. (Note: the platform does NOT fail closed on workspace suspension either - `workspace.disabled` is read only by cron fan-out, number-rental billing and the admin console - so the asymmetry is specifically between the session path and the API-key path on membership change.)
-
-### [#2885](https://github.com/chester-hill-solutions/callcaster/issues/2885) create_outreach_attempt stores an unchecked foreign contact id and get_campaign_attempts renders that contact…
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **create_outreach_attempt stores an unchecked foreign contact id and get_campaign_attempts renders that contact inside the caller's own campaign export**
-- public.create_outreach_attempt(con_id, cam_id, usr_id, wks_id, queue_id) inserts the caller-supplied contact id and campaign id into an outreach_attempt row and stamps that row with the caller's own wks_id, without checking that the…
-- Current behavior: public.create_outreach_attempt(con_id, cam_id, usr_id, wks_id, queue_id) inserts the caller-supplied contact id and campaign id into an outreach_attempt row and stamps that row with the caller's own wks_id, without checking that the contact or the campaign belong to that workspace. public.get_campaign_attempts(p_campaign_id) then reads those rows back with WHERE oa.campaign_id = p_campaign_id and joins contact con ON con.id = oa.contact_id, with no workspace predicate on the attempt row or on the joined contact, and returns that contact's firstname, surname, phone, email, address, city, postal, province, country, opt_out flag and workspace id. Because the export route only checks that the…
-- Root cause: The outreach_attempt INSERT accepts a contact id and a campaign id that are never compared with the workspace the row is tagged with, and the export RPC that renders those rows re-joins contact on id alone. Nothing in the SQL binds the contact or the campaign to the workspace, and the route that calls the wrapper validates only the workspace it was given - the attacker's own workspace - never the contact id it was given. The 2026-08-07 hardening in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql scoped only the campaign_queue attempts-counter UPDATE to workspace = wks_id; its own header records the attempt INSERT as 'correctly tagged with wks_id',…
-- Resolution: Bind the contact and the campaign to the workspace inside the statement, and make the export refuse to render anything outside the caller's workspace. This has to ship as a NEW migration with a fresh version prefix (migrations are tracked by version prefix in AUTH_migrations.schema_migrations and in public.client_migration_bootstrap - scripts/db/check-migration-ledger.mjs - and are applied in filename order by scripts/e2e/bootstrap-compose-db.mjs and scripts/db/bootstrap-fresh-db.mjs, so editing the already-applied 20260722110000 / 20260807120000 files would not re-apply on a deployed database), wired into both bootstrap step lists (the e2e bootstrap fails the build when a client/migrations…
-- Look in: `app/routes/api+/questions.action.server.ts`, `client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql`, `client/migrations/20260722110000_contact_other_data_jsonb.sql`, `app/routes/workspaces+/$id/campaigns/$selected_id.action.server.ts`, `app/lib/db-rpc.server.ts`
-- Existing tests: Two independent reproductions in the audit sandbox against a private Postgres 18 bootstrapped from the repository's own migration chain (scripts/e2e/bootstrap-compose-db.mjs). (A) Wrapper level, using the application's own rpcCreateOutreachAttempt and rpcGetCampaignAttemptsCsv:…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: An outreach attempt, and any export that renders it, must only contain contacts and campaigns owned by the workspace the attempt was recorded for.
-
-### [#2889](https://github.com/chester-hill-solutions/callcaster/issues/2889) Media-stream token without a call SID lets a WebSocket peer overwrite another tenant's coaching rows
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- The media-stream service authenticates a session with an HMAC token that binds the workspace and only optionally the call
-- Current behavior: The media-stream service authenticates a session with an HMAC token that binds the workspace and only optionally the call. The predictive auto-dial branch (app/routes/api+/auto-dial/$roomId.action.server.ts:113-123) attaches a <Start><Stream> to its TwiML without passing a call SID, so app/lib/media-stream-twiml.server.ts:75 mints a token whose payload has no callSid claim (app/lib/media-stream-token.server.ts:38). For such a token the call-binding guard added by the #1530 fix (services/media-stream/twilio-handler.ts:133-140) is skipped and line 144 takes the call SID verbatim from the peer's `start` frame. Every transcript and coaching row is written through the unscoped adminDb client and…
-- Root cause: The call SID is an optional claim in the signed media-stream token, and the service's call-binding check is conditional on that claim being present (`tokenCallSid && msg.start.callSid && msg.start.callSid !== tokenCallSid`). When the token carries no call SID the check is skipped and the row key of the unscoped admin-DB writes is taken from a client-supplied frame field, so the token authorizes writes for a resource it never named. The fix that introduced the check (commit 55e6477b, 'fix(media-stream): bind transcript/coaching writes to the token's callSid (#1530)') hardened only the mint paths that happen to know the call SID at TwiML-generation time and left the predictive auto-dial path…
-- Resolution: Make the call SID a mandatory claim of the media-stream token and refuse any stream frame that does not match it, so the resource selector is always bound by the signature rather than chosen by the peer. Concretely: (1) make `callSid` required in MediaStreamTokenPayload and always include it in the signed payload; (2) make appendLiveTranscriptionStreamTwiml fail closed when the caller cannot name the call instead of minting an unbound token; (3) give the predictive auto-dial branch the call SID it already has (dbCall.sid) so the token binds the call, and update the handleDeviceCheck call site that invokes addToConference; (4) in the stream handler, reject a `start` frame whose call SID is…
-- Look in: `services/media-stream/twilio-handler.ts`, `app/lib/media-stream-token.server.ts`, `app/lib/media-stream-twiml.server.ts`, `app/routes/api+/auto-dial/$roomId.action.server.ts`, `services/media-stream/db-writer.ts`, `app/db/schema-transcription.ts`
-- Existing tests: test/media-stream-token.test.ts covers the neighbouring behaviour on this path.; check_status 'completed'. (A) information_schema for the bootstrapped Postgres shows transcript_segment, coaching_event and coaching_session with columns id/call_sid/... only and NO workspace or workspace_id column on any of them; none of the three is registered in app/db/workspace-scoped-tables.ts. (B) The predictive…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A media-stream token must authorize writes only for the workspace and the call it was minted for, and a `start` frame that names any other call must be refused. Commit 55e6477b states the intent explicitly: 'A token holder for their own workspace could send another workspace's live Call SID and inject rows the victim later sees as genuine.' For that to hold, every minted token must carry the call SID it authorizes (the field must not be optional), and the stream handler must refuse any `start` frame whose call SID is missing or different from the token's, rather than falling back to the frame's value.
-
-### [#2873](https://github.com/chester-hill-solutions/callcaster/issues/2873) POST /account/security intent=enable replaces an already-enrolled second factor with only the password, bypassing…
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **POST /account/security intent=enable replaces an already-enrolled second factor with only the password, bypassing the protected-user rule**
-- The two-factor enrolment state machine at POST /account/security has no prior-state check on its `enable` transition and no protected-user check, while the sibling `disable` transition has both
-- Current behavior: The two-factor enrolment state machine at POST /account/security has no prior-state check on its `enable` transition and no protected-user check, while the sibling `disable` transition has both. Better Auth's enableTwoFactor deletes the account's existing auth_two_factor row (TOTP secret + backup codes) and writes a fresh one, inheriting `verified: true` from the previously verified row, and the account's auth_user.two_factor_enabled flag is left true. The result is that a caller who holds only the first factor (the account password) plus an existing session silently replaces the second factor of a privileged account (workspace owner/admin or platform sudo): the legitimate owner's factor…
-- Root cause: app/routes/account.security.loader.server.ts:61-100 handles `intent=enable` as a stateless operation: it reads the password from the form and calls Better Auth's enableTwoFactor without checking whether the account already has an enrolled second factor (isTwoFactorEnabled / the auth_two_factor row) and without applying userIsTwoFactorProtected, which the `disable` branch does apply at line 151. Better Auth's enableTwoFactor is a replacement operation (node_modules/better-auth/dist/plugins/two-factor/index.mjs:113 deletes the existing auth_two_factor row and line 126 recreates it with `verified` inherited from the previous verified row), so the missing server-side state check turns an…
-- Resolution: Make the enrolment transition stateful on the server and give both 2FA-changing transitions the same assurance rule. (1) In the `enable` branch, refuse the request when the account already has an enrolled second factor (isTwoFactorEnabled(user.id) or an existing verified auth_two_factor row), mirroring the client-side guards in app/routes/account.security.tsx:107 and app/routes/account.tsx:229, so that a repeated enable can never replace an enrolled factor. (2) If re-enrolment must remain possible, put it on a separate `replace` intent that first proves possession of the CURRENT factor (the existing TOTP code or a backup code via Better Auth's verifyTOTP / verifyBackupCode) and that applies…
-- Look in: `app/routes/account.security.loader.server.ts`, `app/routes/account.security.tsx`, `app/routes/account.tsx`, `node_modules/better-auth/dist/plugins/two-factor/index.mjs`, `app/lib/two-factor.server.ts`, `app/server/auth-instance.ts`
-- Existing tests: Two independent sandbox runs against a private Postgres 18 reproduced the same result. The privileged account (workspace role owner + public.user.access_level='sudo') was refused intent=disable ('Privileged accounts cannot disable two-factor authentication') before enrolment, after enrolment and after the replacement.…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: Replacing or removing an enrolled account's second factor must require assurance beyond the first factor, and a privileged account's 2FA state must be governed by the same rule that already blocks intent=disable. Concretely: the server must reject `intent=enable` when the account already has an enrolled second factor (mirroring the client-side guards at app/routes/account.security.tsx:107 and app/routes/account.tsx:229), and any deliberate re-enrolment must first prove possession of the current factor (the existing TOTP code or a backup code) and must satisfy userIsTwoFactorProtected for privileged accounts, so that the effective policy on both transitions is the same.
-
-### [#2878](https://github.com/chester-hill-solutions/callcaster/issues/2878) Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
-- POST /workspaces/:id/settings (formName=updateUser) takes the target role straight from the request body and never validates it against the current workspace role vocabulary
-- Current behavior: POST /workspaces/:id/settings (formName=updateUser) takes the target role straight from the request body and never validates it against the current workspace role vocabulary. The only authorization guard on that value, assertNoRoleEscalation, ranks any role name that is absent from WORKSPACE_ROLE_RANK as 0, so the legacy alias `field_director` passes the 'never grant a role higher than your own' check. The persistence layer then applies memberRoleToRoleId, which still recognises `field_director` and maps it to `admin`, and the membership row is written with role_id='admin'. A workspace `member` therefore promotes themselves, or any peer member, to the workspace `admin` role with one crafted…
-- Root cause: The role string that reaches the membership write is cast rather than validated, and the two components that reason about it disagree about the same string: assertNoRoleEscalation ranks an unknown role name as 0 (fails open), while memberRoleToRoleId recognises the legacy alias `field_director` and maps it to `admin` (fails open into a privileged role). Both are needed for the escalation: the rank guard alone is harmless, and the writer's alias alone is unreachable, because the only unvalidated producer of `field_director` is this form branch. The privileged-role 2FA gate is keyed on the same unvalidated string, so the alias also skips requireTwoFactorForPrivilegedRoleAssignment, whose…
-- Resolution: Validate the submitted role against the current role vocabulary before it is ranked or written, make the escalation guard fail closed on an unknown role name, and keep the legacy field_director alias out of the live write path (it only belongs to the historical backfill). The smallest change that closes the hole is the first one; the second makes the guard fail closed so no future alias or typo can repeat it, and the third removes the writer's half of the disagreement so an unknown string can never resolve to a privileged role. The 2FA gate is fixed as a consequence: once the role is validated against the four real roles, the privileged set it keys on is the role that is actually written.
-- Look in: `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/member-role.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/lib/two-factor.server.ts`
-- Existing tests: Source check: WORKSPACE_ROLE_RANK['field_director'] is undefined (so the guard ranks it 0) while memberRoleToRoleId('field_director') returns 'admin', and isMemberRole('field_director') is false. Arm A (control): the member actor requesting 'admin' got HTTP 403 with body {data:null, error:'You cannot grant a role…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: The workspace settings role-update action must accept only one of the four current workspace roles (owner, admin, member, caller), and no actor may ever grant a role that outranks their own. The sibling addUser branch on the same form enforces this with isMemberRole, and PATCH /api/workspaces/:workspaceId/members enforces it with z.enum(['owner','admin','member','caller']). A member asking for admin must be refused; only an owner/admin may grant admin, and a privileged grant must satisfy the 2FA enrolment requirement.
-
-### [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757) Include all subaccount resources in the Twilio prune report
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-24
-- The report repair uses the Messaging Services API with subaccount credentials, scans all SDK pages and stops on unreadable lists. The keep-list and deletion policy stay unchanged.
-- Current behavior: At dev@e4bb8ac6, the CLI silently reports no subaccount Messaging Services after a failed request and can truncate accounts at 200 or resources at 1,000.
-- Root cause: The subaccount lookup used /2010-04-01/Accounts/{sid}/Messaging/Services.json, ignored the raw response shape and caught every error as an empty list. SDK limit options capped the total inventory instead of setting a page size.
-- Resolution: Extract the resource collector for SDK transport tests. Use messaging.v1.services.list with each subaccount’s credentials, use pageSize without a total limit and preserve a failed read with its account context.
-- Look in: `scripts/twilio-resource-prune-report.mjs`, `scripts/lib/twilio-prune-resources.mjs`, `test/twilio-prune-resources.test.ts`
-- Existing tests: Four new real-SDK transport regressions fail against the original collector while two controls pass.; 38 focused cases pass: seven collector cases plus 31 existing environment, owner and keep-list policy cases.; A live read-only probe confirms that a suspended subaccount rejects Messaging Services reads with HTTP 401 even when listed and fetched tokens match. The report must fail rather than imply that inventory is complete.; Isolated negative controls: restoring a total service cap fails one of seven collector cases; switching the child client to parent credentials fails four. The unchanged control passes all seven.; Full ci:local passes at source commit 3ce5fc82: 5,580 Node, 34 Bun and 1,490 UI cases. PR #2758 is open for review.
-- Done when: Include Messaging Services with the subaccount’s own credentials.; Enumerate all account and resource pages.; Fail unreadable lists with account context instead of reporting an empty successful scan.; Keep the report read-only and preserve all keep-list and environment/owner decisions.
-- Tracker: Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog verified in the browser. Parent #1165. Review https://github.com/chester-hill-solutions/callcaster/pull/2758; the parent full audit and retention decisions remain blocked.
-
-### [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052) Give the completion RPC one best-effort owner
+### [#2860](https://github.com/chester-hill-solutions/callcaster/issues/2860) A webhook credential for one workspace releases or accepts another tenant's live inbound call offer
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24
-- The dispatch worker still propagates a completion RPC error after a successful batch. The dialer now catches this error, but queue, dialer, IVR and settlement paths have separate logging and catch policies.
-- Current behavior: The source fix sends all completion requests through campaign-completion.server.ts. It logs a consistent event, returns false on failure and keeps an explicit transaction executor.
-- Root cause: Completion error handling was repeated at call sites. The dispatch tail had no guard, so a label update failure could retry finished work.
-- Resolution: Use recheckCampaignCompletion as the one best-effort owner. Keep SQL candidate selection in the settlement sweep and deduplication in the dequeue adapter. Remove per-site catches and preserve transaction-bound completion writes.
-- Look in: `app/lib/campaign-completion.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/campaign-settle-recheck.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`
-- Existing tests: 136 focused Node cases cover dispatch, dialer, dequeue, IVR, SMS settlement and recovery sweep, with common failure event fields.; 52 real-Postgres cases cover completion gates and dequeue scope, including transaction rollback.; Original source fails the new dispatch case; 42 control cases pass.; Full ci:local passes at source commit 88bf3518: 5,577 Node, 34 Bun and 1,490 UI cases. Rethrowing completion failures breaks seven caller cases; losing the transaction executor breaks the real-Postgres rollback case.
-- Done when: Exactly one code path owns the best-effort completion call; All five call sites use it with no local try/catch; A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep; One log event name and field set from every surface; Failure path tested at each call site, not only at the owner
-- Tracker: Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification.
-
-### [#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531) Add a Notes field for all callers
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
-- PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.
-- Current behavior: Source audit at dev@e4bb8ac6 on 2026-10-20: the questionnaire has no general Notes field. The result draft is separate from the selected contact, so a predictive connection can retain the preceding contact’s answers.
-- Root cause: The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.
-- Resolution: Add Notes to the existing questionnaire and save result.notes through the caller result endpoint. Restore the selected attempt’s result, preserve answers and notes during edits, reset drafts with contact changes, and flush a pending save to its original contact. Cancel the pending timer on a manual save and treat the next contact’s loaded data as its baseline. Stretch the desktop panel frames together and keep queue and call controls sticky inside them for long scripts.
-- Look in: `app/components/call/CallScreen.Questionnaire.tsx`, `app/hooks/call/useCallScreen.ts`, `app/hooks/utils/useDebouncedSave.ts`, `app/routes/api+/questions.action.server.ts`, `app/lib/callscreenActions.ts`
-- Existing tests: 70 focused UI cases pass, including both dialer modes without admin access, saved notes, clearing, answer preservation, disposition saves, autosave, late result loading, return to a contact and automatic contact changes and Skip Person.; 18 existing save-route and typed-result cases pass; three pre-existing cases remain skipped.; Original source fails all three initial Notes regressions while nine existing hook cases pass. The automatic-contact regression also fails before the contact/draft reset.; Pending, settled and manual save handoffs each have an executed failure before their repair; the fixed hook saves the original contact once and does not submit an unchanged result for the next contact.; The real-hook Skip Person case fails before selecting the new contact synchronously, then passes after the contact/draft handoff is made atomic.; Full npm run ci:local passes on c4d1962a: 5,573 Node, 34 Bun and 1,502 UI tests, plus all guards, production build, bundle check and codegen verification. The real call-screen components pass local note-entry, theme and phone/desktop geometry checks.; Local browser measurements confirm equal desktop panel heights for short scripts, long scripts and long queues. Queue and call controls stay visible during a long-script scroll; the 390 px phone view stays stacked without horizontal overflow.
-- Missing tests: Applicable exact-head remote checks before merge.; Deployed dev acceptance and release verification before closing.
-- Done when: All callers can edit Notes in Power and Predictive modes.; Notes save with the selected outreach attempt and return after reload or contact selection.; Questionnaire answers, notes and disposition edits preserve one another.; Notes do not carry over when the selected contact changes.; The field uses the shared accessible controls and works at phone and desktop widths.; Desktop queue, questionnaire and call-control frames have equal heights; long scripts retain reachable call controls and phone layouts remain stacked.
-- Tracker: User clarified the requirement on 2026-10-20: a Notes field available to all callers. Native Type Feature; Priority High; Effort Medium; environment prod; assigned to wra-sol. Project Status Backlog at the start; no parent, children or dependencies. PR #2755 targets dev and has a verified Development link. Keep open through default-branch promotion and release acceptance.
+- The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id)
+- Current behavior: The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth…
+- Root cause: app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,…
+- Resolution: Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in…
+- Look in: `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`, `app/lib/db-rpc.server.ts`, `app/lib/acd/acd-router.server.ts`, `app/routes/api+/acd-router/agent-status.action.server.ts`, `app/lib/twilio-webhook.server.ts`, `app/lib/workspace-client-projection.server.ts`
+- Existing tests: Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {"ok":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id…
+- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
+- Done when: A credential belonging to workspace A may only mutate workspace A's inbound queue entries. The entry named by entry_id must be verified to belong to the workspace whose credential was validated, and the RPC should filter inbound_queue_entry by that workspace, the way client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql added a required workspace parameter to dequeue_contact and create_outreach_attempt after finding the same class of cross-tenant write.
 
 ### [#2876](https://github.com/chester-hill-solutions/callcaster/issues/2876) The Better Auth mount exposes /api/auth/two-factor/disable, bypassing the rule that privileged accounts cannot…
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -347,17 +243,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A workspace member holding the lowest role (`caller`) must not be able to mutate an existing contact record, and no role may set the opt_out consent flag through the generic contact-update endpoint. The product already enforces both rules on its canonical contact editor route: the write action requires the `member` role and answers 403 to a `caller` (app/routes/workspaces+/$id/contacts/$contactId.action.server.ts:37), and it writes a fixed field set that excludes opt_out (app/server/contact-editor.server.ts:8). Contact deletion is `campaigns.write` plus a `member` floor (app/routes/api+/contacts/$contactId.action.server.ts:24), and `caller` does not hold campaigns.write (app/lib/capabilities.ts:76). The legacy flat route should apply the same capability and role floor to PATCH /api/contacts and accept a fixed column set rather than the raw request body. Contact CREATION via POST /api/contacts must stay membership-only, because the chat composer and the queue picker legitimately create contacts as a `caller` (app/routes/api+/contacts.loader.server.ts:33).
 
-### [#2860](https://github.com/chester-hill-solutions/callcaster/issues/2860) A webhook credential for one workspace releases or accepts another tenant's live inbound call offer
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id)
-- Current behavior: The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth…
-- Root cause: app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,…
-- Resolution: Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in…
-- Look in: `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`, `app/lib/db-rpc.server.ts`, `app/lib/acd/acd-router.server.ts`, `app/routes/api+/acd-router/agent-status.action.server.ts`, `app/lib/twilio-webhook.server.ts`, `app/lib/workspace-client-projection.server.ts`
-- Existing tests: Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {"ok":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A credential belonging to workspace A may only mutate workspace A's inbound queue entries. The entry named by entry_id must be verified to belong to the workspace whose credential was validated, and the RPC should filter inbound_queue_entry by that workspace, the way client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql added a required workspace parameter to dequeue_contact and create_outreach_attempt after finding the same class of cross-tenant write.
-
 ### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it
 - Verdict: **Fix now** · Labels: devops/admin · Assignee: @sai-sy · Updated: 2026-10-20
 - No dedicated CallCaster-qa Twilio account exists and qa.callcaster.ca is not pointed at one: the QA Railway environment still copies the dev/shared Twilio credentials and there is no Twilio account provisioning in the IaC model or in any script.
@@ -377,18 +262,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/ui/team-member-theme.test.tsx — both icons inherit light and dark button foregrounds without a theme provider; all four cases fail against the original component; test/ui/team-member-a11y.test.tsx, test/ui/platform-member-controls.test.tsx and test/ui/mode-toggle.test.tsx — accessible names, member permissions and theme switching; Isolated browser verification — explicit light/dark, system-light/system-dark, a system preference change, and opening the member sheet with the keyboard; both icons measure 12 px in 28 px buttons and match the app foreground. Role dots measure 8 px and align with the member names in every mode.
 - Done when: Manage-member and cancel-invite icons use the correct foreground in light, dark and system modes.; Icons render without waiting for a JavaScript theme value; theme switching and member actions remain available.
 
-### [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507) CSV Upload success should not have a toast (or be a simple success toast that goes away).
-- Verdict: **Fix now** · Labels: ux · Assignee: @sai-sy, @wra-sol · Updated: 2026-10-20
-- PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.
-- Current behavior: The source on origin/master still creates the persistent success toast. The candidate completion hook calls the existing completion callback without creating a toast; the upload panel retains its success message and row report link.
-- Root cause: The completion hook created an infinite-duration root success toast with a report download action, duplicating the upload panel's feedback and report action.
-- Resolution: Review PR #2749 and its remote checks. Verify the deployed upload completion and saved report access before closing the issue.
-- Look in: `app/components/audience/use-audience-upload-progress.ts`, `app/components/audience/AudienceUploadProgressPanel.tsx`
-- Existing tests: test/ui/audience-import-report-handoff.test.tsx: embedded completion and standalone inline success/report checks both fail on the original source and pass with the repair.; 32 focused UI cases pass across report handoff, report panel, uploader progress and status polling.
-- Missing tests: Deployed CSV upload acceptance and saved row report access remain.
-- Done when: CSV upload success does not create a root toast or a toast download prompt.; Inline completion feedback and the saved row report link remain available.; Embedded and standalone completion callbacks still run once.
-- Tracker: Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. PR #2749 targets dev and has the verified Development link. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified.
-
 ### [#2684](https://github.com/chester-hill-solutions/callcaster/issues/2684) Decide the CORS policy for the public API
 - Verdict: **Fix now** · Labels: wayfinder:grilling · Assignee: @wra-sol · Updated: 2026-10-20
 - This change states the existing server-to-server CORS policy in both quickstarts and the public error reference, and replaces the overview's stale Express wording. Review and merge remain.
@@ -399,18 +272,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: Manual documentation check: all six added local links resolve to their target headings; Source review: the Bun server and public API auth add no CORS allow headers; the MDN CORS guide confirms the distinction between a blocked preflight request and a blocked response
 - Done when: The overview, quickstarts and error reference state that public integrator calls are server-to-server and workspace API keys stay on the backend; The error reference explains that failed preflight blocks the intended request, while a request without preflight can reach the server but its response remains blocked in browser JavaScript; Same-origin browser session access remains documented and CORS remains disabled
 - Tracker: Live inspection on 2026-10-20: Task; Priority, Effort and Enviornment unset; Project Status In progress; assigned to wra-sol. Parent #2677; no children, dependency links or active fixing PR at the start. Keep the issue open until the documentation reaches master.
-
-### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Pass the live caller-ID verification status to the onboarding verification sheet
-- Verdict: **Fix now** · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-20
-- PR #2750 refreshes the onboarding loader from workspace_number events, so an open verification sheet changes from pending to success or failure without a reload. Merge and deployed verification remain.
-- Current behavior: Source on origin/master passes the verification status into the sheet but does not refresh its loader snapshot on a number event. The candidate adds workspace_number to the existing batched workspace revalidation subscription.
-- Root cause: PR #1971 added the sheet status prop, but the workspace revalidation hook listened only for campaign, campaign_queue and transaction_history events. The callback already saves and emits the workspace_number update.
-- Resolution: Review and merge PR #2750 into dev. Verify a real caller-ID verification in the deployed onboarding flow before closing.
-- Look in: `app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts`, `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`, `app/routes/workspaces+/$id/onboarding.loader.server.ts`
-- Existing tests: test/ui/workspace-realtime-revalidation.test.tsx: three expected failures on original source; the repaired subscription passes number-event batching plus pending-to-success and pending-to-failure sheet checks through the real Workspace layout, shared subscription and child loader; 37 focused UI cases pass across workspace refresh, onboarding number setup and the shared event connection; Full npm run ci:local passes with VITEST_MAX_WORKERS=2: 5573 Node, 34 Bun and 1483 UI tests, all guards, the production build, bundle check and codegen verification
-- Missing tests: A real caller-ID verification call in the deployed onboarding flow remains
-- Done when: An open pending verification sheet displays the success or failure returned by the callback without a page reload; Number events use the existing batched refresh scheduler; navigation, event filtering and cleanup controls keep passing; Complete deployed caller-ID verification acceptance before closing
-- Tracker: Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance.
 
 ### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) IVR: store speech answers as { value, raw, inputType } (slice B)
 - **IN PROGRESS** · Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-10-19
@@ -450,17 +311,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Review and merge the candidate, then verify the exact promoted guard before closing.
 - Done when: Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.; A new app/lib module cannot import an unscoped database client without a counted baseline exception.; Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.; npm run ci:local is green.
 - Tracker: Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified.
-
-### [#2760](https://github.com/chester-hill-solutions/callcaster/issues/2760) Detect dev-only fixes correctly in the issue verification planner
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
-- The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.
-- Current behavior: At dev@e4bb8ac6, hasDevOnlyFix returns false for the current origin/dev candidate even though the master check exits 1 and the dev check exits 0. PARTIAL and NOT_FIXED code verdicts consequently plan In progress instead of on-dev.
-- Root cause: git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.
-- Resolution: Use a small Git ancestry helper that requires exit 1 against master and exit 0 against dev. Keep unknown refs and malformed candidates conservative. Exercise the actual dry-run CLI with temporary Git graphs and a GitHub boundary that rejects writes.
-- Look in: `.opencode/tools/apply-issue-verdicts.mjs`, `.opencode/tools/lib/issue-verdict-git.mjs`, `test/apply-issue-verdicts.test.ts`
-- Existing tests: Ten real-CLI cases pass. Original source fails three dev-only cases while seven controls pass.; Controls cover already-released, unrelated, missing and malformed candidates; unavailable refs; and the remaining-person on-qa route.; Negative controls: inverted master ancestry fails four cases; treating an unavailable master as a confirmed miss fails one. The restored source passes all ten.
-- Done when: PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.; A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.; Remaining operator actions still plan on-qa.; The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests.
-- Tracker: Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks.
 
 ### [#2896](https://github.com/chester-hill-solutions/callcaster/issues/2896) POST /api/jobs/twilio-open-sync stores unbounded sweep limits: a negative limit silently removes the sweep's LIMIT…
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -605,24 +455,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A route the inventory and the published OpenAPI spec declare session-only must reject workspace API keys, and a key that reaches a write path must have the capability that write requires. The platform's documented rule is that an empty scope allowlist denies (app/lib/capabilities.ts:45).
 
-### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
-- Recommended title: **Show the correct dialing mode on the call screen**
-- PR #2754 contains the correct call-screen mode labels and regression coverage. Deployed acceptance remains after merge.
-- Current behavior: Source checked at dev@d0972882 on 2026-10-20. CallScreenLayout passes campaign.dial_type === "predictive" to TopChrome; only its displayed mode names are wrong.
-- Root cause: TopChrome assigns the wrong user-facing name to both values of the predictive flag.
-- Resolution: Show Predictive dialing for predictive campaigns and Power dialing for power campaigns. Keep the existing mode selection and call controls.
-- Look in: `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-leave.test.tsx`
-- Existing tests: test/ui/call-screen-leave.test.tsx: both new mode cases fail against the original header; all 22 focused header and leave tests pass after the correction.; Browser check: the real header and app CSS show both corrected labels in light and dark themes.
-- Missing tests: Verify both labels on deployed dev after merge and complete release acceptance before default-branch promotion.
-- Done when: Predictive Dialer campaigns show Predictive dialing; Power Dialer campaigns show Power dialing; Existing campaign call and leave behavior stays covered
-- Tracker: Review [PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), then verify on dev. Keep the issue open until default-branch promotion and release acceptance.
-
 ---
 
-## Verify and close — 15
+## Verify and close — 29
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2868](https://github.com/chester-hill-solutions/callcaster/issues/2868) Public survey answer/complete accept a contact-derived respondent token, letting an anonymous caller overwrite…
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-24
+- Recommended title: **Public survey answer/complete accept a contact-derived respondent token, letting an anonymous caller overwrite another respondent's answers and completion state**
+- POST /api/survey-answer and POST /api/survey-complete treat the signed respondent token as the sole authority for which survey_response row a submission may touch, and the token's result_id - the identity of that row - is minted by the…
+- Current behavior: Fixed on dev. The survey loader only reuses an existing response's `result_id` when the request carries a signed proof for that survey and contact; a bare `?contact=` id can start a new response but cannot mint a credential for someone else's.
+- Root cause: app/routes/survey+/$surveyId.loader.server.ts:87-96 resolves an existing response row from the caller-supplied `?contact=` integer and reuses that row's result_id when minting the respondent token, so the minted credential carries the authority to mutate a response the caller never owned. app/lib/survey-public-action.server.ts:36-46 then accepts that credential as sufficient: verifyRespondentToken binds it to survey_id and workspace only, and result_id is copied out of the payload with no check that the caller controls the contact the response belongs to. resolvePublicSurveyContactId (app/lib/survey-public-action.server.ts:142-167) repeats the pattern on the write path by taking the…
+- Resolution: Fixed in #2930 (`5dd77b56`): `verifySurveyContactProof` (app/lib/survey-contact-proof.server.ts:72) checks a signature over survey, contact and expiry; the loader gates on it at app/routes/survey+/$surveyId.loader.server.ts:39,66.
+- Look in: `app/lib/survey-public-action.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/lib/survey-db.server.ts`, `app/server/survey-completion.ts`, `app/lib/survey-respondent.server.ts`, `drizzle/0000_baseline.sql`
+- Existing tests: test/survey-contact-proof.test.ts
+- Done when: Only the respondent who owns a response row may answer for it or change its completion state. The respondent token is the designed proof of that ownership ('Signed respondent token bound to survey id, workspace, result id, and expiry'), the contact lookup is a workspace-scoped read whose stated job is to make a cross-tenant read impossible (app/lib/survey-respondent.server.ts:14-26), and the loader states that the contact id is a bare legacy integer whose only protection is a rate limit (app/routes/survey+/$surveyId.loader.server.ts:25-31). A guessable identifier that is not proof of possession must not select another respondent's response row or another respondent's identity on a write.
+
+### [#2865](https://github.com/chester-hill-solutions/callcaster/issues/2865) The optional workspaceId on the campaign_queue write helpers is never applied to the WHERE clause, so POST…
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-24
+- Recommended title: **The optional workspaceId on the campaign_queue write helpers is never applied to the WHERE clause, so POST /api/ivr lets a member of one workspace dequeue…**
+- app/lib/campaign-queue-db.server.ts performs its campaign_queue UPDATEs on the unscoped `db` client from `@/server/db` and builds the WHERE clause entirely from a caller-assembled `conditions` array, so the tenant predicate is an *optional…
+- Current behavior: Fixed on dev. `dequeueCampaignQueueById` always adds `eq(campaignQueueTable.workspace, workspaceId)` and refuses a workspace-less call, `recordQueueAttemptFailure` takes a required `workspaceId` and puts it in the predicate, and `POST /api/ivr` passes the workspace it authorised.
+- Root cause: The tenancy of a `campaign_queue` write is delegated to the caller as an optional `workspaceId` argument instead of being enforced by the helper. `updateCampaignQueueAndEmit` runs on the unscoped `db` client (`const exec = args.exec ?? db`, campaign-queue-db.server.ts:106) and applies exactly the predicates the caller assembled. `dequeueCampaignQueueById` adds the workspace term only `if (args.workspaceId)` (lines 404-407), and `recordQueueAttemptFailure` never adds it (lines 605-613) even though it takes the argument. `campaign_queue` is a registered workspace-scoped table (app/db/workspace-scoped-tables.ts:50), so ADR-0004's `createTenantDb(workspaceId)` (app/server/tenant-db.ts:32-35)…
+- Resolution: Fixed in #2925 (`b5a4dc18`): the tenant predicate is a property of the helper, not an optional argument. `app/lib/campaign-queue-db.server.ts:235` (by-id dequeue), `:604` (failed-attempt counter), `app/routes/api+/ivr.action.server.ts:80`.
+- Look in: `app/lib/campaign-queue-db.server.ts`, `app/routes/api+/ivr.action.server.ts`, `app/lib/api-surface-generated.ts`, `test/ivr.route.test.ts`, `client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql`, `app/server/tenant-db.ts`
+- Existing tests: test/campaign-queue-workspace-scope.test.ts
+- Done when: A write to a workspace-scoped table must be bound to the authenticated workspace before it is issued. ADR-0004 (`app/server/tenant-db.ts:32-35`, `app/db/workspace-scoped-tables.ts`) makes `createTenantDb(workspaceId)` the only tenant-data accessor for route code precisely because the base `db` client bypasses tenancy, and the audit's architecture summary names `createTenantDb` as the strongest source-visible control on the tenant-to-tenant boundary with no RLS behind it. The repository already applied exactly this discipline to the plpgsql equivalents in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql, which added a mandatory workspace parameter to `dequeue_contact` and `create_outreach_attempt` and named /api/dial, /api/hangup and /api/questions as the exposed callers. The TypeScript by-id dequeue path was not covered by that fix, and /api/ivr is not among the callers it named.
 
 ### [#2292](https://github.com/chester-hill-solutions/callcaster/issues/2292) Assess fragmented public survey responses
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-24
@@ -634,6 +493,39 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: The aggregate SQL executed in a server-enforced read-only production transaction with a 15-second statement limit.; All three synthetic controls passed through the same aggregation: legitimate same-contact repeats, separate anonymous visits and ambiguous partial attempts stay distinct.; Released source and retained deployment metadata establish pre-fix and fixed boundaries; exact traffic switch times remain unavailable.
 - Done when: Record the inspected environment, revision/deployment interval and aggregate counts.; Separate anonymous, contact-backed and unlinked-contact populations; distinguish missing evidence from zero stored rows.; Keep legitimate repeated-attempt controls and explain limits of attribution.; State a repair/no-repair recommendation without changing or exporting respondent rows.
 - Tracker: Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released.
+
+### [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757) Include all subaccount resources in the Twilio prune report
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-24
+- The report repair uses the Messaging Services API with subaccount credentials, scans all SDK pages and stops on unreadable lists. The keep-list and deletion policy stay unchanged.
+- Current behavior: Fixed on dev. The prune report walks the subaccount's resources rather than only the parent account's, so resources held under the subaccount are included in the report.
+- Root cause: The subaccount lookup used /2010-04-01/Accounts/{sid}/Messaging/Services.json, ignored the raw response shape and caught every error as an empty list. SDK limit options capped the total inventory instead of setting a page size.
+- Resolution: Fixed in #2758 (`860b344f`): `scripts/lib/twilio-prune-resources.mjs` and `scripts/twilio-resource-prune-report.mjs`.
+- Look in: `scripts/twilio-resource-prune-report.mjs`, `scripts/lib/twilio-prune-resources.mjs`, `test/twilio-prune-resources.test.ts`
+- Existing tests: test/twilio-prune-resources.test.ts
+- Done when: Include Messaging Services with the subaccount’s own credentials.; Enumerate all account and resource pages.; Fail unreadable lists with account context instead of reporting an empty successful scan.; Keep the report read-only and preserve all keep-list and environment/owner decisions.
+- Tracker: Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog verified in the browser. Parent #1165. Review https://github.com/chester-hill-solutions/callcaster/pull/2758; the parent full audit and retention decisions remain blocked.
+
+### [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052) Give the completion RPC one best-effort owner
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24
+- The dispatch worker still propagates a completion RPC error after a successful batch. The dialer now catches this error, but queue, dialer, IVR and settlement paths have separate logging and catch policies.
+- Current behavior: Fixed on dev. Campaign completion has one best-effort owner: `recheckCampaignCompletion` calls the SQL gate `rpcTryCompleteCampaignIfDrained` with the caller's executor and treats a failure as "not complete yet".
+- Root cause: Completion error handling was repeated at call sites. The dispatch tail had no guard, so a label update failure could retry finished work.
+- Resolution: Fixed in #2759 (`2b879007`): `app/lib/campaign-completion.server.ts`, with the queue, settlement, recovery, worker and IVR-status callers routed through it.
+- Look in: `app/lib/campaign-completion.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/campaign-settle-recheck.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`
+- Existing tests: test/campaign-completion*.test.ts
+- Done when: Exactly one code path owns the best-effort completion call; All five call sites use it with no local try/catch; A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep; One log event name and field set from every surface; Failure path tested at each call site, not only at the owner
+- Tracker: Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification.
+
+### [#2531](https://github.com/chester-hill-solutions/callcaster/issues/2531) Add a Notes field for all callers
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
+- PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.
+- Current behavior: Fixed on dev. Every caller role has a Notes field on the call screen, edited like the other questionnaire fields.
+- Root cause: The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.
+- Resolution: Fixed in #2755 (`b7904d8a`): the Notes control in `app/components/call/CallScreen.Questionnaire.tsx` and the debounced save path in `app/hooks/utils/useDebouncedSave.ts`.
+- Look in: `app/components/call/CallScreen.Questionnaire.tsx`, `app/hooks/call/useCallScreen.ts`, `app/hooks/utils/useDebouncedSave.ts`, `app/routes/api+/questions.action.server.ts`, `app/lib/callscreenActions.ts`
+- Existing tests: test/ui/call-screen-questionnaire.test.tsx; test/ui/hooks-call-screen.test.tsx
+- Done when: All callers can edit Notes in Power and Predictive modes.; Notes save with the selected outreach attempt and return after reload or contact selection.; Questionnaire answers, notes and disposition edits preserve one another.; Notes do not carry over when the selected contact changes.; The field uses the shared accessible controls and works at phone and desktop widths.; Desktop queue, questionnaire and call-control frames have equal heights; long scripts retain reachable call controls and phone layouts remain stacked.
+- Tracker: User clarified the requirement on 2026-10-20: a Notes field available to all callers. Native Type Feature; Priority High; Effort Medium; environment prod; assigned to wra-sol. Project Status Backlog at the start; no parent, children or dependencies. PR #2755 targets dev and has a verified Development link. Keep open through default-branch promotion and release acceptance.
 
 ### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) STOP and START text remains visible to operators but no system information messages
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-10-24
@@ -658,6 +550,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/password-recovery-journey.test.ts — walks the ACTUAL issued email through the installed Better Auth (memory adapter): it reads the reset link out of the sent mail, drives the real `api+/auth/$.loader.server` callback (expects 302 to /reset-password?token=<issued token>), loads the reset page (expects `{ token }`), submits the new password, asserts the password changed (the old password no longer signs in, the new one does) and that the link cannot be replayed (the second submit returns 400). It also covers identical generic feedback for known and unknown emails, the caller-selected-host resistance, the expired-link path, and the request rate limit. Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/password-recovery-journey.test.ts ...` -> 4 files passed, 34 tests passed. test/ui/reset-password-feedback.test.tsx and e2e/specs/password-reset-feedback.spec.ts cover the failure feedback (one toast, retained fields, no layout shift) but the UI suite could not be executed in this checkout (every UI test fails with 'Cannot read properties of null (reading useContext)' from the vendored shad-cc copy of next-themes/react; an unrelated control test fails identically — a local install artifact, not a code defect).
 - Done when: A person confirms the reported symptom is gone on master.
 
+### [#2760](https://github.com/chester-hill-solutions/callcaster/issues/2760) Detect dev-only fixes correctly in the issue verification planner
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
+- The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.
+- Current behavior: Fixed on dev. The verification planner detects a dev-only fix with `git merge-base --is-ancestor` against the release line instead of assuming a commit on dev has shipped.
+- Root cause: git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.
+- Resolution: Fixed in #2762 (`b4c8f8fe`): `.opencode/tools/lib/issue-verdict-git.mjs` and `.opencode/tools/apply-issue-verdicts.mjs`.
+- Look in: `.opencode/tools/apply-issue-verdicts.mjs`, `.opencode/tools/lib/issue-verdict-git.mjs`, `test/apply-issue-verdicts.test.ts`
+- Existing tests: test/apply-issue-verdicts.test.ts
+- Done when: PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.; A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.; Remaining operator actions still plan on-qa.; The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests.
+- Tracker: Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks.
+
 ### [#2060](https://github.com/chester-hill-solutions/callcaster/issues/2060) Verify welcome-credit classification through the display and reconciliation adapters
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-10-23
 - Both public adapters already classify welcome and manual CREDIT grants as purchase. Focused adapter tests now cover the displayed Purchase label, reconciliation category and unchanged prefix-only grant buckets.
@@ -668,6 +571,58 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/billing-keys.test.ts verifies the intentional other bucket for grant prefixes.; test/billing-grant-classification.test.ts verifies both public CREDIT adapters, the Purchase label and DEBIT controls using the real implementations.; 17 focused cases pass. Wrong display classification fails two new cases; inverted reconciliation type handling fails all four. Source faults were restored before the passing run.
 - Done when: A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.; The intentional prefix-only grant bucket remains other unless product semantics change.; Any change to distinguish paid purchases and grants has its own decision and task.
 - Tracker: Bug; unassigned; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked PR at the start. Regression tests verify the existing behavior; no billing-rule change is proposed.
+
+### [#2894](https://github.com/chester-hill-solutions/callcaster/issues/2894) Workspace API keys keep their full scope set after the member who minted them is removed or demoted
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
+- A workspace API key is a bearer credential whose authority comes exclusively from the `scopes` array on the key row
+- Current behavior: Fixed on dev. An API key's scopes are re-derived from its creator's current role on every request, so removing or demoting the creator narrows or revokes the key; a key with no recorded creator fails closed with the same 401.
+- Root cause: The API-key principal model records the creator (`created_by`) but never binds the key to a live workspace principal, and no cascade exists between a membership change and the key rows. `created_by` has no surviving foreign key (dropped in client/migrations/20260919120000_drop_legacy_auth_users_fks.sql:16) and is read by no runtime path; the scope ceiling `assertScopesWithinActorRole` (app/lib/platform-members.server.ts:120) is applied once at mint time against the creator's then-current role and, as the code comment at app/lib/platform-members.server.ts:80-89 states, is never re-derived. The session path re-resolves the role on every request (app/lib/capability-guard.server.ts:54,…
+- Resolution: Fixed in #2928 (`13e1a6c4`): `app/lib/api-auth.server.ts:108-118` re-checks the creator's current role, with the ceiling in `app/lib/capabilities.ts` and the lookup in `app/lib/workspace-members-db.server.ts`.
+- Look in: `app/lib/platform-members.server.ts`, `app/lib/capability-actor.server.ts`, `app/lib/api-auth.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/db/schema.ts`
+- Existing tests: test/api-auth.test.ts
+- Done when: Removing or demoting a workspace member ends that member's effective authority over the workspace, including through credentials the member issued. The platform already implements that for sessions: the membership lookup in `requireWorkspaceAccess` / `getUserRole` yields 404 'Workspace not found' for a non-member, so the session dies with the membership. A key should either be bound to a live membership - with its capability set re-checked against the creator's current role - or be revoked automatically when that membership is removed or reduced. The platform's chosen compensations for key durability are admin-only minting, a mint-time role cap and mandatory expiry; a membership-driven cascade is the missing one. (Note: the platform does NOT fail closed on workspace suspension either - `workspace.disabled` is read only by cron fan-out, number-rental billing and the admin console - so the asymmetry is specifically between the session path and the API-key path on membership change.)
+
+### [#2885](https://github.com/chester-hill-solutions/callcaster/issues/2885) create_outreach_attempt stores an unchecked foreign contact id and get_campaign_attempts renders that contact…
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
+- Recommended title: **create_outreach_attempt stores an unchecked foreign contact id and get_campaign_attempts renders that contact inside the caller's own campaign export**
+- public.create_outreach_attempt(con_id, cam_id, usr_id, wks_id, queue_id) inserts the caller-supplied contact id and campaign id into an outreach_attempt row and stamps that row with the caller's own wks_id, without checking that the…
+- Current behavior: Fixed on dev. `create_outreach_attempt` proves the contact and the campaign belong to the caller's workspace before it stores the row, and `get_campaign_attempts` joins with a workspace predicate, so a foreign contact id can no longer be stored or rendered.
+- Root cause: The outreach_attempt INSERT accepts a contact id and a campaign id that are never compared with the workspace the row is tagged with, and the export RPC that renders those rows re-joins contact on id alone. Nothing in the SQL binds the contact or the campaign to the workspace, and the route that calls the wrapper validates only the workspace it was given - the attacker's own workspace - never the contact id it was given. The 2026-08-07 hardening in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql scoped only the campaign_queue attempts-counter UPDATE to workspace = wks_id; its own header records the attempt INSERT as 'correctly tagged with wks_id',…
+- Resolution: Fixed in #2927 (`386a2042`): `client/migrations/20261020000000_scope_outreach_attempt_contact_and_campaign_by_workspace.sql` adds the proof to both RPCs, reached through `app/lib/db-rpc.server.ts` and the campaign action.
+- Look in: `app/routes/api+/questions.action.server.ts`, `client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql`, `client/migrations/20260722110000_contact_other_data_jsonb.sql`, `app/routes/workspaces+/$id/campaigns/$selected_id.action.server.ts`, `app/lib/db-rpc.server.ts`
+- Existing tests: test/integration-db/scope-outreach-attempt-by-workspace.test.ts
+- Done when: An outreach attempt, and any export that renders it, must only contain contacts and campaigns owned by the workspace the attempt was recorded for.
+
+### [#2889](https://github.com/chester-hill-solutions/callcaster/issues/2889) Media-stream token without a call SID lets a WebSocket peer overwrite another tenant's coaching rows
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
+- The media-stream service authenticates a session with an HMAC token that binds the workspace and only optionally the call
+- Current behavior: Fixed on dev. A media-stream token cannot be minted without a call SID — `createMediaStreamToken` throws when `callSid` is absent — and the DB writer resolves coaching rows through that call rather than a peer-supplied identity.
+- Root cause: The call SID is an optional claim in the signed media-stream token, and the service's call-binding check is conditional on that claim being present (`tokenCallSid && msg.start.callSid && msg.start.callSid !== tokenCallSid`). When the token carries no call SID the check is skipped and the row key of the unscoped admin-DB writes is taken from a client-supplied frame field, so the token authorizes writes for a resource it never named. The fix that introduced the check (commit 55e6477b, 'fix(media-stream): bind transcript/coaching writes to the token's callSid (#1530)') hardened only the mint paths that happen to know the call SID at TwiML-generation time and left the predictive auto-dial path…
+- Resolution: Fixed in #2926 (`1cb8dad0`): `app/lib/media-stream-token.server.ts:41` requires the call SID, `app/lib/media-stream-twiml.server.ts` and `app/routes/api+/auto-dial/$roomId.action.server.ts` pass it.
+- Look in: `services/media-stream/twilio-handler.ts`, `app/lib/media-stream-token.server.ts`, `app/lib/media-stream-twiml.server.ts`, `app/routes/api+/auto-dial/$roomId.action.server.ts`, `services/media-stream/db-writer.ts`, `app/db/schema-transcription.ts`
+- Existing tests: test/media-stream-token.test.ts; test/media-stream-db-writer.test.ts
+- Done when: A media-stream token must authorize writes only for the workspace and the call it was minted for, and a `start` frame that names any other call must be refused. Commit 55e6477b states the intent explicitly: 'A token holder for their own workspace could send another workspace's live Call SID and inject rows the victim later sees as genuine.' For that to hold, every minted token must carry the call SID it authorizes (the field must not be optional), and the stream handler must refuse any `start` frame whose call SID is missing or different from the token's, rather than falling back to the frame's value.
+
+### [#2873](https://github.com/chester-hill-solutions/callcaster/issues/2873) POST /account/security intent=enable replaces an already-enrolled second factor with only the password, bypassing…
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
+- Recommended title: **POST /account/security intent=enable replaces an already-enrolled second factor with only the password, bypassing the protected-user rule**
+- The two-factor enrolment state machine at POST /account/security has no prior-state check on its `enable` transition and no protected-user check, while the sibling `disable` transition has both
+- Current behavior: Fixed on dev. `intent=enable` refuses with `Two-factor authentication is already enabled.` when the account is enrolled, so a password alone can no longer replace an existing factor.
+- Root cause: app/routes/account.security.loader.server.ts:61-100 handles `intent=enable` as a stateless operation: it reads the password from the form and calls Better Auth's enableTwoFactor without checking whether the account already has an enrolled second factor (isTwoFactorEnabled / the auth_two_factor row) and without applying userIsTwoFactorProtected, which the `disable` branch does apply at line 151. Better Auth's enableTwoFactor is a replacement operation (node_modules/better-auth/dist/plugins/two-factor/index.mjs:113 deletes the existing auth_two_factor row and line 126 recreates it with `verified` inherited from the previous verified row), so the missing server-side state check turns an…
+- Resolution: Fixed in #2901 (`69587240`): the enable branch checks `isTwoFactorEnabled(user.id)` before calling Better Auth's `enableTwoFactor`, which replaces the factor. `app/routes/account.security.loader.server.ts`, `app/routes/api+/auth/$.loader.server.ts`.
+- Look in: `app/routes/account.security.loader.server.ts`, `app/routes/account.security.tsx`, `app/routes/account.tsx`, `node_modules/better-auth/dist/plugins/two-factor/index.mjs`, `app/lib/two-factor.server.ts`, `app/server/auth-instance.ts`
+- Existing tests: test/account-security.route.test.ts
+- Done when: Replacing or removing an enrolled account's second factor must require assurance beyond the first factor, and a privileged account's 2FA state must be governed by the same rule that already blocks intent=disable. Concretely: the server must reject `intent=enable` when the account already has an enrolled second factor (mirroring the client-side guards at app/routes/account.security.tsx:107 and app/routes/account.tsx:229), and any deliberate re-enrolment must first prove possession of the current factor (the existing TOTP code or a backup code) and must satisfy userIsTwoFactorProtected for privileged accounts, so that the effective policy on both transitions is the same.
+
+### [#2878](https://github.com/chester-hill-solutions/callcaster/issues/2878) Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-22
+- POST /workspaces/:id/settings (formName=updateUser) takes the target role straight from the request body and never validates it against the current workspace role vocabulary
+- Current behavior: Fixed on dev. The member-role update validates the submitted role with `isMemberRole` before it is ranked or written, the escalation guard fails closed on an unknown role, and `memberRoleToRoleId` no longer maps the legacy `field_director` alias onto `admin`.
+- Root cause: The role string that reaches the membership write is cast rather than validated, and the two components that reason about it disagree about the same string: assertNoRoleEscalation ranks an unknown role name as 0 (fails open), while memberRoleToRoleId recognises the legacy alias `field_director` and maps it to `admin` (fails open into a privileged role). Both are needed for the escalation: the rank guard alone is harmless, and the writer's alias alone is unreachable, because the only unvalidated producer of `field_director` is this form branch. The privileged-role 2FA gate is keyed on the same unvalidated string, so the alias also skips requireTwoFactorForPrivilegedRoleAssignment, whose…
+- Resolution: Fixed in #2898 (`948b200e`): `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:79`, `app/lib/platform-members.server.ts:151-160`, `app/lib/workspace-membership.server.ts:34-48`. The alias mapping now lives only in the one-off backfill SQL.
+- Look in: `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/member-role.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/lib/two-factor.server.ts`
+- Existing tests: test/workspace-role-alias.test.ts; test/workspace-setting-utils.test.ts
+- Done when: The workspace settings role-update action must accept only one of the four current workspace roles (owner, admin, member, caller), and no actor may ever grant a role that outranks their own. The sibling addUser branch on the same form enforces this with isMemberRole, and PATCH /api/workspaces/:workspaceId/members enforces it with z.enum(['owner','admin','member','caller']). A member asking for admin must be refused; only an owner/admin may grant admin, and a privileged grant must satisfy the 2FA enrolment requirement.
 
 ### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
 - **IN PROGRESS** · Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-22
@@ -698,6 +653,40 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/twilio-a2p-messaging-profile.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/a2p-messaging-profile.server.ts`
 - Existing tests: test/twilio-a2p-provision.server.test.ts — I ran it plus test/a2p-messaging-profile.test.ts and test/twilio-a2p-status-sync.test.ts against origin/master: 113 tests passed, 3 files green. The cases that carry the mechanism: "public company sends stock and representative email on EndUser, not BrandRegistration"; "submission failure retains IDs and assignment evidence for a single-resource retry"; "existing approved profile with complete actual attributes can be read without inventing local company data"; "incomplete legacy public profile is repaired before brand reuse without duplicate EndUser"; "unrecorded owned provider product and EndUser are recovered instead of duplicated"; "a preparation failure during polling is retained by the fresh-row status update"; "a concurrent business change prevents old preparation from marking the new inputs ready"; "all assignment pages are read before deciding to create a duplicate". test/integration-db/a2p-messaging-profile.test.ts — 13 real-Postgres storage and callback cases, which I also ran green against a live Postgres 18.
 - Done when: A person confirms the reported symptom is gone on master.
+
+### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
+- Recommended title: **Show the correct dialing mode on the call screen**
+- PR #2754 contains the correct call-screen mode labels and regression coverage. Deployed acceptance remains after merge.
+- Current behavior: Fixed on dev. The call screen labels the campaign's own dialing mode: a predictive campaign reads "Predictive dialing" and a power campaign reads "Power dialing".
+- Root cause: TopChrome assigns the wrong user-facing name to both values of the predictive flag.
+- Resolution: Fixed in #2754 (`e4bb8ac6`): `app/components/call/CallScreen.Header.tsx:250`.
+- Look in: `app/components/call/CallScreen.Header.tsx`, `app/components/call/CallScreen.Layout.tsx`, `test/ui/call-screen-leave.test.tsx`
+- Existing tests: test/ui/call-screen-leave.test.tsx; test/auto-dial.server.test.ts
+- Done when: Predictive Dialer campaigns show Predictive dialing; Power Dialer campaigns show Power dialing; Existing campaign call and leave behavior stays covered
+- Tracker: Review [PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), then verify on dev. Keep the issue open until default-branch promotion and release acceptance.
+
+### [#2507](https://github.com/chester-hill-solutions/callcaster/issues/2507) CSV Upload success should not have a toast (or be a simple success toast that goes away).
+- Verdict: **Verify and close** · Labels: ux · Assignee: @sai-sy, @wra-sol · Updated: 2026-10-20
+- PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.
+- Current behavior: Fixed on dev. A successful CSV upload no longer raises a persistent success toast; progress is shown in the upload panel and the notice clears.
+- Root cause: The completion hook created an infinite-duration root success toast with a report download action, duplicating the upload panel's feedback and report action.
+- Resolution: Fixed in #2749 (`5d453f5c`): `app/components/audience/use-audience-upload-progress.ts` no longer imports sonner or emits a success toast.
+- Look in: `app/components/audience/use-audience-upload-progress.ts`, `app/components/audience/AudienceUploadProgressPanel.tsx`
+- Existing tests: test/ui/audience-import-report-handoff.test.tsx
+- Done when: CSV upload success does not create a root toast or a toast download prompt.; Inline completion feedback and the saved row report link remain available.; Embedded and standalone completion callbacks still run once.
+- Tracker: Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. PR #2749 targets dev and has the verified Development link. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified.
+
+### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Pass the live caller-ID verification status to the onboarding verification sheet
+- Verdict: **Verify and close** · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-20
+- PR #2750 refreshes the onboarding loader from workspace_number events, so an open verification sheet changes from pending to success or failure without a reload. Merge and deployed verification remain.
+- Current behavior: Fixed on dev. Number events revalidate the onboarding verification sheet, so the live caller-ID verification status appears without a reload.
+- Root cause: PR #1971 added the sheet status prop, but the workspace revalidation hook listened only for campaign, campaign_queue and transaction_history events. The callback already saves and emits the workspace_number update.
+- Resolution: Fixed in #2750 (`33d43c1b`): `app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts` revalidates on `workspace_number` events.
+- Look in: `app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts`, `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`, `app/routes/workspaces+/$id/onboarding.loader.server.ts`
+- Existing tests: test/ui/workspace-realtime-revalidation.test.tsx; test/ui/onboarding-first-number-flow.test.tsx
+- Done when: An open pending verification sheet displays the success or failure returned by the callback without a page reload; Number events use the existing batched refresh scheduler; navigation, event filtering and cleanup controls keep passing; Complete deployed caller-ID verification acceptance before closing
+- Tracker: Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance.
 
 ### [#2512](https://github.com/chester-hill-solutions/callcaster/issues/2512) SMS Message page is super slow when sending out a campaign
 - Verdict: **Verify and close** · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-19
@@ -784,6 +773,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 ## Needs reproduction — 16
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#2902](https://github.com/chester-hill-solutions/callcaster/issues/2902) Caller-supplied forwarded host/proto widen the per-request Better Auth trusted-origin list; a wildcard host becomes a catch-all glob that switches off the CSRF…
+- Verdict: **Needs reproduction** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-24
+- resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value
+- Current behavior: resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value. app/server/auth-instance.ts:20 passes that resolver to Better Auth as `trustedOrigins`, and better-auth 1.6.23 matches the Origin header (the CSRF check) and the callbackURL/redirectTo (the post-authentication redirect allow-list) against the merged list with matchesOriginPattern, which compares http/https origins exactly BUT expands any pattern containing `*` or `?` into a glob. Verified locally against the application's own auth instance (drizzle + Postgres) and the…
+- Root cause: app/lib/auth-trusted-origins.server.ts:84-87 reads `x-forwarded-host` (first comma-separated element) with the `host` header as fallback, and `x-forwarded-proto` for the scheme, from the request itself; lines 100-109 then add `${proto}://${host}` to the trusted-origin set with no allowlist against the configured origins, no hostname validation and no rejection of wildcard characters. app/server/auth-instance.ts:20 passes that resolver to Better Auth as the `trustedOrigins` option, and Better Auth's matcher (node_modules/better-auth/dist/auth/trusted-origins.mjs:18-22) expands any pattern containing `*` or `?` into a glob, so a caller-chosen host of `*` becomes a catch-all pattern. Both…
+- Resolution: Owner-observed check against the application's own public auth endpoint, non-destructive and creating no account and no session for a real user. Use a non-existent address and a made-up password: POST https://<app-host>/api/auth/sign-in/email with Content-Type: application/json, body {"email":"v40-probe@example.invalid","password":"not-a-real-password"}, header `Origin: https://probe-host.invalid` and header `X-Forwarded-Host: probe-host.invalid`; repeat once with `X-Forwarded-Host: *` and `X-Forwarded-Proto: https`; repeat once with no X-Forwarded-* header at all as the control. Send at most three requests and space them more than 10 seconds apart so Better Auth's own per-path rate limit…
+- Look in: `app/lib/auth-trusted-origins.server.ts`, `app/server/auth-instance.ts`, `node_modules/better-auth/dist/auth/trusted-origins.mjs`, `node_modules/better-auth/dist/api/middlewares/origin-check.mjs`, `node_modules/better-auth/dist/cookies/index.mjs`, `server/bun.ts`, `app/lib/safe-redirect.ts`, `app/routes/remember.action.server.ts`
+- Existing tests: The source-visible half was reproduced in an OS-enforced sandbox with no external network.
+- Missing tests: Run the recorded deployment observation; the verdict depends on it, not on more code.
 
 ### [#2924](https://github.com/chester-hill-solutions/callcaster/issues/2924) Unsanitised media name reaches the workspaceAudio S3 object key and the signed URL, bypassing the repository's own traversal check; the cross-tenant effect is…
 - Verdict: **Needs reproduction** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -902,16 +901,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Root cause: The three ops-email HTML bodies are built with template-literal interpolation of values that are not passed through escapeHtml (app/lib/email-html.ts), so caller- or provider-originated text is inserted into the HTML body (and, for the voicemail subject, into the subject line) as markup instead of as text. The same codebase applies escapeHtml to the equivalent interpolations in app/lib/low-credit-notify.server.ts:50, app/lib/billing-reconciliation-alert.server.ts:40 and app/lib/number-rental-billing.server.ts:124 and :330, so the omission is inconsistent rather than a deliberate design. Verified: none of app/lib/inbound-voicemail-email.server.ts, app/lib/ops-alert.server.ts or…
 - Resolution: Owner-observed checks, non-production tenant only, with no mail sent to any uninvolved recipient. (a) Sink 1: on a non-production tenant whose voicemail notification address is a mailbox the owner controls, place a real inbound call from a carrier or VoIP provider that permits a non-numeric or alphanumeric caller id, and record byte-for-byte what Twilio delivers in the From parameter of the inbound-call webhook (app/routes/api+/inbound.action.server.ts:163) together with the value stored in call.from. If From is always E.164, sink 1 collapses to tenant self-injection only and the candidate must be re-scoped to the provider-echo sinks with severity reassessed. (b) Sink 3: on the same…
 - Look in: `app/lib/email-html.ts`, `app/lib/inbound-voicemail-email.server.ts`, `app/lib/ops-alert.server.ts`, `app/lib/twilio-compliance-notify.server.ts`, `app/lib/env.server.ts`, `app/routes/api+/email-vm.action.server.ts`, `app/routes/api+/inbound.action.server.ts`, `app/lib/twilio-webhook.server.ts`
-- Existing tests: The source-visible half was reproduced in an OS-enforced sandbox with no external network.
-- Missing tests: Run the recorded deployment observation; the verdict depends on it, not on more code.
-
-### [#2902](https://github.com/chester-hill-solutions/callcaster/issues/2902) Caller-supplied forwarded host/proto widen the per-request Better Auth trusted-origin list; a wildcard host becomes a catch-all glob that switches off the CSRF…
-- Verdict: **Needs reproduction** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value
-- Current behavior: resolveAuthTrustedOrigins() adds one entry per request to the trusted-origin set, derived entirely from the request's own forwarding headers, with no allowlist against the configured origins and no check of the header value. app/server/auth-instance.ts:20 passes that resolver to Better Auth as `trustedOrigins`, and better-auth 1.6.23 matches the Origin header (the CSRF check) and the callbackURL/redirectTo (the post-authentication redirect allow-list) against the merged list with matchesOriginPattern, which compares http/https origins exactly BUT expands any pattern containing `*` or `?` into a glob. Verified locally against the application's own auth instance (drizzle + Postgres) and the…
-- Root cause: app/lib/auth-trusted-origins.server.ts:84-87 reads `x-forwarded-host` (first comma-separated element) with the `host` header as fallback, and `x-forwarded-proto` for the scheme, from the request itself; lines 100-109 then add `${proto}://${host}` to the trusted-origin set with no allowlist against the configured origins, no hostname validation and no rejection of wildcard characters. app/server/auth-instance.ts:20 passes that resolver to Better Auth as the `trustedOrigins` option, and Better Auth's matcher (node_modules/better-auth/dist/auth/trusted-origins.mjs:18-22) expands any pattern containing `*` or `?` into a glob, so a caller-chosen host of `*` becomes a catch-all pattern. Both…
-- Resolution: Owner-observed check against the application's own public auth endpoint, non-destructive and creating no account and no session for a real user. Use a non-existent address and a made-up password: POST https://<app-host>/api/auth/sign-in/email with Content-Type: application/json, body {"email":"v40-probe@example.invalid","password":"not-a-real-password"}, header `Origin: https://probe-host.invalid` and header `X-Forwarded-Host: probe-host.invalid`; repeat once with `X-Forwarded-Host: *` and `X-Forwarded-Proto: https`; repeat once with no X-Forwarded-* header at all as the control. Send at most three requests and space them more than 10 seconds apart so Better Auth's own per-path rate limit…
-- Look in: `app/lib/auth-trusted-origins.server.ts`, `app/server/auth-instance.ts`, `node_modules/better-auth/dist/auth/trusted-origins.mjs`, `node_modules/better-auth/dist/api/middlewares/origin-check.mjs`, `node_modules/better-auth/dist/cookies/index.mjs`, `server/bun.ts`, `app/lib/safe-redirect.ts`, `app/routes/remember.action.server.ts`
 - Existing tests: The source-visible half was reproduced in an OS-enforced sandbox with no external network.
 - Missing tests: Run the recorded deployment observation; the verdict depends on it, not on more code.
 
@@ -1362,7 +1351,7 @@ Product, security, or operations decision required before implementation can be 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
 ### [#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213) Correct the remaining temporal column types listed in the schema drift baseline
-- **IN PROGRESS** · Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-20
+- Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-24
 - The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.
 - Current behavior: Verified on dev@20f59d0e, 19 October 2026. The guard and three slices landed: the campaign_queue, call and message tables now declare their temporal columns as timestamps (3d951645, 6fca427d), and test/integration-db/schema-type-drift.test.ts asserts no column has started lying about being text and that no baselined column has stopped lying. The baseline scripts/baselines/schema-type-drift.txt still holds all 64 entries, so no further table has been sliced. app/db/schema.ts:323 still declares date_updated as text().
 - Root cause: The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.
@@ -1724,12 +1713,136 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 176
+## Needs triage — 184
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
+### [#2816](https://github.com/chester-hill-solutions/callcaster/issues/2816) Feature: SIM task protocol and SMS flows
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2787](https://github.com/chester-hill-solutions/callcaster/issues/2787) Feature: ADR-0040 service-adoption framework
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2789](https://github.com/chester-hill-solutions/callcaster/issues/2789) Feature: SIM configuration and secret-provider adoption
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2965](https://github.com/chester-hill-solutions/callcaster/issues/2965) Task: deploy hosted SIP persona service on a durable host
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2835](https://github.com/chester-hill-solutions/callcaster/issues/2835) Task: develop local Asterisk SIP persona host
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2973](https://github.com/chester-hill-solutions/callcaster/issues/2973) Task: migrate scripts and browser-suite SecretProvider boundary
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2972](https://github.com/chester-hill-solutions/callcaster/issues/2972) Task: migrate scripts and browser-suite typed non-secret configuration
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2971](https://github.com/chester-hill-solutions/callcaster/issues/2971) Task: migrate media-stream SecretProvider boundary
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2970](https://github.com/chester-hill-solutions/callcaster/issues/2970) Task: migrate media-stream typed non-secret configuration
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2969](https://github.com/chester-hill-solutions/callcaster/issues/2969) Task: migrate worker SecretProvider boundary
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2968](https://github.com/chester-hill-solutions/callcaster/issues/2968) Task: migrate worker typed non-secret configuration
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2967](https://github.com/chester-hill-solutions/callcaster/issues/2967) Task: migrate app SecretProvider boundary
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2966](https://github.com/chester-hill-solutions/callcaster/issues/2966) Task: migrate app typed non-secret configuration
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2838](https://github.com/chester-hill-solutions/callcaster/issues/2838) Task: verify direct SIP hello-hangup smoke
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2836](https://github.com/chester-hill-solutions/callcaster/issues/2836) Task: implement Asterisk persona service
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2815](https://github.com/chester-hill-solutions/callcaster/issues/2815) Feature: SIM persona catalog and profile POC
+- Status: In progress · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2790](https://github.com/chester-hill-solutions/callcaster/issues/2790) Feature: ADR-0040 Phase 6 compatibility removal and ratchet
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2827](https://github.com/chester-hill-solutions/callcaster/issues/2827) Task: add profile status and access checks
+- Status: In progress · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2826](https://github.com/chester-hill-solutions/callcaster/issues/2826) Task: implement idempotent profile and workspace reconciliation
+- Status: In progress · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2825](https://github.com/chester-hill-solutions/callcaster/issues/2825) Task: implement ResolvedSimProfile
+- Status: In progress · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2824](https://github.com/chester-hill-solutions/callcaster/issues/2824) Task: add SIM catalog validation
+- Status: In progress · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2823](https://github.com/chester-hill-solutions/callcaster/issues/2823) Task: define the three initial SIM personas
+- Status: In progress · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2812](https://github.com/chester-hill-solutions/callcaster/issues/2812) Task: remove SIM compatibility variables
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2811](https://github.com/chester-hill-solutions/callcaster/issues/2811) Task: verify SIM through dotenv and password manager
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2810](https://github.com/chester-hill-solutions/callcaster/issues/2810) Task: make SIM the first dotenv-backed service boundary
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
 ### [#2732](https://github.com/chester-hill-solutions/callcaster/issues/2732) Delete Workspace Option
-- Status: Backlog · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
+- Status: on-dev · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2801](https://github.com/chester-hill-solutions/callcaster/issues/2801) Task: add required-secret dry-run command
+- Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2800](https://github.com/chester-hill-solutions/callcaster/issues/2800) Task: implement password-manager secret provider
+- Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2799](https://github.com/chester-hill-solutions/callcaster/issues/2799) Task: implement local dotenv secret provider
+- Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2798](https://github.com/chester-hill-solutions/callcaster/issues/2798) Task: define secret catalog and service allowlists
+- Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2786](https://github.com/chester-hill-solutions/callcaster/issues/2786) Feature: ADR-0040 Phase 2 secret provider foundation
+- Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-24
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2652](https://github.com/chester-hill-solutions/callcaster/issues/2652) Give the campaign message editor an accessible field name
@@ -1776,10 +1889,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: on-dev · Labels: none · Assignee: none · Updated: 2026-10-24
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2948](https://github.com/chester-hill-solutions/callcaster/issues/2948) Task: adopt one low-risk service secret through SecretProvider
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-23
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2797](https://github.com/chester-hill-solutions/callcaster/issues/2797) Task: compare resolved config with current runtime
 - Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-23
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
@@ -1798,10 +1907,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#2785](https://github.com/chester-hill-solutions/callcaster/issues/2785) Feature: ADR-0040 Phase 1 typed inherited config
 - Status: tested-on-dev · Labels: none · Assignee: @sai-sy · Updated: 2026-10-23
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2786](https://github.com/chester-hill-solutions/callcaster/issues/2786) Feature: ADR-0040 Phase 2 secret provider foundation
-- Status: Backlog · Labels: none · Assignee: @sai-sy · Updated: 2026-10-23
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2784](https://github.com/chester-hill-solutions/callcaster/issues/2784) Feature: ADR-0040 Phase 0 inventory and guardrails
@@ -1920,19 +2025,7 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2838](https://github.com/chester-hill-solutions/callcaster/issues/2838) Task: verify direct SIP hello-hangup smoke
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2837](https://github.com/chester-hill-solutions/callcaster/issues/2837) Task: implement persona controller and signed events
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2836](https://github.com/chester-hill-solutions/callcaster/issues/2836) Task: implement Asterisk persona service
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2835](https://github.com/chester-hill-solutions/callcaster/issues/2835) Task: provision Hetzner SIP handler host
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
@@ -1960,30 +2053,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828) Task: migrate existing SIM SMS setup to personas
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2827](https://github.com/chester-hill-solutions/callcaster/issues/2827) Task: add profile status and access checks
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2826](https://github.com/chester-hill-solutions/callcaster/issues/2826) Task: implement idempotent profile and workspace reconciliation
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2825](https://github.com/chester-hill-solutions/callcaster/issues/2825) Task: implement ResolvedSimProfile
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2824](https://github.com/chester-hill-solutions/callcaster/issues/2824) Task: add SIM catalog validation
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2823](https://github.com/chester-hill-solutions/callcaster/issues/2823) Task: define the three initial SIM personas
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2822](https://github.com/chester-hill-solutions/callcaster/issues/2822) Feature: SIP load testing
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
@@ -2008,31 +2077,11 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2816](https://github.com/chester-hill-solutions/callcaster/issues/2816) Feature: SIM task protocol and SMS flows
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2815](https://github.com/chester-hill-solutions/callcaster/issues/2815) Feature: SIM persona catalog and profile POC
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2814](https://github.com/chester-hill-solutions/callcaster/issues/2814) Task: ratchet undocumented configuration reads to CI failure
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2813](https://github.com/chester-hill-solutions/callcaster/issues/2813) Task: remove legacy environment readers
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2812](https://github.com/chester-hill-solutions/callcaster/issues/2812) Task: remove SIM compatibility variables
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2811](https://github.com/chester-hill-solutions/callcaster/issues/2811) Task: verify SIM through dotenv and password manager
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2810](https://github.com/chester-hill-solutions/callcaster/issues/2810) Task: adapt SIM config to ProjectConfig and SecretProvider
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
@@ -2068,22 +2117,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2801](https://github.com/chester-hill-solutions/callcaster/issues/2801) Task: add required-secret dry-run command
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2800](https://github.com/chester-hill-solutions/callcaster/issues/2800) Task: implement password-manager secret provider
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2799](https://github.com/chester-hill-solutions/callcaster/issues/2799) Task: implement local dotenv secret provider
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2798](https://github.com/chester-hill-solutions/callcaster/issues/2798) Task: define secret catalog and service allowlists
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2793](https://github.com/chester-hill-solutions/callcaster/issues/2793) Task: add report-only configuration drift guard
 - Status: tested-on-dev · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
@@ -2096,19 +2129,7 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: tested-on-dev · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2790](https://github.com/chester-hill-solutions/callcaster/issues/2790) Feature: ADR-0040 Phase 6 compatibility removal and ratchet
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2789](https://github.com/chester-hill-solutions/callcaster/issues/2789) Feature: ADR-0040 Phase 5 SIM adoption
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#2788](https://github.com/chester-hill-solutions/callcaster/issues/2788) Feature: ADR-0040 Phase 4 deployment mappings and drift control
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2787](https://github.com/chester-hill-solutions/callcaster/issues/2787) Feature: ADR-0040 Phase 3 service-by-service adoption
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-21
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
