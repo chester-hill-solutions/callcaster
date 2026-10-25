@@ -24,6 +24,19 @@ vi.mock("resend", () => ({
   },
 }));
 
+// This suite runs Better Auth on an in-memory adapter, so it models no domain
+// tables. Session resolution asks public.user whether the account is disabled
+// (#2874); answer "standard" here. The check has its own tests in
+// test/disabled-user-enforcement.test.ts.
+vi.mock("@/server/admin-db", () => {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => [{ accessLevel: "standard" }],
+  };
+  return { adminDb: { select: () => chain } };
+});
+
 vi.mock("@/lib/env.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/env.server")>()),
   env: {

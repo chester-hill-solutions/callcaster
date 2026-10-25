@@ -33,6 +33,19 @@ vi.mock("@/lib/env.server", async (importOriginal) => {
     isTwoFactorFeatureEnabled: () => false,
   };
 });
+// The contract under test is cookie handling. The disabled-account check reads
+// public.user, which this suite does not model, so the one domain read answers
+// "standard" here; the check has its own tests
+// (test/disabled-user-enforcement.test.ts).
+vi.mock("@/server/admin-db", () => {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => [{ accessLevel: "standard" }],
+  };
+  return { adminDb: { select: () => chain } };
+});
+
 vi.mock("@/lib/ensure-user-profile.server", async (importOriginal) => ({
   ...(await importOriginal<
     typeof import("@/lib/ensure-user-profile.server")

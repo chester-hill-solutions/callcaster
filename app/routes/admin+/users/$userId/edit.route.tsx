@@ -95,6 +95,11 @@ export default function EditUser() {
                                     <SelectItem value="disabled">Disabled</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Disabled accounts cannot sign in or keep using a live
+                                session. Workspace membership is kept, so restoring an
+                                access level restores access.
+                            </p>
                         </div>
                         
                         <div className="flex justify-end gap-2">
