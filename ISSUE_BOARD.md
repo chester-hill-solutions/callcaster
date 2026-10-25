@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@04d5ef83` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@b99ad0ff` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 29
+## Fix now — 28
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -55,18 +55,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: The request returned 302 with Location /workspaces/<workspaceId>/audios/recorded-<stamp>.mp3/edit, the normalised object was PUT to the bucket (8279 bytes), and workspace_audio held a row with file_name 'recorded-<stamp>.mp3', origin 'recording', duration_ms 14266340 (3.96 hours), size_bytes 8279, content_type…
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A recording is bounded in duration before it is transcoded and before it is stored. The server already measures every recording with its own probe (probeAudioDurationMs), specifically so the recorded length is the server's own measurement rather than the client's timer, and the client already sends a durationMs field; that measured length is expected to be checked against a maximum, with the request rejected before the object is written, and the browser recorder expected to stop at the same maximum.
-
-### [#2892](https://github.com/chester-hill-solutions/callcaster/issues/2892) Workspace SSE stream re-checks membership only, so a demoted owner or a revoked API key keeps the owner-only event…
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Workspace SSE stream re-checks membership only, so a demoted owner or a revoked API key keeps the owner-only event stream**
-- GET /api/workspaces/:workspaceId/events is gated at connect time on the owner-only `audit.read` capability (`dataPlaneCapabilityAuth("audit.read")`, events.loader.server.ts:61), but the only periodic re-authorization of the already-open…
-- Current behavior: GET /api/workspaces/:workspaceId/events is gated at connect time on the owner-only `audit.read` capability (`dataPlaneCapabilityAuth("audit.read")`, events.loader.server.ts:61), but the only periodic re-authorization of the already-open connection asks one question - "is this user still a member of this workspace?" - and never re-applies the capability, the session, or the API key. `stillHasWorkspaceAccess` (events.loader.server.ts:89) returns `true` unconditionally for API-key actors (line 92, `if (!auth.userId) return true;`) and otherwise evaluates only `getUserRole({ user: { id: auth.userId }, workspaceId }) != null` (line 94), i.e. "does a `workspace_member` row still exist". An owner…
-- Root cause: The stream's revocation hook only enforces workspace membership, not the authorization decision that opened the stream. In `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts`, `stillHasWorkspaceAccess` (line 89) returns `true` unconditionally for API-key actors (`if (!auth.userId) return true;`, line 92) and otherwise evaluates only `getUserRole({ user: { id: auth.userId }, workspaceId }) != null` (line 94) - i.e. "is there still a `workspace_member` row". It never re-derives the actor's capabilities from the current role, never re-reads the API key row (existence/expiry/scopes), and never re-validates the session. The 15s heartbeat (lines 174-186) is the only place a…
-- Resolution: Make the stream's periodic re-check re-apply the SAME authorization decision that opened it, instead of a weaker membership test: (a) for session actors, re-derive the capabilities from the CURRENT workspace role and require `audit.read`, and re-validate the session so a password reset ends the stream; (b) for API-key actors, re-read the key row (existence, expiry, current scopes) and require `audit.read` in the current scopes; (c) close the stream with the existing `workspace_access_revoked` frame whenever the re-authorization fails. Keep the existing fail-open-on-DB-error behaviour for the *lookup* itself (a database blip must not drop every open stream), but make the capability…
-- Look in: `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts`, `app/lib/capabilities.ts`, `app/lib/workspace-members-db.server.ts`, `app/server/auth-instance.ts`, `services/media-stream/db-writer.ts`, `app/lib/workspace-events.server.ts`
-- Existing tests: test/workspace-api-key-scope-cap.test.ts covers the neighbouring behaviour on this path.; 5/5 assertions passed, all of them landing in the insecure direction, and they reproduce the source reading exactly. (1) The production matrix confirms `audit.read` is owner-only: `capabilityIdsForRole("owner")` contains it, `admin`/`member`/`caller` do not. (2) Demotion: the stream opens (HTTP 200,…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: The stream's own doc comment states that it outlives the connect-time check by design, and its gate is deliberately the owner-only `audit.read` capability - the same capability the sibling `/api/workspaces/:workspaceId/audit-events` endpoint enforces (audit-events.loader.server.ts:7). A stream that outlives its connect check must therefore be re-authorized with the same authority on every tick: re-derive the actor's current capabilities from the CURRENT workspace role and require `audit.read`; for API-key actors re-read the key row and require the current scopes to contain `audit.read`; for cookie actors re-validate the session. When the re-authorization fails the stream must emit `workspace_access_revoked` and close - exactly as it already does today for a removed member.
 
 ### [#2890](https://github.com/chester-hill-solutions/callcaster/issues/2890) Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for…
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -364,9 +352,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 37
+## Verify and close — 38
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2892](https://github.com/chester-hill-solutions/callcaster/issues/2892) Workspace SSE stream re-checks membership only, so a demoted owner or a revoked API key keeps the owner-only event…
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-25
+- Recommended title: **Workspace SSE stream re-checks membership only, so a demoted owner or a revoked API key keeps the owner-only event stream**
+- GET /api/workspaces/:workspaceId/events is gated at connect time on the owner-only `audit.read` capability (`dataPlaneCapabilityAuth("audit.read")`, events.loader.server.ts:61), but the only periodic re-authorization of the already-open…
+- Current behavior: Fixed on dev. An open workspace event stream re-applies the authorization that opened it: a session or bearer actor must still hold a valid session and a role whose current capabilities include `audit.read`, and an API-key actor's row must still exist, be unexpired and carry `audit.read` in its current scopes. Either failing closes the stream with `workspace_access_revoked`; a failed lookup still keeps it open.
+- Root cause: The stream's revocation hook only enforces workspace membership, not the authorization decision that opened the stream. In `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts`, `stillHasWorkspaceAccess` (line 89) returns `true` unconditionally for API-key actors (`if (!auth.userId) return true;`, line 92) and otherwise evaluates only `getUserRole({ user: { id: auth.userId }, workspaceId }) != null` (line 94) - i.e. "is there still a `workspace_member` row". It never re-derives the actor's capabilities from the current role, never re-reads the API key row (existence/expiry/scopes), and never re-validates the session. The 15s heartbeat (lines 174-186) is the only place a…
+- Resolution: Fixed in #2989: `stillHasWorkspaceAccess` in `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts` now evaluates the capability through `capabilitySetForRole` / `capabilitySetFromScopeAllowlist` instead of testing membership.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts`, `app/lib/capabilities.ts`, `app/lib/workspace-members-db.server.ts`, `app/server/auth-instance.ts`, `services/media-stream/db-writer.ts`, `app/lib/workspace-events.server.ts`
+- Existing tests: test/workspace-events.route.test.ts
+- Done when: The stream's own doc comment states that it outlives the connect-time check by design, and its gate is deliberately the owner-only `audit.read` capability - the same capability the sibling `/api/workspaces/:workspaceId/audit-events` endpoint enforces (audit-events.loader.server.ts:7). A stream that outlives its connect check must therefore be re-authorized with the same authority on every tick: re-derive the actor's current capabilities from the CURRENT workspace role and require `audit.read`; for API-key actors re-read the key row and require the current scopes to contain `audit.read`; for cookie actors re-validate the session. When the re-authorization fails the stream must emit `workspace_access_revoked` and close - exactly as it already does today for a removed member.
 
 ### [#2861](https://github.com/chester-hill-solutions/callcaster/issues/2861) Legacy flat PATCH /api/contacts authorizes on membership alone, so a `caller` can rewrite any contact in its…
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-25
