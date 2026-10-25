@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: The public contact form escapes the visitor's name and message in the HTML body of the operations-inbox email, so an anonymous submission can no longer inject links, images or markup into a trusted internal inbox. The plain-text body still carries their words verbatim ([#2886](https://github.com/chester-hill-solutions/callcaster/issues/2886)).
 - Changed: Deleting a workspace now archives it. Its phone numbers are released at the provider first, so the owner stops paying rent for them, and then the workspace and its people disappear from the account; calls, contacts and campaigns are kept. A release that fails stops the archive and names the number, so nothing is stranded ([#2732](https://github.com/chester-hill-solutions/callcaster/issues/2732)).
 - Fixed: The Twilio resource audit includes all account pages and subaccount Messaging Services, and stops when a resource list cannot be read ([PR #2758](https://github.com/chester-hill-solutions/callcaster/pull/2758), [#2757](https://github.com/chester-hill-solutions/callcaster/issues/2757)).
 - Fixed: Campaign completion checks share one failure handler so a temporary database error does not retry finished dispatch work ([PR #2759](https://github.com/chester-hill-solutions/callcaster/pull/2759), [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052)).
