@@ -1,4 +1,12 @@
-import { getSession } from "@/lib/auth.server";
+import { getSession, resolveBearerSessionUser } from "@/lib/auth.server";
+import {
+  actorHasProductCapability,
+  apiKeyActorFromScopes,
+  sessionActorFromMembership,
+} from "@/lib/capability-actor.server";
+import { eq } from "drizzle-orm";
+import { workspace_api_key } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 import { dataPlaneCapabilityAuth } from "@/lib/capability-guard.server";
 import { defineLoader } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
@@ -87,11 +95,54 @@ async function streamWorkspaceEvents(
   // already-open connection. Re-check rides the heartbeat, so revocation takes
   // effect within one HEARTBEAT_INTERVAL_MS rather than instantly.
   const stillHasWorkspaceAccess = async (): Promise<boolean> => {
-    // API-key connections are pinned to one workspace when the key is issued
-    // and carry no membership to revoke; key revocation is a separate concern.
-    if (!auth.userId) return true;
     try {
-      return (await getUserRole({ user: { id: auth.userId }, workspaceId })) != null;
+      // Re-apply the decision that opened the stream, not a weaker one.
+      if (auth.apiKey) {
+        // A key can be deleted, expire or be narrowed after the connection
+        // opened; only the row says what it is allowed to do now.
+        const row = await createTenantDb(workspaceId).workspace_api_key.findFirst({
+          where: eq(workspace_api_key.id, auth.apiKey.keyId),
+          columns: { scopes: true, expires_at: true },
+        });
+        if (!row) return false;
+        const expiresAt = row.expires_at ? Date.parse(row.expires_at) : null;
+        if (expiresAt != null && Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+          return false;
+        }
+        return actorHasProductCapability(
+          apiKeyActorFromScopes({
+            keyId: auth.apiKey.keyId,
+            workspaceId,
+            scopes: row.scopes ?? [],
+          }),
+          "audit.read",
+        );
+      }
+
+      if (!auth.userId) return false;
+
+      // The session must still exist — a password reset revokes it — and the
+      // CURRENT role must still grant audit.read. Ownership transfer demotes the
+      // previous owner to admin, which does not, and a `caller` never did.
+      const authorization = request.headers.get("authorization");
+      if (authorization?.toLowerCase().startsWith("bearer ")) {
+        const user = await resolveBearerSessionUser(authorization.slice(7).trim());
+        if (!user) return false;
+      } else {
+        const { user } = await getSession(request);
+        if (!user) return false;
+      }
+
+      const roleRow = await getUserRole({ user: { id: auth.userId }, workspaceId });
+      if (roleRow == null) return false;
+      return actorHasProductCapability(
+        sessionActorFromMembership({
+          userId: auth.userId,
+          workspaceId,
+          role: roleRow.role,
+        }),
+        "audit.read",
+      );
     } catch (error) {
       // A failed lookup is not evidence of revocation, and connect-time auth
       // already passed. Dropping every open stream on a database blip would be
