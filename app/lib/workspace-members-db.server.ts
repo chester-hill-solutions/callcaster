@@ -451,14 +451,16 @@ export async function updateUserProfile(args: {
   username: string;
   access_level?: string;
 }) {
+  // Partial update: a field the caller did not send is left alone. Filling the
+  // gaps with `?? null` / `?? "standard"` meant a rename also blanked the names
+  // and demoted sudo to standard, which dropped that account's two-factor.
+  const patch: Partial<typeof userTable.$inferInsert> = { username: args.username };
+  if (args.first_name !== undefined) patch.first_name = args.first_name;
+  if (args.last_name !== undefined) patch.last_name = args.last_name;
+  if (args.access_level !== undefined) patch.access_level = args.access_level;
   const rows = await adminDb
     .update(userTable)
-    .set({
-      first_name: args.first_name ?? null,
-      last_name: args.last_name ?? null,
-      username: args.username,
-      access_level: args.access_level ?? "standard",
-    })
+    .set(patch)
     .where(eq(userTable.id, args.userId))
     .returning();
   return rows[0] ?? null;
