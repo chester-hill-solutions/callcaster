@@ -31,36 +31,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 2060,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify welcome-credit classification through the display and reconciliation adapters",
-    "summary": "Both public adapters already classify welcome and manual CREDIT grants as purchase. Focused adapter tests now cover the displayed Purchase label, reconciliation category and unchanged prefix-only grant buckets.",
-    "currentBehavior": "At dev@e4bb8ac6, getBillingEventSource maps other+CREDIT to purchase, and categorizeLedgerRow maps CREDIT to purchase before reading the shared prefix classifier. Grant prefixes intentionally remain other.",
-    "rootCause": "The original report mistook the prefix-only bucket for the final credit reporting category. No application behavior change is needed.",
-    "resolution": "Verify the public display and reconciliation adapters with real helpers and debit controls. Keep the grant prefix classifier unchanged. Review the regression tests, then close the verified report.",
-    "lookIn": [
-      "app/lib/transaction-history-display.ts",
-      "shared/billing-reconciliation.ts",
-      "shared/billing-keys.ts",
-      "test/billing-grant-classification.test.ts"
-    ],
-    "existingTests": [
-      "test/billing-keys.test.ts verifies the intentional other bucket for grant prefixes.",
-      "test/billing-grant-classification.test.ts verifies both public CREDIT adapters, the Purchase label and DEBIT controls using the real implementations.",
-      "17 focused cases pass. Wrong display classification fails two new cases; inverted reconciliation type handling fails all four. Source faults were restored before the passing run."
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.",
-      "The intentional prefix-only grant bucket remains other unless product semantics change.",
-      "Any change to distinguish paid purchases and grants has its own decision and task."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Bug; unassigned; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked PR at the start. Regression tests verify the existing behavior; no billing-rule change is proposed."
-  },
-  {
     "issueNumber": 1841,
     "verdict": "verify-close",
     "summary": "The IVR prompt is now emitted inside the `<Gather>` element instead of as its sibling, so Twilio listens for DTMF while the prompt plays and a key press stops the audio and takes the mapped branch; both the outbound campaign IVR and the inbound IVR route render through the same shared block renderer that does this.",
@@ -80,6 +50,30 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "Fix commit 51240b0b 'fix(ivr): nest prompts inside Gather so key presses interrupt audio (#1841) (#1851)' — `git merge-base --is-ancestor 51240b0b origin/master` confirms it is in master. The TwiML snapshot tests prove the structural change (prompt inside Gather) but the barge-in itself is a Twilio platform behaviour heard on a live PSTN call, so manual: true: a person still has to place a call and press a key mid-prompt to confirm the audio actually stops. The issue's note about `speechTimeout`/`timeout` still behaving with a nested prompt is covered — the gather attributes are unchanged except for the DTMF-only/speech split (see #1856) and `numDigits` for single-key menus."
+  },
+  {
+    "issueNumber": 1846,
+    "verdict": "verify-close",
+    "summary": "PR #2750 refreshes the onboarding loader from workspace_number events, so an open verification sheet changes from pending to success or failure without a reload. Merge and deployed verification remain.",
+    "currentBehavior": "Fixed on dev. Number events revalidate the onboarding verification sheet, so the live caller-ID verification status appears without a reload.",
+    "resolution": "Fixed in #2750 (`33d43c1b`): `app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts` revalidates on `workspace_number` events.",
+    "lookIn": [
+      "app/hooks/realtime/useWorkspaceRealtimeRevalidation.ts",
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/onboarding.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/workspace-realtime-revalidation.test.tsx",
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "acceptanceCriteria": [
+      "An open pending verification sheet displays the success or failure returned by the callback without a page reload",
+      "Number events use the existing batched refresh scheduler; navigation, event filtering and cleanup controls keep passing",
+      "Complete deployed caller-ID verification acceptance before closing"
+    ],
+    "rootCause": "PR #1971 added the sheet status prop, but the workspace revalidation hook listened only for campaign, campaign_queue and transaction_history events. The callback already saves and emits the workspace_number update.",
+    "missingTests": [],
+    "trackerRecommendation": "Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance."
   },
   {
     "issueNumber": 1874,
@@ -137,6 +131,69 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "The fix is commit 81aebcbb 'Show safe sign-in errors for known provider failures (#2361)', an ancestor of origin/master (first merged by release 268c2692 on 2026-10-08). The issue's own 'Deployed QA — 8 October 2026' section already records browser evidence for the known-credential case on staging, and it explicitly separates the empty-form validation defect into #2494 (out of scope here). manual: true — the issue's remaining acceptance is explicitly a deployed one: 'Check rate-limit feedback and a temporary provider failure on the deployed sign-in page', plus desktop and approved-account checks and two-factor routing. A 429 and a genuine provider outage cannot be produced by a local test, so a person has to sign in on the deployed page and observe the toast."
+  },
+  {
+    "issueNumber": 2052,
+    "verdict": "verify-close",
+    "recommendedTitle": "Give the completion RPC one best-effort owner",
+    "summary": "The dispatch worker still propagates a completion RPC error after a successful batch. The dialer now catches this error, but queue, dialer, IVR and settlement paths have separate logging and catch policies.",
+    "currentBehavior": "Fixed on dev. Campaign completion has one best-effort owner: `recheckCampaignCompletion` calls the SQL gate `rpcTryCompleteCampaignIfDrained` with the caller's executor and treats a failure as \"not complete yet\".",
+    "rootCause": "Completion error handling was repeated at call sites. The dispatch tail had no guard, so a label update failure could retry finished work.",
+    "resolution": "Fixed in #2759 (`2b879007`): `app/lib/campaign-completion.server.ts`, with the queue, settlement, recovery, worker and IVR-status callers routed through it.",
+    "lookIn": [
+      "app/lib/campaign-completion.server.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/campaign-settle-recheck.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-completion*.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Exactly one code path owns the best-effort completion call",
+      "All five call sites use it with no local try/catch",
+      "A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep",
+      "One log event name and field set from every surface",
+      "Failure path tested at each call site, not only at the owner"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Task; unassigned; Priority, Effort and environment unset at the audit. Project Status Backlog verified in the browser. Review https://github.com/chester-hill-solutions/callcaster/pull/2759; keep open through delivery verification."
+  },
+  {
+    "issueNumber": 2060,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify welcome-credit classification through the display and reconciliation adapters",
+    "summary": "Both public adapters already classify welcome and manual CREDIT grants as purchase. Focused adapter tests now cover the displayed Purchase label, reconciliation category and unchanged prefix-only grant buckets.",
+    "currentBehavior": "At dev@e4bb8ac6, getBillingEventSource maps other+CREDIT to purchase, and categorizeLedgerRow maps CREDIT to purchase before reading the shared prefix classifier. Grant prefixes intentionally remain other.",
+    "rootCause": "The original report mistook the prefix-only bucket for the final credit reporting category. No application behavior change is needed.",
+    "resolution": "Verify the public display and reconciliation adapters with real helpers and debit controls. Keep the grant prefix classifier unchanged. Review the regression tests, then close the verified report.",
+    "lookIn": [
+      "app/lib/transaction-history-display.ts",
+      "shared/billing-reconciliation.ts",
+      "shared/billing-keys.ts",
+      "test/billing-grant-classification.test.ts"
+    ],
+    "existingTests": [
+      "test/billing-keys.test.ts verifies the intentional other bucket for grant prefixes.",
+      "test/billing-grant-classification.test.ts verifies both public CREDIT adapters, the Purchase label and DEBIT controls using the real implementations.",
+      "17 focused cases pass. Wrong display classification fails two new cases; inverted reconciliation type handling fails all four. Source faults were restored before the passing run."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.",
+      "The intentional prefix-only grant bucket remains other unless product semantics change.",
+      "Any change to distinguish paid purchases and grants has its own decision and task."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Bug; unassigned; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked PR at the start. Regression tests verify the existing behavior; no billing-rule change is proposed."
   },
   {
     "issueNumber": 2061,
@@ -242,6 +299,35 @@
     "rootCause": "Fix landed in PR #2450 (commit d1f5664e), confirmed an ancestor of origin/master. This replaces the old behaviour the issue documented, where `provisionA2pRegistration` created a Trust Product, assigned the Secondary Customer Profile, had no `us_a2p_messaging_profile_information` EndUser, suppressed Trust Product submission failure and continued to brand registration anyway. manual: true — the deliverable is Twilio accepting a real A2P registration, and the tests use a synthetic provider transport (test/fixtures/a2p-profile-provider.ts) rather than the live TrustHub API, so they prove the sequence, the error surfacing and the idempotency but not that Twilio's real evaluation returns `compliant` for a real business. The issue's own note agrees: \"Provider transport in tests is synthetic. Actual deployed provider verification, accepted-product repair, Authentication+, historic registration review, release QA and default-branch promotion remain. A prepared profile is not brand or campaign approval.\" A person still has to run a real registration against Twilio's TrustHub to confirm the profile is accepted. The manual A2P setup path through the canonical compliance jobs is the separate PR #2283."
   },
   {
+    "issueNumber": 2292,
+    "verdict": "verify-close",
+    "recommendedTitle": "Assess fragmented public survey responses",
+    "summary": "The read-only production assessment is complete: zero surveys, responses and answers. No stored rows are available for repair in the inspected database.",
+    "currentBehavior": "Production app and Postgres-jAO4 database identities matched. The repeatable-read, read-only snapshot at 2026-10-21T06:04:48Z returned zero in each anonymous, contact-backed and unlinked-contact population; RLS does not hide rows.",
+    "rootCause": "The confirmed tokenless identity defect occurs in retained production source from the August 21 deployment until the fixed October 8 replacement. Missing-row completions leave no stored response and cannot be reconstructed from an empty table.",
+    "resolution": "Review and land docs/assessments/2292-survey-response-history.md and its aggregate-only SQL. Do not repair or merge rows in this empty target database. A separate legacy data source needs its own scoped read and identity evidence.",
+    "lookIn": [
+      "docs/assessments/2292-survey-response-history.md",
+      "docs/assessments/2292-survey-response-history.sql"
+    ],
+    "existingTests": [
+      "The aggregate SQL executed in a server-enforced read-only production transaction with a 15-second statement limit.",
+      "All three synthetic controls passed through the same aggregation: legitimate same-contact repeats, separate anonymous visits and ambiguous partial attempts stay distinct.",
+      "Released source and retained deployment metadata establish pre-fix and fixed boundaries; exact traffic switch times remain unavailable."
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Record the inspected environment, revision/deployment interval and aggregate counts.",
+      "Separate anonymous, contact-backed and unlinked-contact populations; distinguish missing evidence from zero stored rows.",
+      "Keep legitimate repeated-attempt controls and explain limits of attribution.",
+      "State a repair/no-repair recommendation without changing or exporting respondent rows."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released."
+  },
+  {
     "issueNumber": 2396,
     "verdict": "verify-close",
     "summary": "Predictive-machine playback is now a durable, leased operation row bound to workspace/call/attempt/campaign/actor/conference, so a signed replay polls the journal instead of issuing a second Play, the continuation job refuses to run until the post-Play acknowledgement commits, and uncertain or rejected outcomes are recorded as a recoverable state with a reconciliation job rather than silently advancing.",
@@ -260,6 +346,28 @@
       "A person confirms the reported symptom is gone on master."
     ],
     "rootCause": "Change is commit db0e1686 (PR #2424, 'Make predictive machine recovery retry-safe'), confirmed in origin/master; the mechanism is still present at master head 91c4409b. manual: true because the acceptance criteria end at a real provider call — a person must hear the voicemail and confirm the continuation actually happens; the code and the 85+ real-Postgres cases stop short of that. The issue's own note (migration and registered worker verified on the release candidate, provider acceptance for playback, acknowledgement, callback retries and recovery) is a release-QA step, not a code gap. Durable-object reconciliation and uncertain attachment outcomes for audio uploads remain in their own issues (#2356); this verdict covers the predictive machine only."
+  },
+  {
+    "issueNumber": 2507,
+    "verdict": "verify-close",
+    "summary": "PR #2749 removes the persistent CSV upload success toast and keeps the inline completion message and saved report link. Full local CI passes; merge and deployed verification remain.",
+    "currentBehavior": "Fixed on dev. A successful CSV upload no longer raises a persistent success toast; progress is shown in the upload panel and the notice clears.",
+    "resolution": "Fixed in #2749 (`5d453f5c`): `app/components/audience/use-audience-upload-progress.ts` no longer imports sonner or emits a success toast.",
+    "lookIn": [
+      "app/components/audience/use-audience-upload-progress.ts",
+      "app/components/audience/AudienceUploadProgressPanel.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audience-import-report-handoff.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "CSV upload success does not create a root toast or a toast download prompt.",
+      "Inline completion feedback and the saved row report link remain available.",
+      "Embedded and standalone completion callbacks still run once."
+    ],
+    "rootCause": "The completion hook created an infinite-duration root success toast with a report download action, duplicating the upload panel's feedback and report action.",
+    "trackerRecommendation": "Live inspection on 2026-10-20: Change Request; Priority Low; Effort nothing-burger; Enviornment prod; Project Status In progress; no parent, children or dependency links. PR #2749 targets dev and has the verified Development link. The old PR #2576 is closed and unmerged. Keep the issue open until the fix reaches production and the reported symptom is verified."
   },
   {
     "issueNumber": 2512,
@@ -305,32 +413,301 @@
     "rootCause": "PARTIAL, and manual. What is covered: the number is no longer an invisible, redeploy-only environment variable. It is a database row, it is visible and changeable in Admin, the decision is written in docs/adr/0038, and the route answers a clean 503 instead of failing. What is not covered: the number itself. The issue's screenshot is the Call settings modal showing 'Call-in verification is not configured', and that is exactly what production still shows after this release, because no row is active. The release guide for the same release says so in plain words. The remaining work is an operator action, not a code change: register and activate a number in Admin (or run scripts/configure-verification-number.mjs), then place a real verification call. manual: true because that last step is a real phone call to a real handset. The candidate commit 6c7c361a (PR #2726) is not an ancestor of origin/master by SHA, but its content is in master through the release merge 91c4409b."
   },
   {
-    "issueNumber": 2292,
+    "issueNumber": 2531,
     "verdict": "verify-close",
-    "recommendedTitle": "Assess fragmented public survey responses",
-    "summary": "The read-only production assessment is complete: zero surveys, responses and answers. No stored rows are available for repair in the inspected database.",
-    "currentBehavior": "Production app and Postgres-jAO4 database identities matched. The repeatable-read, read-only snapshot at 2026-10-21T06:04:48Z returned zero in each anonymous, contact-backed and unlinked-contact population; RLS does not hide rows.",
-    "rootCause": "The confirmed tokenless identity defect occurs in retained production source from the August 21 deployment until the fixed October 8 replacement. Missing-row completions leave no stored response and cannot be reconstructed from an empty table.",
-    "resolution": "Review and land docs/assessments/2292-survey-response-history.md and its aggregate-only SQL. Do not repair or merge rows in this empty target database. A separate legacy data source needs its own scoped read and identity evidence.",
+    "summary": "PR #2755 adds a Notes field for all callers in Power and Predictive modes, with saved-result restoration, contact-safe autosave and equal-height desktop panels. Review and deployed acceptance remain.",
+    "currentBehavior": "Fixed on dev. Every caller role has a Notes field on the call screen, edited like the other questionnaire fields.",
+    "rootCause": "The call screen only renders script questions. Saved outreach results do not initialize the draft, contact changes can retain the preceding draft, and the debounce does not retain the original save target across a handoff. Contact selection also discards results when no provider call row exists.",
+    "resolution": "Fixed in #2755 (`b7904d8a`): the Notes control in `app/components/call/CallScreen.Questionnaire.tsx` and the debounced save path in `app/hooks/utils/useDebouncedSave.ts`.",
     "lookIn": [
-      "docs/assessments/2292-survey-response-history.md",
-      "docs/assessments/2292-survey-response-history.sql"
+      "app/components/call/CallScreen.Questionnaire.tsx",
+      "app/hooks/call/useCallScreen.ts",
+      "app/hooks/utils/useDebouncedSave.ts",
+      "app/routes/api+/questions.action.server.ts",
+      "app/lib/callscreenActions.ts"
     ],
     "existingTests": [
-      "The aggregate SQL executed in a server-enforced read-only production transaction with a 15-second statement limit.",
-      "All three synthetic controls passed through the same aggregation: legitimate same-contact repeats, separate anonymous visits and ambiguous partial attempts stay distinct.",
-      "Released source and retained deployment metadata establish pre-fix and fixed boundaries; exact traffic switch times remain unavailable."
+      "test/ui/call-screen-questionnaire.test.tsx",
+      "test/ui/hooks-call-screen.test.tsx"
     ],
     "missingTests": [],
     "acceptanceCriteria": [
-      "Record the inspected environment, revision/deployment interval and aggregate counts.",
-      "Separate anonymous, contact-backed and unlinked-contact populations; distinguish missing evidence from zero stored rows.",
-      "Keep legitimate repeated-attempt controls and explain limits of attribution.",
-      "State a repair/no-repair recommendation without changing or exporting respondent rows."
+      "All callers can edit Notes in Power and Predictive modes.",
+      "Notes save with the selected outreach attempt and return after reload or contact selection.",
+      "Questionnaire answers, notes and disposition edits preserve one another.",
+      "Notes do not carry over when the selected contact changes.",
+      "The field uses the shared accessible controls and works at phone and desktop widths.",
+      "Desktop queue, questionnaire and call-control frames have equal heights; long scripts retain reachable call controls and phone layouts remain stacked."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "User clarified the requirement on 2026-10-20: a Notes field available to all callers. Native Type Feature; Priority High; Effort Medium; environment prod; assigned to wra-sol. Project Status Backlog at the start; no parent, children or dependencies. PR #2755 targets dev and has a verified Development link. Keep open through default-branch promotion and release acceptance."
+  },
+  {
+    "issueNumber": 2698,
+    "verdict": "verify-close",
+    "recommendedTitle": "Show the correct dialing mode on the call screen",
+    "summary": "PR #2754 contains the correct call-screen mode labels and regression coverage. Deployed acceptance remains after merge.",
+    "currentBehavior": "Fixed on dev. The call screen labels the campaign's own dialing mode: a predictive campaign reads \"Predictive dialing\" and a power campaign reads \"Power dialing\".",
+    "rootCause": "TopChrome assigns the wrong user-facing name to both values of the predictive flag.",
+    "resolution": "Fixed in #2754 (`e4bb8ac6`): `app/components/call/CallScreen.Header.tsx:250`.",
+    "lookIn": [
+      "app/components/call/CallScreen.Header.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "test/ui/call-screen-leave.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-leave.test.tsx",
+      "test/auto-dial.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Predictive Dialer campaigns show Predictive dialing",
+      "Power Dialer campaigns show Power dialing",
+      "Existing campaign call and leave behavior stays covered"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Review [PR #2754](https://github.com/chester-hill-solutions/callcaster/pull/2754), then verify on dev. Keep the issue open until default-branch promotion and release acceptance."
+  },
+  {
+    "issueNumber": 2757,
+    "verdict": "verify-close",
+    "summary": "The report repair uses the Messaging Services API with subaccount credentials, scans all SDK pages and stops on unreadable lists. The keep-list and deletion policy stay unchanged.",
+    "currentBehavior": "Fixed on dev. The prune report walks the subaccount's resources rather than only the parent account's, so resources held under the subaccount are included in the report.",
+    "rootCause": "The subaccount lookup used /2010-04-01/Accounts/{sid}/Messaging/Services.json, ignored the raw response shape and caught every error as an empty list. SDK limit options capped the total inventory instead of setting a page size.",
+    "resolution": "Fixed in #2758 (`860b344f`): `scripts/lib/twilio-prune-resources.mjs` and `scripts/twilio-resource-prune-report.mjs`.",
+    "lookIn": [
+      "scripts/twilio-resource-prune-report.mjs",
+      "scripts/lib/twilio-prune-resources.mjs",
+      "test/twilio-prune-resources.test.ts"
+    ],
+    "existingTests": [
+      "test/twilio-prune-resources.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Include Messaging Services with the subaccount’s own credentials.",
+      "Enumerate all account and resource pages.",
+      "Fail unreadable lists with account context instead of reporting an empty successful scan.",
+      "Keep the report read-only and preserve all keep-list and environment/owner decisions."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Bug; Priority High; Effort Low; environment prod; assigned to wra-sol. Project Status Backlog verified in the browser. Parent #1165. Review https://github.com/chester-hill-solutions/callcaster/pull/2758; the parent full audit and retention decisions remain blocked."
+  },
+  {
+    "issueNumber": 2760,
+    "verdict": "verify-close",
+    "recommendedTitle": "Detect dev-only fixes correctly in the issue verification planner",
+    "summary": "The planner treated Git ancestry stdout as a boolean, so a candidate present on dev but absent from master was classified as requiring implementation. The source fix uses confirmed exit results for both refs.",
+    "currentBehavior": "Fixed on dev. The verification planner detects a dev-only fix with `git merge-base --is-ancestor` against the release line instead of assuming a commit on dev has shipped.",
+    "rootCause": "git merge-base --is-ancestor reports through its exit code and produces empty stdout. A normal non-ancestor result also throws from execFileSync and skips the second predicate in the shared try block.",
+    "resolution": "Fixed in #2762 (`b4c8f8fe`): `.opencode/tools/lib/issue-verdict-git.mjs` and `.opencode/tools/apply-issue-verdicts.mjs`.",
+    "lookIn": [
+      ".opencode/tools/apply-issue-verdicts.mjs",
+      ".opencode/tools/lib/issue-verdict-git.mjs",
+      "test/apply-issue-verdicts.test.ts"
+    ],
+    "existingTests": [
+      "test/apply-issue-verdicts.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "PARTIAL and NOT_FIXED code verdicts with a confirmed dev-only candidate plan on-dev.",
+      "A candidate in master or outside dev, invalid data and unavailable refs retain the conservative path.",
+      "Remaining operator actions still plan on-qa.",
+      "The real dry-run CLI runs with a temporary Git graph and rejects GitHub writes during tests."
     ],
     "blockedBy": [],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Native Task; assigned wra-sol; organization fields unset; no hierarchy or dependency links. Live Project Status In progress. The assessment is complete and awaits review; keep open until the report is accepted and reaches master. The separate source fix is already released."
+    "trackerRecommendation": "Bug; assigned to wra-sol; Priority, Effort and environment unset. Project Status Backlog verified in the browser. No parent, children, blockers or linked fixing PR at the start. The internal tooling fix is ready for comprehensive checks."
+  },
+  {
+    "issueNumber": 2865,
+    "verdict": "verify-close",
+    "recommendedTitle": "The optional workspaceId on the campaign_queue write helpers is never applied to the WHERE clause, so POST /api/ivr lets a member of one workspace dequeue…",
+    "summary": "app/lib/campaign-queue-db.server.ts performs its campaign_queue UPDATEs on the unscoped `db` client from `@/server/db` and builds the WHERE clause entirely from a caller-assembled `conditions` array, so the tenant predicate is an *optional…",
+    "currentBehavior": "Fixed on dev. `dequeueCampaignQueueById` always adds `eq(campaignQueueTable.workspace, workspaceId)` and refuses a workspace-less call, `recordQueueAttemptFailure` takes a required `workspaceId` and puts it in the predicate, and `POST /api/ivr` passes the workspace it authorised.",
+    "rootCause": "The tenancy of a `campaign_queue` write is delegated to the caller as an optional `workspaceId` argument instead of being enforced by the helper. `updateCampaignQueueAndEmit` runs on the unscoped `db` client (`const exec = args.exec ?? db`, campaign-queue-db.server.ts:106) and applies exactly the predicates the caller assembled. `dequeueCampaignQueueById` adds the workspace term only `if (args.workspaceId)` (lines 404-407), and `recordQueueAttemptFailure` never adds it (lines 605-613) even though it takes the argument. `campaign_queue` is a registered workspace-scoped table (app/db/workspace-scoped-tables.ts:50), so ADR-0004's `createTenantDb(workspaceId)` (app/server/tenant-db.ts:32-35)…",
+    "resolution": "Fixed in #2925 (`b5a4dc18`): the tenant predicate is a property of the helper, not an optional argument. `app/lib/campaign-queue-db.server.ts:235` (by-id dequeue), `:604` (failed-attempt counter), `app/routes/api+/ivr.action.server.ts:80`.",
+    "lookIn": [
+      "app/lib/campaign-queue-db.server.ts",
+      "app/routes/api+/ivr.action.server.ts",
+      "app/lib/api-surface-generated.ts",
+      "test/ivr.route.test.ts",
+      "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
+      "app/server/tenant-db.ts"
+    ],
+    "existingTests": [
+      "test/campaign-queue-workspace-scope.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A write to a workspace-scoped table must be bound to the authenticated workspace before it is issued. ADR-0004 (`app/server/tenant-db.ts:32-35`, `app/db/workspace-scoped-tables.ts`) makes `createTenantDb(workspaceId)` the only tenant-data accessor for route code precisely because the base `db` client bypasses tenancy, and the audit's architecture summary names `createTenantDb` as the strongest source-visible control on the tenant-to-tenant boundary with no RLS behind it. The repository already applied exactly this discipline to the plpgsql equivalents in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql, which added a mandatory workspace parameter to `dequeue_contact` and `create_outreach_attempt` and named /api/dial, /api/hangup and /api/questions as the exposed callers. The TypeScript by-id dequeue path was not covered by that fix, and /api/ivr is not among the callers it named."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2868,
+    "verdict": "verify-close",
+    "recommendedTitle": "Public survey answer/complete accept a contact-derived respondent token, letting an anonymous caller overwrite another respondent's answers and completion state",
+    "summary": "POST /api/survey-answer and POST /api/survey-complete treat the signed respondent token as the sole authority for which survey_response row a submission may touch, and the token's result_id - the identity of that row - is minted by the…",
+    "currentBehavior": "Fixed on dev. The survey loader only reuses an existing response's `result_id` when the request carries a signed proof for that survey and contact; a bare `?contact=` id can start a new response but cannot mint a credential for someone else's.",
+    "rootCause": "app/routes/survey+/$surveyId.loader.server.ts:87-96 resolves an existing response row from the caller-supplied `?contact=` integer and reuses that row's result_id when minting the respondent token, so the minted credential carries the authority to mutate a response the caller never owned. app/lib/survey-public-action.server.ts:36-46 then accepts that credential as sufficient: verifyRespondentToken binds it to survey_id and workspace only, and result_id is copied out of the payload with no check that the caller controls the contact the response belongs to. resolvePublicSurveyContactId (app/lib/survey-public-action.server.ts:142-167) repeats the pattern on the write path by taking the…",
+    "resolution": "Fixed in #2930 (`5dd77b56`): `verifySurveyContactProof` (app/lib/survey-contact-proof.server.ts:72) checks a signature over survey, contact and expiry; the loader gates on it at app/routes/survey+/$surveyId.loader.server.ts:39,66.",
+    "lookIn": [
+      "app/lib/survey-public-action.server.ts",
+      "app/routes/survey+/$surveyId.loader.server.ts",
+      "app/lib/survey-db.server.ts",
+      "app/server/survey-completion.ts",
+      "app/lib/survey-respondent.server.ts",
+      "drizzle/0000_baseline.sql"
+    ],
+    "existingTests": [
+      "test/survey-contact-proof.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Only the respondent who owns a response row may answer for it or change its completion state. The respondent token is the designed proof of that ownership ('Signed respondent token bound to survey id, workspace, result id, and expiry'), the contact lookup is a workspace-scoped read whose stated job is to make a cross-tenant read impossible (app/lib/survey-respondent.server.ts:14-26), and the loader states that the contact id is a bare legacy integer whose only protection is a rate limit (app/routes/survey+/$surveyId.loader.server.ts:25-31). A guessable identifier that is not proof of possession must not select another respondent's response row or another respondent's identity on a write."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2873,
+    "verdict": "verify-close",
+    "recommendedTitle": "POST /account/security intent=enable replaces an already-enrolled second factor with only the password, bypassing the protected-user rule",
+    "summary": "The two-factor enrolment state machine at POST /account/security has no prior-state check on its `enable` transition and no protected-user check, while the sibling `disable` transition has both",
+    "currentBehavior": "Fixed on dev. `intent=enable` refuses with `Two-factor authentication is already enabled.` when the account is enrolled, so a password alone can no longer replace an existing factor.",
+    "rootCause": "app/routes/account.security.loader.server.ts:61-100 handles `intent=enable` as a stateless operation: it reads the password from the form and calls Better Auth's enableTwoFactor without checking whether the account already has an enrolled second factor (isTwoFactorEnabled / the auth_two_factor row) and without applying userIsTwoFactorProtected, which the `disable` branch does apply at line 151. Better Auth's enableTwoFactor is a replacement operation (node_modules/better-auth/dist/plugins/two-factor/index.mjs:113 deletes the existing auth_two_factor row and line 126 recreates it with `verified` inherited from the previous verified row), so the missing server-side state check turns an…",
+    "resolution": "Fixed in #2901 (`69587240`): the enable branch checks `isTwoFactorEnabled(user.id)` before calling Better Auth's `enableTwoFactor`, which replaces the factor. `app/routes/account.security.loader.server.ts`, `app/routes/api+/auth/$.loader.server.ts`.",
+    "lookIn": [
+      "app/routes/account.security.loader.server.ts",
+      "app/routes/account.security.tsx",
+      "app/routes/account.tsx",
+      "node_modules/better-auth/dist/plugins/two-factor/index.mjs",
+      "app/lib/two-factor.server.ts",
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "test/account-security.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Replacing or removing an enrolled account's second factor must require assurance beyond the first factor, and a privileged account's 2FA state must be governed by the same rule that already blocks intent=disable. Concretely: the server must reject `intent=enable` when the account already has an enrolled second factor (mirroring the client-side guards at app/routes/account.security.tsx:107 and app/routes/account.tsx:229), and any deliberate re-enrolment must first prove possession of the current factor (the existing TOTP code or a backup code) and must satisfy userIsTwoFactorProtected for privileged accounts, so that the effective policy on both transitions is the same."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2878,
+    "verdict": "verify-close",
+    "recommendedTitle": "Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role",
+    "summary": "POST /workspaces/:id/settings (formName=updateUser) takes the target role straight from the request body and never validates it against the current workspace role vocabulary",
+    "currentBehavior": "Fixed on dev. The member-role update validates the submitted role with `isMemberRole` before it is ranked or written, the escalation guard fails closed on an unknown role, and `memberRoleToRoleId` no longer maps the legacy `field_director` alias onto `admin`.",
+    "rootCause": "The role string that reaches the membership write is cast rather than validated, and the two components that reason about it disagree about the same string: assertNoRoleEscalation ranks an unknown role name as 0 (fails open), while memberRoleToRoleId recognises the legacy alias `field_director` and maps it to `admin` (fails open into a privileged role). Both are needed for the escalation: the rank guard alone is harmless, and the writer's alias alone is unreachable, because the only unvalidated producer of `field_director` is this form branch. The privileged-role 2FA gate is keyed on the same unvalidated string, so the alias also skips requireTwoFactorForPrivilegedRoleAssignment, whose…",
+    "resolution": "Fixed in #2898 (`948b200e`): `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:79`, `app/lib/platform-members.server.ts:151-160`, `app/lib/workspace-membership.server.ts:34-48`. The alias mapping now lives only in the one-off backfill SQL.",
+    "lookIn": [
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/lib/member-role.ts",
+      "app/lib/workspace-membership.server.ts",
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/two-factor.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-role-alias.test.ts",
+      "test/workspace-setting-utils.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The workspace settings role-update action must accept only one of the four current workspace roles (owner, admin, member, caller), and no actor may ever grant a role that outranks their own. The sibling addUser branch on the same form enforces this with isMemberRole, and PATCH /api/workspaces/:workspaceId/members enforces it with z.enum(['owner','admin','member','caller']). A member asking for admin must be refused; only an owner/admin may grant admin, and a privileged grant must satisfy the 2FA enrolment requirement."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2885,
+    "verdict": "verify-close",
+    "recommendedTitle": "create_outreach_attempt stores an unchecked foreign contact id and get_campaign_attempts renders that contact inside the caller's own campaign export",
+    "summary": "public.create_outreach_attempt(con_id, cam_id, usr_id, wks_id, queue_id) inserts the caller-supplied contact id and campaign id into an outreach_attempt row and stamps that row with the caller's own wks_id, without checking that the…",
+    "currentBehavior": "Fixed on dev. `create_outreach_attempt` proves the contact and the campaign belong to the caller's workspace before it stores the row, and `get_campaign_attempts` joins with a workspace predicate, so a foreign contact id can no longer be stored or rendered.",
+    "rootCause": "The outreach_attempt INSERT accepts a contact id and a campaign id that are never compared with the workspace the row is tagged with, and the export RPC that renders those rows re-joins contact on id alone. Nothing in the SQL binds the contact or the campaign to the workspace, and the route that calls the wrapper validates only the workspace it was given - the attacker's own workspace - never the contact id it was given. The 2026-08-07 hardening in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql scoped only the campaign_queue attempts-counter UPDATE to workspace = wks_id; its own header records the attempt INSERT as 'correctly tagged with wks_id',…",
+    "resolution": "Fixed in #2927 (`386a2042`): `client/migrations/20261020000000_scope_outreach_attempt_contact_and_campaign_by_workspace.sql` adds the proof to both RPCs, reached through `app/lib/db-rpc.server.ts` and the campaign action.",
+    "lookIn": [
+      "app/routes/api+/questions.action.server.ts",
+      "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
+      "client/migrations/20260722110000_contact_other_data_jsonb.sql",
+      "app/routes/workspaces+/$id/campaigns/$selected_id.action.server.ts",
+      "app/lib/db-rpc.server.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/scope-outreach-attempt-by-workspace.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "An outreach attempt, and any export that renders it, must only contain contacts and campaigns owned by the workspace the attempt was recorded for."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2889,
+    "verdict": "verify-close",
+    "recommendedTitle": "Media-stream token without a call SID lets a WebSocket peer overwrite another tenant's coaching rows",
+    "summary": "The media-stream service authenticates a session with an HMAC token that binds the workspace and only optionally the call",
+    "currentBehavior": "Fixed on dev. A media-stream token cannot be minted without a call SID — `createMediaStreamToken` throws when `callSid` is absent — and the DB writer resolves coaching rows through that call rather than a peer-supplied identity.",
+    "rootCause": "The call SID is an optional claim in the signed media-stream token, and the service's call-binding check is conditional on that claim being present (`tokenCallSid && msg.start.callSid && msg.start.callSid !== tokenCallSid`). When the token carries no call SID the check is skipped and the row key of the unscoped admin-DB writes is taken from a client-supplied frame field, so the token authorizes writes for a resource it never named. The fix that introduced the check (commit 55e6477b, 'fix(media-stream): bind transcript/coaching writes to the token's callSid (#1530)') hardened only the mint paths that happen to know the call SID at TwiML-generation time and left the predictive auto-dial path…",
+    "resolution": "Fixed in #2926 (`1cb8dad0`): `app/lib/media-stream-token.server.ts:41` requires the call SID, `app/lib/media-stream-twiml.server.ts` and `app/routes/api+/auto-dial/$roomId.action.server.ts` pass it.",
+    "lookIn": [
+      "services/media-stream/twilio-handler.ts",
+      "app/lib/media-stream-token.server.ts",
+      "app/lib/media-stream-twiml.server.ts",
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "services/media-stream/db-writer.ts",
+      "app/db/schema-transcription.ts"
+    ],
+    "existingTests": [
+      "test/media-stream-token.test.ts",
+      "test/media-stream-db-writer.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A media-stream token must authorize writes only for the workspace and the call it was minted for, and a `start` frame that names any other call must be refused. Commit 55e6477b states the intent explicitly: 'A token holder for their own workspace could send another workspace's live Call SID and inject rows the victim later sees as genuine.' For that to hold, every minted token must carry the call SID it authorizes (the field must not be optional), and the stream handler must refuse any `start` frame whose call SID is missing or different from the token's, rather than falling back to the frame's value."
+    ],
+    "size": "M",
+    "risk": "high"
+  },
+  {
+    "issueNumber": 2894,
+    "verdict": "verify-close",
+    "recommendedTitle": "Workspace API keys keep their full scope set after the member who minted them is removed or demoted",
+    "summary": "A workspace API key is a bearer credential whose authority comes exclusively from the `scopes` array on the key row",
+    "currentBehavior": "Fixed on dev. An API key's scopes are re-derived from its creator's current role on every request, so removing or demoting the creator narrows or revokes the key; a key with no recorded creator fails closed with the same 401.",
+    "rootCause": "The API-key principal model records the creator (`created_by`) but never binds the key to a live workspace principal, and no cascade exists between a membership change and the key rows. `created_by` has no surviving foreign key (dropped in client/migrations/20260919120000_drop_legacy_auth_users_fks.sql:16) and is read by no runtime path; the scope ceiling `assertScopesWithinActorRole` (app/lib/platform-members.server.ts:120) is applied once at mint time against the creator's then-current role and, as the code comment at app/lib/platform-members.server.ts:80-89 states, is never re-derived. The session path re-resolves the role on every request (app/lib/capability-guard.server.ts:54,…",
+    "resolution": "Fixed in #2928 (`13e1a6c4`): `app/lib/api-auth.server.ts:108-118` re-checks the creator's current role, with the ceiling in `app/lib/capabilities.ts` and the lookup in `app/lib/workspace-members-db.server.ts`.",
+    "lookIn": [
+      "app/lib/platform-members.server.ts",
+      "app/lib/capability-actor.server.ts",
+      "app/lib/api-auth.server.ts",
+      "app/lib/capability-guard.server.ts",
+      "app/lib/workspace-members-db.server.ts",
+      "app/db/schema.ts"
+    ],
+    "existingTests": [
+      "test/api-auth.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Removing or demoting a workspace member ends that member's effective authority over the workspace, including through credentials the member issued. The platform already implements that for sessions: the membership lookup in `requireWorkspaceAccess` / `getUserRole` yields 404 'Workspace not found' for a non-member, so the session dies with the membership. A key should either be bound to a live membership - with its capability set re-checked against the creator's current role - or be revoked automatically when that membership is removed or reduced. The platform's chosen compensations for key durability are admin-only minting, a mint-time role cap and mandatory expiry; a membership-driven cascade is the missing one. (Note: the platform does NOT fail closed on workspace suspension either - `workspace.disabled` is read only by cron fan-out, number-rental billing and the admin console - so the asymmetry is specifically between the session path and the API-key path on membership change.)"
+    ],
+    "size": "M",
+    "risk": "high"
   }
 ]
