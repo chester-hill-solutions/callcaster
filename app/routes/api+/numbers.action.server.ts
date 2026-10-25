@@ -1,4 +1,4 @@
-import { createErrorResponse } from "@/lib/errors.server";
+import { AppError, createErrorResponse } from "@/lib/errors.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
 import { requireJsonAuth,
@@ -59,7 +59,10 @@ export const action = defineAction({
         }
         if (result.status === 409) return jsonError(result.error, 409);
         return createErrorResponse(
-          new Error(result.error),
+          // The provider's reason is written for the caller; a plain Error is
+          // replaced by the generic default now (#2888), so carry it as an
+          // AppError with the status the provider reported (#2997).
+          new AppError(result.error, result.status ?? 500),
           "Failed to register number",
         );
       }

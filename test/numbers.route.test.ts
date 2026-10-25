@@ -289,9 +289,11 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       }),
     } as any)));
 
-    expect(res.status).toBe(500);
+    // The provider's reason is written for the caller, so it survives as an
+    // AppError with the status the provider reported (#2997).
+    expect(res.status).toBe(404);
     await expect(res.json()).resolves.toMatchObject({
-      error: "Failed to register number",
+      error: "No users found for workspace",
     });
   });
 
