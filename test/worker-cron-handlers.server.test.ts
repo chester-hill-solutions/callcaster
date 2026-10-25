@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   triggerTwilioOpenSync: vi.fn(async () => ({ ok: true, message: "synced" })),
   runNumberRentalBilling: vi.fn(async () => ({ ok: true, processed: 1 })),
   runCampaignScheduleSync: vi.fn(async () => ({ scanned: 0, transitioned: 0 })),
+  getWorkspaceById: vi.fn(async () => ({ id: "ws-1", disabled: false })),
 }));
 
 // Mock the enqueue layer rather than rescheduleJob: the handlers go through
@@ -22,6 +23,11 @@ const mocks = vi.hoisted(() => ({
 // that chain would not exercise the ordering guarantee these tests exist for.
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+}));
+
+vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+  getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
 }));
 
 vi.mock("@/lib/cron-workspace-fanout.server", () => ({
@@ -171,6 +177,41 @@ describe("cron handler self-reschedule gating", () => {
         params: { callLimit: 50, messageLimit: 50, maxAgeMinutes: 120 },
       }),
     );
+  });
+
+  test("a workspace-scoped job for a suspended workspace does not run", async () => {
+    // A body-supplied workspaceId selects the per-workspace branch, which used
+    // to call the money operation without consulting workspace.disabled (#2877).
+    mocks.getWorkspaceById.mockResolvedValueOnce({ id: "ws-1", disabled: true });
+
+    const result = await twilioOpenSyncHandler(
+      makeJob({ type: "twilio_open_sync", workspace_id: "ws-1", params: {} }),
+    );
+
+    expect(mocks.triggerTwilioOpenSync).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ skipped: 1, processed: 0, failed: 0 });
+  });
+
+  test("a workspace-scoped job for an enabled workspace still runs", async () => {
+    mocks.getWorkspaceById.mockResolvedValueOnce({ id: "ws-1", disabled: false });
+
+    await twilioOpenSyncHandler(
+      makeJob({ type: "twilio_open_sync", workspace_id: "ws-1", params: {} }),
+    );
+
+    expect(mocks.triggerTwilioOpenSync).toHaveBeenCalled();
+  });
+
+  test("number rental billing still runs for a suspended workspace", async () => {
+    // The warn -> suspend -> release ladder must keep working for suspended
+    // workspaces, which is what includeDisabled is for.
+    mocks.getWorkspaceById.mockResolvedValueOnce({ id: "ws-1", disabled: true });
+
+    await numberRentalBillingHandler(
+      makeJob({ type: "number_rental_billing", workspace_id: "ws-1", params: {} }),
+    );
+
+    expect(mocks.runNumberRentalBilling).toHaveBeenCalled();
   });
 
   test("workspace-scoped twilio_open_sync does not self-reschedule", async () => {

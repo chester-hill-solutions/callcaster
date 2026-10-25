@@ -14,7 +14,10 @@ import {
   auditWorkspaceTwilioWebhooks,
   repointWorkspaceTwilioWebhooks,
 } from "@/lib/twilio-webhook-audit.server";
-import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
+import {
+  getWorkspaceById,
+  listAllWorkspacesOrdered,
+} from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import {
@@ -77,6 +80,28 @@ async function withOptionalWorkspaceFanout<T>(args: {
       run: args.runOne,
     });
   }
+
+  // A job row can carry a workspace_id from the request body, which selects this
+  // branch instead of the fanout. Apply the same tenant-eligibility policy the
+  // fanout applies, or a body-supplied id reaches the money operation for a
+  // workspace the platform has suspended (#2877). Skipping, not failing: an
+  // ineligible tenant is not an error.
+  if (!args.includeDisabled) {
+    const workspace = await getWorkspaceById(args.workspaceId);
+    if (!workspace) {
+      logger.info(`${args.job}.workspace_skipped_missing`, {
+        workspaceId: args.workspaceId,
+      });
+      return { ok: true, processed: 0, skipped: 1, failed: 0, failures: [] };
+    }
+    if (workspace.disabled) {
+      logger.info(`${args.job}.workspace_skipped_disabled`, {
+        workspaceId: args.workspaceId,
+      });
+      return { ok: true, processed: 0, skipped: 1, failed: 0, failures: [] };
+    }
+  }
+
   return args.runOne(args.workspaceId);
 }
 
