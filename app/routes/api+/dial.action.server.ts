@@ -5,6 +5,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
+import { AppError, ErrorCode } from "@/lib/errors.server";
 import { rpcClaimQueueEntryForDial } from "@/lib/db-rpc.server";
 import {
   outboundCreditsResponse,
@@ -179,7 +180,19 @@ export const action = defineAction({
             throw new Response("Selected caller ID is not marked as emergency-ready.", { status: 400 });
         }
     }
-    const to = normalizePhoneNumber(to_number)
+    let to: string;
+    try {
+      to = normalizePhoneNumber(to_number);
+    } catch (error) {
+      // The shared util throws a plain Error, and a plain error is never echoed
+      // to a caller (#2888). This one is a validation message written for them,
+      // so it becomes an AppError and keeps its text (#2997).
+      throw new AppError(
+        error instanceof Error ? error.message : "Invalid phone number",
+        400,
+        ErrorCode.VALIDATION_ERROR,
+      );
+    }
     const twilio = await createWorkspaceTwilioInstance({ workspace_id });
     const twiml = createVoiceResponse();
     // Track the placed SID outside the try: if the call is created but we then

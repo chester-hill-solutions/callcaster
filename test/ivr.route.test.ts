@@ -93,15 +93,18 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     creditsState.credits = 10;
   });
 
-  test("returns 500 when required form data missing", async () => {
+  test("returns 400 when required form data is missing", async () => {
     const mod = await import("../app/routes/api+/ivr");
     const fd = new FormData();
     fd.set("to_number", "+1");
     const res = await asRouteResponse(
       mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
     );
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
+    // A missing field is a client error, and the caller is told which (#2997).
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Missing required form data",
+    });
   });
 
   test("returns 402 creditsError when workspace balance is <= 0", async () => {
@@ -227,7 +230,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "Error processing IVR request",
+      error: "Failed to insert call record",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });

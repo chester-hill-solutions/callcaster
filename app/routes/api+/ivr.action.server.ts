@@ -2,7 +2,7 @@ import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { data as routeData } from "react-router";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
-import { createErrorResponse } from "@/lib/errors.server";
+import { AppError, ErrorCode, createErrorResponse } from "@/lib/errors.server";
 import {
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
@@ -36,7 +36,11 @@ export const action = defineAction({
     const queue_id = formData.get("queue_id") as string;
     const user_id = formData.get("user_id") as string;
     if (!workspace_id || !campaign_id || !contact_id || !caller_id || !queue_id || !user_id) {
-      throw new Error("Missing required form data");
+      throw new AppError(
+        "Missing required form data",
+        400,
+        ErrorCode.VALIDATION_ERROR,
+      );
     }
     let outreachAttemptId;
     let call;
@@ -104,7 +108,13 @@ export const action = defineAction({
         outreach_attempt_id: Number(outreachAttemptId),
       });
 
-      if (!callRow) throw new Error("Failed to insert call record");
+      if (!callRow) {
+        throw new AppError(
+          "Failed to insert call record",
+          500,
+          ErrorCode.INTERNAL_SERVER_ERROR,
+        );
+      }
 
       // Dequeue. The queue row must belong to the workspace this request was
       // authorised against, so the by-id dequeue is scoped to it.

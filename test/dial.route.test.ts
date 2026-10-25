@@ -425,9 +425,11 @@ describe("app/routes/api+/dial/tsx.route", () => {
     const res = await asRouteResponse((await import("../app/routes/api+/dial")).action({
       request: new Request("http://localhost/api/dial", { method: "POST" }),
     } as any));
-    expect(res.status).toBe(500);
+    // A validation message written for the caller keeps its text and gets a 400
+    // (#2997), where a plain error would now be the generic default (#2888).
+    expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
-      error: "An error occurred",
+      error: expect.stringContaining("Invalid phone number length"),
     });
   });
 
