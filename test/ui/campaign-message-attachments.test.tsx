@@ -83,7 +83,13 @@ function renderMedia(
     {
       path: "/api/message_media",
       action: async ({ request }) => {
-        const form = await request.formData();
+        // Read the FormData the component submitted rather than re-parsing the
+        // request body. Under jsdom the component's `File` is jsdom's class, and
+        // Node's undici multipart parser only accepts its own (it asserts
+        // `webidl.is.File`), so `request.formData()` throws on Node 24 while the
+        // bytes are fine. The subject here is what the component submitted, and
+        // this is that same FormData.
+        const form = boundary.submissions[boundary.submissions.length - 1];
         requests.push({ method: request.method, form });
         const fileName = String(form.get("fileName"));
         const uploadedName = `stored-${fileName}`;
