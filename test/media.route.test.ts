@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   updateCampaignVoicedropAudio: vi.fn(async () => ({ id: 1 })),
   findCampaignInWorkspace: vi.fn(async () => ({ id: 1 })),
+  requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 
 vi.mock("../app/lib/adminDb.server", () => ({
@@ -37,7 +38,8 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
 
 vi.mock("@/lib/database/workspace.server", () => {
   return {
-    requireWorkspaceAccess: vi.fn(async () => undefined),
+    requireWorkspaceAccess: (...args: unknown[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 
@@ -49,6 +51,25 @@ describe("app/routes/api+/media/route.tsx", () => {
     mocks.updateCampaignVoicedropAudio.mockResolvedValue({ id: 1 });
     mocks.findCampaignInWorkspace.mockReset();
     mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
+    mocks.requireWorkspaceAccess.mockReset();
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
+  });
+
+  test("a voicedrop upload requires the member role", async () => {
+    queueDualAuthSession({ user: { id: "u1" } });
+    const mod = await import("../app/routes/api+/media");
+    const fd = new FormData();
+    fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
+    fd.set("live_campaign_id", "1");
+    fd.set("workspace_id", "w1");
+
+    await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as never));
+
+    // The voicedrop audio belongs to a campaign, so it takes the same floor the
+    // rest of the media family applies (#2890).
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "w1", minRole: "member" }),
+    );
   });
 
   test("uploads media and updates campaign, returning public url", async () => {

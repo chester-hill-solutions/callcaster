@@ -18,6 +18,7 @@ import { defineAction } from "@/lib/handler.server";
 async function resolveWorkspaceAuth(
   auth: Awaited<ReturnType<typeof requireDualAuth>>,
   workspaceId: string,
+  options?: { campaignWrite?: boolean },
 ) {
   if (auth instanceof Response) {
     return auth;
@@ -26,6 +27,11 @@ async function resolveWorkspaceAuth(
     if (auth.workspaceId !== workspaceId) {
       return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 403 });
     }
+    // A key may only touch campaign media when its scope allowlist says so; the
+    // campaign-less chat upload is not campaign mutation (#2890).
+    if (options?.campaignWrite && !auth.scopes.includes("campaigns.write")) {
+      return new Response(JSON.stringify({ success: false, error: "Forbidden" }), { status: 403 });
+    }
     return null;
   }
   const user = getDualAuthUser(auth);
@@ -33,7 +39,13 @@ async function resolveWorkspaceAuth(
     return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), { status: 401 });
   }
   try {
-    await requireWorkspaceAccess({ user, workspaceId });
+    await requireWorkspaceAccess({
+      user,
+      workspaceId,
+      // Campaign media is campaigns.write work; the campaign-less chat image
+      // upload stays open to every member, including `caller` (#2890).
+      ...(options?.campaignWrite ? { minRole: "member" as const } : {}),
+    });
   } catch (error) {
     const statusCode = error instanceof AppError ? error.statusCode : 500;
     const message = error instanceof AppError ? error.message : "Internal server error";
@@ -64,7 +76,16 @@ export const action = defineAction({
   }
   const workspaceIdStr = workspaceId.trim();
 
-  const authError = await resolveWorkspaceAuth(auth, workspaceIdStr);
+  const campaignIdForAuthRaw = formData.get("campaignId");
+  const campaignIdForAuth =
+    campaignIdForAuthRaw == null ? null : Number(campaignIdForAuthRaw);
+  // POST with a campaignId and DELETE both mutate campaign.message_media; POST
+  // without one is the chat composer's image upload.
+  const mutatesCampaign =
+    method === "DELETE" || (method === "POST" && campaignIdForAuth !== null);
+  const authError = await resolveWorkspaceAuth(auth, workspaceIdStr, {
+    campaignWrite: mutatesCampaign,
+  });
   if (authError) {
     return authError;
   }

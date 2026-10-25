@@ -6,6 +6,8 @@ export type RouteAuthSessionInput = {
   headers?: Headers;
   authType?: "session" | "bearer";
   userData?: { id: string; access_level?: string; [key: string]: unknown };
+  /** Narrow the API-key actor this helper builds when `user` is null. */
+  apiKey?: { workspaceId?: string; keyId?: string; scopes?: readonly string[] };
 };
 
 function unauthorizedResponse(): Response {
@@ -37,9 +39,9 @@ function buildDualAuth(session: RouteAuthSessionInput) {
   }
   return {
     authType: "api_key" as const,
-    workspaceId: "w-test",
-    keyId: "k-test",
-    scopes: [
+    workspaceId: session.apiKey?.workspaceId ?? "w-test",
+    keyId: session.apiKey?.keyId ?? "k-test",
+    scopes: session.apiKey?.scopes ?? [
       "campaigns.read",
       "campaigns.write",
       "campaigns.dispatch",

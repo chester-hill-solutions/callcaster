@@ -4953,6 +4953,7 @@
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
         "x-callcaster-request-body-limit": 10551296,
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -5040,6 +5041,7 @@
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
         "x-callcaster-request-body-limit": 10551296,
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
