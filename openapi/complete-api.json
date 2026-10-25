@@ -4118,6 +4118,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
