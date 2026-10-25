@@ -77,3 +77,21 @@ interrupted command. Stop for modified, staged or untracked source; preserve
 ignored environment files. Restore only the proven partial deletions from the
 exact verified commit, require a clean worktree, then repeat normal removal with
 a sufficient command deadline. Never force-delete user changes to finish cleanup.
+
+### Background PR sweep pollutes the main worktree
+
+`/tmp/opencode/serial-sweep.sh` (and the `rebase-pr.sh` it calls) rebases a topic
+branch in a linked worktree and force-pushes it. When the branch being rebased is
+also checked out in the main worktree, the main worktree's index can come back
+holding the *pre-rebase* content of the previous merge — staged reverts of work
+that is already on `dev`.
+
+Symptom: `git status` shows staged modifications that undo a recently merged PR,
+and the worktree files no longer match `HEAD`.
+
+Before queueing a sweep, switch the main worktree to `dev`. After it finishes,
+verify with `git diff --stat` (expect no output) and `git show HEAD:<file> | grep`
+for a marker of the last merge; if the tree was polluted, restore it with
+`git reset -q && git checkout -- .` — nothing is lost, because `HEAD` holds the
+committed state. Never commit while those staged reverts are present: it would
+revert merged code.
