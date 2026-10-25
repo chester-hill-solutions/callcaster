@@ -8,7 +8,7 @@ import {
   type BearerSessionAuthResult,
   type SessionAuthResult,
 } from "@/lib/api-auth.server";
-import { requireAudienceWorkspaceAccess } from "@/lib/audience-api-auth.server";
+import { requireFlatApiCapability } from "@/lib/audience-api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import {
@@ -79,7 +79,7 @@ export const action = defineAction({
       if (!workspaceId) {
         return routeData({ error: "Audience not found" }, { status: 404, headers });
       }
-      await requireAudienceWorkspaceAccess({
+      await requireFlatApiCapability({
         auth,
         user,
         workspaceId,
@@ -110,7 +110,7 @@ export const action = defineAction({
       if (!workspaceId) {
         return routeData({ error: "Audience not found" }, { status: 404, headers });
       }
-      await requireAudienceWorkspaceAccess({
+      await requireFlatApiCapability({
         auth,
         user,
         workspaceId,

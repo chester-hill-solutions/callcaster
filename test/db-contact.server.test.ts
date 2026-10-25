@@ -118,7 +118,7 @@ describe("app/lib/database/contact.server.ts", () => {
     expect(bad.contactError).toBeInstanceOf(Error);
   });
 
-  test("updateContact: validates id; strips undefined + audience_id; handles errors and empty update", async () => {
+  test("updateContact: validates id; writes only editor fields; handles errors and empty update", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
     await expect(
@@ -128,18 +128,31 @@ describe("app/lib/database/contact.server.ts", () => {
     tdbMocks.contact.update.mockResolvedValueOnce([{ id: 1, ok: 1 }]);
     const updated = await mod.updateContact("w1", {
       id: 1,
+      firstname: "Pat",
+      // Not in the editor's field set: dropping these is the point (#2861).
       audience_id: "a",
+      opt_out: true,
+      workspace: "w_victim",
       x: undefined,
     } as any);
     expect(updated).toEqual({ id: 1, ok: 1 });
+    expect(tdbMocks.contact.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({ set: { firstname: "Pat" } }),
+    );
 
     tdbMocks.contact.update.mockRejectedValueOnce(new Error("bad"));
-    await expect(mod.updateContact("w1", { id: 1 } as any)).rejects.toThrow("bad");
+    await expect(mod.updateContact("w1", { id: 1, firstname: "Pat" } as any)).rejects.toThrow(
+      "bad",
+    );
 
     tdbMocks.contact.update.mockResolvedValueOnce([]);
-    await expect(mod.updateContact("w1", { id: 1 } as any)).rejects.toThrow(
+    await expect(mod.updateContact("w1", { id: 1, firstname: "Pat" } as any)).rejects.toThrow(
       "Contact not found",
     );
+
+    await expect(
+      mod.updateContact("w1", { id: 1, opt_out: true } as any),
+    ).rejects.toThrow("No updatable contact fields supplied");
   });
 
   test("createContact: inserts contact without audience link", async () => {

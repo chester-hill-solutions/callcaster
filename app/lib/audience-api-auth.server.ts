@@ -14,8 +14,10 @@ type DualAuthLike =
   | { authType: string; workspaceId?: string };
 
 /**
- * Flat `/api/audiences` dual-auth workspace gate + product capability check.
- * Shared by loader (read) and action (write) so capability wiring stays DRY.
+ * Dual-auth workspace gate + product capability check for flat `/api/*` routes
+ * whose workspace id arrives in the body or the query string rather than in a
+ * path parameter (`/api/audiences`, `/api/contacts`). Shared by loaders (read)
+ * and actions (write) so capability wiring stays DRY.
  *
  * Still baselined in scripts/capability-baseline.json (issue #1242, D3): the
  * route has no `workspaceId`/resource-id path param — the caller passes an
@@ -27,7 +29,7 @@ type DualAuthLike =
  * Closing this baseline entry needs a body/query-aware strategy variant —
  * left for a follow-up.
  */
-export async function requireAudienceWorkspaceAccess(args: {
+export async function requireFlatApiCapability(args: {
   auth?: DualAuthLike;
   user?: { id: string };
   workspaceId: string;

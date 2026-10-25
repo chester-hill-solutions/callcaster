@@ -253,6 +253,29 @@ export async function fetchContactData(
   return { contact, potentialContacts, contactError };
 }
 
+/**
+ * Columns a caller may change through `updateContact`, matching what the contact
+ * editor exposes.
+ *
+ * This used to be "every key in the request body except `audience_id`", so the
+ * legacy `PATCH /api/contacts` let a caller rewrite `opt_out`, `created_by`,
+ * `workspace` (moving the contact to another tenant) and the row id itself
+ * (#2861). `id` identifies the row and is never written.
+ */
+const CONTACT_UPDATE_FIELDS = [
+  "firstname",
+  "surname",
+  "phone",
+  "email",
+  "address",
+  "city",
+  "province",
+  "postal",
+  "country",
+  "external_id",
+  "other_data",
+] as const satisfies readonly (keyof Contact)[];
+
 export const updateContact = async (
   workspaceId: string,
   data: Partial<Contact>,
@@ -263,11 +286,18 @@ export const updateContact = async (
   }
 
   const tenantDb = tdb ?? createTenantDb(workspaceId);
-  const sanitizedData = Object.fromEntries(
-    Object.entries(data).filter(
-      ([key, value]) => key !== "audience_id" && value !== undefined,
-    ),
-  ) as Partial<Contact>;
+  const body = data as Record<string, unknown>;
+  const sanitizedData: Partial<Contact> = {};
+  for (const field of CONTACT_UPDATE_FIELDS) {
+    const value = body[field];
+    if (value !== undefined) {
+      (sanitizedData as Record<string, unknown>)[field] = value;
+    }
+  }
+
+  if (Object.keys(sanitizedData).length === 0) {
+    throw new Error("No updatable contact fields supplied");
+  }
 
   const [updated] = await tenantDb.contact.update({
     set: sanitizedData,
