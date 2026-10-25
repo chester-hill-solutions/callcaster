@@ -460,35 +460,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2876,
-    "verdict": "fix-now",
-    "recommendedTitle": "The Better Auth mount exposes /api/auth/two-factor/disable, bypassing the rule that privileged accounts cannot disable 2FA",
-    "summary": "The application's rule 'privileged accounts cannot disable two-factor authentication' is implemented in exactly one place - the intent=disable branch of the POST /account/security action…",
-    "currentBehavior": "The application's rule 'privileged accounts cannot disable two-factor authentication' is implemented in exactly one place - the intent=disable branch of the POST /account/security action (app/routes/account.security.loader.server.ts:145-157, calling userIsTwoFactorProtected at line 151). The same effect is reachable through the Better Auth catch-all mount at /api/auth/* (route 'api/auth/*', app/routes/api+/auth/$.loader.server.ts), which delegates every unmatched path to auth.handler(request) after only a rate limit and a signup-closed check. Better Auth's own disableTwoFactor endpoint (node_modules/better-auth/dist/plugins/two-factor/index.mjs:138-187) requires only a valid session and the…",
-    "rootCause": "app/routes/api+/auth/$.loader.server.ts:18-30 forwards every Better Auth request to auth.handler(request) after only a rate limit (lines 19-25) and the signup-closed check (lines 26-28); it applies no application-level policy to the /api/auth/two-factor/* endpoints. Better Auth's disableTwoFactor (node_modules/better-auth/dist/plugins/two-factor/index.mjs:138-187) therefore runs with only its own session check (use: [sensitiveSessionMiddleware], line 141) plus password validation (lines 156-162), sets twoFactorEnabled=false (line 163) and deletes the auth_two_factor row (line 164). The protected-user rule (app/lib/two-factor.server.ts:121) lives solely in the application route's action and…",
-    "resolution": "Make the application's 2FA state machine the only door that changes 2FA state. In app/routes/api+/auth/$.loader.server.ts, refuse the raw Better Auth two-factor state-changing endpoints (POST /api/auth/two-factor/enable and POST /api/auth/two-factor/disable, and any backup-code/OTP siblings that change enrolment state) and direct callers to /account/security, which already enforces the per-user setup rate limit and the protected-user rule; leave /api/auth/two-factor/verify-totp reachable because the sign-in 2FA challenge posts there. If the raw endpoints must stay reachable for some client, apply the same protected-user rule to them inside handleAuthRequest before delegating to…",
-    "lookIn": [
-      "app/routes/api+/auth/$.loader.server.ts",
-      "app/routes/account.security.loader.server.ts",
-      "node_modules/better-auth/dist/plugins/two-factor/index.mjs",
-      "app/server/auth-instance.ts",
-      "app/lib/two-factor.server.ts",
-      "scripts/baselines/route-tree.txt"
-    ],
-    "existingTests": [
-      "For the same privileged account, the application's own door refused the operation: intent=disable returned {error: 'Privileged accounts cannot disable two-factor authentication.'} (before and after the raw call), with auth_user.two_factor_enabled still true and the auth_two_factor row still present. The raw call…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The application's 2FA policy must be the effective policy on every door that changes 2FA state. The /api/auth/* mount should either refuse the raw two-factor state-changing endpoints (POST /api/auth/two-factor/enable and POST /api/auth/two-factor/disable) so that all 2FA changes go through the POST /account/security action, which enforces userIsTwoFactorProtected and the per-user setup rate limit, or apply the same protected-user rule inside handleAuthRequest before delegating to auth.handler for those paths. The sign-in challenge endpoint POST /api/auth/two-factor/verify-totp must stay reachable, because the 2FA sign-in flow posts there."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2877,
     "verdict": "fix-now",
     "recommendedTitle": "Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and twilio_open_sync",
@@ -834,35 +805,6 @@
     ],
     "acceptanceCriteria": [
       "The stream's own doc comment states that it outlives the connect-time check by design, and its gate is deliberately the owner-only `audit.read` capability - the same capability the sibling `/api/workspaces/:workspaceId/audit-events` endpoint enforces (audit-events.loader.server.ts:7). A stream that outlives its connect check must therefore be re-authorized with the same authority on every tick: re-derive the actor's current capabilities from the CURRENT workspace role and require `audit.read`; for API-key actors re-read the key row and require the current scopes to contain `audit.read`; for cookie actors re-validate the session. When the re-authorization fails the stream must emit `workspace_access_revoked` and close - exactly as it already does today for a removed member."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
-    "issueNumber": 2893,
-    "verdict": "fix-now",
-    "recommendedTitle": "Worker's affected-row count is always zero, so dead-letter and crash-recovery alerts never fire",
-    "summary": "The worker decides whether a write did anything by counting the rows it affected, but it reads that count from the wrong field of the wrong shape",
-    "currentBehavior": "The worker decides whether a write did anything by counting the rows it affected, but it reads that count from the wrong field of the wrong shape. The application connects with the postgres.js driver (app/server/db.ts:1,63,72), so db.execute() resolves to a postgres.js Result object. Result extends Array, so for an UPDATE without RETURNING the value is an empty array (length 0) that still carries the affected-row count on its count property. affectedRowCount() tests Array.isArray(result) first and returns result.length, which is 0, so the count property is never read and the helper's own doc comment about 'postgres.js exposes count' is unreachable. Every caller of the helper therefore sees…",
-    "rootCause": "affectedRowCount() in app/lib/worker/poll-jobs.server.ts:79-86 tests Array.isArray(result) before the driver's count property. Under the postgres-js driver the application uses (app/server/db.ts:1,63,72; drizzle-orm 0.45.2 and postgres 3.4.9 pinned in bun.lock), db.execute() resolves to a postgres.js Result object, which extends Array (node_modules/postgres/src/result.js:1) and is empty (length 0) for an UPDATE without RETURNING while carrying the affected-row count on .count. Drizzle's raw execute path returns the driver object unchanged (node_modules/drizzle-orm/postgres-js/session.js:30-33, 'return await client.unsafe(query, params)'). The array branch returns first, so the helper…",
-    "resolution": "Read the affected-row count from the driver's count property before the array length, so a write that changed rows is never read as a write that changed nothing. Under postgres.js the Result object is an Array that also carries count, so count must be read first; the array length stays as the fallback for the mocked rows the unit tier returns. With the count read correctly, a zero count again means the claim fence rejected the write, so the failJob terminal branch keeps its current behaviour and a real lost claim is still reported.",
-    "lookIn": [
-      "app/lib/worker/poll-jobs.server.ts",
-      "app/server/db.ts",
-      "node_modules/postgres/src/result.js",
-      "node_modules/drizzle-orm/postgres-js/session.js",
-      "app/lib/worker/handlers.server.ts",
-      "app/lib/ops-alert.server.ts"
-    ],
-    "existingTests": [
-      "Seven checks passed against a real Postgres 18 with the target's own modules. (A) db.execute() on an UPDATE without RETURNING returned {isArray: true, length: 0, count: 1, ctorName: 'Result'}; the same statement with RETURNING returned length 1 - so affectedRowCount() reads 0 for a write that changed one row, while a…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "failJob should log worker.job.dead_letter and page on-call through notifyOps when a job permanently fails, resetStaleClaims should log worker.stale_claims_reset when it reclaims a row from a dead worker, deadLetterExhaustedJobs should log worker.exhausted_jobs_dead_lettered when it buries an exhausted row, and worker.claim_lost should be logged only when a post-claim write was actually rejected by the claim fence."
     ],
     "size": "S",
     "risk": "medium"

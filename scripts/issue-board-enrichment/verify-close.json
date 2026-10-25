@@ -658,6 +658,32 @@
     "risk": "low"
   },
   {
+    "issueNumber": 2876,
+    "verdict": "verify-close",
+    "recommendedTitle": "The Better Auth mount exposes /api/auth/two-factor/disable, bypassing the rule that privileged accounts cannot disable 2FA",
+    "summary": "The application's rule 'privileged accounts cannot disable two-factor authentication' is implemented in exactly one place - the intent=disable branch of the POST /account/security action…",
+    "currentBehavior": "Fixed on dev. The Better Auth mount refuses every endpoint that changes 2FA enrolment state — `two-factor/enable`, `two-factor/disable` and `two-factor/generate-backup-codes` — and answers 403 pointing at the account security page, which enforces the prior-state and protected-account rules. The sign-in challenge endpoints (`verify-totp`, `verify-backup-code`) stay reachable.",
+    "rootCause": "app/routes/api+/auth/$.loader.server.ts:18-30 forwards every Better Auth request to auth.handler(request) after only a rate limit (lines 19-25) and the signup-closed check (lines 26-28); it applies no application-level policy to the /api/auth/two-factor/* endpoints. Better Auth's disableTwoFactor (node_modules/better-auth/dist/plugins/two-factor/index.mjs:138-187) therefore runs with only its own session check (use: [sensitiveSessionMiddleware], line 141) plus password validation (lines 156-162), sets twoFactorEnabled=false (line 163) and deletes the auth_two_factor row (line 164). The protected-user rule (app/lib/two-factor.server.ts:121) lives solely in the application route's action and…",
+    "resolution": "Fixed in #2901 (enable/disable) and #2982 (backup-code generation): `isAppManagedTwoFactorPath` in `app/routes/api+/auth/$.loader.server.ts` blocks the three state-changing endpoints before `auth.handler` runs.",
+    "lookIn": [
+      "app/routes/api+/auth/$.loader.server.ts",
+      "app/routes/account.security.loader.server.ts",
+      "node_modules/better-auth/dist/plugins/two-factor/index.mjs",
+      "app/server/auth-instance.ts",
+      "app/lib/two-factor.server.ts",
+      "scripts/baselines/route-tree.txt"
+    ],
+    "existingTests": [
+      "test/auth-catch-all-rate-limit.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The application's 2FA policy must be the effective policy on every door that changes 2FA state. The /api/auth/* mount should either refuse the raw two-factor state-changing endpoints (POST /api/auth/two-factor/enable and POST /api/auth/two-factor/disable) so that all 2FA changes go through the POST /account/security action, which enforces userIsTwoFactorProtected and the per-user setup rate limit, or apply the same protected-user rule inside handleAuthRequest before delegating to auth.handler for those paths. The sign-in challenge endpoint POST /api/auth/two-factor/verify-totp must stay reachable, because the 2FA sign-in flow posts there."
+    ],
+    "size": "S",
+    "risk": "medium"
+  },
+  {
     "issueNumber": 2878,
     "verdict": "verify-close",
     "recommendedTitle": "Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role",
@@ -784,6 +810,32 @@
     "missingTests": [],
     "acceptanceCriteria": [
       "Changing the account password invalidates the account's other sessions, so a password rotation is an effective response to suspected session compromise. The app already states this intent for the sibling path: app/server/auth-instance.ts:28-30 sets revokeSessionsOnPasswordReset with the comment that the sessions which already exist are exactly the ones that must stop working."
+    ],
+    "size": "S",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2893,
+    "verdict": "verify-close",
+    "recommendedTitle": "Worker's affected-row count is always zero, so dead-letter and crash-recovery alerts never fire",
+    "summary": "The worker decides whether a write did anything by counting the rows it affected, but it reads that count from the wrong field of the wrong shape",
+    "currentBehavior": "Fixed on dev. The worker reads the affected-row count from the database driver's `count` before the array length, so a write that changed rows is no longer read as a write that changed nothing. The stale-claim reset signal and the dead-letter and crash-recovery alerts that depend on it fire again.",
+    "rootCause": "affectedRowCount() in app/lib/worker/poll-jobs.server.ts:79-86 tests Array.isArray(result) before the driver's count property. Under the postgres-js driver the application uses (app/server/db.ts:1,63,72; drizzle-orm 0.45.2 and postgres 3.4.9 pinned in bun.lock), db.execute() resolves to a postgres.js Result object, which extends Array (node_modules/postgres/src/result.js:1) and is empty (length 0) for an UPDATE without RETURNING while carrying the affected-row count on .count. Drizzle's raw execute path returns the driver object unchanged (node_modules/drizzle-orm/postgres-js/session.js:30-33, 'return await client.unsafe(query, params)'). The array branch returns first, so the helper…",
+    "resolution": "Fixed in #2983: `affectedRowCount` in `app/lib/worker/poll-jobs.server.ts` reads `count` first (postgres.js resolves `db.execute()` to an Array that carries it) and keeps the array length as the fallback for plain rows.",
+    "lookIn": [
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/server/db.ts",
+      "node_modules/postgres/src/result.js",
+      "node_modules/drizzle-orm/postgres-js/session.js",
+      "app/lib/worker/handlers.server.ts",
+      "app/lib/ops-alert.server.ts"
+    ],
+    "existingTests": [
+      "test/affected-row-count.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "failJob should log worker.job.dead_letter and page on-call through notifyOps when a job permanently fails, resetStaleClaims should log worker.stale_claims_reset when it reclaims a row from a dead worker, deadLetterExhaustedJobs should log worker.exhausted_jobs_dead_lettered when it buries an exhausted row, and worker.claim_lost should be logged only when a post-claim write was actually rejected by the claim fence."
     ],
     "size": "S",
     "risk": "medium"
