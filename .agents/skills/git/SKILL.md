@@ -95,3 +95,8 @@ for a marker of the last merge; if the tree was polluted, restore it with
 `git reset -q && git checkout -- .` — nothing is lost, because `HEAD` holds the
 committed state. Never commit while those staged reverts are present: it would
 revert merged code.
+
+A branch created from a **diverged** local `dev` compounds this: `git merge
+--ff-only origin/dev` refuses ("Not possible to fast-forward") and the branch
+starts from the wrong base. Check `git status -sb` for `[ahead …]` / `[behind …]`
+and run `git reset --hard origin/dev` before branching, not after.
