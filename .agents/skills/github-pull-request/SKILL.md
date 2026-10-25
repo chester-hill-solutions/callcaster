@@ -46,7 +46,8 @@ rows to clear this deployment timing failure.
 ## Structural review declaration
 
 Read `.github/pull_request_template.md` and `review-coverage.yml` before creating
-or editing a PR. High-risk paths or more than 500 added lines require a
+or editing a PR. High-risk paths — `app/lib/worker/`, `app/server/`, `app/db/`,
+`client/migrations/` — or more than 500 added lines require a
 `Structural review:` declaration in the body. Audit PRs with docs, skills or tools
 outside the board/enrichment-only exemption still need that declaration.
 Record the completed review and its scope; do not add a marker without review.

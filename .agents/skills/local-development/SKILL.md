@@ -750,7 +750,12 @@ proof. Parse whole statements and retain valid called-service/auth controls.
 ## Generated API files
 
 For API surface changes, generate with `npm run tools:api:codegen` and
-`npm run tools:api:surface:report` before full CI. Review and stage the expected
+`npm run tools:api:surface:report` before full CI. **Declaring or changing a
+capability is an API surface change**: an entry in
+`scripts/capability-baseline.json` is emitted into
+`app/lib/api-surface-generated.ts` and into `openapi/*.json`, so both generators
+must run. `ci:codegen:verify` catches the omission at the end of the gate, after
+the minutes. Review and stage the expected
 generated files. Run `git diff --cached --check` after staging so new files
 receive the same whitespace check as existing files. `ci:codegen:verify` compares unstaged output with the index;
 an intended un-staged API delta otherwise fails the final gate. Do not stage
