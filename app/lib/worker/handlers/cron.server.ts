@@ -17,7 +17,10 @@ import {
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import { TWILIO_WEBHOOK_AUDIT_JOB_TYPE } from "@/lib/worker/job-types.server";
+import {
+  TWILIO_OPEN_SYNC_DEFAULTS,
+  TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
+} from "@/lib/worker/job-types.server";
 import { withReschedule } from "./shared.server";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
@@ -88,7 +91,10 @@ export async function twilioOpenSyncHandler(
     {
       type: "twilio_open_sync",
       delayMs: TWILIO_OPEN_SYNC_RESCHEDULE_MS,
-      params: { callLimit, messageLimit, maxAgeMinutes },
+      // The successor inherits the sweep's defaults, not this job's params: a row
+      // stored before #2896 could carry a negative or zero limit, and inheriting
+      // it would reconfigure the whole chain from one bad row.
+      params: { ...TWILIO_OPEN_SYNC_DEFAULTS },
       completedJobId: job.id,
       enabled: !workspaceId,
     },
