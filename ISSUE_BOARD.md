@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@0d76007b` · 344 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@a6bf46ff` · 344 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 22
+## Fix now — 21
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -212,18 +212,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A tenant deletion is an accountable platform action: it should leave a durable, attributable record (an audit event and/or a platform-level tombstone with the workspace id, the actor and the timestamp) that survives the deletion of the tenant's own data.
 
-### [#2877](https://github.com/chester-hill-solutions/callcaster/issues/2877) Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and…
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and twilio_open_sync**
-- POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column
-- Current behavior: POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column. A job row that carries a workspace_id makes the worker take the per-workspace branch of withOptionalWorkspaceFanout, and that branch calls the money operation directly - it never consults workspace.disabled. The all-workspaces branch, which is the path the legitimate pg_cron caller takes, does apply the platform's suspension lever: a workspace with disabled = true is skipped, because 'a job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended'. The…
-- Root cause: withOptionalWorkspaceFanout (app/lib/worker/handlers/cron.server.ts:62) splits into two branches, and the tenant-eligibility policy (the workspace.disabled skip) lives only inside runCronWorkspaceFanout, which the per-workspace branch bypasses. The cron enqueue route (app/lib/worker/cron-job-enqueue-route.server.ts:26,66) takes the tenant selector from the untrusted body and writes it to job.workspace_id, so a body-controlled selector picks the branch that has no gate. The route is the only producer of a workspace-scoped billing_reconcile job and one of two producers of a workspace-scoped twilio_open_sync job (the other is app/server/predictive-machine-continuation.server.ts:277), so the…
-- Resolution: Make the per-workspace branch apply the same tenant-eligibility policy the fanout branch applies, so a body-supplied workspaceId cannot select an unguarded path. The smallest change is to re-check workspace.disabled in withOptionalWorkspaceFanout before calling runOne (skipping, not failing, when the job has not opted in); this also protects the other producer of a workspace-scoped twilio_open_sync job (app/server/predictive-machine-continuation.server.ts:277). An equally valid alternative is to reject the enqueue in the cron route when the named workspace is disabled, so the job is never created. The patch needs the getWorkspaceById import (cron.server.ts already imports…
-- Look in: `app/lib/cron-workspace-fanout.server.ts`, `app/lib/worker/handlers/cron.server.ts`, `app/lib/worker/cron-job-enqueue-route.server.ts`, `app/lib/worker/enqueue-job.server.ts`, `app/lib/number-rental-billing.server.ts`, `app/lib/twilio-call-status.server.ts`
-- Existing tests: Route (node tier, real action, enqueue layer captured): POST /api/jobs/billing-reconcile with body {"workspaceId":"11111111-1111-4111-8111-111111111111"} and the correct x-cron-secret produced unsafeEnqueueJob args…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A suspended workspace's money must not move. app/lib/cron-workspace-fanout.server.ts:44 states the rule - 'A job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended: it keeps debiting a balance nobody will pay and keeps reconciling an account that should be frozen' - and line 92 implements it by skipping a disabled workspace unless the job opts in. billing_reconcile and twilio_open_sync deliberately do not opt in (the includeDisabled field is absent at app/lib/worker/handlers/cron.server.ts:141 and :99), and the repo's own test asserts that (test/worker-cron-handlers.server.test.ts:213, :222, and :228-238, which pins number_rental_billing as the only job that opts in). The intended behaviour is therefore that a suspended tenant is skipped on BOTH branches of withOptionalWorkspaceFanout.
-
 ### [#2872](https://github.com/chester-hill-solutions/callcaster/issues/2872) Audience import creates and mutates audience records and links audiences to campaigns under a membership-only gate…
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
 - Recommended title: **Audience import creates and mutates audience records and links audiences to campaigns under a membership-only gate that the sibling audience surfaces refuse**
@@ -286,9 +274,41 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 42
+## Verify and close — 44
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2997](https://github.com/chester-hill-solutions/callcaster/issues/2997) Task: route caller-facing failure messages through AppError
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-25
+- Recommended title: **Route caller-facing failure messages through AppError**
+- The `#2888` change made plain errors generic, which cost four caller-facing messages. They are now AppErrors with matching statuses.
+- Current behavior: Fixed on dev. A malformed phone number on POST /api/dial is a 400 naming the problem, a missing field on POST /api/ivr is a 400 naming it, a failed call insert keeps its message at 500, and a number-registration failure returns the provider reason with the status it reported.
+- Root cause: Those routes threw plain `Error`s whose text was written for the caller, which `createErrorResponse` now replaces with the route default.
+- Resolution: Fixed in #3002: the three throws became `AppError` with the matching status (`app/routes/api+/dial.action.server.ts`, `app/routes/api+/ivr.action.server.ts`, `app/routes/api+/numbers.action.server.ts`).
+- Look in: `app/routes/api+/dial.action.server.ts`, `app/routes/api+/ivr.action.server.ts`, `app/routes/api+/numbers.action.server.ts`
+- Existing tests: test/dial.route.test.ts; test/ivr.route.test.ts; test/numbers.route.test.ts
+
+### [#2877](https://github.com/chester-hill-solutions/callcaster/issues/2877) Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and…
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-25
+- Recommended title: **Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and twilio_open_sync**
+- POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column
+- Current behavior: Fixed on dev. A cron job that names one workspace in its request body applies the same tenant-eligibility rule as the all-workspaces sweep: a missing or suspended workspace is skipped instead of run, so a suspended tenant is not debited or reconciled through that path. The includeDisabled opt-in still lets the number-rental ladder run for suspended workspaces.
+- Root cause: withOptionalWorkspaceFanout (app/lib/worker/handlers/cron.server.ts:62) splits into two branches, and the tenant-eligibility policy (the workspace.disabled skip) lives only inside runCronWorkspaceFanout, which the per-workspace branch bypasses. The cron enqueue route (app/lib/worker/cron-job-enqueue-route.server.ts:26,66) takes the tenant selector from the untrusted body and writes it to job.workspace_id, so a body-controlled selector picks the branch that has no gate. The route is the only producer of a workspace-scoped billing_reconcile job and one of two producers of a workspace-scoped twilio_open_sync job (the other is app/server/predictive-machine-continuation.server.ts:277), so the…
+- Resolution: Fixed in #3001: the disabled/missing check in `withOptionalWorkspaceFanout` (`app/lib/worker/handlers/cron.server.ts`) before `runOne`.
+- Look in: `app/lib/cron-workspace-fanout.server.ts`, `app/lib/worker/handlers/cron.server.ts`, `app/lib/worker/cron-job-enqueue-route.server.ts`, `app/lib/worker/enqueue-job.server.ts`, `app/lib/number-rental-billing.server.ts`, `app/lib/twilio-call-status.server.ts`
+- Existing tests: test/worker-cron-handlers.server.test.ts
+- Done when: A suspended workspace's money must not move. app/lib/cron-workspace-fanout.server.ts:44 states the rule - 'A job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended: it keeps debiting a balance nobody will pay and keeps reconciling an account that should be frozen' - and line 92 implements it by skipping a disabled workspace unless the job opts in. billing_reconcile and twilio_open_sync deliberately do not opt in (the includeDisabled field is absent at app/lib/worker/handlers/cron.server.ts:141 and :99), and the repo's own test asserts that (test/worker-cron-handlers.server.test.ts:213, :222, and :228-238, which pins number_rental_billing as the only job that opts in). The intended behaviour is therefore that a suspended tenant is skipped on BOTH branches of withOptionalWorkspaceFanout.
+
+### [#2890](https://github.com/chester-hill-solutions/callcaster/issues/2890) Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for…
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-25
+- Recommended title: **Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for member and above**
+- POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which…
+- Current behavior: Fixed on dev. Uploading a campaign's voicemail-drop audio, attaching campaign message media and deleting it all require the `member` role, and a workspace API key must carry `campaigns.write` for the campaign branches. The campaign-less chat image upload stays open to every member.
+- Root cause: app/routes/api+/media.action.server.ts line 46 and app/routes/api+/message_media.action.server.ts line 36 both call `requireWorkspaceAccess({ user, workspaceId })` with no `minRole`. `requireWorkspaceAccess` only consults `hasMinRole` when `minRole` is supplied (app/lib/workspace-membership.server.ts line 183), and `hasMinRole` returns true for an omitted gate (app/lib/member-role.ts line 28), so any membership role, including `caller`, passes. The routes then mutate a campaign through `updateCampaignVoicedropAudio` / `updateCampaignMessageMedia`, which are `campaigns.write` operations, without ever consulting the actor's role or capability. The guard that expresses the policy exists and…
+- Resolution: Fixed in #2999: the `member` floor on `/api/media` (`app/routes/api+/media.action.server.ts`) and on the campaign branches of `/api/message_media` (`app/routes/api+/message_media.action.server.ts`), with both operations declared in `scripts/capability-baseline.json`.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/member-role.ts`, `app/lib/capabilities.ts`, `app/routes/api+/campaigns/$campaignId.action.server.ts`
+- Existing tests: test/media.route.test.ts; test/message-media.route.test.ts
+- Done when: A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright.
 
 ### [#2888](https://github.com/chester-hill-solutions/callcaster/issues/2888) API error responses return raw database error text, disclosing the failed statement's internal table and column…
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-25
@@ -589,17 +609,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/twilio-a2p-messaging-profile.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/a2p-messaging-profile.server.ts`
 - Existing tests: test/twilio-a2p-provision.server.test.ts — I ran it plus test/a2p-messaging-profile.test.ts and test/twilio-a2p-status-sync.test.ts against origin/master: 113 tests passed, 3 files green. The cases that carry the mechanism: "public company sends stock and representative email on EndUser, not BrandRegistration"; "submission failure retains IDs and assignment evidence for a single-resource retry"; "existing approved profile with complete actual attributes can be read without inventing local company data"; "incomplete legacy public profile is repaired before brand reuse without duplicate EndUser"; "unrecorded owned provider product and EndUser are recovered instead of duplicated"; "a preparation failure during polling is retained by the fresh-row status update"; "a concurrent business change prevents old preparation from marking the new inputs ready"; "all assignment pages are read before deciding to create a duplicate". test/integration-db/a2p-messaging-profile.test.ts — 13 real-Postgres storage and callback cases, which I also ran green against a live Postgres 18.
 - Done when: A person confirms the reported symptom is gone on master.
-
-### [#2890](https://github.com/chester-hill-solutions/callcaster/issues/2890) Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for…
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for member and above**
-- POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which…
-- Current behavior: Fixed on dev. Uploading a campaign's voicemail-drop audio, attaching campaign message media and deleting it all require the `member` role, and a workspace API key must carry `campaigns.write` for the campaign branches. The campaign-less chat image upload stays open to every member.
-- Root cause: app/routes/api+/media.action.server.ts line 46 and app/routes/api+/message_media.action.server.ts line 36 both call `requireWorkspaceAccess({ user, workspaceId })` with no `minRole`. `requireWorkspaceAccess` only consults `hasMinRole` when `minRole` is supplied (app/lib/workspace-membership.server.ts line 183), and `hasMinRole` returns true for an omitted gate (app/lib/member-role.ts line 28), so any membership role, including `caller`, passes. The routes then mutate a campaign through `updateCampaignVoicedropAudio` / `updateCampaignMessageMedia`, which are `campaigns.write` operations, without ever consulting the actor's role or capability. The guard that expresses the policy exists and…
-- Resolution: Fixed in #2999: the `member` floor on `/api/media` (`app/routes/api+/media.action.server.ts`) and on the campaign branches of `/api/message_media` (`app/routes/api+/message_media.action.server.ts`), with both operations declared in `scripts/capability-baseline.json`.
-- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/member-role.ts`, `app/lib/capabilities.ts`, `app/routes/api+/campaigns/$campaignId.action.server.ts`
-- Existing tests: test/media.route.test.ts; test/message-media.route.test.ts
-- Done when: A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright.
 
 ### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
@@ -1701,13 +1710,9 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 189
+## Needs triage — 188
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
-
-### [#2997](https://github.com/chester-hill-solutions/callcaster/issues/2997) Task: route caller-facing failure messages through AppError
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25

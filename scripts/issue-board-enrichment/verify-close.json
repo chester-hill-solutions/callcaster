@@ -754,6 +754,32 @@
     "risk": "medium"
   },
   {
+    "issueNumber": 2877,
+    "verdict": "verify-close",
+    "recommendedTitle": "Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and twilio_open_sync",
+    "summary": "POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column",
+    "currentBehavior": "Fixed on dev. A cron job that names one workspace in its request body applies the same tenant-eligibility rule as the all-workspaces sweep: a missing or suspended workspace is skipped instead of run, so a suspended tenant is not debited or reconciled through that path. The includeDisabled opt-in still lets the number-rental ladder run for suspended workspaces.",
+    "rootCause": "withOptionalWorkspaceFanout (app/lib/worker/handlers/cron.server.ts:62) splits into two branches, and the tenant-eligibility policy (the workspace.disabled skip) lives only inside runCronWorkspaceFanout, which the per-workspace branch bypasses. The cron enqueue route (app/lib/worker/cron-job-enqueue-route.server.ts:26,66) takes the tenant selector from the untrusted body and writes it to job.workspace_id, so a body-controlled selector picks the branch that has no gate. The route is the only producer of a workspace-scoped billing_reconcile job and one of two producers of a workspace-scoped twilio_open_sync job (the other is app/server/predictive-machine-continuation.server.ts:277), so the…",
+    "resolution": "Fixed in #3001: the disabled/missing check in `withOptionalWorkspaceFanout` (`app/lib/worker/handlers/cron.server.ts`) before `runOne`.",
+    "lookIn": [
+      "app/lib/cron-workspace-fanout.server.ts",
+      "app/lib/worker/handlers/cron.server.ts",
+      "app/lib/worker/cron-job-enqueue-route.server.ts",
+      "app/lib/worker/enqueue-job.server.ts",
+      "app/lib/number-rental-billing.server.ts",
+      "app/lib/twilio-call-status.server.ts"
+    ],
+    "existingTests": [
+      "test/worker-cron-handlers.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A suspended workspace's money must not move. app/lib/cron-workspace-fanout.server.ts:44 states the rule - 'A job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended: it keeps debiting a balance nobody will pay and keeps reconciling an account that should be frozen' - and line 92 implements it by skipping a disabled workspace unless the job opts in. billing_reconcile and twilio_open_sync deliberately do not opt in (the includeDisabled field is absent at app/lib/worker/handlers/cron.server.ts:141 and :99), and the repo's own test asserts that (test/worker-cron-handlers.server.test.ts:213, :222, and :228-238, which pins number_rental_billing as the only job that opts in). The intended behaviour is therefore that a suspended tenant is skipped on BOTH branches of withOptionalWorkspaceFanout."
+    ],
+    "size": "XS",
+    "risk": "low"
+  },
+  {
     "issueNumber": 2878,
     "verdict": "verify-close",
     "recommendedTitle": "Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role",
@@ -1040,6 +1066,30 @@
       "The three numbers are the sweep's budgets, not free-form input: callLimit/messageLimit bound how many open rows one run may touch, and maxAgeMinutes is the grace window that decides when a call the provider does not know yet may be terminalized ('Terminalize it as failed once it is old enough that a race with call creation is impossible', app/lib/twilio-open-sync.server.ts:234). A limit must be a positive integer and maxAgeMinutes must be at least 1, so a negative or zero value can never be stored; and the chain successor must not inherit an unvalidated parameter, because the successor is the platform's only scheduler for this job ('These chains are the only scheduler: there is no pg_cron and no external trigger', app/lib/worker/handlers/shared.server.ts:8), so a bad value there is permanent."
     ],
     "size": "XS",
+    "risk": "low"
+  },
+  {
+    "issueNumber": 2997,
+    "verdict": "verify-close",
+    "recommendedTitle": "Route caller-facing failure messages through AppError",
+    "summary": "The `#2888` change made plain errors generic, which cost four caller-facing messages. They are now AppErrors with matching statuses.",
+    "currentBehavior": "Fixed on dev. A malformed phone number on POST /api/dial is a 400 naming the problem, a missing field on POST /api/ivr is a 400 naming it, a failed call insert keeps its message at 500, and a number-registration failure returns the provider reason with the status it reported.",
+    "rootCause": "Those routes threw plain `Error`s whose text was written for the caller, which `createErrorResponse` now replaces with the route default.",
+    "resolution": "Fixed in #3002: the three throws became `AppError` with the matching status (`app/routes/api+/dial.action.server.ts`, `app/routes/api+/ivr.action.server.ts`, `app/routes/api+/numbers.action.server.ts`).",
+    "lookIn": [
+      "app/routes/api+/dial.action.server.ts",
+      "app/routes/api+/ivr.action.server.ts",
+      "app/routes/api+/numbers.action.server.ts"
+    ],
+    "existingTests": [
+      "test/dial.route.test.ts",
+      "test/ivr.route.test.ts",
+      "test/numbers.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [],
+    "blockedBy": [],
+    "size": "S",
     "risk": "low"
   }
 ]
