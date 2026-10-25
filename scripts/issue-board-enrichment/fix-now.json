@@ -337,35 +337,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2877,
-    "verdict": "fix-now",
-    "recommendedTitle": "Cron enqueue route's body workspaceId bypasses the workspace.disabled suspension gate for billing_reconcile and twilio_open_sync",
-    "summary": "POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column",
-    "currentBehavior": "POST /api/jobs/billing-reconcile and POST /api/jobs/twilio-open-sync read the tenant selector from the request body (workspaceId) and write it onto the job row's workspace_id column. A job row that carries a workspace_id makes the worker take the per-workspace branch of withOptionalWorkspaceFanout, and that branch calls the money operation directly - it never consults workspace.disabled. The all-workspaces branch, which is the path the legitimate pg_cron caller takes, does apply the platform's suspension lever: a workspace with disabled = true is skipped, because 'a job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended'. The…",
-    "rootCause": "withOptionalWorkspaceFanout (app/lib/worker/handlers/cron.server.ts:62) splits into two branches, and the tenant-eligibility policy (the workspace.disabled skip) lives only inside runCronWorkspaceFanout, which the per-workspace branch bypasses. The cron enqueue route (app/lib/worker/cron-job-enqueue-route.server.ts:26,66) takes the tenant selector from the untrusted body and writes it to job.workspace_id, so a body-controlled selector picks the branch that has no gate. The route is the only producer of a workspace-scoped billing_reconcile job and one of two producers of a workspace-scoped twilio_open_sync job (the other is app/server/predictive-machine-continuation.server.ts:277), so the…",
-    "resolution": "Make the per-workspace branch apply the same tenant-eligibility policy the fanout branch applies, so a body-supplied workspaceId cannot select an unguarded path. The smallest change is to re-check workspace.disabled in withOptionalWorkspaceFanout before calling runOne (skipping, not failing, when the job has not opted in); this also protects the other producer of a workspace-scoped twilio_open_sync job (app/server/predictive-machine-continuation.server.ts:277). An equally valid alternative is to reject the enqueue in the cron route when the named workspace is disabled, so the job is never created. The patch needs the getWorkspaceById import (cron.server.ts already imports…",
-    "lookIn": [
-      "app/lib/cron-workspace-fanout.server.ts",
-      "app/lib/worker/handlers/cron.server.ts",
-      "app/lib/worker/cron-job-enqueue-route.server.ts",
-      "app/lib/worker/enqueue-job.server.ts",
-      "app/lib/number-rental-billing.server.ts",
-      "app/lib/twilio-call-status.server.ts"
-    ],
-    "existingTests": [
-      "Route (node tier, real action, enqueue layer captured): POST /api/jobs/billing-reconcile with body {\"workspaceId\":\"11111111-1111-4111-8111-111111111111\"} and the correct x-cron-secret produced unsafeEnqueueJob args…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "A suspended workspace's money must not move. app/lib/cron-workspace-fanout.server.ts:44 states the rule - 'A job that moves money or reconciles a live Twilio account must not run for a workspace the platform has suspended: it keeps debiting a balance nobody will pay and keeps reconciling an account that should be frozen' - and line 92 implements it by skipping a disabled workspace unless the job opts in. billing_reconcile and twilio_open_sync deliberately do not opt in (the includeDisabled field is absent at app/lib/worker/handlers/cron.server.ts:141 and :99), and the repo's own test asserts that (test/worker-cron-handlers.server.test.ts:213, :222, and :228-238, which pins number_rental_billing as the only job that opts in). The intended behaviour is therefore that a suspended tenant is skipped on BOTH branches of withOptionalWorkspaceFanout."
-    ],
-    "size": "XS",
-    "risk": "low"
-  },
-  {
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
