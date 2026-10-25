@@ -20,13 +20,19 @@ function isBetterAuthSignUpPath(url: URL): boolean {
 function isAppManagedTwoFactorPath(pathname: string): boolean {
   return (
     pathname.startsWith("/api/auth/two-factor/enable") ||
-    pathname.startsWith("/api/auth/two-factor/disable")
+    pathname.startsWith("/api/auth/two-factor/disable") ||
+    // Regenerating the backup codes replaces the set the account holds, which is
+    // an enrolment-state change like the two above; the app never calls it.
+    pathname.startsWith("/api/auth/two-factor/generate-backup-codes")
   );
 }
 
 /** Credential/TOTP guessing surfaces get the strict bucket; other POSTs the loose one. */
-function rateLimitScopeForAuthPath(url: URL): "auth:sign-in" | "auth:catch-all" {
-  return url.pathname.includes("/sign-in") || url.pathname.includes("/two-factor")
+function rateLimitScopeForAuthPath(
+  url: URL,
+): "auth:sign-in" | "auth:catch-all" {
+  return url.pathname.includes("/sign-in") ||
+    url.pathname.includes("/two-factor")
     ? "auth:sign-in"
     : "auth:catch-all";
 }
