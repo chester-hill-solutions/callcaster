@@ -4,6 +4,7 @@ import {
   updateContact,
 } from "@/lib/database/contact.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { requireFlatApiCapability } from "@/lib/audience-api-auth.server";
 import { handleError, parseRequestData } from "@/lib/request-utils.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
 import { searchContactsLoader } from "./contacts.loader.server";
@@ -42,6 +43,18 @@ export const action = defineAction({
 
     switch (method) {
       case 'PATCH': {
+        // Contact mutation is campaigns.write, the same capability the canonical
+        // editor and the resource-scoped route require, so a `caller` cannot
+        // rewrite contacts through this legacy door (#2861). Creation stays
+        // membership-only on purpose: callers create contacts from the chat
+        // composer and the queue picker.
+        await requireFlatApiCapability({
+          auth,
+          user,
+          workspaceId,
+          capability: "campaigns.write",
+          requireWorkspaceAccess,
+        });
         const updatedContact = await updateContact(workspaceId, data);
         return routeData({ data: updatedContact }, { status: 200 });
       }
@@ -80,6 +93,9 @@ export const action = defineAction({
   } catch (err) {
     if (err instanceof Error && err.message === 'Unsupported content type') {
       return routeData({ error: 'Unsupported content type' }, { status: 415 });
+    }
+    if (err instanceof Response) {
+      return err;
     }
     if (err instanceof AppError) {
       return routeData({ error: err.message }, { status: err.statusCode });

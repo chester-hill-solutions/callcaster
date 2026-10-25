@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   bulkCreateContacts: vi.fn(),
   updateContact: vi.fn(),
   findAudienceWorkspaceById: vi.fn(),
+  requireFlatApiCapability: vi.fn(),
   searchContactsLoader: vi.fn(),
 }));
 
@@ -31,6 +32,11 @@ vi.mock("@/lib/database/contact.server", async (importOriginal) => ({
   createContact: (...args: unknown[]) => mocks.createContact(...args),
   bulkCreateContacts: (...args: unknown[]) => mocks.bulkCreateContacts(...args),
   updateContact: (...args: unknown[]) => mocks.updateContact(...args),
+}));
+vi.mock("@/lib/audience-api-auth.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/audience-api-auth.server")>()),
+  requireFlatApiCapability: (...args: unknown[]) =>
+    mocks.requireFlatApiCapability(...args),
 }));
 vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/audience-upload-db.server")>()),
@@ -61,6 +67,8 @@ describe("api+/contacts.action.server.ts", () => {
     mocks.requireWorkspaceAccess.mockResolvedValue({ role: "member" });
     mocks.createContact.mockResolvedValue({ id: 1 });
     mocks.bulkCreateContacts.mockResolvedValue({ inserted: 0 });
+    mocks.requireFlatApiCapability.mockResolvedValue(undefined);
+    mocks.updateContact.mockResolvedValue({ id: 7 });
   });
 
   test("creates the contact in the authorized workspace even when the body names another", async () => {
@@ -109,5 +117,66 @@ describe("api+/contacts.action.server.ts", () => {
       undefined,
       "u1",
     );
+  });
+
+  function patchJson(body: Record<string, unknown>) {
+    return new Request("http://x/api/contacts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  test("a PATCH is gated on campaigns.write, not membership alone", async () => {
+    const { action } = await import("../app/routes/api+/contacts.action.server");
+
+    const res = await asRouteResponse(
+      action({
+        request: patchJson({ workspace_id: "ws_1", id: 7, phone: "+15555550100" }),
+        params: {},
+        context: {},
+      } as never),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.requireFlatApiCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "ws_1",
+        capability: "campaigns.write",
+      }),
+    );
+  });
+
+  test("a caller without campaigns.write is refused before the write", async () => {
+    mocks.requireFlatApiCapability.mockRejectedValueOnce(
+      new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    );
+
+    const { action } = await import("../app/routes/api+/contacts.action.server");
+
+    const res = await asRouteResponse(
+      action({
+        request: patchJson({ workspace_id: "ws_1", id: 7, phone: "+15555550100" }),
+        params: {},
+        context: {},
+      } as never),
+    );
+
+    expect(res.status).toBe(403);
+    expect(mocks.updateContact).not.toHaveBeenCalled();
+  });
+
+  test("creating a contact stays membership-only", async () => {
+    const { action } = await import("../app/routes/api+/contacts.action.server");
+
+    await asRouteResponse(
+      action({
+        request: postJson({ workspace_id: "ws_1", firstname: "Pat", phone: "+15555550100" }),
+        params: {},
+        context: {},
+      } as never),
+    );
+
+    expect(mocks.requireFlatApiCapability).not.toHaveBeenCalled();
   });
 });

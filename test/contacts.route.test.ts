@@ -19,6 +19,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/audience-upload-db.server", () => ({
   findAudienceWorkspaceById: vi.fn(async () => "w1"),
 }));
+// PATCH is gated on campaigns.write; the gate has its own tests, and this suite
+// is about the route's plumbing (#2861).
+vi.mock("@/lib/audience-api-auth.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/audience-api-auth.server")>()),
+  requireFlatApiCapability: vi.fn(async () => undefined),
+}));
 
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers() }),

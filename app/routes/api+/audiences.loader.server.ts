@@ -14,7 +14,7 @@ import {
   type SessionAuthResult,
 } from "@/lib/api-auth.server";
 import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
-import { requireAudienceWorkspaceAccess } from "@/lib/audience-api-auth.server";
+import { requireFlatApiCapability } from "@/lib/audience-api-auth.server";
 import { AppError } from "@/lib/errors.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
@@ -112,7 +112,7 @@ export const loader = defineLoader({
         if (!audienceWorkspace) {
           return routeData({ error: "Audience not found" }, { status: 404, headers });
         }
-        await requireAudienceWorkspaceAccess({
+        await requireFlatApiCapability({
           auth,
           user,
           workspaceId: audienceWorkspace,
@@ -170,7 +170,7 @@ export const loader = defineLoader({
         return routeData({ error: "Workspace ID or audienceId is required" }, { status: 400, headers });
       }
 
-      await requireAudienceWorkspaceAccess({
+      await requireFlatApiCapability({
         auth,
         user,
         workspaceId: resolvedWorkspaceId,
