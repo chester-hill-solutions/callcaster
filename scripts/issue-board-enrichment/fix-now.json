@@ -460,64 +460,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2874,
-    "verdict": "fix-now",
-    "recommendedTitle": "Platform-admin 'Disable user' writes access_level='disabled', a value no authorization path enforces: the disabled user keeps a live session and full workspace…",
-    "summary": "The admin panel offers a 'Disable user' control on every user row (POST /admin with _action=toggle_user_status) and the JSON admin plane exposes the same operation (POST /api/admin/dashboard with {\"action\":\"toggle_user_status\"}); PATCH…",
-    "currentBehavior": "The admin panel offers a 'Disable user' control on every user row (POST /admin with _action=toggle_user_status) and the JSON admin plane exposes the same operation (POST /api/admin/dashboard with {\"action\":\"toggle_user_status\"}); PATCH /api/admin/users/:userId can also write access_level='disabled'. All of them end in disableUser() -> updateUserAccessLevel(userId, 'disabled'), which performs exactly one write: public.user.access_level = 'disabled'. Nothing else changes - the target's Better Auth session rows stay live and the target's workspace_member rows stay in place. The only access_level value any authorization path in the repository reads is 'sudo' (app/lib/api-auth.server.ts:215,…",
-    "rootCause": "disableUser treats the string 'disabled' as an account state, but 'disabled' is only a free-text column value on public.user (plain `text DEFAULT 'standard'`, no CHECK constraint, no enum) with no consumer. The disable operation is written as a single-column UPDATE and never revokes the target's Better Auth sessions (auth_session rows) and never touches workspace_member - the two things that actually grant the user authority - so both remain in force. The enforcement that does exist for access_level ('sudo' only) is read in four TypeScript sites and one plpgsql function, none of which is on the disabled path, so the disable control cannot fail closed: it can only fail open. The codebase…",
-    "resolution": "Give 'disabled' an enforced meaning at the two places that actually grant authority: revoke the target's Better Auth sessions when the control is used, and treat access_level='disabled' as unauthenticated in session resolution (cookie and bearer), so a disabled account can neither keep using a live session nor sign in again. Both admin planes already share disableUser, so the write path fix is one place. Record the intended meaning next to the column and in the admin UI, the way app/lib/cron-workspace-fanout.server.ts records what workspace.disabled does and does not buy. Note the hot-path cost: the session check adds one public.user read per authenticated request, so denormalize the flag…",
-    "lookIn": [
-      "app/lib/workspace-members-db.server.ts",
-      "app/lib/api-auth.server.ts",
-      "app/lib/admin-middleware.server.ts",
-      "app/lib/two-factor.server.ts",
-      "app/routes/admin+/requireSudoAdmin.server.ts",
-      "app/lib/workspace-middleware.server.ts"
-    ],
-    "existingTests": [
-      "Admin action: HTTP 200 {\"success\":\"User disabled successfully\"}; public.user.access_level='disabled'; 1 row still present in auth_session for the target; the workspace_member row was still present (1 before, 1 after); the session -> workspace middleware returned authorized=true, status=200, role='member' for the…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "Pressing 'Disable user' in the admin panel, or setting access_level='disabled' through PATCH /api/admin/users/:userId, must stop the target account from acting: its live sessions must stop working, it must not be able to sign in again, and it must no longer be admitted to its workspaces, so an administrator who offboards or contains a user is not told 'User disabled successfully' while the account keeps working."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
-    "issueNumber": 2875,
-    "verdict": "fix-now",
-    "recommendedTitle": "PATCH /api/admin/users/:userId silently rewrites access_level to 'standard' when the field is omitted, stripping sudo (and the 2FA mandate) from the target",
-    "summary": "The JSON admin API documents PATCH /api/admin/users/:userId as 'User detail / edit profile & access level' (docs/api-admin.md:18)",
-    "currentBehavior": "The JSON admin API documents PATCH /api/admin/users/:userId as 'User detail / edit profile & access level' (docs/api-admin.md:18). The request schema makes access_level optional (app/routes/api+/admin+/users+/$userId.action.server.ts:12), but updateUserProfile writes `access_level: args.access_level ?? 'standard'` (app/lib/workspace-members-db.server.ts:448), so a PATCH that omits the field still writes it. A platform administrator who uses the documented endpoint to rename a user therefore silently demotes that user from sudo to standard, and because userIsTwoFactorProtected keys off access_level === 'sudo' (app/lib/two-factor.server.ts:131) the demotion also drops that account's mandatory…",
-    "rootCause": "updateUserProfile treats an absent optional field as 'standard' instead of leaving the column untouched, so a partial update is a full overwrite of the access level. The request schema (access_level: z.string().optional()) and the write helper (args.access_level ?? 'standard') disagree about what 'omitted' means, and nothing reconciles them.",
-    "resolution": "Make the write a true partial update: only include access_level in the UPDATE when the caller supplied one, and constrain the accepted values to the levels the admin UI offers (standard, admin, sudo, disabled) so a typo cannot write an unknown level - the column is free text (app/db/schema.ts:591), and those four values are exactly the ones the admin form offers and every in-repo write uses. The same change should stop blanking first_name/last_name when the caller omits them (app/lib/workspace-members-db.server.ts:445-446), which is the adjacent half of the same defect. The HTML admin form keeps working unchanged: it always sends an explicit accessLevel.",
-    "lookIn": [
-      "app/lib/workspace-members-db.server.ts",
-      "app/routes/api+/admin+/users+/$userId.action.server.ts",
-      "docs/api-admin.md",
-      "app/lib/two-factor.server.ts",
-      "app/routes/admin+/users/$userId/edit.action.server.ts",
-      "app/lib/platform-admin.server.ts"
-    ],
-    "existingTests": [
-      "The PATCH answered 200 with body {\"success\":true,\"message\":\"User updated successfully\"} - no mention of access_level - and public.user.access_level went from 'sudo' to 'standard' although the request body never mentioned access_level. The same PATCH with an explicit access_level:'sudo' left the row at 'sudo', a…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "A PATCH that does not mention access_level must leave the target's access_level unchanged, exactly as the HTML admin form and updateOwnUserProfile do. An administrator renaming a user must not silently change that user's platform role or drop their 2FA mandate."
-    ],
-    "size": "XS",
-    "risk": "low"
-  },
-  {
     "issueNumber": 2876,
     "verdict": "fix-now",
     "recommendedTitle": "The Better Auth mount exposes /api/auth/two-factor/disable, bypassing the rule that privileged accounts cannot disable 2FA",
@@ -780,35 +722,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2886,
-    "verdict": "fix-now",
-    "recommendedTitle": "Public contact form writes unescaped caller text into the ops-inbox email HTML body",
-    "summary": "The public, unauthenticated contact form POST /api/contact-form copies the caller-supplied `name` and `message` form fields into the `html` part of the email sent to the CallCaster operations inbox",
-    "currentBehavior": "The public, unauthenticated contact form POST /api/contact-form copies the caller-supplied `name` and `message` form fields into the `html` part of the email sent to the CallCaster operations inbox. The HTML body is built as `<p>From: ${name}.</p><br/>${message}`, so an anonymous visitor controls the markup that the receiving mail client renders inside a message sent from the company's own address (info@callcaster.ca to info@callcaster.ca). One unauthenticated multipart request can therefore inject links, remote-image beacons, style blocks or other HTML into a trusted internal inbox, without touching tenant data, an account or an API key. The repository already ships the matching control:…",
-    "rootCause": "app/routes/api+/contact-form.action.server.ts builds the outbound email HTML body with a raw template literal (`html: `<p>From: ${name}.</p><br/>${message}``) and never routes the two caller-controlled fields through the repository's own `escapeHtml()` helper from app/lib/email-html.ts, which the module does not import.",
-    "resolution": "Escape both free-text fields with the repository's existing `escapeHtml()` helper at the sink, exactly as app/lib/number-rental-billing.server.ts:330 does for its free-text body. No new dependency is needed and the plain-text part stays unchanged, so the ops inbox still receives the visitor's words verbatim as text.",
-    "lookIn": [
-      "app/routes/api+/contact-form.action.server.ts",
-      "app/lib/email-html.ts",
-      "app/lib/number-rental-billing.server.ts",
-      "app/lib/low-credit-notify.server.ts",
-      "app/lib/billing-reconciliation-alert.server.ts",
-      "node_modules/resend/dist/index.mjs"
-    ],
-    "existingTests": [
-      "The repository's own test/contact-form.route.test.ts passed 4 tests in the same sandbox. My independent harness then imported the real route module and sent one anonymous multipart POST. The action answered 200 with body {\"success\":true,\"message\":\"Email sent\",\"result\":{\"id\":\"em1\"}}, and the captured resend.emails.send…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The visitor's `name` and `message` must reach the operations inbox as literal text, not as markup. The sibling outbound emails that carry caller text escape it first, so the contact form should render `<p>From: ${escapeHtml(name)}.</p><br/>${escapeHtml(message)}` and still deliver the visitor's words in the unchanged plain-text part of the same email."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2887,
     "verdict": "fix-now",
     "recommendedTitle": "Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install",
@@ -891,35 +804,6 @@
     ],
     "acceptanceCriteria": [
       "A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
-    "issueNumber": 2891,
-    "verdict": "fix-now",
-    "recommendedTitle": "Changing the account password leaves every other session of that account usable",
-    "summary": "PATCH /api/me is the product's only password-change path",
-    "currentBehavior": "PATCH /api/me is the product's only password-change path. It reaches app/lib/platform-auth.server.ts updateMeProfile, which calls Better Auth's changePassword with only the new and current password. Better Auth revokes an account's sessions inside changePassword only when the caller asks for it (revokeOtherSessions), and the app never asks, so no session row is deleted. Every session that existed before the change keeps working: the session cookie and the bearer session token that POST /api/auth/token hands out are the same auth_session row, and they survive the password change with their original expiry (7 days by default). The account's owner therefore cannot evict an attacker who holds a…",
-    "rootCause": "app/lib/platform-auth.server.ts:468 invokes auth.api.changePassword without revokeOtherSessions, so the password rotation updates the credential hash and leaves the account's other auth_session rows (and therefore every other session cookie and bearer token) valid; the session invalidation the app performs for the reset path (app/server/auth-instance.ts:30, revokeSessionsOnPasswordReset) has no equivalent on the change path, and no other control in app/ revokes sessions on a password change.",
-    "resolution": "Invalidate the account's other sessions when the password changes, mirroring the control the app already applies to the reset path, and hand the replacement session credential back to the caller so the caller is not logged out by its own rotation. Better Auth's changePassword deletes every session for the account and issues a replacement when revokeOtherSessions is true (node_modules/better-auth/dist/api/routes/update-user.mjs:170-179); the app should request it, merge the resulting Set-Cookie into the response after the earlier updateUser cookie, and return the replacement token in the JSON body because a bearer client has no cookie to receive and its own token is revoked by design. The…",
-    "lookIn": [
-      "app/lib/platform-auth.server.ts",
-      "app/server/auth-instance.ts",
-      "app/routes/api+/me.action.server.ts",
-      "app/lib/schemas/api/platform-auth.ts",
-      "app/lib/auth.server.ts",
-      "node_modules/better-auth/dist/api/routes/update-user.mjs"
-    ],
-    "existingTests": [
-      "The app's password change returned 200 and the new password signed in; auth_session rows for the account were 2 before and 2 after the change (no session revoked); the second session token still resolved (other_session_resolves_after_password_change=true) with a session expiry 7 days out; GET /api/me with that…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "Changing the account password invalidates the account's other sessions, so a password rotation is an effective response to suspected session compromise. The app already states this intent for the sibling path: app/server/auth-instance.ts:28-30 sets revokeSessionsOnPasswordReset with the comment that the sessions which already exist are exactly the ones that must stop working."
     ],
     "size": "S",
     "risk": "medium"

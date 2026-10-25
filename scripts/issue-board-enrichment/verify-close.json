@@ -606,6 +606,58 @@
     "risk": "high"
   },
   {
+    "issueNumber": 2874,
+    "verdict": "verify-close",
+    "recommendedTitle": "Platform-admin 'Disable user' writes access_level='disabled', a value no authorization path enforces: the disabled user keeps a live session and full workspace…",
+    "summary": "The admin panel offers a 'Disable user' control on every user row (POST /admin with _action=toggle_user_status) and the JSON admin plane exposes the same operation (POST /api/admin/dashboard with {\"action\":\"toggle_user_status\"}); PATCH…",
+    "currentBehavior": "Fixed on dev. Disabling an account revokes its sessions, and both session-resolution paths treat `access_level = 'disabled'` as unauthenticated, so a disabled account can neither keep using a live cookie or bearer token nor obtain a working session again. Workspace membership is kept, so restoring a level restores access.",
+    "rootCause": "disableUser treats the string 'disabled' as an account state, but 'disabled' is only a free-text column value on public.user (plain `text DEFAULT 'standard'`, no CHECK constraint, no enum) with no consumer. The disable operation is written as a single-column UPDATE and never revokes the target's Better Auth sessions (auth_session rows) and never touches workspace_member - the two things that actually grant the user authority - so both remain in force. The enforcement that does exist for access_level ('sudo' only) is read in four TypeScript sites and one plpgsql function, none of which is on the disabled path, so the disable control cannot fail closed: it can only fail open. The codebase…",
+    "resolution": "Fixed in #2978: `disableUser` revokes the account's sessions (`app/lib/platform-admin.server.ts`), `getSession` and `resolveBearerSessionUser` reject a disabled account (`app/lib/auth.server.ts`), and the admin console states what the level means (`admin+/users/$userId/edit.route.tsx`).",
+    "lookIn": [
+      "app/lib/workspace-members-db.server.ts",
+      "app/lib/api-auth.server.ts",
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/two-factor.server.ts",
+      "app/routes/admin+/requireSudoAdmin.server.ts",
+      "app/lib/workspace-middleware.server.ts"
+    ],
+    "existingTests": [
+      "test/disabled-user-enforcement.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Pressing 'Disable user' in the admin panel, or setting access_level='disabled' through PATCH /api/admin/users/:userId, must stop the target account from acting: its live sessions must stop working, it must not be able to sign in again, and it must no longer be admitted to its workspaces, so an administrator who offboards or contains a user is not told 'User disabled successfully' while the account keeps working."
+    ],
+    "size": "S",
+    "risk": "medium"
+  },
+  {
+    "issueNumber": 2875,
+    "verdict": "verify-close",
+    "recommendedTitle": "PATCH /api/admin/users/:userId silently rewrites access_level to 'standard' when the field is omitted, stripping sudo (and the 2FA mandate) from the target",
+    "summary": "The JSON admin API documents PATCH /api/admin/users/:userId as 'User detail / edit profile & access level' (docs/api-admin.md:18)",
+    "currentBehavior": "Fixed on dev. `PATCH /api/admin/users/:userId` writes only the fields the caller supplied, so a rename no longer blanks names or demotes an account from sudo to standard, and `access_level` is constrained to the four values the console offers.",
+    "rootCause": "updateUserProfile treats an absent optional field as 'standard' instead of leaving the column untouched, so a partial update is a full overwrite of the access level. The request schema (access_level: z.string().optional()) and the write helper (args.access_level ?? 'standard') disagree about what 'omitted' means, and nothing reconciles them.",
+    "resolution": "Fixed in #2977: `updateUserProfile` builds a partial set (`app/lib/workspace-members-db.server.ts`), the route constrains the value with `z.enum(ACCESS_LEVELS)` (`app/routes/api+/admin+/users+/$userId.action.server.ts`), and the levels live once in `shared/access-levels.ts`.",
+    "lookIn": [
+      "app/lib/workspace-members-db.server.ts",
+      "app/routes/api+/admin+/users+/$userId.action.server.ts",
+      "docs/api-admin.md",
+      "app/lib/two-factor.server.ts",
+      "app/routes/admin+/users/$userId/edit.action.server.ts",
+      "app/lib/platform-admin.server.ts"
+    ],
+    "existingTests": [
+      "test/admin-user-partial-update.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A PATCH that does not mention access_level must leave the target's access_level unchanged, exactly as the HTML admin form and updateOwnUserProfile do. An administrator renaming a user must not silently change that user's platform role or drop their 2FA mandate."
+    ],
+    "size": "XS",
+    "risk": "low"
+  },
+  {
     "issueNumber": 2878,
     "verdict": "verify-close",
     "recommendedTitle": "Workspace settings member-role update accepts the legacy `field_director` alias and grants the `admin` role",
@@ -658,6 +710,32 @@
     "risk": "high"
   },
   {
+    "issueNumber": 2886,
+    "verdict": "verify-close",
+    "recommendedTitle": "Public contact form writes unescaped caller text into the ops-inbox email HTML body",
+    "summary": "The public, unauthenticated contact form POST /api/contact-form copies the caller-supplied `name` and `message` form fields into the `html` part of the email sent to the CallCaster operations inbox",
+    "currentBehavior": "Fixed on dev. The public contact form escapes the visitor's name and message in the HTML body of the operations-inbox email, so an anonymous submission cannot inject links, images or markup; the plain-text body still carries their words verbatim.",
+    "rootCause": "app/routes/api+/contact-form.action.server.ts builds the outbound email HTML body with a raw template literal (`html: `<p>From: ${name}.</p><br/>${message}``) and never routes the two caller-controlled fields through the repository's own `escapeHtml()` helper from app/lib/email-html.ts, which the module does not import.",
+    "resolution": "Fixed in #2976: `escapeHtml` from `app/lib/email-html.ts` at the sink in `app/routes/api+/contact-form.action.server.ts`.",
+    "lookIn": [
+      "app/routes/api+/contact-form.action.server.ts",
+      "app/lib/email-html.ts",
+      "app/lib/number-rental-billing.server.ts",
+      "app/lib/low-credit-notify.server.ts",
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "node_modules/resend/dist/index.mjs"
+    ],
+    "existingTests": [
+      "test/contact-form.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The visitor's `name` and `message` must reach the operations inbox as literal text, not as markup. The sibling outbound emails that carry caller text escape it first, so the contact form should render `<p>From: ${escapeHtml(name)}.</p><br/>${escapeHtml(message)}` and still deliver the visitor's words in the unchanged plain-text part of the same email."
+    ],
+    "size": "S",
+    "risk": "medium"
+  },
+  {
     "issueNumber": 2889,
     "verdict": "verify-close",
     "recommendedTitle": "Media-stream token without a call SID lets a WebSocket peer overwrite another tenant's coaching rows",
@@ -683,6 +761,32 @@
     ],
     "size": "M",
     "risk": "high"
+  },
+  {
+    "issueNumber": 2891,
+    "verdict": "verify-close",
+    "recommendedTitle": "Changing the account password leaves every other session of that account usable",
+    "summary": "PATCH /api/me is the product's only password-change path",
+    "currentBehavior": "Fixed on dev. Changing the account password revokes every other session of the account, including bearer tokens from `POST /api/auth/token`, and returns a replacement session in the body and as a cookie so the caller is not logged out by its own change.",
+    "rootCause": "app/lib/platform-auth.server.ts:468 invokes auth.api.changePassword without revokeOtherSessions, so the password rotation updates the credential hash and leaves the account's other auth_session rows (and therefore every other session cookie and bearer token) valid; the session invalidation the app performs for the reset path (app/server/auth-instance.ts:30, revokeSessionsOnPasswordReset) has no equivalent on the change path, and no other control in app/ revokes sessions on a password change.",
+    "resolution": "Fixed in #2979: `changePassword` is called with `revokeOtherSessions: true` and `returnHeaders: true` (`app/lib/platform-auth.server.ts`), and `PATCH /api/me` returns `session_token` (`app/routes/api+/me.action.server.ts`).",
+    "lookIn": [
+      "app/lib/platform-auth.server.ts",
+      "app/server/auth-instance.ts",
+      "app/routes/api+/me.action.server.ts",
+      "app/lib/schemas/api/platform-auth.ts",
+      "app/lib/auth.server.ts",
+      "node_modules/better-auth/dist/api/routes/update-user.mjs"
+    ],
+    "existingTests": [
+      "test/platform-auth.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Changing the account password invalidates the account's other sessions, so a password rotation is an effective response to suspected session compromise. The app already states this intent for the sibling path: app/server/auth-instance.ts:28-30 sets revokeSessionsOnPasswordReset with the comment that the sessions which already exist are exactly the ones that must stop working."
+    ],
+    "size": "S",
+    "risk": "medium"
   },
   {
     "issueNumber": 2894,
