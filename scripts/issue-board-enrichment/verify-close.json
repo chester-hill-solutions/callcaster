@@ -832,6 +832,32 @@
     "risk": "medium"
   },
   {
+    "issueNumber": 2888,
+    "verdict": "verify-close",
+    "recommendedTitle": "API error responses return raw database error text, disclosing the failed statement's internal table and column names",
+    "summary": "app/lib/errors.server.ts#handleDatabaseError (line 160) builds an AppError whose message is the raw driver error text prefixed with a context string, and app/lib/errors.server.ts#createErrorResponse (lines 80 and 87) puts that message into…",
+    "currentBehavior": "Fixed on dev. A plain (non-AppError) error never reaches the caller with its own message: the body carries the caller-supplied default and the real message goes to the log. Database errors report the failure class only (unique / foreign key / not found / generic) with the SQLSTATE in `details`, so the failed statement, its table and column names and the bound parameter values stay on the server.",
+    "rootCause": "app/lib/errors.server.ts#createErrorResponse uses the raw Error message as the client-facing error text for both AppError (line 80) and plain Error (line 87), and app/lib/errors.server.ts#handleDatabaseError copies the driver error text into the AppError message (line 160). There is no production-only redaction step between the database error and the HTTP response body, so the failed statement's SQL, its table and column names, the bound values and the SQLSTATE reach the caller verbatim.",
+    "resolution": "Fixed in #2998: `createErrorResponse` returns `defaultMessage` for any plain error and logs the original; `handleDatabaseError` logs the driver message and details and throws an AppError built from `callerSafeDatabaseMessage` (`app/lib/errors.server.ts`).",
+    "lookIn": [
+      "app/lib/errors.server.ts",
+      "app/lib/handler.server.ts",
+      "app/routes/api+/surveys.action.server.ts",
+      "app/lib/api-auth.server.ts",
+      "app/server/db.ts",
+      "app/lib/parse-utils.server.ts"
+    ],
+    "existingTests": [
+      "test/errors.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A 4xx/5xx API response should carry a stable, caller-actionable error code and a generic message, and keep the database's own error text (SQL, table, column and constraint names, SQLSTATE, driver detail lines) in the server log only. The repository already applies that discipline on a neighbouring path - app/routes/api+/contact-form.action.server.ts:73-74 logs the underlying error and returns 'Failed to process message'."
+    ],
+    "size": "XS",
+    "risk": "low"
+  },
+  {
     "issueNumber": 2889,
     "verdict": "verify-close",
     "recommendedTitle": "Media-stream token without a call SID lets a WebSocket peer overwrite another tenant's coaching rows",
@@ -857,6 +883,33 @@
     ],
     "size": "M",
     "risk": "high"
+  },
+  {
+    "issueNumber": 2890,
+    "verdict": "verify-close",
+    "recommendedTitle": "Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for member and above",
+    "summary": "POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which…",
+    "currentBehavior": "Fixed on dev. Uploading a campaign's voicemail-drop audio, attaching campaign message media and deleting it all require the `member` role, and a workspace API key must carry `campaigns.write` for the campaign branches. The campaign-less chat image upload stays open to every member.",
+    "rootCause": "app/routes/api+/media.action.server.ts line 46 and app/routes/api+/message_media.action.server.ts line 36 both call `requireWorkspaceAccess({ user, workspaceId })` with no `minRole`. `requireWorkspaceAccess` only consults `hasMinRole` when `minRole` is supplied (app/lib/workspace-membership.server.ts line 183), and `hasMinRole` returns true for an omitted gate (app/lib/member-role.ts line 28), so any membership role, including `caller`, passes. The routes then mutate a campaign through `updateCampaignVoicedropAudio` / `updateCampaignMessageMedia`, which are `campaigns.write` operations, without ever consulting the actor's role or capability. The guard that expresses the policy exists and…",
+    "resolution": "Fixed in #2999: the `member` floor on `/api/media` (`app/routes/api+/media.action.server.ts`) and on the campaign branches of `/api/message_media` (`app/routes/api+/message_media.action.server.ts`), with both operations declared in `scripts/capability-baseline.json`.",
+    "lookIn": [
+      "app/routes/api+/media.action.server.ts",
+      "app/routes/api+/message_media.action.server.ts",
+      "app/lib/workspace-membership.server.ts",
+      "app/lib/member-role.ts",
+      "app/lib/capabilities.ts",
+      "app/routes/api+/campaigns/$campaignId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/media.route.test.ts",
+      "test/message-media.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright."
+    ],
+    "size": "S",
+    "risk": "medium"
   },
   {
     "issueNumber": 2891,
