@@ -101,7 +101,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
     );
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Missing required form data" });
+    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
   });
 
   test("returns 402 creditsError when workspace balance is <= 0", async () => {
@@ -218,7 +218,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     let res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "rpc",
+      error: "Error processing IVR request",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });
@@ -227,7 +227,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "Failed to insert call record",
+      error: "Error processing IVR request",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });
@@ -236,7 +236,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: "dequeue",
+      error: "Error processing IVR request",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });

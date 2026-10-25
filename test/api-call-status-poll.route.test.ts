@@ -332,7 +332,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     await expect(r2.json()).resolves.toEqual({
-      error: "boom",
+      error: "Failed to fetch call status",
       code: "INTERNAL_SERVER_ERROR",
       statusCode: 500,
     });

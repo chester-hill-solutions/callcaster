@@ -77,19 +77,34 @@ describe("errors.server", () => {
     );
   });
 
-  test("createErrorResponse handles Error", async () => {
+  test("createErrorResponse never echoes a plain Error's message", async () => {
     const mod = await import("../app/lib/errors.server");
+    // A plain error's message is a driver's, a library's, or a wrapped
+    // DrizzleQueryError's — it names tables, columns and bound values (#2888).
     const res = await asRouteResponse(
-      mod.createErrorResponse(new Error("boom"), "fallback", 503),
+      mod.createErrorResponse(
+        new Error(
+          'Failed query: select "contact"."phone" from "contact" where "contact"."id" = $1\nparams: 7',
+        ),
+        "Could not load records",
+        503,
+      ),
     );
     expect(res.status).toBe(503);
-    await expect(res.json()).resolves.toMatchObject({
-      error: "boom",
-      code: mod.ErrorCode.INTERNAL_SERVER_ERROR,
-      statusCode: 503,
-    });
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe("Could not load records");
+    expect(JSON.stringify(body)).not.toContain("contact");
+    expect(JSON.stringify(body)).not.toContain("params");
+    expect(JSON.stringify(body)).not.toContain("select");
+    // The real message survives in the log, which is the point.
+    expect(loggerMock.error).toHaveBeenCalledWith(
+      "http.error_response",
+      expect.objectContaining({
+        err: expect.objectContaining({ message: expect.stringContaining("Failed query") }),
+      }),
+    );
 
-    // Covers defaultMessage/defaultStatusCode defaults + error.message falsy path
+    // Covers defaultMessage/defaultStatusCode defaults.
     const res2 = await asRouteResponse(mod.createErrorResponse(new Error("")));
     expect(res2.status).toBe(500);
     await expect(res2.json()).resolves.toMatchObject({
@@ -100,10 +115,11 @@ describe("errors.server", () => {
 
   test("createErrorResponse handles {message} objects and unknowns", async () => {
     const mod = await import("../app/lib/errors.server");
+    // An error-shaped object is still not a message written for callers.
     const res1 = await asRouteResponse(
       mod.createErrorResponse({ message: "m1" }, "fallback", 500),
     );
-    await expect(res1.json()).resolves.toMatchObject({ error: "m1" });
+    await expect(res1.json()).resolves.toMatchObject({ error: "fallback" });
 
     const res1b = await asRouteResponse(
       mod.createErrorResponse({ message: "" } as any),
@@ -134,28 +150,28 @@ describe("errors.server", () => {
     expect(capture(() => mod.handleDatabaseError(e23505, "ctx"))).toMatchObject({
       statusCode: 409,
       code: mod.ErrorCode.CONFLICT,
-      message: "ctx: dup",
+      message: "ctx: A record with these values already exists.",
     });
 
     const e23503 = { code: "23503", message: "fk", details: "x" } as any;
     expect(capture(() => mod.handleDatabaseError(e23503))).toMatchObject({
       statusCode: 400,
       code: mod.ErrorCode.VALIDATION_ERROR,
-      message: "fk",
+      message: "A referenced record does not exist.",
     });
 
     const eNotFound = { code: "PGRST116", message: "missing", details: "x" } as any;
     expect(capture(() => mod.handleDatabaseError(eNotFound))).toMatchObject({
       statusCode: 404,
       code: mod.ErrorCode.NOT_FOUND,
-      message: "missing",
+      message: "The requested record was not found.",
     });
 
     const eOther = { code: "99999", message: "nope", details: "x" } as any;
     expect(capture(() => mod.handleDatabaseError(eOther))).toMatchObject({
       statusCode: 500,
       code: mod.ErrorCode.DATABASE_ERROR,
-      message: "nope",
+      message: "The database operation failed.",
     });
   });
 

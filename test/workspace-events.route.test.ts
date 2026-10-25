@@ -670,7 +670,7 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     );
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Data plane auth context missing",
+      error: "An error occurred",
     });
   });
 

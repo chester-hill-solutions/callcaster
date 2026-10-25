@@ -427,7 +427,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
     } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining("Invalid phone number length"),
+      error: "An error occurred",
     });
   });
 
@@ -473,7 +473,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
     // instead of letting them propagate to the framework.
     const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("db") });
+    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
   });
 
   test("throws when create_outreach_attempt rpc errors", async () => {

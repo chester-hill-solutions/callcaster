@@ -122,7 +122,7 @@ describe("app/routes/api+/call/route-status.tsx", () => {
     } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining("Failed to upsert call CA1"),
+      error: "An error occurred",
     });
   });
 

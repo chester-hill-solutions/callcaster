@@ -84,13 +84,18 @@ export function createErrorResponse(
     };
   } else if (error instanceof Error) {
     errorResponse = {
-      error: error.message || defaultMessage,
+      // A plain error is not written for callers. Its message may be a driver's
+      // ("Failed query: select ... from contact where ..."), a library's, or a
+      // wrapped DrizzleQueryError's, and all of those carry schema identifiers
+      // and bound parameter values (#2888). The caller gets the caller-supplied
+      // default; the real message goes to the log below.
+      error: defaultMessage,
       code: ErrorCode.INTERNAL_SERVER_ERROR,
       statusCode: defaultStatusCode,
     };
   } else if (typeof error === "object" && error !== null && "message" in error) {
     errorResponse = {
-      error: String(error.message) || defaultMessage,
+      error: defaultMessage,
       code: ErrorCode.INTERNAL_SERVER_ERROR,
       statusCode: defaultStatusCode,
     };
@@ -111,7 +116,9 @@ export function createErrorResponse(
     statusCode: errorResponse.statusCode,
     code: errorResponse.code,
     errorMessage: errorResponse.error,
-    ...(isServerError && error instanceof Error ? { err: error } : {}),
+    // The caller now sees a generic string for plain errors, so the log is the
+    // only place the real one survives.
+    ...(error instanceof Error ? { err: error } : {}),
   });
 
   if (isServerError) {
@@ -123,6 +130,25 @@ export function createErrorResponse(
   }
 
   return routeData(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
+}
+
+/**
+ * Caller-safe description of a database failure, by class.
+ *
+ * Nothing here repeats the driver's words: a Postgres or Drizzle message carries
+ * the statement, its table and column names and the bound values.
+ */
+function callerSafeDatabaseMessage(pgCode: string | null): string {
+  switch (pgCode) {
+    case PG_ERROR_CODES.UNIQUE_VIOLATION:
+      return "A record with these values already exists.";
+    case PG_ERROR_CODES.FOREIGN_KEY_VIOLATION:
+      return "A referenced record does not exist.";
+    case PG_ERROR_CODES.POSTGREST_NOT_FOUND:
+      return "The requested record was not found.";
+    default:
+      return "The database operation failed.";
+  }
 }
 
 /**
@@ -156,11 +182,22 @@ export function handleDatabaseError(error: { code?: string; message?: string; de
     code = ErrorCode.NOT_FOUND;
   }
 
+  // Keep the driver text on the server: it names the failed statement, its table
+  // and column names and the bound parameter values (#2888). `details` is
+  // serialized into the response body, so it must not carry the message either -
+  // only the SQLSTATE, which lets a caller branch on the failure class.
+  logger.error("db.error", {
+    context: context ?? null,
+    postgresCode: pgCode,
+    message: error.message,
+    details: error.details,
+  });
+
   throw new AppError(
-    `${contextMessage}${error.message}`,
+    `${contextMessage}${callerSafeDatabaseMessage(pgCode)}`,
     statusCode,
     code,
-    { postgresCode: pgCode, details: error.details }
+    { postgresCode: pgCode }
   );
 }
 
