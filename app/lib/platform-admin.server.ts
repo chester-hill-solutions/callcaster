@@ -13,6 +13,7 @@ import {
 } from "@/lib/workspace-invitations.server";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
+import { revokeAllSessionsForUser } from "@/lib/auth.server";
 import { requireSoleOwnerProtection } from "@/lib/platform-members.server";
 import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
 import {
@@ -179,6 +180,10 @@ export async function disableUser(
     if (!updated) {
       return { ok: false, error: "User not found" };
     }
+    // The access_level write on its own changes nothing the target experiences:
+    // session resolution reads membership, not access. Revoke their sessions so
+    // "User disabled successfully" is true of the session they are holding.
+    await revokeAllSessionsForUser(userId);
     return { ok: true };
   } catch (error) {
     return {

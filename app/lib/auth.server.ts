@@ -3,6 +3,7 @@ import { eq, and, gt } from "drizzle-orm";
 import { auth } from "@/server/auth-instance";
 import { adminDb } from "@/server/admin-db";
 import { authSession, authUser } from "@/db/auth-schema";
+import { user as platformUser } from "@/db/schema";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 
 export type AuthUser = {
@@ -17,6 +18,28 @@ export type SessionResult = {
   headers: Headers;
 };
 
+/**
+ * A platform administrator can disable an account, and `user.access_level` is
+ * the only marker. It must mean "no authority": a disabled account may not keep
+ * using a live session and may not obtain a working one again, so both session
+ * resolution paths below treat it as unauthenticated. Disabling also revokes the
+ * sessions ({@link revokeAllSessionsForUser}); this is the backstop for a session
+ * that outlived the revoke, or for one minted between the two writes.
+ *
+ * Cost: one primary-key read on `public.user` per authenticated request. The
+ * alternative - denormalising the flag onto `auth_user` - needs a second writer
+ * to keep in step, and a stale flag either locks out a valid account or leaves a
+ * disabled one working.
+ */
+export async function isUserDisabled(userId: string): Promise<boolean> {
+  const [row] = await adminDb
+    .select({ accessLevel: platformUser.access_level })
+    .from(platformUser)
+    .where(eq(platformUser.id, userId))
+    .limit(1);
+  return row?.accessLevel === "disabled";
+}
+
 export async function getSession(request: Request): Promise<SessionResult> {
   const result = await auth.api.getSession({
     headers: request.headers,
@@ -28,6 +51,10 @@ export async function getSession(request: Request): Promise<SessionResult> {
   const payload = resultAny?.response ?? resultAny;
 
   if (!payload?.session || !payload?.user) {
+    return { session: null, user: null, headers };
+  }
+
+  if (await isUserDisabled(payload.user.id)) {
     return { session: null, user: null, headers };
   }
 
@@ -77,6 +104,11 @@ export async function revokeSessionByToken(token: string): Promise<void> {
   await adminDb.delete(authSession).where(eq(authSession.token, token));
 }
 
+/** Revoke every live session of a user — used when an administrator disables the account. */
+export async function revokeAllSessionsForUser(userId: string): Promise<void> {
+  await adminDb.delete(authSession).where(eq(authSession.userId, userId));
+}
+
 export async function resolveBearerSessionUser(
   accessToken: string,
 ): Promise<AuthUser | null> {
@@ -86,13 +118,18 @@ export async function resolveBearerSessionUser(
       userId: authSession.userId,
       email: authUser.email,
       name: authUser.name,
+      accessLevel: platformUser.access_level,
     })
     .from(authSession)
     .innerJoin(authUser, eq(authSession.userId, authUser.id))
-    .where(and(eq(authSession.token, accessToken), gt(authSession.expiresAt, now)))
+    .leftJoin(platformUser, eq(authSession.userId, platformUser.id))
+    .where(
+      and(eq(authSession.token, accessToken), gt(authSession.expiresAt, now)),
+    )
     .limit(1);
 
-  if (!row) {
+  // A disabled account holds no authority, bearer token or not.
+  if (!row || row.accessLevel === "disabled") {
     return null;
   }
 
