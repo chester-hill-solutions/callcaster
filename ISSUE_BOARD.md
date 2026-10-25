@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@7e3b0229` · 339 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@0d76007b` · 344 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 24
+## Fix now — 22
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -55,18 +55,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: The request returned 302 with Location /workspaces/<workspaceId>/audios/recorded-<stamp>.mp3/edit, the normalised object was PUT to the bucket (8279 bytes), and workspace_audio held a row with file_name 'recorded-<stamp>.mp3', origin 'recording', duration_ms 14266340 (3.96 hours), size_bytes 8279, content_type…
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A recording is bounded in duration before it is transcoded and before it is stored. The server already measures every recording with its own probe (probeAudioDurationMs), specifically so the recorded length is the server's own measurement rather than the client's timer, and the client already sends a durationMs field; that measured length is expected to be checked against a maximum, with the request rejected before the object is written, and the browser recorder expected to stop at the same maximum.
-
-### [#2890](https://github.com/chester-hill-solutions/callcaster/issues/2890) Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for…
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for member and above**
-- POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which…
-- Current behavior: POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which the platform's own role-to-capability matrix deliberately denies `campaigns.write` - can overwrite `campaign.voicedrop_audio` (the audio a live campaign plays on a voicemail drop) and attach or delete `campaign.message_media` (the MMS a campaign sends). Every sibling control on the same media family refuses that same actor: the workspace library upload (`uploadWorkspaceAudioApi`), the clip editor (`createWorkspaceAudioClip`), the workspace audio routes and…
-- Root cause: app/routes/api+/media.action.server.ts line 46 and app/routes/api+/message_media.action.server.ts line 36 both call `requireWorkspaceAccess({ user, workspaceId })` with no `minRole`. `requireWorkspaceAccess` only consults `hasMinRole` when `minRole` is supplied (app/lib/workspace-membership.server.ts line 183), and `hasMinRole` returns true for an omitted gate (app/lib/member-role.ts line 28), so any membership role, including `caller`, passes. The routes then mutate a campaign through `updateCampaignVoicedropAudio` / `updateCampaignMessageMedia`, which are `campaigns.write` operations, without ever consulting the actor's role or capability. The guard that expresses the policy exists and…
-- Resolution: Gate the campaign-mutating branches of both media routes on the capability the platform already states for campaign writes instead of on membership alone, and put the gate where the workspace id and the campaign id are known. In `POST /api/media`, require at least `MemberRole.Member` for the workspace (the rule `uploadWorkspaceAudioApi` applies) after the multipart body is parsed and before touching storage. In `/api/message_media`, require the same role for the campaign branches - POST with a `campaignId`, and DELETE - while leaving the campaign-less chat image upload (POST without `campaignId`, used by app/hooks/chats/useImageHandling.ts and reachable by every workspace member because the…
-- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/member-role.ts`, `app/lib/capabilities.ts`, `app/routes/api+/campaigns/$campaignId.action.server.ts`
-- Existing tests: Independently reproduced by the verifier in the parent-approved sandbox against real Postgres 18 (vitest integration tier, real workspace_member rows with role_id 'caller', real route action modules loaded from the target, object storage stubbed): POST /api/media returned 201 with body…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright.
 
 ### [#2887](https://github.com/chester-hill-solutions/callcaster/issues/2887) Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker…
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -189,18 +177,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/lib/platform-billing.server.ts`
 - Existing tests: None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo.
 
-### [#2888](https://github.com/chester-hill-solutions/callcaster/issues/2888) API error responses return raw database error text, disclosing the failed statement's internal table and column…
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **API error responses return raw database error text, disclosing the failed statement's internal table and column names**
-- app/lib/errors.server.ts#handleDatabaseError (line 160) builds an AppError whose message is the raw driver error text prefixed with a context string, and app/lib/errors.server.ts#createErrorResponse (lines 80 and 87) puts that message into…
-- Current behavior: app/lib/errors.server.ts#handleDatabaseError (line 160) builds an AppError whose message is the raw driver error text prefixed with a context string, and app/lib/errors.server.ts#createErrorResponse (lines 80 and 87) puts that message into the response body together with the Postgres SQLSTATE; createErrorResponse returns the payload unmodified at line 125. The defineAction/defineLoader wrapper (app/lib/handler.server.ts:118) routes any uncaught error into createErrorResponse, and the traced route's own catch (app/routes/api+/surveys.action.server.ts:175) does the same, so any route handler that lets a database error escape returns database error text to the caller. Independently reproduced…
-- Root cause: app/lib/errors.server.ts#createErrorResponse uses the raw Error message as the client-facing error text for both AppError (line 80) and plain Error (line 87), and app/lib/errors.server.ts#handleDatabaseError copies the driver error text into the AppError message (line 160). There is no production-only redaction step between the database error and the HTTP response body, so the failed statement's SQL, its table and column names, the bound values and the SQLSTATE reach the caller verbatim.
-- Resolution: Keep the database error text on the server and return a stable, generic code to the client. In app/lib/errors.server.ts, make handleDatabaseError log the raw driver message and the SQLSTATE to the server log and give the AppError a caller-safe message that names the operation and the failure class only. The raw driver message must NOT be parked on the AppError: `details` is serialized into the response body by createErrorResponse (app/lib/errors.server.ts:83), so a raw message kept under `details.cause` still reaches the caller verbatim - the originally proposed fix did exactly that and reproduced the same disclosure (the failed statement's SQL, table name, column names and bound parameter…
-- Look in: `app/lib/errors.server.ts`, `app/lib/handler.server.ts`, `app/routes/api+/surveys.action.server.ts`, `app/lib/api-auth.server.ts`, `app/server/db.ts`, `app/lib/parse-utils.server.ts`
-- Existing tests: The error the repository's own driver raises for the failing survey insert is a DrizzleQueryError (class DrizzleQueryError), NOT the raw postgres.js PostgresError the hunter assumed. Its cause is the driver's PostgresError with code 23505 and detail 'Key (survey_id, workspace)=(dup-survey-id, ...) already exists.',…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A 4xx/5xx API response should carry a stable, caller-actionable error code and a generic message, and keep the database's own error text (SQL, table, column and constraint names, SQLSTATE, driver detail lines) in the server log only. The repository already applies that discipline on a neighbouring path - app/routes/api+/contact-form.action.server.ts:73-74 logs the underlying error and returns 'Failed to process message'.
-
 ### [#2884](https://github.com/chester-hill-solutions/callcaster/issues/2884) The structural-review merge gate classifies only four path prefixes as high-risk, so changes to the webhook, auth,…
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-22
 - Recommended title: **The structural-review merge gate classifies only four path prefixes as high-risk, so changes to the webhook, auth, capability, media-stream and route code…**
@@ -310,9 +286,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 40
+## Verify and close — 42
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2888](https://github.com/chester-hill-solutions/callcaster/issues/2888) API error responses return raw database error text, disclosing the failed statement's internal table and column…
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-25
+- Recommended title: **API error responses return raw database error text, disclosing the failed statement's internal table and column names**
+- app/lib/errors.server.ts#handleDatabaseError (line 160) builds an AppError whose message is the raw driver error text prefixed with a context string, and app/lib/errors.server.ts#createErrorResponse (lines 80 and 87) puts that message into…
+- Current behavior: Fixed on dev. A plain (non-AppError) error never reaches the caller with its own message: the body carries the caller-supplied default and the real message goes to the log. Database errors report the failure class only (unique / foreign key / not found / generic) with the SQLSTATE in `details`, so the failed statement, its table and column names and the bound parameter values stay on the server.
+- Root cause: app/lib/errors.server.ts#createErrorResponse uses the raw Error message as the client-facing error text for both AppError (line 80) and plain Error (line 87), and app/lib/errors.server.ts#handleDatabaseError copies the driver error text into the AppError message (line 160). There is no production-only redaction step between the database error and the HTTP response body, so the failed statement's SQL, its table and column names, the bound values and the SQLSTATE reach the caller verbatim.
+- Resolution: Fixed in #2998: `createErrorResponse` returns `defaultMessage` for any plain error and logs the original; `handleDatabaseError` logs the driver message and details and throws an AppError built from `callerSafeDatabaseMessage` (`app/lib/errors.server.ts`).
+- Look in: `app/lib/errors.server.ts`, `app/lib/handler.server.ts`, `app/routes/api+/surveys.action.server.ts`, `app/lib/api-auth.server.ts`, `app/server/db.ts`, `app/lib/parse-utils.server.ts`
+- Existing tests: test/errors.server.test.ts
+- Done when: A 4xx/5xx API response should carry a stable, caller-actionable error code and a generic message, and keep the database's own error text (SQL, table, column and constraint names, SQLSTATE, driver detail lines) in the server log only. The repository already applies that discipline on a neighbouring path - app/routes/api+/contact-form.action.server.ts:73-74 logs the underlying error and returns 'Failed to process message'.
 
 ### [#2892](https://github.com/chester-hill-solutions/callcaster/issues/2892) Workspace SSE stream re-checks membership only, so a demoted owner or a revoked API key keeps the owner-only event…
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-25
@@ -602,6 +589,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/lib/twilio-a2p-messaging-profile.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/a2p-messaging-profile.server.ts`
 - Existing tests: test/twilio-a2p-provision.server.test.ts — I ran it plus test/a2p-messaging-profile.test.ts and test/twilio-a2p-status-sync.test.ts against origin/master: 113 tests passed, 3 files green. The cases that carry the mechanism: "public company sends stock and representative email on EndUser, not BrandRegistration"; "submission failure retains IDs and assignment evidence for a single-resource retry"; "existing approved profile with complete actual attributes can be read without inventing local company data"; "incomplete legacy public profile is repaired before brand reuse without duplicate EndUser"; "unrecorded owned provider product and EndUser are recovered instead of duplicated"; "a preparation failure during polling is retained by the fresh-row status update"; "a concurrent business change prevents old preparation from marking the new inputs ready"; "all assignment pages are read before deciding to create a duplicate". test/integration-db/a2p-messaging-profile.test.ts — 13 real-Postgres storage and callback cases, which I also ran green against a live Postgres 18.
 - Done when: A person confirms the reported symptom is gone on master.
+
+### [#2890](https://github.com/chester-hill-solutions/callcaster/issues/2890) Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for…
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
+- Recommended title: **Media upload API routes let the `caller` workspace role rewrite campaign media that `campaigns.write` reserves for member and above**
+- POST /api/media and POST/DELETE /api/message_media authorise their campaign mutation with workspace membership alone (`requireWorkspaceAccess` without `minRole`), so a workspace member whose `role_id` is `caller` - the lowest role, which…
+- Current behavior: Fixed on dev. Uploading a campaign's voicemail-drop audio, attaching campaign message media and deleting it all require the `member` role, and a workspace API key must carry `campaigns.write` for the campaign branches. The campaign-less chat image upload stays open to every member.
+- Root cause: app/routes/api+/media.action.server.ts line 46 and app/routes/api+/message_media.action.server.ts line 36 both call `requireWorkspaceAccess({ user, workspaceId })` with no `minRole`. `requireWorkspaceAccess` only consults `hasMinRole` when `minRole` is supplied (app/lib/workspace-membership.server.ts line 183), and `hasMinRole` returns true for an omitted gate (app/lib/member-role.ts line 28), so any membership role, including `caller`, passes. The routes then mutate a campaign through `updateCampaignVoicedropAudio` / `updateCampaignMessageMedia`, which are `campaigns.write` operations, without ever consulting the actor's role or capability. The guard that expresses the policy exists and…
+- Resolution: Fixed in #2999: the `member` floor on `/api/media` (`app/routes/api+/media.action.server.ts`) and on the campaign branches of `/api/message_media` (`app/routes/api+/message_media.action.server.ts`), with both operations declared in `scripts/capability-baseline.json`.
+- Look in: `app/routes/api+/media.action.server.ts`, `app/routes/api+/message_media.action.server.ts`, `app/lib/workspace-membership.server.ts`, `app/lib/member-role.ts`, `app/lib/capabilities.ts`, `app/routes/api+/campaigns/$campaignId.action.server.ts`
+- Existing tests: test/media.route.test.ts; test/message-media.route.test.ts
+- Done when: A campaign mutation requires the `campaigns.write` capability and at least the `member` role. `CALLCASTER_ROLE_CAPABILITY_MATRIX` (app/lib/capabilities.ts lines 47-78) grants `campaigns.write` to `owner`, `admin` and `member` and gives `caller` only `campaigns.read`, `calls.start` and `calls.control`. app/routes/api+/campaigns/$campaignId.action.server.ts lines 29-33 states the rule in words: 'Both branches below (duplicate, status transition) are destructive mutations: require at least `member`, blocking the `caller` role.' The same rule is applied across the sibling media surface: `uploadWorkspaceAudioApi` (app/lib/platform-media.server.ts line 116) and `createWorkspaceAudioClip` (app/lib/audio-clip.server.ts line 56) return 403 'Not authorized' for `caller`, the workspace audio routes require `MemberRole.Member` (app/routes/workspaces+/$id/audios/new.action.server.ts line 17, .../record.action.server.ts line 36, .../$fileName.edit.action.server.ts line 29), the product's own campaign-configuration writes are member-gated (app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.action.server.ts line 21 and .../queue.action.server.ts line 47 require `MemberRole.Member`; .../settings.action.server.ts line 91 requires `MemberRole.Admin`), and app/routes/api+/inbound-queue.action.server.ts line 35 rejects `caller` outright.
 
 ### [#2698](https://github.com/chester-hill-solutions/callcaster/issues/2698) call interface in "Predictive Dialer" campaign says "power dialer" and in "power dialer" says "manual dialing"
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-10-20
@@ -1703,9 +1701,29 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 184
+## Needs triage — 189
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#2997](https://github.com/chester-hill-solutions/callcaster/issues/2997) Task: route caller-facing failure messages through AppError
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2995](https://github.com/chester-hill-solutions/callcaster/issues/2995) Task: keep a released number's row with a released status
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2994](https://github.com/chester-hill-solutions/callcaster/issues/2994) Task: decide whether an archived workspace's API keys stay valid
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2993](https://github.com/chester-hill-solutions/callcaster/issues/2993) Task: show archived workspaces in the admin console
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2992](https://github.com/chester-hill-solutions/callcaster/issues/2992) Task: restore an archived workspace
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-25
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2816](https://github.com/chester-hill-solutions/callcaster/issues/2816) Feature: SIM task protocol and SMS flows
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-10-24
