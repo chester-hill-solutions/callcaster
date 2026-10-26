@@ -7,6 +7,8 @@ import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
+import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
@@ -39,6 +41,9 @@ export async function initiateIvrCall(
     workspaceId: input.workspace_id,
   });
 
+  const campaign = await findCampaignInWorkspace(input.workspace_id, input.campaign_id);
+  if (!campaign) return { success: false, error: "Campaign not found" };
+
   const twilio = await createWorkspaceTwilioInstance({
     workspace_id: input.workspace_id,
   });
@@ -67,7 +72,7 @@ export async function initiateIvrCall(
           to: input.contact.phone,
           from: input.contact.caller_id,
           url: ivrUrls.flowUrl,
-          machineDetection: "Enable",
+          machineDetection: ivrMachineDetection(campaign),
           statusCallbackEvent: ["answered", "completed"],
           statusCallback: ivrUrls.statusCallback,
         }),

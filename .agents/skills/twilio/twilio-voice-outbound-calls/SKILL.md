@@ -234,8 +234,16 @@ const call = await client.calls.create({
 | `machine_start` | Machine detected, greeting still playing | Hang up or wait |
 | `machine_end_beep` | Voicemail beep heard | Leave message |
 | `machine_end_silence` | Silence after greeting | Leave message |
+| `machine_end_other` | Greeting ended by another detected condition | Leave message |
 | `fax` | Fax tone detected | Hang up |
 | `unknown` | Could not determine | Treat as human or retry |
+
+For CallCaster IVR voicemail drops, use the saved campaign policy through
+`ivrMachineDetection` on production, API and test calls. A playable drop needs
+synchronous `DetectMessageEnd`; `Enable` can start playback during the greeting.
+Keep webhook classification in `isMachineAnswered` and test all documented
+machine-end results. Verify the recorded message with an approved test recipient
+before claiming that a live voicemail drop is fixed.
 
 **Conference-based agent bridging** (production pattern for sales dialers):
 

@@ -138,6 +138,14 @@ describe("dispatchCampaignIvrBatch", () => {
     defaultMocks();
   });
 
+  test("waits for the end of a voicemail greeting before starting a configured drop (#2774)", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValueOnce(runningCampaign({
+      voicemail_drop_enabled: true, voicemail_file: "campaign-message.mp3",
+    }));
+    await dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+    expect(mocks.twilioCallCreate).toHaveBeenCalledWith(expect.objectContaining({ machineDetection: "DetectMessageEnd" }));
+  });
+
   test("dispatch reaches the saved-entry webhook through the real URL resolver", async () => {
     const actual = await vi.importActual<typeof import("@/lib/twilio-ivr-runtime.server")>("@/lib/twilio-ivr-runtime.server");
     mocks.resolveIvrCallUrls.mockImplementationOnce(actual.resolveIvrCallUrls);

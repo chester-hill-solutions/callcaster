@@ -42,6 +42,7 @@ import {
   DISPATCH_TICK_MS,
 } from "@/lib/throughput-config.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
+import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
@@ -192,6 +193,7 @@ export async function dispatchCampaignIvrBatch(args: {
         campaignId,
         userId,
         callerId,
+        machineDetection: ivrMachineDetection(campaign),
         ivrUrls,
         twilio,
         tdb,
@@ -236,6 +238,7 @@ type IvrQueueMemberContext = {
   campaignId: string;
   userId: string;
   callerId: string;
+  machineDetection: ReturnType<typeof ivrMachineDetection>;
   ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
   twilio: Twilio.Twilio;
   tdb: ReturnType<typeof createTenantDb>;
@@ -370,6 +373,7 @@ async function createOutreachAttemptAndCall(
       twilio: context.twilio,
       phone,
       callerId: context.callerId,
+      machineDetection: context.machineDetection,
       ivrUrls: context.ivrUrls,
       workspaceId: context.workspaceId,
       beforeAttempt: () => {
@@ -459,6 +463,7 @@ function createIvrCall(args: {
   twilio: Twilio.Twilio;
   phone: string;
   callerId: string;
+  machineDetection: ReturnType<typeof ivrMachineDetection>;
   ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
   workspaceId: string;
   beforeAttempt: () => void;
@@ -470,7 +475,7 @@ function createIvrCall(args: {
         to: phone,
         from: callerId,
         url: ivrUrls.flowUrl,
-        machineDetection: "Enable",
+        machineDetection: args.machineDetection,
         statusCallbackEvent: ["answered", "completed"],
         statusCallback: ivrUrls.statusCallback,
       }),

@@ -4,6 +4,7 @@ import {
 } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+export { isMachineAnswered } from "@/lib/ivr-machine-detection";
 
 /**
  * The IVR answering-machine policy, in one place.
@@ -29,24 +30,6 @@ export type IvrMachineCampaign =
   | undefined;
 
 const TWIML_HEADERS = { "Content-Type": "text/xml" };
-
-/**
- * Twilio's `AnsweredBy` says a machine answered. `other` is excluded (fax and
- * unknown answers are not voicemail). The status callback also passes the call
- * status: a `completed` event carrying a machine verdict is the call ending,
- * not the answer, and the flow entry has already acted on it.
- */
-export function isMachineAnswered(
-  answeredBy: string | null | undefined,
-  callStatus?: string | null,
-): boolean {
-  const value = answeredBy ?? "";
-  return (
-    value.includes("machine") &&
-    !value.includes("other") &&
-    (!callStatus || callStatus !== "completed")
-  );
-}
 
 /**
  * What a detected machine should be recorded as. A machine only counts as
