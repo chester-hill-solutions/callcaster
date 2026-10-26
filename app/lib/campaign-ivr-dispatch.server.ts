@@ -37,12 +37,12 @@ import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import {
-  claimBatchSizeForRate,
-  configuredDispatcherVoiceCps,
-  DISPATCH_TICK_MS,
+  ivrDispatchPacing,
+  DEFAULT_WORKER_POLL_INTERVAL_MS,
 } from "@/lib/throughput-config.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
+import { createStartPacer, type StartPacer } from "@/lib/campaign-dispatch-pacing.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
@@ -89,6 +89,7 @@ export type CampaignIvrBatchOutcome =
     } & CampaignDeferralCause
   | {
       kind: "dispatched";
+      nextBatchDelayMs: number;
       counts: CampaignIvrDispatchCounts;
       /**
        * Rows still queued after this batch: recipient-window deferrals,
@@ -136,10 +137,9 @@ export async function dispatchCampaignIvrBatch(args: {
   }
 
   const portalConfig = await getWorkspaceTwilioPortalConfig({ workspaceId });
-  const claimSize = Math.max(
-    1,
-    claimBatchSizeForRate(configuredDispatcherVoiceCps(portalConfig), DISPATCH_TICK_MS),
-  );
+  const { batchSize: claimSize, minStartIntervalMs: nextBatchDelayMs } = ivrDispatchPacing(portalConfig);
+  const idleDelayMs = Math.max(nextBatchDelayMs, DEFAULT_WORKER_POLL_INTERVAL_MS);
+  const startPacer = createStartPacer(nextBatchDelayMs);
 
   const allQueued = await getCampaignQueueById({
     campaign_id: campaignId,
@@ -154,6 +154,7 @@ export async function dispatchCampaignIvrBatch(args: {
   if (queueMembers.length === 0) {
     return {
       kind: "dispatched",
+      nextBatchDelayMs: idleDelayMs,
       counts: {
         called: 0,
         failed: 0,
@@ -184,8 +185,8 @@ export async function dispatchCampaignIvrBatch(args: {
   // first row queued but dequeue its same-number sibling as a duplicate.
   const claimedNumbers = new Map<string, IvrPhoneClaim>();
 
-  // Claim size is CPS-derived (1–2 rows at legacy pacing), so a single
-  // Promise.all per batch keeps us inside the workspace's call rate.
+  // Prepare the CPS-derived batch concurrently; the shared pacer controls
+  // actual provider request starts after each row's preparation.
   await Promise.all(
     queueMembers.map((member) =>
       dispatchIvrQueueMember(member, {
@@ -193,6 +194,7 @@ export async function dispatchCampaignIvrBatch(args: {
         campaignId,
         userId,
         callerId,
+        startPacer,
         machineDetection: ivrMachineDetection(campaign),
         ivrUrls,
         twilio,
@@ -215,8 +217,10 @@ export async function dispatchCampaignIvrBatch(args: {
       progress: { counts, queuedRemaining },
     };
   }
+  const madeProgress = counts.called + counts.dequeued + counts.exhausted > 0;
   return {
     kind: "dispatched",
+    nextBatchDelayMs: madeProgress ? nextBatchDelayMs : idleDelayMs,
     counts,
     queuedRemaining,
   };
@@ -238,6 +242,7 @@ type IvrQueueMemberContext = {
   campaignId: string;
   userId: string;
   callerId: string;
+  startPacer: StartPacer;
   machineDetection: ReturnType<typeof ivrMachineDetection>;
   ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
   twilio: Twilio.Twilio;
@@ -328,6 +333,7 @@ async function reserveIvrPhone(
     const firstResult = await existingClaim.result;
     if (
       firstResult === "campaign_window_closed" ||
+      firstResult === "recipient_window_closed" ||
       firstResult === "failed_before_provider"
     ) {
       context.state.counts.deferred += 1;
@@ -374,11 +380,15 @@ async function createOutreachAttemptAndCall(
       phone,
       callerId: context.callerId,
       machineDetection: context.machineDetection,
+      startPacer: context.startPacer,
       ivrUrls: context.ivrUrls,
       workspaceId: context.workspaceId,
       beforeAttempt: () => {
         if (!isDispatchAllowedAt(context.callingPolicy)) {
-          throw new CampaignCallingWindowClosedError();
+          throw new CallingWindowClosedError("campaign");
+        }
+        if (!recipientCallingWindowStatus(phone).allowed) {
+          throw new CallingWindowClosedError("recipient");
         }
         providerAttemptStarted = true;
       },
@@ -403,13 +413,16 @@ async function createOutreachAttemptAndCall(
     });
     context.state.counts.called += 1;
   } catch (error) {
-    if (error instanceof CampaignCallingWindowClosedError) {
+    if (error instanceof CallingWindowClosedError) {
+      const windowResult = error.scope === "campaign" ? "campaign_window_closed" : "recipient_window_closed";
       phoneClaim?.resolve(
-        providerAttemptStarted ? "provider_attempted" : "campaign_window_closed",
+        providerAttemptStarted ? "provider_attempted" : windowResult,
       );
       await deleteUnusedOutreachAttempt(context.tdb, outreachAttemptId, providerAttemptStarted);
       context.state.counts.deferred += 1;
-      context.state.deferredAt ??= campaignWindowNextOpenAt(context.callingPolicy);
+      if (error.scope === "campaign") {
+        context.state.deferredAt ??= campaignWindowNextOpenAt(context.callingPolicy);
+      }
       return;
     }
 
@@ -464,36 +477,41 @@ function createIvrCall(args: {
   phone: string;
   callerId: string;
   machineDetection: ReturnType<typeof ivrMachineDetection>;
+  startPacer: StartPacer;
   ivrUrls: ReturnType<typeof resolveIvrCallUrls>;
   workspaceId: string;
   beforeAttempt: () => void;
 }) {
   const { twilio, phone, callerId, ivrUrls, workspaceId, beforeAttempt } = args;
   return withTwilioRetry(
-    () =>
-      twilio.calls.create({
+    async () => {
+      await args.startPacer.waitForTurn();
+      beforeAttempt();
+      return twilio.calls.create({
         to: phone,
         from: callerId,
         url: ivrUrls.flowUrl,
         machineDetection: args.machineDetection,
         statusCallbackEvent: ["answered", "completed"],
         statusCallback: ivrUrls.statusCallback,
-      }),
-    { workspaceId, operation: "calls.create.ivr", beforeAttempt },
+      });
+    },
+    { workspaceId, operation: "calls.create.ivr" },
   );
 }
 
 type IvrPhoneClaimResult =
   | "campaign_window_closed"
+  | "recipient_window_closed"
   | "failed_before_provider"
   | "duplicate"
   | "provider_attempted";
 
 type IvrPhoneClaim = PhoneClaim<IvrPhoneClaimResult>;
 
-class CampaignCallingWindowClosedError extends Error {
-  constructor() {
-    super("Campaign calling window closed before the provider attempt");
-    this.name = "CampaignCallingWindowClosedError";
+class CallingWindowClosedError extends Error {
+  constructor(readonly scope: "campaign" | "recipient") {
+    super(`${scope} calling window closed before the provider attempt`);
+    this.name = "CallingWindowClosedError";
   }
 }

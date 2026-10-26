@@ -630,5 +630,35 @@
       "An approved recipient confirms the entire message was recorded after deployment."
     ],
     "trackerRecommendation": "Keep open for release and live acceptance. Native Bug, Priority Urgent, production; PR #3005 is linked in Development."
+  },
+  {
+    "issueNumber": 3007,
+    "verdict": "fix-now",
+    "summary": "IVR dispatch loses throughput to idle polling and uses an obsolete default batch rate.",
+    "currentBehavior": "The current production code misses a one-second successor until the five-second idle poll. The speed patch wakes for eligible scheduled jobs, uses the one-CPS default, and paces provider requests and retries. Production throughput after release has not been measured.",
+    "resolution": "Review and release the independently tested speed patch, then measure the actual campaign start rate without increasing the saved or provider limits.",
+    "rootCause": "A fixed empty-queue sleep ignores queued future jobs. The legacy voice branch also sizes two-call batches from a 1.43-CPS webhook-delay heuristic instead of the default one-CPS voice policy. Waking sooner without request spacing would expose batch bursts.",
+    "lookIn": [
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/lib/throughput-config.ts",
+      "app/lib/campaign-dispatch-pacing.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-outbound-estimate.ts"
+    ],
+    "existingTests": [
+      "test/worker.test.ts: a one-second successor wakes on time and one-minute simulations produce 6/60/150/300 starts at 0.1/1/2.5/5 CPS with no external calls.",
+      "test/campaign-ivr-dispatch.test.ts: default batch, actual provider-start spacing, paced retries and calling-window closure after a wait.",
+      "test/integration-db/job-schedule.test.ts: real PostgreSQL eligibility, lane filters, idle ceiling and no-spin controls."
+    ],
+    "missingTests": [
+      "Measure actual production campaign throughput after release; the simulation excludes provider and database latency."
+    ],
+    "acceptanceCriteria": [
+      "Default one-CPS campaigns approach 60 starts/minute subject to real latency.",
+      "Fractional and higher configured rates preserve request spacing within and between batches.",
+      "Scheduled-job wakeups respect lane filters, attempt bounds, cancellation and the existing idle ceiling.",
+      "Queue estimates use the actual pacing policy; no provider capacity increase is assumed."
+    ],
+    "trackerRecommendation": "Keep open for review, release and production measurement. Related estimate correction is tracked separately in #1874."
   }
 ]

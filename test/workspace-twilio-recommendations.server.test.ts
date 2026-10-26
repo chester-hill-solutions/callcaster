@@ -18,7 +18,7 @@ describe("workspace-twilio-recommendations", () => {
         configuredDispatcherSmsMps: 2,
         twilioAssumedSmsMps: 3,
         legacyDispatcherVoiceCps: 1000 / 700,
-        configuredDispatcherVoiceCps: 1000 / 700,
+        configuredDispatcherVoiceCps: 1,
         voiceConcurrentCallLimit: 100,
         parallelDispatchEnabled: false,
         smsSenderClass: "verified_toll_free",

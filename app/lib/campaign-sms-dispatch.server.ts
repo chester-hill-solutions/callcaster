@@ -22,6 +22,7 @@ import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
+  DEFAULT_WORKER_POLL_INTERVAL_MS,
 } from "@/lib/throughput-config.server";
 import {
   isDispatchAllowedAt,
@@ -41,10 +42,9 @@ import { QUERY_POOL_MAX } from "@/server/db-pool-size";
 import { createSemaphore, type Semaphore } from "@/lib/semaphore";
 import {
   createDispatchCreditBudget,
-  createStartPacer,
   type DispatchCreditBudget,
-  type StartPacer,
 } from "@/lib/campaign-sms-dispatch-primitives.server";
+import { createStartPacer, type StartPacer } from "@/lib/campaign-dispatch-pacing.server";
 import { logger } from "@/lib/logger.server";
 import {
   createPhoneClaim,
@@ -269,6 +269,9 @@ export async function dispatchCampaignSmsBatch(args: {
 
   return {
     kind: "dispatched",
+    nextBatchDelayMs: counts.sent + counts.dequeued + counts.exhausted > 0
+      ? Math.ceil(minStartIntervalMs)
+      : Math.max(Math.ceil(minStartIntervalMs), DEFAULT_WORKER_POLL_INTERVAL_MS),
     responses,
     counts,
     queuedRemaining,

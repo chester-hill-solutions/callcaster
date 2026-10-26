@@ -169,6 +169,20 @@ describe("campaignDispatchHandler", () => {
     );
   });
 
+  test("the shared worker preserves SMS spacing across job boundaries (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-26T12:00:00Z"));
+    try {
+      mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+        ...dispatchedOutcome({ queuedRemaining: 3 }), nextBatchDelayMs: 10000,
+      });
+      await campaignDispatchHandler(makeJob());
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(expect.objectContaining({
+        runAt: new Date("2026-10-26T12:00:10Z"),
+      }));
+    } finally { vi.useRealTimers(); }
+  });
+
   test("skips non-dispatchable campaigns without dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ type: "live_call" }),
@@ -572,6 +586,22 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
       { tenant: true },
       42,
     );
+  });
+
+  test("the IVR successor preserves a fractional configured rate (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-26T12:00:00Z"));
+    try {
+      mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+        kind: "dispatched", nextBatchDelayMs: 10000,
+        counts: { called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
+        queuedRemaining: 3,
+      });
+      await campaignDispatchHandler(makeJob());
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(expect.objectContaining({
+        runAt: new Date("2026-10-26T12:00:10Z"),
+      }));
+    } finally { vi.useRealTimers(); }
   });
 
   test("a fully failed IVR batch throws so the job retries with backoff", async () => {

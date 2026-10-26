@@ -117,6 +117,11 @@ credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
 
+The compose migration fixture grants its public schema to the `callcaster`
+role. Create disposable Postgres with that role, or create it inside the owned
+database before bootstrapping. Keep both database URLs command-scoped to that
+local database for integration tests; do not carry them into the normal gate.
+
 Before adding a second runtime version, inspect existing transitive peer
 requirements. An npm alias can isolate the app version while preserving an
 exact development-tool peer. Verify both lockfiles and a clean `npm ci`, then

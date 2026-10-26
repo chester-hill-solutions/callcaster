@@ -26,6 +26,37 @@ export type JobTypeFilter =
   | { include: string; exclude?: never }
   | { exclude: string; include?: never };
 
+function jobTypePredicate(filter?: JobTypeFilter) {
+  if (!filter) return sql``;
+  return filter.include !== undefined
+    ? sql`AND type = ${filter.include}`
+    : sql`AND type <> ${filter.exclude}`;
+}
+
+/** Wake for this lane's next scheduled job, retaining the normal idle ceiling. */
+export async function nextJobPollDelayMs(
+  maxDelayMs: number,
+  filter?: JobTypeFilter,
+): Promise<number> {
+  // Compute a relative delay on the database clock, which also owns retry_at.
+  // Due jobs have just been considered by claimNextJob; looking only ahead
+  // avoids spinning on a due row another worker has locked.
+  const rows = await db.execute<{ delay_ms: string | number | null }>(sql`
+    SELECT EXTRACT(EPOCH FROM (MIN(retry_at) - now())) * 1000 AS delay_ms
+    FROM job
+    WHERE status = 'queued'
+      AND attempt_count < max_attempts
+      AND retry_at > now()
+      ${jobTypePredicate(filter)}
+  `);
+  const value = rows[0]?.delay_ms;
+  if (value == null) return maxDelayMs;
+  const delay = Number(value);
+  return Number.isFinite(delay)
+    ? Math.min(maxDelayMs, Math.max(1, Math.ceil(delay)))
+    : maxDelayMs;
+}
+
 export type WorkerOptions = {
   pollIntervalMs?: number;
   heartbeatIntervalMs?: number;
@@ -165,11 +196,7 @@ export async function claimNextJob(
       SELECT id, type, params, workspace_id, user_id, attempt_count, max_attempts
       FROM job
       WHERE status = 'queued'
-        ${jobTypeFilter
-          ? jobTypeFilter.include !== undefined
-            ? sql`AND type = ${jobTypeFilter.include}`
-            : sql`AND type <> ${jobTypeFilter.exclude}`
-          : sql``}
+        ${jobTypePredicate(jobTypeFilter)}
         AND (retry_at IS NULL OR retry_at <= now())
         -- Dead-lettering happens in failJob, which is only reached when a
         -- handler THROWS. A job that kills the process instead — OOM, an
@@ -338,7 +365,8 @@ export async function runWorkerPollLoop(
 
       const job = await claimNextJob(workerId, claimTtlMinutes, options.jobTypeFilter);
       if (!job) {
-        await sleep(pollIntervalMs, signal);
+        const delayMs = await nextJobPollDelayMs(pollIntervalMs, options.jobTypeFilter);
+        await sleep(delayMs, signal);
         continue;
       }
 

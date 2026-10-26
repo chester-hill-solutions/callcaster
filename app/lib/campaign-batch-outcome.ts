@@ -113,6 +113,8 @@ export type CampaignSmsBatchOutcome =
     } & CampaignDeferralCause
   | {
       kind: "dispatched";
+      /** Preserve provider-request spacing across durable job boundaries. */
+      nextBatchDelayMs: number;
       responses: ContactDispatchResult[];
       counts: CampaignSmsDispatchCounts;
       /**

@@ -193,7 +193,7 @@ function makePortalSnapshot() {
       configuredDispatcherSmsMps: 2,
       twilioAssumedSmsMps: 1,
       legacyDispatcherVoiceCps: 1000 / 700,
-      configuredDispatcherVoiceCps: 1000 / 700,
+      configuredDispatcherVoiceCps: 1,
       voiceConcurrentCallLimit: 100,
       parallelDispatchEnabled: false,
       smsSenderClass: "unknown",

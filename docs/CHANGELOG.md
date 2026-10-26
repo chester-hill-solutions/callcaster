@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Outbound IVR batches wake when due and space every provider request, including retries, at the configured rate. Default one-CPS sending no longer waits through five-second idle gaps; the queue estimate uses the same pacing ([#3007](https://github.com/chester-hill-solutions/callcaster/issues/3007)).
 - Fixed: IVR queue estimates include durable worker polling and show consistent calls/minute units ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Fixed: IVR voicemail drops wait for the recipient's greeting to finish before playback, including campaign test calls. All documented machine greeting-end results use the voicemail path ([#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774)).
 - Fixed: A validation message written for the caller still reaches them now that plain errors are generic. A malformed phone number on `POST /api/dial` is a 400 that names the problem, a missing field on `POST /api/ivr` is a 400 that says which, a failed call insert keeps its message at 500, and a number-registration failure returns the provider's reason with the status it reported ([#2997](https://github.com/chester-hill-solutions/callcaster/issues/2997)).

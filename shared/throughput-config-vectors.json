@@ -12,7 +12,7 @@
   {
     "id": "legacy-voice-dispatcher",
     "input": { "parallelDispatchEnabled": false, "voiceTargetCps": 10 },
-    "expected": { "configuredDispatcherVoiceCps": 1.4285714285714286 }
+    "expected": { "configuredDispatcherVoiceCps": 1 }
   },
   {
     "id": "parallel-voice-dispatcher",

@@ -4,6 +4,8 @@
  * (#1348). Per-contact mechanics mirror the /api/ivr choke point.
  */
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import type { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 vi.hoisted(() => {
   process.env.TZ = "UTC";
@@ -32,7 +34,7 @@ const mocks = vi.hoisted(() => ({
   dequeueQueueEntry: vi.fn(),
   recordQueueAttemptFailure: vi.fn(async () => undefined),
   rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
-  deleteOutreachAttempt: vi.fn(async () => undefined),
+  deleteOutreachAttempt: vi.fn(async (_args: { where: SQL }) => undefined),
   recipientCallingWindowStatus: vi.fn(),
   createTenantDb: vi.fn(() => ({
     tenant: true,
@@ -138,6 +140,97 @@ describe("dispatchCampaignIvrBatch", () => {
     defaultMocks();
   });
 
+  function twoRecipients() {
+    return [queuedRow(), queuedRow({ id: 502, contact_id: 9002, contact: { id: 9002, phone: "+16135550101", opt_out: false } })];
+  }
+
+  test("the default one-CPS path claims one call per batch (#3007)", async () => {
+    mocks.getCampaignQueueById.mockResolvedValue(twoRecipients());
+    const outcome = await dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+    expect(mocks.twilioCallCreate).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ kind: "dispatched", queuedRemaining: 1, nextBatchDelayMs: 1000 });
+  });
+
+  test("a batch with no eligible recipients keeps the normal idle delay (#3007)", async () => {
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 5 });
+    mocks.getCampaignQueueById.mockResolvedValue(twoRecipients());
+    mocks.recipientCallingWindowStatus.mockReturnValue({ allowed: false });
+    const outcome = await dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+    expect(outcome).toMatchObject({ kind: "dispatched", queuedRemaining: 2, nextBatchDelayMs: 5000, counts: { called: 0, deferred: 2 } });
+    expect(mocks.twilioCallCreate).not.toHaveBeenCalled();
+  });
+
+  test("spaces actual provider starts inside a two-CPS batch (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T12:00:00Z"));
+    try {
+      mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 2 });
+      mocks.getCampaignQueueById.mockResolvedValue(twoRecipients());
+      const starts: number[] = [];
+      mocks.twilioCallCreate.mockImplementation(async () => { starts.push(Date.now()); return { sid: `CA${starts.length}` }; });
+      const pending = dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toMatchObject({ kind: "dispatched", nextBatchDelayMs: 500, counts: { called: 2 } });
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBe(500);
+    } finally { vi.useRealTimers(); }
+  });
+
+  test("a retry also waits for a provider-start slot (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T12:00:00Z"));
+    try {
+      const actual = await vi.importActual<typeof import("@/lib/twilio-client.server")>("@/lib/twilio-client.server");
+      mocks.withTwilioRetry.mockImplementation(fn => actual.withTwilioRetry(async () => fn(), { operation: "test.ivr.retry" }));
+      const starts: number[] = [];
+      mocks.twilioCallCreate.mockImplementation(async () => {
+        starts.push(Date.now());
+        if (starts.length === 1) throw Object.assign(new Error("rate limited"), { status: 429, code: 20429 });
+        return { sid: "CAretry" };
+      });
+      const pending = dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(await pending).toMatchObject({ kind: "dispatched", counts: { called: 1 } });
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBe(1000);
+    } finally { vi.useRealTimers(); }
+  });
+
+  test("a window that closes while pacing leaves the unstarted row queued (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    try {
+      mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 2 });
+      mocks.findCampaignInWorkspace.mockResolvedValue(runningCampaign({ schedule: { wednesday: { active: true, intervals: [{ start: "09:00", end: "21:00" }] } } }));
+      mocks.getCampaignQueueById.mockResolvedValue(twoRecipients());
+      const pending = dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toMatchObject({ kind: "deferred", progress: { counts: { called: 1, deferred: 1 }, queuedRemaining: 1 } });
+      expect(mocks.twilioCallCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.dequeueQueueEntry).not.toHaveBeenCalledWith(expect.objectContaining({ by: { id: 502 } }));
+      expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test("a recipient window closing during pacing keeps its row and removes only its unused attempt (#3007)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    try {
+      mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 2 });
+      mocks.getCampaignQueueById.mockResolvedValue(twoRecipients());
+      mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(777).mockResolvedValueOnce(778);
+      mocks.recipientCallingWindowStatus.mockImplementation(() => ({ allowed: Date.now() < Date.parse("2026-09-09T21:00:00Z") }));
+      const pending = dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toMatchObject({ kind: "dispatched", counts: { called: 1, deferred: 1 }, queuedRemaining: 1 });
+      expect(mocks.twilioCallCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.dequeueQueueEntry).not.toHaveBeenCalledWith(expect.objectContaining({ by: { id: 502 } }));
+      expect(mocks.deleteOutreachAttempt).toHaveBeenCalledTimes(1);
+      expect(new PgDialect().sqlToQuery(mocks.deleteOutreachAttempt.mock.calls[0][0].where).params).toEqual([778]);
+      expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   test("waits for the end of a voicemail greeting before starting a configured drop (#2774)", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValueOnce(runningCampaign({
       voicemail_drop_enabled: true, voicemail_file: "campaign-message.mp3",
@@ -238,6 +331,7 @@ describe("dispatchCampaignIvrBatch", () => {
   });
 
   test("keeps same-number siblings queued when the first row defers at the boundary", async () => {
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 2 });
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
     mocks.findCampaignInWorkspace.mockResolvedValue(
@@ -320,6 +414,7 @@ describe("dispatchCampaignIvrBatch", () => {
   });
 
   test("does not dial the same number twice in one campaign (#1517)", async () => {
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ parallelDispatchEnabled: true, voiceTargetCps: 2 });
     mocks.getCampaignQueueById.mockResolvedValue([
       queuedRow(),
       queuedRow({
