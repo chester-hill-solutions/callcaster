@@ -32,6 +32,7 @@ import { validateTwilioWebhookParams } from "@/twilio.server";
 import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
 import { isObject } from "@/lib/type-safety-utils";
 
 export type { QueueRecord, TwilioCredentials };
@@ -233,16 +234,17 @@ export async function dialAgent(args: {
     // The agent call never existed, so the status callback that normally
     // releases the offer will never fire — release the claim here or the
     // agent stays claimed and the entry is never re-offered.
-    await releaseAgent(args.entryId, "timed_out");
+    await releaseAgent(args.entryId, args.workspaceId, "timed_out");
   }
 }
 
 export async function releaseAgent(
   entryId: number,
+  workspaceId: string,
   outcome: "timed_out" | "declined" = "timed_out",
 ): Promise<void> {
   try {
-    await rpcReleaseInboundOffer(db, { entryId, outcome });
+    await rpcReleaseInboundOffer(db, { entryId, workspaceId, outcome });
   } catch (error) {
     logger.error("release_inbound_offer RPC error", error);
   }
@@ -293,6 +295,14 @@ async function resolveWorkspaceId(
   }
 
   return null;
+}
+
+async function entryBelongsToWorkspace(entryId: number, workspaceId: string): Promise<boolean> {
+  const entry = await createTenantDb(workspaceId).inbound_queue_entry.findFirst({
+    columns: { id: true },
+    where: eq(inboundQueueEntryTable.id, entryId),
+  });
+  return Boolean(entry);
 }
 
 async function validatedAcdCredentials(args: {
@@ -494,8 +504,9 @@ async function handleAgentBridge(
   }
 
   if (entryId) {
+    if (!workspaceId || !(await entryBelongsToWorkspace(entryId, workspaceId))) return invalidSignature();
     try {
-      await rpcAcceptInboundOffer(db, entryId);
+      await rpcAcceptInboundOffer(db, entryId, workspaceId);
     } catch {
       // best-effort
     }
@@ -534,13 +545,15 @@ async function handleAgentStatus(
     return invalidSignature();
   }
 
+  if (!(await entryBelongsToWorkspace(entryId, workspaceId))) return invalidSignature();
+
   if (
     callStatus === "no-answer" ||
     callStatus === "busy" ||
     callStatus === "failed" ||
     callStatus === "canceled"
   ) {
-    await releaseAgent(entryId, "timed_out");
+    await releaseAgent(entryId, workspaceId, "timed_out");
   }
 
   return new Response(JSON.stringify({ ok: true }), {
@@ -583,15 +596,16 @@ async function handleComplete(
   }
 
   if (entryId) {
+    if (!(await entryBelongsToWorkspace(entryId, workspaceId))) return invalidSignature();
     try {
       if (queueResult === "bridged" || queueResult === "completed") {
-        await rpcCompleteInboundQueueEntry(db, entryId);
+        await rpcCompleteInboundQueueEntry(db, entryId, workspaceId);
       } else if (
         queueResult === "hangup" ||
         queueResult === "leave" ||
         queueResult === "leaving"
       ) {
-        await rpcAbandonInboundQueueEntry(db, entryId);
+        await rpcAbandonInboundQueueEntry(db, entryId, workspaceId);
       }
     } catch (error) {
       logger.error("acd complete/abandon RPC error", { entryId, queueResult, error });

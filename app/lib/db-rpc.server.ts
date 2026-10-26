@@ -656,12 +656,13 @@ export async function rpcClaimInboundQueueEntry(
 
 export async function rpcReleaseInboundOffer(
   executor: RpcExecutor,
-  args: { entryId: number; outcome?: "timed_out" | "declined" },
+  args: { entryId: number; workspaceId: string; outcome?: "timed_out" | "declined" },
 ): Promise<void> {
   await execVoid(
     executor,
     sql`select release_inbound_offer(
       ${args.entryId},
+      ${args.workspaceId}::uuid,
       ${args.outcome ?? "timed_out"}
     )`,
   );
@@ -670,22 +671,25 @@ export async function rpcReleaseInboundOffer(
 export async function rpcAcceptInboundOffer(
   executor: RpcExecutor,
   entryId: number,
+  workspaceId: string,
 ): Promise<void> {
-  await execVoid(executor, sql`select accept_inbound_offer(${entryId})`);
+  await execVoid(executor, sql`select accept_inbound_offer(${entryId}, ${workspaceId}::uuid)`);
 }
 
 export async function rpcCompleteInboundQueueEntry(
   executor: RpcExecutor,
   entryId: number,
+  workspaceId: string,
 ): Promise<void> {
-  await execVoid(executor, sql`select complete_inbound_queue_entry(${entryId})`);
+  await execVoid(executor, sql`select complete_inbound_queue_entry(${entryId}, ${workspaceId}::uuid)`);
 }
 
 export async function rpcAbandonInboundQueueEntry(
   executor: RpcExecutor,
   entryId: number,
+  workspaceId: string,
 ): Promise<void> {
-  await execVoid(executor, sql`select abandon_inbound_queue_entry(${entryId})`);
+  await execVoid(executor, sql`select abandon_inbound_queue_entry(${entryId}, ${workspaceId}::uuid)`);
 }
 
 export async function rpcNextInboundQueueOffer(

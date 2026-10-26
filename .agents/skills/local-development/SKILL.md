@@ -84,6 +84,10 @@ Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.
 
+When a service gains a scoped tenant-client read, update its orchestration
+fixtures at that boundary. Prove cross-workspace denials against the real
+database; a permissive query mock is not authorization evidence.
+
 For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the

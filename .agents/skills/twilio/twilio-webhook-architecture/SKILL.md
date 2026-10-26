@@ -152,6 +152,9 @@ encoded query. Internal request hosts and forwarded headers are not trusted
 public origins. For form callbacks, pass POST body fields separately; GET/HEAD
 query fields already occur in the signed URL. Keep query fields available for
 workspace credential lookup. Auth-failure diagnostics must omit query values.
+When testing an entry-only workspace fallback, omit every earlier locator.
+Removing queue_id alone can still leave queue_name selecting a different
+workspace. Keep explicit queue-ID, queue-name and entry-only cases.
 
 Keep the actual SDK validator in regressions. Its port and equivalent query
 encoding compatibility is part of the contract; do not reject those forms with
