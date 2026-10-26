@@ -15,6 +15,36 @@
     "rootCause": "This issue is an acceptance-suite work item, not a code defect, so nothing in the tree can 'fix' it in the usual sense. The upstream dependency is #1827 'Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it', which the board still lists in the 'Blocked / split first' lane (ISSUE_BOARD.md:565-574) with #1356 (dev DNS/IaC) ahead of it. manual: true because the missing artefact is a dev-environment acceptance run that only a person with the dev Twilio account and dev environment credentials can execute."
   },
   {
+    "issueNumber": 1874,
+    "verdict": "fix-now",
+    "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
+    "currentBehavior": "The default branch projects about 80 queue completions per minute for the reported settings. The durable worker sends two calls per batch and waits for a five-second idle poll, matching the screenshots showing 144 dequeues over six minutes (24/minute). A tested branch patch includes that cadence and corrects the displayed units.",
+    "resolution": "Review and release the worker-aware estimate patch, then compare its displayed queue finish range with a real campaign before closing.",
+    "lookIn": [
+      "app/lib/campaign-outbound-estimate.ts",
+      "app/lib/throughput-config.ts",
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+    ],
+    "rootCause": "The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.",
+    "existingTests": [
+      "test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.",
+      "test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.",
+      "test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording."
+    ],
+    "missingTests": [
+      "After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary."
+    ],
+    "acceptanceCriteria": [
+      "Default planning rate includes the durable worker batch and poll cadence.",
+      "The two reported queue counts keep the average projected finish stable at the reported processing pace.",
+      "Rate labels use consistent units and distinguish a drained queue from calls still in flight.",
+      "A deployed campaign confirms the estimate is useful before closing."
+    ],
+    "trackerRecommendation": "Keep open in progress for review, release and deployed acceptance. The prior master concurrency-only fix is insufficient; remove the old verify-and-close claim."
+  },
+  {
     "issueNumber": 1875,
     "verdict": "fix-now",
     "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
