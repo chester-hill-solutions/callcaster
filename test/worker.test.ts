@@ -298,6 +298,42 @@ beforeEach(() => {
 });
 
 describe("worker poll-jobs lifecycle", () => {
+  test("a one-second successor waits for the default five-second idle poll (#1874)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(mockState.baseTime);
+    const controller = new AbortController();
+    const starts: number[] = [];
+    mockState.state.jobs.push(createJob({ id: 100, type: "campaign_dispatch" }));
+    const loop = runWorkerPollLoop(controller.signal, {
+      campaign_dispatch: async () => {
+        starts.push(Date.now());
+        if (starts.length === 2) {
+          controller.abort();
+        } else {
+          mockState.state.jobs.push(createJob({
+            id: 101,
+            type: "campaign_dispatch",
+            retry_at: new Date(Date.now() + 1000).toISOString(),
+          }));
+        }
+      },
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(starts).toHaveLength(1);
+      mockState.state.now = new Date(mockState.baseTime.getTime() + 1000);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(starts).toHaveLength(1);
+      mockState.state.now = new Date(mockState.baseTime.getTime() + 5000);
+      await vi.advanceTimersByTimeAsync(4000);
+      await loop;
+      expect(starts[1] - starts[0]).toBe(5000);
+    } finally {
+      controller.abort();
+      await loop;
+      vi.useRealTimers();
+    }
+  });
   test("claims a queued job", async () => {
     mockState.state.jobs.push(createJob({ id: 42, type: "test" }));
 

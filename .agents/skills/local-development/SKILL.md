@@ -16,6 +16,12 @@ libraries or using a different Node major.
 
 ## Check cadence
 
+For outbound estimates, trace the current batch size, successor schedule and
+worker polling cadence together. A configured provider rate alone does not
+describe queue progress. Confirm when rows dequeue before calling an estimate
+"call completion", and keep rendered rate units consistent with the calculation.
+Use a worker timing test plus the reported queue counts to verify the projection.
+
 Before `ci:local`, check `node --version` and `bun --version` in the same
 command-scoped PATH. A missing Bun executable can be reported as lockfile
 drift; verify tool availability before changing either lockfile.
