@@ -1,5 +1,39 @@
 [
   {
+    "issueNumber": 2638,
+    "verdict": "fix-now",
+    "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, AudienceTable renders unnamed header and contact checkboxes and a local unnamed page-size Select. The reviewed candidate in open PR #3023 is not merged into dev or master.",
+    "rootCause": "The selection controls do not receive accessible names. The Call list duplicates the page-size widget already named in TablePagination. Its URL page and size must stay in the existing single navigation; calling two captured-parameter callbacks can overwrite the new size.",
+    "resolution": "Review PR #3023 and its exact-head checks. The header names its visible-page scope; row names use a trimmed name, phone or email with a contact ID fallback and duplicate-name disambiguation. RowsPerPageSelect now owns the named control for both consumers. Keep each consumer callback contract, checkbox states and current geometry. Verify on deployed dev after merge, then complete release acceptance.",
+    "lookIn": [
+      "app/components/audience/AudienceTable.tsx",
+      "app/components/shared/RowsPerPageSelect.tsx",
+      "app/components/shared/TablePagination.tsx",
+      "test/ui/audience-selection-names.test.tsx",
+      "test/ui/table-pagination-page-size.test.tsx"
+    ],
+    "existingTests": [
+      "The focused run passes 41 cases with real Checkbox, Select and router controls. Six new cases cover duplicate and missing names, Space and mixed states, the correct bulk-delete contact IDs, filtered/current-page selection, empty results, keyboard paging and an atomic size/page change that retains query, sort and repeated tags.",
+      "The original runtime fails all six new cases while four shared pagination controls pass. A row-name fault fails five cases with five controls passing; a two-callback page-size overwrite fails one with nine controls passing. The candidate is restored byte-for-byte. Focused source warnings decrease from 14 to 12; the new shared control and test have none.",
+      "The source commit passes full ci:local; post-CI browser checks compare baseline/candidate geometry in both themes and exercise real keyboard controls with a controlled loader. See the PR validation for the final commit and exact counts."
+    ],
+    "missingTests": [
+      "After merge, verify selection names, states and page-size changes on deployed dev and complete release acceptance. Local browser and router checks use synthetic contacts; they do not prove authentication, production data access or the full workspace shell."
+    ],
+    "acceptanceCriteria": [
+      "Select all names the contacts shown on the current page.",
+      "Row names identify the contact, including duplicate, partial and absent names.",
+      "Use the shared named Rows per page control.",
+      "Keep checked, partial and focus states exposed.",
+      "Preserve keyboard selection and paging; size changes reset page and retain other URL values."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3023 is open into dev and linked only to #2638. Keep open for merge, deployed verification and default-branch release acceptance."
+  },
+  {
     "issueNumber": 1826,
     "verdict": "fix-now",
     "summary": "Nothing in origin/master provides a dev-environment PR acceptance suite: the only PR-level end-to-end gate is the local docker-compose Playwright run, and the Twilio tier uses Twilio's free test credentials, not a CallCaster-dev account.",
