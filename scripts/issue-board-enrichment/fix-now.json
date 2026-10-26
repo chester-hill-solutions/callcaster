@@ -568,5 +568,37 @@
     ],
     "size": "S",
     "risk": "medium"
+  },
+  {
+    "issueNumber": 2774,
+    "verdict": "fix-now",
+    "summary": "IVR voicemail drops start during the greeting and a valid machine-end result can hang up without leaving the saved message.",
+    "currentBehavior": "The default branch still requests early Enable detection. PR #3005 into dev waits for the greeting when a playable drop is configured and recognizes all documented machine-end results. It is open; no live voicemail recording has been verified.",
+    "resolution": "Review and deploy PR #3005, then verify the complete recorded message with an approved test recipient before closing.",
+    "lookIn": [
+      "app/lib/ivr-machine-detection.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/ivr-machine.server.ts",
+      "app/routes/api+/ivr.action.server.ts"
+    ],
+    "rootCause": "Twilio Enable returns machine_start while the greeting is still playing. The fixed one-second pause cannot wait for that greeting. The previous substring classifier also excluded machine_end_other, which Twilio documents as a machine result. Regression tests reproduced both code defects before the patch.",
+    "existingTests": [
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-test-call.test.ts",
+      "test/ivr-machine-detection.test.ts",
+      "test/ivr-page.route.test.ts",
+      "test/ivr.route.test.ts",
+      "test/ivr-initiate.server.test.ts"
+    ],
+    "missingTests": [
+      "A controlled live voicemail recording with a confirmed test recipient after deployment."
+    ],
+    "acceptanceCriteria": [
+      "Configured drops wait for greeting completion on production and test calls.",
+      "Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.",
+      "An approved recipient confirms the entire message was recorded after deployment."
+    ],
+    "trackerRecommendation": "Keep open for release and live acceptance. Native Bug, Priority Urgent, production; PR #3005 is linked in Development."
   }
 ]
