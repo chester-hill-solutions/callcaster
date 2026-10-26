@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: IVR queue estimates include durable worker polling and show consistent calls/minute units ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Fixed: IVR voicemail drops wait for the recipient's greeting to finish before playback, including campaign test calls. All documented machine greeting-end results use the voicemail path ([#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774)).
 - Fixed: A validation message written for the caller still reaches them now that plain errors are generic. A malformed phone number on `POST /api/dial` is a 400 that names the problem, a missing field on `POST /api/ivr` is a 400 that says which, a failed call insert keeps its message at 500, and a number-registration failure returns the provider's reason with the status it reported ([#2997](https://github.com/chester-hill-solutions/callcaster/issues/2997)).
 - Fixed: A cron job that names one workspace in its request body no longer skips the platform's suspension gate. That path called the money operation directly, so a suspended workspace could still be debited for the calls and messages it reconciled and have its frozen Twilio account reconciled. It now applies the same eligibility rule the all-workspaces sweep applies and is skipped instead of run; the number-rental ladder still runs for suspended workspaces, which is what its opt-in is for ([#2877](https://github.com/chester-hill-solutions/callcaster/issues/2877)).

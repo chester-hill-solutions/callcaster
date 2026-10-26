@@ -42,7 +42,7 @@ function countCapableNumbers(
 }
 
 function formatRatePerMinute(ratePerSecond: number): string {
-  return `${Math.max(1, Math.round(ratePerSecond * 60)).toLocaleString()} / min`;
+  return `${(ratePerSecond * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} calls/min`;
 }
 
 function formatCompletionTime(date: Date): string {
@@ -61,7 +61,7 @@ function getEtaRange(input: {
    * The campaign's dispatch policy (SMS send window, or IVR calling hours
    * with start/end dates). Projected through so the ETA starts consuming
    * time at the next allowed moment instead of assuming continuous sending
-* and so IVR dates bound it (E2.2).
+   * and so IVR dates bound it (E2.2).
    */
   policy: DispatchPolicy;
 }) {
@@ -146,16 +146,13 @@ export function CampaignLaunchExtras({
     : null;
 
   const ivrTooltipLines = [
-    `Estimated completion rate: ${formatRatePerMinute(
+    `Estimated queue processing rate: ${formatRatePerMinute(
       ivrEstimate.effectiveCompletionPerSecond,
-    )} calls/sec (dial starts ${formatRatePerMinute(
-      ivrEstimate.effectiveDialAttemptsPerSecond,
-    )} CPS; ${ivrEstimate.voiceConcurrentCallLimit} concurrent × ~${
-      ivrEstimate.avgCallDurationSeconds
-    }s in-flight per call).`,
+    )}. Includes worker pacing and estimated call capacity.`,
     ivrEtaRange
-      ? `If started now, queue completion is estimated around ${ivrEtaRange}.`
+      ? `Remaining queue is estimated to finish around ${ivrEtaRange}.`
       : "Queue completion ETA appears after contacts are queued.",
+    "This is a planning estimate. Provider delays and other worker jobs can change it. Final calls may still be active when the queue finishes.",
     ...ivrEstimate.warnings,
   ];
 

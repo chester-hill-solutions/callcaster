@@ -98,24 +98,6 @@
     "trackerRecommendation": "Live inspection on 2026-10-20: Bug; Priority Low; Effort Low; Enviornment dev; Project Status In progress. Assigned to wra-sol; no parent, children or dependency links. PR #2750 is open into dev with a verified Development link; PR #1971 is the earlier incomplete fix. Keep the issue open for release and deployed acceptance."
   },
   {
-    "issueNumber": 1874,
-    "verdict": "verify-close",
-    "summary": "The IVR launch estimate no longer projects the queue at the dial-start rate: it now computes a completion rate bounded by the concurrent-call limit over the average in-flight call time and uses THAT for the ETA, so a campaign that cannot finish in the promised time says so before it starts.",
-    "currentBehavior": "The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.",
-    "resolution": "Run the verification on master, then close. No new code unless it fails.",
-    "lookIn": [
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
-    ],
-    "existingTests": [
-      "test/campaign-outbound-estimate.test.ts:93-131 — 'IVR completion rate is bounded by the concurrent call limit over avg call time (#1874)' (100 concurrent -> `effectiveCompletionPerSecond` = 100/75 and < the dial-start rate, `avgCallDurationSeconds` = 75, warning contains 'bound by the concurrent call limit'), 'IVR completion rate equals the dial-start rate when concurrency is not the bound' (10,000 concurrent) and 'a low concurrent call limit caps completion well below the dial-start rate' (10 concurrent -> 10/75). Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/campaign-outbound-estimate.test.ts ...` -> 4 files passed, 34 tests passed."
-    ],
-    "acceptanceCriteria": [
-      "A person confirms the reported symptom is gone on master."
-    ],
-    "rootCause": "The fix is commit e833d955 'fix(ivr): bound the completion estimate by the concurrent call limit (#1874) (#1934)', an ancestor of origin/master (first merged by e3a1f002 on 2026-09-21). It matches the issue's own diagnosis comment (wra-sol, 2026-09-20) proposal-for-exactly, including the ~75s default and the concurrent-call bound, and the reporter's worked example (5000 calls, 25 concurrent, ~90s in flight -> ~5 hours) is now the shape the estimate produces. manual: true — the protocol names this case explicitly ('a number a human reads and judges: IVR estimates are too low'); the unit test proves the arithmetic, not that 75s is the right in-flight constant for the operator's actual calls (ring time, answer rate and voicemail differ per campaign), so a person has to judge whether the new number is believable against a real run."
-  },
-  {
     "issueNumber": 1989,
     "verdict": "verify-close",
     "summary": "The manual-dial path now sends Twilio's `recordingStatusCallback` to the canonical signed `/api/recording` endpoint with the `completed` event, and the campaign-conference path no longer sets `record` at all, so no outbound path captures audio that CallCaster never downloads.",

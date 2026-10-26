@@ -5,6 +5,7 @@ import { runWithRequestContext } from "@/lib/request-context.server";
 import { captureException } from "@/lib/sentry.server";
 import { notifyOps } from "@/lib/ops-alert.server";
 import { PAGING_JOB_TYPES } from "@/lib/worker/handlers.server";
+import { DEFAULT_WORKER_POLL_INTERVAL_MS } from "@/lib/throughput-config";
 
 export type ClaimedJobRow = {
   id: number;
@@ -44,7 +45,6 @@ function getJobRequestId(job: ClaimedJobRow): string {
   return `job-${job.id}`;
 }
 
-const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;
 const DEFAULT_CLAIM_TTL_MINUTES = 5;
 
@@ -308,7 +308,7 @@ export async function runWorkerPollLoop(
   options: WorkerOptions = {},
 ): Promise<void> {
   const workerId = getWorkerId();
-  const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_WORKER_POLL_INTERVAL_MS;
   const heartbeatIntervalMs =
     options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
   const claimTtlMinutes = options.claimTtlMinutes ?? DEFAULT_CLAIM_TTL_MINUTES;

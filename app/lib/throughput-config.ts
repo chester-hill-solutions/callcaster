@@ -11,6 +11,7 @@ export const LEGACY_IVR_PIPELINE_CPS = 1000 / 700;
 export const MAX_QUEUE_ATTEMPTS = 5;
 export const STALE_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
 export const DISPATCH_TICK_MS = 1000;
+export const DEFAULT_WORKER_POLL_INTERVAL_MS = 5_000;
 
 /**
  * Upper bound on one send-window/calling-hours deferral. The successor wakes

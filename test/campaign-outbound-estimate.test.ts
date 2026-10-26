@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest";
 import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,
+  estimateOutboundCompletion,
 } from "../app/lib/campaign-outbound-estimate";
 import {
-  LEGACY_IVR_PIPELINE_CPS,
   LEGACY_MESSAGE_PIPELINE_MPS,
 } from "../app/lib/throughput-config";
 import type { WorkspaceTwilioSyncSnapshot } from "../app/lib/types";
@@ -35,6 +35,31 @@ const baseSyncSnapshot: WorkspaceTwilioSyncSnapshot = {
 };
 
 describe("campaign-outbound-estimate", () => {
+  test("IVR planning includes the durable worker's idle polling cadence (#1874)", () => {
+    const estimate = estimateIvrCampaignOutbound({
+      portalConfig: basePortalConfig,
+      voiceCapableLocalNumbers: 1,
+    });
+    // A legacy batch contains two calls, then its one-second successor waits
+    // for the worker's five-second idle poll. The reported screenshots show
+    // 144 dequeues in six minutes: 24/min, not the former 80/min estimate.
+    expect(estimate.effectiveDialAttemptsPerSecond * 60).toBe(24);
+    expect(estimate.effectiveCompletionPerSecond * 60).toBe(24);
+  });
+
+  test("the reported six-minute queue progress keeps the projected finish stable (#1874)", () => {
+    const { effectiveCompletionPerSecond: ratePerSecond } = estimateIvrCampaignOutbound({
+      portalConfig: basePortalConfig, voiceCapableLocalNumbers: 1,
+    });
+    const before = estimateOutboundCompletion({
+      queueCount: 2600, ratePerSecond, now: new Date("2026-10-21T12:28:00Z"),
+    });
+    const after = estimateOutboundCompletion({
+      queueCount: 2456, ratePerSecond, now: new Date("2026-10-21T12:34:00Z"),
+    });
+    expect(before?.averageFinish.toISOString()).toBe("2026-10-21T14:16:20.000Z");
+    expect(after?.averageFinish).toEqual(before?.averageFinish);
+  });
   test("SMS estimate is pipeline-capped when Twilio heuristic is high", () => {
     const estimate = estimateMessageCampaignOutbound({
       portalConfig: basePortalConfig,
@@ -77,25 +102,25 @@ describe("campaign-outbound-estimate", () => {
     );
   });
 
-  test("IVR estimate uses queue-next + ivr-handler pacing math", () => {
+  test("IVR estimate uses durable batch pacing instead of legacy webhook delays", () => {
     const estimate = estimateIvrCampaignOutbound({
       portalConfig: basePortalConfig,
       voiceCapableLocalNumbers: 20,
     });
 
     expect(estimate.pipelineDialAttemptsPerSecond).toBeCloseTo(
-      LEGACY_IVR_PIPELINE_CPS,
+      0.4,
     );
   });
 
   test("IVR completion rate is bounded by the concurrent call limit over avg call time (#1874)", () => {
     const estimate = estimateIvrCampaignOutbound({
-      portalConfig: basePortalConfig, // parallel off, voiceConcurrentCallLimit 100
+      portalConfig: makePortalConfig({ parallelDispatchEnabled: true, voiceTargetCps: 20 }),
       voiceCapableLocalNumbers: 20,
     });
 
     expect(estimate.effectiveDialAttemptsPerSecond).toBeCloseTo(
-      LEGACY_IVR_PIPELINE_CPS,
+      4,
       3,
     );
     expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(100 / 75, 3);
@@ -127,6 +152,14 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(10 / 75, 3);
+  });
+
+  test("worker batch rounding never makes the projection exceed the configured rate", () => {
+    const estimate = estimateIvrCampaignOutbound({
+      portalConfig: makePortalConfig({ parallelDispatchEnabled: true, voiceTargetCps: 0.1 }),
+      voiceCapableLocalNumbers: 1,
+    });
+    expect(estimate.effectiveDialAttemptsPerSecond).toBe(0.1);
   });
 
   test("messaging_service uses sync pool while from_number uses local SMS count", () => {

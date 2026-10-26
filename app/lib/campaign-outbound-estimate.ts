@@ -9,6 +9,9 @@ import type {
 import {
   configuredDispatcherSmsMps,
   configuredDispatcherVoiceCps,
+  claimBatchSizeForRate,
+  DEFAULT_WORKER_POLL_INTERVAL_MS,
+  DISPATCH_TICK_MS,
   LEGACY_IVR_PIPELINE_CPS,
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
@@ -25,9 +28,8 @@ export const IVR_HANDLER_NEXT_DELAY_MS = 500;
 
 /**
  * Assumed average in-flight time per IVR call — ring time, connect, the menu,
- * and hang-up or voicemail. The queue drains at CALL COMPLETION, so
- * completion is bounded by `voiceConcurrentCallLimit / this duration`, not by
- * the dial-start rate.
+ * and hang-up or voicemail. Used as a planning bound for provider capacity;
+ * durable IVR dispatch dequeues rows when the dial is accepted, before hang-up.
  */
 export const IVR_AVG_CALL_DURATION_SECONDS = 75;
 
@@ -73,10 +75,9 @@ export type IvrCampaignEstimate = {
   twilioAssumedDialAttemptsPerSecond: number;
   effectiveDialAttemptsPerSecond: number;
   /**
-   * Dial starts per second minus the concurrency bound
-   * (`voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS`). Rows only
-   * dequeue after a call completes, so THIS is the completion rate the ETA
-   * should use.
+   * Queue processing rate, bounded by worker pacing, configured/provider rate
+   * and estimated concurrent-call capacity. Final calls can still be in flight
+   * after the queue drains.
    */
   effectiveCompletionPerSecond: number;
   avgCallDurationSeconds: number;
@@ -266,11 +267,17 @@ export function estimateIvrCampaignOutbound(
     : "workspace voice-capable numbers";
   const twilioAssumedDialAttemptsPerSecond =
     estimateTwilioDialAttemptsPerSecond(input.portalConfig);
-  const pipelineDialAttemptsPerSecond = LEGACY_IVR_PIPELINE_CPS;
   const configuredDispatcherDialAttemptsPerSecond = configuredDispatcherVoiceCps(
     input.portalConfig,
   );
+  // A successor is scheduled after the batch finishes. An otherwise idle
+  // worker misses that future job and sleeps until its next poll. The old
+  // queue-next + webhook-delay heuristic did not include this durable loop.
+  const batchSize = claimBatchSizeForRate(configuredDispatcherDialAttemptsPerSecond);
+  const pipelineDialAttemptsPerSecond = batchSize * 1000 /
+    Math.max(DISPATCH_TICK_MS, DEFAULT_WORKER_POLL_INTERVAL_MS);
   const effectiveDialAttemptsPerSecond = Math.min(
+    pipelineDialAttemptsPerSecond,
     configuredDispatcherDialAttemptsPerSecond,
     twilioAssumedDialAttemptsPerSecond,
   );
@@ -301,7 +308,7 @@ export function estimateIvrCampaignOutbound(
   }
   if (!input.portalConfig.parallelDispatchEnabled) {
     warnings.push(
-      "Legacy sequential IVR dispatch is still enabled (~1.4 dial starts/sec).",
+      "Legacy IVR batch sizing is enabled. The estimate includes the worker's idle polling interval.",
     );
   }
 
@@ -318,8 +325,8 @@ export function estimateIvrCampaignOutbound(
     warnings,
     footnotes: [
       "Dial-attempt rate reflects dial starts per second, not completed calls.",
-      "Rows are dequeued after each call completes; the estimate bounds completion by the concurrent call limit over the average in-flight call time (~75s: ring, menu, hang-up/voicemail).",
-      "Total IVR completion time also depends on ring time, answer rate, and call duration.",
+      "Queue rows are dequeued when a dial is accepted. Final calls can remain active after the queue finishes.",
+      "Planning assumes one dispatch worker at its default polling interval; provider and database latency, other jobs, recipient calling hours and retries can change the actual rate.",
     ],
   };
 }
