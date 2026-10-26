@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     rpcCreateOutreachAttempt: vi.fn(),
     insertCallForWorkspace: vi.fn(),
     dequeueQueueEntry: vi.fn(),
+    findCampaignInWorkspace: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -21,6 +22,11 @@ const mocks = vi.hoisted(() => {
 
 const creditsState = vi.hoisted(() => ({
   credits: 10 as number | null,
+}));
+
+vi.mock("@/lib/campaign-ivr.server", async importOriginal => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-ivr.server")>()),
+  findCampaignInWorkspace: mocks.findCampaignInWorkspace,
 }));
 
 // The recipient calling window is wall-clock dependent; pin it open so these
@@ -81,6 +87,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     mocks.rpcCreateOutreachAttempt.mockReset();
     mocks.insertCallForWorkspace.mockReset();
     mocks.dequeueQueueEntry.mockReset();
+    mocks.findCampaignInWorkspace.mockReset().mockResolvedValue({ id: 1, voicemail_drop_enabled: false, voicemail_file: null });
     mocks.logger.error.mockReset();
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
@@ -203,6 +210,20 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       workspaceId: "w1",
       reason: "IVR dial dispatched",
     });
+  });
+
+  test("the IVR API waits for the voicemail greeting when a drop is configured (#2774)", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValueOnce({ id: 1, voicemail_drop_enabled: true, voicemail_file: "drop.mp3" });
+    const create = vi.fn().mockResolvedValue({ sid: "CA1" });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: { create } });
+    const { action } = await import("../app/routes/api+/ivr");
+    const response = await asRouteResponse(action({ request: makeRequest({
+      to_number: "+1555", campaign_id: "1", workspace_id: "w1", contact_id: "2",
+      caller_id: "+1666", queue_id: "3", user_id: "u1",
+    }) } as never));
+    expect(response.status).toBe(200);
+    expect(mocks.findCampaignInWorkspace).toHaveBeenCalledWith("w1", "1");
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ machineDetection: "DetectMessageEnd" }));
   });
 
   test("returns 500 on errors (rpc/call insert/dequeue), with unknown error formatting", async () => {

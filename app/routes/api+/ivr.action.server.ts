@@ -1,4 +1,6 @@
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
+import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
@@ -77,6 +79,8 @@ export const action = defineAction({
       if (refusal) throw new Response(refusal, { status: 400 });
 
       const tdb = createTenantDb(workspace_id);
+      const campaign = await findCampaignInWorkspace(workspace_id, campaign_id);
+      if (!campaign) throw new AppError("Campaign not found", 404, ErrorCode.NOT_FOUND);
       outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
         contactId: Number(contact_id),
         campaignId: Number(campaign_id),
@@ -92,7 +96,7 @@ export const action = defineAction({
             to: to_number,
             from: caller_id,
             url: ivrUrls.flowUrl,
-            machineDetection: "Enable",
+            machineDetection: ivrMachineDetection(campaign),
             statusCallbackEvent: ["answered", "completed"],
             statusCallback: ivrUrls.statusCallback,
           }),

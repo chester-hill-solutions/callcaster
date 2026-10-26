@@ -56,6 +56,26 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     vi.mocked(createSignedObjectUrl).mockResolvedValue("https://signed");
   });
 
+  test.each(["machine_end_beep", "machine_end_silence", "machine_end_other"])(
+    "plays the configured drop for the documented greeting-end result %s (#2774)",
+    async (answeredBy) => {
+      vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
+        workspace: "w1", campaign_id: 1,
+        campaign: { voicemail_drop_enabled: true, voicemail_file: "campaign-message.mp3", script: { steps: {
+          pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1", type: "say", text: "Human script" } },
+        } } },
+      } as never);
+      const { action } = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+      const response = await action({ params: { campaignId: "1", pageId: "page_1" }, request: new Request("http://x", {
+        method: "POST", headers: { "x-twilio-signature": "sig" },
+        body: new URLSearchParams({ CallSid: "CA1", AnsweredBy: answeredBy }),
+      }) } as never);
+      const xml = await response.text();
+      expect(xml).toContain("<Play>https://signed</Play>");
+      expect(xml).not.toContain("Human script");
+    },
+  );
+
   test("returns 400 when required params missing", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const res = await asRouteResponse(mod.action({

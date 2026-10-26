@@ -68,6 +68,17 @@ describe("sendCampaignTestCall", () => {
     mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA123" });
   });
 
+  test("test calls use the saved voicemail policy and wait for the greeting end (#2774)", async () => {
+    const row = campaign({ voicemail_drop_enabled: true, voicemail_file: "campaign-message.mp3" });
+    mocks.findFirst.mockImplementationOnce(async ({ columns }: { columns: Record<string, boolean> }) =>
+      Object.fromEntries(Object.entries(row).filter(([key]) => columns[key])),
+    );
+    const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
+    const result = await sendCampaignTestCall(baseArgs);
+    expect(result.ok).toBe(true);
+    expect(mocks.callsCreate).toHaveBeenCalledWith(expect.objectContaining({ machineDetection: "DetectMessageEnd" }));
+  });
+
   test.each(["robocall", "simple_ivr", "complex_ivr"])("places a %s test call with no outreach attempt", async (type) => {
     mocks.findFirst.mockResolvedValue(campaign({ type }));
     const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");

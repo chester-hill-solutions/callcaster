@@ -9,6 +9,7 @@ import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
+import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
 import { createTenantDb } from "@/server/tenant-db";
 
 /** Campaign types whose test is a phone call through the IVR flow. */
@@ -81,7 +82,7 @@ export async function sendCampaignTestCall(args: {
   const tdb = createTenantDb(workspaceId);
   const campaign = await tdb.campaign.findFirst({
     where: eq(campaignTable.id, Number(campaignId)),
-    columns: { id: true, type: true, caller_id: true, script_id: true },
+    columns: { id: true, type: true, caller_id: true, script_id: true, voicemail_drop_enabled: true, voicemail_file: true },
   });
   if (!campaign) return failure("not_found");
   if (!campaign.type || !VOICE_TEST_CAMPAIGN_TYPES.has(campaign.type)) {
@@ -102,7 +103,7 @@ export async function sendCampaignTestCall(args: {
           to,
           from: callerId,
           url: urls.flowUrl,
-          machineDetection: "Enable",
+          machineDetection: ivrMachineDetection(campaign),
           statusCallbackEvent: ["answered", "completed"],
           statusCallback: urls.statusCallback,
         }),
