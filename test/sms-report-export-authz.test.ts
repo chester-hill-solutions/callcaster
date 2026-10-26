@@ -184,9 +184,18 @@ beforeEach(() => {
 
 describe("SMS report history authorization", () => {
   test.each(roles)(
-    "%s receives only authorized entries through the service and API",
+    "%s has the expected service and API history access",
     async (role) => {
       fixtures.memberships.set(`${WORKSPACE}/${USER}`, role);
+      if (role === "caller") {
+        await expect(listWorkspaceExportsApi(USER, WORKSPACE)).rejects.toMatchObject({ statusCode: 403 });
+        const response = await history();
+        expect(response.status).toBe(403);
+        expectNoReport(await response.json());
+        expect(fixtures.list).not.toHaveBeenCalled();
+        expect(fixtures.download).not.toHaveBeenCalled();
+        return;
+      }
       const result = await listWorkspaceExportsApi(USER, WORKSPACE);
       const response = await history();
       expect(result.ok).toBe(true);
@@ -194,7 +203,7 @@ describe("SMS report history authorization", () => {
       const body = await response.json();
       expect(body).toEqual({ exports: result.ok ? result.exports : [] });
       const ids = body.exports.map((entry: { id: string }) => entry.id);
-      if (role === "caller" || role === "member") {
+      if (role === "member") {
         expect(ids).toEqual(["ordinary"]);
         expectNoReport(body);
       } else {
@@ -231,9 +240,16 @@ describe("SMS report history authorization", () => {
           }) as never,
         ),
       );
+      if (role === "caller") {
+        expect(response.status).toBe(403);
+        expectNoReport(await response.json());
+        expect(fixtures.list).not.toHaveBeenCalled();
+        expect(fixtures.download).not.toHaveBeenCalled();
+        return;
+      }
       expect(response.status).toBe(200);
       const body = await response.json();
-      if (role === "caller" || role === "member") {
+      if (role === "member") {
         expect(body.exports.map((entry: { id: string }) => entry.id)).toEqual([
           "ordinary",
         ]);
@@ -253,8 +269,10 @@ describe("SMS report history authorization", () => {
     fixtures.memberships.set(`${WORKSPACE}/${USER}`, "caller");
     fixtures.memberships.set(`${OTHER_WORKSPACE}/${USER}`, "admin");
     const response = await history();
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
     expectNoReport(await response.json());
+    expect(fixtures.list).not.toHaveBeenCalled();
+    expect(fixtures.download).not.toHaveBeenCalled();
   });
 
   test("a nonmember gets 404 before any storage access, even as owner elsewhere", async () => {
@@ -307,12 +325,18 @@ describe("SMS report status and private download links", () => {
   );
 
   test.each(roles)(
-    "%s can still obtain an ordinary export download link",
+    "%s uses its role for ordinary export download links",
     async (role) => {
       fixtures.memberships.set(`${WORKSPACE}/${USER}`, role);
       const response = await status("ordinary");
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual(ordinaryExport());
+      if (role === "caller") {
+        expect(response.status).toBe(403);
+        expectNoReport(await response.json());
+        expect(fixtures.download).not.toHaveBeenCalled();
+      } else {
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(ordinaryExport());
+      }
     },
   );
 

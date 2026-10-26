@@ -88,6 +88,8 @@ When a pipeline gains caller-dependent authorization, inventory HTTP and worker
 callers. Pass the authenticated user for requests and explicit system authority
 for trusted jobs without a user. Test identity forwarding separately from SQL
 row filtering; an all-users fixture cannot prove those boundaries.
+For role-floor changes, search route and permission tests as well as function
+callers. Tests for a related artifact can pin old access on the same surface.
 
 For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
