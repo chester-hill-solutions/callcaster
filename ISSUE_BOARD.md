@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@a6bf46ff` · 344 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Selected review on 2026-10-26 at `dev@a4d22ee5`: **#2616 only**. Unselected entries, Project statuses and the inventory total of **344** remain cached from the checked-in `dev@a6bf46ff` snapshot. This is not a full board refresh. Refresh with `npm run tools:issues:board`.
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 21
+## Fix now — 22
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -271,6 +271,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: All four assertions passed inside the parent-approved sandbox against a private PostgreSQL 18. (1) An API key whose scopes array was EMPTY returned HTTP 200 {success:true, response_id:"1", result_id:"e58565fd-8a3c-4fc4-ba6a-052fb360a65d"} and a survey_response row was created for that key's own survey. (2) A key whose…
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A route the inventory and the published OpenAPI spec declare session-only must reject workspace API keys, and a key that reaches a write path must have the capability that write requires. The platform's documented rule is that an empty scope allowlist denies (app/lib/capabilities.ts:45).
+
+---
+
+### [#2616](https://github.com/chester-hill-solutions/callcaster/issues/2616) Give contact search and its clear button explicit accessible names
+- **IN PROGRESS** · Verdict: **Fix now** · Size: XS · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
+- PR #3010 gives Contacts search and Clear search persistent accessible names and returns focus to the field after clear. Review, merge and deployed acceptance remain.
+- Current behavior: At dev@a4d22ee5, ContactsPage identifies its search input only by placeholder and renders an unnamed Clear button. When clear removes that button, no input ref restores focus. The reviewed candidate is in open PR #3010; it is not merged into dev or master.
+- Root cause: The search input has no stable ID/label association. The conditional icon button has no accessible name, and its click handler only changes URL parameters before the focused button disappears.
+- Resolution: Review PR #3010 and its latest exact-head checks. The fix uses the canonical nested FormFieldControl, a useId-backed Search contacts label, a native Input ref and a Clear search name. Keep the existing URL handler and shared control styling. Verify on deployed dev after merge, then complete release acceptance.
+- Look in: `app/components/contacts/ContactsPage.tsx`, `app/components/ui/form-field.tsx`, `test/ui/contacts-page-a11y.test.tsx`, `test/ui/contacts-route-outlet.test.tsx`
+- Existing tests: PR #3010 extends the real-router contacts accessibility suite to seven cases, retaining both old controls. The focused run passes 21 cases with route outlet and shared FormField coverage. It checks persistent names and IDs, pointer/Enter/Space clear, focus return, controlled loader results, q removal, page reset and preserved sort/repeated tag values.; Fresh original-source control: five failures and two passing controls. Removing only focus return fails three cases with four controls passing; removing only the Clear name fails four with three passing. The candidate is restored byte-for-byte. Focused lint retains 17 baseline source warnings and zero test warnings.; Source head 3de12c56 passes full ci:local: 5,973 Node, 34 Bun and 1,546 UI tests, with 11 existing skips; guards, production build, bundle check and codegen verification pass.; Post-CI real-browser comparisons match baseline input, wrapper and Clear-button bounds in light/dark at 390/1100 px container widths. The Clear target remains 42 by 40 px. Pointer, Enter and Space return visible focus to the same named input and preserve the required URL values. Names persist with one or zero matches. No mobile viewport emulation is claimed.
+- Missing tests: After merge, verify actual Contacts search and clear on deployed dev and complete release acceptance. Local tests and browser checks use a controlled loader; they do not prove production authentication, database filtering or the full workspace shell.
+- Done when: Search contacts has a persistent accessible name, including when no contacts match.; Clear search has an explicit name and preserves the existing target size and shared styling.; Pointer, Enter and Space clear the query, reset page to 1, retain unrelated parameters and return focus to the same input.; Keep edit links, empty-state composition and shared Input/Button behavior.
+- Tracker: Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, Project Status In progress; Priority, Effort and Enviornment unset; no milestone, hierarchy or dependencies. PR #3010 is open into dev and Development-linked only to #2616. Keep open for merge, deployed verification and default-branch release acceptance.
 
 ---
 
@@ -1710,7 +1724,7 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 188
+## Needs triage — 187
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
@@ -2347,10 +2361,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2617](https://github.com/chester-hill-solutions/callcaster/issues/2617) Use CHS action variants for contact custom fields
-- Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2616](https://github.com/chester-hill-solutions/callcaster/issues/2616) Give contact search and its clear button explicit accessible names
 - Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
