@@ -1,3 +1,8 @@
+/** A request user or an explicit trusted background job. */
+export type CampaignExportActor =
+  | { kind: "user"; userId: string }
+  | { kind: "system" };
+
 export interface ExportContact {
   id: number | string;
   firstname?: string | null;

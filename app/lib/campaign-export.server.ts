@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { getUserRole, requireWorkspaceAccess } from "@/lib/workspace-membership.server";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { csvRow } from "@/lib/csv";
 
 /**
@@ -47,6 +49,7 @@ import {
   type CampaignExportStatus,
 } from "@/lib/campaign-export-helpers.server";
 import type {
+  CampaignExportActor,
   ExportAttemptWithDetails,
   ExportCall,
   ExportCampaign,
@@ -388,6 +391,13 @@ export async function processCampaignSmsReportExport(
   }
 }
 
+async function callExportUserScope(workspaceId: string, actor: CampaignExportActor): Promise<string | null> {
+  if (actor.kind === "system") return null;
+  await requireWorkspaceAccess({ user: { id: actor.userId }, workspaceId });
+  const role = await getUserRole({ user: { id: actor.userId }, workspaceId });
+  return hasMinRole(role?.role, MemberRole.Member) ? null : actor.userId;
+}
+
 // Process call campaign export in chunks
 
 export async function processCallCampaignExport(
@@ -395,7 +405,9 @@ export async function processCallCampaignExport(
   workspaceId: string,
   exportId: string,
   campaignName: string,
+  actor: CampaignExportActor,
 ) {
+  const scopedUserId = await callExportUserScope(workspaceId, actor);
   let statusData: CampaignExportStatus = createInitialExportStatus({
     exportId,
     campaignName,
@@ -432,6 +444,7 @@ export async function processCallCampaignExport(
     const totalAttempts = await countExportOutreachAttempts(
       workspaceId,
       campaignId,
+      scopedUserId,
     );
     const ATTEMPT_CHUNK_SIZE = 100;
     let processedAttempts = 0;
@@ -443,6 +456,7 @@ export async function processCallCampaignExport(
         campaignId,
         offset,
         ATTEMPT_CHUNK_SIZE,
+        scopedUserId,
       );
 
       if (!attempts || attempts.length === 0) {

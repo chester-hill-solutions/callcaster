@@ -154,6 +154,7 @@ export async function campaignExportHandler(
       workspaceId,
       exportId,
       campaignName,
+      job.user_id ? { kind: "user", userId: job.user_id } : { kind: "system" },
     );
   } else {
     throw new Error(`campaign_export: unsupported campaign type ${campaignType}`);

@@ -88,7 +88,7 @@ export const action = defineAction({
       await requireWorkspaceAccess({
         user,
         workspaceId: workspaceId.toString(),
-        ...(exportType === "sms-report" ? { minRole: "admin" } : {}),
+        minRole: exportType === "sms-report" ? "admin" : "member",
       });
 
       const numericCampaignId = Number(campaignId);
@@ -135,6 +135,7 @@ export const action = defineAction({
             workspaceId.toString(),
             exportId,
             campaignRow.title || "",
+            { kind: "user", userId: user.id },
           ),
           "campaign_export.background_failed",
           { exportId, campaignId, workspaceId },

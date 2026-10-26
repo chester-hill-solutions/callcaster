@@ -35,7 +35,7 @@ export const loader = defineLoader({
 
       // Defense-in-depth: ensure the requesting user can access the workspace whose
       // export status they are attempting to read.
-      await requireWorkspaceAccess({ user, workspaceId });
+      await requireWorkspaceAccess({ user, workspaceId, minRole: "member" });
 
       // Download the status file from object storage
       let statusBuffer: Buffer;

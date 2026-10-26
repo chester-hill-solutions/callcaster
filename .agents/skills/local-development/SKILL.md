@@ -84,6 +84,11 @@ Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.
 
+When a pipeline gains caller-dependent authorization, inventory HTTP and worker
+callers. Pass the authenticated user for requests and explicit system authority
+for trusted jobs without a user. Test identity forwarding separately from SQL
+row filtering; an all-users fixture cannot prove those boundaries.
+
 For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the

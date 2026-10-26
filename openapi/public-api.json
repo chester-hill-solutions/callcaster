@@ -2179,7 +2179,7 @@
       "post": {
         "operationId": "postCampaign_export",
         "summary": "POST /api/campaign-export",
-        "description": "",
+        "description": "Requires the member role or higher for campaign CSV exports. SMS reports require admin or owner.",
         "tags": [
           "Analytics & Export",
           "User API"
@@ -2247,7 +2247,7 @@
       "get": {
         "operationId": "getCampaign_export_status",
         "summary": "GET /api/campaign-export-status",
-        "description": "",
+        "description": "Requires the member role or higher. SMS-report status and download links require admin or owner.",
         "tags": [
           "Analytics & Export",
           "User API"
@@ -9452,7 +9452,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_exports",
         "summary": "POST /api/workspaces/:workspaceId/exports",
-        "description": "",
+        "description": "Requires the member role or higher to start exports or list saved download links. SMS reports are visible only to admin or owner.",
         "tags": [
           "Analytics & Export",
           "User API"
@@ -9518,7 +9518,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_exports",
         "summary": "GET /api/workspaces/:workspaceId/exports",
-        "description": "",
+        "description": "Requires the member role or higher to start exports or list saved download links. SMS reports are visible only to admin or owner.",
         "tags": [
           "Analytics & Export",
           "User API"

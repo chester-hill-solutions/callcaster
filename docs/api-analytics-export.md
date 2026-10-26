@@ -17,6 +17,8 @@ Auth: `requireJsonAuth` (session cookie or `Authorization: Bearer <access_token>
 | GET/POST | `/api/workspaces/:workspaceId/exports` | Export job history / start async campaign CSV export (JSON `campaign_id`) |
 | GET | `/api/surveys/:surveyId/responses/export` | Survey responses CSV (`workspace_id` query required) |
 
+Campaign export creation, saved export lists, and export status require the `member`, `admin`, or `owner` workspace role. A `caller` cannot use these surfaces or obtain their saved download links. SMS-report creation, status, and download links keep the stricter `admin` or `owner` requirement.
+
 ## Campaign export (legacy flat path)
 
 | Method | Path | Purpose |
