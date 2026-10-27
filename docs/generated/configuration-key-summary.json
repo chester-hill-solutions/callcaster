@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "90b43acd82fc6c2958c824712d7a8dcf231af3e8ef15e8be44091240b3f9c731",
+    "recordDigest": "03eab21619a5fc5ccdc84c153d8496437f6cc5f16f7377674666ff98b1c5e585",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -551,6 +551,7 @@
       "app/lib/ivr-block-runtime.server.ts",
       "app/lib/ivr-gather.server.ts",
       "app/lib/ivr-initiate.server.ts",
+      "app/lib/ivr-machine-detection.ts",
       "app/lib/ivr-machine.server.ts",
       "app/lib/ivr-no-input.ts",
       "app/lib/ivr-option-value.ts",
@@ -1214,6 +1215,7 @@
       "app/routes/confirm-payment.tsx",
       "app/routes/docs.tsx",
       "app/routes/message-segment-calculator.tsx",
+      "app/routes/mock-checkout.$sessionId.tsx",
       "app/routes/other-services.loader.server.ts",
       "app/routes/other-services.tsx",
       "app/routes/pricing.loader.server.ts",
@@ -1398,6 +1400,8 @@
       "app/server/predictive-machine-continuation.server.ts",
       "app/server/predictive-machine-operation.server.ts",
       "app/server/predictive-successor-callback.server.ts",
+      "app/server/sim-profile-reconciliation.server.ts",
+      "app/server/sim-profile-status.server.ts",
       "app/server/survey-completion.ts",
       "app/server/tenant-db.ts",
       "app/sessions.server.tsx",
@@ -1420,6 +1424,7 @@
       "config/secret-provider.ts",
       "config/secrets-required.ts",
       "config/secrets.ts",
+      "config/server-runtime.ts",
       "docker-compose.dev.yml",
       "drizzle.config.ts",
       "e2e/.auth/admin.json",
@@ -1431,9 +1436,9 @@
       "e2e/fixtures/auth.ts",
       "e2e/fixtures/db.ts",
       "e2e/fixtures/factories.ts",
+      "e2e/fixtures/local-checkout.ts",
       "e2e/fixtures/realtime.ts",
       "e2e/fixtures/seed.ts",
-      "e2e/fixtures/stripe-mocks.ts",
       "e2e/fixtures/test-base.ts",
       "e2e/fixtures/twilio-mocks.ts",
       "e2e/fixtures/ui-helpers.ts",
@@ -1451,14 +1456,7 @@
       "e2e/pages/WorkspacePage.ts",
       "e2e/playwright.config.ts",
       "e2e/playwright.sim.config.ts",
-      "e2e/sim-playwright-report/data/df9469f717f2ea8485df9d9ad7bdd4be67553a74.md",
-      "e2e/sim-playwright-report/trace/assets/codeMirrorModule-LEHpjmcn.js",
-      "e2e/sim-playwright-report/trace/assets/defaultSettingsView-BNmKHKpQ.js",
-      "e2e/sim-playwright-report/trace/assets/urlMatch-BYQrIQwR.js",
-      "e2e/sim-playwright-report/trace/index.DMMX1gXU.js",
-      "e2e/sim-playwright-report/trace/snapshot.v8KI4P3m.js",
-      "e2e/sim-playwright-report/trace/sw.bundle.js",
-      "e2e/sim-playwright-report/trace/uiMode.Ut8wwJNp.js",
+      "e2e/sim-playwright-report/data/c1ea5853bb812d907307d8225598bdc1ed15ca23.md",
       "e2e/sim/config.ts",
       "e2e/sim/global-setup.ts",
       "e2e/sim/personas/catalog.ts",
@@ -1572,6 +1570,7 @@
       "scripts/db/check-schema-drift.mjs",
       "scripts/db/check-schema-enums.mjs",
       "scripts/db/clone-database.sh",
+      "scripts/db/migrate-local.mjs",
       "scripts/db/reconcile-stuck-calls.ts",
       "scripts/db/recover-predictive-successor.ts",
       "scripts/delete-legacy-routes.mjs",
@@ -1712,10 +1711,12 @@
       "test/admin-dead-letters-requeue.route.test.ts",
       "test/admin-jobs.server.test.ts",
       "test/admin-response-projection.test.ts",
+      "test/admin-user-partial-update.test.ts",
       "test/admin-workspace-credits.route.test.ts",
       "test/admin-workspace-twilio.route.test.ts",
       "test/admin-workspaces.lib.test.ts",
       "test/admin.route.test.ts",
+      "test/affected-row-count.test.ts",
       "test/agent-status-temporal.test.ts",
       "test/agent-status.route.test.ts",
       "test/api-auth-callback.route.test.ts",
@@ -1896,6 +1897,7 @@
       "test/contact-form.route.test.ts",
       "test/contact-import-headers.test.ts",
       "test/contact-tenant-scope-unified.test.ts",
+      "test/contact-update-allowlist.test.ts",
       "test/contacts-action.server.test.ts",
       "test/contacts.route.test.ts",
       "test/contacts.search.server.test.ts",
@@ -1930,6 +1932,7 @@
       "test/dial-status.route.test.ts",
       "test/dial.route.test.ts",
       "test/dialer-start.route.test.ts",
+      "test/disabled-user-enforcement.test.ts",
       "test/docs-openapi.route.test.ts",
       "test/dotenv-secret-provider.test.ts",
       "test/e2e-webhook-signing.test.ts",
@@ -2085,6 +2088,7 @@
       "test/ivr-block.route.test.ts",
       "test/ivr-gather.test.ts",
       "test/ivr-initiate.server.test.ts",
+      "test/ivr-machine-detection.test.ts",
       "test/ivr-option-value.test.ts",
       "test/ivr-page.route.test.ts",
       "test/ivr-results.test.ts",
@@ -2386,6 +2390,7 @@
       "test/ui/campaign-export-button.test.tsx",
       "test/ui/campaign-export-lifecycle.test.tsx",
       "test/ui/campaign-launch-actions.test.tsx",
+      "test/ui/campaign-launch-ivr-estimate.test.tsx",
       "test/ui/campaign-launch-review.test.tsx",
       "test/ui/campaign-launch-sms-warnings.test.tsx",
       "test/ui/campaign-message-attachments.test.tsx",
@@ -3271,7 +3276,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 39,
+      "sourceCount": 40,
       "dynamic": true,
       "classification": "secret",
       "owner": "app",
@@ -3575,26 +3580,6 @@
       "migrationTarget": "config.services.scripts"
     },
     {
-      "key": "E2E_STRIPE_SESSION",
-      "sourceKinds": [
-        "script-input"
-      ],
-      "consumers": [
-        "e2e"
-      ],
-      "environments": [
-        "shared"
-      ],
-      "usages": [
-        "write"
-      ],
-      "sourceCount": 1,
-      "dynamic": false,
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling"
-    },
-    {
       "key": "E2E_TEST",
       "sourceKinds": [
         "runtime-read"
@@ -3685,7 +3670,7 @@
         "declaration",
         "read"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "scripts",
@@ -4040,7 +4025,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 26,
+      "sourceCount": 27,
       "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "app",
@@ -4758,7 +4743,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 4,
+      "sourceCount": 5,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "app",
@@ -4788,18 +4773,21 @@
       "key": "RAILWAY_PROJECT_ID",
       "sourceKinds": [
         "github-variable",
-        "github-workflow-env"
+        "github-workflow-env",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "ci"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 6,
+      "sourceCount": 7,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "ci",

@@ -231,12 +231,6 @@
       "migrationTarget": "config.services.scripts"
     },
     {
-      "key": "E2E_STRIPE_SESSION",
-      "classification": "non-secret-config",
-      "owner": "local-tooling",
-      "migrationTarget": "config.services.local-tooling"
-    },
-    {
       "key": "E2E_TEST",
       "classification": "non-secret-config",
       "owner": "app",
@@ -1032,7 +1026,7 @@
     },
     {
       "sourceFile": "e2e/sim/config.ts",
-      "line": 16,
+      "line": 19,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "sim",
