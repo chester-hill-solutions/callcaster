@@ -3,15 +3,15 @@
 ## Quick start
 
 ```bash
-make up           # start Postgres and Inbucket without changing database data
-make storage      # start Stow and ensure the object-storage bucket
-make app          # starts in background; logs: make app-logs
-make tunnel       # starts in background; logs: make tunnel-logs
+make all          # start the complete local stack in dependency order
 make calling:sync-local
-make worker       # starts in background; logs: make worker-logs
-# Optional: live dashboard audio, transcription, and coaching
-make media-stream
 ```
+
+`make all` starts Postgres and Inbucket, Stow, the app, the worker, the
+media-stream service, and the named Cloudflare Tunnel. It preserves database
+data. Run `make calling:sync-local` separately because it changes Twilio
+webhook configuration. For individual services, use `make up`, `make storage`,
+`make app`, `make worker`, `make media-stream`, or `make tunnel`.
 
 This is for returning developers with `.env.local`, `DEV_NAME`, `ENV`, and an
 already-created named Cloudflare Tunnel configured. For first-time setup, use
@@ -178,11 +178,11 @@ Set the stable public URL in `.env.local`:
 BASE_URL=https://sai-local.callcaster.ca
 ```
 
-Start the app before starting the tunnel. Both commands return immediately:
+Start the local stack with `make all`. It starts the app before the tunnel, and
+all process commands return immediately:
 
 ```bash
-make app
-make tunnel
+make all
 make local-status
 ```
 
@@ -216,9 +216,7 @@ Initialize the local services after setting the local environment values. For
 returning developers, use the non-destructive commands:
 
 ```bash
-make up                    # start Postgres and Inbucket; preserves database data
-make storage               # start Stow and ensure the bucket
-make app                   # terminal 1
+make all                   # start the complete stack; preserves database data
 ```
 
 Use `make init` only for first-time setup or when you intentionally want to
@@ -232,7 +230,8 @@ make twiml
 make calling:sync-local
 ```
 
-The worker and media-stream are optional and do not need the tunnel URL:
+The worker and media-stream do not need the tunnel URL. Start them separately
+only when you do not use `make all`:
 
 ```bash
 make worker                # background process, when needed
@@ -294,14 +293,15 @@ The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scri
 
 | Command | What it does |
 |---|---|
+| `make all` | Start the complete local stack in dependency order; preserves database data |
 | `make up` / `make down` / `make logs` | Start, stop, or follow logs for Postgres and Inbucket |
 | `make postgres up`, `make postgres logs` | Start or follow logs for a selected Compose service |
 | `make storage` / `make storage down` | Start or stop the Stow S3-compatible object store; `make storage` also ensures the bucket exists |
 | `make postgres init` | Start Postgres and reset/bootstrap the local schema; destructive to local database data |
 | `make ps` | Compose status |
-| `make app` | Run the React Router web app in the foreground |
-| `make worker` | Run the background job worker in the foreground; required for list uploads and other queued work |
-| `make media-stream` | Run the optional media-stream WebSocket service in the foreground; needed for dashboard audio, live transcription, and coaching |
+| `make app` | Start the React Router web app in the background |
+| `make worker` | Start the background job worker in the background; required for list uploads and other queued work |
+| `make media-stream` | Start the optional media-stream WebSocket service in the background; needed for dashboard audio, live transcription, and coaching |
 | `make help` | This list |
 
 Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
@@ -415,14 +415,15 @@ It runs these steps:
 6. Ensure the Stow bucket exists.
 7. Seed test users, workspaces, and campaigns.
 
-For returning developers who need to preserve local data, use `make up` and
-`make storage` instead of `make init`.
+For returning developers who need to preserve local data, use `make all`
+instead of `make init`.
 
 The Make targets for the common individual service operations are listed in
-[Service control](#service-control). In particular, use `make up` for Compose
-services, `make storage` for Stow and its bucket, and `make postgres init` for
-the Postgres bootstrap. For a full repair, use `make init` instead of running
-the underlying Node scripts by hand.
+[Service control](#service-control). In particular, use `make all` for the
+complete local stack, or use `make up` for Compose services and `make storage`
+for Stow and its bucket. Use `make postgres init` for the Postgres bootstrap.
+For a full repair, use `make init` instead of running the underlying Node
+scripts by hand.
 
 The optional media-stream service listens on `MEDIA_STREAM_PORT` (default
 `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you
