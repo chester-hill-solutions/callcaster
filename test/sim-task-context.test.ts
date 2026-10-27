@@ -46,6 +46,7 @@ describe("typed SIM task boundary", () => {
     expect(fills).toEqual([
       "#email:person.a@sai-local.callcaster.ca",
       "#password:password-value",
+      "#password:",
     ]);
     expect(credential).toHaveBeenCalledTimes(1);
   });
