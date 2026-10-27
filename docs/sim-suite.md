@@ -48,6 +48,10 @@ add credits, seed data, or enable geo permissions. Sender attachment remains a
 separate explicit command. These commands refuse dev, QA, production, and hosted
 runtime identities. A provider resource that cannot be proved to belong to the
 SIM workspace causes a safe failure; resolve that state manually before retrying.
+If status reports `manual-recovery`, Twilio may have created an API key but the
+one-time secret was not saved. Do not retry key creation. An administrator must
+inspect the child account, revoke any unusable key, and restore the workspace's
+canonical credentials before provisioning can continue.
 
 ```bash
 npm run sim:sender:status -- --persona <key>
