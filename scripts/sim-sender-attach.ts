@@ -7,7 +7,8 @@ import { env } from "../app/lib/env.server";
 function args(argv: string[]) {
   const result: Record<string, string | boolean> = {};
   for (let i = 0; i < argv.length; i++) {
-    const flag = argv[i]!;
+    const flag = argv[i];
+    if (!flag) throw new Error("Unsupported argument");
     if (flag === "--compliance-attested") result[flag] = true;
     else if (["--persona", "--phone"].includes(flag)) result[flag] = argv[++i] ?? "";
     else throw new Error("Unsupported argument");

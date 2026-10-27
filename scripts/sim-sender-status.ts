@@ -5,7 +5,9 @@ import { getSimSenderStatusInDatabase } from "../app/server/sim-sender-attachmen
 async function main() {
   const argv = process.argv.slice(2);
   if (argv.length !== 2 || argv[0] !== "--persona") throw new Error("Usage: npm run sim:sender:status -- --persona <key>");
-  const profile = await resolveSimRuntimeProfile({ personaKey: argv[1]!, runtimeEnvironment: await readRuntimeEnvironment() });
+  const personaKey = argv[1];
+  if (!personaKey) throw new Error("Usage: npm run sim:sender:status -- --persona <key>");
+  const profile = await resolveSimRuntimeProfile({ personaKey, runtimeEnvironment: await readRuntimeEnvironment() });
   if (profile.environment !== "local" || !["person-a", "person-b"].includes(profile.personaKey)) throw new Error("Only approved local SIM personas are allowed");
   const status = await getSimSenderStatusInDatabase(profile);
   console.log(JSON.stringify({ ...status, persona: profile.personaKey, workspaceMarker: profile.workspaceMarker }));

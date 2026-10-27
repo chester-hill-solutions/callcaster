@@ -7,14 +7,18 @@ async function markedWorkspace(profile: ResolvedSimProfile) {
   const [{ db }] = await Promise.all([import("@/server/db")]);
   const rows = await db.select({ id: workspace.id, data: workspace.twilio_data }).from(workspace).where(and(eq(workspace.name, profile.workspaceName), eq(workspace.sim_marker, profile.workspaceMarker)));
   if (rows.length !== 1) throw new Error("Marked SIM workspace is missing or ambiguous");
-  return rows[0]!;
+  const row = rows[0];
+  if (!row) throw new Error("Marked SIM workspace is missing or ambiguous");
+  return row;
 }
 
 async function markedWorkspaceId(profile: ResolvedSimProfile): Promise<string> {
   const [{ db }] = await Promise.all([import("@/server/db")]);
   const rows = await db.select({ id: workspace.id }).from(workspace).where(and(eq(workspace.name, profile.workspaceName), eq(workspace.sim_marker, profile.workspaceMarker)));
   if (rows.length !== 1) throw new Error("Marked SIM workspace is missing or ambiguous");
-  return rows[0]!.id;
+  const row = rows[0];
+  if (!row) throw new Error("Marked SIM workspace is missing or ambiguous");
+  return row.id;
 }
 
 async function withSimSenderTransaction<T>(workspaceId: string, fn: (repo: SenderRepository) => Promise<T>): Promise<T> {

@@ -200,6 +200,16 @@ export async function createBillingCheckoutSession(args: {
       ? await ensureStripeCustomer(workspaceId)
       : null;
   if (customerResult && !customerResult.ok) return customerResult;
+  const stripeCustomerId = customerResult?.ok
+    ? customerResult.stripeCustomerId
+    : undefined;
+  if (checkoutProvider === "stripe" && !stripeCustomerId) {
+    return {
+      ok: false as const,
+      error: "Billing is not ready for this workspace yet.",
+      status: 400,
+    };
+  }
 
   try {
     const baseUrl = new URL(requestUrl).origin;
@@ -219,7 +229,7 @@ export async function createBillingCheckoutSession(args: {
           return Promise.resolve(record);
         })()
       : createStripeClient().checkout.sessions.create({
-          customer: customerResult!.stripeCustomerId,
+          customer: stripeCustomerId,
           payment_method_types: ["card"],
           line_items: [
             {
