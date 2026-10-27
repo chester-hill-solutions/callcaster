@@ -13,7 +13,7 @@ import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { Json } from "@/lib/db-types";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
@@ -61,7 +61,7 @@ export const loader = defineLoader({
   const [workspaceNumbers, contactData, smsCampaigns, portalConfig] =
     await Promise.all([
     tdb.workspace_number.findMany({
-      where: eq(workspaceNumberTable.type, "rented"),
+      where: or(eq(workspaceNumberTable.type, "rented"), eq(workspaceNumberTable.type, "sim_existing")),
     }),
     contact_number
       ? fetchContactData(
