@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Add explicit, local-only SIM Twilio workspace provisioning and redacted status commands. Refs #2828.
+
 - Added a local-only SIM sender attachment command for an existing, provider-verified workspace sender. It does not buy or change provider resources and records the operator's compliance attestation without treating provider capabilities as proof ([#2828](https://github.com/chester-hill-solutions/callcaster/issues/2828)).
 - Fixed: IVR queue estimates include durable worker polling and show consistent calls/minute units ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Fixed: IVR voicemail drops wait for the recipient's greeting to finish before playback, including campaign test calls. All documented machine greeting-end results use the voicemail path ([#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774)).

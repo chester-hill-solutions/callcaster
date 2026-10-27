@@ -9,6 +9,7 @@ Read-only profile checks are available before any browser or task flow:
 ```bash
 npm run sim:profile:list
 npm run sim:profile:status -- --persona person-a
+npm run sim:twilio:status -- --persona person-a
 npm run sim:profile:check-access -- --persona person-a --capability simulation.manage
 ```
 
@@ -28,6 +29,25 @@ transfer, rent, or release a number. It does not change Twilio state, attach a
 Messaging Service, or claim that the sender is compliant. The operator must
 separately attest that the planned traffic is approved and compliant; provider
 capabilities do not prove compliance. Use placeholders only in command examples:
+
+### Local Twilio workspace setup
+
+`sim:profile:ensure` creates or repairs SIM identity, credentials, membership,
+and audit data only. It does not call a provider. Before a real-provider SIM
+flow, explicitly inspect and provision its local workspace:
+
+```bash
+npm run sim:twilio:status -- --persona <key>
+npm run sim:twilio:ensure -- --persona <key>
+```
+
+The status command is read-only and redacted. Ensure creates a Twilio subaccount,
+API key, and Messaging Service for an exact existing marked local profile. It
+does not rent or attach a number, send SMS or calls, create Stripe customers,
+add credits, seed data, or enable geo permissions. Sender attachment remains a
+separate explicit command. These commands refuse dev, QA, production, and hosted
+runtime identities. A provider resource that cannot be proved to belong to the
+SIM workspace causes a safe failure; resolve that state manually before retrying.
 
 ```bash
 npm run sim:sender:status -- --persona <key>
