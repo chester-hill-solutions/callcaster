@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "b989ecc543723b962a50b080d8dc212d620aac8c153bd117ad7aeae0e515cb22",
+    "recordDigest": "f345df49a9d2944a578ace28285dc12a6d9fafccd5ac9010dab94e950f6f8445",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -698,6 +698,8 @@
       "app/lib/services/hooks-api.ts",
       "app/lib/sim-profile-reconciliation.server.ts",
       "app/lib/sim-profile-status.server.ts",
+      "app/lib/sim-sender-attachment.server.ts",
+      "app/lib/sim-twilio-provisioning.server.ts",
       "app/lib/sms-campaign-db.server.ts",
       "app/lib/sms-campaign-send-mode.ts",
       "app/lib/sms-provider-quantities.ts",
@@ -1215,6 +1217,8 @@
       "app/routes/confirm-payment.tsx",
       "app/routes/docs.tsx",
       "app/routes/message-segment-calculator.tsx",
+      "app/routes/mock-checkout.$sessionId.action.server.ts",
+      "app/routes/mock-checkout.$sessionId.loader.server.ts",
       "app/routes/mock-checkout.$sessionId.tsx",
       "app/routes/other-services.loader.server.ts",
       "app/routes/other-services.tsx",
@@ -1402,6 +1406,8 @@
       "app/server/predictive-successor-callback.server.ts",
       "app/server/sim-profile-reconciliation.server.ts",
       "app/server/sim-profile-status.server.ts",
+      "app/server/sim-sender-attachment.server.ts",
+      "app/server/sim-twilio-provisioning.server.ts",
       "app/server/survey-completion.ts",
       "app/server/tenant-db.ts",
       "app/sessions.server.tsx",
@@ -1456,7 +1462,7 @@
       "e2e/pages/WorkspacePage.ts",
       "e2e/playwright.config.ts",
       "e2e/playwright.sim.config.ts",
-      "e2e/sim-playwright-report/data/c1ea5853bb812d907307d8225598bdc1ed15ca23.md",
+      "e2e/sim-playwright-report/data/0c4144604a3b15545d070181d8d791e2d228ed42.md",
       "e2e/sim/config.ts",
       "e2e/sim/global-setup.ts",
       "e2e/sim/personas/catalog.ts",
@@ -1672,6 +1678,10 @@
       "scripts/sim-profile-ensure.ts",
       "scripts/sim-profile-list.ts",
       "scripts/sim-profile-status.ts",
+      "scripts/sim-sender-attach.ts",
+      "scripts/sim-sender-status.ts",
+      "scripts/sim-twilio-ensure.ts",
+      "scripts/sim-twilio-status.ts",
       "scripts/split-route-server-modules-v2.mjs",
       "scripts/stubs/postgres-client-stub.mjs",
       "scripts/sync-config-after-route-cleanup.mjs",
@@ -2257,7 +2267,9 @@
       "test/sim-profile-reconciliation.test.ts",
       "test/sim-profile-status.test.ts",
       "test/sim-runtime-context.test.ts",
+      "test/sim-sender-attachment.test.ts",
       "test/sim-task-context.test.ts",
+      "test/sim-twilio-provisioning.test.ts",
       "test/sms-action.route.test.ts",
       "test/sms-campaign-send-mode.test.ts",
       "test/sms-recipient-identity.test.ts",
@@ -3680,6 +3692,28 @@
       "migrationTarget": "config.generated.env"
     },
     {
+      "key": "FLY_APP_NAME",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.fly_app_name"
+    },
+    {
       "key": "GH_TOKEN",
       "sourceKinds": [
         "github-workflow-env"
@@ -3808,6 +3842,28 @@
       "classification": "generated-deployment-value",
       "owner": "app",
       "migrationTarget": "config.generated.host"
+    },
+    {
+      "key": "K_SERVICE",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.k_service"
     },
     {
       "key": "LABEL",
@@ -4028,7 +4084,7 @@
         "read",
         "write"
       ],
-      "sourceCount": 27,
+      "sourceCount": 31,
       "dynamic": true,
       "classification": "generated-deployment-value",
       "owner": "app",
@@ -4729,6 +4785,28 @@
       "migrationTarget": "config.generated.railway_dockerfile_path"
     },
     {
+      "key": "RAILWAY_ENVIRONMENT",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment"
+    },
+    {
       "key": "RAILWAY_ENVIRONMENT_ID",
       "sourceKinds": [
         "github-variable",
@@ -4800,11 +4878,13 @@
       "sourceKinds": [
         "github-variable",
         "github-workflow-env",
-        "runtime-read"
+        "runtime-read",
+        "script-input"
       ],
       "consumers": [
         "app",
-        "ci"
+        "ci",
+        "script"
       ],
       "environments": [
         "shared"
@@ -4813,7 +4893,7 @@
         "declaration",
         "read"
       ],
-      "sourceCount": 7,
+      "sourceCount": 11,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "ci",
@@ -6220,6 +6300,28 @@
       "classification": "generated-deployment-value",
       "owner": "scripts",
       "migrationTarget": "config.generated.userprofile"
+    },
+    {
+      "key": "VERCEL",
+      "sourceKinds": [
+        "runtime-read",
+        "script-input"
+      ],
+      "consumers": [
+        "app",
+        "script"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 4,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.vercel"
     },
     {
       "key": "VERIFICATION_PHONE_NUMBER",
