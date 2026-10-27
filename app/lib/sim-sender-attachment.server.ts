@@ -29,7 +29,8 @@ export async function attachSimSender(input: {
   const phone = normalizeSimPhone(input.phone);
   if (input.globalSender && normalizeSimPhone(input.globalSender) === phone) throw new SimSenderAttachmentError("Global fallback sender cannot be attached");
   if (input.providerRows.length !== 1) throw new SimSenderAttachmentError("Provider result is missing or ambiguous");
-  const provider = input.providerRows[0]!;
+  const provider = input.providerRows[0];
+  if (!provider) throw new SimSenderAttachmentError("Provider result is missing or ambiguous");
   if (provider.phoneNumber !== phone || !provider.sid || provider.accountSid !== input.expectedAccountSid) throw new SimSenderAttachmentError("Provider ownership does not match the requested sender");
   if (!provider.capabilities.sms) throw new SimSenderAttachmentError("Provider sender does not support SMS");
 
@@ -59,7 +60,8 @@ export async function getSimSenderStatus(profile: ResolvedSimProfile, workspaceI
   return transaction(async (repo) => {
     const rows = await repo.rows("");
     if (rows.length === 0) return { status: "missing" as const, phoneLast4: null, capabilities: null, provenance: null };
-    const row = rows[0]!;
+    const row = rows[0];
+    if (!row) return { status: "missing" as const, phoneLast4: null, capabilities: null, provenance: null };
     if (rows.length !== 1 || row.type !== "sim_existing" || row.workspace !== workspaceId || (row.capabilities as { simMarker?: string } | null)?.simMarker !== profile.workspaceMarker) return { status: "blocked" as const, phoneLast4: null, capabilities: null, provenance: null };
     return { status: "ready" as const, phoneLast4: row.phone_number?.slice(-4) ?? null, capabilities: (row.capabilities as { capabilities?: unknown })?.capabilities ?? null, provenance: (row.capabilities as { provenance?: unknown })?.provenance ?? null };
   });
