@@ -2,7 +2,7 @@ import type { ResolvedSimProfile } from "../../e2e/sim/personas";
 import { workspaceResourceName } from "@/lib/twilio-resource-name";
 import { invalidateWorkspaceTwilioData, loadWorkspaceTwilioData, mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
-export type SimTwilioReadiness = "ready" | "missing" | "partial" | "blocked";
+export type SimTwilioReadiness = "ready" | "missing" | "partial" | "manual-recovery" | "blocked";
 export type SimTwilioStatus = Readonly<{
   status: SimTwilioReadiness;
   persona: string;
@@ -27,6 +27,11 @@ export function simTwilioStatus(profile: ResolvedSimProfile, data: Record<string
   const subaccount = typeof data.sid === "string" && data.sid.length > 0 && typeof data.authToken === "string" && data.authToken.length > 0;
   const apiKey = typeof data.key === "string" && data.key.length > 0 && typeof data.token === "string" && data.token.length > 0;
   const messagingService = typeof messaging.serviceSid === "string" && messaging.serviceSid.length > 0;
+  // Twilio returns an API key secret once. The durable pending marker means a
+  // create may have succeeded without the secret reaching the canonical DB fields.
+  if (!apiKey && data.simTwilioKeyProvisioning === "pending") {
+    return { status: "manual-recovery", persona: profile.personaKey, profile: profile.runtimeIdentity, marker: profile.workspaceMarker, subaccount, apiKey, messagingService };
+  }
   const count = Number(subaccount) + Number(apiKey) + Number(messagingService);
   return { status: count === 3 ? "ready" : count === 0 ? "missing" : "partial", persona: profile.personaKey, profile: profile.runtimeIdentity, marker: profile.workspaceMarker, subaccount, apiKey, messagingService };
 }
@@ -100,6 +105,10 @@ export async function ensureSimTwilioProvisioning(
     data = { ...data, key: key.sid, token: key.secret };
   }
 
-  const serviceSid = await ensureSimMessagingService(workspaceId, row.name, client);
-  return simTwilioStatus(profile, { ...data, onboarding: { messagingService: { serviceSid } } });
+  await ensureSimMessagingService(workspaceId, row.name, client);
+  const saved = await loadWorkspaceTwilioData(workspaceId);
+  const savedWorkspace = await getSimProvisioningWorkspace(workspaceId, profile.workspaceMarker);
+  const result = simTwilioStatus(profile, { ...saved, key: savedWorkspace?.key, token: savedWorkspace?.token });
+  if (result.status !== "ready") throw new Error("SIM Twilio credentials were not durably saved; inspect redacted status before recovery");
+  return result;
 }

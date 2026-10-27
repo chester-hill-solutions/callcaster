@@ -30,6 +30,7 @@ describe("SIM Twilio provisioning boundary", () => {
     [{}, "missing", false, false, false],
     [{ sid: "AC-hidden", authToken: "secret" }, "partial", true, false, false],
     [{ sid: "AC-hidden", authToken: "secret", key: "SK-hidden", token: "secret", onboarding: { messagingService: { serviceSid: "MG-hidden" } } }, "ready", true, true, true],
+    [{ sid: "AC-hidden", authToken: "secret", simTwilioKeyProvisioning: "pending" }, "manual-recovery", true, false, false],
   ] as const)("reports only readiness for provider fields", (data, status, subaccount, apiKey, messagingService) => {
     expect(simTwilioStatus(localProfile, data as Record<string, unknown>)).toEqual({
       status, persona: "person-a", profile: "sai-local", marker: "sim:sai-local", subaccount, apiKey, messagingService,

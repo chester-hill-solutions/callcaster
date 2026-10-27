@@ -167,6 +167,7 @@ export async function getSimTwilioReadinessBits(workspaceId: string, marker: str
     subaccount: sql`(${workspace.twilio_data}::jsonb)->>'sid' <> '' and (${workspace.twilio_data}::jsonb)->>'authToken' <> ''`,
     apiKey: sql`${workspace.key} <> '' and ${workspace.token} <> ''`,
     messagingService: sql`(${workspace.twilio_data}::jsonb)->'onboarding'->'messagingService'->>'serviceSid' <> ''`,
+    keyRecovery: sql`(${workspace.twilio_data}::jsonb)->>'simTwilioKeyProvisioning' = 'pending'`,
   }).from(workspace).where(and(eq(workspace.id, workspaceId), eq(workspace.sim_marker, marker))).limit(1);
   return row ?? null;
 }

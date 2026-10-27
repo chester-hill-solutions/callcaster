@@ -16,8 +16,9 @@ export async function getSimTwilioStatusInDatabase(profile: ResolvedSimProfile) 
   const subaccount = bits.subaccount === true;
   const apiKey = bits.apiKey === true;
   const messagingService = bits.messagingService === true;
+  const apiKeyRecoveryPending = bits.keyRecovery === true && !apiKey;
   const count = Number(subaccount) + Number(apiKey) + Number(messagingService);
-  return { status: count === 3 ? "ready" as const : count === 0 ? "missing" as const : "partial" as const, persona: profile.personaKey, profile: profile.runtimeIdentity, marker: profile.workspaceMarker, subaccount, apiKey, messagingService };
+  return { status: apiKeyRecoveryPending ? "manual-recovery" as const : count === 3 ? "ready" as const : count === 0 ? "missing" as const : "partial" as const, persona: profile.personaKey, profile: profile.runtimeIdentity, marker: profile.workspaceMarker, subaccount, apiKey, messagingService };
 }
 
 export async function ensureSimTwilioInDatabase(profile: ResolvedSimProfile) {
