@@ -6,13 +6,25 @@ vi.stubEnv("NODE_ENV", "test");
 
 const requireWorkspaceAccess = vi.hoisted(() => vi.fn());
 const dbExecute = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/database/workspace.server", () => ({ requireWorkspaceAccess }));
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
+  requireWorkspaceAccess,
+}));
 vi.mock("@/server/admin-db", () => ({ adminDb: {} }));
 vi.mock("@/server/db", () => ({ db: { execute: dbExecute } }));
 vi.mock("@/server/tenant-db", () => ({ createTenantDb: vi.fn() }));
-vi.mock("@/lib/env.server", () => ({ env: new Proxy({}, { get: () => () => "unused" }) }));
-vi.mock("@/lib/logger.server", () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() } }));
-vi.mock("@/lib/workspace-events.server", () => ({ emitTransactionHistoryInsertEvent: vi.fn() }));
+vi.mock("@/lib/env.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/env.server")>()),
+  env: new Proxy({}, { get: () => () => "unused" }),
+}));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+}));
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-events.server")>()),
+  emitTransactionHistoryInsertEvent: vi.fn(),
+}));
 
 const workspaceId = "workspace-local-checkout";
 const userId = "billing-admin";
