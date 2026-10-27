@@ -1,43 +1,10 @@
-import { Form, redirect, useLoaderData } from "react-router";
-import { verifyAuth } from "@/lib/auth.server";
-import {
-  completeLocalMockCheckout,
-  getLocalMockCheckout,
-} from "@/lib/platform-billing.server";
+export { loader } from "./mock-checkout.$sessionId.loader.server";
+export { action } from "./mock-checkout.$sessionId.action.server";
 
-export async function loader({
-  request,
-  params,
-}: {
-  request: Request;
-  params: { sessionId?: string };
-}) {
-  await verifyAuth(request);
-  const session = getLocalMockCheckout(params.sessionId ?? "");
-  if (!session) throw new Response("Not found", { status: 404 });
-  return { creditAmount: session.creditAmount };
-}
-
-export async function action({
-  request,
-  params,
-}: {
-  request: Request;
-  params: { sessionId?: string };
-}) {
-  const { user } = await verifyAuth(request);
-  const result = await completeLocalMockCheckout({
-    userId: user.id,
-    sessionId: params.sessionId ?? "",
-  });
-  if (!result.ok) throw new Response("Not found", { status: 404 });
-  return redirect(
-    `/confirm-payment?session_id=${encodeURIComponent(params.sessionId ?? "")}`,
-  );
-}
+import { Form, useLoaderData } from "react-router";
 
 export default function MockCheckout() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<{ creditAmount: number }>();
   return (
     <main className="mx-auto max-w-md p-8">
       <h1>Local test checkout</h1>
