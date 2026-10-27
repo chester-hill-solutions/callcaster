@@ -7,6 +7,7 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import postgres from "postgres";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
 import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 
@@ -122,6 +123,9 @@ const coveredByBaseline = new Set([
   "20260713180000_chs_workspace_membership.sql",
   "20260722130000_contact_support_level_and_voter_list.sql",
 ]);
+const allMigrationFiles = readdirSync(path.join(rootDir, "client/migrations"))
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
 
 /**
  * Fail loudly when a migration is added to client/migrations/ but not wired in
@@ -140,8 +144,7 @@ const listed = new Set(
     .filter((step) => step.startsWith("client/migrations/"))
     .map((step) => path.basename(step)),
 );
-const unwired = readdirSync(path.join(rootDir, "client/migrations"))
-  .filter((file) => file.endsWith(".sql"))
+const unwired = allMigrationFiles
   .filter((file) => !listed.has(file) && !coveredByBaseline.has(file) && !coveredByLaterMigration.has(file))
   .sort();
 
@@ -164,3 +167,33 @@ await applySqlSteps({
   rootDir,
   label: "e2e-bootstrap",
 });
+
+const ledgerSql = postgres(databaseUrl, { max: 1, onnotice: () => {} });
+try {
+  await ledgerSql.unsafe(`
+    create schema if not exists auth_migrations;
+    create table if not exists auth_migrations.schema_migrations (
+      version text primary key
+    );
+    create table if not exists public.client_migration_bootstrap (
+      filename text primary key,
+      applied_at timestamptz not null default now()
+    );
+  `);
+  for (const filename of allMigrationFiles) {
+    const version = filename.match(/^(\d+)_/)?.[1];
+    await ledgerSql`
+      insert into auth_migrations.schema_migrations (version)
+      values (${version})
+      on conflict (version) do nothing
+    `;
+    await ledgerSql`
+      insert into public.client_migration_bootstrap (filename)
+      values (${filename})
+      on conflict (filename) do nothing
+    `;
+  }
+  console.log(`[e2e-bootstrap] migration ledgers updated (${allMigrationFiles.length} files)`);
+} finally {
+  await ledgerSql.end({ timeout: 5 });
+}
