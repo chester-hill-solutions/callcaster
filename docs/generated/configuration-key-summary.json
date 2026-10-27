@@ -3,7 +3,7 @@
   "generatedBy": "tools:config:inventory",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "03eab21619a5fc5ccdc84c153d8496437f6cc5f16f7377674666ff98b1c5e585",
+    "recordDigest": "b989ecc543723b962a50b080d8dc212d620aac8c153bd117ad7aeae0e515cb22",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2172,6 +2172,7 @@
       "test/platform-auth.test.ts",
       "test/platform-billing-checkout.test.ts",
       "test/platform-billing-confirm-redirect.test.ts",
+      "test/platform-billing-local-checkout.test.ts",
       "test/platform-billing-receipt.test.ts",
       "test/platform-data-queue-schema.test.ts",
       "test/platform-rate-limit.test.ts",
@@ -2235,6 +2236,7 @@
       "test/send-reset-password-email.server.test.ts",
       "test/send-verification-email.server.test.ts",
       "test/sentry.server.test.ts",
+      "test/server-runtime-checkout-provider.test.ts",
       "test/server-runtime.test.ts",
       "test/services-api.test.ts",
       "test/session-cookie-contract.test.ts",
@@ -2248,6 +2250,7 @@
       "test/signup.route.test.ts",
       "test/sim-browser-context-options.test.ts",
       "test/sim-contact-list.test.ts",
+      "test/sim-local-checkout-credits.test.ts",
       "test/sim-persona-catalog-validation.test.ts",
       "test/sim-persona-profile.test.ts",
       "test/sim-personas.test.ts",
@@ -4684,6 +4687,26 @@
       "migrationTarget": "config.generated.railway_deployment_draining_seconds"
     },
     {
+      "key": "RAILWAY_DEPLOYMENT_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_deployment_id"
+    },
+    {
       "key": "RAILWAY_DOCKERFILE_PATH",
       "sourceKinds": [
         "railway-variable"
@@ -4709,18 +4732,21 @@
       "key": "RAILWAY_ENVIRONMENT_ID",
       "sourceKinds": [
         "github-variable",
-        "github-workflow-env"
+        "github-workflow-env",
+        "runtime-read"
       ],
       "consumers": [
+        "app",
         "ci"
       ],
       "environments": [
         "shared"
       ],
       "usages": [
-        "declaration"
+        "declaration",
+        "read"
       ],
-      "sourceCount": 6,
+      "sourceCount": 7,
       "dynamic": false,
       "classification": "generated-deployment-value",
       "owner": "ci",
@@ -4792,6 +4818,26 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_project_id"
+    },
+    {
+      "key": "RAILWAY_SERVICE_ID",
+      "sourceKinds": [
+        "runtime-read"
+      ],
+      "consumers": [
+        "app"
+      ],
+      "environments": [
+        "shared"
+      ],
+      "usages": [
+        "read"
+      ],
+      "sourceCount": 1,
+      "dynamic": false,
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_service_id"
     },
     {
       "key": "RAILWAY_TOKEN",
