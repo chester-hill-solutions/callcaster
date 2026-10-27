@@ -243,6 +243,12 @@
       "migrationTarget": "config.services.app"
     },
     {
+      "key": "FLY_APP_NAME",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.fly_app_name"
+    },
+    {
       "key": "ELEVENLABS_API_KEY",
       "classification": "secret",
       "owner": "media-stream",
@@ -295,6 +301,12 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.integration_db_url"
+    },
+    {
+      "key": "K_SERVICE",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.k_service"
     },
     {
       "key": "LABEL",
@@ -559,6 +571,12 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_environment_id"
+    },
+    {
+      "key": "RAILWAY_ENVIRONMENT",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_environment"
     },
     {
       "key": "RAILWAY_ENVIRONMENT_NAME",
@@ -976,6 +994,12 @@
       "classification": "non-secret-config",
       "owner": "scripts",
       "migrationTarget": "config.services.scripts"
+    },
+    {
+      "key": "VERCEL",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.vercel"
     },
     {
       "key": "VITE_DEV_HOST",
