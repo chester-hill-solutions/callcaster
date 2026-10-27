@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.stubEnv("ENV", "dev");
+
 vi.mock("@/lib/env.server", () => {
-  const handler = { get: (_target: unknown, prop: string) => () => `test-${prop}` };
+  const handler = {
+    get: (_target: unknown, prop: string) => () => `test-${prop}`,
+  };
   return { env: new Proxy({}, handler) };
 });
 
@@ -22,16 +26,24 @@ vi.mock("@/lib/transaction-history.server", () => ({
 }));
 
 vi.mock("@/server/admin-db", () => ({ adminDb: {} }));
+vi.mock("@/server/db", () => ({ db: {} }));
 vi.mock("@/server/tenant-db", () => ({ createTenantDb: vi.fn() }));
-vi.mock("@/lib/database/stripe.server", () => ({ createStripeContact: vi.fn() }));
-vi.mock("@/lib/database/workspace.server", () => ({ requireWorkspaceAccess: vi.fn() }));
+vi.mock("@/lib/database/stripe.server", () => ({
+  createStripeContact: vi.fn(),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(),
+}));
 
 const WORKSPACE_ID = "c519a538-de2b-4957-84fb-f1fd9171e01d";
 const SESSION_ID = "cs_test_abc123";
 
 async function confirm() {
   const mod = await import("../app/lib/platform-billing.server");
-  return mod.confirmStripeCheckoutSessionForRedirect({ sessionId: SESSION_ID });
+  return mod.confirmStripeCheckoutSessionForRedirect({
+    sessionId: SESSION_ID,
+    userId: "test-user",
+  });
 }
 
 describe("confirmStripeCheckoutSessionForRedirect", () => {
