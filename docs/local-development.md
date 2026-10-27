@@ -418,6 +418,42 @@ It runs these steps:
 For returning developers who need to preserve local data, use `make all`
 instead of `make init`.
 
+### Migrate an existing local database
+
+`make all` preserves the database and does not apply new SQL migrations. Do
+not use `make init` to migrate an existing database: it drops and recreates
+the local schemas.
+
+Apply an individual migration to the running local Postgres service with
+`psql`, from the repository root:
+
+```bash
+docker compose -f docker-compose.dev.yml exec -T postgres \
+  psql -U callcaster -d callcaster \
+  < client/migrations/20261024000001_sim_profile_markers.sql
+```
+
+Run migrations in filename order. Review each SQL file before applying it.
+The command above is safe to repeat for the SIM profile marker migration
+because that migration uses `IF NOT EXISTS`.
+
+Use the migration runner instead. It applies the migration in a transaction
+and updates both local migration ledgers:
+
+```bash
+make migrate 20261024000001_sim_profile_markers.sql
+make migrate up
+```
+
+`make migrate up` applies pending files from `client/migrations/` in filename
+order. Prefer this runner for new migrations. The direct `psql` form above is
+kept as a recovery option and does not update the ledgers.
+
+For safety, `make migrate up` refuses an existing database with an empty
+ledger. It cannot safely infer which historical migrations were already
+applied. Use a verified filename for a known missing migration, or use
+`make init` when resetting local data is acceptable.
+
 The Make targets for the common individual service operations are listed in
 [Service control](#service-control). In particular, use `make all` for the
 complete local stack, or use `make up` for Compose services and `make storage`

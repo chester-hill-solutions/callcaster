@@ -16,6 +16,8 @@
 #   make calling:sync         sync one workspace to the tunnel URL
 #   make calling:sync-local   sync Twilio-enabled local workspaces
 #   make e2e                  compose-first Playwright run
+#   make migrate <filename>  apply one client migration and update its ledgers
+#   make migrate up          apply all pending client migrations and update ledgers
 #
 # The compose file is the source of truth for service names; targets here only
 # wrap `docker compose -f docker-compose.dev.yml` and the npm scripts so nobody
@@ -28,11 +30,22 @@ COMPOSE := docker compose -f docker-compose.dev.yml
 SERVICES := postgres inbucket
 REQUESTED := $(filter $(SERVICES),$(MAKECMDGOALS))
 TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
+MIGRATE_TARGET := $(word 2,$(MAKECMDGOALS))
 # `minio` stays as an alias so existing muscle memory and older notes keep
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init all up down logs ps app app-down worker worker-down media-stream media-stream-down tunnel-setup tunnel tunnel-down local-status storage-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage storage-down minio minio-down postgres-down inbucket-down $(SERVICES)
+.PHONY: help init all up down logs ps app app-down worker worker-down media-stream media-stream-down tunnel-setup tunnel tunnel-down local-status storage-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e migrate storage storage-down minio minio-down postgres-down inbucket-down $(SERVICES)
+
+# `make migrate <filename>` passes the filename as a second make goal. Turn
+# that goal into a no-op prerequisite so make does not reject it as unknown.
+ifneq ($(filter migrate,$(MAKECMDGOALS)),)
+ifneq ($(filter up,$(MIGRATE_TARGET)),up)
+.PHONY: $(MIGRATE_TARGET)
+$(MIGRATE_TARGET):
+	@:
+endif
+endif
 
 help:
 	@sed -n '3,13p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -70,7 +83,14 @@ minio: storage
 minio-down: storage-down
 
 up:
+ifeq ($(filter migrate,$(MAKECMDGOALS)),)
 	$(COMPOSE) up -d $(TARGET_SERVICES)
+else
+	@:
+endif
+
+migrate:
+	@node scripts/db/migrate-local.mjs "$(MIGRATE_TARGET)"
 
 ifeq ($(REQUESTED),)
 down: tunnel-down media-stream-down worker-down app-down storage-down inbucket-down postgres-down
