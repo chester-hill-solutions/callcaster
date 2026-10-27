@@ -7,5 +7,10 @@ export async function signInForSim(page: Page, context: SimSignInTaskContext): P
   await page.locator("#email").fill(context.profile.email);
   await page.locator("#password").fill(await context.runtime.getCredential());
   await page.getByRole("button", { name: "Login" }).click();
+  try {
+    await page.locator("#password").fill("");
+  } catch {
+    // Navigation may remove the form before the cleanup runs.
+  }
   await expect(page).toHaveURL(/\/workspaces/);
 }
