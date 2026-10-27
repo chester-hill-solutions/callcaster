@@ -5,7 +5,10 @@ import { EnvironmentNameSchema } from "./schema";
 const requestedEnvironment =
   process.env.NODE_ENV === "production" ||
   process.env.RAILWAY_ENVIRONMENT_NAME !== undefined ||
-  process.env.RAILWAY_PROJECT_ID !== undefined
+  process.env.RAILWAY_PROJECT_ID !== undefined ||
+  process.env.RAILWAY_ENVIRONMENT_ID !== undefined ||
+  process.env.RAILWAY_SERVICE_ID !== undefined ||
+  process.env.RAILWAY_DEPLOYMENT_ID !== undefined
     ? "production"
     : EnvironmentNameSchema.parse(process.env.ENV ?? "local");
 export const serverProjectConfig = loadProjectConfig(requestedEnvironment);

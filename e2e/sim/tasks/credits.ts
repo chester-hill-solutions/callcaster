@@ -27,7 +27,7 @@ export function smsCreditsRequired(body: string): number {
 export async function ensureSmsCredits(args: {
   page: Page;
   context: SimTaskContext;
-  input: Pick<SimSmsTaskInput, "message" | "stripe">;
+  input: Pick<SimSmsTaskInput, "message" | "stripe" | "checkoutProvider">;
 }): Promise<void> {
   const { page, context, input } = args;
   assertTaskRequirement(context, simTaskDefinitions.credits.requires);

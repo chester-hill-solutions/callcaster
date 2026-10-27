@@ -543,6 +543,12 @@
       "migrationTarget": "config.generated.railway_deployment_draining_seconds"
     },
     {
+      "key": "RAILWAY_DEPLOYMENT_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_deployment_id"
+    },
+    {
       "key": "RAILWAY_DOCKERFILE_PATH",
       "classification": "generated-deployment-value",
       "owner": "deployment",
@@ -571,6 +577,12 @@
       "classification": "generated-deployment-value",
       "owner": "ci",
       "migrationTarget": "config.generated.railway_project_id"
+    },
+    {
+      "key": "RAILWAY_SERVICE_ID",
+      "classification": "generated-deployment-value",
+      "owner": "app",
+      "migrationTarget": "config.generated.railway_service_id"
     },
     {
       "key": "RAILWAY_TOKEN",

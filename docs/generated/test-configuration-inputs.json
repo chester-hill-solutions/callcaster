@@ -5,7 +5,7 @@
   "description": "Observations of configuration inputs found in test source files. A key may also be listed in the runtime catalog.",
   "provenance": {
     "generator": "tools:config:inventory",
-    "recordDigest": "d8ce6d6f5af2373a92a166673c0d02bc8b77d78529af5ed843f6921169a7a566",
+    "recordDigest": "a9b90a8e88ae658ab17e448f564d888c5178cbd6b8121f7e5e5dca27dbee7624",
     "scannedRoots": [
       ".env.example",
       ".github/actions",
@@ -2215,6 +2215,7 @@
       "test/platform-auth.test.ts",
       "test/platform-billing-checkout.test.ts",
       "test/platform-billing-confirm-redirect.test.ts",
+      "test/platform-billing-local-checkout.test.ts",
       "test/platform-billing-receipt.test.ts",
       "test/platform-data-queue-schema.test.ts",
       "test/platform-rate-limit.test.ts",
@@ -2279,6 +2280,7 @@
       "test/send-reset-password-email.server.test.ts",
       "test/send-verification-email.server.test.ts",
       "test/sentry.server.test.ts",
+      "test/server-runtime-checkout-provider.test.ts",
       "test/server-runtime.test.ts",
       "test/services-api.test.ts",
       "test/session-cookie-contract.test.ts",
@@ -2292,6 +2294,7 @@
       "test/signup.route.test.ts",
       "test/sim-browser-context-options.test.ts",
       "test/sim-contact-list.test.ts",
+      "test/sim-local-checkout-credits.test.ts",
       "test/sim-persona-catalog-validation.test.ts",
       "test/sim-persona-profile.test.ts",
       "test/sim-personas.test.ts",
