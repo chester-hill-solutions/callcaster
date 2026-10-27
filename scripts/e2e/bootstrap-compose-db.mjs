@@ -100,6 +100,7 @@ const steps = [
   "client/migrations/20261019000001_verification_number.sql",
   "client/migrations/20261020000000_scope_outreach_attempt_contact_and_campaign_by_workspace.sql",
   "client/migrations/20261024000000_workspace_archive.sql",
+  "client/migrations/20261024000001_sim_profile_markers.sql",
 ];
 
 /**

@@ -4,21 +4,35 @@ The `sim` suite is separate from normal Playwright E2E. It is for explicit,
 paid provider checks against a selected environment. `npm run test:e2e` and
 local CI do not include it.
 
+Read-only profile checks are available before any browser or task flow:
+
+```bash
+npm run sim:profile:list
+npm run sim:profile:status -- --persona person-a
+npm run sim:profile:check-access -- --persona person-a --capability simulation.manage
+```
+
+These commands use only catalog personas and shared configuration, and query
+the exact derived user email, marked workspace name, and canonical membership.
+They never reconcile, repair, audit, create resources, or read credentials.
+Catalog capabilities are a SIM allowlist. The canonical workspace role matrix
+is the real authorization floor: owner-only capabilities deny members.
+
 ## Sai-local SMS flow
 
 `npm run test:sim` currently runs the `sai-local` SMS proof only when these
 environment variables are set in the calling shell or secret manager:
 
 ```text
-SIM_SENDER_EMAIL=<sender account email>
-SIM_SENDER_PASSWORD=<sender account password>
 SIM_RECIPIENT_NAME="Saihaan Syed"
 SIM_RECIPIENT_PHONE=+16478657844
 # Optional; defaults to "CallCaster SIM SMS check".
 SIM_SMS_MESSAGE="<unique test message>"
 ```
 
-The suite rejects a missing or changed sai-local workspace or recipient value.
+The temporary compatibility adapter rejects a missing or changed approved
+recipient value. The sender email is derived from the resolved SIM persona;
+the password is retrieved only by the sign-in task through the runtime context.
 This prevents an environment mix-up from sending a live message to an
 unapproved number.
 
@@ -27,6 +41,9 @@ The planned inherited configuration and secret-provider migration is defined in
 Phase 5 migrates SIM, this page describes the current interface. Do not add new
 SIM-specific variables; new SIM work uses the compatibility boundary until the
 shared loader is available.
+
+`e2e/sim/config.ts` is the temporary #2812 compatibility adapter. It is only
+used at SIM bootstrap to build typed task input. Task modules do not import it.
 
 The flow does these tasks through the product UI:
 

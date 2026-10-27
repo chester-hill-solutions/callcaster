@@ -705,7 +705,6 @@ export interface CampaignSchedule {
 }
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
-
 export interface BaseUser {
   id: string;
   username: string;
@@ -714,6 +713,7 @@ export interface BaseUser {
   access_level: string | null;
   created_at: string;
   verified_audio_numbers: string[] | null;
+  sim_marker: string | null;
 }
 
 export interface AppUser extends BaseUser {}

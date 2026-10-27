@@ -717,6 +717,27 @@
       "migrationTarget": "config.services.sim"
     },
     {
+      "key": "SIM_PERSON_A_PASSWORD",
+      "classification": "secret",
+      "owner": "sim",
+      "migrationTarget": "config.secrets.sim",
+      "declarationOnly": true
+    },
+    {
+      "key": "SIM_PERSON_B_PASSWORD",
+      "classification": "secret",
+      "owner": "sim",
+      "migrationTarget": "config.secrets.sim",
+      "declarationOnly": true
+    },
+    {
+      "key": "SIM_PERSON_C_PASSWORD",
+      "classification": "secret",
+      "owner": "sim",
+      "migrationTarget": "config.secrets.sim",
+      "declarationOnly": true
+    },
+    {
       "key": "SOURCE_DATABASE_URL",
       "classification": "secret",
       "owner": "scripts",
@@ -1011,17 +1032,17 @@
     },
     {
       "sourceFile": "e2e/sim/config.ts",
-      "line": 9,
+      "line": 16,
       "expression": "process.env[name]",
       "status": "approved",
       "owner": "sim",
       "migrationTarget": "config.sim.dynamicEnvironmentAccess",
       "keys": [
-        "SIM_SENDER_EMAIL",
-        "SIM_SENDER_PASSWORD",
         "SIM_RECIPIENT_NAME",
-        "SIM_RECIPIENT_PHONE"
-      ]
+        "SIM_RECIPIENT_PHONE",
+        "SIM_SMS_MESSAGE"
+      ],
+      "boundaryReason": "Temporary #2812 SIM compatibility adapter for approved recipient and message input; task modules must not read environment values."
     },
     {
       "sourceFile": "scripts/db/reconcile-stuck-calls.ts",

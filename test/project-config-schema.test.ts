@@ -18,6 +18,7 @@ const phaseZeroCatalog = JSON.parse(
 
 const valid = {
   environment: "local",
+  emailDomain: "callcaster.ca",
   urls: { publicApp: "https://local.example.test" },
   storage: { endpoint: "https://storage.example.test", host: "storage.example.test" },
   services: { app: { secrets: [{ name: "DATABASE_URL" }] } },
@@ -29,10 +30,10 @@ describe("ProjectConfig schema", () => {
     expect(config.runtime.mode).toBe("development");
     expect(config.secretProvider).toBe("dotenv");
     expect(config.services).toEqual({
-      app: { enabled: true, secrets: [{ name: "DATABASE_URL" }] },
-      worker: { enabled: true, secrets: [] },
-      "media-stream": { enabled: true, secrets: [] },
-      sim: { enabled: true, secrets: [] },
+      app: { enabled: true, trafficPolicy: "disabled", secrets: [{ name: "DATABASE_URL" }] },
+      worker: { enabled: true, trafficPolicy: "disabled", secrets: [] },
+      "media-stream": { enabled: true, trafficPolicy: "disabled", secrets: [] },
+      sim: { enabled: true, trafficPolicy: "disabled", secrets: [] },
     });
   });
 

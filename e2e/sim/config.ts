@@ -1,6 +1,13 @@
-const SAI_LOCAL = {
-  workspaceId: "7e0aa760-7bdf-497c-aa4d-91ff2104db78",
-  workspaceKey: "sai_local",
+import type { TestInfo } from "@playwright/test";
+import type { SimSmsTaskInput } from "./task-context";
+
+export const SIM_BASE_URL_FALLBACK = "http://127.0.0.1:3000";
+
+export function createSimBrowserContextOptions(testInfo: Pick<TestInfo, "project">): { baseURL: string } {
+  return { baseURL: testInfo.project.use.baseURL ?? SIM_BASE_URL_FALLBACK };
+}
+
+const APPROVED_RECIPIENT = {
   recipientName: "Saihaan Syed",
   recipientPhone: "+16478657844",
 } as const;
@@ -14,32 +21,17 @@ function required(name: string): string {
 function exact(name: string, expected: string): string {
   const value = required(name);
   if (value !== expected) {
-    throw new Error(`${name} must be ${expected} for the sai-local sim profile.`);
+    throw new Error(`${name} must match the approved SIM recipient.`);
   }
   return value;
 }
 
-export type SimSmsConfig = {
-  sender: { email: string; password: string };
-  workspace: { id: string; key: string };
-  recipient: { name: string; phone: string };
-  message: string;
-  stripe: { cardNumber: string; expiry: string; cvc: string };
-};
-
-export function loadSaiLocalSmsConfig(): SimSmsConfig {
+/** Temporary #2812 adapter. Remove when the shared SIM project-config input exists. */
+export function loadSimSmsCompatibilityInput(): SimSmsTaskInput {
   return {
-    sender: {
-      email: required("SIM_SENDER_EMAIL"),
-      password: required("SIM_SENDER_PASSWORD"),
-    },
-    workspace: {
-      id: SAI_LOCAL.workspaceId,
-      key: SAI_LOCAL.workspaceKey,
-    },
     recipient: {
-      name: exact("SIM_RECIPIENT_NAME", SAI_LOCAL.recipientName),
-      phone: exact("SIM_RECIPIENT_PHONE", SAI_LOCAL.recipientPhone),
+      name: exact("SIM_RECIPIENT_NAME", APPROVED_RECIPIENT.recipientName),
+      phone: exact("SIM_RECIPIENT_PHONE", APPROVED_RECIPIENT.recipientPhone),
     },
     message: process.env.SIM_SMS_MESSAGE?.trim() || "CallCaster SIM SMS check",
     stripe: {
