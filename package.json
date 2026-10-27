@@ -132,6 +132,8 @@
     "sim:profile:list": "tsx --tsconfig tsconfig.json scripts/sim-profile-list.ts",
     "sim:profile:status": "tsx --tsconfig tsconfig.json scripts/sim-profile-status.ts",
     "sim:profile:check-access": "tsx --tsconfig tsconfig.json scripts/sim-profile-check-access.ts",
+    "sim:sender:attach": "tsx --tsconfig tsconfig.json scripts/sim-sender-attach.ts",
+    "sim:sender:status": "tsx --tsconfig tsconfig.json scripts/sim-sender-status.ts",
     "check:route-authz": "node scripts/check-route-authz.mjs",
     "check:route-membership": "node scripts/check-route-membership.mjs",
     "check:release-closing": "node scripts/check-release-closing-references.mjs",

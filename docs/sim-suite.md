@@ -20,6 +20,23 @@ is the real authorization floor: owner-only capabilities deny members.
 
 ## Sai-local SMS flow
 
+### Existing local sender
+
+Sender attachment and status are local-only. Attachment uses an explicit
+existing sender already owned by the SIM workspace account. It does not buy,
+transfer, rent, or release a number. It does not change Twilio state, attach a
+Messaging Service, or claim that the sender is compliant. The operator must
+separately attest that the planned traffic is approved and compliant; provider
+capabilities do not prove compliance. Use placeholders only in command examples:
+
+```bash
+npm run sim:sender:status -- --persona <key>
+npm run sim:sender:attach -- --persona <key> --phone <E.164> --compliance-attested
+```
+
+The attachment command prints only a phone number's last four digits. Do not
+use a real number unless the operator has separately approved its use.
+
 `npm run test:sim` currently runs the `sai-local` SMS proof only when these
 environment variables are set in the calling shell or secret manager:
 
