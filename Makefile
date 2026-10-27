@@ -1,6 +1,7 @@
 # Local development entry points (#1159).
 #
 #   make init                 first-time or repair: npm run setup (services, .env, schema, bucket, seed)
+#   make all                  start the complete local stack in dependency order
 #   make up | down | logs     every compose service (postgres, inbucket)
 #   make postgres up          one service; any subset works: make postgres logs
 #   make storage up|down      object storage (the stow binary, not a container)
@@ -31,7 +32,7 @@ TARGET_SERVICES := $(if $(REQUESTED),$(REQUESTED),$(SERVICES))
 # working, even though the service it named no longer exists.
 STORAGE_GOALS := storage minio
 
-.PHONY: help init up down logs ps app app-down worker worker-down media-stream media-stream-down tunnel-setup tunnel tunnel-down local-status storage-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage storage-down minio minio-down postgres-down inbucket-down $(SERVICES)
+.PHONY: help init all up down logs ps app app-down worker worker-down media-stream media-stream-down tunnel-setup tunnel tunnel-down local-status storage-status local-logs local-stop app-logs worker-logs media-stream-logs tunnel-logs twiml calling\:sync calling\:sync-local e2e storage storage-down minio minio-down postgres-down inbucket-down $(SERVICES)
 
 help:
 	@sed -n '3,13p' $(MAKEFILE_LIST) | sed 's/^#   //'
@@ -47,6 +48,14 @@ else
 	$(COMPOSE) up -d $(REQUESTED)
 	@$(if $(filter postgres,$(REQUESTED)),node scripts/e2e/bootstrap-compose-db.mjs,:)
 endif
+
+all:
+	$(MAKE) up
+	$(MAKE) storage
+	$(MAKE) app
+	$(MAKE) worker
+	$(MAKE) media-stream
+	$(MAKE) tunnel
 
 # Object storage lifecycle. `up` starts the detached stow process and waits for
 # its STOW_READY banner, then ensures the bucket exists; `down` stops it by pid.
