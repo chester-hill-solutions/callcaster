@@ -15,36 +15,6 @@
     "rootCause": "This issue is an acceptance-suite work item, not a code defect, so nothing in the tree can 'fix' it in the usual sense. The upstream dependency is #1827 'Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it', which the board still lists in the 'Blocked / split first' lane (ISSUE_BOARD.md:565-574) with #1356 (dev DNS/IaC) ahead of it. manual: true because the missing artefact is a dev-environment acceptance run that only a person with the dev Twilio account and dev environment credentials can execute."
   },
   {
-    "issueNumber": 1874,
-    "verdict": "fix-now",
-    "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
-    "currentBehavior": "The default branch projects about 80 queue completions per minute for the reported settings. The durable worker sends two calls per batch and waits for a five-second idle poll, matching the screenshots showing 144 dequeues over six minutes (24/minute). A tested branch patch includes that cadence and corrects the displayed units.",
-    "resolution": "Review and release the worker-aware estimate patch, then compare its displayed queue finish range with a real campaign before closing.",
-    "lookIn": [
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/lib/throughput-config.ts",
-      "app/lib/worker/poll-jobs.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
-    ],
-    "rootCause": "The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.",
-    "existingTests": [
-      "test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.",
-      "test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.",
-      "test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording."
-    ],
-    "missingTests": [
-      "After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary."
-    ],
-    "acceptanceCriteria": [
-      "Default planning rate includes the durable worker batch and poll cadence.",
-      "The two reported queue counts keep the average projected finish stable at the reported processing pace.",
-      "Rate labels use consistent units and distinguish a drained queue from calls still in flight.",
-      "A deployed campaign confirms the estimate is useful before closing."
-    ],
-    "trackerRecommendation": "Keep open in progress for review, release and deployed acceptance. The prior master concurrency-only fix is insufficient; remove the old verify-and-close claim."
-  },
-  {
     "issueNumber": 1875,
     "verdict": "fix-now",
     "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
@@ -81,9 +51,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "A webhook credential for one workspace releases or accepts another tenant's live inbound call offer",
     "summary": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id)",
-    "currentBehavior": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth…",
-    "rootCause": "app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,…",
-    "resolution": "Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in…",
+    "currentBehavior": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth\u2026",
+    "rootCause": "app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,\u2026",
+    "resolution": "Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in\u2026",
     "lookIn": [
       "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
       "app/lib/db-rpc.server.ts",
@@ -93,7 +63,7 @@
       "app/lib/workspace-client-projection.server.ts"
     ],
     "existingTests": [
-      "Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {\"ok\":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id…"
+      "Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {\"ok\":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -103,7 +73,8 @@
       "A credential belonging to workspace A may only mutate workspace A's inbound queue entries. The entry named by entry_id must be verified to belong to the workspace whose credential was validated, and the RPC should filter inbound_queue_entry by that workspace, the way client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql added a required workspace parameter to dequeue_contact and create_outreach_attempt after finding the same class of cross-tenant write."
     ],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Open PR #3063 contains the tested repair. Exact-head GitHub code, browser and database guards passed on 2026-10-28. Live Project Status is In progress. Review and merge authorization remain; do not start a duplicate implementation or mark it on-dev."
   },
   {
     "issueNumber": 2862,
@@ -196,10 +167,10 @@
     "issueNumber": 2866,
     "verdict": "fix-now",
     "recommendedTitle": "Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response",
-    "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount…",
-    "currentBehavior": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount auth token). Every write that persists those columns binds them as SQL parameters of an UPDATE. Under the pinned drizzle-orm 0.45.2 a failed statement is wrapped in `DrizzleQueryError` (node_modules/drizzle-orm/pg-core/session.js:41) whose message is `Failed query: <sql>` plus a `params: <bound values>` line (node_modules/drizzle-orm/errors.js:12), so the credential is rendered into the error text. The repository's logger copies `error.message` into the…",
-    "rootCause": "app/lib/logger-core.ts#serializeError treats the error text as safe: it copies `error.message` (line 66), up to three `cause` messages (line 60) and the stack (line 69, whose first line repeats the message) verbatim into the log entry, and the module contains no redaction, scrubbing or allowlist layer at all. Because Drizzle renders bound parameter values into `DrizzleQueryError.message`, any failed statement that binds a credential as a parameter carries that credential into the emitted log line - and, because app/lib/errors.server.ts#createErrorResponse attaches the raw error object to the `http.error_response` entry, into that line's `err.params` array as well, which survives any fix…",
-    "resolution": "Scrub bound SQL parameter values out of driver error text before it reaches any sink, and stop returning raw error messages to clients - but scrub every copy of the text, not only the message. Three changes close the class: (1) in app/lib/logger-core.ts, strip the `params:` segment from the message, the cause chain AND the stack, because the stack's first line repeats the message and a message-only scrub still leaks the credential into the log line; (2) in app/lib/errors.server.ts, render the client-visible field with the repository's own toUserMessage(error, defaultMessage) and keep the raw error server-side only, as docs/pg-error-strictness.md:38 already requires; (3) in…",
+    "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount\u2026",
+    "currentBehavior": "Shared responder HTTP failures are already generic, but onboarding has a separate raw-error response path. The local diagnostic-sink fix passes 31 focused tests; the onboarding response correction is being added before publication.",
+    "rootCause": "Drizzle embeds SQL bound values in error.message and error.stack. JSON and pretty logging, ops email and the Sentry wrapper have no shared redaction boundary.",
+    "resolution": "Redact SQL parameter tails and credential fields before all diagnostic sinks. Preserve safe error codes and operation context. Cover direct and nested errors, both log formats, cause chains, alert email and initialized Sentry; retain the caller-safe HTTP fallback.",
     "lookIn": [
       "app/lib/logger-core.ts",
       "app/lib/logger.server.ts",
@@ -209,7 +180,7 @@
       "app/lib/twilio-workspace-credentials.ts"
     ],
     "existingTests": [
-      "The caught error's constructor is DrizzleQueryError and its message is: 'Failed query: update \"workspace\" set \"key\" = $1, \"token\" = $2, \"twilio_data\" = $3 where \"workspace\".\"id\" = $4\\nparams: SKdummy00000000000000000000000000,DUMMY_TWILIO_API_KEY_SECRET_0123456789,{\"sid\":\"ACdummy00000000000000000000000000\",\"authToken\":…"
+      "The caught error's constructor is DrizzleQueryError and its message is: 'Failed query: update \"workspace\" set \"key\" = $1, \"token\" = $2, \"twilio_data\" = $3 where \"workspace\".\"id\" = $4\\nparams: SKdummy00000000000000000000000000,DUMMY_TWILIO_API_KEY_SECRET_0123456789,{\"sid\":\"ACdummy00000000000000000000000000\",\"authToken\":\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -219,7 +190,8 @@
       "A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls."
     ],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Native Bug, assigned to wra-sol, Project Status In progress. Original source fails six credential regressions with two controls passing. Separate logger, alert and Sentry faults fail. Full publication gates remain."
   },
   {
     "issueNumber": 2867,
@@ -458,9 +430,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "Campaign export hands the lowest-trust workspace role every agent's attempts and contact PII",
     "summary": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents",
-    "currentBehavior": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents. Each row carries the contact's first name, surname, phone, email, street address and city, the attempt disposition, the call SID and the attempt's complete IVR answer set. The product's own scoped read path deliberately denies the same principal that view: getWorkspaceAnalyticsApi computes canViewAllUsers as owner/admin/member only (app/lib/platform-analytics.server.ts:57) and loadWorkspaceAnalytics then filters the outreach_attempt rows with outreach_attempt.user_id = currentUserId…",
+    "currentBehavior": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents. Each row carries the contact's first name, surname, phone, email, street address and city, the attempt disposition, the call SID and the attempt's complete IVR answer set. The product's own scoped read path deliberately denies the same principal that view: getWorkspaceAnalyticsApi computes canViewAllUsers as owner/admin/member only (app/lib/platform-analytics.server.ts:57) and loadWorkspaceAnalytics then filters the outreach_attempt rows with outreach_attempt.user_id = currentUserId\u2026",
     "rootCause": "The campaign export selects outreach attempts by campaign_id alone and is gated on workspace membership alone. It omits both the per-agent (outreach_attempt.user_id) scope the platform applies to the same rows on its analytics path and the role floor the sibling artifact on the same export surface enforces (the sms-report export is admin-gated because it carries contact names, phone numbers and message text - the same data class the campaign CSV carries, ungated). So the export emits every agent's rows, and hands back a 24 hour pre-signed download URL, to a requester the product otherwise scopes to their own attempts.",
-    "resolution": "Apply the platform's own scope rule to the export surface instead of re-deriving one: raise every export-surface gate to the `member` floor the sibling write surfaces use (leaving the sms-report artifact on its stricter admin gate), including the two listing loaders that publish stored downloadUrl values, and pass the requester's identity into the export pipeline so the attempt selection can be narrowed to outreach_attempt.user_id = requester whenever the requester may not view all users, matching the canViewAllUsers rule the analytics path applies. Gating the listing loaders matters as much as gating the trigger: a `caller` that cannot start an export can still read a member's stored…",
+    "resolution": "Apply the platform's own scope rule to the export surface instead of re-deriving one: raise every export-surface gate to the `member` floor the sibling write surfaces use (leaving the sms-report artifact on its stricter admin gate), including the two listing loaders that publish stored downloadUrl values, and pass the requester's identity into the export pipeline so the attempt selection can be narrowed to outreach_attempt.user_id = requester whenever the requester may not view all users, matching the canViewAllUsers rule the analytics path applies. Gating the listing loaders matters as much as gating the trigger: a `caller` that cannot start an export can still read a member's stored\u2026",
     "lookIn": [
       "app/lib/platform-analytics.server.ts",
       "app/lib/workspace-analytics.server.ts",
@@ -470,7 +442,7 @@
       "app/lib/campaign-export-helpers.server.ts"
     ],
     "existingTests": [
-      "8 of 8 assertions passed against the private Postgres 18. The real export route action, invoked with the `caller` member's session, returned an exportId (no error), i.e. the membership-only gate admitted the lowest-trust role. The artifact it produced (captured at the object-storage boundary) contained BOTH attempts:…"
+      "8 of 8 assertions passed against the private Postgres 18. The real export route action, invoked with the `caller` member's session, returned an exportId (no error), i.e. the membership-only gate admitted the lowest-trust role. The artifact it produced (captured at the object-storage boundary) contained BOTH attempts:\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -480,7 +452,8 @@
       "An export must not contain data above the requester's access level. The platform's scope rule is source-visible: app/lib/platform-analytics.server.ts:57 excludes the `caller` role from canViewAllUsers and app/lib/workspace-analytics.server.ts:41-49 then filters attempts to outreach_attempt.user_id = currentUserId. Sibling surfaces that act on the same records gate on role or capability: app/routes/api+/campaign_audience.action.server.ts:76 and app/routes/api+/contacts/$contactId.action.server.ts:25 both require the `member` role, and app/routes/api+/campaigns/$campaignId.action.server.ts:32 likewise. The same export surface already gates the sibling sms-report artifact behind `admin` for carrying contact names, phone numbers and message text (app/routes/api+/campaign-export-status.loader.server.ts:60-62). A `caller` should therefore not be able to bulk-read other agents' call results."
     ],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Open PR #3064 contains the tested repair. Exact-head GitHub code, browser and database guards passed on 2026-10-28. Live Project Status is In progress. Review and merge authorization remain; do not start a duplicate implementation or mark it on-dev."
   },
   {
     "issueNumber": 2883,
@@ -600,35 +573,24 @@
     "risk": "medium"
   },
   {
-    "issueNumber": 2774,
+    "issueNumber": 2603,
     "verdict": "fix-now",
-    "summary": "IVR voicemail drops start during the greeting and a valid machine-end result can hang up without leaving the saved message.",
-    "currentBehavior": "The default branch still requests early Enable detection. PR #3005 into dev waits for the greeting when a playable drop is configured and recognizes all documented machine-end results. It is open; no live voicemail recording has been verified.",
-    "resolution": "Review and deploy PR #3005, then verify the complete recorded message with an approved test recipient before closing.",
+    "summary": "High priority. SMS report CSVs omit external_id, although the older campaign-export CSV already includes it.",
+    "currentBehavior": "Local branch feature/2603-sms-export-external-id adds external_id to generated all-message and opt-out CSVs. Twelve real PostgreSQL cases pass, including missing and quoted IDs, exact references, unlinked replies, conflicting legacy IDs and foreign-workspace controls.",
+    "rootCause": "The report data projection and CSV column list do not carry the contact external_id.",
+    "resolution": "Add external_id to the SMS delivery and reply CSV data paths. Preserve existing columns, row scope and admin access. Verify the actual generated report artifacts with contacts that have and lack an external ID.",
     "lookIn": [
-      "app/lib/ivr-machine-detection.ts",
-      "app/lib/campaign-ivr-dispatch.server.ts",
-      "app/lib/campaign-test-call.server.ts",
-      "app/lib/ivr-machine.server.ts",
-      "app/routes/api+/ivr.action.server.ts"
-    ],
-    "rootCause": "Twilio Enable returns machine_start while the greeting is still playing. The fixed one-second pause cannot wait for that greeting. The previous substring classifier also excluded machine_end_other, which Twilio documents as a machine result. Regression tests reproduced both code defects before the patch.",
-    "existingTests": [
-      "test/campaign-ivr-dispatch.test.ts",
-      "test/campaign-test-call.test.ts",
-      "test/ivr-machine-detection.test.ts",
-      "test/ivr-page.route.test.ts",
-      "test/ivr.route.test.ts",
-      "test/ivr-initiate.server.test.ts"
-    ],
-    "missingTests": [
-      "A controlled live voicemail recording with a confirmed test recipient after deployment."
+      "app/lib/campaign-sms-report.server.ts",
+      "app/lib/campaign-sms-report-data.server.ts",
+      "test/integration-db/campaign-sms-report.test.ts"
     ],
     "acceptanceCriteria": [
-      "Configured drops wait for greeting completion on production and test calls.",
-      "Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.",
-      "An approved recipient confirms the entire message was recorded after deployment."
+      "Exported delivery and reply CSVs retain the contact external_id.",
+      "Missing external IDs produce an empty cell without losing the row.",
+      "Existing access rules, column values and tenant scope remain correct."
     ],
-    "trackerRecommendation": "Keep open for release and live acceptance. Native Bug, Priority Urgent, production; PR #3005 is linked in Development."
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Feature, Priority High, Effort Low. Assigned to wra-sol and moved to In progress on the live Project. The original source fails three cases with nine controls passing; identity-fallback and duplicate-selection faults fail. Full local CI and publication remain."
   }
 ]

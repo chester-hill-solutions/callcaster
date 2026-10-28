@@ -39,9 +39,9 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
     "summary": "Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.",
-    "currentBehavior": "Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.",
-    "rootCause": "Not implemented. It depended on the synthetic provider (#1328), which closed as completed on 2026-10-17 together with the three asks it consolidated (#1156, #1194, #1161).",
-    "resolution": "Keep as parent epic; the synthetic provider dependency is satisfied, so #1192 (server-owned scenario profiles) can start; #1193 is the final acceptance journey.",
+    "currentBehavior": "The parent is High priority and its three children are closed, but their closure reasons do not prove that all eight requested scenarios exist.",
+    "rootCause": "#1192 is NOT_PLANNED, #1193 is DUPLICATE, and #1191 was folded into #1329. A 3/3 child count is not delivery evidence.",
+    "resolution": "Reconcile the parent scope with the current SIM roadmap and record which requested voice, SMS and IVR scenarios remain. Do not restart the closed child tasks or count their closures as acceptance.",
     "lookIn": [
       "e2e/fixtures/seed.ts",
       "app/components/audience/AudienceUploader.tsx",
@@ -61,7 +61,7 @@
     ],
     "size": "L-XL",
     "risk": "high",
-    "trackerRecommendation": "Parent epic; #1328 landed, so the block is gone. Split before assignment — this is not single-agent work.",
+    "trackerRecommendation": "Live relationships and closure reasons reviewed 2026-10-28. Native Feature, Priority High, Effort High, Project Status In progress. Keep this parent visible until its actual scenarios have acceptance evidence.",
     "blockedBy": []
   },
   {

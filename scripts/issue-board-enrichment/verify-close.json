@@ -225,8 +225,8 @@
     "issueNumber": 2075,
     "verdict": "verify-close",
     "summary": "The password recovery journey is wired end to end again: the request is pinned to the configured BASE_URL with /reset-password as the callback, Better Auth emails a link that keeps its token, the reset page reads that token and posts it to the reset action, and the action hands it to the installed Better Auth `resetPassword` implementation; the success copy now describes a password change, and both verification-callback failure paths land on a real route without a token.",
-    "currentBehavior": "The fix is in master. The symptom can only be confirmed by a person, so the issue stays open until they confirm it.",
-    "resolution": "Run the verification on master, then close. No new code unless it fails.",
+    "currentBehavior": "Reset recovery, password-rule feedback and the missing-token recovery path have merged. The 2026-10-23 issue reports read-only deployed dev checks for feedback; the real email journey remains unverified.",
+    "resolution": "Request a reset with an approved test account, receive the issued email, follow its link and change the password. Confirm expiry/replay behavior and promote through the release process. Do not treat read-only page checks as full recovery acceptance.",
     "lookIn": [
       "app/routes/remember.action.server.ts",
       "app/routes/reset-password.loader.server.ts",
@@ -236,12 +236,13 @@
       "app/routes/remember.tsx"
     ],
     "existingTests": [
-      "test/password-recovery-journey.test.ts — walks the ACTUAL issued email through the installed Better Auth (memory adapter): it reads the reset link out of the sent mail, drives the real `api+/auth/$.loader.server` callback (expects 302 to /reset-password?token=<issued token>), loads the reset page (expects `{ token }`), submits the new password, asserts the password changed (the old password no longer signs in, the new one does) and that the link cannot be replayed (the second submit returns 400). It also covers identical generic feedback for known and unknown emails, the caller-selected-host resistance, the expired-link path, and the request rate limit. Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/password-recovery-journey.test.ts ...` -> 4 files passed, 34 tests passed. test/ui/reset-password-feedback.test.tsx and e2e/specs/password-reset-feedback.spec.ts cover the failure feedback (one toast, retained fields, no layout shift) but the UI suite could not be executed in this checkout (every UI test fails with 'Cannot read properties of null (reading useContext)' from the vendored shad-cc copy of next-themes/react; an unrelated control test fails identically — a local install artifact, not a code defect)."
+      "test/password-recovery-journey.test.ts \u2014 walks the ACTUAL issued email through the installed Better Auth (memory adapter): it reads the reset link out of the sent mail, drives the real `api+/auth/$.loader.server` callback (expects 302 to /reset-password?token=<issued token>), loads the reset page (expects `{ token }`), submits the new password, asserts the password changed (the old password no longer signs in, the new one does) and that the link cannot be replayed (the second submit returns 400). It also covers identical generic feedback for known and unknown emails, the caller-selected-host resistance, the expired-link path, and the request rate limit. Ran green on this tree: `npx vitest run -c vitest.node.config.ts test/password-recovery-journey.test.ts ...` -> 4 files passed, 34 tests passed. test/ui/reset-password-feedback.test.tsx and e2e/specs/password-reset-feedback.spec.ts cover the failure feedback (one toast, retained fields, no layout shift) but the UI suite could not be executed in this checkout (every UI test fails with 'Cannot read properties of null (reading useContext)' from the vendored shad-cc copy of next-themes/react; an unrelated control test fails identically \u2014 a local install artifact, not a code defect)."
     ],
     "acceptanceCriteria": [
       "A person confirms the reported symptom is gone on master."
     ],
-    "rootCause": "The fix is commit 9aa2025e 'Restore the password recovery email journey (#2279)', an ancestor of origin/master (first merged by release 268c2692 on 2026-10-08), with two later touches in master: cb88df8b 'Show reset-password action failures once (#2310)' and ca652b9e 'fix: return to sign in after password reset (#2606)'. IMPORTANT — the operator's 2026-10-17 comment ('I get \"This reset link is invalid or has expired. Request a new one from the sign-in page.\" when attempting to reset password') was NOT a broken journey: the deployed dev log for that minute shows exactly one entry, `reset-password: reset rejected` with `error: \"Password too short\"` (Railway dev env 18ef9173-4b33-4a62-9b94-9dfc7a36eb05, service CallCaster, 2026-10-17T09:58:21Z). That error is raised by Better Auth AFTER the token was accepted, so the emailed link did reach the reset form with a valid token; the submitted new password was simply shorter than Better Auth's minimum (8 characters, node_modules/better-auth/dist/context/create-context.mjs:185). One residual defect is worth a follow-up ticket but is outside this issue's acceptance criteria: the reset form has no `minLength={8}` on its password inputs (app/routes/reset-password.tsx:35-46), unlike sign-up (app/routes/signup.tsx:121), and the too-short error is reported through the generic catch in app/routes/reset-password.action.server.ts:58-70 with the misleading 'This reset link is invalid or has expired' text. manual: true — the final proof is a real reset email landing in a real inbox, a real link, a real password change and a real sign-in with the new password."
+    "rootCause": "The fix is commit 9aa2025e 'Restore the password recovery email journey (#2279)', an ancestor of origin/master (first merged by release 268c2692 on 2026-10-08), with two later touches in master: cb88df8b 'Show reset-password action failures once (#2310)' and ca652b9e 'fix: return to sign in after password reset (#2606)'. IMPORTANT \u2014 the operator's 2026-10-17 comment ('I get \"This reset link is invalid or has expired. Request a new one from the sign-in page.\" when attempting to reset password') was NOT a broken journey: the deployed dev log for that minute shows exactly one entry, `reset-password: reset rejected` with `error: \"Password too short\"` (Railway dev env 18ef9173-4b33-4a62-9b94-9dfc7a36eb05, service CallCaster, 2026-10-17T09:58:21Z). That error is raised by Better Auth AFTER the token was accepted, so the emailed link did reach the reset form with a valid token; the submitted new password was simply shorter than Better Auth's minimum (8 characters, node_modules/better-auth/dist/context/create-context.mjs:185). One residual defect is worth a follow-up ticket but is outside this issue's acceptance criteria: the reset form has no `minLength={8}` on its password inputs (app/routes/reset-password.tsx:35-46), unlike sign-up (app/routes/signup.tsx:121), and the too-short error is reported through the generic catch in app/routes/reset-password.action.server.ts:58-70 with the misleading 'This reset link is invalid or has expired' text. manual: true \u2014 the final proof is a real reset email landing in a real inbox, a real link, a real password change and a real sign-in with the new password.",
+    "trackerRecommendation": "Urgent priority; live Project Status tested-on-dev, but the latest detailed acceptance report explicitly leaves the real inbox journey open. Preserve that gap; do not close or silently claim completion."
   },
   {
     "issueNumber": 2148,
@@ -1073,5 +1074,124 @@
     "blockedBy": [],
     "size": "S",
     "risk": "low"
+  },
+  {
+    "issueNumber": 1874,
+    "verdict": "verify-close",
+    "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
+    "currentBehavior": "PR #3006 merged into dev on 2026-10-26. The completion estimate now includes the durable worker polling delay. High priority; live Project Status is on-dev.",
+    "resolution": "Verify the displayed estimate against an approved real campaign before release. Keep #3007 separate: dispatch pacing remains in open PR #3009.",
+    "lookIn": [
+      "app/lib/campaign-outbound-estimate.ts",
+      "app/lib/throughput-config.ts",
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+    ],
+    "rootCause": "The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.",
+    "existingTests": [
+      "test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.",
+      "test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.",
+      "test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording."
+    ],
+    "missingTests": [
+      "After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary."
+    ],
+    "acceptanceCriteria": [
+      "Default planning rate includes the durable worker batch and poll cadence.",
+      "The two reported queue counts keep the average projected finish stable at the reported processing pace.",
+      "Rate labels use consistent units and distinguish a drained queue from calls still in flight.",
+      "A deployed campaign confirms the estimate is useful before closing."
+    ],
+    "trackerRecommendation": "2026-10-28 source review at dev@4977bfef. This is merged source proof, not deployed call acceptance."
+  },
+  {
+    "issueNumber": 2774,
+    "verdict": "verify-close",
+    "summary": "IVR voicemail drops start during the greeting and a valid machine-end result can hang up without leaving the saved message.",
+    "currentBehavior": "PR #3005 merged into dev on 2026-10-26. Machine detection waits for the greeting end before voicemail playback. Urgent priority; live Project Status is on-dev.",
+    "resolution": "Verify a complete voicemail with an approved test recipient, then follow the release process. No new source fix is required unless acceptance fails.",
+    "lookIn": [
+      "app/lib/ivr-machine-detection.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/ivr-machine.server.ts",
+      "app/routes/api+/ivr.action.server.ts"
+    ],
+    "rootCause": "Twilio Enable returns machine_start while the greeting is still playing. The fixed one-second pause cannot wait for that greeting. The previous substring classifier also excluded machine_end_other, which Twilio documents as a machine result. Regression tests reproduced both code defects before the patch.",
+    "existingTests": [
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-test-call.test.ts",
+      "test/ivr-machine-detection.test.ts",
+      "test/ivr-page.route.test.ts",
+      "test/ivr.route.test.ts",
+      "test/ivr-initiate.server.test.ts"
+    ],
+    "missingTests": [
+      "A controlled live voicemail recording with a confirmed test recipient after deployment."
+    ],
+    "acceptanceCriteria": [
+      "Configured drops wait for greeting completion on production and test calls.",
+      "Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.",
+      "An approved recipient confirms the entire message was recorded after deployment."
+    ],
+    "trackerRecommendation": "2026-10-28 source review at dev@4977bfef. Keep live voicemail acceptance separate from the merge."
+  },
+  {
+    "issueNumber": 2931,
+    "verdict": "verify-close",
+    "summary": "Urgent renewal-notice defect has a source fix on dev in PR #2933.",
+    "currentBehavior": "The rental sweep excludes rows with no provider number SID, so an unprovisioned row is not renewed or announced as a rental.",
+    "rootCause": "The old sweep selected rented rows without checking that a provider rental existed.",
+    "resolution": "Run the focused rental tests, then verify the affected workspace and scheduled notices in the deployed environment before release.",
+    "lookIn": [
+      "app/lib/number-rental-billing.server.ts",
+      "test/number-rental-billing.server.test.ts"
+    ],
+    "trackerRecommendation": "Native Bug, Priority Urgent, Project Status on-dev. PR #2933 / 0bb55f52 is included in current dev. Source evidence is separate from deployed billing acceptance."
+  },
+  {
+    "issueNumber": 2216,
+    "verdict": "verify-close",
+    "recommendedTitle": "Email verification is half-wired: a verify-email route and a \"verify your email\" prompt both exist, but no verification email is ever sent",
+    "summary": "Mandatory email verification is implemented on dev in PR #2953. The old decision claim is stale.",
+    "currentBehavior": "Auth requires email verification and provides a sendVerificationEmail callback. Signup and invite flows carry the verification requirement. The email journey and callback tests are in the full local suite.",
+    "rootCause": "The earlier missing delivery and enforcement settings were added in ce0ca7ce / PR #2953.",
+    "resolution": "Verify issuance, delivery, token consumption and sign-in on the deployed target, then follow the release process. Do not reopen the mandatory-versus-removal decision.",
+    "lookIn": [
+      "app/server/auth-instance.ts",
+      "app/lib/send-verification-email.server.ts",
+      "test/email-verification-journey.test.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "No test exercises real registration to assert verification issuance and session policy. Account-address occupancy is established; automatic account takeover by the first registrant is not, since reset goes to the actual mailbox owner."
+    ],
+    "acceptanceCriteria": [
+      "A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return",
+      "No user-visible string references verification unless verification happens",
+      "The dead route and its rate limit are either live or removed",
+      "A test covers the chosen path end to end"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source and live issue reviewed 2026-10-28 at dev@4977bfef. Project Status on-dev; native Bug. Keep the inbox acceptance gap visible. #2941 also needs an abuse and rollout policy."
+  },
+  {
+    "issueNumber": 2732,
+    "verdict": "verify-close",
+    "summary": "High priority. Workspace archive and provider-number release are implemented in PR #2958.",
+    "currentBehavior": "archiveWorkspace releases each number through removeWorkspacePhoneNumber before setting archived_at. A release failure returns 409 and keeps the workspace visible for retry. History is retained.",
+    "rootCause": "The archive flow preserves provider release state instead of deleting rows before their numbers can be released.",
+    "resolution": "Verify archive, release-failure recovery, retained history and navigation in an approved test workspace. Keep restore and archived-key policy in their separate tasks.",
+    "lookIn": [
+      "app/lib/workspace-archive.server.ts",
+      "test/workspace-archive.test.ts",
+      "test/workspace-archive-middleware.test.ts"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Feature, Priority High, Project Status on-dev. PR #2958 / 0c72d196 is on dev. Source proof is not authorization to archive a live customer workspace."
   }
 ]
