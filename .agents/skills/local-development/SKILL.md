@@ -280,6 +280,11 @@ before trusting a guard's floor result.
 
 ## API and form response adapters
 
+For error redaction, trace returned error strings and payload error fields through
+both UI and API adapters. A safe shared responder does not protect a separate
+service catch or payload mapper. Weaken each distinct output boundary and require
+its regression to fail while intentional product messages remain visible.
+
 If a guarded action's inferred result is `unknown`, give `useActionData` an
 explicit form response contract and test its server metadata and page handling.
 Do not replace the missing boundary with `any` or classify errors by message text.

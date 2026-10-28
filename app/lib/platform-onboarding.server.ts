@@ -21,6 +21,8 @@ import {
 import { ONBOARDING_ACTION_HANDLERS } from "@/lib/platform-onboarding-handlers.server";
 import { parseTollFreeOptInType } from "@/lib/toll-free-opt-in";
 import { validatePostedA2pProfileFields } from "@/lib/a2p-messaging-profile.server";
+import { toUserMessage } from "@/lib/user-message";
+import { logger } from "@/lib/logger.server";
 
 export type {
   OnboardingActionContext,
@@ -197,9 +199,10 @@ export async function runOnboardingAction(
     }
     return { ok: true, result, detail: detail.detail };
   } catch (error) {
+    logger.error("onboarding.action_failed", { workspaceId, actionName }, error);
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Onboarding update failed.",
+      error: toUserMessage(error, "Onboarding update failed."),
       status: 500,
     };
   }
@@ -274,21 +277,24 @@ export function mapOnboardingHandlerResult(
     };
   }
 
-  const status = handlerResult.status ?? (handlerResult.data.error ? 400 : 200);
+  const data = handlerResult.data.error
+    ? { ...handlerResult.data, error: toUserMessage(handlerResult.data.error, "Onboarding update failed.") }
+    : handlerResult.data;
+  const status = handlerResult.status ?? (data.error ? 400 : 200);
   if (target === "ui") {
     return {
       kind: "ui_payload",
-      data: handlerResult.data,
+      data,
       status,
     };
   }
 
   const apiStatus =
-    handlerResult.data.error && status < 400 ? 400 : status;
+    data.error && status < 400 ? 400 : status;
 
   return {
     kind: "api_json",
-    body: { ...detail, ...handlerResult.data },
+    body: { ...detail, ...data },
     status: apiStatus,
   };
 }

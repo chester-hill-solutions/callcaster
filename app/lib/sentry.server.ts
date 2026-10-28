@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/bun";
+import { redactDiagnosticValue } from "@/lib/diagnostic-redaction";
 
 let initialized = false;
 
@@ -17,6 +18,9 @@ export function initializeSentry(
     release: env.RAILWAY_GIT_COMMIT_SHA,
     serverName: service,
     enabled: true,
+    beforeSend(event) {
+      return redactDiagnosticValue(event) as typeof event;
+    },
   });
   Sentry.setTag("service", service);
   initialized = true;
@@ -32,9 +36,9 @@ export function captureException(
   }
 
   Sentry.withScope((scope) => {
-    for (const [key, value] of Object.entries(context)) {
+    for (const [key, value] of Object.entries(redactDiagnosticValue(context))) {
       scope.setExtra(key, value);
     }
-    Sentry.captureException(error);
+    Sentry.captureException(redactDiagnosticValue(error));
   });
 }

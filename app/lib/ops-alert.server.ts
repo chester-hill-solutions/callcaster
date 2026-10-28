@@ -19,6 +19,7 @@
 import { captureException } from "@/lib/sentry.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { redactDiagnosticText, redactDiagnosticValue } from "@/lib/diagnostic-redaction";
 
 export type OpsAlertSeverity = "page" | "warn";
 
@@ -121,6 +122,11 @@ function buildBody(input: OpsAlertInput, suppressedFor: number): {
 }
 
 export async function notifyOps(input: OpsAlertInput): Promise<OpsAlertResult> {
+  input = {
+    ...input,
+    summary: redactDiagnosticText(input.summary),
+    error: redactDiagnosticValue(input.error),
+  };
   const severity = input.severity ?? "page";
   const dedupeKey = input.dedupeKey ?? input.event;
   const windowMs = input.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS;
