@@ -15,6 +15,8 @@
  *   rendering differs.
  */
 
+import { redactDiagnosticText, redactDiagnosticValue } from './diagnostic-redaction';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export type LogFormat = 'pretty' | 'json';
@@ -50,20 +52,24 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function serializeError(error: Error, includeStack: boolean) {
+  error = redactDiagnosticValue(error);
   // Unwrap `cause`: DrizzleQueryError's own message is only
   // "Failed query: … params: …" — the actual Postgres detail (missing column,
   // FK violation, connection failure) lives on cause. Logging without it
   // produces alerts nobody can act on, which is exactly what happened.
   const causes: string[] = [];
+  let code = 'code' in error ? error.code : undefined;
   let current: unknown = error.cause;
   for (let depth = 0; depth < 3 && current instanceof Error; depth += 1) {
     causes.push(`${current.name}: ${current.message}`);
+    if (code === undefined && 'code' in current) code = current.code;
     current = current.cause;
   }
 
   return {
     name: error.name,
     message: error.message,
+    ...(typeof code === 'string' || typeof code === 'number' ? { code } : {}),
     ...(causes.length > 0 ? { cause: causes.join(' <- ') } : {}),
     ...(includeStack && error.stack
       ? { stack: error.stack.split('\n').slice(0, 12).join('\n') }
@@ -72,9 +78,10 @@ function serializeError(error: Error, includeStack: boolean) {
 }
 
 /** JSON.stringify replacer that tolerates cycles and non-serializable values. */
-function safeReplacer(): (key: string, value: unknown) => unknown {
+function safeReplacer(includeStack: boolean): (key: string, value: unknown) => unknown {
   const seen = new WeakSet<object>();
   return (_key, value) => {
+    if (value instanceof Error) return serializeError(value, includeStack);
     if (typeof value === 'bigint') return value.toString();
     if (typeof value === 'function') return '[Function]';
     if (typeof value === 'object' && value !== null) {
@@ -94,11 +101,11 @@ export function buildLogEntry(
   const entry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     level,
-    message,
+    message: redactDiagnosticText(message),
   };
 
   const extras: unknown[] = [];
-  for (const arg of args) {
+  for (const arg of args.map(arg => redactDiagnosticValue(arg))) {
     if (arg instanceof Error) {
       entry.error = serializeError(arg, STACK_LEVELS.has(level));
       continue;
@@ -122,7 +129,7 @@ export function buildLogEntry(
 
   // Context last so an ambient requestId cannot be shadowed by a caller field.
   if (contextFields) {
-    Object.assign(entry, contextFields);
+    Object.assign(entry, redactDiagnosticValue(contextFields));
   }
   return entry;
 }
@@ -130,7 +137,7 @@ export function buildLogEntry(
 function writeJson(level: LogLevel, entry: Record<string, unknown>): void {
   let line: string;
   try {
-    line = JSON.stringify(entry, safeReplacer());
+    line = JSON.stringify(entry, safeReplacer(STACK_LEVELS.has(level)));
     if (line.length > MAX_LINE_LENGTH) {
       line = `${line.slice(0, MAX_LINE_LENGTH)}…","truncated":true}`;
     }
@@ -161,6 +168,8 @@ function writeJson(level: LogLevel, entry: Record<string, unknown>): void {
 }
 
 function writePretty(level: LogLevel, message: string, args: unknown[]): void {
+  message = redactDiagnosticText(message);
+  args = args.map(arg => redactDiagnosticValue(arg));
   const prefix = `[${new Date().toISOString()}] [${level.toUpperCase()}]`;
   switch (level) {
     case 'debug':
