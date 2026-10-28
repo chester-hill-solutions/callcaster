@@ -1193,5 +1193,59 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Native Feature, Priority High, Project Status on-dev. PR #2958 / 0c72d196 is on dev. Source proof is not authorization to archive a live customer workspace."
+  },
+  {
+    "issueNumber": 2603,
+    "verdict": "verify-close",
+    "summary": "High priority. SMS report CSVs omit external_id, although the older campaign-export CSV already includes it.",
+    "currentBehavior": "PR #3068 merged into dev as a0060296 on 2026-10-28. SMS all-message and opt-out CSVs append external_id. Ambiguous or missing contact identity remains blank; existing columns and dates are preserved. Live Project Status on-dev was verified after the merge.",
+    "rootCause": "The report data projection and CSV column list do not carry the contact external_id.",
+    "resolution": "Verify an approved review-environment CSV against known contact IDs, then promote through the release process. No additional source repair is needed unless acceptance fails.",
+    "lookIn": [
+      "app/lib/campaign-sms-report.server.ts",
+      "app/lib/campaign-sms-report-data.server.ts",
+      "test/integration-db/campaign-sms-report.test.ts"
+    ],
+    "acceptanceCriteria": [
+      "Exported delivery and reply CSVs retain the contact external_id.",
+      "Missing external IDs produce an empty cell without losing the row.",
+      "Existing access rules, column values and tenant scope remain correct."
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged source proof on dev, with Project Status on-dev verified in the live issue sidebar on 2026-10-28. Keep the issue open for required environment acceptance and release; no live provider traffic was used.",
+    "existingTests": [
+      "Four added real-PostgreSQL identity cases and the existing report suite pass: 12 cases, zero skipped. Original source and weakened identity guards fail the relevant cases. Full local CI and all applicable GitHub checks passed at final head 582f1255 before the approved merge."
+    ]
+  },
+  {
+    "issueNumber": 2866,
+    "verdict": "verify-close",
+    "recommendedTitle": "Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response",
+    "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount…",
+    "currentBehavior": "PR #3069 merged into dev as 03c3e15a on 2026-10-28. Shared redaction now protects JSON/pretty/legacy logs, ops email and Sentry; onboarding catches and both response adapters use caller-safe messages. Live Project Status on-dev was verified after the merge.",
+    "rootCause": "Drizzle embeds SQL bound values in error.message and error.stack. JSON and pretty logging, ops email and the Sentry wrapper have no shared redaction boundary.",
+    "resolution": "Verify safe diagnostics in an approved deployed test failure, then follow the release process. Preserve caller-written validation messages and safe operation/error codes.",
+    "lookIn": [
+      "app/lib/logger-core.ts",
+      "app/lib/logger.server.ts",
+      "node_modules/drizzle-orm/errors.js",
+      "node_modules/drizzle-orm/pg-core/session.js",
+      "app/db/schema.ts",
+      "app/lib/twilio-workspace-credentials.ts"
+    ],
+    "existingTests": [
+      "77 focused cases pass, including actual diagnostic sinks and UI/API onboarding payloads. Each weakened boundary fails its regression. Full local CI and all applicable GitHub checks passed at final head ea7663ef before the approved merge."
+    ],
+    "missingTests": [
+      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
+      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+    ],
+    "acceptanceCriteria": [
+      "A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls."
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merged source proof on dev, with Project Status on-dev verified in the live issue sidebar on 2026-10-28. No production credentials, provider traffic, live mail or error-tracker delivery were used. Deployed acceptance remains separate."
   }
 ]

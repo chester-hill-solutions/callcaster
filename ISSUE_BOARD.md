@@ -1,10 +1,10 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@4977bfef; complete live issue and Project snapshots 2026-10-28, refreshed after security triage` · 400 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@03c3e15a; complete issue snapshot and Project export 2026-10-28; merged Status verified afterward` · 400 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Live metadata covers all 400 open issues. The complete browser export contains all 397 open CallCaster Project items; the visible count and unique URLs match. #100, #2902 and #2906 are absent from this view and retain unknown Project Status. Priority and Effort are native organization Issue fields. Existing source verdicts retain earlier evidence unless an entry states this review.
+Live issue metadata covers all 400 open issues. The complete browser export contains all 397 open CallCaster Project items; its visible count and unique URLs match. Project Status for #2603 and #2866 was verified again after their merges and is on-dev. #100, #2902 and #2906 are absent from the full Project view and retain unknown Status. Priority and Effort are native organization Issue fields. Earlier source verdicts retain their earlier evidence unless an entry states this review.
 
-Priority order: Urgent #3071 is in progress for the Better Auth patch. High #3072 and #3073 are separate compiler and redirect-library patches. Published PRs #3069 and #3068 contain the credential-safety and SMS report repairs. Review existing security PRs #3063 and #3064 and dispatch PR #3009 before starting duplicate work. SIM follow-up PR #3067 still has failed remote checks.
+PRs #3068 and #3069 are merged into dev. Their SMS identity and credential-safety fixes now need environment acceptance and release. Urgent #3071 has a tested Better Auth 1.7.14 candidate and is running full CI on the new dev base. High #3072 has a separate compiler patch prepared after three failing old-library regressions; High #3073 is the next redirect-library patch. Review existing security PRs #3063 and #3064 and dispatch PR #3009 before starting duplicate work. SIM PR #3067 still has failed remote checks.
 
 High #2546 needs a contact-merge policy and task split. Urgent #1320, #2029 and #2168 need an exact transfer or retention decision; #1165 depends on that work. Urgent #2519 needs an active verification number and a real call. Urgent #2075, #2774 and #2931 retain their stated acceptance gaps. No live provider, inbox or deployed acceptance is claimed here.
 
@@ -35,18 +35,18 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 25
+## Fix now — 23
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
 ### [#3071](https://github.com/chester-hill-solutions/callcaster/issues/3071) Patch Better Auth verification token isolation
 - **IN PROGRESS** · Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-28
 - Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.
-- Current behavior: dev@4977bfef resolves Better Auth 1.6.23. Fresh npm and Bun audits report GHSA-965c-763c-88jm. A local real-library fixture with Magic Link plus OAuth reproduces a session from an OAuth state token; two normal sign-in controls pass. The application itself enables password and optional two-factor sign-in, without the advisory-required Magic Link/OAuth combination.
+- Current behavior: dev before this candidate resolves Better Auth 1.6.23. The isolated candidate updates both locks and every measured auth/core/adapter consumer to 1.7.14. The old library fails the token-purpose regression with two passing controls. The app does not enable the advisory-required Magic Link/OAuth combination.
 - Root cause: Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.
-- Resolution: Complete Task #3071 with matching fixed core/adapters in both locks, installed-consumer proof, real PostgreSQL auth checks, fresh audits and full CI. Keep existing app sign-in methods and policies.
+- Resolution: Finish full CI and PR review for the 1.7.14 candidate on dev@03c3e15a. Keep existing app sign-in methods and policies. Require exact-head remote checks and deployed verification before release.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/server/auth-instance.ts`
-- Existing tests: Local installed-library regression: one failing token-purpose case with two passing valid controls on 1.6.23.
+- Existing tests: 56 focused auth cases pass. Twelve actual-library sign-in/verification/recovery cases and two real-PostgreSQL app-adapter journeys pass. Separate fresh npm and frozen Bun production installs each execute all three token/control cases and resolve matching 1.7.14 peers. Fresh audits show no remaining Better Auth findings. Full local CI is in progress.
 - Done when: A token from one purpose cannot authenticate another purpose or consume its pending state.; Valid email/password and one-use Magic Link controls pass in an isolated fixture.; App verification, recovery, session and two-factor policies remain covered.
 - Tracker: Native Task, Priority Urgent, Effort Medium, parent #1802; assigned to wra-sol and Project Status In progress. Version applicability is separate from live exploit reachability. Follow the Development link for the candidate. No live OAuth or email traffic is needed.
 
@@ -57,6 +57,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: The existing override floor still permits the affected compiler release.
 - Resolution: Raise the compatible override floor to 4.7.10 or a verified fixed release. Prove rejection of bounded advisory fixtures and normal string-template compatibility through the installed generator; run both installers, audits, codegen and full CI.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Existing tests: A bounded test through the actual installed Hey API compiler reproduces three failures on Handlebars 4.7.9: compile and precompile accept malformed AST metadata, and broad prototype-method access exposes the forbidden constructor. A normal escaped string-template control passes. The separate patch and regression file are prepared; dependency installation and full verification remain.
 - Tracker: Native Task, Priority High, Effort Low, assigned to wra-sol, Project Status Backlog. Keep this compiler patch separate from runtime auth and redirects; the historical development Epic #1803 is closed.
 
 ### [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073) Align the patched Twilio redirect dependency
@@ -67,29 +68,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
 - Tracker: Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions.
-
-### [#2603](https://github.com/chester-hill-solutions/callcaster/issues/2603) SMS Exports should have "external_id" and/or all contact fields not just contact name
-- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-28
-- High priority. SMS report CSVs omit external_id, although the older campaign-export CSV already includes it.
-- Current behavior: Complete repair is published in PR #3068 at 582f1255. Generated all-message and opt-out CSVs include external_id; missing and ambiguous IDs remain empty. Full local CI and all applicable exact-head GitHub checks pass.
-- Root cause: The report data projection and CSV column list do not carry the contact external_id.
-- Resolution: Review and merge PR #3068 with approval, then verify generated report artifacts on the deployed target before release.
-- Look in: `app/lib/campaign-sms-report.server.ts`, `app/lib/campaign-sms-report-data.server.ts`, `test/integration-db/campaign-sms-report.test.ts`
-- Done when: Exported delivery and reply CSVs retain the contact external_id.; Missing external IDs produce an empty cell without losing the row.; Existing access rules, column values and tenant scope remain correct.
-- Tracker: Native Feature, Priority High, Effort Low; assigned to wra-sol, Project Status In progress. Twelve real PostgreSQL cases pass. Original source and separate identity faults fail. Do not duplicate the published repair.
-
-### [#2866](https://github.com/chester-hill-solutions/callcaster/issues/2866) Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into…
-- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-28
-- Recommended title: **Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response**
-- CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount…
-- Current behavior: Complete repair is published in PR #3069. It covers direct/nested diagnostic output, both log formats, ops email, Sentry and both onboarding response paths. Full local CI passes on final ea7663ef.
-- Root cause: Drizzle embeds SQL bound values in error.message and error.stack. JSON and pretty logging, ops email and the Sentry wrapper have no shared redaction boundary.
-- Resolution: Review PR #3069, require its final exact-head remote checks, then merge with approval and verify the deployed result. Keep the existing caller-safe shared responder and intentional onboarding messages.
-- Look in: `app/lib/logger-core.ts`, `app/lib/logger.server.ts`, `node_modules/drizzle-orm/errors.js`, `node_modules/drizzle-orm/pg-core/session.js`, `app/db/schema.ts`, `app/lib/twilio-workspace-credentials.ts`
-- Existing tests: The caught error's constructor is DrizzleQueryError and its message is: 'Failed query: update "workspace" set "key" = $1, "token" = $2, "twilio_data" = $3 where "workspace"."id" = $4\nparams: SKdummy00000000000000000000000000,DUMMY_TWILIO_API_KEY_SECRET_0123456789,{"sid":"ACdummy00000000000000000000000000","authToken":…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls.
-- Tracker: Native Bug, assigned to wra-sol, Project Status In progress. Do not start a duplicate implementation. Seventy-seven focused cases pass; original and separate boundary faults fail. Deployed acceptance and release remain.
 
 ### [#2882](https://github.com/chester-hill-solutions/callcaster/issues/2882) Campaign export hands the lowest-trust workspace role every agent's attempts and contact PII
 - **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-26
@@ -322,9 +300,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 48
+## Verify and close — 50
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2866](https://github.com/chester-hill-solutions/callcaster/issues/2866) Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into…
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-28
+- Recommended title: **Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response**
+- CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount…
+- Current behavior: PR #3069 merged into dev as 03c3e15a on 2026-10-28. Shared redaction now protects JSON/pretty/legacy logs, ops email and Sentry; onboarding catches and both response adapters use caller-safe messages. Live Project Status on-dev was verified after the merge.
+- Root cause: Drizzle embeds SQL bound values in error.message and error.stack. JSON and pretty logging, ops email and the Sentry wrapper have no shared redaction boundary.
+- Resolution: Verify safe diagnostics in an approved deployed test failure, then follow the release process. Preserve caller-written validation messages and safe operation/error codes.
+- Look in: `app/lib/logger-core.ts`, `app/lib/logger.server.ts`, `node_modules/drizzle-orm/errors.js`, `node_modules/drizzle-orm/pg-core/session.js`, `app/db/schema.ts`, `app/lib/twilio-workspace-credentials.ts`
+- Existing tests: 77 focused cases pass, including actual diagnostic sinks and UI/API onboarding payloads. Each weakened boundary fails its regression. Full local CI and all applicable GitHub checks passed at final head ea7663ef before the approved merge.
+- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
+- Done when: A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls.
+- Tracker: Merged source proof on dev, with Project Status on-dev verified in the live issue sidebar on 2026-10-28. No production credentials, provider traffic, live mail or error-tracker delivery were used. Deployed acceptance remains separate.
+
+### [#2603](https://github.com/chester-hill-solutions/callcaster/issues/2603) SMS Exports should have "external_id" and/or all contact fields not just contact name
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-10-28
+- High priority. SMS report CSVs omit external_id, although the older campaign-export CSV already includes it.
+- Current behavior: PR #3068 merged into dev as a0060296 on 2026-10-28. SMS all-message and opt-out CSVs append external_id. Ambiguous or missing contact identity remains blank; existing columns and dates are preserved. Live Project Status on-dev was verified after the merge.
+- Root cause: The report data projection and CSV column list do not carry the contact external_id.
+- Resolution: Verify an approved review-environment CSV against known contact IDs, then promote through the release process. No additional source repair is needed unless acceptance fails.
+- Look in: `app/lib/campaign-sms-report.server.ts`, `app/lib/campaign-sms-report-data.server.ts`, `test/integration-db/campaign-sms-report.test.ts`
+- Existing tests: Four added real-PostgreSQL identity cases and the existing report suite pass: 12 cases, zero skipped. Original source and weakened identity guards fail the relevant cases. Full local CI and all applicable GitHub checks passed at final head 582f1255 before the approved merge.
+- Done when: Exported delivery and reply CSVs retain the contact external_id.; Missing external IDs produce an empty cell without losing the row.; Existing access rules, column values and tenant scope remain correct.
+- Tracker: Merged source proof on dev, with Project Status on-dev verified in the live issue sidebar on 2026-10-28. Keep the issue open for required environment acceptance and release; no live provider traffic was used.
 
 ### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
 - Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-26
