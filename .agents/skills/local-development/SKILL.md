@@ -169,6 +169,10 @@ Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.
 
+Run metadata proof and audit dispatch in one script that stops if proof fails.
+Keep a proof failure separate from an audit exit code that reports findings;
+require complete JSON results from both audits.
+
 An audit command can export dependency names and versions to its registry.
 If automatic approval review rejects that export, keep it held and request
 approval for the exact inventory and destination. Do not run it through another
@@ -603,6 +607,11 @@ terminating either socket. Await both close events before asserting that the
 server client set is empty; the server close callback alone can run earlier.
 Bound awaited transport events with a deadline so an old-package rejection
 control cannot leave an open connection after a test timeout.
+
+For raw-array HTTP header fixtures, supply Host explicitly. Node can reject an
+array without it before the request handler runs. Require a completed HTTP 200
+and captured destination headers before claiming a stripping result; keep a
+same-origin credential control and a public-header control.
 
 For loopback HTTP fixtures with several short-lived servers, disable the client
 agent or close its pooled connections between servers. Node can reuse a socket

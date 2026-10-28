@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: Align the Twilio redirect dependency on the patched release so cross-origin redirects remove raw-array credentials and declared custom secret headers ([#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073)).
 - Security: Database failures no longer copy SQL parameter values or credential fields into application logs, operations email, error reports or onboarding responses. Safe error codes and operation context remain available ([PR #3069](https://github.com/chester-hill-solutions/callcaster/pull/3069), [#2866](https://github.com/chester-hill-solutions/callcaster/issues/2866)).
 - Fixed: IVR queue estimates include durable worker polling and show consistent calls/minute units ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Fixed: IVR voicemail drops wait for the recipient's greeting to finish before playback, including campaign test calls. All documented machine greeting-end results use the voicemail path ([#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774)).
