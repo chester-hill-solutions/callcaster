@@ -20,9 +20,13 @@ Extends `github-cli` and `github-issues` — apply their auth/repo rules first.
 
 ## Prerequisites
 
-- `gh` authenticated with a token that has the **`project` scope** (verified: current
-  token has it). A GITHUB_TOKEN from Actions cannot write org projects — do NOT run this
-  in a workflow with `github.token`.
+- For CLI Project reads and writes, verify the current token has the required
+  `read:project` / `project` scope. Do not assume a prior session token still has it.
+  A GITHUB_TOKEN from Actions cannot write org projects. If the current CLI token
+  lacks the scope, use the existing authorized browser session to inspect the
+  Project and verify or repair only the merged items. A successful workflow or
+  its comment does not prove that the Status changed. Do not broaden token access
+  solely to bypass this read limit.
 - Target project facts (verified 2026-09-15, project re-verifiable below):
   - Project: **CHS backlog**, number **9** (org `chester-hill-solutions`)
   - Status field id: `PVTSSF_lADOCNShUM4BeArizhYeBKI`
