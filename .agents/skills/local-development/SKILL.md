@@ -180,6 +180,12 @@ When publication is held, do not predict a PR number in the changelog. Keep
 the issue link during local preparation, add the verified PR link before final
 publication, then repeat full gates and source reviews for those exact bytes.
 
+For a security update, inspect every locked peer consumer, including local
+`file:` packages. Bun can retain an affected root peer while installing a fixed
+private copy for the parent. `npm ls` proves only the npm tree. A targeted
+`bun update` can add a direct dependency; review the manifest, keep only intended
+declarations, and require both frozen install trees to use the fixed peer.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
