@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: Update the API generator compiler to reject malformed AST metadata and keep prototype constructors blocked ([#3072](https://github.com/chester-hill-solutions/callcaster/issues/3072)).
 - Security: Auth aliases share the same 10-per-minute credential limits. New auth POST paths use a strict default, while sign-out and session revocation keep their 30-per-minute limits ([PR #3079](https://github.com/chester-hill-solutions/callcaster/pull/3079), [#2867](https://github.com/chester-hill-solutions/callcaster/issues/2867)).
 - Update Better Auth and its adapters to isolate verification-token purposes; preserve verified password sign-in, recovery and two-factor sessions ([PR #3074](https://github.com/chester-hill-solutions/callcaster/pull/3074), [#3071](https://github.com/chester-hill-solutions/callcaster/issues/3071)).
 - Security: Database failures no longer copy SQL parameter values or credential fields into application logs, operations email, error reports or onboarding responses. Safe error codes and operation context remain available ([PR #3069](https://github.com/chester-hill-solutions/callcaster/pull/3069), [#2866](https://github.com/chester-hill-solutions/callcaster/issues/2866)).
