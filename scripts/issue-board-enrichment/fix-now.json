@@ -168,9 +168,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response",
     "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount\u2026",
-    "currentBehavior": "Shared responder HTTP failures are already generic, but onboarding has a separate raw-error response path. The local diagnostic-sink fix passes 31 focused tests; the onboarding response correction is being added before publication.",
+    "currentBehavior": "Complete repair is published in PR #3069. It covers direct/nested diagnostic output, both log formats, ops email, Sentry and both onboarding response paths. Full local CI passes on final ea7663ef.",
     "rootCause": "Drizzle embeds SQL bound values in error.message and error.stack. JSON and pretty logging, ops email and the Sentry wrapper have no shared redaction boundary.",
-    "resolution": "Redact SQL parameter tails and credential fields before all diagnostic sinks. Preserve safe error codes and operation context. Cover direct and nested errors, both log formats, cause chains, alert email and initialized Sentry; retain the caller-safe HTTP fallback.",
+    "resolution": "Review PR #3069, require its final exact-head remote checks, then merge with approval and verify the deployed result. Keep the existing caller-safe shared responder and intentional onboarding messages.",
     "lookIn": [
       "app/lib/logger-core.ts",
       "app/lib/logger.server.ts",
@@ -191,7 +191,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Bug, assigned to wra-sol, Project Status In progress. Original source fails six credential regressions with two controls passing. Separate logger, alert and Sentry faults fail. Full publication gates remain."
+    "trackerRecommendation": "Native Bug, assigned to wra-sol, Project Status In progress. Do not start a duplicate implementation. Seventy-seven focused cases pass; original and separate boundary faults fail. Deployed acceptance and release remain."
   },
   {
     "issueNumber": 2867,
@@ -576,9 +576,9 @@
     "issueNumber": 2603,
     "verdict": "fix-now",
     "summary": "High priority. SMS report CSVs omit external_id, although the older campaign-export CSV already includes it.",
-    "currentBehavior": "Local branch feature/2603-sms-export-external-id adds external_id to generated all-message and opt-out CSVs. Twelve real PostgreSQL cases pass, including missing and quoted IDs, exact references, unlinked replies, conflicting legacy IDs and foreign-workspace controls.",
+    "currentBehavior": "Complete repair is published in PR #3068 at 582f1255. Generated all-message and opt-out CSVs include external_id; missing and ambiguous IDs remain empty. Full local CI and all applicable exact-head GitHub checks pass.",
     "rootCause": "The report data projection and CSV column list do not carry the contact external_id.",
-    "resolution": "Add external_id to the SMS delivery and reply CSV data paths. Preserve existing columns, row scope and admin access. Verify the actual generated report artifacts with contacts that have and lack an external ID.",
+    "resolution": "Review and merge PR #3068 with approval, then verify generated report artifacts on the deployed target before release.",
     "lookIn": [
       "app/lib/campaign-sms-report.server.ts",
       "app/lib/campaign-sms-report-data.server.ts",
@@ -591,6 +591,63 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Feature, Priority High, Effort Low. Assigned to wra-sol and moved to In progress on the live Project. The original source fails three cases with nine controls passing; identity-fallback and duplicate-selection faults fail. Full local CI and publication remain."
+    "trackerRecommendation": "Native Feature, Priority High, Effort Low; assigned to wra-sol, Project Status In progress. Twelve real PostgreSQL cases pass. Original source and separate identity faults fail. Do not duplicate the published repair."
+  },
+  {
+    "issueNumber": 3071,
+    "verdict": "fix-now",
+    "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
+    "currentBehavior": "dev@4977bfef resolves Better Auth 1.6.23. Fresh npm and Bun audits report GHSA-965c-763c-88jm. A local real-library fixture with Magic Link plus OAuth reproduces a session from an OAuth state token; two normal sign-in controls pass. The application itself enables password and optional two-factor sign-in, without the advisory-required Magic Link/OAuth combination.",
+    "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
+    "resolution": "Complete Task #3071 with matching fixed core/adapters in both locks, installed-consumer proof, real PostgreSQL auth checks, fresh audits and full CI. Keep existing app sign-in methods and policies.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "Local installed-library regression: one failing token-purpose case with two passing valid controls on 1.6.23."
+    ],
+    "acceptanceCriteria": [
+      "A token from one purpose cannot authenticate another purpose or consume its pending state.",
+      "Valid email/password and one-use Magic Link controls pass in an isolated fixture.",
+      "App verification, recovery, session and two-factor policies remain covered."
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Task, Priority Urgent, Effort Medium, parent #1802; assigned to wra-sol and Project Status In progress. Version applicability is separate from live exploit reachability. Follow the Development link for the candidate. No live OAuth or email traffic is needed."
+  },
+  {
+    "issueNumber": 3072,
+    "verdict": "fix-now",
+    "summary": "High: patch the API generator Handlebars compiler in npm and Bun.",
+    "currentBehavior": "Both locks resolve Handlebars 4.7.9. Fresh audits report the Critical AST-type and own-property findings. The measured npm consumer is Hey API code generation; the findings need untrusted AST input or unsafe prototype settings.",
+    "rootCause": "The existing override floor still permits the affected compiler release.",
+    "resolution": "Raise the compatible override floor to 4.7.10 or a verified fixed release. Prove rejection of bounded advisory fixtures and normal string-template compatibility through the installed generator; run both installers, audits, codegen and full CI.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Native Task, Priority High, Effort Low, assigned to wra-sol, Project Status Backlog. Keep this compiler patch separate from runtime auth and redirects; the historical development Epic #1803 is closed."
+  },
+  {
+    "issueNumber": 3073,
+    "verdict": "fix-now",
+    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
+    "currentBehavior": "The npm Twilio/Axios path resolves follow-redirects 1.16.0, affected by array-form and custom sensitive-header forwarding findings. Bun resolves fixed 1.16.1 and reports no redirect-library finding.",
+    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
+    "resolution": "Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions."
   }
 ]
