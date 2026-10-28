@@ -103,6 +103,7 @@ function messageCsvRow(direction: string, message: ReportMessage) {
     message.error_code,
     errorDescription(message.error_code),
     message.body,
+    message.external_id,
   ];
 }
 
@@ -438,6 +439,7 @@ export async function buildCampaignSmsReport(
     "error_code",
     "error_description",
     "body",
+    "external_id",
   ];
   const replyBreakdown = [...summary.replyCounts].map(([theme, count]) => [
     theme,
@@ -469,12 +471,13 @@ export async function buildCampaignSmsReport(
       label: "Opt-outs (CSV)",
       contentType: "text/csv; charset=utf-8",
       body: csv(
-        ["contact_name", "phone", "body", "date_created"],
+        ["contact_name", "phone", "body", "date_created", "external_id"],
         summary.optouts.map((message) => [
           contactName(message),
           message.from,
           message.body,
           iso(message.date_created),
+          message.external_id,
         ]),
       ),
     },

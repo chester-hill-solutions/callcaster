@@ -21,6 +21,7 @@ export type ReportMessage = {
   firstname?: string | null;
   surname?: string | null;
   phone?: string | null;
+  external_id?: string | null;
 };
 
 export type CampaignReportRow = {
@@ -163,30 +164,41 @@ export async function loadCampaignReportData(
   const inbound = threadMessages.filter(
     (message) => message.direction === "inbound",
   );
-  const staff = threadMessages
-    .filter((message) => message.direction !== "inbound")
-    .map((message) => ({
-      ...message,
-      ...(contactById.get(Number(message.contact_id)) ?? {}),
-    }));
-  const outboundNames = new Map<string, string>();
+  const outboundContacts = new Map<string, { name: string; externalId: string | null }>();
   for (const message of outboundWithContacts) {
     const phone = digits(message.to);
-    if (phone && !outboundNames.has(phone)) {
-      outboundNames.set(phone, contactName(message));
+    if (!phone) continue;
+    const existing = outboundContacts.get(phone);
+    const externalId = message.external_id ?? null;
+    if (!existing) {
+      outboundContacts.set(phone, { name: contactName(message), externalId });
+    } else if (existing.externalId !== externalId) {
+      existing.externalId = null;
     }
   }
-  const inboundWithContacts = inbound.map((row) => {
+
+  function withRecipient(row: ReportMessage, phone: string | null) {
     const message = {
       ...row,
       ...(contactById.get(Number(row.contact_id)) ?? {}),
     };
-    if (message.firstname || message.surname) return message;
+    const fallback = outboundContacts.get(digits(phone));
     return {
       ...message,
-      firstname: outboundNames.get(digits(message.from)) ?? "Unknown",
+      // Conflicting legacy contacts must not give a reply an arbitrary identity.
+      external_id: row.contact_id == null
+        ? fallback?.externalId ?? null
+        : message.external_id ?? null,
     };
+  }
+  const inboundWithContacts = inbound.map(row => {
+    const message = withRecipient(row, row.from);
+    if (message.firstname || message.surname) return message;
+    return { ...message, firstname: outboundContacts.get(digits(row.from))?.name ?? "Unknown" };
   });
+  const staff = threadMessages
+    .filter(message => message.direction !== "inbound")
+    .map(row => withRecipient(row, row.to));
   return {
     campaign,
     outbound,
