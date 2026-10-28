@@ -4,7 +4,7 @@ Reviewed at `dev@03c3e15a; complete issue snapshot and Project export 2026-10-28
 
 Live issue metadata covers all 400 open issues. The complete browser export contains all 397 open CallCaster Project items; its visible count and unique URLs match. Project Status for #2603 and #2866 was verified again after their merges and is on-dev. #100, #2902 and #2906 are absent from the full Project view and retain unknown Status. Priority and Effort are native organization Issue fields. Earlier source verdicts retain their earlier evidence unless an entry states this review.
 
-PRs #3068 and #3069 are merged into dev. Their SMS identity and credential-safety fixes now need environment acceptance and release. Urgent #3071 has a tested Better Auth 1.7.14 candidate and is running full CI on the new dev base. High #3072 has a separate compiler patch prepared after three failing old-library regressions; High #3073 is the next redirect-library patch. Review existing security PRs #3063 and #3064 and dispatch PR #3009 before starting duplicate work. SIM PR #3067 still has failed remote checks.
+PRs #3068 and #3069 are merged into dev. Their SMS identity and credential-safety fixes now need environment acceptance and release. Urgent #3071 has tested PR #3074 for Better Auth 1.7.14; both complete local gates pass and final-head remote checks are required. High #3072 has a separate compiler patch prepared after three failing old-library regressions; High #3073 is the next redirect-library patch, with three old-library failures and three passing controls reproduced. Review existing security PRs #3063 and #3064 and dispatch PR #3009 before starting duplicate work. SIM PR #3067 still has failed remote checks. General lock parity #2887 needs an atomic task split; its passing guard still permits different production and CI dependency versions.
 
 High #2546 needs a contact-merge policy and task split. Urgent #1320, #2029 and #2168 need an exact transfer or retention decision; #1165 depends on that work. Urgent #2519 needs an active verification number and a real call. Urgent #2075, #2774 and #2931 retain their stated acceptance gaps. No live provider, inbox or deployed acceptance is claimed here.
 
@@ -35,20 +35,20 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 23
+## Fix now — 22
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
 ### [#3071](https://github.com/chester-hill-solutions/callcaster/issues/3071) Patch Better Auth verification token isolation
 - **IN PROGRESS** · Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-28
 - Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.
-- Current behavior: dev before this candidate resolves Better Auth 1.6.23. The isolated candidate updates both locks and every measured auth/core/adapter consumer to 1.7.14. The old library fails the token-purpose regression with two passing controls. The app does not enable the advisory-required Magic Link/OAuth combination.
+- Current behavior: Open PR #3074 updates Better Auth and every measured core/adapter consumer from 1.6.23 to 1.7.14 in both install paths. Final local head 6d51738c is based on dev@03c3e15a. The application still uses password and optional two-factor sign-in; it does not enable the advisory-required Magic Link/OAuth combination.
 - Root cause: Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.
-- Resolution: Finish full CI and PR review for the 1.7.14 candidate on dev@03c3e15a. Keep existing app sign-in methods and policies. Require exact-head remote checks and deployed verification before release.
+- Resolution: Review PR #3074 and require its final-head remote checks before the authorized merge. Keep app sign-in policies unchanged and run approved deployed acceptance before release.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`, `app/server/auth-instance.ts`
-- Existing tests: 56 focused auth cases pass. Twelve actual-library sign-in/verification/recovery cases and two real-PostgreSQL app-adapter journeys pass. Separate fresh npm and frozen Bun production installs each execute all three token/control cases and resolve matching 1.7.14 peers. Fresh audits show no remaining Better Auth findings. Full local CI is in progress.
+- Existing tests: The old library fails the token-purpose case with two passing controls. Twelve installed-library journeys and two real-PostgreSQL app-adapter cases pass.; Fresh full and production install checks pass; npm and Bun production trees and a separate frozen Bun full tree each execute all three behavior cases and resolve matching 1.7.14 auth/core/adapters.; Fresh audits report no Better Auth findings. Two complete local gates pass; final head 6d51738c has 6,064 Node, 34 Bun and 1,541 UI passes, 11 existing skips, all guards, build, bundle and codegen checks.
 - Done when: A token from one purpose cannot authenticate another purpose or consume its pending state.; Valid email/password and one-use Magic Link controls pass in an isolated fixture.; App verification, recovery, session and two-factor policies remain covered.
-- Tracker: Native Task, Priority Urgent, Effort Medium, parent #1802; assigned to wra-sol and Project Status In progress. Version applicability is separate from live exploit reachability. Follow the Development link for the candidate. No live OAuth or email traffic is needed.
+- Tracker: Native Task, Urgent, Effort Medium, parent #1802; assigned to wra-sol and Status In progress. PR #3074 has an explicit Development link. Remote check results and deployed acceptance must be verified separately; no live OAuth or email traffic was used.
 
 ### [#3072](https://github.com/chester-hill-solutions/callcaster/issues/3072) Patch the API generator Handlebars compiler
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-28
@@ -67,6 +67,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: The two locks resolve different compatible versions of the same transitive runtime package.
 - Resolution: Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.
 - Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Existing tests: Six bounded loopback cases resolve the actual Twilio → Axios → follow-redirects consumer. The npm 1.16.0 copy fails the array-credential and two custom-header cases; three normal controls pass.; The already fixed Bun 1.16.1 copy passes all six cases. Array fixtures include the required Host header and require a completed HTTP 200 before checking the destination headers.
 - Tracker: Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions.
 
 ### [#2882](https://github.com/chester-hill-solutions/callcaster/issues/2882) Campaign export hands the lowest-trust workspace role every agent's attempts and contact PII
@@ -104,18 +105,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: The request returned 302 with Location /workspaces/<workspaceId>/audios/recorded-<stamp>.mp3/edit, the normalised object was PUT to the bucket (8279 bytes), and workspace_audio held a row with file_name 'recorded-<stamp>.mp3', origin 'recording', duration_ms 14266340 (3.96 hours), size_bytes 8279, content_type…
 - Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
 - Done when: A recording is bounded in duration before it is transcoded and before it is stored. The server already measures every recording with its own probe (probeAudioDurationMs), specifically so the recorded length is the server's own measurement rather than the client's timer, and the client already sends a durationMs field; that measured length is expected to be checked against a maximum, with the request rejected before the object is written, and the browser recorder expected to stop at the same maximum.
-
-### [#2887](https://github.com/chester-hill-solutions/callcaster/issues/2887) Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker…
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
-- Recommended title: **Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install**
-- The repository keeps two lockfiles because the two halves of the pipeline use different package managers
-- Current behavior: The repository keeps two lockfiles because the two halves of the pipeline use different package managers. Every CI job installs with `npm ci` (.github/workflows/ci.yml:78, 92, 110, 127, 144, 193, 214), so typecheck, lint, the node and UI test suites and the static checks all run against the package-lock.json (npm) tree, while the deployed worker image installs the bun.lock (bun) tree (`bun install --production` at Dockerfile.worker:8; the Dockerfile web image installs the same tree at Dockerfile:11). The repository's only control for keeping those trees aligned is `npm run check:bun-lock` -> scripts/check-bun-lockfile.mjs, and that script implements the check as `bun install…
-- Root cause: scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,…
-- Resolution: Make the drift gate compare the two lockfiles instead of only bun.lock against package.json, make the worker image fail loudly on any future drift, and pin the resolver so the gate validates the same lockfile the image installs. Three steps, in order: (1) align the resolver configuration first - .npmrc legacy-peer-deps=true makes npm ignore peer dependencies while bun installs them, which is why the trees differ in package content and not only in versions; either drop legacy-peer-deps (and regenerate package-lock.json) or record the peer difference as accepted and scope the comparison accordingly; (2) regenerate both lockfiles from the same package.json so the resolved trees agree, and…
-- Look in: `.github/workflows/ci.yml`, `scripts/check-bun-lockfile.mjs`, `package.json`, `Dockerfile.worker`, `Dockerfile`, `package-lock.json`
-- Existing tests: The gate's only assertion holds: bun.lock satisfies every package.json range, so `bun install --frozen-lockfile --dry-run` has nothing to change in bun.lock and the gate is green, while the two lockfiles disagree. The comparison of the two lockfiles shows 250 package names resolving to different version sets (31…
-- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
-- Done when: The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced.
 
 ### [#2881](https://github.com/chester-hill-solutions/callcaster/issues/2881) A tenant workspace delete is aborted by the job table's NO ACTION foreign key, so the delete removes nothing and…
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
@@ -1452,7 +1441,7 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 31
+## Blocked / split first — 32
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
@@ -1479,6 +1468,19 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Missing tests: Review and merge the candidate, then verify the exact promoted guard before closing.
 - Done when: Workspace and nested data-plane routes reuse middleware tdb for plain request-scoped access; documented flat and transaction routes keep their explicit client.; A new app/lib module cannot import an unscoped database client without a counted baseline exception.; Existing exceptions cannot grow; reduced or removed imports require a smaller baseline.; npm run ci:local is green.
 - Tracker: Reopened after the JavaScript probe disproved the first closure. Native Type Epic; assigned wra-sol; organization fields unset; all three children closed, no blockers. Live Project Status In progress. Remaining work is code, manual false. Keep open until the complete guard reaches master and is verified.
+
+### [#2887](https://github.com/chester-hill-solutions/callcaster/issues/2887) Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker…
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
+- Recommended title: **Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install**
+- Split first. The drift guard validates Bun against package.json, while CI and production still resolve different provider SDK versions.
+- Current behavior: Current source at dev@03c3e15a still runs only bun install --frozen-lockfile --dry-run. Fresh installs confirm Twilio 5.13.1 in npm and 5.4.4 in Bun. The full gate passes despite that difference. .bun-version is 1.2.15, Docker uses 1.3.5, and Dockerfile.worker still omits --frozen-lockfile.
+- Root cause: scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,…
+- Resolution: Split resolver-version/worker-freeze alignment, explicit peer/platform comparison rules, the comparison guard, and dependency-family alignment into atomic tasks. Preserve the current peer policy until its change has consumer proof. Do not put a global package upgrade into a targeted security patch.
+- Look in: `.github/workflows/ci.yml`, `scripts/check-bun-lockfile.mjs`, `package.json`, `Dockerfile.worker`, `Dockerfile`, `package-lock.json`
+- Existing tests: Fresh installed-consumer proofs confirm the live npm/Bun Twilio version difference; the current full CI passes because its Bun guard checks only manifest satisfaction.; The earlier audit measured broad version and package-set differences. Recompute the complete matrix after the targeted patches before defining a parity guard.
+- Missing tests: A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).; A negative control for the same path keeps passing, so the fix does not silently widen access.
+- Done when: The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced.
+- Tracker: 2026-10-28 source review changes the earlier S-sized Fix now verdict: this is a multi-step dependency and CI task. Keep #3071, #3072 and #3073 atomic and require their individual fresh-consumer proofs. General parity remains unresolved.
 
 ### [#1165](https://github.com/chester-hill-solutions/callcaster/issues/1165) Prune stale non-production Twilio resources safely
 - **IN PROGRESS** · Verdict: **Blocked / split first** · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-10-19

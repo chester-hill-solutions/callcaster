@@ -485,35 +485,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2887,
-    "verdict": "fix-now",
-    "recommendedTitle": "Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install",
-    "summary": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers",
-    "currentBehavior": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers. Every CI job installs with `npm ci` (.github/workflows/ci.yml:78, 92, 110, 127, 144, 193, 214), so typecheck, lint, the node and UI test suites and the static checks all run against the package-lock.json (npm) tree, while the deployed worker image installs the bun.lock (bun) tree (`bun install --production` at Dockerfile.worker:8; the Dockerfile web image installs the same tree at Dockerfile:11). The repository's only control for keeping those trees aligned is `npm run check:bun-lock` -> scripts/check-bun-lockfile.mjs, and that script implements the check as `bun install…",
-    "rootCause": "scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,…",
-    "resolution": "Make the drift gate compare the two lockfiles instead of only bun.lock against package.json, make the worker image fail loudly on any future drift, and pin the resolver so the gate validates the same lockfile the image installs. Three steps, in order: (1) align the resolver configuration first - .npmrc legacy-peer-deps=true makes npm ignore peer dependencies while bun installs them, which is why the trees differ in package content and not only in versions; either drop legacy-peer-deps (and regenerate package-lock.json) or record the peer difference as accepted and scope the comparison accordingly; (2) regenerate both lockfiles from the same package.json so the resolved trees agree, and…",
-    "lookIn": [
-      ".github/workflows/ci.yml",
-      "scripts/check-bun-lockfile.mjs",
-      "package.json",
-      "Dockerfile.worker",
-      "Dockerfile",
-      "package-lock.json"
-    ],
-    "existingTests": [
-      "The gate's only assertion holds: bun.lock satisfies every package.json range, so `bun install --frozen-lockfile --dry-run` has nothing to change in bun.lock and the gate is green, while the two lockfiles disagree. The comparison of the two lockfiles shows 250 package names resolving to different version sets (31…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2895,
     "verdict": "fix-now",
     "recommendedTitle": "Workspace-UI recording path stores the take before it measures its duration, and no maximum duration exists anywhere to compare against",
@@ -543,47 +514,6 @@
     "risk": "medium"
   },
   {
-    "issueNumber": 3073,
-    "verdict": "fix-now",
-    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
-    "currentBehavior": "The npm Twilio/Axios path resolves follow-redirects 1.16.0, affected by array-form and custom sensitive-header forwarding findings. Bun resolves fixed 1.16.1 and reports no redirect-library finding.",
-    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
-    "resolution": "Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions."
-  },
-  {
-    "issueNumber": 3071,
-    "verdict": "fix-now",
-    "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
-    "currentBehavior": "dev before this candidate resolves Better Auth 1.6.23. The isolated candidate updates both locks and every measured auth/core/adapter consumer to 1.7.14. The old library fails the token-purpose regression with two passing controls. The app does not enable the advisory-required Magic Link/OAuth combination.",
-    "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
-    "resolution": "Finish full CI and PR review for the 1.7.14 candidate on dev@03c3e15a. Keep existing app sign-in methods and policies. Require exact-head remote checks and deployed verification before release.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock",
-      "app/server/auth-instance.ts"
-    ],
-    "existingTests": [
-      "56 focused auth cases pass. Twelve actual-library sign-in/verification/recovery cases and two real-PostgreSQL app-adapter journeys pass. Separate fresh npm and frozen Bun production installs each execute all three token/control cases and resolve matching 1.7.14 peers. Fresh audits show no remaining Better Auth findings. Full local CI is in progress."
-    ],
-    "acceptanceCriteria": [
-      "A token from one purpose cannot authenticate another purpose or consume its pending state.",
-      "Valid email/password and one-use Magic Link controls pass in an isolated fixture.",
-      "App verification, recovery, session and two-factor policies remain covered."
-    ],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Native Task, Priority Urgent, Effort Medium, parent #1802; assigned to wra-sol and Project Status In progress. Version applicability is separate from live exploit reachability. Follow the Development link for the candidate. No live OAuth or email traffic is needed."
-  },
-  {
     "issueNumber": 3072,
     "verdict": "fix-now",
     "summary": "High: patch the API generator Handlebars compiler in npm and Bun.",
@@ -600,6 +530,53 @@
     "trackerRecommendation": "Native Task, Priority High, Effort Low, assigned to wra-sol, Project Status Backlog. Keep this compiler patch separate from runtime auth and redirects; the historical development Epic #1803 is closed.",
     "existingTests": [
       "A bounded test through the actual installed Hey API compiler reproduces three failures on Handlebars 4.7.9: compile and precompile accept malformed AST metadata, and broad prototype-method access exposes the forbidden constructor. A normal escaped string-template control passes. The separate patch and regression file are prepared; dependency installation and full verification remain."
+    ]
+  },
+  {
+    "issueNumber": 3071,
+    "verdict": "fix-now",
+    "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
+    "currentBehavior": "Open PR #3074 updates Better Auth and every measured core/adapter consumer from 1.6.23 to 1.7.14 in both install paths. Final local head 6d51738c is based on dev@03c3e15a. The application still uses password and optional two-factor sign-in; it does not enable the advisory-required Magic Link/OAuth combination.",
+    "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
+    "resolution": "Review PR #3074 and require its final-head remote checks before the authorized merge. Keep app sign-in policies unchanged and run approved deployed acceptance before release.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "The old library fails the token-purpose case with two passing controls. Twelve installed-library journeys and two real-PostgreSQL app-adapter cases pass.",
+      "Fresh full and production install checks pass; npm and Bun production trees and a separate frozen Bun full tree each execute all three behavior cases and resolve matching 1.7.14 auth/core/adapters.",
+      "Fresh audits report no Better Auth findings. Two complete local gates pass; final head 6d51738c has 6,064 Node, 34 Bun and 1,541 UI passes, 11 existing skips, all guards, build, bundle and codegen checks."
+    ],
+    "acceptanceCriteria": [
+      "A token from one purpose cannot authenticate another purpose or consume its pending state.",
+      "Valid email/password and one-use Magic Link controls pass in an isolated fixture.",
+      "App verification, recovery, session and two-factor policies remain covered."
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Task, Urgent, Effort Medium, parent #1802; assigned to wra-sol and Status In progress. PR #3074 has an explicit Development link. Remote check results and deployed acceptance must be verified separately; no live OAuth or email traffic was used."
+  },
+  {
+    "issueNumber": 3073,
+    "verdict": "fix-now",
+    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
+    "currentBehavior": "The npm Twilio/Axios path resolves follow-redirects 1.16.0, affected by array-form and custom sensitive-header forwarding findings. Bun resolves fixed 1.16.1 and reports no redirect-library finding.",
+    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
+    "resolution": "Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions.",
+    "existingTests": [
+      "Six bounded loopback cases resolve the actual Twilio → Axios → follow-redirects consumer. The npm 1.16.0 copy fails the array-credential and two custom-header cases; three normal controls pass.",
+      "The already fixed Bun 1.16.1 copy passes all six cases. Array fixtures include the required Host header and require a completed HTTP 200 before checking the destination headers."
     ]
   }
 ]

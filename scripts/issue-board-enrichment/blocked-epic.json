@@ -998,5 +998,36 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Validate an upload ownership and attachment reconciliation protocol using existing media/storage/job patterns, then split implementation tasks as needed. Retain uncertain results until authoritative reconciliation and prevent attachment/deletion races. #2355 can proceed independently."
+  },
+  {
+    "issueNumber": 2887,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install",
+    "summary": "Split first. The drift guard validates Bun against package.json, while CI and production still resolve different provider SDK versions.",
+    "currentBehavior": "Current source at dev@03c3e15a still runs only bun install --frozen-lockfile --dry-run. Fresh installs confirm Twilio 5.13.1 in npm and 5.4.4 in Bun. The full gate passes despite that difference. .bun-version is 1.2.15, Docker uses 1.3.5, and Dockerfile.worker still omits --frozen-lockfile.",
+    "rootCause": "scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,…",
+    "resolution": "Split resolver-version/worker-freeze alignment, explicit peer/platform comparison rules, the comparison guard, and dependency-family alignment into atomic tasks. Preserve the current peer policy until its change has consumer proof. Do not put a global package upgrade into a targeted security patch.",
+    "lookIn": [
+      ".github/workflows/ci.yml",
+      "scripts/check-bun-lockfile.mjs",
+      "package.json",
+      "Dockerfile.worker",
+      "Dockerfile",
+      "package-lock.json"
+    ],
+    "existingTests": [
+      "Fresh installed-consumer proofs confirm the live npm/Bun Twilio version difference; the current full CI passes because its Bun guard checks only manifest satisfaction.",
+      "The earlier audit measured broad version and package-set differences. Recompute the complete matrix after the targeted patches before defining a parity guard."
+    ],
+    "missingTests": [
+      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
+      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+    ],
+    "acceptanceCriteria": [
+      "The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced."
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "2026-10-28 source review changes the earlier S-sized Fix now verdict: this is a multi-step dependency and CI task. Keep #3071, #3072 and #3073 atomic and require their individual fresh-consumer proofs. General parity remains unresolved."
   }
 ]
