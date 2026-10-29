@@ -14,14 +14,14 @@ import {
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
 import { logger } from "@/lib/logger.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { dispatchReservedVoiceCall, ivrQueueVoiceOperationKey, voiceDispatchBlockedResponse } from "@/lib/voice-credit-dispatch.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
-import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
+import { voiceBillingKindFromCampaignType } from "@/lib/pricing";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -44,10 +44,6 @@ export const action = defineAction({
         ErrorCode.VALIDATION_ERROR,
       );
     }
-    let outreachAttemptId;
-    let call;
-    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
-
     try {
       await requireWorkspaceAccess({ user, workspaceId: workspace_id });
 
@@ -78,47 +74,32 @@ export const action = defineAction({
       );
       if (refusal) throw new Response(refusal, { status: 400 });
 
-      const tdb = createTenantDb(workspace_id);
       const campaign = await findCampaignInWorkspace(workspace_id, campaign_id);
       if (!campaign) throw new AppError("Campaign not found", 404, ErrorCode.NOT_FOUND);
-      outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
-        contactId: Number(contact_id),
-        campaignId: Number(campaign_id),
-        userId: user_id,
-        workspaceId: workspace_id,
-        queueId: Number(queue_id),
-      });
-
+      const twilio = await createWorkspaceTwilioInstance({ workspace_id });
       const ivrUrls = resolveIvrCallUrls(campaign_id);
-      call = await withTwilioRetry(
-        () =>
+      const dispatched = await dispatchReservedVoiceCall({
+        workspaceId: workspace_id, kind: voiceBillingKindFromCampaignType(campaign.type), accountSid: twilio.accountSid,
+        to: to_number, from: caller_id, campaignId: Number(campaign_id),
+        contactId: Number(contact_id), queueId: Number(queue_id), userId: user_id,
+        operationKey: ivrQueueVoiceOperationKey(Number(queue_id)),
+        voiceUrl: ivrUrls.flowUrl, statusCallback: ivrUrls.statusCallback,
+        prepareOutreach: (tx) => rpcCreateOutreachAttempt(createTenantDb(workspace_id, tx), {
+          contactId: Number(contact_id), campaignId: Number(campaign_id), userId: user_id,
+          workspaceId: workspace_id, queueId: Number(queue_id),
+        }),
+        create: ({ voiceUrl, statusCallback }) =>
           twilio.calls.create({
             to: to_number,
             from: caller_id,
-            url: ivrUrls.flowUrl,
+            url: voiceUrl,
             machineDetection: ivrMachineDetection(campaign),
             statusCallbackEvent: ["answered", "completed"],
-            statusCallback: ivrUrls.statusCallback,
+            statusCallback,
           }),
-        { workspaceId: workspace_id, operation: "calls.create" },
-      );
-
-      const callRow = await insertCallForWorkspace(workspace_id, {
-        sid: call.sid,
-        to: to_number,
-        from: caller_id,
-        campaign_id: Number(campaign_id),
-        contact_id: Number(contact_id),
-        outreach_attempt_id: Number(outreachAttemptId),
       });
-
-      if (!callRow) {
-        throw new AppError(
-          "Failed to insert call record",
-          500,
-          ErrorCode.INTERNAL_SERVER_ERROR,
-        );
-      }
+      if (!dispatched.ok) return voiceDispatchBlockedResponse(dispatched);
+      const { callSid } = dispatched;
 
       // Dequeue. The queue row must belong to the workspace this request was
       // authorised against, so the by-id dequeue is scoped to it.
@@ -129,7 +110,7 @@ export const action = defineAction({
         reason: "IVR dial dispatched",
       });
 
-      return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
+      return new Response(JSON.stringify({ success: true, callSid }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });

@@ -9,7 +9,11 @@ create table if not exists public.workspace_voice_reservation (
   campaign_id bigint,
   contact_id bigint,
   outreach_attempt_id bigint,
+  queue_id bigint,
+  operation_key text,
   user_id text,
+  voice_url text,
+  status_callback text,
   state text not null default 'reserved'
     check (state in ('reserved', 'creating', 'active', 'settled', 'released')),
   provider_sid text,
@@ -29,6 +33,12 @@ create unique index if not exists workspace_voice_reservation_setup_sid
 create index if not exists workspace_voice_reservation_funding
   on public.workspace_voice_reservation(workspace)
   where state in ('reserved', 'creating', 'active');
+create unique index if not exists workspace_voice_reservation_active_queue
+  on public.workspace_voice_reservation(workspace, queue_id)
+  where queue_id is not null and state in ('reserved', 'creating', 'active');
+create unique index if not exists workspace_voice_reservation_operation
+  on public.workspace_voice_reservation(workspace, operation_key)
+  where operation_key is not null and state <> 'released';
 create index if not exists workspace_voice_reservation_recovery
   on public.workspace_voice_reservation(lease_expires_at)
   where state in ('reserved', 'creating', 'active');

@@ -280,6 +280,10 @@ For a new owned Postgres container, verify readiness over TCP before bootstrap.
 The image can accept socket connections on its temporary initialization server,
 then stop that server. A successful socket `pg_isready` is not final readiness.
 
+Raw postgres.js fixture reads keep PostgreSQL bigint values as strings. Decode
+queue counters explicitly, or cast bounded test counters to integer in SQL
+before comparing them with numeric expectations.
+
 The UI test config aliases `@twilio/voice-sdk` to a mock. For SDK resource
 lifetime changes, exercise the installed SDK at that boundary as well. Use
 `createRequire` to resolve its actual entry where the alias would hide it.

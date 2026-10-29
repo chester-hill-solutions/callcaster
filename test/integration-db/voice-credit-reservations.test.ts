@@ -88,10 +88,15 @@ describe("durable voice credit admission (#2879)", () => {
   const reserve = (kind: "ivr" | "staffed" = "ivr") => holds.reserveVoiceCredits({
     workspaceId, kind, accountSid, to: recipient, from: callerId, campaignId,
   });
+  const urls = (id: string) => ({
+    voiceUrl: `https://voice-credit.example.test/api/ivr/${campaignId}/?credit_reservation=${id}`,
+    statusCallback: `https://voice-credit.example.test/api/ivr/status?credit_reservation=${id}`,
+  });
+  const start = (reservation: Parameters<typeof holds.startVoiceReservation>[0]) => holds.startVoiceReservation(reservation, urls(reservation.id));
   async function connected(kind: "ivr" | "staffed" = "ivr") {
     const result = await reserve(kind);
     if (!result.ok) throw new Error("Affordable fixture reservation required");
-    const started = await holds.startVoiceReservation(result.reservation);
+    const started = await start(result.reservation);
     const callSid = sid();
     await holds.recordVoiceReservationProvider(started, callSid);
     const [call] = await sql`select * from public.call where sid = ${callSid}`;
@@ -168,7 +173,7 @@ describe("durable voice credit admission (#2879)", () => {
     await sql`update public.workspace_voice_reservation set lease_expires_at = now() - interval '1 minute' where id = ${result.reservation.id}::uuid`;
     const [owner] = await holds.claimVoiceReservationRecovery();
     expect(owner.lease_token).not.toBe(result.reservation.lease_token);
-    await expect(holds.startVoiceReservation(result.reservation)).rejects.toThrow("no longer owned");
+    await expect(start(result.reservation)).rejects.toThrow("no longer owned");
     await expect(holds.recordVoiceReservationProvider(result.reservation, sid())).rejects.toThrow("no longer owned");
     await holds.releaseUnsentVoiceReservation(result.reservation, "not_sent");
     expect(await state()).toEqual({ credits: 2, ledger: 0, active: 1 });
@@ -178,8 +183,8 @@ describe("durable voice credit admission (#2879)", () => {
   test("a committed send checkpoint refuses a second provider attempt", async () => {
     const result = await reserve();
     if (!result.ok) throw new Error("Fixture reservation required");
-    await holds.startVoiceReservation(result.reservation);
-    await expect(holds.startVoiceReservation(result.reservation)).rejects.toThrow("no longer owned");
+    await start(result.reservation);
+    await expect(start(result.reservation)).rejects.toThrow("no longer owned");
     expect(await state()).toEqual({ credits: 2, ledger: 0, active: 1 });
   });
   test("two recovery claimants cannot own the same expired intent", async () => {
@@ -252,6 +257,8 @@ describe("durable voice credit admission (#2879)", () => {
       accountSid: mismatch === "account" ? "AC00000000000000000000000000009999" : accountSid,
       to: mismatch === "recipient" ? "+16135550999" : recipient,
       direction: mismatch === "direction" ? "inbound" : "outbound-api",
+      requestUrl: urls(reservation.id).statusCallback,
+      entryPoint: "status",
     })).rejects.toThrow("does not match");
     expect(await state()).toEqual({ credits: 2, ledger: 0, active: 1 });
   });
@@ -259,7 +266,7 @@ describe("durable voice credit admission (#2879)", () => {
     const { action } = await import("../../app/routes/api+/ivr/status.action.server");
     const result = await reserve();
     if (!result.ok) throw new Error("Fixture reservation required");
-    await holds.startVoiceReservation(result.reservation);
+    await start(result.reservation);
     const url = `https://voice-credit.example.test/api/ivr/status?credit_reservation=${result.reservation.id}`;
     const params = { AccountSid: accountSid, CallSid: sid(), To: recipient, CallStatus: "completed", CallDuration: "42", Direction: "outbound-api" };
     const request = new Request(`${url}&tampered=true`, { method: "POST", headers: {

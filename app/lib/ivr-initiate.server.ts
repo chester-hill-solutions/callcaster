@@ -4,15 +4,14 @@ import {
 } from "@/lib/database/workspace.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { dispatchReservedVoiceCall, ivrQueueVoiceOperationKey } from "@/lib/voice-credit-dispatch.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import { insertCallForWorkspace } from "@/lib/telephony-db.server";
-import { db } from "@/server/db";
+import { createTenantDb } from "@/server/tenant-db";
+import { voiceBillingKindFromCampaignType } from "@/lib/pricing";
 export type InitiateIvrContact = {
   id: number;
   contact_id: number;
@@ -48,52 +47,34 @@ export async function initiateIvrCall(
     workspace_id: input.workspace_id,
   });
 
-  let outreachAttemptId: number;
-  try {
-    outreachAttemptId = await rpcCreateOutreachAttempt(db, {
-      contactId: input.contact.contact_id,
-      campaignId: input.campaign_id,
-      userId: input.user_id,
-      workspaceId: input.workspace_id,
-      queueId: input.contact.id,
-    });
-  } catch (outreachError) {
-    logger.error("initiateIvrCall outreach error", outreachError);
-    const message =
-      outreachError instanceof Error ? outreachError.message : String(outreachError);
-    return { success: false, error: message };
-  }
-
   try {
     const ivrUrls = resolveIvrCallUrls(input.campaign_id);
-    const call = await withTwilioRetry(
-      () =>
+    const dispatched = await dispatchReservedVoiceCall({
+      workspaceId: input.workspace_id, kind: voiceBillingKindFromCampaignType(campaign.type), accountSid: twilio.accountSid,
+      to: input.contact.phone, from: input.contact.caller_id, campaignId: input.campaign_id,
+      contactId: input.contact.contact_id, queueId: input.contact.id, userId: input.user_id,
+      operationKey: ivrQueueVoiceOperationKey(input.contact.id),
+      voiceUrl: ivrUrls.flowUrl, statusCallback: ivrUrls.statusCallback,
+      prepareOutreach: (tx) => rpcCreateOutreachAttempt(createTenantDb(input.workspace_id, tx), {
+        contactId: input.contact.contact_id, campaignId: input.campaign_id,
+        userId: input.user_id, workspaceId: input.workspace_id, queueId: input.contact.id,
+      }),
+      create: ({ voiceUrl, statusCallback }) =>
         twilio.calls.create({
           to: input.contact.phone,
           from: input.contact.caller_id,
-          url: ivrUrls.flowUrl,
+          url: voiceUrl,
           machineDetection: ivrMachineDetection(campaign),
           statusCallbackEvent: ["answered", "completed"],
-          statusCallback: ivrUrls.statusCallback,
+          statusCallback,
         }),
-      {
-        workspaceId: input.workspace_id,
-        operation: "calls.create.ivr",
-      },
-    );
-
-    const inserted = await insertCallForWorkspace(input.workspace_id, {
-      sid: call.sid,
-      to: input.contact.phone,
-      from: input.contact.caller_id,
-      campaign_id: input.campaign_id,
-      contact_id: input.contact.contact_id,
-      outreach_attempt_id: Number(outreachAttemptId),
     });
-
-    if (!inserted) {
-      return { success: false, error: "Failed to insert call row" };
+    if (!dispatched.ok) {
+      return dispatched.reason === "dispatch_in_progress"
+        ? { success: false, error: "This call is awaiting completion or recovery." }
+        : { success: false, creditsError: true };
     }
+    const { callSid } = dispatched;
 
     await dequeueQueueEntry({
       by: { id: input.contact.id },
@@ -102,7 +83,7 @@ export async function initiateIvrCall(
       reason: "IVR dial dispatched",
     });
 
-    return { success: true, callSid: call.sid };
+    return { success: true, callSid };
   } catch (error) {
     const message = twilioErrorUserMessage(error);
     if (message.toLowerCase().includes("credit")) {

@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { SQL } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
+import { acceptVoiceDispatch } from "./helpers/voice-dispatch-stub";
 
 vi.hoisted(() => {
   process.env.TZ = "UTC";
@@ -19,17 +20,14 @@ const mocks = vi.hoisted(() => ({
   getWorkspaceTwilioPortalConfig: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
   twilioCallCreate: vi.fn(),
-  withTwilioRetry: vi.fn((fn: () => unknown, options?: { beforeAttempt?: () => void }) => {
-    options?.beforeAttempt?.();
-    return fn();
-  }),
+  dispatchReservedVoiceCall: vi.fn(),
+  withTwilioRetry: vi.fn((fn: () => Promise<unknown>) => fn()),
   resolveIvrCallUrls: vi.fn(() => ({
     flowUrl: "https://base.test/api/ivr/42/page_1/",
     statusCallback: "https://base.test/api/ivr/status",
     runtime: "remix",
   })),
   rpcCreateOutreachAttempt: vi.fn(),
-  insertCallForWorkspace: vi.fn(),
   hasDuplicateCampaignCall: vi.fn(async () => false),
   dequeueQueueEntry: vi.fn(),
   recordQueueAttemptFailure: vi.fn(async () => undefined),
@@ -75,11 +73,15 @@ vi.mock("@/lib/env.server", async (importOriginal) => {
 vi.mock("@/lib/twilio-ivr-runtime.server", () => ({
   resolveIvrCallUrls: mocks.resolveIvrCallUrls,
 }));
-vi.mock("@/lib/twilio-client.server", () => ({
+vi.mock("@/lib/twilio-client.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/twilio-client.server")>(),
   withTwilioRetry: mocks.withTwilioRetry,
 }));
+vi.mock("@/lib/voice-credit-dispatch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/voice-credit-dispatch.server")>(),
+  dispatchReservedVoiceCall: mocks.dispatchReservedVoiceCall,
+}));
 vi.mock("@/lib/telephony-db.server", () => ({
-  insertCallForWorkspace: mocks.insertCallForWorkspace,
   hasDuplicateCampaignCall: (...a: unknown[]) => mocks.hasDuplicateCampaignCall(...a),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -124,11 +126,13 @@ function defaultMocks() {
   });
   mocks.getCampaignQueueById.mockResolvedValue([queuedRow()]);
   mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+    accountSid: "ACfixture",
     calls: { create: mocks.twilioCallCreate },
   });
   mocks.twilioCallCreate.mockResolvedValue({ sid: "CAsid" });
   mocks.rpcCreateOutreachAttempt.mockResolvedValue(777);
-  mocks.insertCallForWorkspace.mockResolvedValue({ id: 1 });
+  mocks.dispatchReservedVoiceCall.mockImplementation(acceptVoiceDispatch);
+  mocks.withTwilioRetry.mockImplementation((fn) => fn());
   mocks.hasDuplicateCampaignCall.mockResolvedValue(false);
   mocks.dequeueQueueEntry.mockResolvedValue({ dequeuedPrimary: true });
   mocks.recipientCallingWindowStatus.mockReturnValue({ allowed: true });
@@ -398,9 +402,8 @@ describe("dispatchCampaignIvrBatch", () => {
         queueId: 501,
       }),
     );
-    expect(mocks.insertCallForWorkspace).toHaveBeenCalledWith(
-      WORKSPACE_ID,
-      expect.objectContaining({ sid: "CAsid", outreach_attempt_id: 777 }),
+    expect(mocks.dispatchReservedVoiceCall).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: WORKSPACE_ID, queueId: 501, contactId: 9001, kind: "ivr" }),
     );
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 501 },
@@ -505,7 +508,7 @@ describe("dispatchCampaignIvrBatch", () => {
   });
 
   test("a failed Twilio call leaves the row queued and counts it", async () => {
-    mocks.twilioCallCreate.mockRejectedValue(new Error("21215: invalid number"));
+    mocks.twilioCallCreate.mockRejectedValue(Object.assign(new Error("21215: invalid number"), { status: 400 }));
 
     const outcome = (await dispatchCampaignIvrBatch({
       workspaceId: WORKSPACE_ID,

@@ -99,27 +99,27 @@ export async function sendCampaignTestCall(args: {
     const dispatched = await dispatchReservedVoiceCall({
       workspaceId, kind: "ivr", accountSid: twilio.accountSid, to, from: callerId,
       campaignId: campaign.id, contactId: contact?.id ?? null, outreachAttemptId: null, userId,
-      statusCallback: urls.statusCallback,
-      create: (statusCallback) =>
+      voiceUrl: urls.flowUrl, statusCallback: urls.statusCallback,
+      create: ({ voiceUrl, statusCallback }) =>
         twilio.calls.create({
           to,
           from: callerId,
-          url: urls.flowUrl,
+          url: voiceUrl,
           machineDetection: ivrMachineDetection(campaign),
           statusCallbackEvent: ["answered", "completed"],
           statusCallback,
         }),
     });
     if (!dispatched.ok) return failure("insufficient_credits");
-    const { call } = dispatched;
+    const { callSid } = dispatched;
     logger.info("campaign.test_call", {
       workspaceId,
       campaignId: String(campaign.id),
       userId,
-      callSid: call.sid,
+      callSid,
       usedContact: Boolean(contact),
     });
-    return { ok: true, to, callSid: call.sid, usedContact: Boolean(contact) };
+    return { ok: true, to, callSid, usedContact: Boolean(contact) };
   } catch (error) {
     logger.error("campaign.test_call_failed", {
       workspaceId,
