@@ -714,6 +714,10 @@ Keep legacy caller fixtures on the actual accepted upload ID, and retain a
 foreign-ID rejection control. Key the uploader state to its workspace so tenant
 navigation cannot reuse another workspace’s file draft or enabled report action.
 
+For real-router write fixtures, update the fixture store before the action returns.
+Wait for revalidation to finish before checking the final rows. A static loader can
+restore deleted rows and turn an optimistic-state assertion into a timing race.
+
 For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a
 redirect can complete without result data. Distinguish retained prior data from

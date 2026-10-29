@@ -94,6 +94,10 @@ add a later `no-issue` label to that payload. Verify the current PR label, the
 successful later event, all applicable required checks and deployment contexts,
 and the PR's current merge state before merging.
 
+If the connected GitHub reader rejects a valid endpoint as unsupported, use the
+installed `gh api` for that same read. Keep the exact repository and object IDs;
+do not request broader access or repeat the unsupported connector call.
+
 ## Empty REST Responses
 
 A successful REST deletion can return HTTP 204 with no response body. Check the

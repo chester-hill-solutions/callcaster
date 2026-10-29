@@ -33,6 +33,20 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
+### [#2638](https://github.com/chester-hill-solutions/callcaster/issues/2638) Give Call list selection controls accessible names
+- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
+- PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.
+- Current behavior: At dev@a4d22ee5, AudienceTable renders unnamed header and contact checkboxes and a local unnamed page-size Select. The reviewed candidate in open PR #3023 is not merged into dev or master.
+- Root cause: The selection controls do not receive accessible names. The Call list duplicates the page-size widget already named in TablePagination. Its URL page and size must stay in the existing single navigation; calling two captured-parameter callbacks can overwrite the new size.
+- Resolution: Review PR #3023 and its exact-head checks. The header names its visible-page scope; row names use a trimmed name, phone or email with a contact ID fallback and duplicate-name disambiguation. RowsPerPageSelect now owns the named control for both consumers. Keep each consumer callback contract, checkbox states and current geometry. Verify on deployed dev after merge, then complete release acceptance.
+- Look in: `app/components/audience/AudienceTable.tsx`, `app/components/shared/RowsPerPageSelect.tsx`, `app/components/shared/TablePagination.tsx`, `test/ui/audience-selection-names.test.tsx`, `test/ui/table-pagination-page-size.test.tsx`
+- Existing tests: The focused run passes 41 cases with real Checkbox, Select and router controls. Six new cases cover duplicate and missing names, Space and mixed states, the correct bulk-delete contact IDs, filtered/current-page selection, empty results, keyboard paging and an atomic size/page change that retains query, sort and repeated tags.; The original runtime fails all six new cases while four shared pagination controls pass. A row-name fault fails five cases with five controls passing; a two-callback page-size overwrite fails one with nine controls passing. The candidate is restored byte-for-byte. Focused source warnings decrease from 14 to 12; the new shared control and test have none.; The source commit passes full ci:local; post-CI browser checks compare baseline/candidate geometry in both themes and exercise real keyboard controls with a controlled loader. See the PR validation for the final commit and exact counts.
+- Missing tests: After merge, verify selection names, states and page-size changes on deployed dev and complete release acceptance. Local browser and router checks use synthetic contacts; they do not prove authentication, production data access or the full workspace shell.
+- Done when: Select all names the contacts shown on the current page.; Row names identify the contact, including duplicate, partial and absent names.; Use the shared named Rows per page control.; Keep checked, partial and focus states exposed.; Preserve keyboard selection and paging; size changes reset page and retain other URL values.
+- Tracker: Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3023 is open into dev and linked only to #2638. Keep open for merge, deployed verification and default-branch release acceptance.
+
+---
+
 ### [#2860](https://github.com/chester-hill-solutions/callcaster/issues/2860) A webhook credential for one workspace releases or accepts another tenant's live inbound call offer
 - **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-10-26
 - PR #3063 binds inbound-offer mutations to the authenticated workspace. Review, merge and deployed verification remain.
@@ -2279,10 +2293,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2639](https://github.com/chester-hill-solutions/callcaster/issues/2639) Show stored opt-out status in contact details
-- Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2638](https://github.com/chester-hill-solutions/callcaster/issues/2638) Give Call list selection controls accessible names
 - Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 

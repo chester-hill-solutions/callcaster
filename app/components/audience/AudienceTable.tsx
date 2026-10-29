@@ -25,13 +25,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ContactListRow } from "@/lib/contacts-loader.types";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RowsPerPageSelect } from "@/components/shared/RowsPerPageSelect";
+
+function contactSelectionLabel(contact: ContactListRow): string {
+  const name = [contact.firstname?.trim(), contact.surname?.trim()].filter(Boolean).join(" ");
+  const identity = name || contact.phone?.trim() || contact.email?.trim();
+  return `Select ${identity ? `${identity}, ` : ""}contact ${contact.id}`;
+}
 
 type AudienceTableProps = {
   contacts: Array<{ contact: ContactListRow }> | null;
@@ -116,11 +116,11 @@ export function AudienceTable({
     setSearchParams(newParams);
   };
 
-  const handlePageSizeChange = (newSize: string) => {
+  const handlePageSizeChange = (newSize: number) => {
     setSelectedContacts([]);
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", "1");
-    newParams.set("pageSize", newSize);
+    newParams.set("pageSize", newSize.toString());
     setSearchParams(newParams);
   };
 
@@ -336,20 +336,12 @@ export function AudienceTable({
         </form>
 
         <div className="flex items-center gap-2">
-          <Select
-            value={pagination.pageSize.toString()}
+          <RowsPerPageSelect
+            value={pagination.pageSize}
+            options={[10, 25, 50, 100]}
             onValueChange={handlePageSizeChange}
-          >
-            <SelectTrigger className="w-[120px] text-muted-foreground">
-              <SelectValue placeholder="Rows per page" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 per page</SelectItem>
-              <SelectItem value="25">25 per page</SelectItem>
-              <SelectItem value="50">50 per page</SelectItem>
-              <SelectItem value="100">100 per page</SelectItem>
-            </SelectContent>
-          </Select>
+            className="w-30 text-muted-foreground"
+          />
 
           <Button variant="outline" size="sm" onClick={handleExportCSV} className="text-muted-foreground">
             <Download className="h-4 w-4 mr-2" />
@@ -370,6 +362,7 @@ export function AudienceTable({
             <TableRow>
               <TableHead className="w-[50px]">
                 <Checkbox
+                  aria-label="Select all contacts shown on this page"
                   checked={
                     filteredContacts.length === 0 || selectedVisibleCount === 0
                       ? false
@@ -404,6 +397,7 @@ export function AudienceTable({
                 <TableRow key={contact.id}>
                   <TableCell>
                     <Checkbox
+                      aria-label={contactSelectionLabel(contact)}
                       checked={selectedContacts.includes(contact.id.toString())}
                       onCheckedChange={(checked: boolean) => handleSelectContact(contact.id, checked)}
                     />

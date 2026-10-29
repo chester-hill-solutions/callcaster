@@ -7,13 +7,7 @@ import {
   PaginationItem,
 } from "@/components/ui/pagination";
 import { buttonVariants } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RowsPerPageSelect } from "./RowsPerPageSelect";
 import { cn } from "@/lib/utils";
 
 type TablePaginationProps = {
@@ -92,24 +86,14 @@ const TablePagination = ({
       {showSummary && totalCount != null && pageSize != null ? (
         <div className="flex flex-wrap items-center gap-3">
           {pageSizeOptions && onPageSizeChange ? (
-            <Select
-              value={String(pageSize)}
+            <RowsPerPageSelect
+              value={pageSize}
+              options={pageSizeOptions}
               onValueChange={(value) => {
-                onPageSizeChange(Number(value));
+                onPageSizeChange(value);
                 onPageChange(1);
               }}
-            >
-              <SelectTrigger className="w-[100px]" aria-label="Rows per page">
-                <SelectValue placeholder="Per page" />
-              </SelectTrigger>
-              <SelectContent>
-                {pageSizeOptions.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size} per page
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           ) : null}
           <div className="text-xs text-muted-foreground">
             Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to{" "}

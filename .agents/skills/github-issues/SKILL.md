@@ -181,8 +181,11 @@ the diff for unrelated serialization changes before staging.
 Validate the complete enrichment set before filtering. For an atomic audit,
 pass only the selected issue and its matching record to `buildBoard`, with
 fresh native metadata, then replace only its complete section. Never prune
-records from a partial issue list. `buildBoard` returns
-`{ md, counts }`; use `md` as the rendered text. Require the generated cause
+records from a partial issue list. `buildBoard` returns `{ md, counts }`; use
+`md` as the rendered text. Selected render inputs also need the real
+`updatedAt` value; map REST `updated_at` when using a native REST snapshot.
+Validate the complete input before editing or committing selected evidence.
+Require the generated cause
 and test fields before writing. A multiline `$` can match the heading line,
 so use an explicit next-section or end-of-input boundary.
 Trace the affected route or worker to its actual helper before moving an issue to

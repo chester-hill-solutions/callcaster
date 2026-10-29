@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Call list selection controls identify each contact and the current page. The shared Rows per page control keeps keyboard paging and selection clear ([PR #3023](https://github.com/chester-hill-solutions/callcaster/pull/3023), [#2638](https://github.com/chester-hill-solutions/callcaster/issues/2638)).
 - Fixed: Contact search and Clear search have accessible names, and clearing a search returns focus to the search field ([PR #3010](https://github.com/chester-hill-solutions/callcaster/pull/3010), [#2616](https://github.com/chester-hill-solutions/callcaster/issues/2616)).
 - Fixed: Outbound IVR batches wake when due and space every provider request, including retries, at the configured rate. Default one-CPS sending no longer waits through five-second idle gaps; the queue estimate uses the same pacing ([#3007](https://github.com/chester-hill-solutions/callcaster/issues/3007)).
 - Fixed: Campaign export creation, status and saved download links require a member, admin or owner role. SMS reports retain the admin or owner requirement ([PR #3064](https://github.com/chester-hill-solutions/callcaster/pull/3064), [#2882](https://github.com/chester-hill-solutions/callcaster/issues/2882)).
