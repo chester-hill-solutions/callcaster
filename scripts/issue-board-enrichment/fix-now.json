@@ -151,26 +151,27 @@
       "drizzle/0000_baseline.sql"
     ],
     "existingTests": [
-      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted…"
+      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted…",
+      "At dev@03c3e15a, the new real-PostgreSQL route/service suite has 11 failing regressions and three passing valid controls. The candidate passes all 14 with real caller sessions and workspace API keys; no provider or email traffic is sent.",
+      "Removing the sink guard through an isolated test transform causes 10 failures; removing the read workspace join or bigint mapping causes one failure each. All three normal-submission controls remain green, and working source hashes stay unchanged.",
+      "All 14 cases pass with DATABASE_URL alone, INTEGRATION_DB_URL alone and conflicting loopback app URLs. All 83 survey PostgreSQL cases and 105 focused survey unit cases pass; typecheck passes and lint adds no warnings."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A contact id supplied by a caller must resolve to a contact in the survey's own workspace before it is stored, exactly as the public survey path does: app/lib/survey-public-action.server.ts:142-167 routes the id through app/lib/survey-respondent.server.ts:27-46, which applies `eq(contactTable.workspace, workspaceId)` so a foreign id simply does not resolve and the request is refused with 400."
     ],
     "size": "XS",
-    "risk": "low"
+    "risk": "low",
+    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. PR #3077 fixes the shared sink, recent-response read and bigint mapping. Full local CI passes at 0de271ac: 6,061 Node, 34 Bun and 1,541 UI cases; 11 existing skips. The final publication commit and exact-head remote checks must pass before merge approval is requested. API-key admission policy stays in #2863."
   },
   {
     "issueNumber": 2867,
     "verdict": "fix-now",
-    "recommendedTitle": "The strict 10/min credential bucket is not applied to every credential surface: POST /api/auth/token performs the same email+password sign-in under the 30/min…",
-    "summary": "The authentication scope table (app/lib/platform-auth-rate-limit.server.ts:18-33) documents 'auth:sign-in' (10/min) as the bucket for 'Credential + TOTP guesses via the Better Auth handler' and 'auth:catch-all' (30/min) as the bucket for…",
-    "currentBehavior": "The authentication scope table (app/lib/platform-auth-rate-limit.server.ts:18-33) documents 'auth:sign-in' (10/min) as the bucket for 'Credential + TOTP guesses via the Better Auth handler' and 'auth:catch-all' (30/min) as the bucket for 'Remaining Better Auth POSTs (sign-out, session revoke, ...)'. Two live credential surfaces do not match that mapping, so the per-client credential budget depends on which URL the caller uses. First, POST /api/auth/token is bound to 'auth:token' (30/min, app/lib/platform-auth-rate-limit.server.ts:23) although its handler performs the identical email+password check as POST /signin ('auth:sign-in', 10/min) and POST /api/auth/sign-in/email ('auth:sign-in',…",
-    "rootCause": "The scope a surface receives is bound to the route module that declares it, and for the Better Auth catch-all to a substring match on the request path, instead of to the credential or operation the surface actually performs. Two surfaces that perform the same check therefore run with different guessing budgets, and the guard that is meant to keep credential surfaces covered only recognises direct calls in application route modules and only checks that some limiter is present.",
-    "resolution": "Bind the bucket to the operation rather than to the route module. Give POST /api/auth/token the strict credential scope so the email+password check it performs shares the 10/min budget of the other sign-in surfaces. If integrator sign-in volume genuinely needs a higher ceiling, add a per-account dimension to the credential bucket instead of leaving one check at two budgets. Make the Better Auth catch-all choose a strict scope for the credential-bearing endpoints it forwards instead of the loose 'auth:catch-all', and treat the Better Auth endpoint map as part of the coverage gate: scripts/check-auth-rate-limits.mjs must check the scope a credential surface declares, not only that some…",
+    "recommendedTitle": "Unify credential rate limits across auth endpoints",
+    "summary": "PR #3079 shares strict credential-operation limits across auth aliases. Full local CI, focused tests and five mutation checks pass; review, merge and release verification remain.",
+    "currentBehavior": "Token login shares the 10/min sign-in limit with browser and Better Auth sign-in. Registration, reset and OTP aliases use their operation limits. Unknown auth POSTs default to strict sign-in; only exact sign-out and session-revocation paths retain 30/min. Implemented in PR #3079; dev still has the old limits.",
+    "rootCause": "Token login used a separate 30/min scope, while the catch-all sent signup and reset aliases through the loose scope. The source guard skipped tokenLogin and checked only for some limiter, so comments and wrong scopes could satisfy it.",
+    "resolution": "Remove the token-only scope; bind aliases to credential operations; use a strict default with an exact session-lifecycle allowlist. Parse real calls and literal policy tables in the coverage guard, including imported helper aliases. Publish the operation limits in the API documents.",
     "lookIn": [
       "app/lib/platform-auth-rate-limit.server.ts",
       "app/routes/api+/auth/token.action.server.ts",
@@ -180,17 +181,15 @@
       "app/routes/api+/auth/register.action.server.ts"
     ],
     "existingTests": [
-      "Application-level buckets (node tier, one client address per surface): POST /api/auth/sign-in/email admits 10 requests and answers 429 on request 11; POST /signin admits 10 and answers 429 on request 11; POST /api/auth/token admits 30, answers 401 (not limited) on requests 1 to 30 while auth.api.signInEmail is reached…"
+      "68 focused tests pass. Reverting the runtime fails 11 of 15 cases; loose token and default budgets fail two each, and a split registration budget fails one. Four positive controls pass in every runtime mutation. Restoring the old guard fails 13 cases while nine existing controls pass. Typed Better Auth aliases and the stronger user-scoped 2FA setup limiter are covered. Working source hashes stay unchanged during mutation runs. Tests use the real application limiter with its in-memory backend and mocked auth handlers; no mail or provider traffic."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "Every surface that performs an email+password credential check is bounded by the strict 'auth:sign-in' bucket (10/min), and every surface that performs a password-reset request or an account creation is bounded by the 10/min scope documented for that operation, so the per-client budget for the same operation does not depend on which URL the caller uses."
     ],
-    "size": "XS",
-    "risk": "low"
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Keep open and In progress for PR #3079 review, merge and release verification. Native Priority, Effort and Enviornment remain unset; there are no blocking relationships. Source tests do not prove deployment."
   },
   {
     "issueNumber": 2869,
@@ -254,10 +253,10 @@
     "issueNumber": 2871,
     "verdict": "fix-now",
     "recommendedTitle": "Tenant-facing GET /api/numbers falls back to the platform parent-account Twilio credential when workspace_id is omitted",
-    "summary": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id…",
-    "currentBehavior": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id query parameter as \"Workspace scope (required for session auth)\" (openapi/complete-api.json:6631-6637). The loader nevertheless treats the absence of that caller-supplied parameter as \"platform-admin context\": on the else branch it builds a Twilio REST client from the platform's own parent-account credentials (env.TWILIO_SID() / env.TWILIO_AUTH_TOKEN(), app/twilio.server.ts:131) and lists that account's purchasable Canadian numbers, returning the listing…",
-    "rootCause": "The loader treats the absence of the caller-supplied workspace_id query parameter as 'platform-admin context' and, on that branch, constructs a Twilio REST client from the platform parent-account credentials via createParentTwilioInstance(). The only control applied to the request is requireDualAuth(request), which performs authentication and (only when a capability is passed) a capability check - it never checks workspace membership, a workspace role, or platform-admin/sudo status. The workspace branch of the same handler does call requireWorkspaceAccess, so the two branches of one resource have inconsistent authorization: the membership gate lives only on the branch where the caller…",
-    "resolution": "Make the workspace context mandatory for the number search so a tenant-level request can never select the platform parent-account identity, and remove the silent parent fallback. Require workspace_id, run the existing membership gate, and build the client from that workspace's subaccount. If platform operators still need a parent-account search, expose it on the admin surface behind requireSudo rather than as the default branch of a tenant route, and drop the now-unused createParentTwilioInstance import from the loader (app/twilio.server.ts:130 stays for other callers). The repository's committed test at test/numbers.route.test.ts:185 asserts the current parent behaviour, so it must be…",
+    "summary": "Workspace-only number search is implemented in PR #3078. Full local CI, focused tests and three mutation checks pass; review, merge and release verification remain.",
+    "currentBehavior": "PR #3078 rejects missing or blank workspace_id with 400, checks membership before creating a client, preserves uniform non-member 404 and searches only through createWorkspaceTwilioInstance. The dev branch still has the parent-account fallback.",
+    "rootCause": "The optional workspace_id selected the provider identity. Omitting it bypassed membership and constructed a parent-account client. A broad provider catch also changed membership 404 into 500.",
+    "resolution": "Require workspace_id, remove the parent fallback, and await membership outside the provider error handler. Keep local and toll-free searches on the workspace client. Mark workspace_id required in both published OpenAPI documents.",
     "lookIn": [
       "app/routes/api+/numbers.loader.server.ts",
       "app/twilio.server.ts",
@@ -267,17 +266,15 @@
       "openapi/complete-api.json"
     ],
     "existingTests": [
-      "1 test file passed, 7 tests passed (exit status 0) in the sandbox (docker --network none, read-only /target, scratch-only writes, empty environment, 2 CPUs / 2g memory / 512 pids / 300s wall clock; bun + vitest 4.1.11; dummy credentials only). The DECISIVE case 'a plain session user with no workspace context reaches…"
+      "56 focused tests pass across number route, number mapping and public/complete API contracts. The unchanged loader fails four regressions with 23 controls passing. Restoring the old loader fails four tests; removing membership fails four; making the contract optional fails two. Three authentication/validation controls pass in every mutation run. Provider calls are mocked; no live Twilio traffic."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A number search must run under the identity of the tenant that owns it. GET /api/numbers should require a workspace_id, verify the caller is a member of that workspace, and use that workspace's Twilio subaccount - which is what the declared surface (exposure sessionOnly, authClass session, workspaceScoped true, app/lib/api-surface-annotations.ts:87) and the published OpenAPI operation (workspace_id 'required for session auth', openapi/complete-api.json:6631) describe. A request with no workspace context must be rejected; if parent-account search is genuinely required for platform operators, it must sit behind platform-admin authority (requireSudo / the admin surface) and must never be the silent fallback of a tenant-facing route."
     ],
     "size": "XS",
-    "risk": "low"
+    "risk": "low",
+    "trackerRecommendation": "Keep open and In progress for PR #3078 review, merge and release verification. Native Priority, Effort and Enviornment are unset; no blocking relationships. Do not treat source proof as a deployed fix."
   },
   {
     "issueNumber": 2872,
@@ -312,30 +309,36 @@
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
-    "summary": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0)",
-    "currentBehavior": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0). The comparison reserves nothing, and the floor sits below the price of the cheapest outbound unit (2 credits for an IVR first minute, 4 for a staffed first minute), so a workspace holding 1 credit passes the gate for a call it cannot pay for. The debit for a voice dispatch is written when the call reaches a terminal billable status (app/lib/twilio-call-status.server.ts:193), not when the call is placed, so workspace.credits does not fall until after the calls have run. The number of outbound…",
-    "rootCause": "requireOutboundCredits is a balance read plus a floor comparison with no reservation of the amount the dispatch is about to spend, and the floor it compares against (0) is below the cost of the smallest outbound unit. Because the voice debit is written only when the call reaches a terminal billable status, the check-then-act window covers every call that is in flight rather than a single call, and the ledger RPC applies the delta with no floor (credits = coalesce(credits, 0) + p_amount) so nothing downstream repairs the result. The SMS dispatch path holds a per-batch per-dispatch budget and the number-purchase path holds credits with a workspace-row lock; no voice dispatch path reserves…",
-    "resolution": "Reserve the cost of the outbound dispatch in the same atomic statement that reads the balance, the way the number-purchase path already holds credits with a workspace-row lock and the way the SMS batch path holds a per-dispatch budget, and compare the balance against that cost rather than against zero. The hold must be released when the dispatch never reaches the provider and settled when the completion debit is written, so the workspace is not left over-reserved; the hold is set to the per-call first-minute price, and a per-call reservation record (the shape app/server/number-purchase-reservation.server.ts already uses) is the form that lets the hold be set to the per-call maximum and…",
+    "summary": "Concurrent voice sends reuse the same positive credit balance; no durable hold is taken before provider work. This blocks predictive capacity work in #3045.",
+    "currentBehavior": "On dev@03c3e15a, one credit still admits a two-credit IVR test call. Fifty concurrent real application service calls with two credits all reach a mocked provider; the stored balance stays two before terminal billing.",
+    "rootCause": "The shared gate reads workspace.credits without locking or reserving the first-minute cost. HTTP, background IVR, test-call and predictive paths can each reuse that balance.",
+    "resolution": "Build one workspace-scoped reservation contract under a workspace row lock. Count existing voice and number-purchase holds; retain uncertain creates; fence dispatch ownership; settle the hold atomically with the existing idempotent terminal debit. Apply the contract to every outbound voice path and preserve the staffed two-leg rate. Per-credential limits bound starts, while durable holds bound funded admission.",
     "lookIn": [
       "app/lib/outbound-credit-gate.server.ts",
-      "app/lib/workspace-credits.server.ts",
-      "shared/credit-floor.ts",
-      "shared/pricing.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/auto-dial.server.ts",
       "app/routes/api+/dial.action.server.ts",
-      "app/lib/campaign-sms-dispatch-primitives.server.ts"
+      "app/lib/twilio-call-status.server.ts",
+      "app/server/number-purchase-reservation.server.ts"
     ],
     "existingTests": [
-      "5/5 tests passed against real Postgres 18 with the repository's own migration chain. requireOutboundCredits admitted a 1-credit workspace ({ ok: true, balance: 1 }) although the cheapest outbound voice unit costs 2 credits, the effective floor refuses a 0-credit workspace, and the sibling SMS budget refuses that same…"
+      "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "Competing reservations must admit only one funded first minute.",
+      "Reject/release before provider work; retain uncertain sends and prevent replay or expired-owner sends.",
+      "Prove early callback, parent/child billing identity, zero-duration/canceled release and once-only settlement; keep multi-minute in-flight grace explicit.",
+      "Full local and applicable remote CI after the complete implementation."
     ],
     "acceptanceCriteria": [
-      "docs/credit-floor-policy.md defines app/lib/outbound-credit-gate.server.ts as 'the single gate every outbound entry point calls' and the block tier as 'block when balance cannot fund new outbound usage', with 'no negative-balance grace for new outbound'; it records that the campaign SMS batch path 'reserves each message's estimated cost before its send starts' so a batch cannot spend the same stale balance. The gate protects two principals: the workspace owner, whose funded credit balance is the money being spent, and the operator, whose Twilio account pays for every call before the workspace's balance is settled. The gate is therefore expected to admit only outbound the balance can fund, at the moment of admission."
+      "New voice dispatches cannot reuse funds already held by another outbound call or number purchase.",
+      "First-minute reservation and canonical terminal billing remain separate accounting events; holds do not add a second usage charge.",
+      "Recovery cannot free a hold while a provider call may exist."
     ],
-    "size": "S",
-    "risk": "medium"
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; live Project Status In progress. No blockers; blocks open #3045. Proof and implementation checklist added to the existing issue on 2026-10-29 UTC. The money-path fix remains in progress; do not mark fixed or on-dev."
   },
   {
     "issueNumber": 2880,
@@ -517,9 +520,9 @@
     "issueNumber": 3072,
     "verdict": "fix-now",
     "summary": "High: patch the API generator Handlebars compiler in npm and Bun.",
-    "currentBehavior": "Both locks resolve Handlebars 4.7.9. Fresh audits report the Critical AST-type and own-property findings. The measured npm consumer is Hey API code generation; the findings need untrusted AST input or unsafe prototype settings.",
+    "currentBehavior": "PR #3075 is open with the tested Handlebars 4.7.10 patch. It is not merged into dev.",
     "rootCause": "The existing override floor still permits the affected compiler release.",
-    "resolution": "Raise the compatible override floor to 4.7.10 or a verified fixed release. Prove rejection of bounded advisory fixtures and normal string-template compatibility through the installed generator; run both installers, audits, codegen and full CI.",
+    "resolution": "Review and approve PR #3075, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
     "lookIn": [
       "package.json",
       "package-lock.json",
@@ -527,18 +530,22 @@
     ],
     "size": "S",
     "risk": "high",
-    "trackerRecommendation": "Native Task, Priority High, Effort Low, assigned to wra-sol, Project Status Backlog. Keep this compiler patch separate from runtime auth and redirects; the historical development Epic #1803 is closed.",
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3075 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
     "existingTests": [
-      "A bounded test through the actual installed Hey API compiler reproduces three failures on Handlebars 4.7.9: compile and precompile accept malformed AST metadata, and broad prototype-method access exposes the forbidden constructor. A normal escaped string-template control passes. The separate patch and regression file are prepared; dependency installation and full verification remain."
+      "Four real compiler cases pass; the old compiler fails three while the normal control passes.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
     ]
   },
   {
     "issueNumber": 3071,
     "verdict": "fix-now",
     "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
-    "currentBehavior": "Open PR #3074 updates Better Auth and every measured core/adapter consumer from 1.6.23 to 1.7.14 in both install paths. Final local head 6d51738c is based on dev@03c3e15a. The application still uses password and optional two-factor sign-in; it does not enable the advisory-required Magic Link/OAuth combination.",
+    "currentBehavior": "PR #3074 is open with the tested Better Auth 1.7.14 patch. It is not merged into dev.",
     "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
-    "resolution": "Review PR #3074 and require its final-head remote checks before the authorized merge. Keep app sign-in policies unchanged and run approved deployed acceptance before release.",
+    "resolution": "Review and approve PR #3074, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
     "lookIn": [
       "package.json",
       "package-lock.json",
@@ -546,9 +553,8 @@
       "app/server/auth-instance.ts"
     ],
     "existingTests": [
-      "The old library fails the token-purpose case with two passing controls. Twelve installed-library journeys and two real-PostgreSQL app-adapter cases pass.",
-      "Fresh full and production install checks pass; npm and Bun production trees and a separate frozen Bun full tree each execute all three behavior cases and resolve matching 1.7.14 auth/core/adapters.",
-      "Fresh audits report no Better Auth findings. Two complete local gates pass; final head 6d51738c has 6,064 Node, 34 Bun and 1,541 UI passes, 11 existing skips, all guards, build, bundle and codegen checks."
+      "Token-purpose regressions fail against the old library and pass against the patch.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
     ],
     "acceptanceCriteria": [
       "A token from one purpose cannot authenticate another purpose or consume its pending state.",
@@ -557,15 +563,18 @@
     ],
     "size": "M",
     "risk": "high",
-    "trackerRecommendation": "Native Task, Urgent, Effort Medium, parent #1802; assigned to wra-sol and Status In progress. PR #3074 has an explicit Development link. Remote check results and deployed acceptance must be verified separately; no live OAuth or email traffic was used."
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3074 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
+    ]
   },
   {
     "issueNumber": 3073,
     "verdict": "fix-now",
     "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
-    "currentBehavior": "The npm Twilio/Axios path resolves follow-redirects 1.16.0, affected by array-form and custom sensitive-header forwarding findings. Bun resolves fixed 1.16.1 and reports no redirect-library finding.",
+    "currentBehavior": "PR #3076 is open with the tested follow-redirects 1.16.2 patch. It is not merged into dev.",
     "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
-    "resolution": "Align the targeted consumer on a fixed release in both installer paths. Test cross-origin header stripping with dummy loopback endpoints and ordinary redirect controls, then verify fresh installs, audits and full CI. Keep general drift-guard work in #2887.",
+    "resolution": "Review and approve PR #3076, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
     "lookIn": [
       "package.json",
       "package-lock.json",
@@ -573,10 +582,43 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Task, Priority High, Effort Low, parent #1802; assigned to wra-sol, Project Status Backlog. Installed membership does not prove that the live Twilio path uses the advisory header conditions.",
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3076 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
     "existingTests": [
-      "Six bounded loopback cases resolve the actual Twilio → Axios → follow-redirects consumer. The npm 1.16.0 copy fails the array-credential and two custom-header cases; three normal controls pass.",
-      "The already fixed Bun 1.16.1 copy passes all six cases. Array fixtures include the required Host header and require a completed HTTP 200 before checking the destination headers."
+      "Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
     ]
+  },
+  {
+    "issueNumber": 3080,
+    "verdict": "fix-now",
+    "recommendedTitle": "Rate-limit failed password checks when disabling 2FA in account security",
+    "summary": "An authenticated ordinary account can repeat failed password checks on the local 2FA disable path without an application limiter.",
+    "currentBehavior": "An isolated current-source probe made 15 wrong-password requests using the real local limiter module; all 15 reached the mocked disable API and returned Invalid password. The route checks session freshness and refuses protected accounts; no factor was removed.",
+    "rootCause": "The enable and TOTP verification branches have user-scoped setup limiters. The disable branch calls Better Auth disableTwoFactor without one.",
+    "resolution": "Add a user-scoped limiter before the disable password check and include that credential surface in the guard. Preserve protected-account refusal and successful ordinary-account disable behavior.",
+    "lookIn": [
+      "app/routes/account.security.loader.server.ts",
+      "app/lib/two-factor-rate-limit.server.ts",
+      "scripts/check-auth-rate-limits.mjs",
+      "test/account-security.route.test.ts"
+    ],
+    "existingTests": [
+      "Private scratch probe: 15 requests reached a mocked password provider. The working source hash stayed unchanged. This proves admission behavior, not password bypass or factor removal."
+    ],
+    "missingTests": [
+      "Exhaustion blocks before the password provider; separate users and reset windows retain their own budgets.",
+      "Protected accounts remain refused, and an ordinary correct-password disable still works.",
+      "The regression must fail when its limiter is removed."
+    ],
+    "acceptanceCriteria": [
+      "Failed disable password checks are limited by the authenticated user identity before the provider call.",
+      "The source coverage guard detects a missing or wrong limiter on this operation."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "New native Bug; Priority Low, Effort Low, Enviornment unset; Project Status Backlog. No assignee, PR, parent, children or native dependencies. File and implement separately from the public credential-budget repair #2867."
   }
 ]

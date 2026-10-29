@@ -36,6 +36,21 @@ function issue(number, updatedAt = "2026-08-26T00:00:00Z") {
   };
 }
 
+function withIssueFields(value, priority, effort = "Medium") {
+  return {
+    ...value,
+    issueType: { name: "Bug" },
+    issueFieldValues: { nodes: [
+      { field: { name: "Priority" }, name: priority },
+      { field: { name: "Effort" }, name: effort },
+    ] },
+  };
+}
+
+function boardOrder(md) {
+  return [...md.matchAll(/^### \[#(\d+)\]/gm)].map((match) => Number(match[1]));
+}
+
 afterEach(() => rmSync(TMP, { recursive: true, force: true }));
 
 describe("loadEnrichment", () => {
@@ -121,5 +136,61 @@ describe("buildBoard", () => {
     expect(() =>
       buildBoard({ issues: [issue(2)], records, repo: "x/y", projectNumber: 9, reviewedAt: "dev@abc1234" }),
     ).toThrow(/enrichment records for closed issues: 1, 3/);
+  });
+
+  test("puts urgent and high work before risk, size and recent updates", () => {
+    const { md } = buildBoard({
+      issues: [
+        withIssueFields(issue(1, "2026-10-28T00:00:00Z"), "Low"),
+        withIssueFields(issue(2), "Urgent"),
+        withIssueFields(issue(3), "High"),
+        withIssueFields(issue(4), "Medium"),
+        issue(5, "2026-10-29T00:00:00Z"),
+      ],
+      records: [
+        record({ issueNumber: 1, risk: "high", size: "XL" }),
+        record({ issueNumber: 2, risk: "low", size: "XS" }),
+        record({ issueNumber: 3, risk: "low", size: "XS" }),
+        record({ issueNumber: 4, risk: "high", size: "L" }),
+        record({ issueNumber: 5, risk: "high", size: "XL" }),
+      ],
+      repo: "x/y", projectNumber: 9, reviewedAt: "dev@test",
+    });
+    expect(boardOrder(md)).toEqual([2, 3, 4, 1, 5]);
+    expect(md).toContain("Type: Bug · Priority: Urgent · Effort: Medium");
+    expect(md).toContain("Type: unset · Priority: unset · Effort: unset");
+  });
+
+  test("uses native Issue fields even when labels and Project Priority disagree", () => {
+    const low = withIssueFields(issue(1), "Low", "High");
+    low.labels = { nodes: [{ name: "Urgent" }] };
+    low.projectItems = { nodes: [{ project: { number: 9 }, fieldValueByName: { name: "In progress" }, priority: "Urgent" }] };
+    const high = withIssueFields(issue(2), "High", "Low");
+    const { md } = buildBoard({
+      issues: [low, high], records: [record({ issueNumber: 1 }), record({ issueNumber: 2 })],
+      repo: "x/y", projectNumber: 9, reviewedAt: "dev@test",
+    });
+    expect(boardOrder(md)).toEqual([2, 1]);
+    expect(md).toContain("Type: Bug · Priority: Low · Effort: High");
+    expect(md).toContain("**IN PROGRESS**");
+  });
+
+  test("keeps verdict lanes and their existing risk order within equal priority", () => {
+    const { md } = buildBoard({
+      issues: [withIssueFields(issue(1), "High"), withIssueFields(issue(2), "High"), withIssueFields(issue(3), "Urgent")],
+      records: [record({ issueNumber: 1, risk: "low" }), record({ issueNumber: 2, risk: "high" }), record({ issueNumber: 3, verdict: "verify-close" })],
+      repo: "x/y", projectNumber: 9, reviewedAt: "dev@test",
+    });
+    expect(boardOrder(md)).toEqual([2, 1, 3]);
+    expect(md.indexOf("## Verify and close")).toBeLessThan(md.indexOf("### [#3]"));
+  });
+
+  test("shows priority for unaudited issues and keeps unknown priorities last", () => {
+    const { md } = buildBoard({
+      issues: [issue(1, "2026-10-29T00:00:00Z"), withIssueFields(issue(2), "Urgent", "Low")],
+      records: [], repo: "x/y", projectNumber: 9, reviewedAt: "dev@test",
+    });
+    expect(boardOrder(md)).toEqual([2, 1]);
+    expect(md).toContain("Status: No status · Type: Bug · Priority: Urgent · Effort: Low");
   });
 });

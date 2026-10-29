@@ -41,6 +41,15 @@ query($owner: String!, $repo: String!, $cursor: String) {
         title
         url
         updatedAt
+        issueType { name }
+        issueFieldValues(first: 100) {
+          nodes {
+            ... on IssueFieldSingleSelectValue {
+              field { ... on IssueFieldSingleSelect { name } }
+              name
+            }
+          }
+        }
         assignees(first: 10) { nodes { login } }
         labels(first: 20) { nodes { name } }
         projectItems(first: 20) {
