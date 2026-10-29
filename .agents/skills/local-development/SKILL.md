@@ -144,6 +144,11 @@ carry that test URL into ci:local and then claim its ledger failure is code drif
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.
 
+Give each real-database provider fixture a unique account SID. Delete its queued
+jobs before its workspace, including after deliberate faults: a fault can enqueue
+work that a passing control never creates. A mutation proof requires the expected
+failed assertions, passing controls, and no suite or cleanup-hook failure.
+
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
 gate with the required permissions. The vendor guard leaves rebuilt output for

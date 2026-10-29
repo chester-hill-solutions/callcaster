@@ -7,10 +7,10 @@ import { hasTwilioCallRequestHistory, isTwilioCallHistoryReady } from "@/lib/twi
 import { terminalVoiceCallDuration } from "@/lib/voice-recovery-duration";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
+import { matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
 
 function matchesSetup(reservation: VoiceReservation, candidate: CallInstance) {
-  return candidate.accountSid === reservation.account_sid && candidate.to === reservation.setup_to &&
-    candidate.from === reservation.caller_id && candidate.direction === "outbound-api" && !candidate.parentCallSid;
+  return matchesVoiceSetupRoot(reservation, candidate);
 }
 
 function matchesRecipient(reservation: VoiceReservation, candidate: CallInstance) {
@@ -25,7 +25,7 @@ async function setupHistory(reservation: VoiceReservation, root: CallInstance, t
 }
 
 async function unknownSetup(reservation: VoiceReservation, twilio: Twilio.Twilio) {
-  if (!reservation.setup_to || !reservation.send_started_at) return null;
+  if (reservation.setup_client_identity || !reservation.setup_to || !reservation.send_started_at) return null;
   const rows = await twilio.calls.list({ to: reservation.setup_to, from: reservation.caller_id, limit: 20 });
   const started = reservation.send_started_at.getTime();
   const candidates = rows.filter((candidate) => matchesSetup(reservation, candidate) &&
@@ -46,7 +46,7 @@ async function childEvidence(reservation: VoiceReservation, root: CallInstance, 
   if (isTwilioCallHistoryReady(child) && await hasTwilioCallRequestHistory({
     twilio, callSid: child.sid, statusCallback: reservation.status_callback,
   })) return true;
-  return setupHistory(reservation, root, twilio);
+  return !reservation.setup_client_identity && setupHistory(reservation, root, twilio);
 }
 
 async function unknownRecipient(reservation: VoiceReservation, root: CallInstance, twilio: Twilio.Twilio) {
@@ -91,6 +91,9 @@ export async function reconcileVoiceBridge(reservation: VoiceReservation, twilio
 }
 
 export async function recoverVoiceBridgeCandidate(reservation: VoiceReservation, candidateSid: string, twilio: Twilio.Twilio) {
+  if (reservation.setup_client_identity && (!reservation.setup_sid || !reservation.send_started_at)) {
+    throw new Error("An SDK setup requires its original authenticated root");
+  }
   const candidate = await twilio.calls(candidateSid).fetch();
   if (candidate.sid !== candidateSid) throw new Error("Unexpected voice recovery candidate");
   if (!reservation.setup_sid) {

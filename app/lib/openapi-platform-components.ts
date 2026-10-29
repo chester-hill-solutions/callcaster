@@ -30,6 +30,24 @@ export const rateLimitResponse = {
 
 export const platformOpenApiComponents = {
   schemas: {
+    HandsetDialPreparationRequest: {
+      type: "object" as const,
+      required: ["to_number", "client_identity", "dial_intent_id"] as const,
+      properties: {
+        to_number: { type: "string" as const, description: "Destination phone number." },
+        client_identity: { type: "string" as const, description: "Active handset session owned by the signed-in user." },
+        dial_intent_id: { type: "string" as const, format: "uuid", description: "Keep this UUID when retrying the same dial action." },
+      },
+      additionalProperties: false,
+    },
+    HandsetDialPreparationResponse: {
+      type: "object" as const,
+      required: ["reservation_id", "expires_at"] as const,
+      properties: {
+        reservation_id: { type: "string" as const, format: "uuid" },
+        expires_at: { type: "string" as const, format: "date-time" },
+      },
+    },
     PlatformError: {
       type: "object" as const,
       required: ["error"] as const,

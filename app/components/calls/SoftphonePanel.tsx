@@ -67,8 +67,9 @@ export function SoftphonePanel({
           <OutboundDialer
             value={controller.outboundTo}
             error={controller.outboundError}
-            disabled={outboundDialDisabled}
-            disabledReason={outboundDialDisabledReason}
+            pending={controller.isPreparingOutbound}
+            disabled={outboundDialDisabled || controller.isPreparingOutbound}
+            disabledReason={controller.isPreparingOutbound ? "Preparing your call" : outboundDialDisabledReason}
             onChange={controller.setOutboundTo}
             onDial={controller.handleOutboundDial}
             onClearError={controller.clearOutboundError}

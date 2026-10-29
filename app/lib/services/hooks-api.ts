@@ -28,6 +28,27 @@ interface StartConferenceResponse {
   error?: string;
 }
 
+export async function prepareHandsetDial(params: {
+  workspaceId: string; clientIdentity: string; to: string; intentId: string;
+}): Promise<string> {
+  const fallback = "We could not prepare this call. Please try again.";
+  let response: Response;
+  try {
+    response = await fetch(`/api/workspaces/${encodeURIComponent(params.workspaceId)}/handset/session`, {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to_number: params.to, client_identity: params.clientIdentity, dial_intent_id: params.intentId }),
+    });
+  } catch { throw new Error(fallback); }
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : fallback;
+    throw new Error(message);
+  }
+  if (!body || typeof body !== "object" || !("reservation_id" in body) ||
+      typeof body.reservation_id !== "string" || !body.reservation_id.trim()) throw new Error(fallback);
+  return body.reservation_id;
+}
+
 /**
  * Hang up an active call
  * @param params - Call SID and workspace ID

@@ -5,11 +5,6 @@ import { useTwilioConnection } from "./useTwilioConnection";
 import { useCallHandling } from "./useCallHandling";
 import { logger } from "@/lib/logger.client";
 
-interface CallConnectParams {
-  To: string;
-  [key: string]: string;
-}
-
 interface TwilioDeviceHook {
   device: Device | null;
   status: string;
@@ -18,7 +13,7 @@ interface TwilioDeviceHook {
   incomingCall: Call | null;
   isMicMuted: boolean;
   setMicMuted: (muted: boolean) => void;
-  makeCall: (params: CallConnectParams) => void;
+  makeCall: ReturnType<typeof useCallHandling>["makeCall"];
   hangUp: () => void;
   answer: () => void;
   holdAndAnswer: () => void;

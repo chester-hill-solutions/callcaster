@@ -44,7 +44,7 @@ interface UseCallHandlingReturn {
   isMicMuted: boolean;
   /** Active call is locally suspended via SDK mute (not conference hold). */
   isActiveCallOnLocalHold: boolean;
-  makeCall: (params: CallConnectParams) => void;
+  makeCall: (params: CallConnectParams) => Promise<Call | undefined> | undefined;
   hangUp: (call?: Call) => Promise<void>;
   answer: () => void;
   holdAndAnswer: () => void;
@@ -66,6 +66,15 @@ function applyAgentLegMute(call: Call, muted: boolean): void {
 
 function suspendHeldCall(call: Call): void {
   applyAgentLegMute(call, true);
+}
+
+async function endStaleOutgoingCall(call: Call, workspaceId: string) {
+  try { call.disconnect(); }
+  catch (error) { logger.error("Error disconnecting a stale outgoing call:", error); }
+  const callSid = getCallSid(call);
+  if (!callSid) return;
+  try { await hangupCall({ callSid, workspaceId }); }
+  catch (error) { logger.error("Error ending a stale outgoing call:", error); }
 }
 
 /**
@@ -386,19 +395,24 @@ export function useCallHandling({
       const myGeneration = callGenerationRef.current;
 
       const connection = device.connect({ params });
-      connection
-        .then((call: Call) => {
-          if (callGenerationRef.current !== myGeneration) return;
+      return connection
+        .then(async (call: Call) => {
+          if (callGenerationRef.current !== myGeneration) {
+            await endStaleOutgoingCall(call, workspaceId);
+            return;
+          }
           updateActiveCall(call);
           updateCallState("dialing");
+          return call;
         })
         .catch((err: unknown) => {
           if (callGenerationRef.current !== myGeneration) return;
           logger.error("Error making call:", err);
           onError?.(err instanceof Error ? err : new Error("Failed to make call"));
+          return undefined;
         });
     },
-    [device, updateActiveCall, updateCallState, onError],
+    [device, workspaceId, updateActiveCall, updateCallState, onError],
   );
 
   const hangUp = useCallback(
@@ -656,7 +670,7 @@ export function useCallHandling({
   }, [heldCalls]);
 
   /**
-   * @effect On unmount, run any incoming-call SDK listener cleanups still
+   * @effect On unmount, invalidate pending outgoing connections and run incoming-call SDK listener cleanups still
    * pending in `incomingListenerCleanupsRef` so no Twilio Call listeners leak
    * past the hook's lifetime.
    * @effect-deps [] — intentionally mount-once, cleanup-only; the ref's Map
@@ -670,6 +684,7 @@ export function useCallHandling({
   useEffect(() => {
     const incomingListenerCleanups = incomingListenerCleanupsRef.current;
     return () => {
+      callGenerationRef.current += 1;
       incomingListenerCleanups.forEach((cleanup) => cleanup());
       incomingListenerCleanups.clear();
     };

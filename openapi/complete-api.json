@@ -11206,6 +11206,72 @@
       }
     },
     "/api/workspaces/{workspaceId}/handset/session": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_handset_session",
+        "summary": "POST /api/workspaces/:workspaceId/handset/session",
+        "description": "",
+        "tags": [
+          "User API",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId_handset_session",
         "summary": "DELETE /api/workspaces/:workspaceId/handset/session",

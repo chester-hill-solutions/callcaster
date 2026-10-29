@@ -14,6 +14,7 @@ import { logger } from "@/lib/logger.server";
 import { terminalVoiceCallDuration as terminalDuration } from "@/lib/voice-recovery-duration";
 import { reconcileVoiceBridge, recoverVoiceBridgeCandidate } from "@/lib/voice-bridge-recovery.server";
 import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
+import { hasVoiceSetup } from "@/lib/voice-bridge-identity";
 
 function matchesReservation(reservation: VoiceReservation, candidate: CallInstance) {
   return candidate.accountSid === reservation.account_sid &&
@@ -39,7 +40,7 @@ export async function recoverVoiceReservationCall(reservation: VoiceReservation,
     throw new Error("Voice reservation is not eligible for candidate recovery");
   }
   const twilio = await originalAccountClient(reservation);
-  if (reservation.setup_to) return recoverVoiceBridgeCandidate(reservation, candidateSid, twilio);
+  if (hasVoiceSetup(reservation)) return recoverVoiceBridgeCandidate(reservation, candidateSid, twilio);
   const candidate = await twilio.calls(candidateSid).fetch();
   if (candidate.sid !== candidateSid || !await adoptVerifiedCandidate(reservation, candidate, twilio)) {
     throw new Error("Provider history does not prove the reserved voice call");
@@ -91,7 +92,7 @@ async function reconcileVoiceReservation(reservation: VoiceReservation) {
   }
   if (await settleSavedVoiceReservation(reservation)) return "settled";
   const twilio = await originalAccountClient(reservation);
-  if (reservation.setup_to) return reconcileVoiceBridge(reservation, twilio);
+  if (hasVoiceSetup(reservation)) return reconcileVoiceBridge(reservation, twilio);
   const remote = reservation.provider_sid
     ? await twilio.calls(reservation.provider_sid).fetch()
     : await findUnknownCall(reservation, twilio);

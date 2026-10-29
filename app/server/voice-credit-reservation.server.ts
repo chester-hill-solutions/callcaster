@@ -34,6 +34,7 @@ export type VoiceReservationInput = {
   operationKey?: string;
   userId?: string | null;
   setupTo?: string | null;
+  setupClientIdentity?: string | null;
   conferenceId?: string | null;
   predictiveOperationId?: string | null;
   /** Runs database work only, after funding succeeds and inside its transaction. */
@@ -61,12 +62,13 @@ async function resolveQueueOperation(tx: CreditTransaction, args: VoiceReservati
 }
 
 type VoiceIntentInput = Pick<VoiceReservationInput,
-  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId">;
+  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "setupClientIdentity" | "outreachAttemptId" | "operationKey" | "conferenceId" | "predictiveOperationId">;
 
 function sameVoiceContext(existing: VoiceReservation, args: VoiceIntentInput) {
   return existing.campaign_id === (args.campaignId ?? null) && existing.contact_id === (args.contactId ?? null) &&
     existing.queue_id === (args.queueId ?? null) && existing.user_id === (args.userId ?? null) &&
-    existing.setup_to === (args.setupTo ?? null) && existing.requested_outreach_attempt_id === (args.outreachAttemptId ?? null);
+    existing.setup_to === (args.setupTo ?? null) && existing.setup_client_identity === (args.setupClientIdentity ?? null) &&
+    existing.requested_outreach_attempt_id === (args.outreachAttemptId ?? null);
 }
 
 async function findRepeatedOperation(tx: CreditTransaction, args: VoiceIntentInput & { accountSid?: string }, operationKey: string | undefined) {
@@ -99,7 +101,7 @@ export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, ar
   const [balance] = await tx.select({ credits: workspace.credits }).from(workspace)
     .where(eq(workspace.id, args.workspaceId)).for("no key update");
   if (!balance) return { ok: false as const, reason: "workspace_not_found" as const };
-  if (args.setupTo) {
+  if (args.setupTo != null) {
     const replay = await findRepeatedOperation(tx, args, args.operationKey);
     if (replay) return replay;
   }
@@ -126,6 +128,7 @@ export async function reserveVoiceCreditsInTransaction(tx: CreditTransaction, ar
     outreach_attempt_id: outreachAttemptId, queue_id: args.queueId, queue_generation: queue.queueGeneration,
     requested_outreach_attempt_id: args.outreachAttemptId,
     operation_key: queue.operationKey, user_id: args.userId, setup_to: args.setupTo,
+    setup_client_identity: args.setupClientIdentity,
     conference_id: args.conferenceId, predictive_operation_id: args.predictiveOperationId,
     lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS),
     // Admission may wait for a workspace lock. Record the real insertion

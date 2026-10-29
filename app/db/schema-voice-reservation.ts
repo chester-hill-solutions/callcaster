@@ -17,6 +17,7 @@ export const workspace_voice_reservation = pgTable("workspace_voice_reservation"
   operation_key: text(),
   user_id: text(),
   setup_to: text(),
+  setup_client_identity: text(),
   conference_id: text(),
   conference_sid: text(),
   predictive_operation_id: uuid(),

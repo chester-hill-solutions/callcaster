@@ -39,13 +39,6 @@ test/api-call-status-poll.route.test.ts::@/lib/database/workspace.server#1
 test/api-call-status-poll.route.test.ts::@/lib/env.server#1
 test/api-call-status-poll.route.test.ts::@/lib/logger.server#1
 test/api-call-status-poll.route.test.ts::@/lib/telephony-db.server#1
-test/api-call.route.test.ts::@/lib/database/workspace.server#1
-test/api-call.route.test.ts::@/lib/env.server#1
-test/api-call.route.test.ts::@/lib/handset/handset-session.server#1
-test/api-call.route.test.ts::@/lib/logger.server#1
-test/api-call.route.test.ts::@/lib/telephony-db.server#1
-test/api-call.route.test.ts::@/lib/twilio-webhook.server#1
-test/api-call.route.test.ts::@/lib/workspace-members-db.server#1
 test/api-caller-id-status.route.test.ts::@/lib/env.server#1
 test/api-caller-id-status.route.test.ts::@/lib/inbound-call-db.server#1
 test/api-caller-id-status.route.test.ts::@/lib/twilio-webhook.server#1

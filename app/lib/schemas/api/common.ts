@@ -51,6 +51,12 @@ export const connectPhoneDeviceBodySchema = z.object({
   campaignId: coerceEntityIdSchema,
 });
 
+export const handsetDialPreparationBodySchema = z.strictObject({
+  to_number: z.string().trim().min(1),
+  client_identity: z.string().trim().min(1),
+  dial_intent_id: z.uuid(),
+});
+
 export const testWebhookBodySchema = z.object({
   workspace_id: workspaceIdSchema.optional(),
   event: z.string().min(1),

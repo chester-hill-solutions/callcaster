@@ -5,6 +5,7 @@ import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { declineIncomingCall } from "@/components/calls/IncomingCallPanel";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
+import { prepareHandsetDial } from "@/lib/services/hooks-api";
 
 type UseSoftphoneControllerOptions = {
   token: string;
@@ -25,7 +26,25 @@ export function useSoftphoneController({
 }: UseSoftphoneControllerOptions) {
   const [outboundTo, setOutboundTo] = useState("");
   const [outboundError, setOutboundError] = useState<string | null>(null);
+  const [isPreparingOutbound, setIsPreparingOutbound] = useState(false);
+  const outboundPreparationRef = useRef(false);
+  const outboundEpochRef = useRef(0);
+  const dialIntentRef = useRef<{ context: string; id: string } | null>(null);
   const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
+
+  /**
+   * @effect Cancel preparation responses when the committed handset owner changes.
+   * @effect-deps workspaceId, clientIdentity (the authenticated dial owner).
+   * @effect-side-effects none (invalidates async work and clears its pending state).
+   * @effect-why-not-loader An imperative SDK start must not follow a stale browser request.
+   */
+  useEffect(() => {
+    const epoch = ++outboundEpochRef.current;
+    outboundPreparationRef.current = false;
+    dialIntentRef.current = null;
+    setIsPreparingOutbound(false);
+    return () => { if (outboundEpochRef.current === epoch) outboundEpochRef.current += 1; };
+  }, [workspaceId, clientIdentity]);
 
   const noop = useCallback(() => {}, []);
   const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
@@ -85,13 +104,13 @@ export function useSoftphoneController({
   }, [callHandling]);
 
   const handleEndSession = useCallback(async () => {
+    outboundEpochRef.current += 1;
+    outboundPreparationRef.current = true;
     try {
       for (const held of callHandling.heldCalls) {
         await callHandling.hangUp(held);
       }
-      if (callHandling.activeCall) {
-        await callHandling.hangUp();
-      }
+      await callHandling.hangUp();
     } catch {
       connection.device?.disconnectAll();
     }
@@ -145,23 +164,48 @@ export function useSoftphoneController({
     [callHandling.activeCall],
   );
 
-  const handleOutboundDial = useCallback(() => {
+  const handleOutboundDial = useCallback(async () => {
+    if (outboundPreparationRef.current || callHandling.activeCall || callHandling.incomingCall || callHandling.heldCalls.length) return;
     const raw = outboundTo.trim();
     if (!raw) {
       setOutboundError("Enter a phone number");
       return;
     }
     setOutboundError(null);
-    try {
-      const to = normalizePhoneNumber(raw);
-      callHandling.makeCall({
-        To: to,
-        workspace_id: workspaceId,
-        client_identity: clientIdentity,
-      });
-    } catch {
+    let to: string;
+    try { to = normalizePhoneNumber(raw); }
+    catch {
       setOutboundError("Invalid phone number");
       onError("Invalid phone number");
+      return;
+    }
+    const epoch = outboundEpochRef.current;
+    const context = JSON.stringify([workspaceId, clientIdentity, to]);
+    if (dialIntentRef.current?.context !== context) dialIntentRef.current = { context, id: crypto.randomUUID() };
+    outboundPreparationRef.current = true;
+    setIsPreparingOutbound(true);
+    try {
+      const reservationId = await prepareHandsetDial({ workspaceId, clientIdentity, to, intentId: dialIntentRef.current.id });
+      if (outboundEpochRef.current !== epoch) return;
+      if (ownedCallsRef.current.some(Boolean)) {
+        setOutboundError("A call is already active. End it before dialing.");
+        return;
+      }
+      const call = await callHandling.makeCall({ To: to, workspace_id: workspaceId, client_identity: clientIdentity,
+        credit_reservation: reservationId });
+      if (outboundEpochRef.current !== epoch) return;
+      if (call) dialIntentRef.current = null;
+      else setOutboundError("The call could not be connected. Check its status before retrying.");
+    } catch (error) {
+      if (outboundEpochRef.current !== epoch) return;
+      const message = error instanceof Error ? error.message : "We could not prepare this call. Please try again.";
+      setOutboundError(message);
+      onError(message);
+    } finally {
+      if (outboundEpochRef.current === epoch) {
+        outboundPreparationRef.current = false;
+        setIsPreparingOutbound(false);
+      }
     }
   }, [outboundTo, workspaceId, clientIdentity, callHandling, onError]);
 
@@ -184,6 +228,7 @@ export function useSoftphoneController({
     outboundTo,
     setOutboundTo,
     outboundError,
+    isPreparingOutbound,
     clearOutboundError,
     handleOutboundDial,
     showOutboundDialer,
