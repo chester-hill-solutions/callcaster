@@ -84,36 +84,6 @@
     "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Task, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3034 is open into dev and linked only to #2626. Keep open for merge, deployed verification and default-branch release acceptance."
   },
   {
-    "issueNumber": 1874,
-    "verdict": "fix-now",
-    "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
-    "currentBehavior": "The default branch projects about 80 queue completions per minute for the reported settings. The durable worker sends two calls per batch and waits for a five-second idle poll, matching the screenshots showing 144 dequeues over six minutes (24/minute). A tested branch patch includes that cadence and corrects the displayed units.",
-    "resolution": "Review and release the worker-aware estimate patch, then compare its displayed queue finish range with a real campaign before closing.",
-    "lookIn": [
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/lib/throughput-config.ts",
-      "app/lib/worker/poll-jobs.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
-    ],
-    "rootCause": "The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.",
-    "existingTests": [
-      "test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.",
-      "test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.",
-      "test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording."
-    ],
-    "missingTests": [
-      "After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary."
-    ],
-    "acceptanceCriteria": [
-      "Default planning rate includes the durable worker batch and poll cadence.",
-      "The two reported queue counts keep the average projected finish stable at the reported processing pace.",
-      "Rate labels use consistent units and distinguish a drained queue from calls still in flight.",
-      "A deployed campaign confirms the estimate is useful before closing."
-    ],
-    "trackerRecommendation": "Keep open in progress for review, release and deployed acceptance. The prior master concurrency-only fix is insufficient; remove the old verify-and-close claim."
-  },
-  {
     "issueNumber": 1875,
     "verdict": "fix-now",
     "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` \u2014 but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
@@ -177,7 +147,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, hierarchy or dependencies; organization fields unset. CHS backlog Status In progress. The earlier on-dev claim cited PR #2900, whose actual diff is board/enrichment only. PR #3063 is the runtime fix candidate into dev, linked only to #2860. Keep open for merge, deployed verification and release."
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, hierarchy or dependencies; organization fields unset. CHS backlog Status In progress. The earlier on-dev claim cited PR #2900, whose actual diff is board/enrichment only. PR #3063 is the runtime fix candidate into dev, linked only to #2860. Keep open for merge, deployed verification and release. The user has now authorized this source in merge batch PR #3070. The original head passed GitHub gates; combined-head checks remain. Keep the issue open and do not mark it on-dev before the batch actually merges."
   },
   {
     "issueNumber": 2862,
@@ -266,35 +236,6 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. PR #3077 fixes the shared sink, recent-response read and bigint mapping. Full local CI passes at 0de271ac: 6,061 Node, 34 Bun and 1,541 UI cases; 11 existing skips. The final publication commit and exact-head remote checks must pass before merge approval is requested. API-key admission policy stays in #2863."
-  },
-  {
-    "issueNumber": 2866,
-    "verdict": "fix-now",
-    "recommendedTitle": "Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response",
-    "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount\u2026",
-    "currentBehavior": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount auth token). Every write that persists those columns binds them as SQL parameters of an UPDATE. Under the pinned drizzle-orm 0.45.2 a failed statement is wrapped in `DrizzleQueryError` (node_modules/drizzle-orm/pg-core/session.js:41) whose message is `Failed query: <sql>` plus a `params: <bound values>` line (node_modules/drizzle-orm/errors.js:12), so the credential is rendered into the error text. The repository's logger copies `error.message` into the\u2026",
-    "rootCause": "app/lib/logger-core.ts#serializeError treats the error text as safe: it copies `error.message` (line 66), up to three `cause` messages (line 60) and the stack (line 69, whose first line repeats the message) verbatim into the log entry, and the module contains no redaction, scrubbing or allowlist layer at all. Because Drizzle renders bound parameter values into `DrizzleQueryError.message`, any failed statement that binds a credential as a parameter carries that credential into the emitted log line - and, because app/lib/errors.server.ts#createErrorResponse attaches the raw error object to the `http.error_response` entry, into that line's `err.params` array as well, which survives any fix\u2026",
-    "resolution": "Scrub bound SQL parameter values out of driver error text before it reaches any sink, and stop returning raw error messages to clients - but scrub every copy of the text, not only the message. Three changes close the class: (1) in app/lib/logger-core.ts, strip the `params:` segment from the message, the cause chain AND the stack, because the stack's first line repeats the message and a message-only scrub still leaks the credential into the log line; (2) in app/lib/errors.server.ts, render the client-visible field with the repository's own toUserMessage(error, defaultMessage) and keep the raw error server-side only, as docs/pg-error-strictness.md:38 already requires; (3) in\u2026",
-    "lookIn": [
-      "app/lib/logger-core.ts",
-      "app/lib/logger.server.ts",
-      "node_modules/drizzle-orm/errors.js",
-      "node_modules/drizzle-orm/pg-core/session.js",
-      "app/db/schema.ts",
-      "app/lib/twilio-workspace-credentials.ts"
-    ],
-    "existingTests": [
-      "The caught error's constructor is DrizzleQueryError and its message is: 'Failed query: update \"workspace\" set \"key\" = $1, \"token\" = $2, \"twilio_data\" = $3 where \"workspace\".\"id\" = $4\\nparams: SKdummy00000000000000000000000000,DUMMY_TWILIO_API_KEY_SECRET_0123456789,{\"sid\":\"ACdummy00000000000000000000000000\",\"authToken\":\u2026"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls."
-    ],
-    "size": "S",
-    "risk": "medium"
   },
   {
     "issueNumber": 2867,
@@ -441,30 +382,36 @@
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
-    "summary": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0)",
-    "currentBehavior": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0). The comparison reserves nothing, and the floor sits below the price of the cheapest outbound unit (2 credits for an IVR first minute, 4 for a staffed first minute), so a workspace holding 1 credit passes the gate for a call it cannot pay for. The debit for a voice dispatch is written when the call reaches a terminal billable status (app/lib/twilio-call-status.server.ts:193), not when the call is placed, so workspace.credits does not fall until after the calls have run. The number of outbound\u2026",
-    "rootCause": "requireOutboundCredits is a balance read plus a floor comparison with no reservation of the amount the dispatch is about to spend, and the floor it compares against (0) is below the cost of the smallest outbound unit. Because the voice debit is written only when the call reaches a terminal billable status, the check-then-act window covers every call that is in flight rather than a single call, and the ledger RPC applies the delta with no floor (credits = coalesce(credits, 0) + p_amount) so nothing downstream repairs the result. The SMS dispatch path holds a per-batch per-dispatch budget and the number-purchase path holds credits with a workspace-row lock; no voice dispatch path reserves\u2026",
-    "resolution": "Reserve the cost of the outbound dispatch in the same atomic statement that reads the balance, the way the number-purchase path already holds credits with a workspace-row lock and the way the SMS batch path holds a per-dispatch budget, and compare the balance against that cost rather than against zero. The hold must be released when the dispatch never reaches the provider and settled when the completion debit is written, so the workspace is not left over-reserved; the hold is set to the per-call first-minute price, and a per-call reservation record (the shape app/server/number-purchase-reservation.server.ts already uses) is the form that lets the hold be set to the per-call maximum and\u2026",
+    "summary": "Concurrent voice sends reuse the same positive credit balance; no durable hold is taken before provider work. This blocks predictive capacity work in #3045.",
+    "currentBehavior": "On dev@03c3e15a, one credit still admits a two-credit IVR test call. Fifty concurrent real application service calls with two credits all reach a mocked provider; the stored balance stays two before terminal billing.",
+    "rootCause": "The shared gate reads workspace.credits without locking or reserving the first-minute cost. HTTP, background IVR, test-call and predictive paths can each reuse that balance.",
+    "resolution": "Build one workspace-scoped reservation contract under a workspace row lock. Count existing voice and number-purchase holds; retain uncertain creates; fence dispatch ownership; settle the hold atomically with the existing idempotent terminal debit. Apply the contract to every outbound voice path and preserve the staffed two-leg rate. Per-credential limits bound starts, while durable holds bound funded admission.",
     "lookIn": [
       "app/lib/outbound-credit-gate.server.ts",
-      "app/lib/workspace-credits.server.ts",
-      "shared/credit-floor.ts",
-      "shared/pricing.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/auto-dial.server.ts",
       "app/routes/api+/dial.action.server.ts",
-      "app/lib/campaign-sms-dispatch-primitives.server.ts"
+      "app/lib/twilio-call-status.server.ts",
+      "app/server/number-purchase-reservation.server.ts"
     ],
     "existingTests": [
-      "5/5 tests passed against real Postgres 18 with the repository's own migration chain. requireOutboundCredits admitted a 1-credit workspace ({ ok: true, balance: 1 }) although the cheapest outbound voice unit costs 2 credits, the effective floor refuses a 0-credit workspace, and the sibling SMS budget refuses that same\u2026"
+      "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "Competing reservations must admit only one funded first minute.",
+      "Reject/release before provider work; retain uncertain sends and prevent replay or expired-owner sends.",
+      "Prove early callback, parent/child billing identity, zero-duration/canceled release and once-only settlement; keep multi-minute in-flight grace explicit.",
+      "Full local and applicable remote CI after the complete implementation."
     ],
     "acceptanceCriteria": [
-      "docs/credit-floor-policy.md defines app/lib/outbound-credit-gate.server.ts as 'the single gate every outbound entry point calls' and the block tier as 'block when balance cannot fund new outbound usage', with 'no negative-balance grace for new outbound'; it records that the campaign SMS batch path 'reserves each message's estimated cost before its send starts' so a batch cannot spend the same stale balance. The gate protects two principals: the workspace owner, whose funded credit balance is the money being spent, and the operator, whose Twilio account pays for every call before the workspace's balance is settled. The gate is therefore expected to admit only outbound the balance can fund, at the moment of admission."
+      "New voice dispatches cannot reuse funds already held by another outbound call or number purchase.",
+      "First-minute reservation and canonical terminal billing remain separate accounting events; holds do not add a second usage charge.",
+      "Recovery cannot free a hold while a provider call may exist."
     ],
-    "size": "S",
-    "risk": "medium"
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; live Project Status In progress. No blockers; blocks open #3045. Proof and implementation checklist added to the existing issue on 2026-10-29 UTC. The money-path fix remains in progress; do not mark fixed or on-dev."
   },
   {
     "issueNumber": 2880,
@@ -561,7 +508,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, parent, children or dependencies; organization fields unset. CHS backlog Status In progress. PR #3064 is open into dev and linked only to #2882. Keep open for merge, deployed verification and release."
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, parent, children or dependencies; organization fields unset. CHS backlog Status In progress. PR #3064 is open into dev and linked only to #2882. Keep open for merge, deployed verification and release. The user has now authorized this source in merge batch PR #3070. The original head passed GitHub gates; combined-head checks remain. Keep the issue open and do not mark it on-dev before the batch actually merges."
   },
   {
     "issueNumber": 2883,
@@ -623,35 +570,6 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2887,
-    "verdict": "fix-now",
-    "recommendedTitle": "Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install",
-    "summary": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers",
-    "currentBehavior": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers. Every CI job installs with `npm ci` (.github/workflows/ci.yml:78, 92, 110, 127, 144, 193, 214), so typecheck, lint, the node and UI test suites and the static checks all run against the package-lock.json (npm) tree, while the deployed worker image installs the bun.lock (bun) tree (`bun install --production` at Dockerfile.worker:8; the Dockerfile web image installs the same tree at Dockerfile:11). The repository's only control for keeping those trees aligned is `npm run check:bun-lock` -> scripts/check-bun-lockfile.mjs, and that script implements the check as `bun install\u2026",
-    "rootCause": "scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,\u2026",
-    "resolution": "Make the drift gate compare the two lockfiles instead of only bun.lock against package.json, make the worker image fail loudly on any future drift, and pin the resolver so the gate validates the same lockfile the image installs. Three steps, in order: (1) align the resolver configuration first - .npmrc legacy-peer-deps=true makes npm ignore peer dependencies while bun installs them, which is why the trees differ in package content and not only in versions; either drop legacy-peer-deps (and regenerate package-lock.json) or record the peer difference as accepted and scope the comparison accordingly; (2) regenerate both lockfiles from the same package.json so the resolved trees agree, and\u2026",
-    "lookIn": [
-      ".github/workflows/ci.yml",
-      "scripts/check-bun-lockfile.mjs",
-      "package.json",
-      "Dockerfile.worker",
-      "Dockerfile",
-      "package-lock.json"
-    ],
-    "existingTests": [
-      "The gate's only assertion holds: bun.lock satisfies every package.json range, so `bun install --frozen-lockfile --dry-run` has nothing to change in bun.lock and the gate is green, while the two lockfiles disagree. The comparison of the two lockfiles shows 250 package names resolving to different version sets (31\u2026"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2895,
     "verdict": "fix-now",
     "recommendedTitle": "Workspace-UI recording path stores the take before it measures its duration, and no maximum duration exists anywhere to compare against",
@@ -679,38 +597,6 @@
     ],
     "size": "S",
     "risk": "medium"
-  },
-  {
-    "issueNumber": 2774,
-    "verdict": "fix-now",
-    "summary": "IVR voicemail drops start during the greeting and a valid machine-end result can hang up without leaving the saved message.",
-    "currentBehavior": "The default branch still requests early Enable detection. PR #3005 into dev waits for the greeting when a playable drop is configured and recognizes all documented machine-end results. It is open; no live voicemail recording has been verified.",
-    "resolution": "Review and deploy PR #3005, then verify the complete recorded message with an approved test recipient before closing.",
-    "lookIn": [
-      "app/lib/ivr-machine-detection.ts",
-      "app/lib/campaign-ivr-dispatch.server.ts",
-      "app/lib/campaign-test-call.server.ts",
-      "app/lib/ivr-machine.server.ts",
-      "app/routes/api+/ivr.action.server.ts"
-    ],
-    "rootCause": "Twilio Enable returns machine_start while the greeting is still playing. The fixed one-second pause cannot wait for that greeting. The previous substring classifier also excluded machine_end_other, which Twilio documents as a machine result. Regression tests reproduced both code defects before the patch.",
-    "existingTests": [
-      "test/campaign-ivr-dispatch.test.ts",
-      "test/campaign-test-call.test.ts",
-      "test/ivr-machine-detection.test.ts",
-      "test/ivr-page.route.test.ts",
-      "test/ivr.route.test.ts",
-      "test/ivr-initiate.server.test.ts"
-    ],
-    "missingTests": [
-      "A controlled live voicemail recording with a confirmed test recipient after deployment."
-    ],
-    "acceptanceCriteria": [
-      "Configured drops wait for greeting completion on production and test calls.",
-      "Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.",
-      "An approved recipient confirms the entire message was recorded after deployment."
-    ],
-    "trackerRecommendation": "Keep open for release and live acceptance. Native Bug, Priority Urgent, production; PR #3005 is linked in Development."
   },
   {
     "issueNumber": 3007,
@@ -774,5 +660,110 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, Project Status In progress; Priority, Effort and Enviornment unset; no milestone, hierarchy or dependencies. PR #3010 is open into dev and Development-linked only to #2616. Keep open for merge, deployed verification and default-branch release acceptance."
+  },
+  {
+    "issueNumber": 3072,
+    "verdict": "fix-now",
+    "summary": "High: patch the API generator Handlebars compiler in npm and Bun.",
+    "currentBehavior": "PR #3075 is open with the tested Handlebars 4.7.10 patch. It is not merged into dev.",
+    "rootCause": "The existing override floor still permits the affected compiler release.",
+    "resolution": "Review and approve PR #3075, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3075 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
+    "existingTests": [
+      "Four real compiler cases pass; the old compiler fails three while the normal control passes.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
+    ]
+  },
+  {
+    "issueNumber": 3071,
+    "verdict": "fix-now",
+    "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
+    "currentBehavior": "PR #3074 is open with the tested Better Auth 1.7.14 patch. It is not merged into dev.",
+    "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
+    "resolution": "Review and approve PR #3074, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock",
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "Token-purpose regressions fail against the old library and pass against the patch.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "acceptanceCriteria": [
+      "A token from one purpose cannot authenticate another purpose or consume its pending state.",
+      "Valid email/password and one-use Magic Link controls pass in an isolated fixture.",
+      "App verification, recovery, session and two-factor policies remain covered."
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3074 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
+    ]
+  },
+  {
+    "issueNumber": 3073,
+    "verdict": "fix-now",
+    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
+    "currentBehavior": "PR #3076 is open with the tested follow-redirects 1.16.2 patch. It is not merged into dev.",
+    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
+    "resolution": "Review and approve PR #3076, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3076 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
+    "existingTests": [
+      "Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
+    ]
+  },
+  {
+    "issueNumber": 3080,
+    "verdict": "fix-now",
+    "recommendedTitle": "Rate-limit failed password checks when disabling 2FA in account security",
+    "summary": "An authenticated ordinary account can repeat failed password checks on the local 2FA disable path without an application limiter.",
+    "currentBehavior": "An isolated current-source probe made 15 wrong-password requests using the real local limiter module; all 15 reached the mocked disable API and returned Invalid password. The route checks session freshness and refuses protected accounts; no factor was removed.",
+    "rootCause": "The enable and TOTP verification branches have user-scoped setup limiters. The disable branch calls Better Auth disableTwoFactor without one.",
+    "resolution": "Add a user-scoped limiter before the disable password check and include that credential surface in the guard. Preserve protected-account refusal and successful ordinary-account disable behavior.",
+    "lookIn": [
+      "app/routes/account.security.loader.server.ts",
+      "app/lib/two-factor-rate-limit.server.ts",
+      "scripts/check-auth-rate-limits.mjs",
+      "test/account-security.route.test.ts"
+    ],
+    "existingTests": [
+      "Private scratch probe: 15 requests reached a mocked password provider. The working source hash stayed unchanged. This proves admission behavior, not password bypass or factor removal."
+    ],
+    "missingTests": [
+      "Exhaustion blocks before the password provider; separate users and reset windows retain their own budgets.",
+      "Protected accounts remain refused, and an ordinary correct-password disable still works.",
+      "The regression must fail when its limiter is removed."
+    ],
+    "acceptanceCriteria": [
+      "Failed disable password checks are limited by the authenticated user identity before the provider call.",
+      "The source coverage guard detects a missing or wrong limiter on this operation."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "New native Bug; Priority Low, Effort Low, Enviornment unset; Project Status Backlog. No assignee, PR, parent, children or native dependencies. File and implement separately from the public credential-budget repair #2867."
   }
 ]

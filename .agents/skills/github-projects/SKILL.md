@@ -75,6 +75,19 @@ Do not use `gh project item-edit` to change organization Issue fields. After
 every edit, read the issue field values or Project item again and report the
 field name and option name.
 
+## Browser export completeness
+
+For a complete Project export, temporarily turn off Show hierarchy so child
+issues appear as rows. Load the table to its end before exporting: the export
+dialog includes only loaded rows, even when the filter count is larger. Require
+the unique exported URLs to match the visible filtered count. A partial export
+must not replace a complete snapshot. Do not save temporary view changes unless
+the user requests that saved view.
+
+When Issue metadata was not read, report it as unknown. Report an Issue field
+as unset only when GitHub returned its field values and that field was empty.
+Never substitute a Project field or label for a missing native Issue field.
+
 ## Pull Request and Issue Linking
 
 Each pull request must link to the issue it resolves.

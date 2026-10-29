@@ -32,6 +32,13 @@ editing them.
 
 The supported CallCaster issue types are:
 
+For native Priority or Effort writes, inspect the current GraphQL
+`SetIssueFieldValueInput` contract and resolve the live field and option IDs.
+Use `setIssueFieldValue` with `issueId` and an `issueFields` list containing
+`fieldId` and `singleSelectOptionId`; pass only the fields being changed.
+Verify the resulting `issueFieldValues`. These organization fields do not need
+Project scope and must not be replaced with labels or Project item fields.
+
 | Type | Use for |
 | --- | --- |
 | `Bug` | An unexpected problem or behavior |
