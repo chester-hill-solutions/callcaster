@@ -1,5 +1,6 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, test, beforeEach, vi } from "vitest";
+import { startTransition, Suspense, type ReactNode } from "react";
 
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -11,6 +12,7 @@ vi.mock("@twilio/voice-sdk", async () => {
 
 import { mockTwilioDevice, resetTwilioVoiceSdkMock } from "../mocks/twilio-voice-sdk";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
+import { createMockTwilioCall } from "./hooks-test-helpers";
 
 // Regression: the call-screen loader re-mints the Twilio JWT on every
 // revalidation (every fetcher submit), and the old effect was keyed on the
@@ -27,10 +29,7 @@ describe("useTwilioConnection token stability", () => {
       { initialProps: { token: "tok-1" } },
     );
 
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1));
 
     rerender({ token: "tok-2" });
     await act(async () => {
@@ -46,9 +45,7 @@ describe("useTwilioConnection token stability", () => {
   test("unmount destroys the device (closes the signalling socket)", async () => {
     const { unmount } = renderHook(() => useTwilioConnection({ token: "tok-1" }));
 
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await waitFor(() => expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1));
 
     unmount();
     expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
@@ -345,5 +342,141 @@ describe("useTwilioConnection teardown (#2706)", () => {
       await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
       expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
     } finally { vi.useRealTimers(); }
+  });
+});
+
+describe("browser transport suspension", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTwilioVoiceSdkMock();
+    mockTwilioDevice.calls = [];
+  });
+
+  test("does not register while browser audio is disabled", async () => {
+    const hook = renderHook(() => useTwilioConnection({ token: "token", enabled: false }));
+    await act(async () => { await Promise.resolve(); });
+    expect(hook.result.current.device).toBeNull();
+    expect(mockTwilioDevice.register).not.toHaveBeenCalled();
+  });
+
+  test("releases an idle device and ignores late events until browser audio returns", async () => {
+    const hook = renderHook(({ enabled, token }) => useTwilioConnection({ token, enabled }),
+      { initialProps: { enabled: true, token: "first" } });
+    await act(async () => { await Promise.resolve(); });
+    expect(hook.result.current.isRegistered).toBe(true);
+    hook.rerender({ enabled: false, token: "first" });
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.device).toBeNull();
+    expect(hook.result.current.isRegistered).toBe(false);
+    act(() => mockTwilioDevice.emit("registered"));
+    hook.rerender({ enabled: false, token: "refreshed" });
+    await act(async () => { await Promise.resolve(); });
+    expect(hook.result.current.isRegistered).toBe(false);
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+    hook.rerender({ enabled: true, token: "refreshed" });
+    await act(async () => { await Promise.resolve(); });
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(2);
+    expect(hook.result.current.isRegistered).toBe(true);
+  });
+
+  test("a delayed SDK import cannot register after browser audio is disabled", async () => {
+    const hook = renderHook(({ enabled }) => useTwilioConnection({ token: "token", enabled }),
+      { initialProps: { enabled: true } });
+    hook.rerender({ enabled: false });
+    await act(async () => { await Promise.resolve(); });
+    expect(mockTwilioDevice.register).not.toHaveBeenCalled();
+    expect(hook.result.current.device).toBeNull();
+  });
+
+  test("an uncommitted suspension keeps the current device and token refresh owner", async () => {
+    const pending = new Promise<void>(() => {}), onTokenWillExpire = vi.fn();
+    const hook = renderHook(({ enabled, suspend }) => {
+      const connection = useTwilioConnection({ token: "token", enabled, onTokenWillExpire });
+      if (suspend) throw pending;
+      return connection;
+    }, { initialProps: { enabled: true, suspend: false },
+      wrapper: ({ children }: { children: ReactNode }) => <Suspense fallback={null}>{children}</Suspense> });
+    await waitFor(() => expect(hook.result.current.isRegistered).toBe(true));
+    act(() => startTransition(() => hook.rerender({ enabled: false, suspend: true })));
+    expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+    act(() => mockTwilioDevice.emit("tokenWillExpire"));
+    expect(onTokenWillExpire).toHaveBeenCalledOnce();
+    expect(hook.result.current.isRegistered).toBe(true);
+    hook.rerender({ enabled: true, suspend: false });
+  });
+
+  test("a late registration failure cannot restart a disabled browser transport", async () => {
+    let reject!: (error: Error) => void;
+    mockTwilioDevice.register.mockImplementationOnce(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const onError = vi.fn();
+    const hook = renderHook(({ enabled }) => useTwilioConnection({ token: "token", enabled, onError }),
+      { initialProps: { enabled: true } });
+    await act(async () => { await Promise.resolve(); });
+    hook.rerender({ enabled: false });
+    await act(async () => reject(new Error("Late owned registration failure")));
+    expect(onError).not.toHaveBeenCalled();
+    expect(hook.result.current.device).toBeNull();
+    expect(hook.result.current.error).toBeNull();
+  });
+
+  test("disabling idle browser audio cancels a pending recovery timer", async () => {
+    vi.useFakeTimers();
+    try {
+      const hook = renderHook(({ enabled }) => useTwilioConnection({ token: "token", enabled }),
+        { initialProps: { enabled: true } });
+      await act(async () => { await Promise.resolve(); });
+      act(() => mockTwilioDevice.emit("error", new Error("Owned device error")));
+      hook.rerender({ enabled: false });
+      expect(vi.getTimerCount()).toBe(0);
+      await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+      expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+      expect(hook.result.current.device).toBeNull();
+      hook.unmount();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test.each(["SDK", "app"])("keeps an unretired live %s call while a switch is pending", async (owner) => {
+    const call = createMockTwilioCall();
+    if (owner === "SDK") mockTwilioDevice.calls = [call];
+    const hook = renderHook(({ enabled }) => useTwilioConnection({ token: "token", enabled,
+      getOwnedCalls: () => owner === "app" ? [call as never] : [],
+    }), { initialProps: { enabled: true } });
+    await act(async () => { await Promise.resolve(); });
+    hook.rerender({ enabled: false });
+    expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+    expect(call.disconnect).not.toHaveBeenCalled();
+    expect(hook.result.current.device).toBeTruthy();
+  });
+
+  test.each(["SDK", "app"])("keeps token refresh for an unretired %s call", async (owner) => {
+    const call = createMockTwilioCall(), onTokenWillExpire = vi.fn();
+    if (owner === "SDK") mockTwilioDevice.calls = [call];
+    const hook = renderHook(({ enabled, token }) => useTwilioConnection({ token, enabled, onTokenWillExpire,
+      getOwnedCalls: () => owner === "app" ? [call as never] : [],
+    }), { initialProps: { enabled: true, token: "first" } });
+    await waitFor(() => expect(hook.result.current.isRegistered).toBe(true));
+    hook.rerender({ enabled: false, token: "first" });
+    act(() => mockTwilioDevice.emit("tokenWillExpire"));
+    expect(onTokenWillExpire).toHaveBeenCalledOnce();
+    hook.rerender({ enabled: false, token: "refreshed" });
+    expect(mockTwilioDevice.updateToken).toHaveBeenCalledWith("refreshed");
+    expect(mockTwilioDevice.register).toHaveBeenCalledOnce();
+    expect(call.disconnect).not.toHaveBeenCalled();
+  });
+
+  test("reports a failed suspension and blocks replacement until cleanup succeeds", async () => {
+    const hook = renderHook(({ enabled }) => useTwilioConnection({ token: "token", enabled }),
+      { initialProps: { enabled: true } });
+    await act(async () => { await Promise.resolve(); });
+    mockTwilioDevice.destroy.mockImplementationOnce(() => { throw new Error("Owned cleanup failure"); });
+    hook.rerender({ enabled: false });
+    expect(hook.result.current.status).toBe("Error");
+    expect(hook.result.current.error?.message).toMatch(/cleanup did not finish/i);
+    hook.rerender({ enabled: true });
+    await act(async () => { await Promise.resolve(); });
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+    act(() => hook.result.current.reconnect());
+    await act(async () => { await Promise.resolve(); });
+    expect(mockTwilioDevice.register).toHaveBeenCalledTimes(2);
   });
 });
