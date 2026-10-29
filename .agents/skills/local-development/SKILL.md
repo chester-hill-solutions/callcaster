@@ -297,6 +297,11 @@ For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.
 with the file paths. `npm run test:node -- <file>` appends that path to the final
 Bun command and still runs the entire Node suite.
 
+If a read-only `tsx` check fails because the sandbox denies its IPC socket,
+run the same script with Node 22 and `node --import tsx <script>` from the
+worktree. Confirm that its normal result completes. A socket failure is not an
+API or source failure.
+
 Vite `mergeConfig` concatenates `test.include` arrays. For an isolated database
 probe, assign its final `include` after merging and pass the exact fixture path
 to Vitest. Check reported file and case counts before claiming focused proof.

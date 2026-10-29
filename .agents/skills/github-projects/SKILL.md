@@ -120,6 +120,11 @@ Do not infer Project Status from labels or PRs. Preserve cached progress markers
 only with a visible notice that names their source revision and says they were
 not refreshed. This fallback does not verify or change Project Status.
 
+For a selected local board refresh, pass the normalized records returned by
+`validateEnrichmentFiles` or `loadEnrichment` to `buildBoard`. Raw JSON can omit
+default arrays such as `blockedBy` and fail during rendering. Build and validate
+the replacement before writing the board or enrichment; preserve other entries.
+
 ## Common Commands
 
 - View: `gh project view NUMBER --owner OWNER`

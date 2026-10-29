@@ -340,10 +340,10 @@
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
-    "summary": "Outbound funding, handset preparation and held-credit prechecks pass locally. Browser resource controls are saved; verified-phone audio connection and safe handoff remain unfinished.",
-    "currentBehavior": "Published dev still needs the outbound funding contract. The protected local branch is rebased onto dev@af5767d6. Full local CI passed at 7c84173d; e98bd491 adds held-credit availability and a3e1af7f adds browser resource controls with focused proof. No #2879 push, PR or merge exists. The phone must replace browser mic and speaker, keep connection-only behavior and one customer charge, and preserve the current audio until a replacement is confirmed.",
+    "summary": "Outbound funding and browser resource controls pass locally. The owned audio journal is saved; signed routing, recovery and safe live phone handoff remain unfinished.",
+    "currentBehavior": "Published dev still needs the outbound funding contract. The protected branch is based on dev@af5767d6. Full local CI passed at 7c84173d; later checkpoints add availability, browser resource controls and the agent audio journal at b637ecc5. The journal preserves one provider send, immutable receipt identity and customer billing isolation. No #2879 push, PR or merge exists. Phone audio must replace both mic and speaker, stay connection-only and preserve current audio until confirmed.",
     "rootCause": "The shared gate reads workspace.credits without locking or reserving the first-minute cost. HTTP, background IVR, test-call and predictive paths can each reuse that balance.",
-    "resolution": "Finish the existing funded voice contract with a durable, owned phone-audio connection. Bind signed participant events and distinguish current, replacement and retired audio legs. Preserve the original customer SID, parent, direction, hold and billing key through manual promotion. Keep recording and transcript segments across the handoff. Wire the effective transport into existing call owners and readiness; complete admission/recovery review and final gates.",
+    "resolution": "Complete the separate audio journal with signed webhook routing, participant roles and generation binding, original-account recovery and cancellation. Preserve the original customer SID, parent, direction, hold and billing key through manual promotion. Keep recording and transcript segments across handoff. Wire the effective transport into existing call owners and readiness; complete the admission/recovery review and final gates.",
     "lookIn": [
       "app/lib/outbound-credit-gate.server.ts",
       "app/lib/campaign-test-call.server.ts",
@@ -357,16 +357,20 @@
       "app/routes/api+/connect-phone-device.action.server.ts",
       "app/hooks/call/usePhoneVerification.ts",
       "app/hooks/call/useTwilioConnection.ts",
-      "app/hooks/call/useCallAudioControls.ts"
+      "app/hooks/call/useCallAudioControls.ts",
+      "app/server/voice-audio-admission.server.ts",
+      "app/server/voice-audio-connection.server.ts",
+      "app/server/voice-audio-callback.server.ts"
     ],
     "existingTests": [
       "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic.",
       "Rebased checkpoint 7c84173d passes full ci:local: 6,164 Node, 34 Bun and 1,581 UI cases; three existing Node skips. All guards, database checks, production build, bundle check and codegen verification pass. Start/end heads match and tracked source stays clean. The combined voice proof passes 315 PostgreSQL 17.6 cases with zero skips, including funded IVR 429 retries and calling-window rechecks.",
       "At e98bd491, the new availability suite passes 17 real-database cases; original source fails 11 with six controls passing. Combined voice, availability and number-purchase controls pass 359 PostgreSQL 17.6 cases with zero skips. Focused Node checks pass 161 cases. Posted balances stay unchanged; active holds, mixed holds, foreign workspaces, uncertain expiry and settlement snapshots are covered. Cross-worker SMS reservations remain separate in #1271.",
-      "At a3e1af7f, 108 focused UI cases pass with zero skips. Original hooks fail 12 of 51 browser resource cases while 39 controls pass. Coverage includes idle release, late SDK/media work, failed cleanup, live and held calls, token refresh, and uncommitted React transitions. Typecheck, effects/type/mock guards and lint ratchet pass with no new warning debt. The resource gates are not yet wired to a confirmed phone switch. The final full gate and provider acceptance remain."
+      "At a3e1af7f, 108 focused UI cases pass with zero skips. Original hooks fail 12 of 51 browser resource cases while 39 controls pass. Coverage includes idle release, late SDK/media work, failed cleanup, live and held calls, token refresh, and uncommitted React transitions. Typecheck, effects/type/mock guards and lint ratchet pass with no new warning debt. The resource gates are not yet wired to a confirmed phone switch. The final full gate and provider acceptance remain.",
+      "At b637ecc5, 433 PostgreSQL 17.6 cases pass with zero skips, including 74 audio journal and receipt cases; 269 focused Node cases pass. The real startup runner applies the audio migration and its ledger matches. Four isolated faults remove billing exclusion, receipt identity, phone verification or the send checkpoint: 6/4/2/4 cases fail while controls pass, with no suite cleanup failures. Typecheck, focused lint and affected guards pass without new warning debt. No live provider traffic has occurred. The draft API is outside the published registry. Full local CI remains required after complete integration."
     ],
     "missingTests": [
-      "Integrate a durable verified-phone connection with signed leg/conference binding, idempotent create, original-account recovery, cancellation and replacement failure. No connection event may dispatch a customer, bill another customer leg, set disposition, dequeue or advance the queue.",
+      "Complete signed route authentication, owned participant/conference binding, original-account recovery, cancellation and replacement failure. Prove connection-only behavior and physical handoff; the journal already tests one provider send and exclusion from customer billing and outcomes. No connection event may dispatch, dequeue or advance a customer.",
       "Prove manual child redirection and signed parent continuation while preserving the original customer SID, direction and parent. Keep calls issued before that capability safe. Preserve recording/transcript segments and coherent transcription usage before retiring their source root.",
       "Wire requested/effective transport into the existing call owner, browser resource gates, start readiness and phone controls. Initial manual/predictive phone mode must not require SDK registration; a failed live switch keeps current audio, and retired events cannot complete the customer.",
       "Complete remaining admission/recovery review, final fault checks, full local CI and exact-head remote checks after integration. Physical provider and release acceptance are still required; no live traffic or deployed database writes are claimed."
@@ -380,7 +384,7 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Keep In progress and preserve the same three unchecked issue tasks. All work remains local. Full CI is proven at 7c84173d; later availability/resource changes have focused proof and need the final full gate after phone integration. Next add the durable phone transport and manual continuation/media handoff. Keep one active draft PR when publication is ready."
+    "trackerRecommendation": "Keep In progress and preserve the same three unchecked issue tasks. All work remains local. The saved audio journal is b637ecc5; full CI remains proven at 7c84173d. Next complete signed routing, participant roles, recovery/cancellation and manual continuation/media handoff, then UI transport controls and the final complete gate. Keep one active draft PR when publication is ready."
   },
   {
     "issueNumber": 2880,
