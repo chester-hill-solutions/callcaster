@@ -30,10 +30,10 @@ export async function checkRateLimit(config: RateLimitConfig): Promise<RateLimit
   return checkRateLimitPostgres(config);
 }
 
-export function rateLimitResponse(retryAfterSeconds: number): Response {
-  return jsonError("Too many requests", 429, "rate_limited", {
-    "Retry-After": String(retryAfterSeconds),
-  });
+export function rateLimitResponse(retryAfterSeconds: number, extraHeaders?: HeadersInit): Response {
+  const headers = new Headers(extraHeaders);
+  headers.set("Retry-After", String(retryAfterSeconds));
+  return jsonError("Too many requests", 429, "rate_limited", headers);
 }
 
 export function clientRateLimitKey(request: Request, scope: string): string {

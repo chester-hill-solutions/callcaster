@@ -16,6 +16,27 @@ Dialer, handset, and agent-presence routes require an authenticated user via **s
 
 Keep the exact cookie name and signed value issued by the target deployment. Browser clients use their cookie jar. See [session client setup](./api-overview.md#session-browser) for generated SDK configuration.
 
+## Voice start request limit
+
+Voice starts share a budget of **120 requests per minute per authenticated
+user or API key**. The budget covers `POST /api/dial`, `POST /api/ivr`,
+`POST /api/connect-phone-device`,
+`POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start`, and
+voice test sends from campaign settings. The workspace dialer start route
+accepts keys with `calls.start` and an authorized `agentUserId`. The legacy
+routes keep their current authentication rules.
+
+An exhausted budget returns HTTP `429` with
+`{ "error": "Too many requests", "code": "rate_limited" }` and a
+`Retry-After` header in seconds. Wait that long before retrying. The refusal
+occurs before a provider call. Changing the target workspace, recipient,
+agent, or caller IP does not reset the same credential's budget.
+
+This limit bounds HTTP starts. Funded reservations control available credits;
+worker dispatch and active predictive capacity have separate controls. Provider
+callbacks, call endings, inbound calls and campaign SMS tests do not spend this
+voice request budget.
+
 ## Workspace telephony (Phase 6)
 
 | Method | Path | Purpose |

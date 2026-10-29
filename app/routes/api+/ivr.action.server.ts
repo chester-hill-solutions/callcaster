@@ -22,11 +22,14 @@ import { createTenantDb } from "@/server/tenant-db";
 import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
 import { defineAction } from "@/lib/handler.server";
 import { voiceBillingKindFromCampaignType } from "@/lib/pricing";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
+    const rateLimited = await apiWriteRateLimitResponse(auth, "api-voice");
+    if (rateLimited) return rateLimited;
     const user = auth.user;
     const formData = await request.formData();
 

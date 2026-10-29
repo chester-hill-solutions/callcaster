@@ -12,6 +12,7 @@ import {
 } from "@/lib/auto-dial-start.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
@@ -54,6 +55,13 @@ export const action = defineAction({
   auth: dataPlaneCapabilityAuthWithParam("calls.start", "campaignId"),
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
+    const rateLimited = await apiWriteRateLimitResponse(
+      auth.auth.apiKey
+        ? { authType: "api_key", keyId: auth.auth.apiKey.keyId }
+        : { user: { id: auth.auth.userId } },
+      "api-voice",
+    );
+    if (rateLimited) return rateLimited;
     const campaignId = Number(auth.campaignId);
     if (!Number.isFinite(campaignId)) {
       return jsonError("Invalid campaignId", 400);

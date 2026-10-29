@@ -243,6 +243,12 @@ describe("openapi spec", () => {
     ).toContain("DialerStartResponse");
   });
 
+  test("voice start documents the shared limit and retry header", () => {
+    const dialer = openApiSpec.paths["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"].post;
+    expect(dialer?.description).toContain("120 requests per minute");
+    expect(dialer?.responses?.["429"]?.headers?.["Retry-After"]?.schema?.type).toBe("integer");
+  });
+
   test("audit events route documents dual auth with audit.read capability", () => {
     const audit =
       openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;

@@ -43,6 +43,8 @@ export type ApiWriteScope =
   | "api-sms"
   /** POST /api/chat_sms — one billable SMS to an arbitrary number. */
   | "api-chat-sms"
+  /** Shared authenticated voice starts, across dial/IVR/device/test routes. */
+  | "api-voice"
   /** POST /api/campaigns/create-with-script — provisions Twilio resources. */
   | "api-create-with-script"
   /** POST /api/media — object-storage upload, and the body is buffered first. */
@@ -61,6 +63,10 @@ export const API_WRITE_LIMITS: Record<ApiWriteScope, { limit: number; windowMs: 
   // Cheapest request to serve and the one most likely to be looped by a
   // mis-written integration, so the highest ceiling of the money-spending set.
   "api-chat-sms": { limit: 120, windowMs: 60_000 },
+  // Two starts per second leaves room for interactive dialing and headless
+  // clients. One scope prevents hopping between start routes to reset it.
+  // Worker fan-out and active call capacity need their own funded controls.
+  "api-voice": { limit: 120, windowMs: 60_000 },
   // Provisions Twilio numbers and a campaign. Nobody legitimately does this
   // faster than a handful a minute.
   "api-create-with-script": { limit: 10, windowMs: 60_000 },
@@ -94,7 +100,7 @@ export function apiRateLimitPrincipal(auth: unknown): string | null {
   return typeof userId === "string" && userId ? userId : null;
 }
 
-/** Bucket key. Scoped so two endpoints cannot share a budget. */
+/** Bucket key. Endpoints with the same scope intentionally share a budget. */
 export function apiRateLimitKey(principal: string, scope: ApiWriteScope): string {
   return `api-write:${scope}:${principal}`;
 }
@@ -122,8 +128,9 @@ export function checkApiWriteRateLimit(
 export async function apiWriteRateLimitResponse(
   auth: unknown,
   scope: ApiWriteScope,
+  headers?: HeadersInit,
 ): Promise<Response | null> {
   const result = await checkApiWriteRateLimit(auth, scope);
   if (result.ok) return null;
-  return rateLimitResponse(result.retryAfterSeconds);
+  return rateLimitResponse(result.retryAfterSeconds, headers);
 }
