@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
@@ -75,7 +76,7 @@ function makeReq(params: Record<string, string>) {
 
 function setUpsertRow(row: Record<string, unknown>) {
   telephonyDbMocks.upsertCallBySid.mockReset();
-  telephonyDbMocks.upsertCallBySid.mockResolvedValue(row);
+  telephonyDbMocks.upsertCallBySid.mockResolvedValue(row == null ? row : { sid: "CA1", ...row });
 }
 
 function setCurrentAttempt(attempt: Record<string, unknown> | null) {

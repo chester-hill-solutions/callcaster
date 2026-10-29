@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { RouterContextProvider } from "react-router";
 import { asRouteResponse } from "./helpers/route-result";

@@ -3,24 +3,19 @@ import {
   processCallStatusWebhook,
 } from "@/lib/twilio-call-status.server";
 import { data as routeData } from "react-router";
-import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { CALL_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
 import type { ActionFunctionArgs } from "react-router";
+import { bindVerifiedFundedCallStatus } from "@/lib/voice-bridge-webhook.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 type CallStatusAuth = {
   params: Record<string, string>;
   callSid: string | null;
+  funded?: { setup: boolean; workspaceId: string; campaignId?: number | null; pending?: boolean } | null;
 };
-
-function callStatusSideEffectsIdempotencyKey(
-  callSid: string,
-  status: string,
-): string {
-  return `call_status_side_effects:${callSid}:${status.toLowerCase()}`;
-}
 
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs): Promise<CallStatusAuth | Response> => {
@@ -31,43 +26,33 @@ export const action = defineAction({
     if (!callSidRaw) {
       return { params, callSid: null };
     }
-
     const forbidden = await requireTwilioSignature(request, {
       callSid: callSidRaw,
       params,
     });
     if (forbidden) return forbidden;
-
-    return { params, callSid: callSidRaw };
+    const funded = await bindVerifiedFundedCallStatus(request, params);
+    if (funded instanceof Response) return funded;
+    return { params, callSid: callSidRaw, funded };
   },
   // Sync upsert skips billing; the enqueued worker job debits terminal calls.
-  sideEffects: ["db-write", "credit"],
+  sideEffects: ["db-write"],
   handler: async ({ auth }) => {
-    const { params, callSid: callSidRaw } = auth;
+    const { params, callSid: callSidRaw, funded } = auth;
     if (!callSidRaw) {
       return routeData({ error: "Missing CallSid" }, { status: 400 });
     }
+    if (funded?.pending) return routeData({ success: true });
+    if (funded?.setup) {
+      await recheckCampaignCompletion({ workspaceId: funded.workspaceId, campaignId: funded.campaignId,
+        reason: "voice_setup_status", exec: createTenantDb(funded.workspaceId) });
+      return routeData({ success: true });
+    }
 
-    // Parsed here so the side-effects job carries the discriminated event
-    // instead of the worker re-deriving its own view of the same body (#1243).
-    const event = parseTwilioVoiceCallback(params);
     const updateData = buildCallUpsertFromTwilioParams(params);
-    const { call } = await processCallStatusWebhook(updateData, { skipBilling: true });
+    const { call } = await processCallStatusWebhook(updateData, { skipBilling: true, workspaceId: funded?.workspaceId });
 
-    const status = String(call.status ?? params.CallStatus ?? params.call_status ?? "")
-      .trim()
-      .toLowerCase();
-
-    await enqueueRegisteredJob({
-      type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
-      workspaceId: call.workspace ?? null,
-      idempotencyKey: callStatusSideEffectsIdempotencyKey(callSidRaw, status || "unknown"),
-      params: {
-        sid: callSidRaw,
-        twilioParams: params,
-        event,
-      },
-    });
+    await enqueueCallStatusSideEffects(call, params);
 
     return routeData({ success: true });
   },

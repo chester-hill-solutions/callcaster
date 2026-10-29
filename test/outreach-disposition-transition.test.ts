@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
@@ -13,7 +14,7 @@ const twilioMocks = vi.hoisted(() => ({
 
 const telephonyMocks = vi.hoisted(() => ({
   findCallBySid: vi.fn(async () => null),
-  upsertCallBySid: vi.fn(async () => ({ id: "CA_TERM", workspace: "w1", outreach_attempt_id: 123 })),
+  upsertCallBySid: vi.fn(async () => ({ sid: "CA_TERM", workspace: "w1", outreach_attempt_id: 123 })),
   findOutreachAttemptWithCampaignType: vi.fn(async () => ({
     id: 123,
     disposition: "completed",
@@ -58,7 +59,7 @@ describe("outreach disposition transitions", () => {
       }
     });
     telephonyMocks.findCallBySid.mockResolvedValue(null);
-    telephonyMocks.upsertCallBySid.mockResolvedValue({ id: "CA_TERM", workspace: "w1", outreach_attempt_id: 123 });
+    telephonyMocks.upsertCallBySid.mockResolvedValue({ sid: "CA_TERM", workspace: "w1", outreach_attempt_id: 123 });
     telephonyMocks.findOutreachAttemptWithCampaignType.mockResolvedValue({
       id: 123,
       disposition: "completed",

@@ -13,6 +13,8 @@ import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -35,6 +37,7 @@ export const action = defineAction({
         }
 
         const tdb = createTenantDb(workspaceId);
+        const reservation = await findVoiceReservationForCall(workspaceId, callSid);
         const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
@@ -50,7 +53,9 @@ export const action = defineAction({
             // Household fan-out follows the campaign's setting; it was
             // hardcoded true, dequeuing whole households on campaigns that
             // never asked for household grouping.
-            if (call.campaign_id) {
+            if (reservation) {
+                await dequeueFundedVoiceAttempt(reservation);
+            } else if (call.campaign_id) {
                 const campaign = await tdb.campaign.findFirst({
                     where: eq(campaignTable.id, call.campaign_id),
                     columns: { group_household_queue: true },

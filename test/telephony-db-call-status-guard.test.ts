@@ -86,7 +86,7 @@ describe("updateCallBySid status regression guard", () => {
     (tenantDbMocks.update.mock.calls[0]?.[0] as { set: Record<string, unknown> })
       .set;
 
-  test("issues a single guarded UPDATE (no prior read) and passes other fields through when a status is present", async () => {
+  test("issues a single guarded UPDATE (no prior read) and guards final duration when a status is present", async () => {
     tenantDbMocks.update.mockResolvedValueOnce([
       { sid: "CA1", status: "completed", workspace: "w1", duration: "42" },
     ]);
@@ -105,7 +105,7 @@ describe("updateCallBySid status regression guard", () => {
     // terminal existing row is protected in-SQL (the DB keeps "completed").
     expect(set.status).toBeInstanceOf(SQL);
     expect(set.status).not.toBe("in-progress");
-    expect(set.duration).toBe("42");
+    expect(set.duration).toBeInstanceOf(SQL);
     expect(result).toMatchObject({ status: "completed", duration: "42" });
   });
 

@@ -261,13 +261,16 @@ export async function updateCallBySid(
   // accumulated in 'queued' forever. The unit tier mocks the db
   // client and could not see it; test/integration-db/call-status-guard.test.ts
   // runs this statement against a real database.
-  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
+  const regression = sql`LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL})`;
+  const guardedStatus = sql`CASE WHEN ${regression} THEN ${callTable.status} ELSE ${update.status} END`;
 
   // type-cast justified: mixing SQL expressions with regular fields in set object requires unknown intermediate
   const [row] = await tdb.call.update({
     set: {
       ...update,
       status: guardedStatus,
+      ...(update.duration !== undefined ? { duration: sql`CASE WHEN ${regression} THEN ${callTable.duration} ELSE ${update.duration} END` } : {}),
+      ...(update.call_duration !== undefined ? { call_duration: sql`CASE WHEN ${regression} THEN ${callTable.call_duration} ELSE ${update.call_duration} END` } : {}),
     } as unknown as Partial<CallRow>,
     where: eq(callTable.sid, sid),
   });

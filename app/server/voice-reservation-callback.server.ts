@@ -3,8 +3,9 @@ import { call, campaign, campaign_queue, contact, outreach_attempt, workspace_vo
 import { db } from "@/server/db";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { normalizeProviderStatus } from "@/lib/call-status";
 
-export async function persistReservedVoiceCall(tx: CreditTransaction, reservation: VoiceReservation, callSid: string) {
+async function survivingCallContext(tx: CreditTransaction, reservation: VoiceReservation) {
   // Customer data can be removed after the provider accepts a call. Keep its
   // billing identity, and lock only surviving tenant links through insertion.
   const [campaignRow] = reservation.campaign_id == null ? [] : await tx.select({ id: campaign.id }).from(campaign).where(and(
@@ -19,13 +20,24 @@ export async function persistReservedVoiceCall(tx: CreditTransaction, reservatio
   const [queueRow] = reservation.queue_id == null ? [] : await tx.select({ id: campaign_queue.id }).from(campaign_queue).where(and(
     eq(campaign_queue.id, reservation.queue_id), eq(campaign_queue.workspace, reservation.workspace),
   )).for("key share");
+  return { campaign_id: campaignRow?.id ?? null, contact_id: contactRow?.id ?? null,
+    outreach_attempt_id: attemptRow?.id ?? null, queue_id: queueRow?.id ?? null };
+}
+
+export async function persistReservedVoiceCall(
+  tx: CreditTransaction, reservation: VoiceReservation, callSid: string, purpose: "recipient" | "setup" = "recipient",
+) {
+  if (purpose === "recipient" && reservation.setup_sid) await persistReservedVoiceCall(tx, reservation, reservation.setup_sid, "setup");
+  const context = await survivingCallContext(tx, reservation);
   await tx.insert(call).values({
+    ...context,
     sid: callSid, workspace: reservation.workspace, account_sid: reservation.account_sid,
-    to: reservation.recipient, from: reservation.caller_id,
-    parent_call_sid: reservation.setup_sid, campaign_id: campaignRow?.id ?? null,
-    contact_id: contactRow?.id ?? null, outreach_attempt_id: attemptRow?.id ?? null,
-    user_id: reservation.user_id, status: "initiated", direction: "outbound-api",
-    queue_id: queueRow?.id ?? null,
+    to: purpose === "setup" ? reservation.setup_to : reservation.recipient, from: reservation.caller_id,
+    parent_call_sid: purpose === "setup" ? null : reservation.setup_sid,
+    user_id: reservation.user_id,
+    status: normalizeProviderStatus(purpose === "setup" ? reservation.setup_terminal_status : reservation.terminal_status) ?? "initiated",
+    duration: purpose === "setup" ? null : reservation.terminal_duration,
+    direction: purpose === "recipient" && reservation.setup_sid ? "outbound-dial" : "outbound-api",
   }).onConflictDoNothing({ target: call.sid });
   const [saved] = await tx.select().from(call).where(and(eq(call.sid, callSid), eq(call.workspace, reservation.workspace)));
   if (!saved || (saved.account_sid && saved.account_sid !== reservation.account_sid)) {
@@ -40,6 +52,7 @@ export async function bindVoiceReservationCallback(args: {
   accountSid: string;
   callSid: string;
   to: string;
+  from: string;
   direction: string;
   requestUrl: string;
   entryPoint: "voice" | "status";
@@ -52,11 +65,12 @@ export async function bindVoiceReservationCallback(args: {
     const [reservation] = await tx.select().from(reservations)
       .where(eq(reservations.id, args.reservationId)).for("update");
     if (!reservation || !reservation.send_started_at || reservation.state === "released" ||
-        reservation.account_sid !== args.accountSid || reservation.recipient !== args.to ||
+        reservation.account_sid !== args.accountSid || reservation.recipient !== args.to || reservation.caller_id !== args.from ||
         args.direction !== (reservation.setup_sid ? "outbound-dial" : "outbound-api") ||
         (args.entryPoint === "voice" ? reservation.voice_url : reservation.status_callback) !== args.requestUrl ||
         (reservation.provider_sid && reservation.provider_sid !== args.callSid) ||
-        (reservation.setup_sid ?? null) !== (args.parentCallSid || null)) {
+        (reservation.setup_sid ?? null) !== (args.parentCallSid || null) ||
+        (reservation.setup_to !== null && !reservation.recipient_instruction_issued_at)) {
       throw new Error("Voice reservation callback does not match its dispatch");
     }
     const saved = await persistReservedVoiceCall(tx, reservation, args.callSid);

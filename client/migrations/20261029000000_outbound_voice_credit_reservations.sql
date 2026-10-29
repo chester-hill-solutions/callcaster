@@ -4,6 +4,8 @@ alter table public.campaign_queue
   add column if not exists dispatch_generation uuid not null default gen_random_uuid();
 alter table public.campaign_queue
   add column if not exists redial_requested_at timestamptz;
+alter table public.campaign_queue
+  add column if not exists voice_reservation_id uuid;
 
 create table if not exists public.workspace_voice_reservation (
   id uuid primary key,
@@ -16,10 +18,19 @@ create table if not exists public.workspace_voice_reservation (
   campaign_id bigint,
   contact_id bigint,
   outreach_attempt_id bigint,
+  requested_outreach_attempt_id bigint,
   queue_id bigint,
   queue_generation uuid,
   operation_key text,
   user_id text,
+  setup_to text,
+  setup_voice_url text,
+  setup_status_callback text,
+  recipient_instruction_issued_at timestamptz,
+  setup_terminal_at timestamptz,
+  setup_terminal_status text,
+  terminal_status text,
+  terminal_duration text,
   voice_url text,
   status_callback text,
   state text not null default 'reserved'
@@ -48,7 +59,7 @@ create unique index if not exists workspace_voice_reservation_active_queue
   where queue_id is not null and state in ('reserved', 'creating', 'active');
 create unique index if not exists workspace_voice_reservation_operation
   on public.workspace_voice_reservation(workspace, operation_key)
-  where operation_key is not null and state <> 'released';
+  where operation_key is not null and (state <> 'released' or setup_sid is not null or provider_sid is not null);
 create index if not exists workspace_voice_reservation_recovery
   on public.workspace_voice_reservation(lease_expires_at)
   where state in ('reserved', 'creating', 'active');
@@ -168,4 +179,127 @@ BEGIN
           AND r.state <> 'released'
       );
 END;
+$function$;
+
+-- Funded terminal outcomes extend the canonical household operation. Legacy
+-- callers keep the six-argument/default contract and its assigned-agent guard.
+DROP FUNCTION IF EXISTS public.dequeue_contact(bigint, bigint, boolean, uuid, uuid, text);
+CREATE OR REPLACE FUNCTION public.dequeue_contact(
+  passed_contact_id bigint,
+  p_campaign_id bigint,
+  group_on_household boolean,
+  p_workspace uuid,
+  dequeued_by_id uuid DEFAULT NULL::uuid,
+  dequeued_reason_text text DEFAULT NULL::text,
+  p_voice_reservation_id uuid DEFAULT NULL::uuid
+)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare
+  primary_rows integer;
+  funded public.workspace_voice_reservation%rowtype;
+  locked_queue_ids bigint[];
+begin
+  if p_voice_reservation_id is not null then
+    -- Match admission's workspace-first lock order. Concurrent new funded
+    -- intents cannot enter a household while its terminal update runs.
+    perform 1 from public.workspace where id = p_workspace for no key update;
+    select * into funded from public.workspace_voice_reservation
+    where id = p_voice_reservation_id and workspace = p_workspace
+      and campaign_id = p_campaign_id and contact_id = passed_contact_id;
+    if not found or funded.queue_id is null or funded.queue_generation is null then return 0; end if;
+
+    -- Lock the full candidate set in a stable order. A later insert is not
+    -- in this set; a concurrent re-add is checked again after its row lock.
+    select array_agg(candidate.id) into locked_queue_ids from (
+      select cq.id from public.campaign_queue cq
+      join public.contact c on c.id = cq.contact_id and c.workspace = p_workspace
+      where cq.workspace = p_workspace and cq.campaign_id = p_campaign_id
+        and (c.id = passed_contact_id or (group_on_household and c.household_id = (
+          select household_id from public.contact where id = passed_contact_id and workspace = p_workspace
+        )))
+      order by cq.id for no key update of cq
+    ) candidate;
+    select assigned_to_user_id into dequeued_by_id from public.campaign_queue
+    where id = funded.queue_id and workspace = p_workspace;
+  end if;
+  update public.campaign_queue
+  set
+    queue_state = 'dequeued',
+    assigned_to_user_id = null,
+    provider_status = null,
+    dequeued_by = dequeued_by_id,
+    dequeued_at = now(),
+    dequeued_reason = dequeued_reason_text
+  where contact_id = passed_contact_id
+    and workspace = p_workspace
+    and campaign_id = p_campaign_id
+    and (p_voice_reservation_id is null or (
+      id = funded.queue_id and id = any(locked_queue_ids)
+      and dispatch_generation = funded.queue_generation
+      and voice_reservation_id = funded.id and dequeued_at is null
+    ))
+    and (
+      queue_state is null
+      or queue_state = 'queued'
+      or (
+        queue_state = 'assigned'
+        and dequeued_by_id is not null
+        and assigned_to_user_id = dequeued_by_id
+      )
+    );
+
+  get diagnostics primary_rows = row_count;
+
+  if p_voice_reservation_id is not null and primary_rows = 0 then return 0; end if;
+
+  if group_on_household then
+    update public.campaign_queue cq
+    set
+      queue_state = 'dequeued',
+      assigned_to_user_id = null,
+      provider_status = null,
+      dequeued_by = dequeued_by_id,
+      dequeued_at = now(),
+      dequeued_reason = dequeued_reason_text
+    from public.contact c1
+    join public.contact c2 on c1.household_id is not null and c1.household_id = c2.household_id
+    where
+      c1.id = passed_contact_id
+      and c1.workspace = p_workspace
+      and c2.workspace = p_workspace
+      and cq.contact_id = c2.id
+      and cq.workspace = p_workspace
+      and cq.campaign_id = p_campaign_id
+      and (p_voice_reservation_id is null or (
+        cq.id = any(locked_queue_ids) and cq.dequeued_at is null
+        and cq.created_at <= funded.created_at
+        and coalesce(cq.redial_requested_at, cq.created_at) <= funded.created_at
+        and (cq.voice_reservation_id is null or exists (
+          select 1 from public.workspace_voice_reservation sibling
+          where sibling.id = cq.voice_reservation_id and sibling.workspace = p_workspace
+            and sibling.created_at <= funded.created_at and sibling.state in ('settled', 'released')
+        ))
+      ))
+      -- A wrong campaign must not dequeue siblings of an absent primary row.
+      and exists (
+        select 1 from public.campaign_queue source_queue
+        where source_queue.contact_id = passed_contact_id
+          and source_queue.workspace = p_workspace
+          and source_queue.campaign_id = p_campaign_id
+      )
+      and (
+        cq.queue_state is null
+        or cq.queue_state = 'queued'
+        or (
+          cq.queue_state = 'assigned'
+          and dequeued_by_id is not null
+          and cq.assigned_to_user_id = dequeued_by_id
+        )
+      );
+  end if;
+
+  return primary_rows;
+end;
 $function$;

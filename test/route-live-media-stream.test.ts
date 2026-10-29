@@ -122,6 +122,18 @@ vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: (...a: unknown[]) => mocks.createSignedObjectUrl(...a),
 }));
 
+vi.mock("@/lib/voice-bridge-webhook.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/voice-bridge-webhook.server")>(),
+  bindVerifiedVoiceSetupRequest: async () => {
+    const call = await mocks.findCallBySid();
+    return { ...call, status_callback: "https://base.example/api/call-status/", recipient: "+15552223333", caller_id: "+15550001111" };
+  },
+  voiceBridgeCallbackArgs: () => ({}),
+}));
+vi.mock("@/server/voice-bridge-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-bridge-reservation.server")>(), claimVoiceBridgeRecipient: async () => ({ issued: true }),
+}));
+
 /** The three capability states each route is exercised against. */
 const FLAGS_OFF = {};
 const FLAGS_TRANSCRIPTION = { liveTranscription: true };
@@ -284,7 +296,7 @@ describe("api/dial/$number — outbound dial", () => {
     expect(await run()).toContain("<Stream");
   });
 
-  test("no <Stream> when the call row has no user to attribute the stream to", async () => {
+  test("rejects a setup without an authenticated stream owner", async () => {
     mocks.getWorkspaceById.mockResolvedValue(workspaceWithFlags(FLAGS_TRANSCRIPTION));
     mocks.findCallBySid.mockResolvedValue({
       sid: "CA-dial",
@@ -294,7 +306,8 @@ describe("api/dial/$number — outbound dial", () => {
     const xml = await run();
 
     expect(xml).not.toContain("<Stream");
-    expect(xml).toContain("<Dial");
+    expect(xml).not.toContain("<Dial");
+    expect(xml).toContain("<Hangup");
   });
 });
 

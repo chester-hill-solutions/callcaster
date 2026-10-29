@@ -249,13 +249,14 @@ describe("durable voice credit admission (#2879)", () => {
     await billing.billTerminalCallStatus(call);
     expect(await state()).toEqual({ credits: 0, ledger: 1, active: 0 });
   });
-  test.each(["account", "recipient", "sid", "direction"])("callback with a different %s cannot bind another call", async (mismatch) => {
+  test.each(["account", "recipient", "sid", "direction", "caller"])("callback with a different %s cannot bind another call", async (mismatch) => {
     const { reservation, call } = await connected();
     await expect(callbacks.bindVoiceReservationCallback({
       reservationId: reservation.id,
       callSid: mismatch === "sid" ? sid() : call.sid,
       accountSid: mismatch === "account" ? "AC00000000000000000000000000009999" : accountSid,
       to: mismatch === "recipient" ? "+16135550999" : recipient,
+      from: mismatch === "caller" ? "+16135550999" : callerId,
       direction: mismatch === "direction" ? "inbound" : "outbound-api",
       requestUrl: urls(reservation.id).statusCallback,
       entryPoint: "status",

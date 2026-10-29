@@ -100,11 +100,15 @@ export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["su
       data.append("user_id", user.id);
       data.append("contact_id", contact.id.toString());
       data.append("workspace_id", workspaceId);
+      data.append("dial_intent_id", crypto.randomUUID());
       if (recentAttempt?.id != null) {
         data.append("outreach_id", recentAttempt.id.toString());
       }
       if (nextRecipient?.id != null) {
         data.append("queue_id", nextRecipient.id.toString());
+      }
+      if (nextRecipient?.dispatch_generation) {
+        data.append("expected_queue_generation", nextRecipient.dispatch_generation);
       }
       if (campaign.caller_id) {
         data.append("caller_id", campaign.caller_id);

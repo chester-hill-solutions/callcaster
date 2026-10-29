@@ -1,43 +1,28 @@
 import { data as routeData } from "react-router";
-import { createOutreachAttempt , saveCallToDatabase } from "@/lib/auto-dial.server";
-import {
-  createWorkspaceTwilioInstance,
-  requireWorkspaceAccess,
-} from "@/lib/database/workspace.server";
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { AppError, ErrorCode } from "@/lib/errors.server";
-import { rpcClaimQueueEntryForDial } from "@/lib/db-rpc.server";
-import {
-  outboundCreditsResponse,
-  requireOutboundCredits,
-} from "@/lib/outbound-credit-gate.server";
+import { rpcClaimQueueEntryForDial, rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
-import { and, eq } from "drizzle-orm";
-import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { env } from "@/lib/env.server";
-import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { normalizePhoneNumber } from "@/lib/utils";
 import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
-import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
+import { manualDialIdentity, parseManualDialRequest, validateManualDialRequest } from "@/lib/manual-dial-request.server";
+import { dispatchManualVoiceCall } from "@/lib/manual-voice-dispatch.server";
+import { voiceDispatchBlockedResponse, VoiceDispatchUncertainError } from "@/lib/voice-credit-dispatch.server";
 
-interface DialRequest {
-  to_number: string;
-  user_id: string;
-  campaign_id: string;
-  contact_id: string;
-  workspace_id: string;
-  queue_id: string;
-  outreach_id?: string;
-  caller_id: string;
-  selected_device?: string;
-}
+import { replayVoiceOperation } from "@/server/voice-credit-reservation.server";
+
+const CLAIM_MESSAGES = {
+  claimed_by_other: "This contact is being dialed by another agent.",
+  active_call: "This contact already has a call in progress.",
+  not_queued: "This contact is no longer queued.",
+  unavailable: "This contact is not available to dial.",
+};
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -45,251 +30,60 @@ export const action = defineAction({
   handler: async ({ request, auth }) => {
     const rateLimited = await apiWriteRateLimitResponse(auth, "api-voice");
     if (rateLimited) return rateLimited;
-    const user = auth.user;
-    const raw = await parseActionRequest(request) as Partial<DialRequest>;
-    const {
-        to_number,
-        user_id,
-        campaign_id,
-        contact_id,
-        workspace_id,
-        queue_id,
-        outreach_id,
-        caller_id,
-        selected_device,
-    } = raw;
-    if (
-        typeof to_number !== "string" ||
-        typeof user_id !== "string" ||
-        typeof campaign_id !== "string" ||
-        typeof contact_id !== "string" ||
-        typeof workspace_id !== "string" ||
-        typeof queue_id !== "string" ||
-        typeof caller_id !== "string" ||
-        (selected_device !== undefined && typeof selected_device !== "string")
-    ) {
-        throw new Response("Invalid dial payload", { status: 400 });
+    const input = parseManualDialRequest(await parseActionRequest(request));
+    await requireWorkspaceAccess({ user: auth.user, workspaceId: input.workspace_id });
+    const identity = manualDialIdentity(input, auth.user.id);
+    if (input.dial_intent_id) {
+      const replay = await replayVoiceOperation({ workspaceId: input.workspace_id, to: identity.to, from: identity.from,
+        campaignId: input.campaign_id, contactId: input.contact_id, queueId: input.queue_id, userId: auth.user.id,
+        setupTo: identity.setupTo, outreachAttemptId: input.outreach_id, operationKey: `manual:${auth.user.id}:${input.dial_intent_id}` });
+      if (replay?.reason === "already_dispatched") return new Response(createVoiceResponse().toString(), { headers: { "Content-Type": "text/xml" } });
+      if (replay) return voiceDispatchBlockedResponse(replay);
     }
-    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
-    if (selected_device && selected_device !== "computer") {
-        const verifiedNumbers = await getUserVerifiedAudioNumbers(user.id);
-        if (!verifiedNumbers?.includes(selected_device)) {
-            throw new Response("Selected device is not a verified phone number", { status: 400 });
-        }
-    }
-
-    // Recipient-local calling window (TCPA/CRTC 8:00 a.m.–9:00 p.m. in the
-    // recipient's own time zone). Auto-dial, IVR dispatch, and campaign SMS
-    // already gate on this; the manual dial path was the last outbound
-    // campaign-triggered call that could originate outside the window
-    // (issue #1207 — the campaign scheduler UI promises the floor holds
-    // "regardless of the hours set here"). Refuse before claiming the queue
-    // row so a refused dial does not have to be released back.
-    const windowStatus = recipientCallingWindowStatus(to_number);
+    const dial = await validateManualDialRequest(input, auth.user.id);
+    const windowStatus = recipientCallingWindowStatus(dial.to);
     if (!windowStatus.allowed) {
-        logger.warn("dial.recipient_window_closed", {
-            campaignId: Number(campaign_id),
-            contactId: Number(contact_id),
-            queueId: Number(queue_id),
-            workspaceId: workspace_id,
-            userId: user.id,
-            timezone: windowStatus.timezone,
-            reason: windowStatus.reason,
-        });
-        return routeData(
-            {
-                error:
-                    "Outside recipient's local calling window (8:00 a.m.–9:00 p.m.). Try again during their local daytime.",
-                reason: "recipient_window_closed",
-                timezone: windowStatus.timezone,
-            },
-            { status: 409 },
-        );
+      logger.warn("dial.recipient_window_closed", { campaignId: dial.campaign_id, contactId: dial.contact_id,
+        queueId: dial.queue_id, workspaceId: dial.workspace_id, userId: auth.user.id,
+        timezone: windowStatus.timezone, reason: windowStatus.reason });
+      return routeData({ error: "Outside recipient's local calling window (8:00 a.m.–9:00 p.m.). Try again during their local daytime.",
+        reason: "recipient_window_closed", timezone: windowStatus.timezone }, { status: 409 });
     }
-
-    const credits = await requireOutboundCredits(workspace_id);
-    if (!credits.ok) return outboundCreditsResponse(credits);
-    // NOTE: this credit gate is check-then-act — N concurrent dials can all
-    // read the same pre-debit balance (the debit lands at call completion).
-    // Overdraw is bounded by concurrency × per-call cost; an atomic pre-dial
-    // hold via apply_ledger_entry_and_sync_credits is the follow-up if that
-    // bound ever matters.
-    const tdb = createTenantDb(workspace_id);
-
-    // Atomically claim the queue row before placing a real call. This is the
-    // server-side guard the client's callState check cannot provide: without
-    // it a double-click, a second tab, or two agents holding the same
-    // unclaimed row each dialed a real person. Refusals are 409s the call
-    // screen surfaces as a failed dial rather than a stuck "Dialing…".
-    const claim = await rpcClaimQueueEntryForDial(tdb, {
-        queueId: Number(queue_id),
-        campaignId: Number(campaign_id),
-        workspaceId: workspace_id,
-        userId: user.id,
-    });
-    if (claim !== "claimed") {
-        // The refusal reaches the agent as a toast + "Call Failed" bar, but
-        // until this line it left no server-side trace at all — a support
-        // report of "an error flashed when I pressed dial" was unattributable
-        // from the logs. Keep every field needed to reconstruct the refusal.
-        logger.warn("Dial claim refused", {
-            claim,
-            queueId: Number(queue_id),
-            campaignId: Number(campaign_id),
-            contactId: Number(contact_id),
-            workspaceId: workspace_id,
-            userId: user.id,
-        });
-        const messages: Record<string, string> = {
-            claimed_by_other: "This contact is being dialed by another agent.",
-            active_call: "This contact already has a call in progress.",
-            not_queued: "This contact is no longer queued.",
-            unavailable: "This contact is not available to dial.",
-        };
-        return routeData(
-            { error: messages[claim] ?? messages.unavailable, claim },
-            { status: 409 },
-        );
-    }
-    // The caller must own the number they are dialling from, on every voice
-    // send. This lookup used to be gated behind the emergency-compliance branch
-    // below, so a workspace without that compliance could place a call from any
-    // number it liked -- the voice half of the SMS sender-spoofing path
-    // (`caller-id-usability.server.ts`).
-    const refusal = callerIdRefusalMessage(
-        await resolveCallerIdUsability(workspace_id, caller_id),
-    );
-    if (refusal) throw new Response(refusal, { status: 400 });
-
-    const [callerIdRecord, onboarding] = await Promise.all([
-        tdb.workspace_number.findFirst({
-            where: eq(workspaceNumberTable.phone_number, caller_id),
-        }),
-        getWorkspaceMessagingOnboardingState({
-            workspaceId: workspace_id,
-        }),
-    ]);
-    if (onboarding.selectedChannels?.includes("voice_compliance") && onboarding.emergencyVoice.enabled) {
-        if (!callerIdRecord) {
-            throw new Response("Caller ID must be a workspace number for emergency-compliant voice.", { status: 400 });
-        }
-        if (!onboarding.emergencyVoice.allowedCallerIdTypes.includes(callerIdRecord.type ?? "")) {
-            throw new Response("Selected caller ID is not eligible for emergency-compliant voice.", { status: 400 });
-        }
-        if (
-            callerIdRecord.phone_number &&
-            !onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.includes(callerIdRecord.phone_number)
-        ) {
-            throw new Response("Selected caller ID is not marked as emergency-ready.", { status: 400 });
-        }
-    }
-    let to: string;
-    try {
-      to = normalizePhoneNumber(to_number);
-    } catch (error) {
-      // The shared util throws a plain Error, and a plain error is never echoed
-      // to a caller (#2888). This one is a validation message written for them,
-      // so it becomes an AppError and keeps its text (#2997).
-      throw new AppError(
-        error instanceof Error ? error.message : "Invalid phone number",
-        400,
-        ErrorCode.VALIDATION_ERROR,
-      );
-    }
-    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id: dial.workspace_id });
     const twiml = createVoiceResponse();
-    // Track the placed SID outside the try: if the call is created but we then
-    // fail to persist its row, the active_call redial guard can't see it and a
-    // retry would double-dial the same contact. Hang it up in that case — a
-    // killed call the agent retries is far safer than a duplicate live call to a
-    // real person plus a duplicate completion charge.
-    let placedCallSid: string | null = null;
-    const hangUpUntrackedCall = async (reason: string) => {
-        if (!placedCallSid) return;
-        try {
-            await twilio.calls(placedCallSid).update({ status: "completed" });
-        } catch (hangupError) {
-            logger.error(`Failed to hang up untracked call (${reason}):`, hangupError);
-        }
-    };
     try {
-        const call = await withTwilioRetry(
-          () =>
-            twilio.calls.create({
-              to:
-                selected_device && selected_device !== "computer"
-                  ? selected_device
-                  : `client:${user_id}`,
-              from: caller_id,
-              url: `${env.BASE_URL()}/api/dial/${encodeURIComponent(to)}`,
-            }),
-          { workspaceId: workspace_id, operation: "calls.create" },
-        );
-        placedCallSid = call.sid ?? null;
-        let outreach_attempt_id;
-        const campaignId = parseInt(campaign_id, 10);
-        const contactId = parseInt(contact_id, 10);
-        const queueId = parseInt(queue_id, 10);
-        if (!outreach_id) {
-            outreach_attempt_id = await createOutreachAttempt(
-                {
-                    queue_id: queueId,
-                    contact_id: contactId,
-                    contact_phone: to_number,
-                },
-                campaignId,
-                workspace_id,
-                user_id,
-            );
-        } else {
-            outreach_attempt_id = Number(outreach_id)
-        }
-
-        const callSaved = await saveCallToDatabase(workspace_id, {
-            sid: call.sid,
-            date_updated: call.dateUpdated ?? new Date(),
-            parent_call_sid: call.parentCallSid ?? null,
-            account_sid: call.accountSid ?? null,
-            to: to_number,
-            from: call.from ?? null,
-            phone_number_sid: call.phoneNumberSid ?? null,
-            status: call.status ?? null,
-            start_time: call.startTime ?? null,
-            end_time: call.endTime ?? null,
-            duration: call.duration != null ? String(call.duration) : null,
-            price: call.price ?? null,
-            direction: call.direction ?? null,
-            answered_by: call.answeredBy ?? null,
-            api_version: call.apiVersion ?? null,
-            forwarded_from: call.forwardedFrom ?? null,
-            group_sid: call.groupSid ?? null,
-            caller_name: call.callerName ?? null,
-            uri: call.uri ?? null,
-            campaign_id: campaignId,
-            contact_id: contactId,
-            workspace: workspace_id,
-            user_id: user_id,
-            outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
-            queue_id: queueId,
-        });
-
-        // saveCallToDatabase swallows its own DB errors (returns false) so a
-        // status callback can't be blocked by a transient write failure; here on
-        // the dial path a failed write means the redial guard is blind, so hang up.
-        if (!callSaved) {
-            logger.error('Call placed but its row was not persisted; hanging up to avoid an untracked live call.');
-            await hangUpUntrackedCall('save failed');
-        }
+      const result = await dispatchManualVoiceCall({
+        workspaceId: dial.workspace_id, kind: "staffed", accountSid: twilio.accountSid,
+        to: dial.to, from: dial.from, setupTo: dial.setupTo, campaignId: dial.campaign_id,
+        contactId: dial.contact_id, queueId: dial.queue_id, outreachAttemptId: dial.outreach_id, userId: auth.user.id,
+        operationKey: `manual:${auth.user.id}:${dial.intentId}`, expectedQueueGeneration: dial.expected_queue_generation,
+        voiceUrl: `${env.BASE_URL()}/api/dial/${encodeURIComponent(dial.to)}`,
+        statusCallback: `${env.BASE_URL()}/api/call-status/`, recipientStatusCallback: `${env.BASE_URL()}/api/call-status/`,
+        prepareOutreach: async (tx) => {
+          const tdb = createTenantDb(dial.workspace_id, tx);
+          const claim = await rpcClaimQueueEntryForDial(tdb, { queueId: dial.queue_id, campaignId: dial.campaign_id,
+            workspaceId: dial.workspace_id, userId: auth.user.id });
+          if (claim !== "claimed") {
+            logger.warn("Dial claim refused", { claim, queueId: dial.queue_id, campaignId: dial.campaign_id,
+              contactId: dial.contact_id, workspaceId: dial.workspace_id, userId: auth.user.id });
+            throw new AppError(CLAIM_MESSAGES[claim], 409, ErrorCode.CONFLICT);
+          }
+          return dial.outreach_id ?? rpcCreateOutreachAttempt(tdb, { queueId: dial.queue_id, contactId: dial.contact_id,
+            campaignId: dial.campaign_id, workspaceId: dial.workspace_id, userId: auth.user.id });
+        },
+        create: ({ voiceUrl, statusCallback }) => twilio.calls.create({ to: dial.setupTo, from: dial.from,
+          url: voiceUrl, statusCallback, statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] }),
+      });
+      if (!result.ok) return voiceDispatchBlockedResponse(result);
     } catch (error) {
-        logger.error('Error placing call:', error);
-        await hangUpUntrackedCall('error placing call');
-        twiml.say('There was an error placing your call. Please try again later.');
+      if (error instanceof AppError) throw error;
+      logger.error("Error placing call:", error);
+      if (error instanceof VoiceDispatchUncertainError) {
+        return routeData({ error: "The call is awaiting provider verification. Wait for recovery before dialing again.",
+          reason: "voice_dispatch_pending" }, { status: 409 });
+      }
+      return routeData({ error: "There was an error placing your call. Please try again later." }, { status: 502 });
     }
-
-    return new Response(twiml.toString(), {
-        headers: {
-            'Content-Type': 'text/xml'
-        }
-    });
+    return new Response(twiml.toString(), { headers: { "Content-Type": "text/xml" } });
   },
 });

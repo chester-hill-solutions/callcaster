@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { campaign_queue, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { voiceCreditsFromDurationSeconds, type VoiceBillingKind } from "@/lib/pricing";
@@ -31,6 +31,7 @@ export type VoiceReservationInput = {
   expectedQueueGeneration?: string;
   operationKey?: string;
   userId?: string | null;
+  setupTo?: string | null;
   /** Runs database work only, after funding succeeds and inside its transaction. */
   prepareOutreach?: (tx: CreditTransaction) => Promise<number>;
 };
@@ -50,23 +51,42 @@ async function resolveQueueOperation(tx: CreditTransaction, args: VoiceReservati
   }
   return {
     ok: true as const, queueGeneration: queue.dispatch_generation,
-    operationKey: args.operationKey ? `${args.operationKey}:${queue.dispatch_generation}` : undefined,
+    operationKey: args.setupTo ? args.operationKey : args.operationKey ? `${args.operationKey}:${queue.dispatch_generation}` : undefined,
     queued: queue.dequeued_at === null && (queue.queue_state === null || ["queued", "assigned"].includes(queue.queue_state)),
   };
 }
 
-async function findRepeatedOperation(tx: CreditTransaction, args: VoiceReservationInput, operationKey: string | undefined) {
+type VoiceIntentInput = Pick<VoiceReservationInput,
+  "workspaceId" | "to" | "from" | "campaignId" | "contactId" | "queueId" | "userId" | "setupTo" | "outreachAttemptId" | "operationKey">;
+
+function sameVoiceContext(existing: VoiceReservation, args: VoiceIntentInput) {
+  return existing.campaign_id === (args.campaignId ?? null) && existing.contact_id === (args.contactId ?? null) &&
+    existing.queue_id === (args.queueId ?? null) && existing.user_id === (args.userId ?? null) &&
+    existing.setup_to === (args.setupTo ?? null) && existing.requested_outreach_attempt_id === (args.outreachAttemptId ?? null);
+}
+
+async function findRepeatedOperation(tx: CreditTransaction, args: VoiceIntentInput & { accountSid?: string }, operationKey: string | undefined) {
   if (!operationKey) return null;
   const [existing] = await tx.select().from(reservations).where(and(
-    eq(reservations.workspace, args.workspaceId), eq(reservations.operation_key, operationKey), ne(reservations.state, "released"),
+    eq(reservations.workspace, args.workspaceId), eq(reservations.operation_key, operationKey),
+    or(ne(reservations.state, "released"), isNotNull(reservations.setup_sid), isNotNull(reservations.provider_sid)),
   )).limit(1);
   if (!existing) return null;
-  const sameRequest = existing.account_sid === args.accountSid && existing.recipient === args.to &&
-    existing.caller_id === args.from && existing.campaign_id === (args.campaignId ?? null) &&
-    existing.contact_id === (args.contactId ?? null);
-  return existing.provider_sid && sameRequest
-    ? { ok: false as const, reason: "already_dispatched" as const, callSid: existing.provider_sid, queueGeneration: existing.queue_generation }
-    : { ok: false as const, reason: "dispatch_in_progress" as const };
+  const sameRequest = (args.accountSid === undefined || existing.account_sid === args.accountSid) &&
+    existing.recipient === args.to && existing.caller_id === args.from && sameVoiceContext(existing, args);
+  const acceptedSid = existing.setup_sid ?? existing.provider_sid;
+  if (!acceptedSid || !sameRequest) return { ok: false as const, reason: "dispatch_in_progress" as const };
+  if (existing.provider_sid) await persistReservedVoiceCall(tx, existing, existing.provider_sid);
+  else await persistReservedVoiceCall(tx, existing, acceptedSid, "setup");
+  return { ok: false as const, reason: "already_dispatched" as const, callSid: acceptedSid, queueGeneration: existing.queue_generation };
+}
+
+/** The route must authorize the workspace and actor before this lookup. */
+export async function replayVoiceOperation(args: VoiceIntentInput) {
+  return db.transaction(async (tx) => {
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
+    return findRepeatedOperation(tx, args, args.operationKey);
+  });
 }
 
 export async function reserveVoiceCredits(args: VoiceReservationInput) {
@@ -74,6 +94,10 @@ export async function reserveVoiceCredits(args: VoiceReservationInput) {
     const [balance] = await tx.select({ credits: workspace.credits }).from(workspace)
       .where(eq(workspace.id, args.workspaceId)).for("no key update");
     if (!balance) return { ok: false as const, reason: "workspace_not_found" as const };
+    if (args.setupTo) {
+      const replay = await findRepeatedOperation(tx, args, args.operationKey);
+      if (replay) return replay;
+    }
     const queue = await resolveQueueOperation(tx, args);
     if (!queue.ok) return queue;
     const replay = await findRepeatedOperation(tx, args, queue.operationKey);
@@ -95,13 +119,17 @@ export async function reserveVoiceCredits(args: VoiceReservationInput) {
       account_sid: args.accountSid, recipient: args.to, caller_id: args.from,
       campaign_id: args.campaignId, contact_id: args.contactId,
       outreach_attempt_id: outreachAttemptId, queue_id: args.queueId, queue_generation: queue.queueGeneration,
-      operation_key: queue.operationKey, user_id: args.userId,
+      requested_outreach_attempt_id: args.outreachAttemptId,
+      operation_key: queue.operationKey, user_id: args.userId, setup_to: args.setupTo,
       lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS),
       // Admission may wait for a workspace lock. Record the real insertion
       // time, not the transaction start, for explicit-redial duplicate checks.
       created_at: sql`clock_timestamp()`,
     }).returning();
     if (!reservation) throw new Error("Voice credit reservation was not saved");
+    if (args.queueId != null) await tx.update(campaign_queue).set({ voice_reservation_id: reservation.id }).where(and(
+      eq(campaign_queue.id, args.queueId), eq(campaign_queue.workspace, args.workspaceId),
+    ));
     return { ok: true as const, reservation };
   });
 }
@@ -156,4 +184,11 @@ export async function claimVoiceReservationRecovery(limit = 25) {
     return tx.update(reservations).set({ lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS) })
       .where(inArray(reservations.id, rows.map((row) => row.id))).returning();
   });
+}
+
+/** A verified terminal receipt can identify a call before its duration is ready. */
+export async function requestVoiceReservationRecovery(reservationId: string) {
+  await db.update(reservations).set({ lease_expires_at: new Date(), last_error: "Final call duration is not available" }).where(and(
+    eq(reservations.id, reservationId), inArray(reservations.state, [...ACTIVE_VOICE_RESERVATION_STATES]),
+  ));
 }

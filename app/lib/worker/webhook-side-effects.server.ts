@@ -43,6 +43,9 @@ import {
   WEBHOOK_DELIVERY_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
+import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
 const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
@@ -67,6 +70,11 @@ export async function runCallStatusSideEffects(args: {
   if (!callRow) {
     throw new Error(`Call ${args.callSid} not found for side effects`);
   }
+  const reservation = callRow.workspace ? await findVoiceReservationForCall(callRow.workspace, args.callSid) : null;
+  if (reservation?.setup_sid === args.callSid) return { ok: true };
+  // An older progress job can observe a newer terminal row. Keep its hold
+  // recoverable until a terminal job exists to carry all recipient outcomes.
+  if (reservation && isTerminalStatus(normalizeProviderStatus(callRow.status)) && !CALL_STATUS_TO_DISPOSITION[args.event.callStatus.toLowerCase()]) return { ok: true };
 
   await billTerminalCallStatus(callRow);
 
@@ -104,6 +112,11 @@ export async function runCallStatusSideEffects(args: {
         ended_at: new Date().toISOString(),
       });
     }
+  }
+
+  if (reservation && CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()]) {
+    await dequeueFundedVoiceAttempt(reservation);
+    return { ok: true };
   }
 
   // A provider-terminal status must collapse the contact's queue entry exactly

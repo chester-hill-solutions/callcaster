@@ -113,6 +113,7 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     provider.fetch.mockReset().mockImplementation(async (sid: string) => requiredCall(sid));
     provider.list.mockReset().mockImplementation(async () => [...provider.records.values()]);
     provider.events.mockReset().mockImplementation(async (sid: string) => [{ request: { method: "POST", url: requiredCall(sid).voiceUrl, parameters: { call_sid: sid } } }]);
+    await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
@@ -135,6 +136,7 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     try {
       if (sql) {
         await clearFault();
+        await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
         for (const table of ["transaction_history", "call", "workspace_voice_reservation", "campaign_queue", "outreach_attempt", "contact", "workspace_number", "campaign", "script"])
           await sql.unsafe(`delete from public.${table} where workspace = $1::uuid`, [workspaceId]);
         await sql`delete from public.workspace_member where workspace_id = ${workspaceId}`;
@@ -718,14 +720,13 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     expect(await send("api")).toMatchObject({ status: 200, body: { success: true, callSid: record.sid } });
     expect(provider.create).toHaveBeenCalledOnce();
   });
-  test("an unanswered call can be recovered from its original API request with both saved URLs", async () => {
+  test("an unanswered call can be recovered from its saved status callback history", async () => {
     const create = provider.create.getMockImplementation(); if (!create) throw new Error("Provider fixture required");
     provider.create.mockImplementation(async (args) => { await create(args); throw new Error("Owned response lost"); });
     await send("api"); await ageForRecovery();
     for (const record of provider.records.values()) { record.status = "no-answer"; record.duration = "0"; }
     provider.events.mockImplementation(async (sid: string) => [{ request: {
-      method: "POST", url: `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls/${sid}.json`,
-      parameters: { url: requiredCall(sid).voiceUrl, status_callback: requiredCall(sid).statusCallback },
+      method: "POST", url: requiredCall(sid).statusCallback, parameters: { call_sid: sid },
     } }]);
     expect(await recovery.runVoiceCreditRecovery()).toMatchObject({ settled: 1, pending: 0 });
     expect(await state()).toMatchObject({ credits: 100, holds: 0, calls: 1, ledger: 0 });
@@ -762,7 +763,7 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     const response = await asRouteResponse(action({ ...routeArgs(request, { campaignId: String(campaignId) }), context: new RouterContextProvider() }));
     expect(response.status).toBe(403); expect(await state()).toMatchObject({ credits: 100, holds: 1, ledger: 0 });
   });
-  test.each(["wrong URL", "wrong account", "no history", "not ready", "ambiguous"])("unknown creation with %s keeps its funding", async (kind) => {
+  test.each(["wrong URL", "wrong account", "no history", "not ready", "ambiguous", "REST request"])("unknown creation with %s keeps its funding", async (kind) => {
     const create = provider.create.getMockImplementation(); if (!create) throw new Error("Provider fixture required");
     provider.create.mockImplementation(async (args) => { await create(args); throw new Error("Owned response lost"); });
     await send("api"); await ageForRecovery();
@@ -770,6 +771,10 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     if (kind === "wrong URL") record.voiceUrl += "&different=true";
     if (kind === "wrong account") record.accountSid = "AC00000000000000000000000000009999";
     if (kind === "no history") provider.events.mockResolvedValue([]);
+    if (kind === "REST request") provider.events.mockImplementation(async (sid: string) => [{ request: {
+      method: "POST", url: `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls/${sid}.json`,
+      parameters: { url: record.voiceUrl, status_callback: record.statusCallback },
+    } }]);
     if (kind === "not ready") record.endTime = new Date();
     if (kind === "ambiguous") { const duplicate = { ...record, sid: callSid() }; provider.records.set(duplicate.sid, duplicate); }
     expect(await recovery.runVoiceCreditRecovery()).toEqual({ examined: 1, settled: 0, released: 0, pending: 1 });
