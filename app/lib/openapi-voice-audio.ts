@@ -21,7 +21,7 @@ const query = [
   { name: "connection_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
 ];
 
-/** Keep this draft outside the platform registry until handoff recovery is complete. */
+/** One owned audio operation covers session control and signed provider callbacks. */
 export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = {
   "/api/connect-phone-device": {
     post: {
@@ -45,7 +45,9 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
           content: { "application/json": { schema: { ...snapshot, required: [...snapshot.required, "success"],
             properties: { ...snapshot.properties, success: { type: "boolean", enum: [true] } } } } } },
         "400": errorResponse("Invalid input or unavailable caller ID"), "401": errorResponse("Unauthorized"),
-        "402": errorResponse("Idle connection has no available credits"), "403": errorResponse("Device is not verified for this user"),
+        "402": { description: "Idle connection has no available credits", content: { "application/json": { schema: {
+          type: "object", required: ["error", "creditsError"], properties: { error: { type: "string", enum: ["Insufficient credits"] }, creditsError: { type: "boolean", enum: [true] } },
+        } } } }, "403": errorResponse("Device is not verified for this user"),
         "404": errorResponse("Workspace, user-owned connection or target call not found"),
         "409": errorResponse("Pending operation, stale audio owner, changed provider account or unavailable manual continuation. Current audio stays active."),
         "429": rateLimitResponse, "502": errorResponse("Provider refused the connection"),
@@ -65,6 +67,37 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
       responses: { "200": { description: "Cancellation saved or already complete", content: { "application/json": { schema: snapshot } } },
         "400": errorResponse("Invalid query"), "401": errorResponse("Unauthorized"), "404": errorResponse("Connection not found"),
         "409": errorResponse("Active customer audio must be replaced or ended through the customer control") },
+    },
+  },
+};
+
+export const voiceAudioProviderPathOverrides: Record<string, Record<string, unknown>> = {
+  "/api/voice-audio": {
+    post: {
+      operationId: "handleAgentAudioProviderEvent", summary: "Handle signed agent audio instructions, status and conference events",
+      description: "Provider-only POST. Validate the raw Twilio signature over the unchanged full URL and form before alias normalization. The connection UUID, saved callback URL, original account and physical participant facts bind the event. An accepted or answered call does not activate audio. A replacement prejoins muted and cannot dispatch or bill a customer. A retired participant cannot end the current conference. Transient processing or provider-stop failures return 500 for retry.",
+      parameters: [
+        { name: "X-Twilio-Signature", in: "header", required: true, schema: { type: "string", minLength: 1 } },
+        { name: "connection", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+        { name: "event", in: "query", required: true, schema: { type: "string", enum: ["voice", "status", "conference"] } },
+      ],
+      requestBody: { required: true, content: { "application/x-www-form-urlencoded": { schema: { oneOf: [
+        { type: "object", required: ["AccountSid", "CallSid", "To", "From", "Direction"], properties: {
+          AccountSid: { type: "string" }, CallSid: callSid, To: { type: "string" }, From: { type: "string" },
+          Direction: { type: "string", enum: ["outbound-api"] }, CallStatus: { type: "string" }, CallDuration: { type: "string" },
+          Digits: { type: "string", description: "Phone audio requires a signed press-1 Gather confirmation before conference instructions are issued." },
+        } },
+        { type: "object", required: ["AccountSid", "ConferenceSid", "FriendlyName", "StatusCallbackEvent"], properties: {
+          AccountSid: { type: "string" }, ConferenceSid: { type: "string", pattern: "^CF[0-9a-fA-F]{32}$" }, FriendlyName: { type: "string" },
+          StatusCallbackEvent: { type: "string" }, CallSid: callSid, ParticipantLabel: { type: "string" }, Muted: { type: "string", enum: ["true", "false"] },
+        } },
+      ] } } } },
+      responses: {
+        "200": { description: "Saved conference instruction or a safe hangup", content: { "text/xml": { schema: { type: "string" } } } },
+        "204": { description: "Owned provider event acknowledged" },
+        "403": { description: "Signature, operation or participant mismatch", content: { "text/xml": { schema: { type: "string" } } } },
+        "500": errorResponse("Temporary event-processing or provider-stop failure"),
+      },
     },
   },
 };

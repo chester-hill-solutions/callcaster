@@ -119,6 +119,11 @@ When a service gains a scoped tenant-client read, update its orchestration
 fixtures at that boundary. Prove cross-workspace denials against the real
 database; a permissive query mock is not authorization evidence.
 
+The route-membership guard follows local imports one hop. Keep the canonical
+workspace check visible at the HTTP boundary when transaction services place
+their membership recheck deeper. Preserve the locked service check as well;
+do not add a public-route exception or deepen the crawl to clear the guard.
+
 When a pipeline gains caller-dependent authorization, inventory HTTP and worker
 callers. Pass the authenticated user for requests and explicit system authority
 for trusted jobs without a user. Test identity forwarding separately from SQL

@@ -1,3 +1,4 @@
+import { handleConferenceParticipantHangup } from "@/lib/conference-participant-hangup.server";
 import { recordPredictiveSuccessorCallback } from "@/server/predictive-successor-callback.server";
 import { getPredictiveMachineOperation } from "@/server/predictive-machine-operation.server";
 import { needsPredictiveTerminalContinuation } from "@/lib/predictive-terminal-status";
@@ -11,7 +12,6 @@ import {
   parseTwilioVoiceCallback,
   userIdFromConferenceName,
   type ParticipantJoinEvent,
-  type ParticipantLeaveEvent,
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
@@ -40,9 +40,13 @@ import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
 import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
 import { runCallStatusSideEffects } from "@/lib/worker/webhook-side-effects.server";
-import { findVoiceReservationForCall, hasVoiceReservationCallBinding } from "@/server/voice-bridge-reservation.server";
+import { hasVoiceReservationCallBinding } from "@/server/voice-bridge-reservation.server";
 import { bindVerifiedFundedCallStatus } from "@/lib/voice-bridge-webhook.server";
 import { bindPredictiveConferenceEvent, claimFirstPredictiveRecipient } from "@/server/predictive-conference-reservation.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
+import { handleBoundVoiceAudioParticipant } from "@/lib/voice-audio-participant.server";
+import { isRetiredVoiceAudioSource } from "@/server/voice-audio-classification.server";
+import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
 
 type TwilioClient = Twilio.Twilio;
 
@@ -215,56 +219,6 @@ const handleCallStatus = async (
   }
 };
 
-const handleParticipantLeave = async (
-  event: ParticipantLeaveEvent,
-  dbCall: Tables<"call">,
-  twilio: TwilioClient,
-) => {
-  try {
-    const callSid = requireValue(event.callSid, "CallSid");
-    const workspaceId = requireValue(dbCall.workspace, "workspace");
-    let conferenceName = event.conferenceName ?? dbCall.conference_id;
-    if (!conferenceName && event.conferenceSid) {
-      const conference = await twilio.conferences(event.conferenceSid).fetch();
-      conferenceName = conference.friendlyName;
-    }
-    const conferences = await twilio.conferences.list({
-      friendlyName: requireValue(conferenceName, "conference name"),
-      status: "in-progress",
-    });
-    await Promise.all(
-      conferences.map(({ sid }: { sid: string }) =>
-        twilio.conferences(sid).update({ status: "completed" }),
-      ),
-    );
-
-    await emitPredictiveBroadcast(workspaceId, {
-      contact_id: dbCall.contact_id,
-      status: "completed",
-      conference_id: requireValue(conferenceName, "conference name"),
-      conference_ended: true,
-    });
-
-    // Terminal call.status owns the ordinary callback's billing/replay claim.
-    // A participant event must not take that claim before billing runs.
-    try {
-      const update: Partial<Tables<"call">> = {};
-      if (event.timestamp) {
-        const endedAt = new Date(event.timestamp);
-        if (Number.isFinite(endedAt.getTime())) update.end_time = endedAt;
-      }
-      const funded = await findVoiceReservationForCall(workspaceId, callSid);
-      if (!funded && event.durationSeconds !== null) update.duration = String(event.durationSeconds);
-      if (Object.keys(update).length) await updateCall(callSid, workspaceId, update);
-    } catch (error) {
-      logger.error("Participant conference stopped but call metadata update failed", error);
-    }
-  } catch (error) {
-    logger.error("Error in handleParticipantLeave:", error);
-    throw error;
-  }
-};
-
 const handleParticipantJoin = async (
   event: ParticipantJoinEvent,
   dbCall: Tables<"call">,
@@ -317,7 +271,13 @@ const handleParticipantJoin = async (
 async function handleFundedConferenceEvent(
   context: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>>, event: Extract<TwilioVoiceCallback, { kind: "participant" }>,
 ) {
-      const twilio = await createWorkspaceTwilioInstance({ workspace_id: context.reservation.workspace });
+      if (context.audio) {
+        await handleBoundVoiceAudioParticipant(context.reservation.workspace, context.audio.conference_callback, event);
+        return;
+      }
+      if (await isRetiredVoiceAudioSource({ workspaceId: context.reservation.workspace, accountSid: context.reservation.account_sid,
+        conferenceId: context.reservation.conference_id ?? "", callSid: context.call.sid })) return;
+      const twilio = await createOriginalVoiceAccountClient(context.reservation);
       if (isParticipantJoin(event)) {
         if (context.setup && context.reservation.setup_sid === context.call.sid) {
           const first = await claimFirstPredictiveRecipient(context.reservation, context.call.sid);
@@ -325,7 +285,7 @@ async function handleFundedConferenceEvent(
           else if (first) await stopRefusedPredictiveSetup(first.reservation, twilio);
         }
         await handleParticipantJoin(event, context.call);
-      } else if (isParticipantHangup(event)) await handleParticipantLeave(event, context.call, twilio);
+      } else if (isParticipantHangup(event)) await handleConferenceParticipantHangup(event, context.call, twilio);
 }
 
 export const action = defineAction({
@@ -333,9 +293,8 @@ export const action = defineAction({
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    // Parse the payload ONCE, here, into a discriminated union. Everything
-    // downstream takes a typed event instead of re-narrowing the same form
-    // fields with `typeof x === "string"` — see @/lib/twilio/voice-callback.
+    // Read the raw call identity for signature lookup. Normalize aliases only
+    // after signature validation, then parse the verified event for dispatch.
     let event = parseTwilioVoiceCallback(params);
 
     const callSidValue = event.callSid;
@@ -348,6 +307,9 @@ export const action = defineAction({
       params,
     });
     if (forbidden) return forbidden;
+    if (Array.from(formData.keys()).some((key) => formData.getAll(key).length !== 1) || !normalizeVerifiedVoiceParams(params))
+      return twilioWebhookForbiddenHangup();
+    event = parseTwilioVoiceCallback(params);
     let conferenceEvent: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>> | null = null;
     let setupStatus = false;
     const query = new URL(request.url).searchParams;
@@ -358,6 +320,7 @@ export const action = defineAction({
             reservationId: query.get("credit_reservation") ?? "", requestUrl: resolveCanonicalTwilioWebhookUrl(request),
             accountSid: event.accountSid ?? "", callSid: callSidValue,
             conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "",
+            event: event.event, participantLabel: params.ParticipantLabel, muted: params.Muted,
           });
         } catch { return twilioWebhookForbiddenHangup(); }
       } else if (await hasVoiceReservationCallBinding(callSidValue)) return twilioWebhookForbiddenHangup();
@@ -409,7 +372,7 @@ export const action = defineAction({
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
     if (isParticipantHangup(event)) {
-      await handleParticipantLeave(event, dbCall, twilio);
+      await handleConferenceParticipantHangup(event, dbCall, twilio);
       return routeData({ success: true });
     }
     const callStatusValue = event.callStatus;

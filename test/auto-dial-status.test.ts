@@ -886,10 +886,6 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error in handleParticipantLeave:",
-      expect.any(Error),
-    );
   });
 
   test("participant-join does nothing when conference_id exists and no outreach_attempt_id", async () => {

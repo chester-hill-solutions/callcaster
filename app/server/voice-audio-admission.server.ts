@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, eq, isNotNull, or } from "drizzle-orm";
 import { call, campaign, handset_session, user, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { getUserRole, WORKSPACE_MEMBERSHIP_ROLES } from "@/lib/workspace-membership.server";
@@ -13,19 +13,26 @@ import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import type { VoiceAudioConnection } from "./voice-audio-connection.server";
 import { predictiveConferenceCallbackUrl } from "./predictive-conference-reservation.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { hasActiveVoiceAudioCustomer, hasFundedAgentVoice } from "./voice-audio-classification.server";
 
-export async function lockVoiceAudioActor(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">) {
+export async function lockVoiceAudioMember(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">, allowDisabledWorkspace = false) {
   const [owner] = await tx.select().from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
   if (!owner || owner.archived_at) return voiceAudioRefusal("workspace_not_found");
-  if (owner.disabled) return voiceAudioRefusal("workspace_unavailable");
+  if (owner.disabled && !allowDisabledWorkspace) return voiceAudioRefusal("workspace_unavailable");
   const tdb = createTenantDb(args.workspaceId, tx);
   const membership = await getUserRole({ user: { id: args.userId }, workspaceId: args.workspaceId, tdb });
   const [actor] = await tx.select({ access: user.access_level, numbers: user.verified_audio_numbers }).from(user).where(eq(user.id, args.userId));
   if (!actor || actor.access === "disabled" || !membership || !WORKSPACE_MEMBERSHIP_ROLES.some((r) => r === membership.role))
     return voiceAudioRefusal("agent_not_found");
-  const credentials = readTwilioWorkspaceCredentials(owner.twilio_data);
+  return { ok: true as const, owner, actor, tdb };
+}
+
+export async function lockVoiceAudioActor(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">) {
+  const member = await lockVoiceAudioMember(tx, args);
+  if (!member.ok) return member;
+  const credentials = readTwilioWorkspaceCredentials(member.owner.twilio_data);
   if (!credentials) return voiceAudioRefusal("caller_id_unavailable");
-  return { ok: true as const, owner, actor, tdb, accountSid: credentials.sid };
+  return { ...member, accountSid: credentials.sid };
 }
 
 type Actor = Extract<Awaited<ReturnType<typeof lockVoiceAudioActor>>, { ok: true }>;
@@ -98,13 +105,6 @@ async function liveTarget(actor: Actor, args: VoiceAudioConnectionInput, current
   return row.conference_id ? conferenceTarget(actor, args, row, current) : directTarget(actor.tdb, row, current, args.userId);
 }
 
-async function idleConferenceIsFunded(tdb: TenantDb, current: VoiceAudioConnection) {
-  const funded = await tdb.workspace_voice_reservation.findFirst({ where: and(
-    eq(reservations.conference_id, current.conference_id), inArray(reservations.state, ["reserved", "creating", "active"]),
-  ), columns: { id: true } });
-  return Boolean(funded);
-}
-
 function currentConference(current: VoiceAudioConnection | null) {
   return { conferenceId: current?.conference_id ?? null, conferenceSid: current?.conference_sid ?? null,
     conferenceCallback: current?.conference_callback ?? null };
@@ -112,9 +112,10 @@ function currentConference(current: VoiceAudioConnection | null) {
 
 async function idleTarget(actor: Actor, args: VoiceAudioConnectionInput, current: VoiceAudioConnection | null) {
   if (args.transport !== "phone") return voiceAudioRefusal("target_not_found");
+  if (await hasFundedAgentVoice(actor.tdb, args.userId)) return voiceAudioRefusal("stale_audio");
   if (current && (current.target_kind !== "idle" || current.campaign_id !== (args.campaignId ?? null)))
     return voiceAudioRefusal("stale_audio");
-  if (current && await idleConferenceIsFunded(actor.tdb, current)) return voiceAudioRefusal("stale_audio");
+  if (current && await hasActiveVoiceAudioCustomer(actor.tdb, current.conference_id)) return voiceAudioRefusal("stale_audio");
   if (args.campaignId != null) {
     const owned = await actor.tdb.campaign.findFirst({ where: eq(campaign.id, args.campaignId) });
     if (!owned) return voiceAudioRefusal("target_not_found");

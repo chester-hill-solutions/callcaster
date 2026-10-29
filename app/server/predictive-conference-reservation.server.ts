@@ -1,11 +1,25 @@
 import { and, eq, isNull, or, sql } from "drizzle-orm";
-import { campaign, campaign_queue, workspace_voice_reservation as reservations } from "@/db/schema";
+import { campaign, campaign_queue, workspace_voice_reservation as reservations, workspace_voice_audio_connection as audioConnections } from "@/db/schema";
 import { db } from "@/server/db";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import { checkSchedule } from "@/lib/database/campaign.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
+import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
+import { voiceAudioParticipantLabel, voiceAudioStartsMuted } from "@/lib/voice-audio-connection";
+
+type ConferenceBindingInput = {
+  reservationId: string; requestUrl: string; accountSid: string; callSid: string; conferenceId: string; conferenceSid: string;
+  event?: string; participantLabel?: string; muted?: string;
+};
+
+function matchesAudioParticipant(row: typeof audioConnections.$inferSelect, input: ConferenceBindingInput) {
+  if (!row.voice_issued_at || row.conference_callback !== input.requestUrl || row.conference_sid && row.conference_sid !== input.conferenceSid ||
+    input.participantLabel !== voiceAudioParticipantLabel(row)) return false;
+  if (input.event !== "participant-join" || row.joined_at || row.state === "active") return true;
+  return input.muted === String(voiceAudioStartsMuted(row));
+}
 
 /** Twilio sends all conference events to the first participant's callback URL. */
 export function predictiveConferenceCallbackUrl(reservation: VoiceReservation) {
@@ -17,9 +31,7 @@ export function predictiveConferenceCallbackUrl(reservation: VoiceReservation) {
 }
 
 /** Provider authentication must precede this conference-scoped binding. */
-export async function bindPredictiveConferenceEvent(input: {
-  reservationId: string; requestUrl: string; accountSid: string; callSid: string; conferenceId: string; conferenceSid: string;
-}) {
+export async function bindPredictiveConferenceEvent(input: ConferenceBindingInput) {
   if (!/^[0-9a-f-]{36}$/i.test(input.reservationId) || !/^CF[0-9a-f]{32}$/i.test(input.conferenceSid))
     throw new Error("Invalid predictive conference event identity");
   return db.transaction(async (tx) => {
@@ -27,6 +39,18 @@ export async function bindPredictiveConferenceEvent(input: {
     if (!owner?.conference_id || owner.account_sid !== input.accountSid || owner.conference_id !== input.conferenceId ||
         predictiveConferenceCallbackUrl(owner) !== input.requestUrl || owner.conference_sid && owner.conference_sid !== input.conferenceSid)
       throw new Error("Predictive conference event does not match its owner");
+    const [reservation] = await tx.update(reservations).set({ conference_sid: input.conferenceSid, updated_at: new Date() })
+      .where(eq(reservations.id, owner.id)).returning();
+    if (!reservation) throw new Error("Predictive conference event was not saved");
+    const [audio] = await tx.select().from(audioConnections).where(and(
+      eq(audioConnections.workspace, owner.workspace), eq(audioConnections.account_sid, owner.account_sid),
+      eq(audioConnections.conference_id, owner.conference_id), eq(audioConnections.provider_sid, input.callSid),
+    )).limit(1);
+    if (audio) {
+      if (!matchesAudioParticipant(audio, input))
+        throw new Error("Predictive audio participant does not match its join");
+      return { reservation, call: await persistVoiceAudioCall(tx, audio), setup: false, audio };
+    }
     const [participant] = await tx.select().from(reservations).where(and(
       eq(reservations.workspace, owner.workspace), eq(reservations.account_sid, owner.account_sid),
       eq(reservations.conference_id, owner.conference_id),
@@ -35,10 +59,7 @@ export async function bindPredictiveConferenceEvent(input: {
     if (!participant) throw new Error("Predictive conference participant is not funded");
     const setup = participant.setup_sid === input.callSid;
     const call = await persistReservedVoiceCall(tx, participant, input.callSid, setup ? "setup" : "recipient");
-    const [reservation] = await tx.update(reservations).set({ conference_sid: input.conferenceSid, updated_at: new Date() })
-      .where(eq(reservations.id, owner.id)).returning();
-    if (!reservation) throw new Error("Predictive conference event was not saved");
-    return { reservation, call, setup };
+    return { reservation, call, setup, audio: null };
   });
 }
 

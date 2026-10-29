@@ -12,9 +12,11 @@ import {
 } from "@/lib/openapi-integrator";
 
 import { handsetPathOverrides } from "@/lib/openapi-handset";
+import { voiceAudioPathOverrides } from "@/lib/openapi-voice-audio";
 
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   ...handsetPathOverrides,
+  ...voiceAudioPathOverrides,
   "/api/workspaces/{workspaceId}/conversations": {
     get: {
       operationId: "getWorkspaces_workspaceId_conversations",

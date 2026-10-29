@@ -1,17 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { call, workspace, workspace_voice_audio_connection as connections } from "@/db/schema";
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { workspace, workspace_voice_audio_connection as connections } from "@/db/schema";
 import { db } from "@/server/db";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { logger } from "@/lib/logger.server";
-import { PENDING_VOICE_AUDIO_STATES, voiceAudioOperationUrl, voiceAudioRefusal, type VoiceAudioConnectionInput } from "@/lib/voice-audio-connection";
+import { PENDING_VOICE_AUDIO_STATES, VoiceAudioBindingError, voiceAudioOperationUrl, voiceAudioRefusal, type VoiceAudioConnectionInput } from "@/lib/voice-audio-connection";
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
 import { lockVoiceAudioActor, resolveVoiceAudioAdmission } from "./voice-audio-admission.server";
+import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
 
 export type VoiceAudioConnection = typeof connections.$inferSelect;
 const LEASE_MS = 5 * 60_000;
 
 function pendingReplay(pending: VoiceAudioConnection, args: VoiceAudioConnectionInput, targetKey: string, accountSid: string) {
+  if (!PENDING_VOICE_AUDIO_STATES.some((state) => state === pending.state)) return voiceAudioRefusal("connection_pending");
   return pending.target_key === targetKey && sameRequest(pending, args) && pending.account_sid === accountSid
     ? { ok: true as const, connection: pending, replayed: true } : voiceAudioRefusal("connection_pending");
 }
@@ -47,12 +49,13 @@ export async function prepareVoiceAudioConnection(args: VoiceAudioConnectionInpu
     const admission = await resolveVoiceAudioAdmission(actor, args, current);
     if (!admission.ok) return admission;
     const { target, destination, sourceSid } = admission;
-    const pending = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: and(
-      eq(connections.user_id, args.userId), inArray(connections.state, [...PENDING_VOICE_AUDIO_STATES]),
-    ) });
-    if (pending) return pendingReplay(pending, args, target.key, actor.accountSid);
     if (current && current.target_key === target.key && current.destination === destination)
       return { ok: true as const, connection: current, replayed: true };
+    const pending = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: and(
+      eq(connections.user_id, args.userId), or(inArray(connections.state, [...PENDING_VOICE_AUDIO_STATES]),
+        and(inArray(connections.state, ["failed", "canceled", "retired"]), isNotNull(connections.provider_sid), isNull(connections.terminal_at))),
+    ) });
+    if (pending) return pendingReplay(pending, args, target.key, actor.accountSid);
     if (await lacksIdleCredits(tx, args.workspaceId, actor.owner.credits, target.kind))
       return voiceAudioRefusal("insufficient_credits");
     const latest = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: eq(connections.user_id, args.userId),
@@ -74,7 +77,7 @@ export async function prepareVoiceAudioConnection(args: VoiceAudioConnectionInpu
   });
 }
 
-function originalInput(row: VoiceAudioConnection): VoiceAudioConnectionInput {
+export function voiceAudioSavedInput(row: VoiceAudioConnection): VoiceAudioConnectionInput {
   return { workspaceId: row.workspace, userId: row.user_id, intentId: row.intent_id, transport: row.transport,
     phoneNumber: row.transport === "phone" ? row.destination : undefined, callSid: row.requested_call_sid ?? undefined,
     expectedAgentSid: row.requested_call_sid ? row.source_agent_sid ?? undefined : undefined,
@@ -84,7 +87,7 @@ function originalInput(row: VoiceAudioConnection): VoiceAudioConnectionInput {
 /** Commit before provider create. A timeout cannot return this row to prepared. */
 export async function claimVoiceAudioSend(row: VoiceAudioConnection) {
   return db.transaction(async (tx) => {
-    const args = originalInput(row), actor = await lockVoiceAudioActor(tx, args);
+    const args = voiceAudioSavedInput(row), actor = await lockVoiceAudioActor(tx, args);
     if (!actor.ok) return actor;
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!current || current.user_id !== row.user_id || current.lease_token !== row.lease_token || current.state !== "prepared" ||
@@ -117,36 +120,19 @@ export async function withVoiceAudioConnection<T>(row: VoiceAudioConnection, run
     await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, row.workspace)).for("no key update");
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!current || current.user_id !== row.user_id || current.account_sid !== row.account_sid || current.voice_url !== row.voice_url || current.status_callback !== row.status_callback)
-      throw new Error("Agent audio operation does not match its owner");
+      throw new VoiceAudioBindingError("Agent audio operation does not match its owner");
     return run(tx, current);
   });
 }
 
-export async function persistVoiceAudioCall(tx: CreditTransaction, row: VoiceAudioConnection) {
-  if (!row.provider_sid || !row.send_started_at) throw new Error("Agent audio provider receipt missing");
-  await tx.insert(call).values({ sid: row.provider_sid, workspace: row.workspace, user_id: row.user_id,
-    account_sid: row.account_sid, to: row.destination, from: row.caller_id, direction: "outbound-api", parent_call_sid: null,
-    conference_id: row.conference_id, status: row.terminal_status ? normalizeAudioStatus(row.terminal_status) : "initiated",
-    contact_id: null, outreach_attempt_id: null, queue_id: null,
-  }).onConflictDoNothing({ target: call.sid });
-  const [saved] = await tx.select().from(call).where(and(eq(call.sid, row.provider_sid), eq(call.workspace, row.workspace)));
-  if (!saved || saved.account_sid !== row.account_sid || saved.to !== row.destination || saved.from !== row.caller_id || saved.direction !== "outbound-api" || saved.parent_call_sid)
-    throw new Error("Agent audio call record does not match its provider receipt");
-  return saved;
-}
-
-function normalizeAudioStatus(status: string) {
-  return status === "busy" || status === "no-answer" || status === "failed" || status === "canceled" ? status : "completed";
-}
-
 export async function recordVoiceAudioProvider(row: VoiceAudioConnection, providerSid: string) {
-  if (!/^CA[0-9a-f]{32}$/i.test(providerSid)) throw new Error("Invalid agent audio provider SID");
+  if (!/^CA[0-9a-f]{32}$/i.test(providerSid)) throw new VoiceAudioBindingError("Invalid agent audio provider SID");
   return withVoiceAudioConnection(row, (tx, current) => saveVoiceAudioProvider(tx, current, providerSid));
 }
 
 export async function saveVoiceAudioProvider(tx: CreditTransaction, current: VoiceAudioConnection, providerSid: string) {
   if (!current.send_started_at || current.provider_sid && current.provider_sid !== providerSid)
-    throw new Error("Agent audio receipt does not match its send");
+    throw new VoiceAudioBindingError("Agent audio receipt does not match its send");
   const [saved] = await tx.update(connections).set({ provider_sid: providerSid,
     state: current.state === "creating" ? "joining" : current.state, updated_at: new Date() })
     .where(eq(connections.id, current.id)).returning();

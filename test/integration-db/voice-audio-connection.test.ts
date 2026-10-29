@@ -1,11 +1,34 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
+import twilio from "twilio";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { asRouteResponse, routeArgs } from "../helpers/route-result";
 import type { VoiceAudioConnectionInput } from "@/lib/voice-audio-connection";
 import { isVoiceAudioLeg } from "@/server/voice-audio-classification.server";
 import { bindVoiceAudioProviderReceipt, type VoiceAudioProviderIdentity } from "@/server/voice-audio-callback.server";
+import { issueVoiceAudioInstruction, observeVoiceAudioConferenceEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
+import { voiceAudioConferenceTwiml } from "@/lib/voice-audio-twiml.server";
 
-vi.hoisted(() => { process.env.TZ = "UTC"; });
+vi.hoisted(() => { process.env.TZ = "UTC"; process.env.BASE_URL = "https://audio-connection.example.test"; process.env.TWILIO_VALIDATE_WEBHOOKS = "true"; });
+type ApiPhysical = { sid: string; accountSid: string; to: string; from: string; direction: string; parentCallSid: null;
+  status: string; duration: string | null; dateCreated: Date; dateUpdated: Date; endTime: Date | null; voiceUrl: string; statusCallback: string };
+const web = vi.hoisted(() => ({ userId: "", accountSid: "", authenticated: true, create: vi.fn(), fetch: vi.fn(), update: vi.fn(), records: new Map<string, ApiPhysical>() }));
+const rooms = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), list: vi.fn(), records: new Map<string, { sid: string; accountSid: string; friendlyName: string; status: string }>() }));
+vi.mock("@/lib/api-auth.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/api-auth.server")>(),
+  requireJsonAuth: async () => web.authenticated ? { authType: "session", user: { id: web.userId } } : Response.json({ error: "Unauthorized" }, { status: 401 }),
+}));
+vi.mock("@/lib/auth.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/auth.server")>(),
+  getSession: async () => ({ user: { id: web.userId }, headers: new Headers({ "Set-Cookie": "audio-session=refreshed" }) }),
+}));
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/database/workspace.server")>(),
+  createWorkspaceTwilioInstance: async () => ({ accountSid: web.accountSid,
+    calls: Object.assign((id: string) => ({ fetch: () => web.fetch(id), update: (args: { status: string }) => web.update(id, args) }), { create: web.create }),
+    conferences: Object.assign((id: string) => ({ fetch: () => rooms.fetch(id), update: (args: { status: string }) => rooms.update(id, args) }), { list: rooms.list }),
+  }),
+}));
 vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/workspace-events.server")>(),
   emitPostgresChangeEvent: vi.fn(), emitQueueEvent: vi.fn(), emitPredictiveBroadcast: vi.fn(),
@@ -45,6 +68,22 @@ describe("owned agent audio connection journal (#2879)", () => {
   }
   beforeEach(async () => {
     vi.clearAllMocks();
+    web.userId = actor; web.accountSid = accountSid; web.authenticated = true; web.records.clear();
+    rooms.records.clear();
+    rooms.fetch.mockReset().mockImplementation(async (id: string) => { const room = rooms.records.get(id); if (!room) throw new Error("Owned audio conference required"); return room; });
+    rooms.update.mockReset().mockImplementation(async (id: string, args: { status: string }) => { const room = rooms.records.get(id); if (!room) throw new Error("Owned audio conference required"); room.status = args.status; return room; });
+    rooms.list.mockReset().mockImplementation(async () => [...rooms.records.values()].filter((r) => r.status === "in-progress"));
+    web.create.mockReset().mockImplementation(async (args: { to: string; from: string; url: string; statusCallback: string }) => {
+      const physical: ApiPhysical = { sid: sid(), accountSid, to: args.to, from: args.from, direction: "outbound-api", parentCallSid: null,
+        status: "ringing", duration: null, dateCreated: new Date(), dateUpdated: new Date(), endTime: null, voiceUrl: args.url, statusCallback: args.statusCallback };
+      web.records.set(physical.sid, physical); return physical;
+    });
+    web.fetch.mockReset().mockImplementation(async (id: string) => { const physical = web.records.get(id); if (!physical) throw new Error("Owned audio API call required"); return physical; });
+    web.update.mockReset().mockImplementation(async (id: string, args: { status: string }) => {
+      const physical = web.records.get(id); if (!physical) throw new Error("Owned audio API call required");
+      physical.status = args.status; physical.endTime = new Date(); return physical;
+    });
+    const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server"); resetRateLimitsForTests();
     await clearFault();
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
@@ -111,9 +150,11 @@ describe("owned agent audio connection journal (#2879)", () => {
        ${conference ? phone : ""}, ${conference ? null : actor}, ${parent}, ${child}, 'active', ${randomUUID()}::uuid,
        now() + interval '5 minutes', now(), ${`${baseUrl}/api/voice-audio?reservation=${id}&event=parent`},
        ${conference ? room : null}, ${conference ? cf : null}, ${`${baseUrl}/api/auto-dial/status?credit_reservation=${id}&credit_leg=recipient`})`;
-    await sql`insert into public.call (sid, workspace, user_id, account_sid, "to", "from", direction, status, parent_call_sid)
-      values (${parent}, ${workspaceId}::uuid, ${actor}, ${accountSid}, '', ${`client:${actor}`}, 'inbound', 'in-progress', null),
-      (${child}, ${workspaceId}::uuid, ${actor}, ${accountSid}, ${customer}, ${callerId}, 'outbound-dial', 'in-progress', ${parent})`;
+    await sql`insert into public.call (sid, workspace, user_id, account_sid, "to", "from", direction, status, parent_call_sid, conference_id)
+      values (${parent}, ${workspaceId}::uuid, ${actor}, ${accountSid}, ${conference ? phone : ""}, ${conference ? callerId : `client:${actor}`},
+        ${conference ? "outbound-api" : "inbound"}, 'in-progress', null, ${conference ? room : null}),
+      (${child}, ${workspaceId}::uuid, ${actor}, ${accountSid}, ${customer}, ${callerId}, ${conference ? "outbound-api" : "outbound-dial"},
+        'in-progress', ${conference ? null : parent}, ${conference ? room : null})`;
     return { id, parent, child, room, cf, args: input({ callSid: child, expectedAgentSid: parent }) };
   }
   async function claim(row: Connection) {
@@ -124,6 +165,43 @@ describe("owned agent audio connection journal (#2879)", () => {
   function receipt(row: Connection, overrides: Partial<VoiceAudioProviderIdentity> = {}): VoiceAudioProviderIdentity {
     return { connectionId: row.id, event: "status", requestUrl: row.status_callback, accountSid,
       callSid: sid(), to: row.destination, from: row.caller_id, direction: "outbound-api", parentCallSid: null, ...overrides };
+  }
+  async function issued(args = input()) {
+    const row = await claim(await prepare(args)), accepted = await journal.recordVoiceAudioProvider(row, sid());
+    const result = await issueVoiceAudioInstruction(accepted, "1");
+    if (!result.ok) throw new Error(`Audio fixture instruction refused: ${result.reason}`);
+    return result.connection;
+  }
+  function joined(row: Connection, overrides: Partial<VoiceAudioConferenceEvent> = {}): VoiceAudioConferenceEvent {
+    return { workspaceId, accountSid, requestUrl: row.conference_callback, conferenceId: row.conference_id,
+      conferenceSid: row.conference_sid ?? `CF${randomUUID().replaceAll("-", "")}`, callSid: row.provider_sid ?? "",
+      participantLabel: `audio:${row.id}:${row.generation}`, muted: row.target_kind === "idle" && !row.source_agent_sid ? "false" : "true",
+      event: "participant-join", ...overrides };
+  }
+  async function apiPost(body: unknown = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() }) {
+    const { action } = await import("../../app/routes/api+/connect-phone-device.action.server");
+    return asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/connect-phone-device`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }))));
+  }
+  async function apiControl(row: Connection, method: "GET" | "DELETE" = "GET", targetWorkspace = workspaceId) {
+    const request = new Request(`${baseUrl}/api/connect-phone-device?workspaceId=${targetWorkspace}&connection_id=${row.id}`, { method });
+    if (method === "GET") { const { loader } = await import("../../app/routes/api+/connect-phone-device.loader.server"); return asRouteResponse(loader(routeArgs(request))); }
+    const { action } = await import("../../app/routes/api+/connect-phone-device.action.server"); return asRouteResponse(action(routeArgs(request)));
+  }
+  async function signedAudio(url: string, params: Record<string, string>, validSignature = true, extraFields: [string, string][] = []) {
+    const { action } = await import("../../app/routes/api+/voice-audio.action.server");
+    const body = new URLSearchParams([...Object.entries(params), ...extraFields]);
+    return asRouteResponse(action(routeArgs(new Request(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
+      "X-Twilio-Signature": validSignature ? twilio.getExpectedTwilioSignature("owned-audio-token", url, params) : "invalid" }, body }))));
+  }
+  async function signedPredictive(url: string, params: Record<string, string>) {
+    const { action } = await import("../../app/routes/api+/auto-dial/status.action.server");
+    return asRouteResponse(action(routeArgs(new Request(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
+      "X-Twilio-Signature": twilio.getExpectedTwilioSignature("owned-audio-token", url, params) }, body: new URLSearchParams(params) }))));
+  }
+  function voiceParams(row: Connection, providerSid = sid()) {
+    return { AccountSid: accountSid, CallSid: providerSid, To: row.destination, From: row.caller_id, Direction: "outbound-api", CallStatus: "in-progress" };
   }
 
   test("prepares an idle connection without claiming a contact, a customer hold or a debit", async () => {
@@ -153,6 +231,16 @@ describe("owned agent audio connection journal (#2879)", () => {
   test("a different replacement cannot bypass an existing pending attempt", async () => {
     await prepare();
     expect(await journal.prepareVoiceAudioConnection(input({ phoneNumber: otherPhone }))).toEqual({ ok: false, reason: "connection_pending" });
+  });
+  test.each(["failed", "canceled", "retired"])("a nonterminal %s leg must finish cleanup before another phone can ring", async (audioState) => {
+    const row = await claim(await prepare()), providerSid = sid();
+    await journal.recordVoiceAudioProvider(row, providerSid);
+    await sql`update public.workspace_voice_audio_connection set state = ${audioState} where id = ${row.id}::uuid`;
+    expect(await journal.prepareVoiceAudioConnection(input({ phoneNumber: otherPhone }))).toEqual({ ok: false, reason: "connection_pending" });
+    const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server");
+    const accepted = await journal.findVoiceAudioConnection(row.id); if (!accepted) throw new Error("Accepted audio operation required");
+    await observeVoiceAudioStatus(accepted, "completed", "0");
+    expect(await journal.prepareVoiceAudioConnection(input({ phoneNumber: otherPhone }))).toMatchObject({ ok: true, connection: { generation: 2 } });
   });
   test("concurrent retries create and send one physical agent leg", async () => {
     const args = input();
@@ -192,9 +280,15 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect((await state()).operations).toBe(0);
   });
   test("held customer credits cannot fund a new idle connection", async () => {
-    await funded();
+    const target = await funded();
+    await sql`update public.workspace_voice_reservation set user_id = ${otherActor} where id = ${target.id}::uuid`;
     await sql`update public.workspace set credits = 4 where id = ${workspaceId}::uuid`;
     expect(await journal.prepareVoiceAudioConnection(input())).toEqual({ ok: false, reason: "insufficient_credits" });
+  });
+  test("an idle connection cannot replace audio for the actor's funded browser call", async () => {
+    await funded();
+    expect(await journal.prepareVoiceAudioConnection(input())).toEqual({ ok: false, reason: "stale_audio" });
+    expect((await state()).operations).toBe(0);
   });
   test("replaces a funded customer's audio at zero available balance without a second hold", async () => {
     const target = await funded();
@@ -421,5 +515,303 @@ describe("owned agent audio connection journal (#2879)", () => {
     const rows = await db.select({ sid: call.sid }).from(call).where(and(eq(call.workspace, workspaceId),
       unreservedVoiceCallPredicate(workspaceId))).orderBy(desc(call.sid)).limit(1);
     expect(rows).toEqual([{ sid: legacySid }]);
+  });
+  test("accepted and answered are not a confirmed audio connection", async () => {
+    const row = await claim(await prepare()), accepted = await journal.recordVoiceAudioProvider(row, sid());
+    expect(accepted.state).toBe("joining");
+    const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server");
+    expect((await observeVoiceAudioStatus(accepted, "in-progress")).state).toBe("joining");
+    const result = await issueVoiceAudioInstruction(accepted);
+    expect(result).toMatchObject({ ok: true, connection: { state: "joining", committed_at: null } });
+  });
+  test("commits the first idle phone only after its owned conference join", async () => {
+    const row = await issued(), before = await state(), event = joined(row);
+    expect(await observeVoiceAudioConferenceEvent(event)).toMatchObject({ state: "active", conference_sid: event.conferenceSid });
+    const connected = await journal.findVoiceAudioConnection(row.id);
+    expect(connected?.joined_at).toBeInstanceOf(Date); expect(connected?.committed_at).toBeInstanceOf(Date);
+    expect(await state()).toEqual(before);
+    const xml = voiceAudioConferenceTwiml(row);
+    expect(xml).toContain('endConferenceOnExit="false"'); expect(xml).toContain('muted="false"');
+    expect(xml).toContain(`participantLabel="audio:${row.id}:1"`); expect(xml).toContain(`>${row.conference_id}</Conference>`);
+    expect(xml).not.toContain("<Number"); expect(xml).not.toContain("record=");
+  });
+  test("joins a live replacement muted and keeps the original customer and hold", async () => {
+    const target = await funded(), row = await issued(target.args), before = await state();
+    expect(voiceAudioConferenceTwiml(row)).toContain('muted="true"');
+    expect(await observeVoiceAudioConferenceEvent(joined(row))).toMatchObject({ state: "ready", committed_at: null, source_agent_sid: target.parent });
+    expect(await state()).toEqual(before);
+    const [parent] = await sql`select status from public.call where sid = ${target.parent}`;
+    expect(parent.status).toBe("in-progress");
+  });
+  test.each(["account", "room", "callback", "label", "mute", "conference SID"])("rejects a join with wrong %s", async (field) => {
+    const row = await issued(), event = joined(row);
+    if (field === "account") event.accountSid = `AC${"0".repeat(32)}`;
+    if (field === "room") event.conferenceId = `${actor}~${randomUUID()}`;
+    if (field === "callback") event.requestUrl += "&untrusted=1";
+    if (field === "label") event.participantLabel = `audio:${row.id}:2`;
+    if (field === "mute") event.muted = "true";
+    if (field === "conference SID") await sql`update public.workspace_voice_audio_connection set conference_sid = ${`CF${"f".repeat(32)}`} where id = ${row.id}::uuid`;
+    await expect(observeVoiceAudioConferenceEvent(event)).rejects.toThrow();
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ state: "joining", joined_at: null, committed_at: null });
+  });
+  test("cannot attribute an unknown participant or a different workspace to the audio owner", async () => {
+    const row = await issued();
+    expect(await observeVoiceAudioConferenceEvent(joined(row, { callSid: sid() }))).toBeNull();
+    expect(await observeVoiceAudioConferenceEvent(joined(row, { workspaceId: foreignId }))).toBeNull();
+    expect((await journal.findVoiceAudioConnection(row.id))?.state).toBe("joining");
+  });
+  test("does not accept a conference participant before its saved voice instruction", async () => {
+    const row = await claim(await prepare()), accepted = await journal.recordVoiceAudioProvider(row, sid());
+    await expect(observeVoiceAudioConferenceEvent(joined(accepted))).rejects.toThrow("does not match its conference");
+  });
+  test("duplicate conference joins retain the committed generation and timestamps", async () => {
+    const row = await issued(), event = joined(row), first = await observeVoiceAudioConferenceEvent(event);
+    expect(await observeVoiceAudioConferenceEvent(event)).toEqual(first);
+  });
+  test("a phone leave before its late join cannot reactivate the operation", async () => {
+    const row = await issued(), event = joined(row);
+    expect(await observeVoiceAudioConferenceEvent({ ...event, event: "participant-leave" })).toMatchObject({ state: "failed" });
+    expect(await observeVoiceAudioConferenceEvent(event)).toMatchObject({ state: "failed", committed_at: null });
+  });
+  test("a canceled replacement cannot become effective on a late join", async () => {
+    const row = await issued();
+    const { cancelOwnedVoiceAudioConnection } = await import("@/server/voice-audio-lifecycle.server");
+    await cancelOwnedVoiceAudioConnection({ workspaceId, userId: actor, connectionId: row.id });
+    expect(await observeVoiceAudioConferenceEvent(joined(row))).toMatchObject({ state: "joining", committed_at: null });
+  });
+  test("membership revocation between instruction and join prevents idle activation", async () => {
+    const row = await issued(); await sql`delete from public.workspace_member where workspace_id = ${workspaceId}`;
+    expect(await observeVoiceAudioConferenceEvent(joined(row))).toMatchObject({ state: "failed", committed_at: null });
+  });
+  test("a funded browser call started while the phone joins keeps its original audio", async () => {
+    const row = await issued(), target = await funded();
+    expect(await observeVoiceAudioConferenceEvent(joined(row))).toMatchObject({ state: "failed", committed_at: null });
+    const [customer] = await sql`select status, parent_call_sid from public.call where sid = ${target.child}`;
+    expect(customer).toEqual({ status: "in-progress", parent_call_sid: target.parent });
+    expect((await state()).reservations).toBe(1);
+  });
+  test("a funded browser call started before the phone answers prevents its first instruction", async () => {
+    const row = await claim(await prepare()), accepted = await journal.recordVoiceAudioProvider(row, sid());
+    await funded();
+    expect(await issueVoiceAudioInstruction(accepted)).toEqual({ ok: false, reason: "stale_audio" });
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ voice_issued_at: null });
+  });
+  test("an already issued instruction replays its saved room before mutable device checks", async () => {
+    const row = await issued();
+    await sql`update public."user" set verified_audio_numbers = '{}' where id = ${actor}::uuid`;
+    await sql`update public.workspace_number set suspended_at = now() where workspace = ${workspaceId}::uuid`;
+    const replay = await issueVoiceAudioInstruction(row);
+    expect(replay).toMatchObject({ ok: true, replayed: true, connection: { id: row.id, conference_id: row.conference_id } });
+  });
+  test("a later phone joins through the first participant's callback without retiring the current phone", async () => {
+    const first = await issued(), connected = await observeVoiceAudioConferenceEvent(joined(first));
+    if (!connected) throw new Error("First audio participant required");
+    const next = await issued(input({ phoneNumber: otherPhone }));
+    expect(next.conference_callback).toBe(first.conference_callback);
+    expect(voiceAudioConferenceTwiml(next)).toContain('muted="true"');
+    expect(await observeVoiceAudioConferenceEvent(joined(next))).toMatchObject({ state: "ready", committed_at: null });
+    expect((await journal.findVoiceAudioConnection(first.id))?.state).toBe("active");
+    await sql`update public.workspace_voice_audio_connection set state = 'retired', retired_at = now() where id = ${first.id}::uuid`;
+    expect(await observeVoiceAudioConferenceEvent(joined(connected, { event: "participant-leave" }))).toMatchObject({ state: "retired" });
+    expect((await journal.findVoiceAudioConnection(next.id))?.state).toBe("ready");
+  });
+  test("the session API creates one connection-only leg and returns an owned pending snapshot", async () => {
+    const response = await apiPost(); expect(response.status).toBe(200); expect(response.headers.get("Set-Cookie")).toBe("audio-session=refreshed");
+    const body = await response.json(); expect(body).toMatchObject({ success: true, connection_state: "joining", generation: 1, transport: "phone", cancel_requested: false });
+    const row = await journal.findVoiceAudioConnection(body.connection_id); if (!row) throw new Error("Saved API connection required");
+    expect(web.create).toHaveBeenCalledExactlyOnceWith({ to: phone, from: callerId, url: row.voice_url, method: "POST",
+      statusCallback: row.status_callback, statusCallbackMethod: "POST", statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] });
+    expect((await apiControl(row)).status).toBe(200);
+    expect(await state()).toMatchObject({ reservations: 0, attempts: 0, queue: 0, ledger: 0 });
+    expect(row.conference_id).not.toContain("undefined");
+  });
+  test("concurrent session retries send at most one provider POST", async () => {
+    const body = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() };
+    const responses = await Promise.all(Array.from({ length: 8 }, () => apiPost(body)));
+    expect(responses.every((r) => r.status === 200 || r.status === 409)).toBe(true);
+    expect(responses.some((r) => r.status === 200)).toBe(true); expect(web.create).toHaveBeenCalledTimes(1);
+    expect((await state()).operations).toBe(1);
+  });
+  test("API auth, tenant membership and device checks stop before provider create", async () => {
+    web.authenticated = false; expect((await apiPost()).status).toBe(401);
+    web.authenticated = true; web.userId = otherActor; expect((await apiPost()).status).toBe(404);
+    web.userId = actor; expect((await apiPost({ workspaceId: foreignId, phoneNumber: phone })).status).toBe(404);
+    expect((await apiPost({ workspaceId, phoneNumber: "+16135550777" })).status).toBe(403);
+    expect(web.create).not.toHaveBeenCalled(); expect((await state()).operations).toBe(0);
+  });
+  test("the API preserves the uniform 402 body before a new idle connection", async () => {
+    await sql`update public.workspace set credits = 0 where id = ${workspaceId}::uuid`;
+    const response = await apiPost(); expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toEqual({ error: "Insufficient credits", creditsError: true });
+    expect(web.create).not.toHaveBeenCalled();
+  });
+  test("the API exposes uncertain creation without retrying the provider POST", async () => {
+    web.create.mockRejectedValueOnce(Object.assign(new Error("Owned uncertain API response"), { status: 500 }));
+    const body = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() };
+    const first = await apiPost(body); expect(first.status).toBe(409);
+    await expect(first.json()).resolves.toMatchObject({ reason: "voice_audio_pending", connection_state: "creating" });
+    expect((await apiPost(body)).status).toBe(409); expect(web.create).toHaveBeenCalledTimes(1);
+  });
+  test("a late accepted API response honors cancellation instead of restoring audio", async () => {
+    let entered: () => void = () => undefined, release: () => void = () => undefined;
+    const posted = new Promise<void>((resolve) => { entered = resolve; }), acknowledged = new Promise<void>((resolve) => { release = resolve; });
+    const create = web.create.getMockImplementation(); if (!create) throw new Error("Owned provider create required");
+    web.create.mockImplementationOnce(async (...args) => { const physical = await create(...args); entered(); await acknowledged; return physical; });
+    const intent = randomUUID(), sending = apiPost({ workspaceId, phoneNumber: phone, connection_intent_id: intent });
+    await posted;
+    let canceled: Response | undefined, response: Response | undefined, stopsBeforeAck = -1;
+    try {
+      const [record] = await sql`select id from public.workspace_voice_audio_connection where workspace = ${workspaceId}::uuid and intent_id = ${intent}::uuid`;
+      const row = await journal.findVoiceAudioConnection(record.id); if (!row) throw new Error("In-flight audio journal required");
+      canceled = await apiControl(row, "DELETE"); stopsBeforeAck = web.update.mock.calls.length;
+    } finally { release(); response = await sending; }
+    if (!canceled || !response) throw new Error("Audio cancellation responses required");
+    expect(canceled.status).toBe(200);
+    await expect(canceled.json()).resolves.toMatchObject({ connection_state: "creating", cancel_requested: true });
+    expect(stopsBeforeAck).toBe(0); expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ connection_state: "canceled", cancel_requested: true });
+    expect(web.create).toHaveBeenCalledTimes(1); expect(web.update).toHaveBeenCalledTimes(1);
+  });
+  test("a definite provider API refusal has a safe visible error and no uncertain retry", async () => {
+    web.create.mockRejectedValueOnce(Object.assign(new Error("owned-provider-secret-marker"), { status: 400 }));
+    const body = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() };
+    const response = await apiPost(body); expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: "Unable to connect the agent device" });
+    expect((await apiPost(body)).status).toBe(409); expect(web.create).toHaveBeenCalledTimes(1);
+  });
+  test("GET and DELETE are owned by the session and cannot end another user's audio", async () => {
+    const response = await apiPost(), body = await response.json(), row = await journal.findVoiceAudioConnection(body.connection_id);
+    if (!row) throw new Error("Saved API connection required");
+    expect((await apiControl(row, "GET", foreignId)).status).toBe(404);
+    web.userId = otherActor; expect((await apiControl(row)).status).toBe(404); expect((await apiControl(row, "DELETE")).status).toBe(404);
+    expect(web.update).not.toHaveBeenCalled();
+    web.userId = actor; const canceled = await apiControl(row, "DELETE"); expect(canceled.status).toBe(200);
+    await expect(canceled.json()).resolves.toMatchObject({ connection_state: "canceled", cancel_requested: true });
+    expect(web.update).toHaveBeenCalledExactlyOnceWith(row.provider_sid, { status: "canceled" });
+  });
+  test("a signed phone answer needs press 1 before the saved conference is issued", async () => {
+    const row = await claim(await prepare()), params = voiceParams(row);
+    const response = await signedAudio(row.voice_url, params), prompt = await response.text();
+    expect(response.status).toBe(200); expect(prompt).toContain("<Gather"); expect(prompt).toContain('numDigits="1"'); expect(prompt).toContain("press 1");
+    expect(prompt).not.toContain("<Conference"); expect((await journal.findVoiceAudioConnection(row.id))?.voice_issued_at).toBeNull();
+    const confirmed = await signedAudio(row.voice_url, { ...params, Digits: "1" }), xml = await confirmed.text();
+    expect(confirmed.status).toBe(200); expect(xml).toContain(`>${row.conference_id}</Conference>`); expect(xml).not.toContain("<Number");
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ provider_sid: params.CallSid, state: "joining", committed_at: null });
+  });
+  test.each(["signature", "account", "destination", "sender", "direction", "parent", "callback", "alias", "duplicate"])(
+    "the signed endpoint rejects changed %s before issuing audio", async (field) => {
+      const row = await claim(await prepare()), params: Record<string, string> = voiceParams(row);
+      if (field === "account") params.AccountSid = `AC${"0".repeat(32)}`;
+      if (field === "destination") params.To = otherPhone;
+      if (field === "sender") params.From = otherPhone;
+      if (field === "direction") params.Direction = "inbound";
+      if (field === "parent") params.ParentCallSid = sid();
+      if (field === "alias") params.call_sid = sid();
+      const url = field === "callback" ? row.voice_url + "&extra=1" : row.voice_url;
+      const response = await signedAudio(url, params, field !== "signature", field === "duplicate" ? [["To", otherPhone]] : []);
+      expect(response.status).toBe(403);
+      expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ provider_sid: null, voice_issued_at: null, committed_at: null });
+    },
+  );
+  test("signed answered status cannot activate the transport; the owned join does", async () => {
+    const row = await claim(await prepare()), params = voiceParams(row);
+    expect((await signedAudio(row.status_callback, params)).status).toBe(204);
+    expect((await journal.findVoiceAudioConnection(row.id))?.state).toBe("joining");
+    expect((await signedAudio(row.voice_url, { ...params, Digits: "1" })).status).toBe(200);
+    const event = { AccountSid: accountSid, CallSid: params.CallSid, FriendlyName: row.conference_id, ConferenceSid: `CF${randomUUID().replaceAll("-", "")}`,
+      ParticipantLabel: `audio:${row.id}:1`, Muted: "false", StatusCallbackEvent: "participant-join" };
+    expect((await signedAudio(row.conference_callback, event)).status).toBe(204);
+    expect((await journal.findVoiceAudioConnection(row.id))?.state).toBe("active");
+    expect(await state()).toMatchObject({ reservations: 0, ledger: 0, attempts: 0, queue: 0 });
+  });
+  test.each(["", "2", "11"])("an absent or wrong confirmation %s cannot join customer audio", async (digits) => {
+    const row = await claim(await prepare()), params = { ...voiceParams(row), Digits: digits };
+    const response = await signedAudio(row.voice_url, params), xml = await response.text();
+    expect(response.status).toBe(200); expect(xml).toContain("<Hangup"); expect(xml).not.toContain("<Conference");
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ voice_issued_at: null, committed_at: null });
+  });
+  test("terminal signed audio status stays outside customer billing and outcomes", async () => {
+    const row = await claim(await prepare()), params = { ...voiceParams(row), CallStatus: "completed", CallDuration: "61" };
+    expect((await signedAudio(row.status_callback, params)).status).toBe(204);
+    expect((await signedAudio(row.status_callback, params)).status).toBe(204);
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ state: "failed", terminal_status: "completed" });
+    expect(await state()).toMatchObject({ ledger: 0, attempts: 0, queue: 0, reservations: 0 });
+  });
+  test("the first funded conference callback accepts replacement audio without dispatching a customer", async () => {
+    const target = await funded(true), row = await issued(target.args), before = await state();
+    const params = { AccountSid: accountSid, CallSid: row.provider_sid ?? "", FriendlyName: target.room, ConferenceSid: target.cf,
+      ParticipantLabel: `audio:${row.id}:1`, Muted: "true", StatusCallbackEvent: "participant-join" };
+    const response = await signedPredictive(row.conference_callback, params); expect(response.status).toBe(200);
+    expect((await journal.findVoiceAudioConnection(row.id))?.state).toBe("ready");
+    expect(web.create).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
+  });
+  test.each(["label", "mute"])("the funded callback rejects a wrong replacement %s before participant work", async (field) => {
+    const target = await funded(true), row = await issued(target.args);
+    const params = { AccountSid: accountSid, CallSid: row.provider_sid ?? "", FriendlyName: target.room, ConferenceSid: target.cf,
+      ParticipantLabel: field === "label" ? `audio:${row.id}:999` : `audio:${row.id}:1`, Muted: field === "mute" ? "false" : "true", StatusCallbackEvent: "participant-join" };
+    expect((await signedPredictive(row.conference_callback, params)).status).toBe(403);
+    expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ state: "joining", joined_at: null });
+    expect(web.create).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled();
+  });
+  test("a retired original browser cannot end the conference on its delayed leave", async () => {
+    const target = await funded(true), row = await issued(target.args);
+    await observeVoiceAudioConferenceEvent(joined(row));
+    await sql`update public.workspace_voice_audio_connection set state = 'active', committed_at = now() where id = ${row.id}::uuid`;
+    rooms.records.set(target.cf, { sid: target.cf, accountSid, friendlyName: target.room, status: "in-progress" });
+    const params = { AccountSid: accountSid, CallSid: target.parent, FriendlyName: target.room, ConferenceSid: target.cf,
+      StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" };
+    expect((await signedPredictive(row.conference_callback, params)).status).toBe(200);
+    expect(rooms.update).not.toHaveBeenCalled(); expect(rooms.records.get(target.cf)?.status).toBe("in-progress");
+    const [customer] = await sql`select status from public.call where sid = ${target.child}`;
+    expect(customer.status).toBe("in-progress"); expect((await state()).ledger).toBe(0);
+  });
+  test("an uncommitted replacement hangup keeps the existing customer conference", async () => {
+    const target = await funded(true), row = await issued(target.args);
+    await observeVoiceAudioConferenceEvent(joined(row));
+    rooms.records.set(target.cf, { sid: target.cf, accountSid, friendlyName: target.room, status: "in-progress" });
+    const event = { AccountSid: accountSid, CallSid: row.provider_sid ?? "", FriendlyName: target.room, ConferenceSid: target.cf,
+      ParticipantLabel: `audio:${row.id}:1`, Muted: "true", StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" };
+    expect((await signedPredictive(row.conference_callback, event)).status).toBe(200);
+    expect(rooms.update).not.toHaveBeenCalled(); expect(rooms.records.get(target.cf)?.status).toBe("in-progress");
+    expect((await journal.findVoiceAudioConnection(row.id))?.state).toBe("failed");
+  });
+  test("a newer committed audio generation fences a late old phone leave before its retirement stamp", async () => {
+    const target = await funded(true), first = await issued(target.args); await observeVoiceAudioConferenceEvent(joined(first));
+    await sql`update public.workspace_voice_audio_connection set state = 'active', committed_at = now() where id = ${first.id}::uuid`;
+    const next = await issued({ ...target.args, intentId: randomUUID(), phoneNumber: otherPhone, expectedAgentSid: first.provider_sid ?? "" });
+    await observeVoiceAudioConferenceEvent(joined(next));
+    await sql`update public.workspace_voice_audio_connection set state = 'failed' where id = ${first.id}::uuid`;
+    await sql`update public.workspace_voice_audio_connection set state = 'active', committed_at = now() where id = ${next.id}::uuid`;
+    rooms.records.set(target.cf, { sid: target.cf, accountSid, friendlyName: target.room, status: "in-progress" });
+    const event = { AccountSid: accountSid, CallSid: first.provider_sid ?? "", FriendlyName: target.room, ConferenceSid: target.cf,
+      ParticipantLabel: `audio:${first.id}:1`, Muted: "false", StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" };
+    expect((await signedPredictive(first.conference_callback, event)).status).toBe(200);
+    expect(rooms.update).not.toHaveBeenCalled(); expect((await journal.findVoiceAudioConnection(next.id))?.state).toBe("active");
+  });
+  test.each([false, true])("the current phone ends its conference even when terminal status arrives first: %s", async (statusFirst) => {
+    const target = await funded(true), row = await issued(target.args);
+    await observeVoiceAudioConferenceEvent(joined(row));
+    await sql`update public.workspace_voice_audio_connection set state = 'active', committed_at = now() where id = ${row.id}::uuid`;
+    rooms.records.set(target.cf, { sid: target.cf, accountSid, friendlyName: target.room, status: "in-progress" });
+    const status = { ...voiceParams(row, row.provider_sid ?? ""), CallStatus: "completed", CallDuration: "61" };
+    if (statusFirst) expect((await signedAudio(row.status_callback, status)).status).toBe(204);
+    const event = { AccountSid: accountSid, CallSid: row.provider_sid ?? "", FriendlyName: target.room, ConferenceSid: target.cf,
+      ParticipantLabel: `audio:${row.id}:1`, Muted: "false", StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" };
+    expect((await signedPredictive(row.conference_callback, event)).status).toBe(200);
+    expect(rooms.update).toHaveBeenCalledExactlyOnceWith(target.cf, { status: "completed" });
+    if (!statusFirst) expect((await signedAudio(row.status_callback, status)).status).toBe(204);
+    expect((await state()).ledger).toBe(0);
+    const [customer] = await sql`select status from public.call where sid = ${target.child}`;
+    expect(customer.status).toBe("in-progress");
+  });
+  test("a provider stop failure on the current phone returns 500 for retry", async () => {
+    const row = await issued(), event = joined(row); await observeVoiceAudioConferenceEvent(event);
+    rooms.records.set(event.conferenceSid, { sid: event.conferenceSid, accountSid, friendlyName: row.conference_id, status: "in-progress" });
+    rooms.update.mockRejectedValueOnce(new Error("Owned conference stop failure"));
+    const params = { AccountSid: accountSid, CallSid: row.provider_sid ?? "", FriendlyName: row.conference_id, ConferenceSid: event.conferenceSid,
+      ParticipantLabel: `audio:${row.id}:1`, Muted: "false", StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" };
+    expect((await signedAudio(row.conference_callback, params)).status).toBe(500);
+    expect((await signedAudio(row.conference_callback, params)).status).toBe(204);
+    expect(rooms.records.get(event.conferenceSid)?.status).toBe("completed");
   });
 });

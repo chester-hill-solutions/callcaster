@@ -57,8 +57,8 @@ Interactive specs:
 | `/api/campaigns/create-with-script` | POST | Integrator API | publicSdk | yes | `routes/api+/campaigns/create-with-script.route.tsx` | `docs/api-create-campaign-with-script.md` |  |
 | `/api/chat_sms` | POST | Integrator API | publicSdk | yes | `routes/api+/chat_sms.tsx` | `docs/api-send-sms.md` |  |
 | `/api/coaching-ack` | POST | User API | sessionOnly | yes | `routes/api+/coaching-ack.tsx` | `docs/api-telephony-control.md` |  |
-| `/api/connect-campaign-conference/:workspaceId/:campaignId` | GET | Provider Webhook | providerOnly | no | `routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route.tsx` | `docs/api-webhooks.md` | Twilio voice URL after connect-phone-device; returns TwiML. |
-| `/api/connect-phone-device` | POST | User API | sessionOnly | yes | `routes/api+/connect-phone-device.tsx` | `docs/api-telephony-control.md` |  |
+| `/api/connect-campaign-conference/:workspaceId/:campaignId` | GET | Provider Webhook | providerOnly | no | `routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route.tsx` | `docs/api-webhooks.md` | Legacy campaign conference TwiML. Owned agent audio uses /api/voice-audio. |
+| `/api/connect-phone-device` | POST, DELETE, GET | User API | sessionOnly | yes | `routes/api+/connect-phone-device.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/contact-audience` | DELETE | User API | sessionOnly | yes | `routes/api+/contact-audience.tsx` | `docs/api-data-management.md` |  |
 | `/api/contact-audience/bulk-delete` | DELETE | User API | sessionOnly | yes | `routes/api+/contact-audience/bulk-delete.route.tsx` | `docs/api-data-management.md` |  |
 | `/api/contact-form` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/contact-form.tsx` | `docs/api-internal-unsupported.md` | Marketing contact form; sends email via Resend. |
@@ -123,6 +123,7 @@ Interactive specs:
 | `/api/verify-audio-session` | POST, GET | User API | sessionOnly | yes | `routes/api+/verify-audio-session.tsx` | `docs/api-telephony-control.md` | Retired audio PIN flow; both methods return 410. |
 | `/api/verify-call-in-session` | GET | User API | sessionOnly | yes | `routes/api+/verify-call-in-session.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Retired audio PIN flow; returns 410. |
+| `/api/voice-audio` | POST | Provider Webhook | providerOnly | no | `routes/api+/voice-audio.tsx` | `docs/api-webhooks.md` | Operation-bound agent audio instructions, status and conference events. No customer dispatch or billing. |
 | `/api/workspace-api-keys` | POST, DELETE, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` | Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264). |
 | `/api/workspaces` | POST, GET | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId` | PATCH, DELETE, GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/route.tsx` | `docs/api-agent-quickstart.md` | Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session. |
@@ -162,5 +163,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **149**
+Total entries: **150**
 
