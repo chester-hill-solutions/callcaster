@@ -17,6 +17,7 @@ import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
+import { settleVoiceReservation } from "@/server/voice-credit-settlement.server";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -166,6 +167,14 @@ export async function billTerminalCallStatus(
   const isTerminal = TERMINAL_BILLABLE_CALL_STATUSES.includes(
     status as (typeof TERMINAL_BILLABLE_CALL_STATUSES)[number],
   );
+
+  if (call.workspace && (isTerminal || status === "canceled")) {
+    const settlement = await settleVoiceReservation({
+      workspaceId: call.workspace, callSid: call.sid, status, duration,
+      note: options.note ?? `Call ${call.sid}`,
+    });
+    if (settlement.handled) return settlement.billingResult;
+  }
 
   if (!call.workspace || !isTerminal || duration <= 0) {
     return null;

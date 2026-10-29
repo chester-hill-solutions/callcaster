@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Campaign test calls reserve their first-minute credits before dispatch. Completion settles the hold with the usage debit; uncertain provider results retain the hold. Voice and number-purchase reservations share available funds ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 - Changed: Campaign calling hours and SMS send windows use a compact summary that groups matching days and keeps exceptions, inactive days and all time intervals visible ([PR #3034](https://github.com/chester-hill-solutions/callcaster/pull/3034), [#2626](https://github.com/chester-hill-solutions/callcaster/issues/2626)).
 - Fixed: Call list selection controls identify each contact and the current page. The shared Rows per page control keeps keyboard paging and selection clear ([PR #3023](https://github.com/chester-hill-solutions/callcaster/pull/3023), [#2638](https://github.com/chester-hill-solutions/callcaster/issues/2638)).
 - Fixed: Contact search and Clear search have accessible names, and clearing a search returns focus to the search field ([PR #3010](https://github.com/chester-hill-solutions/callcaster/pull/3010), [#2616](https://github.com/chester-hill-solutions/callcaster/issues/2616)).

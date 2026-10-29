@@ -17,6 +17,8 @@ import {
 } from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { bindVoiceReservationCallback } from "@/server/voice-reservation-callback.server";
+import { VOICE_RESERVATION_QUERY_PARAM } from "@/lib/voice-credit-dispatch.server";
 
 export interface CallEvent {
     Called: string;
@@ -86,7 +88,7 @@ export const action = defineAction({
         return forbidden ?? { params, event, callSid };
     },
     sideEffects: ["db-write", "credit", "external"],
-    handler: async ({ auth }) => {
+    handler: async ({ auth, request }) => {
     const { params, event, callSid } = auth;
 
     try {
@@ -94,7 +96,12 @@ export const action = defineAction({
             throw new Error("Missing CallSid");
         }
 
-        const dbCall = await findCallBySid(callSid);
+        const reservationId = new URL(request.url).searchParams.get(VOICE_RESERVATION_QUERY_PARAM);
+        const dbCall = reservationId ? await bindVoiceReservationCallback({
+            reservationId, callSid, accountSid: params.AccountSid ?? "", to: params.To ?? "",
+            parentCallSid: params.ParentCallSid,
+            direction: params.Direction ?? "",
+        }) : await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
         if (!dbCall.workspace) throw new Error("Call missing workspace");
         if (dbCall.campaign_id == null) throw new Error("Call missing campaign_id");

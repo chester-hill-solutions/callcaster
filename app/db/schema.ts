@@ -19,6 +19,8 @@ import {
 import { relations, sql } from "drizzle-orm";
 export { audience_import_run, audience_import_row } from "./schema-audience-import";
 export { workspace_number_release } from "./schema-number-release";
+export { workspace_number_purchase } from "./schema-number-purchase";
+export { workspace_voice_reservation } from "./schema-voice-reservation";
 export { predictive_machine_operation } from "./schema-predictive-machine";
 export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
@@ -275,22 +277,6 @@ export const workspace_number = pgTable("workspace_number", {
   twilio_phone_number_sid: text(),
   type: text().notNull(),
   workspace: uuid().notNull(),
-});
-
-export const workspace_number_purchase = pgTable("workspace_number_purchase", {
-  id: uuid().primaryKey(),
-  workspace: uuid().notNull(),
-  actor_user_id: text().notNull(),
-  phone_number: text().notNull(),
-  account_sid: text().notNull(),
-  credits: integer().notNull(),
-  state: text().$type<"reserved" | "creating" | "provisioned" | "completed" | "cancelled">().notNull().default("reserved"),
-  provider_sid: text(),
-  last_error: text(),
-  lease_token: uuid().notNull(),
-  lease_expires_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
-  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
-  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
 });
 
 // ─── Script ───────────────────────────────────────

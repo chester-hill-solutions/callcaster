@@ -142,6 +142,7 @@ const steps = [
   "client/migrations/20261024000000_workspace_archive.sql",
   "client/migrations/20261024000001_sim_profile_markers.sql",
   "client/migrations/20261026000000_scope_inbound_offer_rpcs_by_workspace.sql",
+  "client/migrations/20261029000000_outbound_voice_credit_reservations.sql",
 ];
 
 /**
