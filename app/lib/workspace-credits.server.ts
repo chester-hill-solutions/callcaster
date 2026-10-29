@@ -1,13 +1,17 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { workspace } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
+import { outboundHeldCreditsSql } from "@/server/outbound-credit-reservations.server";
 
-/** Read workspace credit balance for dial/SMS gates (global `workspace` table). */
+/** Keep posted balances unchanged unless an outbound precheck requests availability. */
 export async function getWorkspaceCreditsBalance(
   workspaceId: string,
+  options: { excludeOutboundHolds?: boolean } = {},
 ): Promise<number | null> {
   const rows = await adminDb
-    .select({ credits: workspace.credits })
+    .select({ credits: options.excludeOutboundHolds
+      ? sql<number>`${workspace.credits} - ${outboundHeldCreditsSql(workspaceId)}`
+      : workspace.credits })
     .from(workspace)
     .where(eq(workspace.id, workspaceId))
     .limit(1);

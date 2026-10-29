@@ -21,10 +21,10 @@ Number rental cron uses a **separate** affordability check: monthly rental debit
 
 ## Block tier (hard)
 
-`app/lib/outbound-credit-gate.server.ts` is the single gate every outbound
-entry point calls — it owns the balance read, the unknown-workspace
-distinction, and the one locked blocked-response shape, so no call site
-hand-rolls its own credit check or its own error body anymore.
+`app/lib/outbound-credit-gate.server.ts` owns balance-only outbound prechecks,
+the unknown-workspace distinction and the shared blocked-response shape.
+Voice dispatch also requires an atomic reservation before the provider request;
+a precheck alone does not fund a call.
 
 ```ts
 import {
@@ -34,9 +34,13 @@ import {
 } from "@/lib/outbound-credit-gate.server";
 ```
 
-`requireOutboundCredits(workspaceId)` reads the balance and returns a plain
-discriminated result — no HTTP in it, so service-layer callers (not just
-route handlers) can use it directly:
+`requireOutboundCredits(workspaceId)` reads available credits after active voice
+and number-purchase holds. The balance and holds use one database snapshot, so
+settlement cannot combine the new balance with the old hold. Lease expiry does
+not release an uncertain send. Only settlement or verified release restores
+availability. The normal account balance still shows posted credits.
+
+The helper returns a plain result that services and routes can use:
 
 ```ts
 type OutboundCreditsResult =
@@ -70,7 +74,7 @@ site:
 |------|--------|------|
 | Staffed / queue dial | `app/routes/api+/dial.action.server.ts` | 404 (`outboundCreditsResponse`) |
 | IVR outbound | `app/routes/api+/ivr.action.server.ts` | 404 (`outboundCreditsResponse`) |
-| Connect phone device (browser dial) | `app/routes/api+/connect-phone-device.action.server.ts` | 404 (`outboundCreditsResponse`) |
+| Agent phone connection (connection only) | `app/routes/api+/connect-phone-device.action.server.ts` | 404 (`outboundCreditsResponse`) |
 | Auto-dial conference start | `app/lib/auto-dial-start.server.ts` | 404, mapped to `jsonError(..., 404)` by the route caller |
 | 1:1 chat SMS | `app/routes/api+/chat_sms.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
 | Chat composer send | `app/routes/workspaces+/$id/chats.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
@@ -85,13 +89,23 @@ site:
 
 ### Grace
 
-There is **no negative-balance grace** for new outbound. Existing product behavior blocks at `<= 0`. In-flight calls/messages started while balance was positive may still debit on completion.
+There is **no negative-balance grace** for new outbound. Balance-only prechecks
+block when available credits are `<= 0`. A new voice call must reserve its full
+first minute: two credits for IVR or four for staffed calls. Staffed setup and
+the customer share one hold. Only the customer leg settles the voice debit.
+Later minutes can still debit on completion; that existing per-call grace stays.
+
+SMS prechecks and each campaign batch budget use the balance after existing
+voice and number holds. A balance-only precheck does not reserve SMS usage
+across workers; that separate reservation work remains tracked in
+[#1271](https://github.com/chester-hill-solutions/callcaster/issues/1271).
 
 ## Helper
 
-New outbound entry points should call `requireOutboundCredits` from
+New balance-only prechecks should call `requireOutboundCredits` from
 `app/lib/outbound-credit-gate.server.ts` (see Block tier above), not the raw
-predicate. `shared/credit-floor.ts`'s `hasInsufficientCreditsForOutbound` /
+predicate. New voice dispatch must use the funded dispatch service as well.
+`shared/credit-floor.ts`'s `hasInsufficientCreditsForOutbound` /
 `OUTBOUND_CREDIT_FLOOR` still exist and back the gate internally — reach for
 them directly only in non-route, non-service code that needs the bare floor
 comparison (e.g. tests).
