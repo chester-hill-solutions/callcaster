@@ -6,6 +6,7 @@ import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { normalizeProviderStatus } from "@/lib/call-status";
 import { recordFundedPredictiveReceipt } from "./predictive-voice-receipt.server";
 import { matchesStoredVoiceCallbackUrl } from "@/lib/twilio/callback-url";
+import { voiceCallLegIdentity } from "@/lib/voice-bridge-identity";
 
 async function survivingCallContext(tx: CreditTransaction, reservation: VoiceReservation) {
   // Customer data can be removed after the provider accepts a call. Keep its
@@ -35,12 +36,10 @@ export async function persistReservedVoiceCall(
     ...context,
     ...(purpose === "setup" && reservation.conference_id ? { contact_id: null, outreach_attempt_id: null, queue_id: null } : {}),
     sid: callSid, workspace: reservation.workspace, account_sid: reservation.account_sid,
-    to: purpose === "setup" ? reservation.setup_to : reservation.recipient, from: reservation.caller_id,
-    parent_call_sid: purpose === "setup" || reservation.conference_id ? null : reservation.setup_sid,
+    ...voiceCallLegIdentity(reservation, purpose),
     user_id: reservation.user_id, conference_id: reservation.conference_id,
     status: normalizeProviderStatus(purpose === "setup" ? reservation.setup_terminal_status : reservation.terminal_status) ?? "initiated",
     duration: purpose === "setup" ? null : reservation.terminal_duration,
-    direction: purpose === "recipient" && reservation.setup_sid && !reservation.conference_id ? "outbound-dial" : "outbound-api",
   }).onConflictDoNothing({ target: call.sid });
   const [saved] = await tx.select().from(call).where(and(eq(call.sid, callSid), eq(call.workspace, reservation.workspace)));
   if (!saved || (saved.account_sid && saved.account_sid !== reservation.account_sid)) {

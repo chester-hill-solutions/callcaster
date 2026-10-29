@@ -61,12 +61,19 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 // JWT dep chain that does not load under this suite's module mocks.
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: vi.fn(async () => null),
+  resolveCanonicalTwilioWebhookUrl: () => "https://base.example/api/call",
   twilioWebhookForbidden: (message = "Invalid Twilio signature") =>
     new Response(message, { status: 403 }),
   twilioWebhookBadRequest: (message: string) => new Response(message, { status: 400 }),
   twilioWebhookNotFound: (message = "Not Found") => new Response(message, { status: 404 }),
   twilioWebhookInternalError: (message = "Internal Server Error") =>
     new Response(message, { status: 500 }),
+}));
+vi.mock("@/server/handset-voice-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/handset-voice-reservation.server")>(),
+  startPreparedHandsetVoiceRecipient: async (_args: unknown, build: (row: {
+    user_id: string; caller_id: string; recipient: string;
+  }) => unknown) => ({ instruction: build({ user_id: "user-1", caller_id: "+15550001111", recipient: "+15552223333" }) }),
 }));
 vi.mock("@/lib/workspace-members-db.server", () => ({
   getWorkspaceById: (...a: unknown[]) => mocks.getWorkspaceById(...a),
@@ -193,7 +200,11 @@ describe("api/call — outbound handset call", () => {
     fd.set("To", "+15552223333");
     fd.set("workspace_id", "ws-1");
     fd.set("client_identity", "agent-1");
-    fd.set("CallSid", "CA-outbound");
+    fd.set("credit_reservation", "10000000-0000-4000-8000-000000000001");
+    fd.set("CallSid", "CA00000000000000000000000000000001");
+    fd.set("AccountSid", "AC00000000000000000000000000000001");
+    fd.set("From", "client:agent-1");
+    fd.set("Direction", "inbound");
     return new Request("http://localhost/api/call", { method: "POST", body: fd });
   }
 
@@ -218,14 +229,14 @@ describe("api/call — outbound handset call", () => {
 
     expect(xml).toContain("<Stream");
     expect(xml).toContain('track="both_tracks"');
-    expect(xml).toContain('name="call-CA-outbound"');
+    expect(xml).toContain('name="call-CA00000000000000000000000000000001"');
     expect(xml).toContain("<Dial");
 
     expect(streamParameters(xml)).toMatchObject({
       workspaceId: "ws-1",
       userId: "user-1",
       direction: "outbound",
-      callSid: "CA-outbound",
+      callSid: "CA00000000000000000000000000000001",
     });
   });
 

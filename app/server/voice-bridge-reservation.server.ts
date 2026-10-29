@@ -8,6 +8,7 @@ import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import { logger } from "@/lib/logger.server";
 import type { DeferredEmit } from "@/lib/campaign-queue-db.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
+import { hasVoiceSetup, matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
 
 export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string; recipientVoiceUrl?: string };
 const TERMINAL = ["completed", "failed", "busy", "no-answer", "canceled"];
@@ -28,7 +29,7 @@ export async function startVoiceBridgeReservationInTransaction(
     eq(reservations.lease_token, reservation.lease_token), eq(reservations.state, "reserved"),
     gt(reservations.lease_expires_at, new Date()), eq(reservations.kind, "staffed"),
   )).returning();
-  if (!row?.setup_to) throw new Error("Voice bridge reservation is no longer owned");
+  if (!row || !hasVoiceSetup(row)) throw new Error("Voice bridge reservation is no longer owned");
   return row;
 }
 
@@ -37,7 +38,7 @@ export async function recordVoiceBridgeSetupProvider(reservation: VoiceReservati
     const [row] = await tx.select().from(reservations).where(and(
       eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
     )).for("update");
-    if (!row?.setup_to || !row.send_started_at || (row.setup_sid && row.setup_sid !== callSid)) {
+    if (!row || !hasVoiceSetup(row) || !row.send_started_at || (row.setup_sid && row.setup_sid !== callSid)) {
       throw new Error("Voice bridge setup does not match its dispatch");
     }
     if (row.setup_sid !== callSid && (row.lease_token !== reservation.lease_token || row.state !== "creating")) {
@@ -66,7 +67,7 @@ export type VoiceBridgeSetupCallback = {
 };
 
 function matchesSetup(row: VoiceReservation, args: VoiceBridgeSetupCallback) {
-  return row.setup_to && row.send_started_at && row.account_sid === args.accountSid &&
+  return !row.setup_client_identity && row.setup_to && row.send_started_at && row.account_sid === args.accountSid &&
     row.setup_to === args.to && row.caller_id === args.from && args.direction === "outbound-api" &&
     !args.parentCallSid && (row.setup_sid === null || row.setup_sid === args.callSid) &&
     (args.entryPoint === "voice" ? row.setup_voice_url : row.setup_status_callback) === args.requestUrl;
@@ -156,8 +157,7 @@ export async function observeVoiceBridgeSetupStatus(reservation: VoiceReservatio
       eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
       eq(reservations.lease_token, reservation.lease_token),
     )).for("update");
-    if (!row || row.setup_sid !== root.sid || row.account_sid !== root.accountSid || row.setup_to !== root.to ||
-        row.caller_id !== root.from || root.direction !== "outbound-api" || root.parentCallSid) {
+    if (!row || row.setup_sid !== root.sid || !matchesVoiceSetupRoot(row, root)) {
       throw new Error("Voice recovery setup does not match its dispatch");
     }
     await persistReservedVoiceCall(tx, row, root.sid, "setup");

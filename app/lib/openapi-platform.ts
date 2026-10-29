@@ -11,7 +11,10 @@ import {
   sessionCookieSecurity,
 } from "@/lib/openapi-integrator";
 
+import { handsetPathOverrides } from "@/lib/openapi-handset";
+
 export const platformPathOverrides: Record<string, Record<string, unknown>> = {
+  ...handsetPathOverrides,
   "/api/workspaces/{workspaceId}/conversations": {
     get: {
       operationId: "getWorkspaces_workspaceId_conversations",

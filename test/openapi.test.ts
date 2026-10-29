@@ -12,11 +12,34 @@ import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-s
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
 import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
+import { handsetDialPreparationBodySchema } from "../app/lib/schemas/api/common";
 import { zConversationSummaryMode, zWorkspaceUnreadCountResponse } from "../app/lib/api-generated/zod.gen";
 
 const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
+  test("documents funded handset preparation as session-only before SDK dialing", () => {
+    const path = "/api/workspaces/{workspaceId}/handset/session";
+    for (const spec of [openApiSpec, completeOpenApiSpec]) {
+      expect(spec.paths[path]?.post).toMatchObject({
+        security: [{ sessionCookie: [] }, { secureSessionCookie: [] }],
+        "x-callcaster-exposure": "sessionOnly",
+      });
+    }
+    const operation = openApiSpec.paths[path]?.post;
+    expect(operation?.operationId).toBe("prepareHandsetDial");
+    expect(operation?.responses).toHaveProperty("402");
+    expect(operation?.responses).toHaveProperty("409");
+    expect(operation?.responses).toHaveProperty("429");
+    expect(operation?.description).toContain("four credits");
+    expect(openApiSpec.components.schemas.HandsetDialPreparationRequest).toMatchObject({
+      required: ["to_number", "client_identity", "dial_intent_id"], additionalProperties: false,
+    });
+    const valid = { to_number: "+16135550599", client_identity: "handset-one", dial_intent_id: "10000000-0000-4000-8000-000000000001" };
+    expect(handsetDialPreparationBodySchema.safeParse(valid).success).toBe(true);
+    expect(handsetDialPreparationBodySchema.safeParse({ ...valid, user_id: "another-actor" }).success).toBe(false);
+    expect(handsetDialPreparationBodySchema.safeParse({ ...valid, dial_intent_id: "" }).success).toBe(false);
+  });
   test.each([
     { route: "/api/workspaces/:workspaceId/billing/checkout-session", path: "/api/workspaces/{workspaceId}/billing/checkout-session", method: "post" },
     { route: "/api/workspaces/:workspaceId/billing/sessions/:sessionId", path: "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}", method: "get" },

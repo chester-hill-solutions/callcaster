@@ -24,6 +24,7 @@ create table if not exists public.workspace_voice_reservation (
   operation_key text,
   user_id text,
   setup_to text,
+  setup_client_identity text,
   conference_id text,
   conference_sid text,
   predictive_operation_id uuid,
@@ -47,6 +48,8 @@ create table if not exists public.workspace_voice_reservation (
   last_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
+  constraint workspace_voice_reservation_sdk_setup
+    check (setup_client_identity is null or (setup_client_identity <> '' and kind = 'staffed' and setup_to is not null and setup_to = '' and user_id is not null and conference_id is null)),
   constraint workspace_voice_reservation_queue_generation
     check ((queue_id is null) = (queue_generation is null))
 );

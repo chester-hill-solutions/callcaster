@@ -9650,6 +9650,165 @@
       }
     },
     "/api/workspaces/{workspaceId}/handset/session": {
+      "post": {
+        "operationId": "prepareHandsetDial",
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "summary": "Prepare a funded handset dial",
+        "description": "Session authentication only. Reserve four credits for one staffed call before Device.connect. The client identity must belong to the user's active handset session. Send the returned reservation_id as credit_reservation in the SDK parameters. Repeated preparation for the same unsent intent returns the same hold. An accepted or uncertain root returns 409; a new dial action uses a new UUID. Token creation and inbound availability remain credit-free.",
+        "tags": [
+          "Telephony"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HandsetDialPreparationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One funded dial intent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandsetDialPreparationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid handset dial or unavailable caller ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Available credits cannot fund the call",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "creditsError"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Insufficient credits"
+                      ]
+                    },
+                    "creditsError": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The current session cannot dial",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace or owned handset session not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The intent already started or needs recovery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
+              }
+            }
+          },
+          "500": {
+            "description": "Unable to prepare the handset call",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId_handset_session",
         "summary": "DELETE /api/workspaces/:workspaceId/handset/session",
@@ -11409,6 +11568,47 @@
           },
           "error": {
             "type": "string"
+          }
+        }
+      },
+      "HandsetDialPreparationRequest": {
+        "type": "object",
+        "required": [
+          "to_number",
+          "client_identity",
+          "dial_intent_id"
+        ],
+        "properties": {
+          "to_number": {
+            "type": "string",
+            "description": "Destination phone number."
+          },
+          "client_identity": {
+            "type": "string",
+            "description": "Active handset session owned by the signed-in user."
+          },
+          "dial_intent_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Keep this UUID when retrying the same dial action."
+          }
+        },
+        "additionalProperties": false
+      },
+      "HandsetDialPreparationResponse": {
+        "type": "object",
+        "required": [
+          "reservation_id",
+          "expires_at"
+        ],
+        "properties": {
+          "reservation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
