@@ -1,5 +1,5 @@
 import { and, eq, gt, inArray, isNull, notInArray, notExists, or, sql } from "drizzle-orm";
-import { call, campaign_queue, workspace_voice_reservation as reservations } from "@/db/schema";
+import { call, campaign_queue, workspace_voice_audio_connection as audioConnections, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { normalizeProviderStatus, isTerminalStatus } from "@/lib/call-status";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
@@ -175,10 +175,14 @@ export async function findVoiceReservationForCall(workspaceId: string, callSid: 
 
 /** Apply before a legacy recovery LIMIT, including children not yet bound. */
 export function unreservedVoiceCallPredicate(workspaceId: string) {
-  return notExists(db.select({ id: reservations.id }).from(reservations).where(and(
+  const customerFunding = notExists(db.select({ id: reservations.id }).from(reservations).where(and(
     eq(reservations.workspace, workspaceId), or(eq(reservations.provider_sid, call.sid),
       eq(reservations.setup_sid, call.sid), eq(reservations.setup_sid, call.parent_call_sid)),
   )));
+  const agentAudio = notExists(db.select({ id: audioConnections.id }).from(audioConnections).where(and(
+    eq(audioConnections.workspace, workspaceId), eq(audioConnections.provider_sid, call.sid),
+  )));
+  return sql`${customerFunding} and ${agentAudio}`;
 }
 
 /** Use only after provider authentication; expose no cross-workspace metadata. */

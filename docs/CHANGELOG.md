@@ -24,6 +24,9 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Importing a phone into another audience reuses its workspace contact and preserves its saved details and opt-out state. The row report identifies reused contacts and ambiguous duplicate records ([PR #3087](https://github.com/chester-hill-solutions/callcaster/pull/3087), [#3085](https://github.com/chester-hill-solutions/callcaster/issues/3085)).
 
+- Changed: Added durable agent audio connection records with one provider send per attempt. Audio leg identity remains separate from customer billing and queue outcomes, including late events after retirement. The phone replacement API is still in development ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
+
 - Fixed: Outbound prechecks and SMS batch budgets exclude credits already held for voice calls or number purchases. Account balances keep showing posted credits, and uncertain calls keep their funding until recovery proves the outcome ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Outbound handset calls reserve one staffed call before dialing. Retries keep the same funded intent, and delayed replies cannot start a call after the agent leaves or ends the session. Only the recipient call settles the customer charge ([#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).

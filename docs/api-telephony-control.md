@@ -56,7 +56,46 @@ voice request budget.
 | GET | `/api/token` | Twilio client access token (`?workspace=`) — bearer or session |
 | GET | `/api/handset-token` | Handset-specific access token — bearer or session |
 | GET/POST | `/api/agent-status` | Read/update agent dialer status — bearer or session |
-| POST | `/api/connect-phone-device` | Connect browser device to campaign conference |
+| POST | `/api/connect-phone-device` | Connect a verified agent phone to a campaign conference |
+
+### Planned agent audio connection (#2879)
+
+This contract is in development. The current route accepts the connection-only
+POST body. Read, cancel and live replacement forms below are not available yet.
+
+A verified phone replaces both the microphone and speaker. Connection remains
+separate from customer dispatch: it does not claim or dial the first contact,
+take another customer hold, or write another customer voice debit.
+
+An idle phone request keeps the legacy body `{ workspaceId, phoneNumber,
+campaignId? }`. Send a stable UUID in `connection_intent_id` to replay the same
+attempt. The campaign, when supplied, must belong to the workspace. The phone
+must be verified for the signed-in user.
+
+For a live change, send `callSid`, `expected_agent_sid` and
+`connection_intent_id`. Omit `campaignId`; the server resolves the owned call
+and its campaign. Phone mode uses `phoneNumber` and optional `device: "phone"`.
+Computer mode uses `device: "computer"` and omits `phoneNumber`. The server
+resolves the user's client identity; callers cannot choose another agent.
+
+The response retains `success` and `callSid`, and adds `connection_id`,
+`connection_state`, `generation` and `transport`. Poll with
+`GET /api/connect-phone-device?workspaceId=…&connection_id=…`. Only **active**
+means the new transport is committed. Accepted, answered and **ready** mean
+that work remains. Keep the existing audio until active. A failed phone change
+keeps that audio and the original customer call. Manual calls issued before
+the parent-continuation capability return `409` for a live change.
+
+Retries keep the same intent. A pending or uncertain create returns `409`;
+recovery checks the original provider account and saved callback URLs before
+another action. A current funded call does not need more available credits
+to change its audio. Idle connection still requires available credits.
+
+`DELETE` with the same query cancels only the selected pending attempt or an
+idle connection. An uncertain create keeps its pending state until recovery
+can stop the accepted agent leg. It cannot end or advance the customer. End a
+live customer through the existing call control, or replace its audio with a
+new connection attempt.
 
 ## Outbound dial & hangup
 
