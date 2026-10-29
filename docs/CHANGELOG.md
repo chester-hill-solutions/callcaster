@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: Survey submissions reject contacts outside the survey workspace before saving a response. Recent responses show valid contact details and hide legacy foreign references ([PR #3077](https://github.com/chester-hill-solutions/callcaster/pull/3077), [#2864](https://github.com/chester-hill-solutions/callcaster/issues/2864)).
 - Security: Align the Twilio redirect dependency on the patched release so cross-origin redirects remove raw-array credentials and declared custom secret headers ([PR #3076](https://github.com/chester-hill-solutions/callcaster/pull/3076), [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073)).
 - Security: Update the API generator compiler to reject malformed AST metadata and keep prototype constructors blocked ([PR #3075](https://github.com/chester-hill-solutions/callcaster/pull/3075), [#3072](https://github.com/chester-hill-solutions/callcaster/issues/3072)).
 - Security: Auth aliases share the same 10-per-minute credential limits. New auth POST paths use a strict default, while sign-out and session revocation keep their 30-per-minute limits ([PR #3079](https://github.com/chester-hill-solutions/callcaster/pull/3079), [#2867](https://github.com/chester-hill-solutions/callcaster/issues/2867)).

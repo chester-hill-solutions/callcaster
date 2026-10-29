@@ -447,6 +447,11 @@ explicit locale and encoding (`initdb --locale=C --encoding=UTF8`). Shell locale
 settings can be invalid for the installed server. Use a dedicated directory and
 loopback port, and stop only that owned cluster after its readers finish.
 
+The compose bootstrap grants its public schema to the `callcaster` role. Use
+that role for an owned Docker fixture, or create it in that fixture before
+bootstrap. Verify the recorded container ID, label and loopback port before
+any schema reset; a missing fixture role is not an application failure.
+
 For the full real-Postgres suite, set `DATABASE_URL`, `DATABASE_DIRECT_URL` and
 `INTEGRATION_DB_URL` to the owned fixture in the command environment. Some suites
 gate on the app URL or import its direct client. The integration override alone

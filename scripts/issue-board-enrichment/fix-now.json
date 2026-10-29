@@ -180,17 +180,18 @@
       "drizzle/0000_baseline.sql"
     ],
     "existingTests": [
-      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted…"
+      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted…",
+      "At dev@03c3e15a, the new real-PostgreSQL route/service suite has 11 failing regressions and three passing valid controls. The candidate passes all 14 with real caller sessions and workspace API keys; no provider or email traffic is sent.",
+      "Removing the sink guard through an isolated test transform causes 10 failures; removing the read workspace join or bigint mapping causes one failure each. All three normal-submission controls remain green, and working source hashes stay unchanged.",
+      "All 14 cases pass with DATABASE_URL alone, INTEGRATION_DB_URL alone and conflicting loopback app URLs. All 83 survey PostgreSQL cases and 105 focused survey unit cases pass; typecheck passes and lint adds no warnings."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A contact id supplied by a caller must resolve to a contact in the survey's own workspace before it is stored, exactly as the public survey path does: app/lib/survey-public-action.server.ts:142-167 routes the id through app/lib/survey-respondent.server.ts:27-46, which applies `eq(contactTable.workspace, workspaceId)` so a foreign id simply does not resolve and the request is refused with 400."
     ],
     "size": "XS",
-    "risk": "low"
+    "risk": "low",
+    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. PR #3077 fixes the shared sink, recent-response read and bigint mapping. Full local CI passes at 0de271ac: 6,061 Node, 34 Bun and 1,541 UI cases; 11 existing skips. The final publication commit and exact-head remote checks must pass before merge approval is requested. API-key admission policy stays in #2863."
   },
   {
     "issueNumber": 2866,

@@ -178,8 +178,10 @@ trailing comma after a removed entry. The pure local check needs no GitHub scope
 `node --input-type=module -e 'import { loadEnrichment } from "./scripts/issue-board-lib.mjs"; loadEnrichment("scripts/issue-board-enrichment")'`.
 Preserve the enrichment files' UTF-8 characters and existing rendering. Review
 the diff for unrelated serialization changes before staging.
-For an atomic audit, render the selected issue with `buildBoard` and fresh native
-metadata, then replace only its complete section. `buildBoard` returns
+Validate the complete enrichment set before filtering. For an atomic audit,
+pass only the selected issue and its matching record to `buildBoard`, with
+fresh native metadata, then replace only its complete section. Never prune
+records from a partial issue list. `buildBoard` returns
 `{ md, counts }`; use `md` as the rendered text. Require the generated cause
 and test fields before writing. A multiline `$` can match the heading line,
 so use an explicit next-section or end-of-input boundary.

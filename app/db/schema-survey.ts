@@ -9,7 +9,7 @@
  *
  * Import from "@/db/schema" as before; this module is re-exported there.
  */
-import { pgTable, text, timestamp, integer, boolean, uuid, serial, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, uuid, serial, bigint, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { isoTimestamps } from "./schema-timestamps";
 
@@ -59,7 +59,7 @@ export const survey_response = pgTable(
     id: serial().notNull().primaryKey(),
     survey_id: serial().notNull(),
     result_id: text().notNull(),
-    contact_id: serial(),
+    contact_id: bigint({ mode: "number" }),
     started_at: timestamp({ withTimezone: true, mode: "string" }).notNull().defaultNow(),
     completed_at: timestamp({ withTimezone: true, mode: "string" }),
     last_page_completed: text(),
