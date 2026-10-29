@@ -312,8 +312,8 @@
     "issueNumber": 2871,
     "verdict": "fix-now",
     "recommendedTitle": "Tenant-facing GET /api/numbers falls back to the platform parent-account Twilio credential when workspace_id is omitted",
-    "summary": "Workspace-only number search is implemented locally. Focused tests and three mutation checks pass; full local CI, review and merge remain.",
-    "currentBehavior": "The local loader rejects missing or blank workspace_id with 400, checks membership before creating a client, preserves uniform non-member 404 and searches only through createWorkspaceTwilioInstance. The dev branch still has the parent-account fallback.",
+    "summary": "Workspace-only number search is implemented in PR #3078. Full local CI, focused tests and three mutation checks pass; review, merge and release verification remain.",
+    "currentBehavior": "PR #3078 rejects missing or blank workspace_id with 400, checks membership before creating a client, preserves uniform non-member 404 and searches only through createWorkspaceTwilioInstance. The dev branch still has the parent-account fallback.",
     "rootCause": "The optional workspace_id selected the provider identity. Omitting it bypassed membership and constructed a parent-account client. A broad provider catch also changed membership 404 into 500.",
     "resolution": "Require workspace_id, remove the parent fallback, and await membership outside the provider error handler. Keep local and toll-free searches on the workspace client. Mark workspace_id required in both published OpenAPI documents.",
     "lookIn": [
@@ -333,7 +333,7 @@
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Keep open and In progress until full CI, review, merge and release verification are complete. Native Priority, Effort and Enviornment are unset; no blocking relationships. Do not treat local source proof as a deployed fix."
+    "trackerRecommendation": "Keep open and In progress for PR #3078 review, merge and release verification. Native Priority, Effort and Enviornment are unset; no blocking relationships. Do not treat source proof as a deployed fix."
   },
   {
     "issueNumber": 2872,
