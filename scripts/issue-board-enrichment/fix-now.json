@@ -191,7 +191,7 @@
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. A scoped candidate fixes the shared sink, recent-response read and bigint mapping. Full local CI, exact-head remote checks and approved merge remain. API-key admission policy stays in #2863."
+    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. PR #3077 fixes the shared sink, recent-response read and bigint mapping. Full local CI passes at 0de271ac: 6,061 Node, 34 Bun and 1,541 UI cases; 11 existing skips. The final publication commit and exact-head remote checks must pass before merge approval is requested. API-key admission policy stays in #2863."
   },
   {
     "issueNumber": 2866,
