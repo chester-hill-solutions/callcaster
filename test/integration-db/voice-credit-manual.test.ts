@@ -92,6 +92,7 @@ describe("manual voice funding and ownership (#2879)", () => {
     recovery = await import("@/lib/voice-credit-recovery.server");
   });
   beforeEach(async () => {
+    await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server"); resetRateLimitsForTests();
     vi.clearAllMocks(); provider.records.clear(); delivery.jobs.length = 0; provider.accountSid = accountSid; principal.windowAllowed = true;
     provider.create.mockReset().mockImplementation(async (args: { to: string; from: string; url: string; statusCallback?: string }) => {
@@ -191,11 +192,13 @@ describe("manual voice funding and ownership (#2879)", () => {
   async function flushCallJobs() {
     const { callStatusSideEffectsParams } = await import("@/lib/worker/job-params.server");
     const { runCallStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
-    for (const job of delivery.jobs.splice(0)) {
+    const stored = await sql`select id, type, params from public.job where workspace_id = ${workspaceId}::uuid and type = 'call_status_side_effects' and status = 'queued'`;
+    for (const job of [...delivery.jobs.splice(0), ...stored]) {
       if (job.type !== "call_status_side_effects") continue;
       const args = callStatusSideEffectsParams.parse(job.params);
       await runCallStatusSideEffects({ callSid: args.sid, event: args.event });
     }
+    for (const job of stored) await sql`update public.job set status = 'completed' where id = ${job.id}`;
   }
   async function billWithoutQueueEffects(child: ProviderCall) {
     await status(child, "completed", "42");

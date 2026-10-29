@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 

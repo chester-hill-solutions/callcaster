@@ -88,6 +88,10 @@ describe("predictive start feedback", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start Dialing" }));
     await waitFor(() => expect(screen.getByLabelText("Conference")).toHaveTextContent("retry"));
     expect(fetch).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    const retryBody = JSON.parse(String(vi.mocked(fetch).mock.calls[1][1]?.body));
+    expect(firstBody.dial_intent_id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(retryBody.dial_intent_id).toBe(firstBody.dial_intent_id);
     expect(showError).toHaveBeenCalledTimes(1);
   });
 

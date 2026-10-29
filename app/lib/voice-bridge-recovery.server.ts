@@ -15,8 +15,8 @@ function matchesSetup(reservation: VoiceReservation, candidate: CallInstance) {
 
 function matchesRecipient(reservation: VoiceReservation, candidate: CallInstance) {
   return candidate.accountSid === reservation.account_sid && candidate.to === reservation.recipient &&
-    candidate.from === reservation.caller_id && candidate.direction === "outbound-dial" &&
-    candidate.parentCallSid === reservation.setup_sid;
+    candidate.from === reservation.caller_id && candidate.direction === (reservation.conference_id ? "outbound-api" : "outbound-dial") &&
+    (candidate.parentCallSid || null) === (reservation.conference_id ? null : reservation.setup_sid);
 }
 
 async function setupHistory(reservation: VoiceReservation, root: CallInstance, twilio: Twilio.Twilio) {
@@ -40,6 +40,9 @@ async function unknownSetup(reservation: VoiceReservation, twilio: Twilio.Twilio
 
 async function childEvidence(reservation: VoiceReservation, root: CallInstance, child: CallInstance, twilio: Twilio.Twilio) {
   if (!reservation.recipient_instruction_issued_at || !matchesRecipient(reservation, child)) return false;
+  if (reservation.conference_id) return isTwilioCallHistoryReady(child) && hasTwilioCallRequestHistory({
+    twilio, callSid: child.sid, voiceUrl: reservation.voice_url, statusCallback: reservation.status_callback,
+  });
   if (isTwilioCallHistoryReady(child) && await hasTwilioCallRequestHistory({
     twilio, callSid: child.sid, statusCallback: reservation.status_callback,
   })) return true;
@@ -48,11 +51,17 @@ async function childEvidence(reservation: VoiceReservation, root: CallInstance, 
 
 async function unknownRecipient(reservation: VoiceReservation, root: CallInstance, twilio: Twilio.Twilio) {
   if (!reservation.setup_sid || !reservation.recipient_instruction_issued_at) return null;
-  const children = await twilio.calls.list({ parentCallSid: reservation.setup_sid, limit: 20 });
-  const candidates = children.filter((child) => matchesRecipient(reservation, child));
-  if (candidates.length !== 1 || !candidates[0]) return null;
-  const child = candidates[0];
-  if (!await childEvidence(reservation, root, child, twilio)) return null;
+  const children = await twilio.calls.list(reservation.conference_id
+    ? { to: reservation.recipient, from: reservation.caller_id, limit: 20 }
+    : { parentCallSid: reservation.setup_sid, limit: 20 });
+  const started = reservation.recipient_instruction_issued_at.getTime();
+  const candidates = children.filter((child) => matchesRecipient(reservation, child) && (!reservation.conference_id ||
+    child.dateCreated?.getTime() >= started - 5_000 && child.dateCreated.getTime() <= started + 120_000));
+  if (!candidates.length || candidates.length > (reservation.conference_id ? 3 : 1)) return null;
+  const matches: CallInstance[] = [];
+  for (const candidate of candidates) if (await childEvidence(reservation, root, candidate, twilio)) matches.push(candidate);
+  if (matches.length !== 1 || !matches[0]) return null;
+  const child = matches[0];
   await recordVoiceReservationProvider(reservation, child.sid);
   return child;
 }
@@ -64,13 +73,17 @@ export async function reconcileVoiceBridge(reservation: VoiceReservation, twilio
   const owned = await observeVoiceBridgeSetupStatus({ ...reservation, setup_sid: root.sid }, root);
   if (owned.state === "released") return "released";
   if (owned.state === "settled") return "settled";
+  if (owned.conference_id && owned.recipient_refused_at) {
+    await twilio.calls(root.sid).update({ status: "completed" });
+    return "pending";
+  }
   const child = owned.provider_sid ? await twilio.calls(owned.provider_sid).fetch() : await unknownRecipient(owned, root, twilio);
   if (!child || !matchesRecipient(owned, child) || (owned.provider_sid && child.sid !== owned.provider_sid)) return "pending";
   const duration = terminalVoiceCallDuration(child.status, child.duration);
   if (duration === null) return "pending";
   await recordVoiceReservationProvider(owned, child.sid);
   const { call: saved } = await processCallStatusWebhook({ sid: child.sid, account_sid: child.accountSid, to: child.to, from: child.from,
-    parent_call_sid: root.sid, direction: child.direction, status: child.status, duration: String(duration),
+    parent_call_sid: owned.conference_id ? null : root.sid, direction: child.direction, status: child.status, duration: String(duration),
     date_updated: child.dateUpdated ?? new Date(), end_time: child.endTime ?? undefined,
   }, { workspaceId: owned.workspace, skipBilling: true });
   await settleRecoveredVoiceCall(saved);

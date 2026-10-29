@@ -7,3 +7,7 @@ vi.mock("@/server/voice-bridge-reservation.server", async (importOriginal) => ({
   findVoiceReservationForCall: async () => null,
   hasVoiceReservationCallBinding: async () => false,
 }));
+vi.mock("@/server/voice-terminal-outcome.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-terminal-outcome.server")>(),
+  enqueueFundedVoiceTerminalOutcome: async () => null,
+}));

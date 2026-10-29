@@ -1,10 +1,11 @@
 import {
   deferVoiceReservation, recordVoiceReservationProvider, releaseUnsentVoiceReservation,
-  reserveVoiceCredits, startVoiceReservation,
-  type VoiceDispatchUrls,
+  reserveVoiceCredits, startVoiceReservation, knownVoiceReservationProviderSid,
+  type VoiceDispatchUrls, type VoiceReservation,
 } from "@/server/voice-credit-reservation.server";
 import { data as routeData } from "react-router";
 import { outboundCreditsResponse } from "@/lib/outbound-credit-gate.server";
+import { logger } from "@/lib/logger.server";
 import { AppError, ErrorCode } from "@/lib/errors.server";
 
 export const VOICE_RESERVATION_QUERY_PARAM = "credit_reservation";
@@ -53,25 +54,41 @@ export async function dispatchReservedVoiceCall(
   voice.searchParams.set(VOICE_RESERVATION_QUERY_PARAM, reserved.reservation.id);
   const urls = { voiceUrl: voice.toString(), statusCallback: callback.toString() };
   let reservation = reserved.reservation;
-  let attempted = false;
-  let created = false;
   try {
     reservation = await startVoiceReservation(reservation, urls);
     await args.beforeCreate?.();
-    attempted = true;
-    const call = await args.create(urls);
+  } catch (error) {
+    await releaseUnsentVoiceReservation(reservation, "not_sent");
+    throw error;
+  }
+  return dispatchStartedVoiceCall(reservation, () => args.create(urls));
+}
+
+/** The owner has committed its send checkpoint; never retry the provider POST. */
+export async function dispatchStartedVoiceCall<T extends { sid: string }>(
+  reservation: VoiceReservation, create: () => Promise<T>,
+) {
+  if (reservation.state !== "creating" || !reservation.send_started_at || !reservation.voice_url || !reservation.status_callback ||
+      reservation.lease_expires_at.getTime() <= Date.now()) {
+    throw new VoiceDispatchUncertainError(reservation.id, new Error("Voice send checkpoint is not owned"));
+  }
+  let created = false;
+  try {
+    const call = await create();
     created = true;
     await recordVoiceReservationProvider(reservation, call.sid);
-    return { ok: true as const, callSid: call.sid, replayed: false, queueGeneration: reservation.queue_generation };
+    return { ok: true as const, callSid: call.sid, call, replayed: false, queueGeneration: reservation.queue_generation };
   } catch (error) {
-    if (!attempted) {
-      await releaseUnsentVoiceReservation(reservation, "not_sent");
-    } else if (!created && isDefiniteVoiceCreateRejection(error)) {
+    let knownSid: string | null = null;
+    try { knownSid = await knownVoiceReservationProviderSid(reservation); }
+    catch (receiptError) { logger.error("voice_credit.receipt_read_failed", receiptError); }
+    if (knownSid) return { ok: true as const, callSid: knownSid, call: undefined, replayed: true, queueGeneration: reservation.queue_generation };
+    if (!created && isDefiniteVoiceCreateRejection(error)) {
       await releaseUnsentVoiceReservation(reservation, "rejected");
-    } else {
-      await deferVoiceReservation(reservation, "Provider creation or call persistence needs recovery");
-      throw new VoiceDispatchUncertainError(reservation.id, error);
+      throw error;
     }
-    throw error;
+    try { await deferVoiceReservation(reservation, "Provider creation or call persistence needs recovery"); }
+    catch (deferError) { logger.error("voice_credit.uncertainty_record_failed", deferError); }
+    throw new VoiceDispatchUncertainError(reservation.id, error);
   }
 }

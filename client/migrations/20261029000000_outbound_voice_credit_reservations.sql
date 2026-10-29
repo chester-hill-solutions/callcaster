@@ -24,9 +24,13 @@ create table if not exists public.workspace_voice_reservation (
   operation_key text,
   user_id text,
   setup_to text,
+  conference_id text,
+  conference_sid text,
+  predictive_operation_id uuid,
   setup_voice_url text,
   setup_status_callback text,
   recipient_instruction_issued_at timestamptz,
+  recipient_refused_at timestamptz,
   setup_terminal_at timestamptz,
   setup_terminal_status text,
   terminal_status text,
@@ -303,3 +307,112 @@ begin
   return primary_rows;
 end;
 $function$;
+
+
+-- A funded or uncertain provider send remains pending after its queue lease ages.
+CREATE OR REPLACE FUNCTION public.fail_exhausted_campaign_queue_contacts(campaign_id_pro integer) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+  failed_count integer;
+  policy record;
+begin
+  select * into policy from public.campaign_queue_policy();
+
+  update public.campaign_queue cq
+  set
+    queue_state = 'failed',
+    dequeued_at = now(),
+    assigned_to_user_id = null,
+    provider_status = 'failed',
+    claimed_at = null,
+    dequeued_reason = coalesce(cq.dequeued_reason, 'Max queue attempts exceeded')
+  where cq.campaign_id = campaign_id_pro
+    and cq.dequeued_at is null
+    and cq.attempt_count >= policy.max_attempts
+    and cq.queue_state in ('queued', 'assigned', 'failed')
+    and not exists (
+      select 1 from public.workspace_voice_reservation r
+      where r.workspace = cq.workspace and r.queue_id = cq.id
+        and r.state in ('reserved', 'creating', 'active')
+    );
+
+  get diagnostics failed_count = row_count;
+  return failed_count;
+end;
+$$;
+
+CREATE OR REPLACE FUNCTION public.campaign_queue_has_pending_work(campaign_id_pro integer, stale_after interval DEFAULT NULL::interval) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+declare
+  pending_count integer;
+  policy record;
+begin
+  select * into policy from public.campaign_queue_policy();
+
+  select count(*)::integer
+  into pending_count
+  from public.campaign_queue cq
+  where cq.campaign_id = campaign_id_pro
+    and cq.dequeued_at is null
+    and (
+      cq.queue_state = 'queued'
+      or (
+        cq.queue_state = 'assigned'
+        and cq.claimed_at is not null
+        and cq.claimed_at >= now() - coalesce(stale_after, policy.stale_after)
+        and cq.attempt_count < policy.max_attempts
+      )
+    );
+
+  return pending_count > 0 or exists (
+    select 1 from public.workspace_voice_reservation r
+    where r.campaign_id = campaign_id_pro
+      and r.workspace = (select workspace from public.campaign where id = campaign_id_pro)
+      and r.state in ('reserved', 'creating', 'active')
+  );
+end;
+$$;
+
+CREATE OR REPLACE FUNCTION public.reset_stale_campaign_queue_claims(campaign_id_pro integer, stale_after interval DEFAULT NULL::interval) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+declare
+  reset_count integer;
+  policy record;
+begin
+  select * into policy from public.campaign_queue_policy();
+
+  perform public.fail_exhausted_campaign_queue_contacts(campaign_id_pro);
+
+  update public.campaign_queue cq
+  set
+    queue_state = 'queued',
+    assigned_to_user_id = null,
+    claimed_at = null,
+    provider_status = null
+  where cq.campaign_id = campaign_id_pro
+    and cq.dequeued_at is null
+    and cq.queue_state = 'assigned'
+    and cq.claimed_at is not null
+    and cq.claimed_at < now() - coalesce(stale_after, policy.stale_after)
+    and cq.attempt_count < policy.max_attempts
+    and not exists (
+      select 1 from public.workspace_voice_reservation r
+      where r.workspace = cq.workspace and r.queue_id = cq.id
+        and r.state in ('reserved', 'creating', 'active')
+    )
+    and not exists (
+      select 1 from public.predictive_machine_operation op
+      where op.workspace = cq.workspace
+        and op.campaign_id = cq.campaign_id
+        and op.successor_queue_id = cq.id
+        and op.send_started_at is not null
+        and op.state in ('continuing', 'uncertain')
+    );
+
+  get diagnostics reset_count = row_count;
+  return reset_count;
+end;
+$$;

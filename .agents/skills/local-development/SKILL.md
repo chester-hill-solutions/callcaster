@@ -137,8 +137,9 @@ temporary worktrees whose readers have stopped; keep source, proof artifacts
 and user files. A disk-space failure is not a green gate: rerun the full gate
 after recovery.
 
-Scope an isolated integration-test DATABASE_URL to the bootstrap and database test
-commands. The reset compose fixture deliberately has no deployment ledger. Do not
+Scope an isolated integration fixture's DATABASE_URL, DATABASE_DIRECT_URL and
+INTEGRATION_DB_URL to its bootstrap and database test commands. Set all three to
+the owned fixture so lazy direct connections cannot use another environment. The reset compose fixture deliberately has no deployment ledger. Do not
 carry that test URL into ci:local and then claim its ledger failure is code drift.
 Keep the full normal-environment CI result and the real database proof separate;
 never mark missing migrations as applied merely to pass the ledger guard.

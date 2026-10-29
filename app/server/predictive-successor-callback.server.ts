@@ -1,3 +1,4 @@
+import { matchesStoredVoiceCallbackUrl } from "@/lib/twilio/callback-url";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { call, job, predictive_machine_operation } from "@/db/schema";
@@ -17,23 +18,6 @@ const callbackBinding = z.object({
   attemptId: z.coerce.number().int().positive(),
   callSid: z.string().regex(/^CA[0-9a-f]{32}$/i),
 });
-
-function matchesStatusUrl(actual: string, saved: string | null) {
-  if (!saved) return false;
-  const received = new URL(actual);
-  const reserved = new URL(saved);
-  const entries = (url: URL) =>
-    JSON.stringify(
-      [...url.searchParams.entries()]
-        .map((entry) => JSON.stringify(entry))
-        .sort(),
-    );
-  return (
-    received.origin === reserved.origin &&
-    received.pathname === reserved.pathname &&
-    entries(received) === entries(reserved)
-  );
-}
 
 /** Call only after requireTwilioSignature validates the unchanged URL and body. */
 export async function recordPredictiveSuccessorCallback(
@@ -68,7 +52,7 @@ export async function recordPredictiveSuccessorCallback(
     });
     if (
       request.method !== "POST" ||
-      !matchesStatusUrl(signedUrl, operation.successor_status_url) ||
+      !matchesStoredVoiceCallbackUrl(signedUrl, operation.successor_status_url) ||
       binding.attemptId !== operation.successor_attempt_id ||
       !operation.send_started_at ||
       !parent?.account_sid ||

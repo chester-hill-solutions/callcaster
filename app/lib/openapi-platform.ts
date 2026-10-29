@@ -271,7 +271,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       "x-callcaster-capability": "calls.start",
       security: apiKeyOrSessionSecurity,
       description:
-        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
+        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for setup and the first eligible recipient before provider dispatch. Reuse optional `dial_intent_id` for an unknown start result; an accepted retry returns the original conference and sends no new setup. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
       requestBody: {
         required: true,
         content: {
@@ -282,7 +282,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       },
       responses: {
         "200": {
-          description: "Conference started",
+          description: "Conference setup accepted, or the original accepted start replayed",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/DialerStartResponse" },
@@ -290,10 +290,18 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           },
         },
         "400": errorResponse("Validation error"),
+        "402": {
+          description: "Available credits cannot fund setup and the first recipient; no provider call was made",
+          content: { "application/json": { schema: { type: "object" as const, required: ["error", "creditsError"],
+            properties: { error: { type: "string" as const, enum: ["Insufficient credits"] }, creditsError: { type: "boolean" as const, enum: [true] } },
+          } } },
+        },
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Insufficient role or MFA enrollment required"),
         "404": errorResponse("Campaign not found"),
+        "409": errorResponse("Start is pending provider verification, or no eligible recipient can be admitted now; retry the same intent"),
         "429": rateLimitResponse,
+        "500": errorResponse("Provider call was rejected or a local operation failed"),
       },
     },
   },

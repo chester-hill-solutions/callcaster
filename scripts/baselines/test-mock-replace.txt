@@ -92,13 +92,6 @@ test/auto-dial-room.route.test.ts::@/lib/object-storage.server#1
 test/auto-dial-room.route.test.ts::@/lib/twilio-webhook.server#1
 test/auto-dial-room.route.test.ts::@/lib/user-audio.server#1
 test/auto-dial-room.route.test.ts::@/lib/workspace-members-db.server#1
-test/auto-dial-start.server.test.ts::@/lib/campaign-ivr.server#1
-test/auto-dial-start.server.test.ts::@/lib/database/campaign.server#1
-test/auto-dial-start.server.test.ts::@/lib/database/workspace.server#1
-test/auto-dial-start.server.test.ts::@/lib/env.server#1
-test/auto-dial-start.server.test.ts::@/lib/telephony-db.server#1
-test/auto-dial-start.server.test.ts::@/lib/user-audio.server#1
-test/auto-dial-start.server.test.ts::@/lib/workspace-credits.server#1
 test/auto-dial-status.test.ts::@/lib/auth.server#1
 test/auto-dial-status.test.ts::@/lib/auto-dial.server#1
 test/auto-dial-status.test.ts::@/lib/campaign-queue-db.server#1
@@ -106,7 +99,6 @@ test/auto-dial-status.test.ts::@/lib/env.server#1
 test/auto-dial-status.test.ts::@/lib/logger.server#1
 test/auto-dial-status.test.ts::@/lib/telephony-db.server#1
 test/auto-dial-status.test.ts::@/lib/twilio-webhook.server#1
-test/auto-dial.server.test.ts::@/lib/campaign-queue-db.server#1
 test/auto-dial.server.test.ts::@/lib/database/workspace.server#1
 test/auto-dial.server.test.ts::@/lib/db-rpc.server#1
 test/auto-dial.server.test.ts::@/lib/env.server#1
@@ -192,7 +184,6 @@ test/campaign-ivr-dispatch.test.ts::@/lib/logger.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/outbound-credit-gate.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/telephony-db.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/twilio-ivr-runtime.server#1
-test/campaign-queue-db.claim.test.ts::@/lib/workspace-events.server#1
 test/campaign-queue.route.test.ts::@/lib/auth.server#1
 test/campaign-queue.route.test.ts::@/lib/campaign-queue-db.server#1
 test/campaign-queue.route.test.ts::@/lib/campaign-queue-search.server#1

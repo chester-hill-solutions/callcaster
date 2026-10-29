@@ -10,12 +10,19 @@ import {
   findCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { requireTwilioSignature, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { isMachineAnswered } from "@/lib/ivr-machine.server";
+import { bindVerifiedVoiceSetupRequest } from "@/lib/voice-bridge-webhook.server";
+import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
+import { predictiveConferenceCallbackUrl } from "@/server/predictive-conference-reservation.server";
+import type { VoiceReservation } from "@/server/voice-credit-reservation.server";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 
 function resolveUserIdFromConferenceName(conferenceName: string): string {
     // Conference names are generated as `${userId}~${uuid}`. The user id is a UUID,
@@ -68,7 +75,7 @@ const triggerAutoDialer = async (conferenceId: string, campaignId: string, works
     });
 };
 
-const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string) => {
+const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string, callbackUrl?: string) => {
     const twiml = createVoiceResponse();
     const conferenceName = dbCall.conference_id?.toString() ?? '';
 
@@ -92,7 +99,7 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: str
     dial.conference({
         beep: 'onExit',
         endConferenceOnExit: true,
-        statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
+        statusCallback: callbackUrl ?? `${env.BASE_URL()}/api/auto-dial/status`,
         statusCallbackEvent: ['join', 'leave', 'modify'],
     }, `${conferenceName}`);
 
@@ -104,10 +111,11 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: str
 const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
     const conferenceId = dbCall.conference_id?.toString() ?? '';
     const userId = resolveUserIdFromConferenceName(conferenceId);
-    return await addToConference(conferenceId, dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', userId, dbCall.sid ?? '');
+    return addToConference({ conferenceId, campaignId: String(dbCall.campaign_id ?? ''), workspaceId: dbCall.workspace?.toString() ?? '', userId, callSid: dbCall.sid ?? '' });
 };
 
-async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string, callSid: string) {
+async function addToConference(context: { conferenceId: string; campaignId: string; workspaceId: string; userId: string; callSid: string }, funded?: VoiceReservation) {
+    const { conferenceId, campaignId, workspaceId, userId, callSid } = context;
     const twiml = createVoiceResponse();
     const workspace = await getWorkspaceById(workspaceId);
     appendLiveTranscriptionStreamTwiml({
@@ -127,11 +135,11 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
     const dial = twiml.dial();
     dial.conference({
         beep: 'false',
-        statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
+        statusCallback: funded ? predictiveConferenceCallbackUrl(funded) : `${env.BASE_URL()}/api/auto-dial/status`,
         statusCallbackEvent: ['join', 'leave', 'modify'],
         endConferenceOnExit: false,
     }, conferenceId);
-    await triggerAutoDialer(conferenceId, campaignId, workspaceId, userId);
+    if (!funded) await triggerAutoDialer(conferenceId, campaignId, workspaceId, userId);
     return new Response(twiml.toString(), {
         headers: { 'Content-Type': 'text/xml' }
     });
@@ -147,29 +155,47 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
     return false;
 }
 
+async function handleFundedSetup(request: Request, callbackParams: Record<string, string>, conferenceName: string, callSid: string) {
+  const funded = await bindVerifiedVoiceSetupRequest(request, callbackParams);
+  if (funded instanceof Response) return funded;
+  if (funded.conference_id !== conferenceName || funded.state === "released" || funded.state === "settled" || funded.setup_terminal_at)
+    return new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } });
+  return addToConference({ conferenceId: conferenceName, campaignId: String(funded.campaign_id ?? ""),
+    workspaceId: funded.workspace, userId: funded.user_id ?? "", callSid }, funded);
+}
+
 export const action = defineAction({
   auth: async ({ request }) => {
     const formData = await request.clone().formData();
-    const callSid = formData.get("CallSid") as string;
-    const forbidden = await requireTwilioSignature(request, { callSid });
-    return forbidden ?? null;
+    const callbackParams = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const callSid = callbackParams.CallSid ?? callbackParams.call_sid;
+    const forbidden = await requireTwilioSignature(request, { callSid, params: callbackParams });
+    if (forbidden) return forbidden;
+    if (!normalizeVerifiedVoiceParams(callbackParams)) return twilioWebhookForbiddenHangup();
+    const event = parseTwilioVoiceCallback(callbackParams);
+    if (!event.callSid) return new Response(hangupTwiml(), { status: 400, headers: { "Content-Type": "text/xml" } });
+    return { callbackParams, callSid: event.callSid, answeredBy: event.answeredBy ?? "", callStatus: event.callStatus,
+      called: callbackParams.Called ?? callbackParams.To ?? "" };
   },
   sideEffects: ["db-write", "twilio", "external"],
-  handler: async ({ request, params }) => {
+  handler: async ({ request, params, auth }) => {
     const conferenceName = params.roomId as string;
-    const formData = await request.clone().formData();
-    const callSid = formData.get("CallSid") as string;
-    const answeredBy = formData.get("AnsweredBy") as string;
-    const callStatus = formData.get("CallStatus") as string;
-    const called = (formData.get("Called") ?? "").toString();
+    const { callbackParams, callSid, answeredBy, callStatus, called } = auth;
 
     let response: Response;
 
     try {
+      const query = new URL(request.url).searchParams;
+      if (query.get("credit_leg") === "setup") return handleFundedSetup(request, callbackParams, conferenceName, callSid);
+      const blocked = await bindVerifiedVoiceReservationRequest(request, callbackParams, "voice");
+      if (blocked) return blocked;
       const dbCall = await fetchCallData(callSid);
-      const machinePhase = new URL(request.url).searchParams.get("machine");
+      if (query.has("credit_reservation") && dbCall.conference_id !== conferenceName)
+        return new Response(hangupTwiml(), { status: 403, headers: { "Content-Type": "text/xml" } });
+      const machinePhase = query.get("machine");
+      const workspaceId = String(dbCall.workspace ?? ""), campaignId = String(dbCall.campaign_id ?? "");
       const binding = {
-        workspaceId: dbCall.workspace?.toString() ?? "",
+        workspaceId,
         callSid,
         conferenceId: conferenceName,
       };
@@ -177,19 +203,16 @@ export const action = defineAction({
         return await predictiveMachineResponse(
           binding,
           machinePhase,
-          new URL(request.url).searchParams.get("operation"),
+          query.get("operation"),
         );
-      const campaign = await fetchCampaignData(
-        dbCall.campaign_id?.toString() ?? "",
-        dbCall.workspace?.toString() ?? "",
-      );
+      const campaign = await fetchCampaignData(campaignId, workspaceId);
 
       if (
-        await checkUserDevices(
-          dbCall.contact_id?.toString() ?? "",
+        !query.has("credit_reservation") && await checkUserDevices(
+          String(dbCall.contact_id ?? ""),
           conferenceName,
           called,
-          campaign.caller_id?.toString() ?? "",
+          String(campaign.caller_id ?? ""),
         )
       ) {
         return await handleDeviceCheck(dbCall);
@@ -199,7 +222,8 @@ export const action = defineAction({
           response = await predictiveMachineResponse(binding);
         } else {
           //This is a human answer
-          response = await handleHumanAnswer(dbCall, called);
+          const funded = query.has("credit_reservation") ? await findVoiceReservationForCall(workspaceId, callSid) : null;
+          response = await handleHumanAnswer(dbCall, called, funded ? predictiveConferenceCallbackUrl(funded) : undefined);
         }
       }
     } catch (error) {

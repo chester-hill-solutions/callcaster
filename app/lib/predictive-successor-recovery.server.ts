@@ -1,12 +1,19 @@
 import { TERMINAL_CALL_STATUSES } from "@/lib/telephony-db.server";
 import { eq } from "drizzle-orm";
-import { call } from "@/db/schema";
+import { call, outreach_attempt } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import type { PredictiveMachineOperation } from "@/server/predictive-machine-operation.server";
-import { savePredictiveSuccessorCall } from "@/server/predictive-machine-continuation.server";
+import { savePredictiveSuccessorCall, claimPredictiveContinuation } from "@/server/predictive-machine-continuation.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { hasTwilioCallRequestHistory, isTwilioCallHistoryReady } from "@/lib/twilio-call-history.server";
 import type { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
+import { findPredictiveVoiceReservation } from "@/server/predictive-voice-receipt.server";
+import { recoverVoiceReservationCall } from "@/lib/voice-credit-recovery.server";
+import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
+import { terminalVoiceCallDuration } from "@/lib/voice-recovery-duration";
+import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
+import { requestVoiceReservationRecovery, type VoiceReservation } from "@/server/voice-credit-reservation.server";
+import { machineBinding } from "@/server/predictive-machine-operation.server";
 
 function requireRecoverableSuccessor(
   operation: PredictiveMachineOperation,
@@ -55,6 +62,8 @@ export async function recoverPredictiveSuccessorCall(
     throw new Error("Predictive successor provider identity does not match");
   if (!TERMINAL_CALL_STATUSES.has(candidate.status))
     throw new Error("Predictive successor is not terminal");
+  const funded = await findPredictiveVoiceReservation(operation.workspace, operation.id);
+  if (funded) return recoverFundedSuccessor(operation, candidate, funded);
   const signedEvidence =
     operation.successor_callback_sid === candidateSid &&
     operation.successor_callback_status === candidate.status;
@@ -88,6 +97,25 @@ export async function recoverPredictiveSuccessorCall(
     },
     { recovery: true, terminalStatus: candidate.status },
   );
+}
+
+async function recoverFundedSuccessor(operation: PredictiveMachineOperation, candidate: CallInstance, funded: VoiceReservation) {
+    const attempt = await createTenantDb(funded.workspace).outreach_attempt.findFirst({ where: eq(outreach_attempt.id, funded.outreach_attempt_id ?? 0) });
+    if (attempt && (attempt.campaign_id !== funded.campaign_id || attempt.contact_id !== funded.contact_id || attempt.user_id !== funded.user_id))
+      throw new Error("Predictive successor outreach binding changed");
+    if (candidate.accountSid !== funded.account_sid || candidate.to !== funded.recipient || candidate.from !== funded.caller_id ||
+        candidate.parentCallSid || funded.provider_sid && funded.provider_sid !== candidate.sid)
+      throw new Error("Predictive successor does not match its funding");
+    if (!funded.provider_sid) await recoverVoiceReservationCall(funded, candidate.sid);
+    const duration = terminalVoiceCallDuration(candidate.status, candidate.duration ?? null);
+    const { call: saved } = await processCallStatusWebhook({ sid: candidate.sid, account_sid: candidate.accountSid,
+        to: candidate.to, from: candidate.from, parent_call_sid: null, direction: "outbound-api", status: candidate.status,
+        ...(duration === null ? {} : { duration: String(duration) }), date_updated: candidate.dateUpdated ?? new Date(),
+    }, { workspaceId: funded.workspace, skipBilling: true });
+    if (duration !== null) await settleRecoveredVoiceCall(saved);
+    else await requestVoiceReservationRecovery(funded.id);
+    return (await claimPredictiveContinuation(machineBinding(operation), operation.id)).operation;
+
 }
 
 async function requireSuccessorHistory(

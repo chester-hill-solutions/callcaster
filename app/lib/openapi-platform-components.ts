@@ -109,6 +109,10 @@ export const platformOpenApiComponents = {
       type: "object" as const,
       required: ["caller_id", "selected_device"] as const,
       properties: {
+        dial_intent_id: {
+          type: "string" as const, format: "uuid",
+          description: "Reuse this ID when retrying the same conference start. A new call session needs a new ID.",
+        },
         caller_id: {
           type: "string" as const,
           description: "E.164 caller ID to present on outbound dials.",

@@ -6,6 +6,8 @@ import {
   job,
   outreach_attempt,
   predictive_machine_operation as operationTable,
+  campaign_queue,
+  workspace,
 } from "@/db/schema";
 import { db, type Database } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -22,6 +24,8 @@ import {
   PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE,
   PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
+import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { needsPredictiveTerminalContinuation } from "@/lib/predictive-terminal-status";
 
 export type PredictiveMachineOperation = typeof operationTable.$inferSelect;
 export type MachineBinding = {
@@ -250,21 +254,30 @@ export async function queueRecoveredPredictiveContinuation(
 ) {
   if (!parent.successor_attempt_id)
     throw new Error("Recovered successor attempt missing");
-  const tdb = createTenantDb(parent.workspace, tx);
+  return queuePredictiveTerminalContinuation(tx, {
+    workspace: parent.workspace, callSid: successorCallSid, attemptId: parent.successor_attempt_id,
+    campaignId: parent.campaign_id, conferenceId: parent.conference_id, userId: parent.user_id, ackUrl: parent.ack_url,
+  });
+}
+
+async function queuePredictiveTerminalContinuation(tx: Tx, input: {
+  workspace: string; callSid: string; attemptId: number; campaignId: number; conferenceId: string; userId: string; ackUrl: string;
+}) {
+  const tdb = createTenantDb(input.workspace, tx);
   const existing = await tdb.predictive_machine_operation.findFirst({
-    where: eq(operationTable.call_sid, successorCallSid),
+    where: eq(operationTable.call_sid, input.callSid),
   });
   if (existing) return;
   const id = randomUUID();
-  const ackUrl = new URL(parent.ack_url);
+  const ackUrl = new URL(input.ackUrl);
   ackUrl.searchParams.set("operation", id);
   const [operation] = await tdb.predictive_machine_operation.insert({
     id,
-    call_sid: successorCallSid,
-    outreach_attempt_id: parent.successor_attempt_id,
-    campaign_id: parent.campaign_id,
-    conference_id: parent.conference_id,
-    user_id: parent.user_id,
+    call_sid: input.callSid,
+    outreach_attempt_id: input.attemptId,
+    campaign_id: input.campaignId,
+    conference_id: input.conferenceId,
+    user_id: input.userId,
     audio_file: null,
     ack_url: ackUrl.href,
     state: "dropped",
@@ -274,6 +287,24 @@ export async function queueRecoveredPredictiveContinuation(
   if (!operation)
     throw new Error("Recovered terminal continuation was not saved");
   await outbox(tx, PREDICTIVE_MACHINE_CONTINUE_JOB_TYPE, operation);
+}
+
+/** The recipient's own AMD journal, if present, owns its next turn. */
+export async function queueFundedPredictiveContinuation(reservation: VoiceReservation) {
+  if (!reservation.conference_id || !reservation.provider_sid || !reservation.outreach_attempt_id || !reservation.campaign_id ||
+      !reservation.user_id || !reservation.queue_id || !reservation.queue_generation || !reservation.voice_url ||
+      !needsPredictiveTerminalContinuation(reservation.terminal_status)) return;
+  const queueId = reservation.queue_id, queueGeneration = reservation.queue_generation;
+  const input = { workspace: reservation.workspace, callSid: reservation.provider_sid, attemptId: reservation.outreach_attempt_id,
+    campaignId: reservation.campaign_id, conferenceId: reservation.conference_id, userId: reservation.user_id, ackUrl: reservation.voice_url };
+  await db.transaction(async (tx) => {
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, reservation.workspace)).for("no key update");
+    const [queue] = await tx.select({ id: campaign_queue.id }).from(campaign_queue).where(and(
+      eq(campaign_queue.workspace, reservation.workspace), eq(campaign_queue.id, queueId),
+      eq(campaign_queue.dispatch_generation, queueGeneration), eq(campaign_queue.voice_reservation_id, reservation.id),
+    )).for("update");
+    if (queue) await queuePredictiveTerminalContinuation(tx, input);
+  });
 }
 
 /** Commit issuance before returning XML. An expired owner cannot emit audio. */

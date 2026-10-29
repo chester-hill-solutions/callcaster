@@ -5,7 +5,6 @@ app/lib/audience-detail.server.ts::@/server/db	1
 app/lib/audience-upload-db.server.ts::@/server/db	1
 app/lib/audit-event.server.ts::@/server/db	1
 app/lib/auth.server.ts::@/server/admin-db	1
-app/lib/auto-dial.server.ts::@/server/db	1
 app/lib/call-coaching-ack.server.ts::@/server/admin-db	1
 app/lib/call-coaching-hydration.server.ts::@/server/admin-db	1
 app/lib/call-log.server.ts::@/server/db	1

@@ -1,6 +1,6 @@
 # Live Operations API
 
-Bearer/session routes for dialer, call screen, handset, and call log. Not available with workspace API keys alone.
+Bearer/session routes for dialer, call screen, handset, and call log. Dialer start also accepts a workspace API key with an authorized `agentUserId`. The other routes below require a user session.
 
 ## Call log
 
@@ -17,6 +17,10 @@ Bearer/session routes for dialer, call screen, handset, and call log. Not availa
 | GET | `/api/handset-token?workspace_id=` | Twilio token (legacy flat path) |
 
 ## Call screen
+
+`POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` accepts `caller_id`, `selected_device`, and an optional UUID `dial_intent_id`. Use the same intent ID when retrying a request whose result is unknown. Use a new ID for a new call session. Workspace API keys also require `agentUserId`; the selected agent must have the caller role or above.
+
+The start reserves four available credits for the first eligible recipient before it calls the agent. The setup and first recipient share this hold. The recipient call starts when the agent joins the conference. Later recipients each need a new hold. A credit refusal returns 402 before any provider call. An uncertain provider result retains its hold for recovery.
 
 | Method | Path | Purpose |
 | --- | --- | --- |

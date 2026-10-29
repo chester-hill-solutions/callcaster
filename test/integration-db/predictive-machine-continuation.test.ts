@@ -45,6 +45,7 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
       typeof import("@/lib/database/workspace.server")
     >()),
     createWorkspaceTwilioInstance: vi.fn(async () => ({
+      accountSid: "ACfixture",
       calls: Object.assign(
         () => ({ fetch: provider.fetch, events: { list: provider.events } }),
         { create: provider.create, list: provider.callList },
@@ -54,6 +55,10 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
     })),
   };
 });
+vi.mock("@/lib/recipient-calling-window", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/recipient-calling-window")>(),
+  recipientCallingWindowStatus: () => ({ allowed: true, timezone: "UTC", reason: "owned_fixture_clock" }),
+}));
 
 const describeDb = fixture.url ? describe : describe.skip;
 if (!fixture.probe)
@@ -139,6 +144,7 @@ if (!fixture.probe)
         sid: childSid,
         accountSid: "ACfixture",
         from: "+15559876543",
+        to: "+15551230002", direction: "outbound-api", parentCallSid: null, duration: null,
         status: "queued",
         dateUpdated: new Date(),
         startTime: null,
@@ -158,10 +164,15 @@ if (!fixture.probe)
         expect(table.name).toBeTruthy();
         await sql`insert into public."user" (id,username) values (${user}, ${`predictive-${user}`})`;
         await sql`insert into public.workspace (id,name,credits,twilio_data) values (${workspace}, 'Predictive continuation fixture', 10000, ${sql.json({ sid: "ACfixture", authToken: "fixture-token" })})`;
+        await sql`insert into public.workspace_number (workspace,phone_number,type,capabilities)
+          values (${workspace}, '+15559876543', 'local', '{"voice":true}'::jsonb)`;
         const [row] =
           await sql`insert into public.campaign (workspace,title,type,status,caller_id,voicemail_drop_enabled,voicemail_file)
       values (${workspace}, 'Predictive continuation fixture', 'live_call', 'running', '+15559876543', true, 'fixture.mp3') returning id`;
         campaign = Number(row.id);
+        const schedule = Object.fromEntries(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) =>
+          [day, { active: true, intervals: [{ start: "00:00", end: "12:00" }, { start: "12:00", end: "00:00" }] }]));
+        await sql`update public.campaign set schedule = ${sql.json(schedule)}, start_date = '2000-01-01', end_date = '2100-01-01' where id = ${campaign}`;
         const contacts =
           await sql`insert into public.contact (workspace,phone) values
       (${workspace}, '+15551230001'), (${workspace}, '+15551230002'), (${workspace}, '+15551230003') returning id`;
@@ -178,6 +189,9 @@ if (!fixture.probe)
           await import("@/routes/api+/auto-dial/status.action.server"));
       });
       beforeEach(async () => {
+        await sql`delete from public.workspace_voice_reservation where workspace=${workspace}`;
+        await sql`delete from public.transaction_history where workspace=${workspace}`;
+        await sql`update public.workspace set credits=10000 where id=${workspace}`;
         await sql`delete from public.predictive_machine_operation where workspace=${workspace}`;
         await sql`delete from public.job where workspace_id=${workspace}`;
         await sql`delete from public.call where workspace=${workspace}`;
@@ -297,12 +311,12 @@ if (!fixture.probe)
         expect(Number(child.outreach_attempt_id)).toBe(
           pending.successor_attempt_id,
         );
-        expect(child.status).toBe("queued");
+        expect(child.status).toBe("completed");
         expect(Number(child.queue_id)).toBe(queueId);
         expect(child.account_sid).toBe("ACfixture");
         expect(
           await sql`select id from public.job where workspace_id=${workspace} and type='twilio_open_sync'`,
-        ).toHaveLength(1);
+        ).toHaveLength(0);
         await recoverInWorker();
         await freshProcess("continued");
         expect(provider.create).toHaveBeenCalledTimes(1);
@@ -468,7 +482,7 @@ if (!fixture.probe)
         async ({ status, callbackFirst }) => {
           const pending = await loseSuccessor();
           expect((await signedStatus(status)).body).toMatchObject({
-            resolved: false,
+            success: true,
           });
           const candidate = {
             ...createdCall(),
@@ -481,14 +495,9 @@ if (!fixture.probe)
           provider.events.mockResolvedValue([]);
           await sql`insert into public.campaign_queue (workspace,campaign_id,contact_id,queue_state,queue_order,attempt_count,attempts)
           values (${workspace},${campaign},${controlContact},'queued',2,0,0)`;
-          const callbackJobs =
-            await sql`select * from public.job where workspace_id=${workspace} and idempotency_key like 'predictive-successor-callback:%'`;
-          expect(callbackJobs).toHaveLength(1);
-          if (callbackFirst)
-            await worker.jobHandlers.predictive_machine_reconcile(
-              callbackJobs[0],
-            );
-          else await freshProcess("uncertain", Number(callbackJobs[0].id));
+          const outcomeJobs = await sql`select id from public.job where workspace_id=${workspace} and idempotency_key=${`funded-voice-terminal:${childSid}`}`;
+          expect(outcomeJobs).toHaveLength(1);
+          await recoverInWorker(!callbackFirst);
           expect(provider.events).not.toHaveBeenCalled();
           const [childOperation] =
             await sql`select * from public.predictive_machine_operation where workspace=${workspace} and call_sid=${childSid}`;
@@ -497,17 +506,7 @@ if (!fixture.probe)
             await sql`select * from public.job where workspace_id=${workspace} and type='predictive_machine_continue' and params->>'operationId'=${childOperation.id}`;
           expect(childJobs).toHaveLength(1);
           const [childJob] = childJobs;
-          const [syncJob] =
-            await sql`select * from public.job where workspace_id=${workspace} and type='twilio_open_sync'`;
-          provider.callList.mockResolvedValue([
-            { sid: parentSid, status: "in-progress" },
-            candidate,
-          ]);
-          if (callbackFirst)
-            expect((await signedStatus(status)).status).toBe(200);
-          const sync = worker.jobHandlers.twilio_open_sync;
-          if (!sync) throw new Error("Status sync worker missing");
-          await sync(syncJob);
+          expect(await sql`select id from public.job where workspace_id=${workspace} and type='twilio_open_sync'`).toHaveLength(0);
           expect((await signedStatus(status)).status).toBe(200);
           expect(provider.create).toHaveBeenCalledTimes(1);
           const nextSid = `CA${randomUUID().replaceAll("-", "")}`;
@@ -534,7 +533,7 @@ if (!fixture.probe)
           provider.create.mockImplementationOnce(async () => {
             const result = await signedStatus(status);
             expect(result.status).toBe(200);
-            expect(result.body).toMatchObject({ resolved: false });
+            expect(result.body).toMatchObject({ success: true });
             return createdCall();
           });
           await service.runPredictiveMachineContinuation(params());
@@ -560,7 +559,7 @@ if (!fixture.probe)
           expect(provider.create.mock.calls[1]?.[0]?.to).toBe("+15551230003");
           expect(
             await sql`select id from public.job where workspace_id=${workspace} and type='twilio_open_sync'`,
-          ).toHaveLength(1);
+          ).toHaveLength(0);
         },
       );
       test.each([
@@ -602,20 +601,20 @@ if (!fixture.probe)
           expect(saved.successor_callback_sid).toBe(
             mode === "conflicting SID" ? childSid : null,
           );
-          expect(saved.successor_call_sid).toBeNull();
+          expect(saved.successor_call_sid).toBe(mode === "conflicting SID" ? childSid : null);
           expect(saved.state).toBe("uncertain");
           expect(
-            await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'predictive-successor-callback:%'`,
+            await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'funded-voice-terminal:%'`,
           ).toHaveLength(mode === "conflicting SID" ? 1 : 0);
           expect(provider.create).toHaveBeenCalledTimes(1);
         },
       );
-      test("signed callback evidence rolls back when its recovery outbox fails", async () => {
+      test("signed callback evidence rolls back when its funded outcome outbox fails", async () => {
         await loseSuccessor();
         const name = `reject_callback_${workspace.replaceAll("-", "")}`;
         try {
           await sql.unsafe(`create function public.${name}() returns trigger language plpgsql as $$ begin
-            if NEW.workspace_id='${workspace}'::uuid and NEW.idempotency_key like 'predictive-successor-callback:%' then
+            if NEW.workspace_id='${workspace}'::uuid and NEW.idempotency_key like 'funded-voice-terminal:%' then
               raise exception 'fixture callback outbox unavailable';
             end if; return NEW; end; $$`);
           await sql.unsafe(
@@ -625,7 +624,7 @@ if (!fixture.probe)
           expect((await operation()).successor_callback_sid).toBeNull();
           expect((await operation()).successor_callback_status).toBeNull();
           expect(
-            await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'predictive-successor-callback:%'`,
+            await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'funded-voice-terminal:%'`,
           ).toHaveLength(0);
         } finally {
           try {
@@ -638,7 +637,7 @@ if (!fixture.probe)
         expect((await signedStatus("busy")).status).toBe(200);
         expect((await operation()).successor_callback_sid).toBe(childSid);
         expect(
-          await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'predictive-successor-callback:%'`,
+          await sql`select id from public.job where workspace_id=${workspace} and idempotency_key like 'funded-voice-terminal:%'`,
         ).toHaveLength(1);
         expect(provider.create).toHaveBeenCalledTimes(1);
       });
@@ -684,7 +683,7 @@ if (!fixture.probe)
         const url = new URL(pending.successor_status_url);
         url.searchParams.append("workspace", workspace);
         expect((await signedStatus("busy", { url: url.href })).status).toBe(
-          500,
+          403,
         );
         expect((await operation()).successor_callback_sid).toBeNull();
         expect(
@@ -775,7 +774,7 @@ if (!fixture.probe)
         ).toHaveLength(1);
       });
       test.each(["network loss", "server rejection"])(
-        "%s parks the uncertain successor and refuses another send",
+        "%s retains the funded uncertain claim and refuses another send",
         async (mode) => {
           provider.create.mockRejectedValueOnce(
             mode === "network loss"
@@ -787,7 +786,7 @@ if (!fixture.probe)
           ).rejects.toThrow("uncertain");
           expect((await operation()).state).toBe("uncertain");
           expect((await operation()).last_error).toBeTruthy();
-          expect((await queue()).queue_state).toBe("dequeued");
+          expect((await queue()).queue_state).toBe("assigned");
           await expect(
             service.runPredictiveMachineContinuation(params()),
           ).rejects.toThrow("uncertain");
@@ -811,15 +810,15 @@ if (!fixture.probe)
           const op = await operation();
           expect(op.state).toBe("uncertain");
           expect(op.send_started_at).toBeTruthy();
-          expect(op.successor_call_sid).toBeNull();
-          expect((await queue()).queue_state).toBe("assigned");
+          expect(op.successor_call_sid).toBe(childSid);
+          expect((await queue()).queue_state).toBe("dequeued");
           await sql`update public.campaign_queue set claimed_at=now()-interval '2 hours' where id=${queueId}`;
           await sql`insert into public.campaign_queue (workspace,campaign_id,contact_id,queue_state,assigned_to_user_id,claimed_at,queue_order,attempt_count,attempts)
         values (${workspace},${campaign},${controlContact},'assigned',${user},now()-interval '2 hours',2,1,1)`;
           const [reset] =
             await sql`select public.reset_stale_campaign_queue_claims(${campaign}::integer,interval '1 minute') as count`;
           expect(reset.count).toBe(1);
-          expect((await queue()).queue_state).toBe("assigned");
+          expect((await queue()).queue_state).toBe("dequeued");
           const [control] =
             await sql`select queue_state from public.campaign_queue where contact_id=${controlContact} and campaign_id=${campaign}`;
           expect(control.queue_state).toBe("queued");
