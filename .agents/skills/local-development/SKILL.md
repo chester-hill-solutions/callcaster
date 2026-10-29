@@ -194,6 +194,10 @@ exact development-tool peer. Verify both lockfiles and a clean `npm ci`, then
 require `npm ls` to accept both versions. For async React owners, test a
 suspended identity transition: changing an owner ref during render can cancel
 work that still belongs to the committed screen.
+For lazy SDK and media tests, wait for observable registration or capture
+readiness. A fixed number of Promise.resolve turns does not prove that an
+import or a microphone request has completed. Keep cancellation tests separate
+so late setup must still be rejected after the owner is suspended or removed.
 
 Discover uncertain module paths with `rg --files` before reading them. An ADR's
 planned layout can differ from the active source. A referenced skill can also
