@@ -31,7 +31,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3023 is open into dev and linked only to #2638. Keep open for merge, deployed verification and default-branch release acceptance."
+    "trackerRecommendation": "Included from original PR #3023 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 1826,
@@ -81,7 +81,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Task, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3034 is open into dev and linked only to #2626. Keep open for merge, deployed verification and default-branch release acceptance."
+    "trackerRecommendation": "Included from original PR #3034 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 1875,
@@ -147,7 +147,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, hierarchy or dependencies; organization fields unset. CHS backlog Status In progress. The earlier on-dev claim cited PR #2900, whose actual diff is board/enrichment only. PR #3063 is the runtime fix candidate into dev, linked only to #2860. Keep open for merge, deployed verification and release. The user has now authorized this source in merge batch PR #3070. The original head passed GitHub gates; combined-head checks remain. Keep the issue open and do not mark it on-dev before the batch actually merges."
+    "trackerRecommendation": "Included from original PR #3063 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2862,
@@ -235,34 +235,7 @@
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; Project Status In progress verified in the browser. PR #3077 fixes the shared sink, recent-response read and bigint mapping. Full local CI passes at 0de271ac: 6,061 Node, 34 Bun and 1,541 UI cases; 11 existing skips. The final publication commit and exact-head remote checks must pass before merge approval is requested. API-key admission policy stays in #2863."
-  },
-  {
-    "issueNumber": 2867,
-    "verdict": "fix-now",
-    "recommendedTitle": "Unify credential rate limits across auth endpoints",
-    "summary": "PR #3079 shares strict credential-operation limits across auth aliases. Full local CI, focused tests and five mutation checks pass; review, merge and release verification remain.",
-    "currentBehavior": "Token login shares the 10/min sign-in limit with browser and Better Auth sign-in. Registration, reset and OTP aliases use their operation limits. Unknown auth POSTs default to strict sign-in; only exact sign-out and session-revocation paths retain 30/min. Implemented in PR #3079; dev still has the old limits.",
-    "rootCause": "Token login used a separate 30/min scope, while the catch-all sent signup and reset aliases through the loose scope. The source guard skipped tokenLogin and checked only for some limiter, so comments and wrong scopes could satisfy it.",
-    "resolution": "Remove the token-only scope; bind aliases to credential operations; use a strict default with an exact session-lifecycle allowlist. Parse real calls and literal policy tables in the coverage guard, including imported helper aliases. Publish the operation limits in the API documents.",
-    "lookIn": [
-      "app/lib/platform-auth-rate-limit.server.ts",
-      "app/routes/api+/auth/token.action.server.ts",
-      "app/lib/platform-auth.server.ts",
-      "app/routes/signin.action.server.ts",
-      "app/routes/api+/auth/$.loader.server.ts",
-      "app/routes/api+/auth/register.action.server.ts"
-    ],
-    "existingTests": [
-      "68 focused tests pass. Reverting the runtime fails 11 of 15 cases; loose token and default budgets fail two each, and a split registration budget fails one. Four positive controls pass in every runtime mutation. Restoring the old guard fails 13 cases while nine existing controls pass. Typed Better Auth aliases and the stronger user-scoped 2FA setup limiter are covered. Working source hashes stay unchanged during mutation runs. Tests use the real application limiter with its in-memory backend and mocked auth handlers; no mail or provider traffic."
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Every surface that performs an email+password credential check is bounded by the strict 'auth:sign-in' bucket (10/min), and every surface that performs a password-reset request or an account creation is bounded by the 10/min scope documented for that operation, so the per-client budget for the same operation does not depend on which URL the caller uses."
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Keep open and In progress for PR #3079 review, merge and release verification. Native Priority, Effort and Enviornment remain unset; there are no blocking relationships. Source tests do not prove deployment."
+    "trackerRecommendation": "Included from original PR #3077 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2869,
@@ -347,7 +320,7 @@
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Keep open and In progress for PR #3078 review, merge and release verification. Native Priority, Effort and Enviornment are unset; no blocking relationships. Do not treat source proof as a deployed fix."
+    "trackerRecommendation": "Included from original PR #3078 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2872,
@@ -382,8 +355,8 @@
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
-    "summary": "Concurrent voice sends reuse the same positive credit balance; no durable hold is taken before provider work. This blocks predictive capacity work in #3045.",
-    "currentBehavior": "On dev@03c3e15a, one credit still admits a two-credit IVR test call. Fifty concurrent real application service calls with two credits all reach a mocked provider; the stored balance stays two before terminal billing.",
+    "summary": "Outbound credit reservations are partly implemented on an unpublished branch. Handset preparation, phone audio replacement and final admission checks remain.",
+    "currentBehavior": "Published dev still needs the outbound funding contract. The protected unpublished branch at be2e726b has reservation, manual and predictive work plus unfinished handset changes. The phone must replace browser mic and speaker; connecting it remains connection-only and must not start a contact or add a separate customer charge. This source is excluded from merge batch #3070.",
     "rootCause": "The shared gate reads workspace.credits without locking or reserving the first-minute cost. HTTP, background IVR, test-call and predictive paths can each reuse that balance.",
     "resolution": "Build one workspace-scoped reservation contract under a workspace row lock. Count existing voice and number-purchase holds; retain uncertain creates; fence dispatch ownership; settle the hold atomically with the existing idempotent terminal debit. Apply the contract to every outbound voice path and preserve the staffed two-leg rate. Per-credential limits bound starts, while durable holds bound funded admission.",
     "lookIn": [
@@ -396,13 +369,15 @@
       "app/server/number-purchase-reservation.server.ts"
     ],
     "existingTests": [
-      "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic."
+      "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic.",
+      "Observed before interruption: 321 real PostgreSQL 18 cases passed with zero skips after the predictive rebase. At be2e726b, all 16 focused legacy media-stream cases passed. The later full local gate was interrupted; no passing final result is retained. Current handset changes have not passed typecheck or behavior tests."
     ],
     "missingTests": [
       "Competing reservations must admit only one funded first minute.",
       "Reject/release before provider work; retain uncertain sends and prevent replay or expired-owner sends.",
       "Prove early callback, parent/child billing identity, zero-duration/canceled release and once-only settlement; keep multi-minute in-flight grace explicit.",
-      "Full local and applicable remote CI after the complete implementation."
+      "Full local and applicable remote CI after the complete implementation.",
+      "Complete handset preparation, phone audio replacement and held-credit admission; then rebase the protected branch and run its real-DB proofs and complete local and remote gates."
     ],
     "acceptanceCriteria": [
       "New voice dispatches cannot reuse funds already held by another outbound call or number purchase.",
@@ -411,7 +386,7 @@
     ],
     "size": "L",
     "risk": "high",
-    "trackerRecommendation": "Native Bug; Priority, Effort and Enviornment unset. Assigned to wra-sol; live Project Status In progress. No blockers; blocks open #3045. Proof and implementation checklist added to the existing issue on 2026-10-29 UTC. The money-path fix remains in progress; do not mark fixed or on-dev."
+    "trackerRecommendation": "Keep In progress. No PR or push exists for this protected work. The user chose connection-only phone setup and requires it to replace browser audio. Resume after the authorized green merge batch; preserve the existing issue checklist."
   },
   {
     "issueNumber": 2880,
@@ -508,7 +483,7 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, parent, children or dependencies; organization fields unset. CHS backlog Status In progress. PR #3064 is open into dev and linked only to #2882. Keep open for merge, deployed verification and release. The user has now authorized this source in merge batch PR #3070. The original head passed GitHub gates; combined-head checks remain. Keep the issue open and do not mark it on-dev before the batch actually merges."
+    "trackerRecommendation": "Included from original PR #3064 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2883,
@@ -626,7 +601,7 @@
       "Scheduled-job wakeups respect lane filters, attempt bounds, cancellation and the existing idle ceiling.",
       "Queue estimates use the actual pacing policy; no provider capacity increase is assumed."
     ],
-    "trackerRecommendation": "Keep open for review, release and production measurement. Related estimate correction is tracked separately in #1874."
+    "trackerRecommendation": "Included from original PR #3009 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2616,
@@ -659,59 +634,7 @@
     "blockedBy": [],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug, wra-sol, ux, Project Status In progress; Priority, Effort and Enviornment unset; no milestone, hierarchy or dependencies. PR #3010 is open into dev and Development-linked only to #2616. Keep open for merge, deployed verification and default-branch release acceptance."
-  },
-  {
-    "issueNumber": 3072,
-    "verdict": "fix-now",
-    "summary": "High: patch the API generator Handlebars compiler in npm and Bun.",
-    "currentBehavior": "PR #3075 is open with the tested Handlebars 4.7.10 patch. It is not merged into dev.",
-    "rootCause": "The existing override floor still permits the affected compiler release.",
-    "resolution": "Review and approve PR #3075, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3075 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
-    "existingTests": [
-      "Four real compiler cases pass; the old compiler fails three while the normal control passes.",
-      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
-    ],
-    "missingTests": [
-      "Merge approval, dev deployment verification and required release acceptance remain."
-    ]
-  },
-  {
-    "issueNumber": 3071,
-    "verdict": "fix-now",
-    "summary": "Urgent: patch Better Auth verification-token purpose isolation in both locked install paths.",
-    "currentBehavior": "PR #3074 is open with the tested Better Auth 1.7.14 patch. It is not merged into dev.",
-    "rootCause": "Affected library versions share verification identifiers between token purposes. Version 1.7.7 is published and fixes the namespace separation.",
-    "resolution": "Review and approve PR #3074, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock",
-      "app/server/auth-instance.ts"
-    ],
-    "existingTests": [
-      "Token-purpose regressions fail against the old library and pass against the patch.",
-      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
-    ],
-    "acceptanceCriteria": [
-      "A token from one purpose cannot authenticate another purpose or consume its pending state.",
-      "Valid email/password and one-use Magic Link controls pass in an isolated fixture.",
-      "App verification, recovery, session and two-factor policies remain covered."
-    ],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3074 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
-    "missingTests": [
-      "Merge approval, dev deployment verification and required release acceptance remain."
-    ]
+    "trackerRecommendation": "Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 3073,
@@ -727,7 +650,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Native Task; assigned to wra-sol; live Project Status In progress. Final PR #3076 is open and mergeable. CI was read again on 2026-10-29 UTC; no live provider traffic is claimed.",
+    "trackerRecommendation": "Included from original PR #3076 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.",
     "existingTests": [
       "Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.",
       "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."

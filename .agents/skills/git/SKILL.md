@@ -18,6 +18,22 @@ request.
 6. Name product branches as `<type>/<issueNumber>-some-description`. Use lowercase kebab-case for the description and name the worktree after the branch with `/` replaced by `-`.
 7. Use `chore/<description>` only for issue-free repository maintenance. Such a PR must use the `no-issue` label. Do not use a label as a substitute for the native issue Type, and do not guess a missing or unsupported Type.
 
+## Trunk and active work
+
+Use `dev` as the trunk. Keep at most one open PR for the active working branch;
+keep it in draft while work is in progress. Finish the current PR before
+creating another. Do not build a parallel queue of open feature PRs.
+
+An explicit user request for one merge batch is an exception to the normal
+one-concern worktree rule. Start the batch at current `origin/dev`, reuse an
+existing PR, and preserve every selected original head as an ancestor. Keep
+failed and unpublished work out. Use a merge commit only when the repository
+and base rules allow it; never weaken branch protection. If the trunk moves,
+merge it into the batch to keep original ancestry, then retest the new head.
+Run full `npm run ci:local` and the applicable real-DB tier at the combined
+head before the single push. Require exact-head remote gates before merging,
+then read back each original PR state. Keep ordinary PRs atomic.
+
 ## Required Checks
 
 - Confirm the starting point with `git merge-base --is-ancestor origin/dev HEAD`.

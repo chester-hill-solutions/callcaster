@@ -185,6 +185,10 @@ trailing comma after a removed entry. The pure local check needs no GitHub scope
 `node --input-type=module -e 'import { loadEnrichment } from "./scripts/issue-board-lib.mjs"; loadEnrichment("scripts/issue-board-enrichment")'`.
 Preserve the enrichment files' UTF-8 characters and existing rendering. Review
 the diff for unrelated serialization changes before staging.
+For a merge, compare enrichment records by `issueNumber` and then by field.
+Keep newer test evidence and intentional moves between verdict files. Never
+choose one whole conflicting array. Check the before/after issue sets, then
+validate cross-file uniqueness and dependency edges before rendering the board.
 Validate the complete enrichment set before filtering. For an atomic audit,
 pass only the selected issue and its matching record to `buildBoard`, with
 fresh native metadata, then replace only its complete section. Never prune
