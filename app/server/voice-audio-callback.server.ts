@@ -1,3 +1,4 @@
+import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
 import { findVoiceAudioConnection, saveVoiceAudioProvider, withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 
 export type VoiceAudioProviderIdentity = {
@@ -20,11 +21,11 @@ function matchesAudioReceipt(row: VoiceAudioConnection, input: VoiceAudioProvide
 
 /** Authenticate the provider signature before binding its immutable send receipt. */
 export async function bindVoiceAudioProviderReceipt(input: VoiceAudioProviderIdentity) {
-  if (!/^CA[0-9a-f]{32}$/i.test(input.callSid)) throw new Error("Invalid agent audio provider SID");
+  if (!/^CA[0-9a-f]{32}$/i.test(input.callSid)) throw new VoiceAudioBindingError("Invalid agent audio provider SID");
   const row = await findVoiceAudioConnection(input.connectionId);
-  if (!row) throw new Error("Agent audio connection not found");
+  if (!row) throw new VoiceAudioBindingError("Agent audio connection not found");
   return withVoiceAudioConnection(row, async (tx, current) => {
-    if (!matchesAudioReceipt(current, input)) throw new Error("Agent audio callback does not match its send");
+    if (!matchesAudioReceipt(current, input)) throw new VoiceAudioBindingError("Agent audio callback does not match its send");
     return saveVoiceAudioProvider(tx, current, input.callSid);
   });
 }

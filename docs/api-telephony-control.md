@@ -56,12 +56,14 @@ voice request budget.
 | GET | `/api/token` | Twilio client access token (`?workspace=`) — bearer or session |
 | GET | `/api/handset-token` | Handset-specific access token — bearer or session |
 | GET/POST | `/api/agent-status` | Read/update agent dialer status — bearer or session |
-| POST | `/api/connect-phone-device` | Connect a verified agent phone to a campaign conference |
+| POST/GET/DELETE | `/api/connect-phone-device` | Create, read or cancel an owned agent audio connection |
 
-### Planned agent audio connection (#2879)
+### Agent audio connection (#2879, in development)
 
-This contract is in development. The current route accepts the connection-only
-POST body. Read, cancel and live replacement forms below are not available yet.
+The active branch implements the owned connection journal, read/cancel controls,
+signed provider callbacks and confirmed idle phone joins. Live cutover, media
+continuity and browser transport controls remain in development. No release
+acceptance is claimed.
 
 A verified phone replaces both the microphone and speaker. Connection remains
 separate from customer dispatch: it does not claim or dial the first contact,
@@ -71,6 +73,10 @@ An idle phone request keeps the legacy body `{ workspaceId, phoneNumber,
 campaignId? }`. Send a stable UUID in `connection_intent_id` to replay the same
 attempt. The campaign, when supplied, must belong to the workspace. The phone
 must be verified for the signed-in user.
+
+After the phone answers, the agent must press **1** before joining. Voicemail
+cannot activate audio. The signed Gather callback uses the same saved voice URL
+and physical call identity; a missing or wrong digit ends that agent leg.
 
 For a live change, send `callSid`, `expected_agent_sid` and
 `connection_intent_id`. Omit `campaignId`; the server resolves the owned call

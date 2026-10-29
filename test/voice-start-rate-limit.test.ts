@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   testSms: vi.fn(),
   start: vi.fn(),
   create: vi.fn(),
+  phonePrepare: vi.fn(),
   campaignType: "simple_ivr",
 }));
 
@@ -51,6 +52,10 @@ vi.mock("@/lib/auto-dial-start.server", async (importOriginal) => ({
 vi.mock("@/lib/audit-event.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/audit-event.server")>(),
   safeRecordWorkspaceAuditEvent: async () => undefined,
+}));
+vi.mock("@/server/voice-audio-connection.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-audio-connection.server")>(),
+  prepareVoiceAudioConnection: mocks.phonePrepare,
 }));
 
 const routes = {
@@ -105,6 +110,7 @@ beforeEach(() => {
   mocks.testSms.mockResolvedValue({ ok: true, to: "+15555550101" });
   mocks.start.mockResolvedValue({ ok: true, conferenceName: "agent-1~proof" });
   mocks.create.mockResolvedValue({ sid: "CAproof" });
+  mocks.phonePrepare.mockResolvedValue({ ok: false, reason: "device_not_verified" });
   setJsonAuthSession({ user: { id: mocks.userId } });
 });
 afterEach(() => vi.useRealTimers());
@@ -155,16 +161,17 @@ describe("funded voice request limits", () => {
     await expectLimited(await asRouteResponse(ivr({ request: post(), params: {}, context: {} } as never)));
   });
 
-  test("a different user can still start a phone call", async () => {
+  test("a different user reaches phone admission with a separate request budget", async () => {
     await spend("user-1");
     mocks.userId = "user-2";
+    setJsonAuthSession({ user: { id: "user-2" } });
     const { action } = await routes.phone();
     const response = await asRouteResponse(action({
-      request: post({ workspaceId: "w1", phoneNumber: "+15555550101" }), params: {}, context: {},
+      request: post({ workspaceId: "44ac4c13-ff42-4447-a43f-2ade42fb51e5", phoneNumber: "+15555550101" }), params: {}, context: {},
     } as never));
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true, callSid: "CAproof" });
-    expect(mocks.create).toHaveBeenCalledOnce();
+    expect(response.status).toBe(403);
+    expect(mocks.phonePrepare).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-2" }));
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 
   test("the fixed minute window opens again", async () => {

@@ -3764,7 +3764,7 @@
       "get": {
         "operationId": "getConnect_campaign_conference_workspaceId_campaignId",
         "summary": "GET /api/connect-campaign-conference/:workspaceId/:campaignId",
-        "description": "Twilio voice URL after connect-phone-device; returns TwiML.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Legacy campaign conference TwiML. Owned agent audio uses /api/voice-audio.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Provider Webhook",
           "dialer"
@@ -3800,9 +3800,9 @@
     },
     "/api/connect-phone-device": {
       "post": {
-        "operationId": "postConnect_phone_device",
-        "summary": "POST /api/connect-phone-device",
-        "description": "",
+        "operationId": "connectAgentAudio",
+        "summary": "Connect or replace the agent audio transport",
+        "description": "Session cookie or bearer session only. The device belongs to the signed-in user. Connection is separate from customer dispatch: it does not claim or call the first contact, add a customer debit or take another customer hold. Keep current audio until connection_state is active. Accepted, answered and ready states alone do not prove a completed handoff. Retain the intent UUID on retry; uncertain provider creation is recovered without another create. A manual call issued without a saved parent continuation returns 409 and keeps its existing audio.",
         "tags": [
           "User API",
           "dialer"
@@ -3824,21 +3824,207 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "workspaceId",
+                      "phoneNumber"
+                    ],
+                    "properties": {
+                      "workspaceId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "phoneNumber": {
+                        "type": "string",
+                        "pattern": "^\\+[1-9][0-9]{1,14}$",
+                        "description": "Verified number owned by this user. Outer whitespace is trimmed."
+                      },
+                      "device": {
+                        "type": "string",
+                        "enum": [
+                          "phone"
+                        ]
+                      },
+                      "connection_intent_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Keep this UUID for retries of the same audio change."
+                      },
+                      "campaignId": {
+                        "oneOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        ],
+                        "description": "Optional owned idle campaign; a string must parse as a positive integer."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "workspaceId",
+                      "phoneNumber",
+                      "callSid",
+                      "connection_intent_id",
+                      "expected_agent_sid"
+                    ],
+                    "properties": {
+                      "workspaceId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "callSid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "connection_intent_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Keep this UUID for retries of the same audio change."
+                      },
+                      "expected_agent_sid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "phoneNumber": {
+                        "type": "string",
+                        "pattern": "^\\+[1-9][0-9]{1,14}$",
+                        "description": "Verified number owned by this user. Outer whitespace is trimmed."
+                      },
+                      "device": {
+                        "type": "string",
+                        "enum": [
+                          "phone"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "workspaceId",
+                      "device",
+                      "callSid",
+                      "connection_intent_id",
+                      "expected_agent_sid"
+                    ],
+                    "properties": {
+                      "workspaceId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "callSid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "connection_intent_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Keep this UUID for retries of the same audio change."
+                      },
+                      "expected_agent_sid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "device": {
+                        "type": "string",
+                        "enum": [
+                          "computer"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Agent call accepted or an owned attempt replayed. Check connection_state before changing effective audio.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": true
+                  "required": [
+                    "connection_id",
+                    "connection_state",
+                    "callSid",
+                    "generation",
+                    "transport",
+                    "success"
+                  ],
+                  "properties": {
+                    "connection_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connection_state": {
+                      "type": "string",
+                      "enum": [
+                        "prepared",
+                        "creating",
+                        "joining",
+                        "ready",
+                        "switching",
+                        "active",
+                        "retired",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "callSid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "source_agent_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "generation": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "phone",
+                        "computer"
+                      ]
+                    },
+                    "cancel_requested": {
+                      "type": "boolean"
+                    },
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or unavailable caller ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -3848,17 +4034,371 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Idle connection has no available credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "creditsError"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Insufficient credits"
+                      ]
+                    },
+                    "creditsError": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Device is not verified for this user",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace, user-owned connection or target call not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Pending operation, stale audio owner, changed provider account or unavailable manual continuation. Current audio stays active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
+              }
+            }
+          },
+          "502": {
+            "description": "Provider refused the connection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "cancelAgentAudioConnection",
+        "summary": "Cancel a pending audio replacement or idle connection",
+        "description": "Cancel only this agent transport. An uncertain create remains pending until recovery can stop the accepted leg. This operation cannot hang up or advance a live customer; use the customer hangup or a new audio change for an active live transport.",
+        "tags": [
+          "User API",
+          "dialer"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation saved or already complete",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connection_id",
+                    "connection_state",
+                    "callSid",
+                    "generation",
+                    "transport"
+                  ],
+                  "properties": {
+                    "connection_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connection_state": {
+                      "type": "string",
+                      "enum": [
+                        "prepared",
+                        "creating",
+                        "joining",
+                        "ready",
+                        "switching",
+                        "active",
+                        "retired",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "callSid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "source_agent_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "generation": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "phone",
+                        "computer"
+                      ]
+                    },
+                    "cancel_requested": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Active customer audio must be replaced or ended through the customer control",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "getAgentAudioConnection",
+        "summary": "Read an owned audio connection attempt",
+        "description": "",
+        "tags": [
+          "User API",
+          "dialer"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation state; active requires a verified conference join and completed transport commit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "connection_id",
+                    "connection_state",
+                    "callSid",
+                    "generation",
+                    "transport"
+                  ],
+                  "properties": {
+                    "connection_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "connection_state": {
+                      "type": "string",
+                      "enum": [
+                        "prepared",
+                        "creating",
+                        "joining",
+                        "ready",
+                        "switching",
+                        "active",
+                        "retired",
+                        "failed",
+                        "canceled"
+                      ]
+                    },
+                    "callSid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "source_agent_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "generation": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "transport": {
+                      "type": "string",
+                      "enum": [
+                        "phone",
+                        "computer"
+                      ]
+                    },
+                    "cancel_requested": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Connection not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -8594,6 +9134,180 @@
             }
           }
         }
+      }
+    },
+    "/api/voice-audio": {
+      "post": {
+        "operationId": "handleAgentAudioProviderEvent",
+        "summary": "Handle signed agent audio instructions, status and conference events",
+        "description": "Provider-only POST. Validate the raw Twilio signature over the unchanged full URL and form before alias normalization. The connection UUID, saved callback URL, original account and physical participant facts bind the event. An accepted or answered call does not activate audio. A replacement prejoins muted and cannot dispatch or bill a customer. A retired participant cannot end the current conference. Transient processing or provider-stop failures return 500 for retry.",
+        "tags": [
+          "Provider Webhook",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "AccountSid",
+                      "CallSid",
+                      "To",
+                      "From",
+                      "Direction"
+                    ],
+                    "properties": {
+                      "AccountSid": {
+                        "type": "string"
+                      },
+                      "CallSid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "To": {
+                        "type": "string"
+                      },
+                      "From": {
+                        "type": "string"
+                      },
+                      "Direction": {
+                        "type": "string",
+                        "enum": [
+                          "outbound-api"
+                        ]
+                      },
+                      "CallStatus": {
+                        "type": "string"
+                      },
+                      "CallDuration": {
+                        "type": "string"
+                      },
+                      "Digits": {
+                        "type": "string",
+                        "description": "Phone audio requires a signed press-1 Gather confirmation before conference instructions are issued."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "AccountSid",
+                      "ConferenceSid",
+                      "FriendlyName",
+                      "StatusCallbackEvent"
+                    ],
+                    "properties": {
+                      "AccountSid": {
+                        "type": "string"
+                      },
+                      "ConferenceSid": {
+                        "type": "string",
+                        "pattern": "^CF[0-9a-fA-F]{32}$"
+                      },
+                      "FriendlyName": {
+                        "type": "string"
+                      },
+                      "StatusCallbackEvent": {
+                        "type": "string"
+                      },
+                      "CallSid": {
+                        "type": "string",
+                        "pattern": "^CA[0-9a-fA-F]{32}$"
+                      },
+                      "ParticipantLabel": {
+                        "type": "string"
+                      },
+                      "Muted": {
+                        "type": "string",
+                        "enum": [
+                          "true",
+                          "false"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved conference instruction or a safe hangup",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "Owned provider event acknowledged"
+          },
+          "403": {
+            "description": "Signature, operation or participant mismatch",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Temporary event-processing or provider-stop failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Twilio-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "connection",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "voice",
+                "status",
+                "conference"
+              ]
+            }
+          }
+        ]
       }
     },
     "/api/workspace-api-keys": {

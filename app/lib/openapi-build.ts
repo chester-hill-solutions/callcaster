@@ -199,6 +199,8 @@ export type BuildOpenApiSpecOptions = {
   useIntegratorPathOverrides?: boolean;
   /** Merge detailed platform path definitions (auth, workspaces). */
   usePlatformPathOverrides?: boolean;
+  /** Detailed definitions for operations already present in this selected view. */
+  pathOverrides?: Record<string, Record<string, unknown>>;
   /** Append integrator JSON schemas to components. */
   includeIntegratorSchemas?: boolean;
   /** Append platform JSON schemas to components. */
@@ -214,6 +216,19 @@ function tagsForEntry(
     return [OWNER_AREA_TAGS[entry.ownerArea], AUTH_CLASS_TAGS[entry.authClass]];
   }
   return [AUTH_CLASS_TAGS[entry.authClass], entry.ownerArea];
+}
+
+function mergeSelectedPathOverrides(paths: Record<string, Record<string, unknown>>, overrides: BuildOpenApiSpecOptions["pathOverrides"]) {
+  for (const [path, methods] of Object.entries(overrides ?? {})) {
+    const knownPath = paths[path];
+    if (!knownPath) throw new Error(`Unknown OpenAPI override path: ${path}`);
+    for (const [method, definition] of Object.entries(methods)) {
+      const knownOperation = knownPath[method];
+      if (!knownOperation || typeof knownOperation !== "object") throw new Error(`Unknown OpenAPI override operation: ${method} ${path}`);
+      if (!definition || typeof definition !== "object" || Array.isArray(definition)) throw new Error(`Invalid OpenAPI override: ${method} ${path}`);
+      knownPath[method] = { ...knownOperation, ...definition };
+    }
+  }
 }
 
 export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
@@ -287,6 +302,8 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
       paths[path] = { ...paths[path], ...override };
     }
   }
+
+  mergeSelectedPathOverrides(paths, options.pathOverrides);
 
   const tagNames = new Set<string>();
   for (const entry of options.entries) {

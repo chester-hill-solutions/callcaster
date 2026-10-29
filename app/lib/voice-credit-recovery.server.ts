@@ -7,7 +7,7 @@ import {
   claimVoiceReservationRecovery, recordVoiceReservationProvider, releaseUnsentVoiceReservation,
   type VoiceReservation,
 } from "@/server/voice-credit-reservation.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import { hasTwilioCallRequestHistory, isTwilioCallHistoryReady } from "@/lib/twilio-call-history.server";
 import { logger } from "@/lib/logger.server";
@@ -39,21 +39,13 @@ export async function recoverVoiceReservationCall(reservation: VoiceReservation,
   if (!/^CA[0-9a-f]{32}$/i.test(candidateSid) || reservation.provider_sid) {
     throw new Error("Voice reservation is not eligible for candidate recovery");
   }
-  const twilio = await originalAccountClient(reservation);
+  const twilio = await createOriginalVoiceAccountClient(reservation);
   if (hasVoiceSetup(reservation)) return recoverVoiceBridgeCandidate(reservation, candidateSid, twilio);
   const candidate = await twilio.calls(candidateSid).fetch();
   if (candidate.sid !== candidateSid || !await adoptVerifiedCandidate(reservation, candidate, twilio)) {
     throw new Error("Provider history does not prove the reserved voice call");
   }
   return candidate.sid;
-}
-
-async function originalAccountClient(reservation: VoiceReservation) {
-  const twilio = await createWorkspaceTwilioInstance({ workspace_id: reservation.workspace });
-  if (twilio.accountSid !== reservation.account_sid) {
-    throw new Error("Voice recovery requires the original provider account");
-  }
-  return twilio;
 }
 
 async function findUnknownCall(reservation: VoiceReservation, twilio: Twilio.Twilio) {
@@ -91,7 +83,7 @@ async function reconcileVoiceReservation(reservation: VoiceReservation) {
     return await releaseUnsentVoiceReservation(reservation, "not_sent") ? "released" : "pending";
   }
   if (await settleSavedVoiceReservation(reservation)) return "settled";
-  const twilio = await originalAccountClient(reservation);
+  const twilio = await createOriginalVoiceAccountClient(reservation);
   if (hasVoiceSetup(reservation)) return reconcileVoiceBridge(reservation, twilio);
   const remote = reservation.provider_sid
     ? await twilio.calls(reservation.provider_sid).fetch()

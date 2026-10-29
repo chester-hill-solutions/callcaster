@@ -47,7 +47,8 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | POST | `/api/inbound-handset-dial-end` | Handset dial end |
 | POST | `/api/auto-dial/:roomId` | Conference/AMD TwiML |
 | POST | `/api/auto-dial/status` | Auto-dial status |
-| GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Conference connect voice URL |
+| POST | `/api/voice-audio` | Operation-bound agent audio instructions, status and conference events |
+| GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Legacy campaign conference voice URL |
 | POST | `/api/caller-id/status` | Caller ID verification status |
 
 `POST /api/auto-dial/status` handles a signed `participant-leave` event with
@@ -65,6 +66,17 @@ available for the next dialer turn.
 Call end metadata is saved on a best-effort basis. The participant event does
 not claim `call.status`; the ordinary terminal callback retains its billing
 and outcome work. See [Twilio's conference callback parameters](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
+Agent audio callbacks bind the original account, saved URL and owned leg. Phone
+acceptance and answered status do not activate the transport. A first idle phone
+requires press-1 confirmation followed by its labeled conference join; a live
+replacement joins muted and waits for a completed handoff. The first participant keeps ownership of the conference
+callback URL. Current, pending and retired audio roles are resolved from the
+event's actual participant SID. Retired leaves cannot end the current room.
+Agent audio never dispatches the first contact or writes customer billing,
+disposition or queue outcomes. A genuine current-agent hangup ends its exact
+owned conference through the existing conference-end owner. Transient stop
+failures return 500 so the provider can retry.
 
 ## Stripe
 

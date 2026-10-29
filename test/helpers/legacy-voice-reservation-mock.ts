@@ -14,4 +14,5 @@ vi.mock("@/server/voice-terminal-outcome.server", async (importOriginal) => ({
 vi.mock("@/server/voice-audio-classification.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/server/voice-audio-classification.server")>(),
   isVoiceAudioLeg: async () => false,
+  isRetiredVoiceAudioSource: async () => false,
 }));

@@ -37,7 +37,7 @@ import {
 } from "@/lib/worker/job-params.server";
 import { runRecordingRepairSweep } from "@/lib/call-recording-repair.server";
 import { runNumberPurchaseRecovery } from "@/lib/number-purchase-recovery.server";
-import { runVoiceCreditRecovery } from "@/lib/voice-credit-recovery.server";
+import { runVoiceRecovery } from "@/lib/voice-recovery.server";
 import { withReschedule } from "@/lib/worker/handlers/shared.server";
 import {
   billingReconcileHandler,
@@ -156,7 +156,7 @@ const registrations = [
     type: "voice_credit_recovery", params: noParams, pages: true, schedule: true,
     handler: (job) => withReschedule({
       type: "voice_credit_recovery", delayMs: 60_000, params: {}, completedJobId: job.id,
-    }, runVoiceCreditRecovery),
+    }, runVoiceRecovery),
   }),
   defineJob({
     type: "number_release_recovery",

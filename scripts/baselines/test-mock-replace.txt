@@ -305,15 +305,6 @@ test/connect-campaign-conference.route.test.ts::@/lib/campaign-ivr.server#1
 test/connect-campaign-conference.route.test.ts::@/lib/env.server#1
 test/connect-campaign-conference.route.test.ts::@/lib/logger.server#1
 test/connect-campaign-conference.route.test.ts::@/lib/twilio-webhook.server#1
-test/connect-phone-device.route.test.ts::@/lib/auth.server#1
-test/connect-phone-device.route.test.ts::@/lib/campaign-ivr.server#1
-test/connect-phone-device.route.test.ts::@/lib/database/campaign.server#1
-test/connect-phone-device.route.test.ts::@/lib/database/workspace.server#1
-test/connect-phone-device.route.test.ts::@/lib/env.server#1
-test/connect-phone-device.route.test.ts::@/lib/logger.server#1
-test/connect-phone-device.route.test.ts::@/lib/request-utils.server#1
-test/connect-phone-device.route.test.ts::@/lib/user-audio.server#1
-test/connect-phone-device.route.test.ts::@/lib/workspace-credits.server#1
 test/contact-audience-bulk-delete.route.test.ts::@/lib/audience-upload-db.server#1
 test/contact-audience-bulk-delete.route.test.ts::@/lib/auth.server#1
 test/contact-audience-bulk-delete.route.test.ts::@/lib/database/contact-audience.server#1
