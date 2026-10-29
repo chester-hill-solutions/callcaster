@@ -203,6 +203,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       // authorised against, so a foreign row cannot be dequeued by id.
       workspaceId: "w1",
       reason: "IVR dial dispatched",
+      expectedGeneration: "00000000-0000-4000-8000-000000000001",
     });
   });
 

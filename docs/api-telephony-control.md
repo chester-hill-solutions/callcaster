@@ -74,6 +74,21 @@ voice request budget.
 | POST | `/api/ivr` | Outbound IVR dial initiation |
 | POST | `/api/initiate-ivr` | Structured IVR initiate (JSON/Zod) |
 
+Repeated requests for the same queued IVR attempt reuse its call SID. An
+explicit re-add of a completed contact starts a new funded attempt. Moving a
+row to Queued through the queue page/API or resetting the campaign also creates
+a new attempt. Campaign reset pauses the campaign and retains funded call and
+outreach records for billing and recovery. An older
+call reply cannot remove that new attempt or add to its failure count.
+
+While an earlier call for the same queue row is active or awaiting provider
+recovery, the new attempt stays queued. Direct IVR initiation returns `409`
+for that pending operation or a contact that is no longer queued. A queue ID
+that does not match the workspace, campaign and contact returns `404`.
+Normal campaign phone deduplication remains in effect. An explicit redial
+request permits a new attempt after prior calls; it keeps the current funding
+and recipient calling-window checks.
+
 ## Auto-dial
 
 | Method | Path | Purpose |

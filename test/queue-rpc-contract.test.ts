@@ -320,12 +320,11 @@ describe("the real migration lineage", () => {
 
   test("resolves the LATEST definition, not a superseded one", () => {
     // handle_campaign_queue_entry is defined several times across the lineage
-    // (baseline, 20260716120000, 20260814120000, and 20260930150000, which
-    // added `claimed_at = null` for #2208). Checking a superseded body would
-    // report drift that was repaired by a later migration.
+    // including claim cleanup and explicit redial generations. Checking a
+    // superseded body would report drift repaired by the current migration.
     const enqueue = rpcs.find((r) => r.name === "handle_campaign_queue_entry");
     expect(enqueue!.file).toBe(
-      "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+      "client/migrations/20261029000000_outbound_voice_credit_reservations.sql",
     );
   });
 

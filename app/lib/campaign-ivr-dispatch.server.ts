@@ -277,13 +277,7 @@ async function dispatchIvrQueueMember(
   }
 
   if (member.contact?.opt_out) {
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: OPTED_OUT_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, OPTED_OUT_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return;
   }
 
@@ -298,6 +292,7 @@ async function dispatchIvrQueueMember(
         workspaceId: context.workspaceId,
         campaignId: context.campaignId,
         to: phone,
+        queueIntent: { id: member.id, generation: member.dispatch_generation },
         tdb: context.tdb,
       }));
   } catch (error) {
@@ -307,13 +302,7 @@ async function dispatchIvrQueueMember(
 
   if (duplicateExists) {
     phoneClaim.claim?.resolve("duplicate");
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: DUPLICATE_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, DUPLICATE_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return;
   }
 
@@ -351,13 +340,7 @@ async function reserveIvrPhone(
       return { claimed: false };
     }
 
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: DUPLICATE_IVR_DEQUEUED_REASON,
-    });
-    context.state.counts.dequeued += 1;
+    if (await dequeueIvrQueueMember(member, context, DUPLICATE_IVR_DEQUEUED_REASON)) context.state.counts.dequeued += 1;
     return { claimed: false };
   }
 
@@ -382,6 +365,7 @@ async function createOutreachAttemptAndCall(
       kind: context.billingKind, accountSid: context.twilio.accountSid, to: phone, from: context.callerId,
       campaignId: Number(context.campaignId), contactId: member.contact_id,
       queueId: member.id, userId: context.userId,
+      expectedQueueGeneration: member.dispatch_generation,
       operationKey: ivrQueueVoiceOperationKey(member.id),
       voiceUrl: context.ivrUrls.flowUrl, statusCallback: context.ivrUrls.statusCallback,
       prepareOutreach: async (tx) => {
@@ -411,23 +395,15 @@ async function createOutreachAttemptAndCall(
       });
     }, { workspaceId: context.workspaceId, operation: "calls.create.ivr" });
     if (!dispatched.ok) {
-      const pending = dispatched.reason === "dispatch_in_progress";
-      phoneClaim?.resolve(pending ? "provider_pending" : "failed_before_provider");
-      context.state.counts.deferred += 1;
-      if (pending) context.state.blocked = "provider_recovery";
-      else context.state.blocked ??= "insufficient_credits";
+      deferBlockedVoiceDispatch(dispatched.reason, phoneClaim, context);
       return;
     }
     phoneClaim?.resolve(dispatched.replayed ? "duplicate" : "provider_attempted");
 
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId: context.userId,
-      workspaceId: context.workspaceId,
-      reason: dispatched.replayed ? DUPLICATE_IVR_DEQUEUED_REASON : IVR_CALL_DEQUEUED_REASON,
-    });
-    if (dispatched.replayed) context.state.counts.dequeued += 1;
-    else context.state.counts.called += 1;
+    const dequeued = await dequeueIvrQueueMember(member, context,
+      dispatched.replayed ? DUPLICATE_IVR_DEQUEUED_REASON : IVR_CALL_DEQUEUED_REASON, dispatched.queueGeneration);
+    if (!dispatched.replayed) context.state.counts.called += 1;
+    else if (dequeued) context.state.counts.dequeued += 1;
   } catch (error) {
     if (error instanceof VoiceDispatchUncertainError) {
       phoneClaim?.resolve("provider_pending");
@@ -461,6 +437,7 @@ async function createOutreachAttemptAndCall(
       queueId: member.id,
       error: message,
       workspaceId: context.workspaceId,
+      expectedGeneration: member.dispatch_generation,
     });
     logger.error("campaign_ivr_dispatch.call_failed", {
       campaignId: context.campaignId,
@@ -468,6 +445,32 @@ async function createOutreachAttemptAndCall(
       error: message,
     });
   }
+}
+
+function deferBlockedVoiceDispatch(
+  reason: Extract<Awaited<ReturnType<typeof dispatchReservedVoiceCall>>, { ok: false }>["reason"],
+  phoneClaim: IvrPhoneClaim | null,
+  context: IvrQueueMemberContext,
+) {
+  const pending = reason === "dispatch_in_progress";
+  phoneClaim?.resolve(pending ? "provider_pending" : "failed_before_provider");
+  context.state.counts.deferred += 1;
+  if (pending) context.state.blocked = "provider_recovery";
+  else if (reason === "insufficient_credits" || reason === "workspace_not_found") context.state.blocked ??= "insufficient_credits";
+}
+
+async function dequeueIvrQueueMember(
+  member: IvrQueueMember,
+  context: IvrQueueMemberContext,
+  reason: string,
+  generation: string | null = member.dispatch_generation,
+) {
+  const result = await dequeueQueueEntry({
+    by: { id: member.id }, userId: context.userId, workspaceId: context.workspaceId,
+    reason, expectedGeneration: generation,
+  });
+  if (!result.dequeuedPrimary) context.state.counts.deferred += 1;
+  return result.dequeuedPrimary;
 }
 
 function remainingIvrQueue(

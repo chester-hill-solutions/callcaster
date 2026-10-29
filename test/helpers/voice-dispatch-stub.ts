@@ -9,5 +9,5 @@ export async function acceptVoiceDispatch(args: {
   await args.prepareOutreach?.({});
   await args.beforeCreate?.();
   const call = await args.create({ voiceUrl: args.voiceUrl, statusCallback: args.statusCallback });
-  return { ok: true as const, callSid: call.sid, replayed: false };
+  return { ok: true as const, callSid: call.sid, replayed: false, queueGeneration: "00000000-0000-4000-8000-000000000001" };
 }

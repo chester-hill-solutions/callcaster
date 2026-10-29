@@ -4,6 +4,7 @@ import twilio from "twilio";
 import { RouterContextProvider } from "react-router";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse, routeArgs } from "../helpers/route-result";
+import { withWorkspaceRouteArgs } from "../helpers/route-context-mock";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 vi.hoisted(() => { process.env.TZ = "UTC"; process.env.BASE_URL = "https://ivr-credit.example.test"; });
@@ -98,6 +99,8 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     return row;
   }
   beforeEach(async () => {
+    const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server");
+    resetRateLimitsForTests();
     vi.clearAllMocks(); principal.windowAllowed = true; provider.accountSid = accountSid; provider.records.clear();
     provider.create.mockReset().mockImplementation(async (args: { to: string; from: string; url: string; statusCallback: string }) => {
       const row: ProviderCall = {
@@ -115,9 +118,11 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.outreach_attempt where workspace = ${workspaceId}::uuid`;
     await sql`update public.campaign_queue set queue_state = 'queued', dequeued_at = null, dequeued_by = null, dequeued_reason = null,
-      assigned_to_user_id = null, claimed_at = null, attempt_count = 0, attempts = 0, last_attempt_error = null where workspace = ${workspaceId}::uuid`;
+      assigned_to_user_id = null, claimed_at = null, attempt_count = 0, attempts = 0, last_attempt_error = null,
+      dispatch_generation = gen_random_uuid(), redial_requested_at = null where workspace = ${workspaceId}::uuid`;
     await sql`update public.campaign_queue set queue_state = 'dequeued', dequeued_at = now()
       where workspace = ${workspaceId}::uuid and id <> ${queueId}`;
+    await sql`update public.contact set phone = case when id = ${contactId} then ${to} else '+16135550198' end where workspace = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100 where id = ${workspaceId}::uuid`;
     await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
   });
@@ -169,6 +174,261 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
       row.status = "completed"; row.duration = "42";
     }
   }
+  async function readdContact(targetContactId = contactId) {
+    const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+    await enqueueContactsForCampaign(campaignId, [targetContactId], { requeue: true });
+    await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+  }
+  async function requeueFromQueuePage() {
+    const { action } = await import("../../app/routes/workspaces+/$id/campaigns/$selected_id/queue.action.server");
+    const request = new Request(`https://ivr-credit.example.test/workspaces/${workspaceId}/campaigns/${campaignId}/queue`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intent: "update_status", ids: [String(queueId)], status: "queued" }),
+    });
+    const response = await asRouteResponse(action(await withWorkspaceRouteArgs({
+      request, params: { id: workspaceId, selected_id: String(campaignId) },
+    }, { workspaceId, userId: actor, userRole: "owner" })));
+    expect(response.status).toBe(200); await expect(response.json()).resolves.toEqual({ success: true });
+    await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+  }
+  async function resetFromCampaignSettings() {
+    const { action } = await import("../../app/routes/api+/reset_campaign.action.server");
+    const request = new Request("https://ivr-credit.example.test/api/reset_campaign", {
+      method: "POST", body: new URLSearchParams({ campaign_id: String(campaignId) }),
+    });
+    const response = await asRouteResponse(action({ ...routeArgs(request), context: new RouterContextProvider() }));
+    expect(response.status).toBe(200); await expect(response.json()).resolves.toEqual({ success: true });
+  }
+  function firstProviderCall() {
+    const [row] = [...provider.records.values()];
+    if (!row) throw new Error("Owned provider call required");
+    return row;
+  }
+  async function completeCall(row: ProviderCall) {
+    const { processCallStatusWebhook } = await import("@/lib/twilio-call-status.server");
+    row.status = "completed"; row.duration = "42"; row.endTime = new Date();
+    await processCallStatusWebhook({ sid: row.sid, account_sid: row.accountSid, to: row.to, from: row.from,
+      direction: row.direction, status: "completed", duration: "42" }, { workspaceId, campaignId, contactId, userId: actor });
+  }
+  test.each(["api", "worker", "legacy"] as const)("%s gives a re-added completed contact a new funded call", async (mode) => {
+    await send(mode);
+    const first = firstProviderCall();
+    await completeCall(first); await completeCall(first);
+    await send(mode);
+    expect(provider.create).toHaveBeenCalledOnce();
+    await readdContact(); await send(mode);
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    const second = [...provider.records.values()].find((row) => row.sid !== first.sid);
+    if (!second) throw new Error("Second funded call required");
+    await send(mode);
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    await completeCall(first);
+    expect(await state()).toEqual({ credits: 98, holds: 1, attempts: 2, calls: 2, ledger: 1 });
+    await completeCall(second); await completeCall(second);
+    expect(await state()).toEqual({ credits: 96, holds: 0, attempts: 2, calls: 2, ledger: 2 });
+  });
+  test.each(["api", "worker", "legacy"] as const)("%s honors a new attempt requested through the real queue page", async (mode) => {
+    await send(mode); await completeCall(firstProviderCall());
+    await requeueFromQueuePage(); await send(mode); await send(mode);
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    expect(await state()).toEqual({ credits: 98, holds: 1, attempts: 2, calls: 2, ledger: 1 });
+  });
+  test("a late worker reply cannot drain an attempt requeued through the real queue page", async () => {
+    const create = provider.create.getMockImplementation();
+    if (!create) throw new Error("Owned create implementation required");
+    provider.create.mockImplementationOnce(async (args) => { const row = await create(args); await requeueFromQueuePage(); return row; });
+    expect(await send("worker")).toMatchObject({ counts: { called: 1, deferred: 1 }, queuedRemaining: 1 });
+    const [queue] = await sql`select queue_state, dequeued_at from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", dequeued_at: null });
+  });
+  test.each(["api", "worker", "legacy"] as const)("%s can start a new attempt after the real campaign reset", async (mode) => {
+    await send(mode); const first = firstProviderCall(); await completeCall(first);
+    await resetFromCampaignSettings();
+    const [campaign] = await sql`select status from public.campaign where id = ${campaignId}`;
+    expect(campaign.status).toBe("paused");
+    expect(await state()).toEqual({ credits: 98, holds: 0, attempts: 1, calls: 1, ledger: 1 });
+    await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+    await send(mode); expect(provider.create).toHaveBeenCalledTimes(2);
+    await completeCall(first);
+    expect(await state()).toEqual({ credits: 98, holds: 1, attempts: 2, calls: 2, ledger: 1 });
+  });
+  test("campaign reset retains an in-flight call's outreach for its late provider reply", async () => {
+    const create = provider.create.getMockImplementation();
+    if (!create) throw new Error("Owned create implementation required");
+    provider.create.mockImplementationOnce(async (args) => { const row = await create(args); await resetFromCampaignSettings(); return row; });
+    const outcome = await send("worker");
+    expect(outcome).toMatchObject({ kind: "dispatched", counts: { called: 1, deferred: 1 } });
+    if (!("queuedRemaining" in outcome)) throw new Error("Dispatch outcome required");
+    expect(outcome.queuedRemaining).toBeGreaterThan(0);
+    const [queue] = await sql`select queue_state, dequeued_at from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", dequeued_at: null });
+    expect(await state()).toEqual({ credits: 100, holds: 1, attempts: 1, calls: 1, ledger: 0 });
+    await completeCall(firstProviderCall());
+    expect(await state()).toEqual({ credits: 98, holds: 0, attempts: 1, calls: 1, ledger: 1 });
+  });
+  test("campaign reset leaves a foreign workspace queue row unchanged", async () => {
+    const [contact] = await sql`insert into public.contact (workspace, phone) values (${foreignId}::uuid, '+16135550197') returning id`;
+    const [queue] = await sql`insert into public.campaign_queue (workspace, campaign_id, contact_id, queue_state, attempts, attempt_count, dequeued_at)
+      values (${foreignId}::uuid, ${campaignId}, ${contact.id}, 'dequeued', 2, 1, now()) returning *`;
+    try {
+      await resetFromCampaignSettings();
+      const [after] = await sql`select * from public.campaign_queue where id = ${queue.id}`;
+      expect(after).toEqual(queue);
+    } finally {
+      await sql`delete from public.campaign_queue where id = ${queue.id}`;
+      await sql`delete from public.contact where id = ${contact.id}`;
+    }
+  });
+  test.each(["api", "worker", "legacy"] as const)("%s keeps a new queue attempt pending while its prior call is active", async (mode) => {
+    await send(mode);
+    const first = firstProviderCall();
+    await readdContact(); await send(mode);
+    expect(provider.create).toHaveBeenCalledOnce();
+    const [queue] = await sql`select queue_state, dequeued_at, attempts::int as attempts from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", dequeued_at: null, attempts: 0 });
+    expect(await state()).toMatchObject({ credits: 100, holds: 1, attempts: 1, calls: 1 });
+    await completeCall(first);
+    await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+    await send(mode);
+    expect(provider.create).toHaveBeenCalledTimes(2);
+  });
+  test.each(["api", "worker", "legacy"] as const)("%s cannot dequeue a fresh attempt when an older provider reply arrives", async (mode) => {
+    const create = provider.create.getMockImplementation();
+    if (!create) throw new Error("Owned create implementation required");
+    provider.create.mockImplementationOnce(async (args) => {
+      const row = await create(args);
+      await readdContact();
+      return row;
+    });
+    const outcome = await send(mode);
+    if (mode === "worker") expect(outcome).toMatchObject({ counts: { called: 1, deferred: 1 }, queuedRemaining: 1 });
+    expect(provider.create).toHaveBeenCalledOnce();
+    const [queue] = await sql`select queue_state, dequeued_at, attempts::int as attempts from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", dequeued_at: null, attempts: 0 });
+    await completeCall(firstProviderCall()); await send(mode);
+    expect(provider.create).toHaveBeenCalledTimes(2);
+  });
+  test("a rejected older dispatch cannot add a failure to a fresh queue intent", async () => {
+    provider.create.mockImplementationOnce(async () => {
+      await readdContact();
+      throw Object.assign(new Error("Owned provider rejection"), { status: 400 });
+    });
+    expect(await send("worker")).toMatchObject({ counts: { failed: 1 }, queuedRemaining: 1 });
+    const [queue] = await sql`select queue_state, attempt_count, attempts::int as attempts, last_attempt_error from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", attempt_count: 0, attempts: 0, last_attempt_error: null });
+    expect(await state()).toMatchObject({ holds: 0, calls: 0 });
+    await send("worker"); expect(provider.create).toHaveBeenCalledTimes(2);
+  });
+  test.each(["dequeued", "failed", "queued-with-dequeued-time"])("re-adding a %s row changes its intent without changing the row ID", async (state) => {
+    const [before] = await sql`select dispatch_generation from public.campaign_queue where id = ${queueId}`;
+    await sql`update public.campaign_queue set queue_state = ${state === "queued-with-dequeued-time" ? "queued" : state}, dequeued_at = now() where id = ${queueId}`;
+    const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+    await enqueueContactsForCampaign(campaignId, [contactId], { requeue: false });
+    const [after] = await sql`select id, dispatch_generation, redial_requested_at, queue_state, dequeued_at from public.campaign_queue where id = ${queueId}`;
+    expect(Number(after.id)).toBe(queueId); expect(after.dispatch_generation).not.toBe(before.dispatch_generation);
+    expect(after.redial_requested_at).not.toBeNull(); expect(after.queue_state).toBe("queued"); expect(after.dequeued_at).toBeNull();
+  });
+  test("ordinary enqueues, outreach counters and assignment releases retain their intent", async () => {
+    const [before] = await sql`select dispatch_generation from public.campaign_queue where id = ${queueId}`;
+    const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+    const { rpcCreateOutreachAttempt } = await import("@/lib/db-rpc.server");
+    const { createTenantDb } = await import("@/server/tenant-db");
+    const { releaseAssignedQueueForUser } = await import("@/lib/campaign-queue-db.server");
+    const { requeueCampaignQueueById, requeueAllCampaignQueueForCampaign } = await import("@/lib/campaign-queue-updates.server");
+    await enqueueContactsForCampaign(campaignId, [contactId], { requeue: false });
+    await rpcCreateOutreachAttempt(createTenantDb(workspaceId), { workspaceId, campaignId, contactId, userId: actor, queueId });
+    await sql`update public.campaign_queue set queue_state = 'assigned', assigned_to_user_id = ${actor}::uuid, claimed_at = now() where id = ${queueId}`;
+    expect(await releaseAssignedQueueForUser(actor, campaignId, workspaceId)).toEqual({ ok: true, released: 1 });
+    await requeueCampaignQueueById(queueId, workspaceId);
+    await requeueAllCampaignQueueForCampaign(campaignId, workspaceId);
+    const [after] = await sql`select dispatch_generation, redial_requested_at, attempts::int as attempts from public.campaign_queue where id = ${queueId}`;
+    expect(after).toEqual({ dispatch_generation: before.dispatch_generation, redial_requested_at: null, attempts: 1 });
+  });
+  test("the stale-claim sweep retains the current queue intent", async () => {
+    const [before] = await sql`select dispatch_generation from public.campaign_queue where id = ${queueId}`;
+    await sql`update public.campaign_queue set queue_state = 'assigned', assigned_to_user_id = ${actor}::uuid, claimed_at = now() - interval '2 minutes' where id = ${queueId}`;
+    const [result] = await sql`select reset_stale_campaign_queue_claims(${campaignId}::integer, interval '1 second') as reset`;
+    expect(Number(result.reset)).toBe(1);
+    const [after] = await sql`select dispatch_generation, redial_requested_at, queue_state from public.campaign_queue where id = ${queueId}`;
+    expect(after).toEqual({ dispatch_generation: before.dispatch_generation, redial_requested_at: null, queue_state: "queued" });
+  });
+  test.each(["workspace", "campaign", "contact"] as const)("funding rejects a queue with a different %s", async (mismatch) => {
+    const result = await holds.reserveVoiceCredits({ workspaceId: mismatch === "workspace" ? foreignId : workspaceId,
+      kind: "ivr", accountSid, to, from, campaignId: mismatch === "campaign" ? campaignId + 100000 : campaignId,
+      contactId: mismatch === "contact" ? contactId + 100000 : contactId, queueId, operationKey: `ivr-queue:${queueId}` });
+    expect(result).toEqual({ ok: false, reason: "queue_not_found" });
+    expect(await state()).toEqual({ credits: 100, holds: 0, attempts: 0, calls: 0, ledger: 0 });
+    expect(provider.create).not.toHaveBeenCalled();
+  });
+  test("an unqueued contact with no prior operation cannot start a new call", async () => {
+    await sql`update public.campaign_queue set queue_state = 'dequeued', dequeued_at = now() where id = ${queueId}`;
+    expect(await send("api")).toEqual({ status: 409, body: { error: "This contact is no longer queued." } });
+    expect(await state()).toEqual({ credits: 100, holds: 0, attempts: 0, calls: 0, ledger: 0 });
+    expect(provider.create).not.toHaveBeenCalled();
+  });
+  test("a missing funded generation cannot dequeue or exhaust a queue row", async () => {
+    const { dequeueQueueEntry, recordQueueAttemptFailure } = await import("@/lib/campaign-queue-db.server");
+    expect(await dequeueQueueEntry({ by: { id: queueId }, workspaceId, userId: actor, reason: "Owned missing-generation control", expectedGeneration: null })).toEqual({ dequeuedPrimary: false });
+    await recordQueueAttemptFailure({ queueId, workspaceId, error: "Owned stale failure", expectedGeneration: null });
+    const [queue] = await sql`select queue_state, attempt_count, last_attempt_error from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", attempt_count: 0, last_attempt_error: null });
+  });
+  test("admission permits foreign-key call persistence while it blocks a queue generation change", async () => {
+    const { dispatchReservedVoiceCall } = await import("@/lib/voice-credit-dispatch.server");
+    const { rpcCreateOutreachAttempt } = await import("@/lib/db-rpc.server");
+    const { createTenantDb } = await import("@/server/tenant-db");
+    const result = await dispatchReservedVoiceCall({ workspaceId, kind: "ivr", accountSid, to, from, campaignId, contactId, queueId,
+      operationKey: `ivr-queue:${queueId}`, voiceUrl: "https://ivr-credit.example.test/api/ivr/fixture", statusCallback: "https://ivr-credit.example.test/api/ivr/status",
+      prepareOutreach: async (tx) => {
+        expect(provider.create).not.toHaveBeenCalled();
+        await sql.begin(async (other) => {
+          await other`set local lock_timeout = '100ms'`;
+          await other`insert into public.call (sid, workspace, queue_id, campaign_id, contact_id, status) values
+            (${callSid()}, ${workspaceId}::uuid, ${queueId}, ${campaignId}, ${contactId}, 'initiated')`;
+        });
+        await expect(sql.begin(async (other) => {
+          await other`set local lock_timeout = '100ms'`;
+          await other`select handle_campaign_queue_entry(${contactId}::bigint, ${campaignId}::bigint, 999::bigint, true)`;
+        })).rejects.toMatchObject({ code: "55P03" });
+        return rpcCreateOutreachAttempt(createTenantDb(workspaceId, tx), { workspaceId, campaignId, contactId, queueId, userId: actor });
+      }, create: provider.create,
+    });
+    expect(result).toMatchObject({ ok: true, replayed: false });
+    expect(provider.create).toHaveBeenCalledOnce();
+    expect(await state()).toEqual({ credits: 100, holds: 1, attempts: 1, calls: 2, ledger: 0 });
+  });
+  test("a new explicit IVR attempt still suppresses another initial row at the same phone", async () => {
+    await send("worker"); await completeCall(firstProviderCall());
+    await readdContact(); await send("worker");
+    const [other] = await sql`select id, contact_id from public.campaign_queue where workspace = ${workspaceId}::uuid and id <> ${queueId}`;
+    await sql`update public.contact set phone = ${to} where id = ${other.contact_id}`;
+    await sql`update public.campaign_queue set queue_state = 'queued', dequeued_at = null where id = ${other.id}`;
+    await sql`update public.campaign set status = 'running' where id = ${campaignId}`;
+    await send("worker");
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    expect(await state()).toEqual({ credits: 98, holds: 1, attempts: 2, calls: 2, ledger: 1 });
+  });
+  test("an explicitly re-added duplicate row can call after its prior campaign call ends", async () => {
+    await send("worker");
+    const first = firstProviderCall();
+    const [other] = await sql`select id, contact_id from public.campaign_queue where workspace = ${workspaceId}::uuid and id <> ${queueId}`;
+    await sql`update public.contact set phone = ${to} where id = ${other.contact_id}`;
+    await sql`update public.campaign_queue set queue_state = 'queued', dequeued_at = null where id = ${other.id}`;
+    await send("worker");
+    expect(provider.create).toHaveBeenCalledOnce();
+    await completeCall(first); await readdContact(Number(other.contact_id)); await send("worker");
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    const [row] = await sql`select contact_id from public.call where workspace = ${workspaceId}::uuid and sid <> ${first.sid}`;
+    expect(Number(row.contact_id)).toBe(Number(other.contact_id));
+  });
+  test("a late call row does not round an earlier admission into the new redial window", async () => {
+    await send("worker"); const first = firstProviderCall(); await completeCall(first); await readdContact();
+    await sql`update public.workspace_voice_reservation r set created_at = q.redial_requested_at - interval '1 microsecond'
+      from public.campaign_queue q where r.provider_sid = ${first.sid} and q.id = ${queueId}`;
+    await sql`update public.call c set date_created = q.redial_requested_at + interval '1 second'
+      from public.campaign_queue q where c.sid = ${first.sid} and q.id = ${queueId}`;
+    await send("worker"); expect(provider.create).toHaveBeenCalledTimes(2);
+  });
   test.each(["api", "worker", "legacy"] as const)("%s refuses one credit before outreach or provider work", async (mode) => {
     await sql`update public.workspace set credits = 1 where id = ${workspaceId}::uuid`;
     const result = await send(mode);
@@ -183,11 +443,11 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     await send(mode);
     expect(provider.create).toHaveBeenCalledOnce();
     expect(await state()).toEqual({ credits: 2, holds: 1, attempts: 1, calls: 1, ledger: 0 });
-    const [row] = await sql`select c.queue_id, c.outreach_attempt_id, r.operation_key, r.voice_url, r.status_callback,
+    const [row] = await sql`select c.queue_id, c.outreach_attempt_id, r.operation_key, r.voice_url, r.status_callback, q.dispatch_generation,
       q.queue_state, q.attempts::int as attempts from public.call c join public.workspace_voice_reservation r on r.provider_sid = c.sid
       join public.campaign_queue q on q.id = c.queue_id where c.workspace = ${workspaceId}::uuid`;
     expect(Number(row.queue_id)).toBe(queueId); expect(Number(row.outreach_attempt_id)).toBeGreaterThan(0);
-    expect(row.operation_key).toBe(`ivr-queue:${queueId}`); expect(row.queue_state).toBe("dequeued"); expect(row.attempts).toBe(1);
+    expect(row.operation_key).toBe(`ivr-queue:${queueId}:${row.dispatch_generation}`); expect(row.queue_state).toBe("dequeued"); expect(row.attempts).toBe(1);
     const request = provider.create.mock.calls[0][0];
     expect(request.url).toBe(row.voice_url); expect(request.statusCallback).toBe(row.status_callback);
     expect(new URL(request.url).searchParams.get("credit_reservation")).toBe(new URL(request.statusCallback).searchParams.get("credit_reservation"));
@@ -195,7 +455,8 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
   test.each(["api", "legacy"] as const)("fifty concurrent %s retries create one funded operation and one outreach attempt", async (mode) => {
     await Promise.all(Array.from({ length: 50 }, () => send(mode)));
     expect(provider.create).toHaveBeenCalledOnce();
-    expect(await state()).toEqual({ credits: 100, holds: 1, attempts: 1, calls: 1, ledger: 0 });
+    const snapshot = await state();
+    expect(snapshot, JSON.stringify(snapshot)).toEqual({ credits: 100, holds: 1, attempts: 1, calls: 1, ledger: 0 });
     const [queue] = await sql`select attempts::int as attempts from public.campaign_queue where id = ${queueId}`;
     expect(queue.attempts).toBe(1);
   });
