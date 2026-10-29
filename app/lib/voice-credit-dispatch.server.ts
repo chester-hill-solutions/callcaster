@@ -5,6 +5,7 @@ import {
 } from "@/server/voice-credit-reservation.server";
 import { data as routeData } from "react-router";
 import { outboundCreditsResponse } from "@/lib/outbound-credit-gate.server";
+import { AppError, ErrorCode } from "@/lib/errors.server";
 
 export const VOICE_RESERVATION_QUERY_PARAM = "credit_reservation";
 
@@ -20,6 +21,8 @@ export class VoiceDispatchUncertainError extends Error {
 }
 
 export function voiceDispatchBlockedResponse(result: Extract<Awaited<ReturnType<typeof reserveVoiceCredits>>, { ok: false }>) {
+  if (result.reason === "queue_not_found") throw new AppError("Queue entry not found", 404, ErrorCode.NOT_FOUND);
+  if (result.reason === "queue_not_queued") return routeData({ error: "This contact is no longer queued." }, { status: 409 });
   return result.reason === "dispatch_in_progress" || result.reason === "already_dispatched"
     ? routeData({ error: "This call is awaiting completion or recovery." }, { status: 409 })
     : outboundCreditsResponse(result);
@@ -43,7 +46,7 @@ export async function dispatchReservedVoiceCall(
   const reserved = await reserveVoiceCredits(args);
   if (!reserved.ok) {
     return reserved.reason === "already_dispatched"
-      ? { ok: true as const, callSid: reserved.callSid, replayed: true }
+      ? { ok: true as const, callSid: reserved.callSid, replayed: true, queueGeneration: reserved.queueGeneration }
       : reserved;
   }
   callback.searchParams.set(VOICE_RESERVATION_QUERY_PARAM, reserved.reservation.id);
@@ -59,7 +62,7 @@ export async function dispatchReservedVoiceCall(
     const call = await args.create(urls);
     created = true;
     await recordVoiceReservationProvider(reservation, call.sid);
-    return { ok: true as const, callSid: call.sid, replayed: false };
+    return { ok: true as const, callSid: call.sid, replayed: false, queueGeneration: reservation.queue_generation };
   } catch (error) {
     if (!attempted) {
       await releaseUnsentVoiceReservation(reservation, "not_sent");

@@ -97,6 +97,7 @@ function queuedRow(overrides?: Record<string, unknown>) {
     contact_id: 9001,
     campaign_id: 42,
     queue_state: "queued",
+    dispatch_generation: "00000000-0000-4000-8000-000000000001",
     contact: { id: 9001, phone: "+16135550100", opt_out: false },
     ...overrides,
   };
@@ -410,6 +411,7 @@ describe("dispatchCampaignIvrBatch", () => {
       userId: USER_ID,
       workspaceId: WORKSPACE_ID,
       reason: "IVR dial dispatched",
+      expectedGeneration: "00000000-0000-4000-8000-000000000001",
     });
     expect(outcome.kind).toBe("dispatched");
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 });
@@ -439,6 +441,7 @@ describe("dispatchCampaignIvrBatch", () => {
       userId: USER_ID,
       workspaceId: WORKSPACE_ID,
       reason: "Duplicate IVR call prevented",
+      expectedGeneration: "00000000-0000-4000-8000-000000000001",
     });
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 1, deferred: 0, exhausted: 0 });
   });
@@ -503,6 +506,7 @@ describe("dispatchCampaignIvrBatch", () => {
       userId: USER_ID,
       workspaceId: WORKSPACE_ID,
       reason: "Contact opted out",
+      expectedGeneration: "00000000-0000-4000-8000-000000000001",
     });
     expect(outcome.counts).toEqual({ called: 0, failed: 0, dequeued: 1, deferred: 0, exhausted: 0 });
   });

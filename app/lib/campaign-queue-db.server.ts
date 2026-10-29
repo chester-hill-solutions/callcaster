@@ -228,13 +228,18 @@ export async function updateCampaignQueueStatusByIds(
   if (ids.length === 0) {
     return;
   }
+  const set: QueueColumnWrite = buildQueueStatusUpdatePayload(status);
+  if (status === QUEUE_STATUS_QUEUED) {
+    set.dispatch_generation = sql`gen_random_uuid()`;
+    set.redial_requested_at = sql`clock_timestamp()`;
+  }
 
   await updateCampaignQueueAndEmit({
     conditions: [
       inArray(campaignQueueTable.id, ids),
       eq(campaignQueueTable.workspace, workspaceId),
     ],
-    set: buildQueueStatusUpdatePayload(status),
+    set,
     workspaceId,
   });
 }
@@ -400,6 +405,7 @@ async function dequeueCampaignQueueById(args: {
   userId: string;
   reason: string;
   workspaceId: string;
+  expectedGeneration?: string | null;
   exec?: QueueWriteExecutor;
   deferEmit?: DeferredEmit;
 }) {
@@ -409,6 +415,7 @@ async function dequeueCampaignQueueById(args: {
     eq(campaignQueueTable.id, args.queueId),
     eq(campaignQueueTable.workspace, args.workspaceId),
   ];
+  conditions.push(matchesQueueGeneration(args.expectedGeneration));
 
   return updateCampaignQueueAndEmit({
     conditions,
@@ -417,6 +424,11 @@ async function dequeueCampaignQueueById(args: {
     exec: args.exec,
     deferEmit: args.deferEmit,
   });
+}
+
+function matchesQueueGeneration(expected: string | null | undefined): SQL {
+  if (expected === undefined) return sql`true`;
+  return expected === null ? sql`false` : eq(campaignQueueTable.dispatch_generation, expected);
 }
 
 
@@ -541,6 +553,8 @@ type DequeueQueueEntryByIdArgs = {
   userId: string;
   reason: string;
   workspaceId: string;
+  /** A funded dispatch may finish only its own queue intent. Null refuses the write. */
+  expectedGeneration?: string | null;
   household?: undefined;
   /** Run in the caller's transaction, and hold the publish until it commits. */
   exec?: QueueWriteExecutor;
@@ -605,12 +619,14 @@ export async function recordQueueAttemptFailure(args: {
   queueId: number;
   error: string;
   workspaceId: string;
+  expectedGeneration?: string | null;
 }): Promise<void> {
   await updateCampaignQueueAndEmit({
     conditions: [
       eq(campaignQueueTable.id, args.queueId),
       eq(campaignQueueTable.workspace, args.workspaceId),
       isNull(campaignQueueTable.dequeued_at),
+      matchesQueueGeneration(args.expectedGeneration),
     ],
     set: {
       attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
@@ -638,6 +654,7 @@ export async function dequeueQueueEntry(
       userId: args.userId,
       reason: args.reason,
       workspaceId: args.workspaceId,
+      expectedGeneration: args.expectedGeneration,
       exec: args.exec,
       deferEmit: args.deferEmit,
     });
@@ -702,65 +719,7 @@ export async function dequeueQueueEntry(
 }
 
 
-/**
- * Why a dequeue reported `dequeuedPrimary: false`.
- *
- * A plain read, run only on the no-op path, so the API can say something true
- * instead of "assigned to another agent" for every zero-row dequeue — the
- * manual-dial "next contact" flow dequeues a contact the hangup route has
- * usually already dequeued, and calling that a conflict would be a new lie in
- * place of the old one.
- *
- * Best-effort by construction: the row can change again between the RPC and
- * this read. It decides a message, never a write.
- */
-export type DequeueNoOpReason =
-  | "already_dequeued"
-  | "assigned_elsewhere"
-  | "not_found"
-  | "unknown";
-
-export async function explainDequeueNoOp(args: {
-  contactId: number;
-  campaignId: number;
-  workspaceId: string;
-  userId: string | null;
-}): Promise<DequeueNoOpReason> {
-  const rows = await db
-    .select({
-      queue_state: campaignQueueTable.queue_state,
-      assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
-      dequeued_at: campaignQueueTable.dequeued_at,
-    })
-    .from(campaignQueueTable)
-    .where(
-      and(
-        eq(campaignQueueTable.contact_id, args.contactId),
-        eq(campaignQueueTable.campaign_id, args.campaignId),
-        eq(campaignQueueTable.workspace, args.workspaceId),
-      ),
-    );
-
-  if (rows.length === 0) {
-    return "not_found";
-  }
-
-  const heldByAnotherAgent = rows.some(
-    (row) =>
-      row.dequeued_at == null &&
-      row.assigned_to_user_id != null &&
-      row.assigned_to_user_id !== args.userId,
-  );
-  if (heldByAnotherAgent) {
-    return "assigned_elsewhere";
-  }
-
-  if (rows.every((row) => row.dequeued_at != null)) {
-    return "already_dequeued";
-  }
-
-  return "unknown";
-}
+export { explainDequeueNoOp, type DequeueNoOpReason } from "@/lib/campaign-queue-dequeue-result.server";
 
 export async function releaseAssignedQueueForUser(
   userId: string,

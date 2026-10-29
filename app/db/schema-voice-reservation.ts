@@ -12,6 +12,7 @@ export const workspace_voice_reservation = pgTable("workspace_voice_reservation"
   contact_id: bigint({ mode: "number" }),
   outreach_attempt_id: bigint({ mode: "number" }),
   queue_id: bigint({ mode: "number" }),
+  queue_generation: uuid(),
   operation_key: text(),
   user_id: text(),
   voice_url: text(),

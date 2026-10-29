@@ -110,6 +110,7 @@ export const action = defineAction({
         by: { id: Number(queue_id) },
         userId: user_id,
         workspaceId: workspace_id,
+        expectedGeneration: dispatched.queueGeneration,
         reason: "IVR dial dispatched",
       });
 

@@ -198,6 +198,10 @@ Quote literal route paths containing `$` or shell glob characters; otherwise
 the shell can remove a route segment before the command runs. Read script names
 from `package.json` and discover helper files before reading them. Do not guess
 filenames from an exported function or an npm script's display name.
+When extracting a legacy tenant-data helper, use `createTenantDb` in its new
+module. Moving an old unscoped database import creates new guard debt even
+when the query already has a workspace predicate. Verify the scoped read
+against the existing real-database controls.
 
 After changing a local file package's test dependencies, verify its lock metadata
 and every installed consumer. Bun can retain the old local metadata after a
@@ -510,6 +514,12 @@ decode each selected timestamp and prove it against the installed driver.
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.
+For funding and queue metadata updates that preserve referenced keys, use
+`FOR NO KEY UPDATE` to serialize writers while permitting foreign-key checks.
+Prove that a real call insert can reference the locked workspace and queue,
+and that a concurrent requeue still cannot change the intent. `FOR UPDATE`
+can block the key-share locks from those inserts and create a lock cycle.
+See [PostgreSQL row lock modes](https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS).
 Read current enum values before seeding companion rows. Script and campaign
 types can use different vocabularies; a script type does not prove a valid
 campaign enum.

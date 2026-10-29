@@ -1,9 +1,11 @@
 import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import {
   call as callTable,
+  campaign_queue as campaignQueueTable,
   campaign as campaignTable,
   outreach_attempt as outreachAttemptTable,
   script as scriptTable,
+  workspace_voice_reservation as voiceReservationTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { adminDb } from "@/server/admin-db";
@@ -27,7 +29,7 @@ export async function countCampaignCallsToPhone(
   workspaceId: string,
   campaignId: string | number,
   to: string,
-  options?: { tdb?: TenantDb },
+  options?: { tdb?: TenantDb; queueIntent?: { id: number; generation: string } },
 ): Promise<number> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
   return tdb.call.count({
@@ -35,6 +37,7 @@ export async function countCampaignCallsToPhone(
       eq(callTable.campaign_id, Number(campaignId)),
       eq(callTable.to, to),
       isNotNull(callTable.outreach_attempt_id),
+      options?.queueIntent ? campaignCallWithinQueueIntent(workspaceId, options.queueIntent) : undefined,
     ),
   });
 }
@@ -44,14 +47,33 @@ export async function hasDuplicateCampaignCall(args: {
   campaignId: string | number;
   to: string;
   tdb?: TenantDb;
+  queueIntent?: { id: number; generation: string };
 }): Promise<boolean> {
   const count = await countCampaignCallsToPhone(
     args.workspaceId,
     args.campaignId,
     args.to,
-    { tdb: args.tdb },
+    { tdb: args.tdb, queueIntent: args.queueIntent },
   );
   return count > 0;
+}
+
+function campaignCallWithinQueueIntent(workspaceId: string, intent: { id: number; generation: string }) {
+  // Compare full database timestamps. A late call-row insert must not turn a
+  // prior funded admission into a duplicate of a newly requested attempt.
+  // Unknown legacy timestamps remain duplicates; initial rows have no cutoff.
+  return sql`coalesce(
+    (select ${voiceReservationTable.created_at} from ${voiceReservationTable}
+      where ${voiceReservationTable.workspace} = ${workspaceId}::uuid and ${voiceReservationTable.provider_sid} = ${callTable.sid}),
+    (select ${outreachAttemptTable.created_at} from ${outreachAttemptTable}
+      where ${outreachAttemptTable.workspace} = ${workspaceId}::uuid and ${outreachAttemptTable.id} = ${callTable.outreach_attempt_id}),
+    ${callTable.date_created}, 'infinity'::timestamptz
+  ) >= coalesce(
+    (select ${campaignQueueTable.redial_requested_at} from ${campaignQueueTable}
+      where ${campaignQueueTable.workspace} = ${workspaceId}::uuid and ${campaignQueueTable.id} = ${intent.id}
+        and ${campaignQueueTable.dispatch_generation} = ${intent.generation}::uuid),
+    '-infinity'::timestamptz
+  )`;
 }
 type OutreachRow = typeof outreachAttemptTable.$inferSelect;
 

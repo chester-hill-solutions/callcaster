@@ -142,6 +142,8 @@ export const campaign_queue = pgTable(
     dequeued_by: uuid(),
     dequeued_at: timestamp({ withTimezone: true, mode: "date" }),
     dequeued_reason: text(),
+    dispatch_generation: uuid().notNull().defaultRandom(),
+    redial_requested_at: timestamp({ withTimezone: true, mode: "date" }),
     workspace: uuid().notNull(),
   },
   (table) => [unique("campaign_queue_campaign_contact_unique").on(table.campaign_id, table.contact_id)],

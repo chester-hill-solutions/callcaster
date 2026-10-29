@@ -70,9 +70,11 @@ export async function initiateIvrCall(
         }),
     });
     if (!dispatched.ok) {
-      return dispatched.reason === "dispatch_in_progress"
-        ? { success: false, error: "This call is awaiting completion or recovery." }
-        : { success: false, creditsError: true };
+      if (dispatched.reason === "insufficient_credits" || dispatched.reason === "workspace_not_found") {
+        return { success: false, creditsError: true };
+      }
+      return { success: false, error: dispatched.reason === "dispatch_in_progress"
+        ? "This call is awaiting completion or recovery." : "This contact is no longer queued." };
     }
     const { callSid } = dispatched;
 
@@ -80,6 +82,7 @@ export async function initiateIvrCall(
       by: { id: input.contact.id },
       userId: input.user_id,
       workspaceId: input.workspace_id,
+      expectedGeneration: dispatched.queueGeneration,
       reason: "IVR dial dispatched",
     });
 
