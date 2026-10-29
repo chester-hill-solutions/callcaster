@@ -27,7 +27,7 @@ import {
   QUEUE_LIFECYCLE_ASSIGNED,
   QUEUE_STATUS_QUEUED,
 } from "@/lib/queue-status";
-import { updateCampaignQueueAndEmit } from "@/lib/campaign-queue-db.server";
+import { updateCampaignQueueAndEmit, type QueueWriteExecutor, type DeferredEmit } from "@/lib/campaign-queue-db.server";
 
 /**
  * Revert a claimed campaign_queue row back to `queued`. Used to release a
@@ -39,8 +39,12 @@ import { updateCampaignQueueAndEmit } from "@/lib/campaign-queue-db.server";
 export async function requeueCampaignQueueById(
   queueId: number,
   workspaceId?: string,
+  options?: { exec?: QueueWriteExecutor; deferEmit?: DeferredEmit; expectedGeneration?: string; userId?: string; voiceReservationId?: string },
 ) {
   const conditions: SQL[] = [eq(campaignQueueTable.id, queueId)];
+  if (options?.expectedGeneration) conditions.push(eq(campaignQueueTable.dispatch_generation, options.expectedGeneration));
+  if (options?.voiceReservationId) conditions.push(eq(campaignQueueTable.voice_reservation_id, options.voiceReservationId));
+  if (options?.userId) conditions.push(eq(campaignQueueTable.assigned_to_user_id, options.userId));
   if (workspaceId) {
     conditions.push(eq(campaignQueueTable.workspace, workspaceId));
   }
@@ -48,7 +52,7 @@ export async function requeueCampaignQueueById(
   return updateCampaignQueueAndEmit({
     conditions,
     set: buildQueuedQueueUpdate(),
-    workspaceId,
+    workspaceId, exec: options?.exec, deferEmit: options?.deferEmit,
   });
 }
 

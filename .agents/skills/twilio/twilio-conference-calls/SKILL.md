@@ -21,6 +21,22 @@ Caller ──→ Conference Room ←── Agent
 
 ---
 
+## Conference callback ownership
+
+Twilio uses the first participant's `statusCallback` URL and event selection
+for the whole conference. Later participants do not replace that URL. Bind a
+signed event to its stored account, conference name and conference SID, then
+resolve the event's actual CallSid within that conference. Do not assume that
+the callback URL's owner is the participant named by every event.
+
+A participant event does not establish final call duration. Keep final billing
+on the recipient call-status contract. For a funded predictive start, emit the
+agent's conference TwiML first; use its validated join event to claim the first
+recipient's single-send checkpoint. Recheck recipient calling hours at that
+checkpoint because the agent can answer after the admission window closes.
+
+Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
 ## Prerequisites
 
 - Twilio account with a voice-capable phone number — see `twilio-account-setup`

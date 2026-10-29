@@ -3,7 +3,8 @@ import { recoverPredictiveSuccessorCall } from "@/lib/predictive-successor-recov
 import {
   claimPredictiveContinuation,
   finishPredictiveContinuation,
-  recordPredictiveSuccessorAttempt,
+  recordPredictiveSuccessorAttemptInTransaction,
+  lockPredictiveContinuationSend,
   retryPredictiveContinuation,
   savePredictiveSuccessorCall,
 } from "@/server/predictive-machine-continuation.server";
@@ -29,6 +30,9 @@ import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { PREDICTIVE_MACHINE_RECONCILE_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { recordVoiceReservationProvider } from "@/server/voice-credit-reservation.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
 
 const headers = { "Content-Type": "text/xml" };
 
@@ -36,8 +40,9 @@ function operationUrl(
   binding: MachineBinding,
   phase: "complete" | "wait",
   id: string,
+  initialUrl?: string | null,
 ) {
-  const url = new URL(
+  const url = initialUrl ? new URL(initialUrl) : new URL(
     `/api/auto-dial/${encodeURIComponent(binding.conferenceId)}`,
     env.BASE_URL(),
   );
@@ -62,7 +67,7 @@ async function waitResponse(operation: PredictiveMachineOperation) {
   twiml.pause({ length: 1 });
   twiml.redirect(
     { method: "POST" },
-    operationUrl(machineBinding(operation), "wait", operation.id),
+    operationUrl(machineBinding(operation), "wait", operation.id, operation.ack_url),
   );
   return new Response(twiml.toString(), { headers });
 }
@@ -101,9 +106,10 @@ export async function predictiveMachineResponse(
     if (stopped(existing)) return new Response(hangupTwiml(), { headers });
     if (existing.state === "issued") return waitResponse(existing);
   }
+  const funded = await findVoiceReservationForCall(binding.workspaceId, binding.callSid);
   const { operation, owned } = await preparePredictiveMachineOperation(
     binding,
-    (operationId) => operationUrl(binding, "complete", operationId),
+    (operationId) => operationUrl(binding, "complete", operationId, funded?.voice_url),
   );
   if (stopped(operation)) return new Response(hangupTwiml(), { headers });
   if (!owned) return waitResponse(operation);
@@ -132,6 +138,16 @@ async function loadOperation(workspaceId: string, id: string) {
   });
 }
 async function settleSuccessor(operation: PredictiveMachineOperation) {
+  const funded = operation.successor_call_sid
+    ? await findVoiceReservationForCall(operation.workspace, operation.successor_call_sid) : null;
+  if (funded?.provider_sid) {
+    await recordVoiceReservationProvider(funded, funded.provider_sid);
+    const saved = await createTenantDb(funded.workspace).call.findFirst({ where: eq(call.sid, funded.provider_sid) });
+    if (!saved) throw new Error("Accepted predictive call record is still uncertain");
+    await dequeueFundedVoiceAttempt(funded);
+    await finishPredictiveContinuation(operation);
+    return;
+  }
   if (operation.successor_call_sid && operation.successor_contact_id) {
     await dequeueQueueEntry({
       by: {
@@ -204,28 +220,32 @@ export async function runPredictiveMachineContinuation(
   );
   if (!claim.owned) return { completed: true, replay: true };
   let operation = claim.operation;
-  if (claim.recover) {
-    await settleSuccessor(operation);
-    return { completed: true, recovered: true };
-  }
   try {
+    if (claim.recover) {
+      await settleSuccessor(operation);
+      return { completed: true, recovered: true };
+    }
     const result = await runAutoDialerTurn({
       user_id: operation.user_id,
       campaign_id: operation.campaign_id,
       workspace_id: operation.workspace,
       conference_id: operation.conference_id,
       continuation: {
-        beforeDial: async (contact, attemptId) => {
-          operation = await recordPredictiveSuccessorAttempt(operation, {
-            queueId: contact.queue_id,
-            contactId: contact.contact_id,
-            attemptId,
-          });
+        operationId: operation.id,
+        lockTurn: (tx) => lockPredictiveContinuationSend(tx, operation),
+        prepareSend: async (tx, reservation, urls) => {
+          if (!reservation.queue_id || !reservation.contact_id || !reservation.outreach_attempt_id)
+            throw new Error("Predictive successor has no funded claim");
+          operation = await recordPredictiveSuccessorAttemptInTransaction(tx, operation, {
+            queueId: reservation.queue_id,
+            contactId: reservation.contact_id,
+            attemptId: reservation.outreach_attempt_id,
+          }, urls);
           if (!operation.successor_voice_url || !operation.successor_status_url)
             throw new Error("Predictive successor URL was not saved");
           return {
             voiceUrl: operation.successor_voice_url,
-            statusUrl: operation.successor_status_url,
+            statusCallback: operation.successor_status_url,
           };
         },
         afterDial: async (callData) => {
@@ -234,6 +254,10 @@ export async function runPredictiveMachineContinuation(
       },
     });
     if (!result.success) {
+      if (result.failureKind === "stopped") {
+        await finishPredictiveContinuation(operation);
+        return { completed: true, stopped: true };
+      }
       if (
         result.failureKind === "not-sent" ||
         result.failureKind === "rejected"

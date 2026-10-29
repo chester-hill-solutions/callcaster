@@ -18,6 +18,7 @@ interface StartConferenceParams {
   workspace_id: string;
   campaign_id: string;
   selected_device: string;
+  dial_intent_id?: string;
 }
 
 interface StartConferenceResponse {
@@ -75,6 +76,10 @@ const CONFERENCE_START_MESSAGES = new Map([
   ["Unauthorized", "Sign in, then try again."],
   ["Workspace not found", "This campaign is unavailable. Reload the page."],
   ["Campaign not found", "This campaign is unavailable. Reload the page."],
+  ["Call creation needs provider verification", "Call start is pending provider verification. Please wait."],
+  ["A call is awaiting completion or recovery", "A call is awaiting completion or recovery. Please wait."],
+  ["No queued contacts", "No queued contacts."],
+  ["No contacts within recipient calling hours", "No contacts within recipient calling hours."],
 ]);
 
 function conferenceStartError(data: unknown): string {
@@ -137,6 +142,7 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
       body: JSON.stringify({
         caller_id,
         selected_device,
+        dial_intent_id: params.dial_intent_id,
       }),
     },
     ).catch(() => {

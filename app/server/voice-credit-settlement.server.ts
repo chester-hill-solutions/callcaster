@@ -27,14 +27,16 @@ export async function settleVoiceReservation(args: {
     if (reservation.provider_sid !== args.callSid || !TERMINAL_STATUSES.has(args.status)) {
       return { handled: true as const, billingResult: null };
     }
-    const billable = args.status !== "canceled" && Number.isFinite(args.duration) && args.duration > 0;
-    const amount = billable ? debitAmountFromCredits(voiceCreditsFromDurationSeconds(args.duration, reservation.kind)) : 0;
+    const status = reservation.terminal_status ?? args.status;
+    const duration = reservation.terminal_duration == null ? args.duration : Number(reservation.terminal_duration);
+    const billable = status !== "canceled" && Number.isFinite(duration) && duration > 0;
+    const amount = billable ? debitAmountFromCredits(voiceCreditsFromDurationSeconds(duration, reservation.kind)) : 0;
     const billingResult = billable ? await insertTransactionHistoryIdempotent(tx, {
       workspaceId: args.workspaceId, type: "DEBIT", amount, note: args.note,
       idempotencyKey: callKey(args.callSid), callSid: args.callSid,
       campaignId: reservation.campaign_id, emitEvent: false,
     }) : null;
-    await tx.update(reservations).set({ state: "settled", terminal_status: args.status, terminal_duration: String(args.duration),
+    await tx.update(reservations).set({ state: "settled", terminal_status: status, terminal_duration: String(duration),
       updated_at: new Date(), last_error: null })
       .where(eq(reservations.id, reservation.id));
     return { handled: true as const, billingResult, amount };

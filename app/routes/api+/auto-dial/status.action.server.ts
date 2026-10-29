@@ -21,7 +21,7 @@ import {
 } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
-import { runAutoDialerTurn } from "@/lib/auto-dial.server";
+import { runAutoDialerTurn, sendFundedPredictiveRecipient, stopRefusedPredictiveSetup } from "@/lib/auto-dial.server";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
@@ -34,9 +34,15 @@ import {
   updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature, resolveCanonicalTwilioWebhookUrl, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
+import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
+import { runCallStatusSideEffects } from "@/lib/worker/webhook-side-effects.server";
+import { findVoiceReservationForCall, hasVoiceReservationCallBinding } from "@/server/voice-bridge-reservation.server";
+import { bindVerifiedFundedCallStatus } from "@/lib/voice-bridge-webhook.server";
+import { bindPredictiveConferenceEvent, claimFirstPredictiveRecipient } from "@/server/predictive-conference-reservation.server";
 
 type TwilioClient = Twilio.Twilio;
 
@@ -247,7 +253,8 @@ const handleParticipantLeave = async (
         const endedAt = new Date(event.timestamp);
         if (Number.isFinite(endedAt.getTime())) update.end_time = endedAt;
       }
-      if (event.durationSeconds !== null) update.duration = String(event.durationSeconds);
+      const funded = await findVoiceReservationForCall(workspaceId, callSid);
+      if (!funded && event.durationSeconds !== null) update.duration = String(event.durationSeconds);
       if (Object.keys(update).length) await updateCall(callSid, workspaceId, update);
     } catch (error) {
       logger.error("Participant conference stopped but call metadata update failed", error);
@@ -307,6 +314,20 @@ const handleParticipantJoin = async (
   }
 };
 
+async function handleFundedConferenceEvent(
+  context: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>>, event: Extract<TwilioVoiceCallback, { kind: "participant" }>,
+) {
+      const twilio = await createWorkspaceTwilioInstance({ workspace_id: context.reservation.workspace });
+      if (isParticipantJoin(event)) {
+        if (context.setup && context.reservation.setup_sid === context.call.sid) {
+          const first = await claimFirstPredictiveRecipient(context.reservation, context.call.sid);
+          if (first?.send) await sendFundedPredictiveRecipient(first.reservation, twilio);
+          else if (first) await stopRefusedPredictiveSetup(first.reservation, twilio);
+        }
+        await handleParticipantJoin(event, context.call);
+      } else if (isParticipantHangup(event)) await handleParticipantLeave(event, context.call, twilio);
+}
+
 export const action = defineAction({
   auth: async ({ request }) => {
     // Clone before reading — Bun yields empty params on re-read after consume.
@@ -315,7 +336,7 @@ export const action = defineAction({
     // Parse the payload ONCE, here, into a discriminated union. Everything
     // downstream takes a typed event instead of re-narrowing the same form
     // fields with `typeof x === "string"` — see @/lib/twilio/voice-callback.
-    const event = parseTwilioVoiceCallback(params);
+    let event = parseTwilioVoiceCallback(params);
 
     const callSidValue = event.callSid;
     if (!callSidValue) {
@@ -327,13 +348,40 @@ export const action = defineAction({
       params,
     });
     if (forbidden) return forbidden;
-
-    return { event, callSidValue };
+    let conferenceEvent: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>> | null = null;
+    let setupStatus = false;
+    const query = new URL(request.url).searchParams;
+    if (event.kind === "participant") {
+      if (query.get("conference_events") === "1") {
+        try {
+          conferenceEvent = await bindPredictiveConferenceEvent({
+            reservationId: query.get("credit_reservation") ?? "", requestUrl: resolveCanonicalTwilioWebhookUrl(request),
+            accountSid: event.accountSid ?? "", callSid: callSidValue,
+            conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "",
+          });
+        } catch { return twilioWebhookForbiddenHangup(); }
+      } else if (await hasVoiceReservationCallBinding(callSidValue)) return twilioWebhookForbiddenHangup();
+    } else if (query.get("credit_leg") === "setup") {
+      const bound = await bindVerifiedFundedCallStatus(request, params);
+      if (bound instanceof Response) return bound;
+      if (!bound?.setup) return twilioWebhookForbiddenHangup();
+      setupStatus = true;
+    } else {
+      const blocked = await bindVerifiedVoiceReservationRequest(request, params, "status");
+      if (blocked) return blocked;
+      event = parseTwilioVoiceCallback(params);
+    }
+    return { event, callSidValue, funded: query.has("credit_reservation"), conferenceEvent, setupStatus };
   },
   sideEffects: ["db-write", "credit", "twilio"],
   handler: async ({ auth, request }) => {
-    const { event, callSidValue } = auth;
+    const { event, callSidValue, funded, conferenceEvent, setupStatus } = auth;
     try {
+    if (setupStatus) return routeData({ success: true });
+    if (conferenceEvent && event.kind === "participant") {
+      await handleFundedConferenceEvent(conferenceEvent, event);
+      return routeData({ success: true });
+    }
     let dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
       await recordPredictiveSuccessorCallback(request, event.raw);
@@ -347,6 +395,15 @@ export const action = defineAction({
         callSid: callSidValue,
       });
       return routeData({ success: true, resolved: false });
+    }
+
+    if (funded && event.kind !== "participant") {
+      const { call } = await processCallStatusWebhook(buildCallUpsertFromTwilioParams(event.raw), {
+        workspaceId: dbCall.workspace, skipBilling: true,
+      });
+      const outcome = await enqueueCallStatusSideEffects(call, event.raw);
+      await runCallStatusSideEffects({ callSid: call.sid, event: outcome });
+      return routeData({ success: true });
     }
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),

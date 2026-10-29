@@ -199,6 +199,11 @@ Validate the complete input before editing or committing selected evidence.
 Require the generated cause
 and test fields before writing. A multiline `$` can match the heading line,
 so use an explicit next-section or end-of-input boundary.
+When replacing a JSON record with `JSONDecoder.raw_decode`, its second return
+value is an absolute end offset, not a length. Parse the final complete array
+and require every unrelated record and the record count to remain equal.
+A one-issue board render can end with a horizontal rule; exclude that footer
+when replacing the selected section in the full board.
 Trace the affected route or worker to its actual helper before moving an issue to
 Verify and close. A merged PR that changes another parser does not fix the upload
 path. For SQL, check bootstrap inclusion and later function definitions; a file

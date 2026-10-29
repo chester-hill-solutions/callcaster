@@ -46,6 +46,9 @@ import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-ba
 import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
+import { queueFundedPredictiveContinuation } from "@/server/predictive-machine-operation.server";
+import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
+import { ensureFundedPredictiveReceipt } from "@/server/predictive-voice-receipt.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
 const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
@@ -70,15 +73,23 @@ export async function runCallStatusSideEffects(args: {
   if (!callRow) {
     throw new Error(`Call ${args.callSid} not found for side effects`);
   }
-  const reservation = callRow.workspace ? await findVoiceReservationForCall(callRow.workspace, args.callSid) : null;
+  let reservation = callRow.workspace ? await findVoiceReservationForCall(callRow.workspace, args.callSid) : null;
   if (reservation?.setup_sid === args.callSid) return { ok: true };
   // An older progress job can observe a newer terminal row. Keep its hold
   // recoverable until a terminal job exists to carry all recipient outcomes.
   if (reservation && isTerminalStatus(normalizeProviderStatus(callRow.status)) && !CALL_STATUS_TO_DISPOSITION[args.event.callStatus.toLowerCase()]) return { ok: true };
 
-  await billTerminalCallStatus(callRow);
+  if (reservation && CALL_STATUS_TO_DISPOSITION[args.event.callStatus.toLowerCase()] && !reservation.terminal_status) {
+    await enqueueFundedVoiceTerminalOutcome(reservation.workspace, args.callSid, args.event.raw);
+    reservation = await findVoiceReservationForCall(reservation.workspace, args.callSid);
+  }
+  const finalStatus = normalizeProviderStatus(reservation?.terminal_status);
+  const effectiveCall = finalStatus && reservation?.terminal_duration != null
+    ? { ...callRow, status: finalStatus, duration: reservation.terminal_duration } : callRow;
+  if (reservation) await ensureFundedPredictiveReceipt(reservation);
+  await billTerminalCallStatus(effectiveCall);
 
-  const callStatus = args.event.callStatus;
+  const callStatus = finalStatus ?? args.event.callStatus;
   const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(callRow);
 
   const currentAttempt =
@@ -116,6 +127,7 @@ export async function runCallStatusSideEffects(args: {
 
   if (reservation && CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()]) {
     await dequeueFundedVoiceAttempt(reservation);
+    await queueFundedPredictiveContinuation(reservation);
     return { ok: true };
   }
 

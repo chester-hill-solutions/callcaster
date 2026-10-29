@@ -1,147 +1,60 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-/**
- * Unit tests for the opt-out claim guard in claimNextQueueContact
- * (app/lib/campaign-queue-db.server.ts): the claim_next_queue_contact RPC does
- * not filter on contact.opt_out, so the TS wrapper must dequeue opted-out
- * claims and try again (bounded).
- */
-
-const dbMocks = vi.hoisted(() => ({
-  select: vi.fn(),
-  update: vi.fn(),
-  delete: vi.fn(),
+const globalDb = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn() }));
+const scoped = vi.hoisted(() => ({ find: vi.fn(), update: vi.fn(), emit: vi.fn() }));
+vi.mock("@/server/db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/db")>(), db: globalDb,
+}));
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/workspace-events.server")>(), emitQueueEvent: scoped.emit,
 }));
 
-const emitQueueEventMock = vi.hoisted(() => vi.fn(async () => undefined));
-
-vi.mock("@/server/db", () => ({ db: dbMocks }));
-vi.mock("@/lib/workspace-events.server", () => ({
-  emitQueueEvent: (...args: unknown[]) => emitQueueEventMock(...args),
-}));
-
-// Per-test responder: returns the rows for the Nth db.select() call.
-let selectResponder: (callIndex: number) => unknown[] = () => [];
-let selectCallCount = 0;
-
-// Captured `set` payloads from db.update().set(...) calls.
-let updateSetCalls: unknown[] = [];
-
-function installDbMockImplementations() {
-  dbMocks.select.mockImplementation(() => {
-    const callIndex = selectCallCount++;
-    const chain: any = {
-      from: () => chain,
-      where: () => chain,
-      limit: () => Promise.resolve(selectResponder(callIndex)),
-      then: (onFulfilled: any, onRejected: any) =>
-        Promise.resolve(selectResponder(callIndex)).then(onFulfilled, onRejected),
-    };
-    return chain;
-  });
-  dbMocks.update.mockImplementation(() => ({
-    set: (setPayload: unknown) => {
-      updateSetCalls.push(setPayload);
-      return {
-        where: () => ({
-          returning: () => Promise.resolve([{ id: 999, workspace: "w1" }]),
-        }),
-      };
-    },
-  }));
+const generation = "00000000-0000-4000-8000-000000000001";
+const queue = (id: number) => ({ id, workspace: "w1", dispatch_generation: generation, assigned_to_user_id: "user-1" });
+const claim = (contactId: number, queueId: number) => ({ contact_id: contactId, queue_id: queueId,
+  caller_id: "+15550001111", contact_phone: "+15550002222" });
+function makeTdb(execute: ReturnType<typeof vi.fn>) {
+  return { execute, campaign_queue: { findFirst: scoped.find, update: scoped.update }, contact: { findFirst: scoped.find } } as any;
 }
-
-function makeTdb(executeMock: ReturnType<typeof vi.fn>) {
-  return { execute: executeMock } as any;
-}
-
-const claimRow = (contactId: number, queueId: number) => ({
-  contact_id: contactId,
-  queue_id: queueId,
-  caller_id: "+15550001111",
-  contact_phone: "+15550002222",
-});
 
 describe("claimNextQueueContact opt-out guard", () => {
   beforeEach(() => {
-    dbMocks.select.mockReset();
-    dbMocks.update.mockReset();
-    emitQueueEventMock.mockClear();
-    selectCallCount = 0;
-    updateSetCalls = [];
-    selectResponder = () => [];
-    installDbMockImplementations();
+    vi.clearAllMocks(); scoped.find.mockReset();
+    scoped.update.mockReset().mockResolvedValue([queue(11)]);
+    globalDb.select.mockImplementation(() => { throw new Error("Claim reads must use the supplied transaction"); });
+    globalDb.update.mockImplementation(() => { throw new Error("Claim writes must use the supplied transaction"); });
   });
-
   test("returns the claimed row when the contact is not opted out", async () => {
     const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
-    const execute = vi.fn().mockResolvedValueOnce([claimRow(5, 11)]);
-    // Call order: queue row lookup, then contact opt_out lookup.
-    const responses = [[{ id: 11, workspace: "w1" }], [{ opt_out: false }]];
-    selectResponder = (i) => responses[i] ?? [];
-
-    const result = await claimNextQueueContact(makeTdb(execute), 1, "user-1");
-
-    expect(result).toEqual(claimRow(5, 11));
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(dbMocks.update).not.toHaveBeenCalled();
+    const execute = vi.fn().mockResolvedValueOnce([claim(5, 11)]);
+    scoped.find.mockResolvedValueOnce(queue(11)).mockResolvedValueOnce({ opt_out: false });
+    expect(await claimNextQueueContact(makeTdb(execute), 1, "user-1")).toEqual(claim(5, 11));
+    expect(execute).toHaveBeenCalledOnce(); expect(scoped.update).not.toHaveBeenCalled();
+    expect(globalDb.select).not.toHaveBeenCalled();
   });
-
   test("returns null when no row is claimed", async () => {
     const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
     const execute = vi.fn().mockResolvedValueOnce([]);
-
-    const result = await claimNextQueueContact(makeTdb(execute), 1, "user-1");
-
-    expect(result).toBeNull();
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(dbMocks.select).not.toHaveBeenCalled();
+    expect(await claimNextQueueContact(makeTdb(execute), 1, "user-1")).toBeNull();
+    expect(execute).toHaveBeenCalledOnce(); expect(scoped.find).not.toHaveBeenCalled();
   });
-
-  test("dequeues an opted-out claim and returns the next non-opted-out contact", async () => {
+  test("dequeues an opted-out claim and returns the next eligible contact", async () => {
     const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
-    const execute = vi
-      .fn()
-      .mockResolvedValueOnce([claimRow(5, 11)])
-      .mockResolvedValueOnce([claimRow(6, 12)]);
-    const responses = [
-      // iteration 1: queue row, opted-out contact, dequeue's old-rows read
-      [{ id: 11, workspace: "w1" }],
-      [{ opt_out: true }],
-      [{ id: 11, workspace: "w1" }],
-      // iteration 2: queue row, contact ok
-      [{ id: 12, workspace: "w1" }],
-      [{ opt_out: false }],
-    ];
-    selectResponder = (i) => responses[i] ?? [];
-
-    const result = await claimNextQueueContact(makeTdb(execute), 1, "user-1");
-
-    expect(result).toEqual(claimRow(6, 12));
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect(dbMocks.update).toHaveBeenCalledTimes(1);
-    expect(updateSetCalls[0]).toMatchObject({
-      queue_state: "dequeued",
-      dequeued_by: "user-1",
-      dequeued_reason: "Contact opted out",
-    });
+    const execute = vi.fn().mockResolvedValueOnce([claim(5, 11)]).mockResolvedValueOnce([claim(6, 12)]);
+    scoped.find.mockResolvedValueOnce(queue(11)).mockResolvedValueOnce({ opt_out: true })
+      .mockResolvedValueOnce(queue(12)).mockResolvedValueOnce({ opt_out: false });
+    expect(await claimNextQueueContact(makeTdb(execute), 1, "user-1")).toEqual(claim(6, 12));
+    expect(execute).toHaveBeenCalledTimes(2); expect(scoped.update).toHaveBeenCalledOnce();
+    expect(scoped.update).toHaveBeenCalledWith(expect.objectContaining({ set: expect.objectContaining({
+      queue_state: "dequeued", dequeued_by: "user-1", dequeued_reason: "Contact opted out",
+    }) }));
+    expect(globalDb.update).not.toHaveBeenCalled();
   });
-
-  test("gives up after 10 opted-out claims and returns null", async () => {
+  test("gives up after ten opted-out claims", async () => {
     const { claimNextQueueContact } = await import("@/lib/campaign-queue-db.server");
-    const execute = vi.fn().mockResolvedValue([claimRow(5, 11)]);
-    // Every iteration: queue row, opted-out contact, dequeue's old-rows read.
-    selectResponder = (i) => {
-      const step = i % 3;
-      if (step === 0) return [{ id: 11, workspace: "w1" }];
-      if (step === 1) return [{ opt_out: true }];
-      return [{ id: 11, workspace: "w1" }];
-    };
-
-    const result = await claimNextQueueContact(makeTdb(execute), 1, "user-1");
-
-    expect(result).toBeNull();
-    expect(execute).toHaveBeenCalledTimes(10);
-    expect(dbMocks.update).toHaveBeenCalledTimes(10);
+    const execute = vi.fn().mockResolvedValue([claim(5, 11)]);
+    let reads = 0; scoped.find.mockImplementation(async () => reads++ % 2 === 0 ? queue(11) : { opt_out: true });
+    expect(await claimNextQueueContact(makeTdb(execute), 1, "user-1")).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(10); expect(scoped.update).toHaveBeenCalledTimes(10);
   });
 });

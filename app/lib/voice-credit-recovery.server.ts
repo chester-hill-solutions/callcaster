@@ -18,8 +18,8 @@ import { settleRecoveredVoiceCall } from "@/lib/recovered-voice-status.server";
 function matchesReservation(reservation: VoiceReservation, candidate: CallInstance) {
   return candidate.accountSid === reservation.account_sid &&
     candidate.to === reservation.recipient && candidate.from === reservation.caller_id &&
-    candidate.direction === (reservation.setup_sid ? "outbound-dial" : "outbound-api") &&
-    (candidate.parentCallSid || null) === reservation.setup_sid;
+    candidate.direction === (reservation.setup_sid && !reservation.conference_id ? "outbound-dial" : "outbound-api") &&
+    (candidate.parentCallSid || null) === (reservation.conference_id ? null : reservation.setup_sid);
 }
 
 async function adoptVerifiedCandidate(reservation: VoiceReservation, candidate: CallInstance, twilio: Twilio.Twilio) {
@@ -77,6 +77,7 @@ async function findUnknownCall(reservation: VoiceReservation, twilio: Twilio.Twi
 
 async function settleSavedVoiceReservation(reservation: VoiceReservation) {
   if (!reservation.provider_sid) return false;
+  await recordVoiceReservationProvider(reservation, reservation.provider_sid);
   const local = await createTenantDb(reservation.workspace).call.findFirst({ where: eq(call.sid, reservation.provider_sid) });
   const duration = local?.duration ?? (local?.call_duration == null ? null : String(local.call_duration));
   if (!local || terminalDuration(local.status, duration) === null) return false;

@@ -158,50 +158,35 @@ export async function claimNextQueueContact(
   tdb: TenantDb,
   campaignId: number,
   userId: string,
+  options?: { deferEmit?: DeferredEmit },
 ): Promise<ClaimedQueueContact | null> {
+  const publish = async (workspaceId: string, oldRows: CampaignQueueRow[], newRows: CampaignQueueRow[]) => {
+    const emit = () => emitQueueRowUpdates(workspaceId, oldRows, newRows);
+    if (options?.deferEmit) options.deferEmit(emit);
+    else await emit();
+  };
   for (let attempt = 0; attempt < MAX_OPT_OUT_CLAIM_SKIPS; attempt++) {
     const rows = await tdb.execute(
       sql`select * from claim_next_queue_contact(${campaignId}, ${userId}::uuid)`,
     );
     const row = rows[0] as ClaimedQueueContact | undefined;
     if (!row || !row.queue_id) return null;
+    const queueRow = await tdb.campaign_queue.findFirst({ where: eq(campaignQueueTable.id, row.queue_id) });
+    if (!queueRow) return null;
+    await publish(queueRow.workspace, [], [queueRow]);
 
-    const [queueRow] = await db
-      .select()
-      .from(campaignQueueTable)
-      .where(eq(campaignQueueTable.id, row.queue_id))
-      .limit(1);
-    if (queueRow) {
-      await emitQueueEvent(
-        queueRow.workspace,
-        "UPDATE",
-        queueRow as Record<string, unknown>,
-        null,
-      );
-    }
-
-    // Belt-and-suspenders opt-out guard: `claim_next_queue_contact` does not
-    // filter on `contact.opt_out`, so a contact opted out by a writer that did
-    // not also dequeue their rows could still be claimed. Dequeue such claims
-    // and try again (bounded so a queue full of opted-out rows can't loop
-    // forever).
-    const [contactRow] = await db
-      .select({ opt_out: contactTable.opt_out })
-      .from(contactTable)
-      .where(eq(contactTable.id, row.contact_id))
-      .limit(1);
+    // Reads and opt-out writes use the same tenant transaction as the claim.
+    // A later explicit re-add must survive this older claim's cleanup.
+    const contactRow = await tdb.contact.findFirst({ where: eq(contactTable.id, row.contact_id), columns: { opt_out: true } });
     if (contactRow?.opt_out) {
-      // Nothing to dequeue if the row can no longer be read.
-      if (!queueRow) continue;
-      await dequeueCampaignQueueById({
-        queueId: row.queue_id,
-        userId,
-        reason: "Contact opted out",
-        workspaceId: queueRow.workspace,
-      });
+      const updated = await tdb.campaign_queue.update({ set: buildDequeuedQueueUpdate(userId, "Contact opted out"), where: and(
+        eq(campaignQueueTable.id, row.queue_id), eq(campaignQueueTable.dispatch_generation, queueRow.dispatch_generation),
+        eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED), eq(campaignQueueTable.assigned_to_user_id, userId),
+        isNull(campaignQueueTable.dequeued_at),
+      ) });
+      await publish(queueRow.workspace, [queueRow], updated);
       continue;
     }
-
     return row;
   }
   return null;

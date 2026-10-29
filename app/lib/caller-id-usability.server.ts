@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { canSpendFromNumber } from "@/lib/number-rental-lifecycle";
 
 /**
@@ -55,11 +55,12 @@ export type CallerIdUsability =
 export async function resolveCallerIdUsability(
   workspaceId: string,
   callerId: string | null | undefined,
+  options?: { tdb?: Pick<TenantDb, "workspace_number"> },
 ): Promise<CallerIdUsability> {
   const wanted = String(callerId ?? "").trim();
   if (!wanted) return { kind: "not_provided" };
 
-  const tdb = createTenantDb(workspaceId);
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
   const owned = await tdb.workspace_number.findFirst({
     where: eq(workspaceNumberTable.phone_number, wanted),
     columns: { id: true, suspended_at: true },

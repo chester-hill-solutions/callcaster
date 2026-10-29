@@ -7,6 +7,7 @@ import {
   job,
   outreach_attempt,
   predictive_machine_operation as operationTable,
+  workspace_voice_reservation as reservations,
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -14,6 +15,9 @@ import { randomUUID } from "node:crypto";
 import { saveCallToDatabase } from "@/lib/auto-dial.server";
 import { twilioOpenSyncParams } from "@/lib/worker/job-params.server";
 import type { Call } from "@/lib/types";
+import type { CreditTransaction } from "./outbound-credit-reservations.server";
+import type { VoiceDispatchUrls } from "./voice-credit-reservation.server";
+import { PredictiveContinuationStoppedError } from "./predictive-voice-receipt.server";
 import {
   lockPredictiveMachineOperation,
   predictiveMachineIdentity,
@@ -97,12 +101,33 @@ export async function recordPredictiveSuccessorAttempt(
   operation: PredictiveMachineOperation,
   successor: { queueId: number; attemptId: number; contactId: number },
 ) {
-  return db.transaction(async (tx) => {
-    await lockPredictiveMachineOperation(
-      tx,
-      machineBinding(operation),
-      operation.id,
-    );
+  return db.transaction((tx) => recordPredictiveSuccessorAttemptInTransaction(tx, operation, successor));
+}
+
+export async function lockPredictiveContinuationSend(tx: CreditTransaction, operation: PredictiveMachineOperation) {
+  const current = await lockPredictiveMachineOperation(tx, machineBinding(operation), operation.id);
+  if (current.lease_token !== operation.lease_token || current.state !== "continuing" ||
+      current.lease_until.getTime() <= Date.now() || current.send_started_at) {
+    throw new Error("Predictive continuation no longer owns the send");
+  }
+  const [predecessor] = await tx.select().from(reservations).where(and(
+    eq(reservations.workspace, operation.workspace), eq(reservations.provider_sid, operation.call_sid),
+  )).limit(1);
+  if (predecessor) {
+    const [queue] = await tx.select({ id: campaign_queue.id }).from(campaign_queue).where(and(
+      eq(campaign_queue.workspace, predecessor.workspace), eq(campaign_queue.id, predecessor.queue_id ?? 0),
+      eq(campaign_queue.dispatch_generation, predecessor.queue_generation ?? ""), eq(campaign_queue.voice_reservation_id, predecessor.id),
+    )).limit(1);
+    if (!queue) throw new PredictiveContinuationStoppedError("Predictive predecessor queue generation changed");
+  }
+}
+
+export async function recordPredictiveSuccessorAttemptInTransaction(
+  tx: CreditTransaction, operation: PredictiveMachineOperation,
+  successor: { queueId: number; attemptId: number; contactId: number },
+  urls?: VoiceDispatchUrls,
+) {
+    await lockPredictiveContinuationSend(tx, operation);
     const [campaign] = await tx
       .select()
       .from(campaignTable)
@@ -149,15 +174,15 @@ export async function recordPredictiveSuccessorAttempt(
       attempt.id === operation.outreach_attempt_id
     )
       throw new Error("Predictive successor claim binding does not match");
-    const voiceUrl = new URL(
-      `/api/auto-dial/${encodeURIComponent(operation.conference_id)}`,
-      operation.ack_url,
+    const voiceUrl = urls ? new URL(urls.voiceUrl) : new URL(
+      `/api/auto-dial/${encodeURIComponent(operation.conference_id)}`, operation.ack_url,
     );
     voiceUrl.searchParams.set("continuation", operation.id);
     voiceUrl.searchParams.set("attempt", String(successor.attemptId));
     voiceUrl.searchParams.set("workspace", operation.workspace);
-    const statusUrl = new URL(voiceUrl);
+    const statusUrl = urls ? new URL(urls.statusCallback) : new URL(voiceUrl);
     statusUrl.pathname = "/api/auto-dial/status";
+    for (const [key, value] of voiceUrl.searchParams) statusUrl.searchParams.set(key, value);
     const [saved] = await createTenantDb(
       operation.workspace,
       tx,
@@ -179,7 +204,6 @@ export async function recordPredictiveSuccessorAttempt(
     if (!saved)
       throw new Error("Predictive continuation no longer owns the send");
     return saved;
-  });
 }
 function requireSuccessorBinding(
   current: PredictiveMachineOperation,
@@ -256,21 +280,29 @@ export async function savePredictiveSuccessorCall(
     requireSuccessorBinding(current, operation, callData);
     const tdb = createTenantDb(operation.workspace, tx);
     if (options?.recovery) await verifyRecoveryBinding(tdb, current, callData);
-    if (!(await saveCallToDatabase(operation.workspace, callData, { tdb })))
-      throw new Error("Predictive successor call was not saved");
     const [saved] = await tdb.predictive_machine_operation.update({
-      set: {
-        state: "continuing",
-        successor_call_sid: callData.sid,
-        last_error: null,
-        lease_until: new Date(Date.now() + CONTINUATION_LEASE_MS),
-        updated_at: new Date(),
-      },
+      set: { state: "continuing", successor_call_sid: callData.sid, last_error: null,
+        lease_until: new Date(Date.now() + CONTINUATION_LEASE_MS), updated_at: new Date() },
       where: eq(operationTable.id, current.id),
     });
+    if (!saved) throw new Error("Predictive successor checkpoint was not saved");
+    try {
+      await tx.transaction(async (savepoint) => {
+        if (!(await saveCallToDatabase(operation.workspace, callData, { tdb: createTenantDb(operation.workspace, savepoint) })))
+          throw new Error("Predictive successor call was not saved");
+      });
+    } catch {
+      await tdb.predictive_machine_operation.update({ where: eq(operationTable.id, current.id),
+        set: { last_error: "Accepted predictive successor record needs recovery", lease_until: new Date() } });
+      return saved;
+    }
     const terminalStatus =
       options?.terminalStatus ?? current.successor_callback_status;
-    if (terminalStatus) {
+    const [funded] = await tx.select({ id: reservations.id }).from(reservations).where(and(
+      eq(reservations.workspace, operation.workspace), eq(reservations.predictive_operation_id, operation.id),
+      eq(reservations.provider_sid, callData.sid ?? ""),
+    )).limit(1);
+    if (terminalStatus && !funded) {
       if (needsPredictiveTerminalContinuation(terminalStatus) && callData.sid) {
         await queueRecoveredPredictiveContinuation(tx, current, callData.sid);
       }

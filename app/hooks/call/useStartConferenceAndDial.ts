@@ -24,6 +24,7 @@ export function useStartConferenceAndDial({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const pending = useRef(false);
+  const dialIntent = useRef<{ context: string; id: string } | null>(null);
   const disabledReason = !callerId
     ? "Set caller ID in Setup"
     : !selectedDevice
@@ -50,16 +51,20 @@ export function useStartConferenceAndDial({
     setError(null);
     setCreditsError(false);
     try {
+      const context = JSON.stringify([userId, campaignId, workspaceId, callerId, selectedDevice]);
+      if (dialIntent.current?.context !== context) dialIntent.current = { context, id: crypto.randomUUID() };
       const result = await startConferenceAndDial({
         caller_id: callerId,
         workspace_id: workspaceId,
         campaign_id: campaignId,
         selected_device: selectedDevice,
+        dial_intent_id: dialIntent.current.id,
       });
       if (result.creditsError) {
         fail("Insufficient credits to start dialing", true);
       } else if (result.success && result.conferenceName) {
         setConference(result.conferenceName);
+        dialIntent.current = null;
       } else {
         fail(result.error || "Could not start dialing. Try again.");
       }
@@ -70,7 +75,7 @@ export function useStartConferenceAndDial({
       pending.current = false;
       setIsLoading(false);
     }
-  }, [campaignId, workspaceId, callerId, selectedDevice, disabledReason, showError]);
+  }, [userId, campaignId, workspaceId, callerId, selectedDevice, disabledReason, showError]);
 
   return { begin, conference, setConference, creditsError, error, isLoading, disabledReason };
 }

@@ -1,70 +1,40 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
 import type { Call } from '@/lib/types';
 import type TwilioSDK from "twilio";
 import { call as callTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import {
-  rpcCreateOutreachAttempt,
   rpcResetStaleCampaignQueueClaims,
 } from "@/lib/db-rpc.server";
 import { recheckCampaignCompletion } from "@/lib/campaign-completion.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
-import {
-  claimNextQueueContact,
-  dequeueQueueEntry
-} from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
-import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
-import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
-import { db } from "@/server/db";
+import { admitPredictiveVoiceRecipient, type PredictiveVoiceAdmissionInput } from "@/server/predictive-voice-admission.server";
+import type { VoiceReservation, VoiceDispatchUrls } from "@/server/voice-credit-reservation.server";
+import { dispatchStartedVoiceCall, isDefiniteVoiceCreateRejection, VoiceDispatchUncertainError } from "@/lib/voice-credit-dispatch.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
+import { refuseFirstPredictiveRecipient } from "@/server/predictive-conference-reservation.server";
+import { PredictiveContinuationStoppedError } from "@/server/predictive-voice-receipt.server";
 
 type TwilioClient = TwilioSDK.Twilio;
-
-export const normalizePhoneNumber = sharedNormalizePhoneNumber;
-
-export async function getNextAutoDialQueueContact(
-  campaign_id: number,
-  user_id: string,
-  tdb: TenantDb = createTenantDb("service"),
-) {
-  return claimNextQueueContact(tdb, campaign_id, user_id);
-}
-
-export async function createOutreachAttempt(
-  contactRecord: { queue_id: number, contact_id: number, contact_phone: string },
-  campaign_id: number,
-  workspace_id: string,
-  user_id: string,
-) {
-  return rpcCreateOutreachAttempt(db, {
-    contactId: contactRecord.contact_id,
-    campaignId: campaign_id,
-    userId: user_id,
-    workspaceId: workspace_id,
-    queueId: contactRecord.queue_id,
-  });
-}
 
 export async function createTwilioCall(
   client: TwilioClient,
   toNumber: string,
   fromNumber: string,
   conference_id: string,
-  selected_device: string,
-  voiceUrl?: string,
-  statusUrl?: string,
+  urls?: VoiceDispatchUrls,
 ) {
-  return await client.calls.create({
+  return client.calls.create({
     to: toNumber,
     from: fromNumber,
-    url: voiceUrl ?? `${env.BASE_URL()}/api/auto-dial/${conference_id}`,
+    url: urls?.voiceUrl ?? `${env.BASE_URL()}/api/auto-dial/${conference_id}`,
     machineDetection: "Enable",
     statusCallbackEvent: ["answered", "completed", "ringing"],
-    statusCallback: statusUrl ?? `${env.BASE_URL()}/api/auto-dial/status`,
+    statusCallback: urls?.statusCallback ?? `${env.BASE_URL()}/api/auto-dial/status`,
   });
 }
 
@@ -176,11 +146,7 @@ export type AutoDialerTurnInput = {
   selected_device?: string;
   conference_id?: string | null;
   /** Durable predictive continuation checkpoints; ordinary dial turns omit them. */
-  continuation?: {
-    beforeDial: (
-      contact: { queue_id: number; contact_id: number },
-      attemptId: number,
-    ) => Promise<void | { voiceUrl: string; statusUrl: string }>;
+  continuation?: Pick<PredictiveVoiceAdmissionInput, "operationId" | "lockTurn" | "prepareSend"> & {
     afterDial: (callData: Partial<Call>) => Promise<void>;
   };
 };
@@ -190,7 +156,7 @@ export type AutoDialerTurnResult =
   | {
       success: false;
       error: string;
-      failureKind?: "not-sent" | "rejected" | "uncertain";
+      failureKind?: "not-sent" | "rejected" | "uncertain" | "stopped";
     };
 
 /**
@@ -209,12 +175,9 @@ export type AutoDialerTurnResult =
 export async function runAutoDialerTurn(
   input: AutoDialerTurnInput,
 ): Promise<AutoDialerTurnResult> {
-  const { user_id, workspace_id, selected_device } = input;
+  const { user_id, workspace_id } = input;
   const campaign_id = Number(input.campaign_id);
-  const conferenceId =
-    typeof input.conference_id === "string" && input.conference_id
-      ? input.conference_id
-      : user_id;
+  const conferenceId = input.conference_id || user_id;
 
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
   const tdb = createTenantDb(workspace_id);
@@ -249,165 +212,52 @@ export async function runAutoDialerTurn(
 
   let failureKind: "not-sent" | "rejected" | "uncertain" = "not-sent";
   try {
-    // Claim the next contact that is inside the recipient-local calling
-    // window (TCPA/CRTC 8am–9pm recipient time). Out-of-window claims are
-    // released back to `queued` so a later turn can dial them; seeing an
-    // already-released row again means every claimable contact is currently
-    // out of window, so the turn ends instead of spinning.
-    const MAX_WINDOW_SKIPS_PER_TURN = 25;
-    const releasedQueueIds = new Set<number>();
-    let contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
-    while (contactRecord) {
-      const windowStatus = recipientCallingWindowStatus(
-        contactRecord.contact_phone,
-      );
-      if (windowStatus.allowed) break;
-      logger.info("auto_dial.recipient_window_skip", {
-        campaignId: campaign_id,
-        queueId: contactRecord.queue_id,
-        timezone: windowStatus.timezone,
-        reason: windowStatus.reason,
-      });
-      const alreadyReleased = releasedQueueIds.has(contactRecord.queue_id);
-      releasedQueueIds.add(contactRecord.queue_id);
-      await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
-      if (alreadyReleased || releasedQueueIds.size >= MAX_WINDOW_SKIPS_PER_TURN) {
-        contactRecord = null;
-        break;
+    const admitted = await admitPredictiveVoiceRecipient({
+      workspaceId: workspace_id, campaignId: campaign_id, userId: user_id,
+      conferenceId, accountSid: twilioClient.accountSid,
+      operationId: input.continuation?.operationId,
+      lockTurn: input.continuation?.lockTurn,
+      prepareSend: input.continuation?.prepareSend,
+    });
+    if (!admitted.ok) {
+      if (admitted.reason === "queue_empty") {
+        await completeAllConferences(twilioClient, conferenceId);
+        await recheckCampaignCompletion({ campaignId: campaign_id, workspaceId: workspace_id, exec: tdb, reason: "auto_dial_drain" });
+        return { success: true, message: "No queued contacts" };
       }
-      contactRecord = await getNextAutoDialQueueContact(campaign_id, user_id, tdb);
+      if (input.continuation) return { success: false, failureKind: "not-sent", error: `Predictive admission deferred: ${admitted.reason}` };
+      return { success: true, message: `Predictive admission deferred: ${admitted.reason}` };
+    }
+    failureKind = "uncertain";
+    try {
+      await sendFundedPredictiveRecipient(admitted.reservation, twilioClient, input.continuation?.afterDial);
+      return { success: true };
+    } catch (error) {
+      if (!(error instanceof VoiceDispatchUncertainError) && isDefiniteVoiceCreateRejection(error)) failureKind = "rejected";
+      throw error;
     }
 
-    if (contactRecord) {
-      logger.debug("Contact record:", contactRecord);
+  } catch (error) {
+    if (error instanceof PredictiveContinuationStoppedError) return { success: false, failureKind: "stopped", error: error.message };
+    logger.error("Error dialing number:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: errorMessage, failureKind };
+  }
+}
 
-      // Re-check the credit floor on every turn, not just at conference start
-      // (auto-dial-start.server.ts). Each later contact is dialled from a Twilio
-      // webhook, so without this a session that started just above the floor
-      // keeps placing staffed calls into a negative balance until the queue
-      // empties. Out of credits: release the claim and stop the dialer (no new
-      // call means no status callback, so no further turn is triggered).
-      const credits = await requireOutboundCredits(workspace_id);
-      if (!credits.ok) {
-        logger.warn("auto_dial.insufficient_credits", {
-          campaignId: campaign_id,
-          workspaceId: workspace_id,
-          reason: credits.reason,
-        });
-        try {
-          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
-        } catch (releaseError) {
-          logger.error(
-            "Failed to release claimed queue contact after credit stop:",
-            releaseError,
-          );
-        }
-        return {
-          success: true,
-          message: "Insufficient credits, stopping auto-dial",
-        };
-      }
-
-      // Everything up through placing the Twilio call can fail without any
-      // call having actually been placed. If it does, release the claimed
-      // queue row back to `queued` — otherwise `claim_next_queue_contact`
-      // has already marked it assigned and it is stuck forever, wedging the
-      // predictive dialer's queue for that contact.
-      let toNumber: string;
-      let outreach_attempt_id: number;
-      let voiceUrl: string | undefined;
-      let statusUrl: string | undefined;
-      try {
-        toNumber = normalizePhoneNumber(contactRecord.contact_phone);
-        outreach_attempt_id = await createOutreachAttempt(
-          contactRecord,
-          campaign_id,
-          workspace_id,
-          user_id,
-        );
-        const reservation = await input.continuation?.beforeDial(
-          contactRecord,
-          outreach_attempt_id,
-        );
-        voiceUrl = reservation?.voiceUrl;
-        statusUrl = reservation?.statusUrl;
-      } catch (prepError) {
-        try {
-          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
-        } catch (revertError) {
-          logger.error(
-            "Failed to release claimed queue contact after auto-dial failure:",
-            revertError,
-          );
-        }
-        throw prepError;
-      }
-
-      // `calls.create` failures split two ways. A Twilio REST error (has a
-      // numeric HTTP `status`) means Twilio rejected the request and no call
-      // exists — requeue so a later turn can retry. Anything else (network
-      // failure, timeout) is AMBIGUOUS: the call may be live and untracked.
-      // Requeueing an ambiguous attempt makes the next dialer turn redial a
-      // contact who may already be on the phone, so park the entry by
-      // dequeueing it with an explicit reason for manual/open-sync review.
-      let call: Awaited<ReturnType<typeof createTwilioCall>>;
-      try {
-        failureKind = "uncertain";
-        call = await createTwilioCall(
-          twilioClient,
-          toNumber,
-          contactRecord.caller_id,
-          conferenceId,
-          selected_device ?? "",
-          voiceUrl,
-          statusUrl,
-        );
-      } catch (dialError) {
-        const restStatus = (dialError as { status?: unknown }).status;
-        const callDefinitelyNotCreated =
-          typeof restStatus === "number" &&
-          restStatus >= 400 &&
-          (!input.continuation || restStatus < 500);
-        failureKind = callDefinitelyNotCreated ? "rejected" : "uncertain";
-        try {
-          if (callDefinitelyNotCreated) {
-            await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
-          } else {
-            logger.error("auto_dial.ambiguous_dial_parked", {
-              campaignId: campaign_id,
-              queueId: contactRecord.queue_id,
-              contactId: contactRecord.contact_id,
-              outreachAttemptId: outreach_attempt_id,
-            });
-            await dequeueQueueEntry({
-              by: {
-                contactId: contactRecord.contact_id,
-                campaignId: Number(campaign_id),
-              },
-              workspaceId: workspace_id,
-              // false, not omitted: the guarded RPC path, not plain Drizzle
-              // — deliberately parks only this one row (no household
-              // fan-out) and no-ops rather than stomping a row this turn no
-              // longer holds. `user_id` is the claim holder
-              // claim_next_queue_contact stamped a few lines up, which is
-              // what lets the RPC dequeue the row while it is still
-              // `assigned` (#1260). See dequeueQueueEntry's doc comment.
-              household: false,
-              userId: user_id,
-              reason:
-                "Ambiguous dial failure — call may exist at Twilio; parked for review, not redialed",
-              exec: tdb,
-            });
-          }
-        } catch (revertError) {
-          logger.error(
-            "Failed to release claimed queue contact after auto-dial failure:",
-            revertError,
-          );
-        }
-        throw dialError;
-      }
-
+/** Initial and successor recipients use the same committed funding and send seam. */
+export async function sendFundedPredictiveRecipient(
+  reservation: VoiceReservation, client: TwilioClient, afterDial?: (callData: Partial<Call>) => Promise<void>,
+) {
+  const { conference_id: conferenceId, voice_url: voiceUrl, status_callback: statusUrl } = reservation;
+  if (client.accountSid !== reservation.account_sid || !conferenceId || !voiceUrl || !statusUrl)
+    throw new Error("Predictive provider binding does not match");
+  try {
+    const sent = await dispatchStartedVoiceCall(reservation, () => createTwilioCall(client, reservation.recipient,
+      reservation.caller_id, conferenceId, { voiceUrl, statusCallback: statusUrl }));
+    await dequeueFundedVoiceAttempt(reservation);
+    const call = sent.call;
+    if (!call) return;
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's
       // `CallInstance` type, and `Call.date_updated`/`start_time`/`end_time` are
       // `timestamptz` — so they are handed over as the Dates they already are,
@@ -420,7 +270,7 @@ export async function runAutoDialerTurn(
         date_updated: call.dateUpdated ?? null,
         parent_call_sid: call.parentCallSid,
         account_sid: call.accountSid,
-        to: toNumber,
+        to: reservation.recipient,
         from: call.from,
         phone_number_sid: call.phoneNumberSid,
         status: call.status,
@@ -435,61 +285,38 @@ export async function runAutoDialerTurn(
         group_sid: call.groupSid,
         caller_name: call.callerName,
         uri: call.uri,
-        campaign_id,
-        contact_id: contactRecord.contact_id,
-        workspace: workspace_id,
-        outreach_attempt_id,
-        conference_id: conferenceId,
-        ...(input.continuation
-          ? { queue_id: contactRecord.queue_id, user_id }
-          : {}),
+        campaign_id: reservation.campaign_id,
+        contact_id: reservation.contact_id,
+        workspace: reservation.workspace,
+        outreach_attempt_id: reservation.outreach_attempt_id,
+        conference_id: reservation.conference_id,
+        queue_id: reservation.queue_id, user_id: reservation.user_id,
       };
 
-      await input.continuation?.afterDial(callData);
+      await afterDial?.(callData);
 
-      await dequeueQueueEntry({
-        by: {
-          contactId: contactRecord.contact_id,
-          campaignId: Number(campaign_id),
-        },
-        workspaceId: workspace_id,
-        household: true,
-        userId: user_id,
-        reason: "Predictive Dialer called contact",
-        exec: tdb,
-      });
+      if (!(await saveCallToDatabase(reservation.workspace, callData))) {
+        throw new VoiceDispatchUncertainError(reservation.id, new Error("Accepted predictive call record needs recovery"));
+      }
 
-      await saveCallToDatabase(workspace_id, callData);
-      return { success: true };
-    }
-
-    await completeAllConferences(twilioClient, conferenceId);
-
-    // Nothing left to dial: mark the campaign complete. Until this was wired,
-    // NOTHING set that status — the only caller of the completion RPC lived in
-    // the dead Supabase-era dispatch module — so a campaign that had dialed its
-    // entire queue displayed "Running" forever and a customer had no way to
-    // tell it had finished. The RPC re-checks pending work, so an
-    // out-of-window release does not complete a campaign early.
-    await recheckCampaignCompletion({
-      campaignId: campaign_id,
-      workspaceId: workspace_id,
-      exec: tdb,
-      reason: "auto_dial_drain",
-    });
-
-    return {
-      success: true,
-      message:
-        releasedQueueIds.size > 0
-          ? "No contacts within recipient calling hours"
-          : "No queued contacts",
-    };
   } catch (error) {
-    logger.error("Error dialing number:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return input.continuation
-      ? { success: false, error: errorMessage, failureKind }
-      : { success: false, error: errorMessage };
+    if (!(error instanceof VoiceDispatchUncertainError) && isDefiniteVoiceCreateRejection(error) && reservation.queue_id) {
+      if (reservation.setup_sid) {
+        await stopRefusedPredictiveSetup(await refuseFirstPredictiveRecipient(reservation), client);
+        throw error;
+      }
+      await requeueCampaignQueueById(reservation.queue_id, reservation.workspace, {
+        expectedGeneration: reservation.queue_generation ?? undefined, userId: reservation.user_id ?? undefined,
+        voiceReservationId: reservation.id,
+      });
+    }
+    throw error;
   }
+}
+
+export async function stopRefusedPredictiveSetup(reservation: VoiceReservation, client: TwilioClient) {
+  if (!reservation.setup_sid || !reservation.recipient_refused_at || client.accountSid !== reservation.account_sid)
+    throw new Error("Predictive setup stop has no owned refusal");
+  try { await client.calls(reservation.setup_sid).update({ status: "completed" }); }
+  catch (error) { logger.error("predictive.setup_stop_pending", error); }
 }

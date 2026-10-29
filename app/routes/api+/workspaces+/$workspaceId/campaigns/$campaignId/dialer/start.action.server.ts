@@ -17,6 +17,7 @@ import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
   selected_device: z.string().min(1),
+  dial_intent_id: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
   agentUserId: z.string().min(1).optional(),
 });
 
@@ -90,6 +91,7 @@ export const action = defineAction({
       campaignId,
       callerId: parsed.caller_id,
       selectedDevice: parsed.selected_device,
+      dialIntentId: parsed.dial_intent_id,
     });
 
     if (!result.ok) {
