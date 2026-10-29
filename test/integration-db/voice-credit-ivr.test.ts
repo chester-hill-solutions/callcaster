@@ -210,6 +210,138 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     await processCallStatusWebhook({ sid: row.sid, account_sid: row.accountSid, to: row.to, from: row.from,
       direction: row.direction, status: "completed", duration: "42" }, { workspaceId, campaignId, contactId, userId: actor });
   }
+  async function withRemovableContext(run: () => Promise<void>) {
+    const original = { campaignId, contactId, queueId };
+    const [campaign] = await sql`insert into public.campaign (title, workspace, type, caller_id, script_id, status, schedule)
+      select 'Removable funded campaign', workspace, type, caller_id, script_id, status, schedule
+      from public.campaign where id = ${campaignId} returning id`;
+    const [contact] = await sql`insert into public.contact (workspace, firstname, phone)
+      values (${workspaceId}::uuid, 'Removable funded contact', ${to}) returning id`;
+    const [queue] = await sql`insert into public.campaign_queue (workspace, campaign_id, contact_id, queue_state, queue_order)
+      values (${workspaceId}::uuid, ${campaign.id}, ${contact.id}, 'queued', 0) returning id`;
+    campaignId = Number(campaign.id); contactId = Number(contact.id); queueId = Number(queue.id);
+    try { await run(); } finally {
+      await sql`delete from public.campaign where id = ${campaignId} and workspace = ${workspaceId}::uuid`;
+      await sql`delete from public.contact where id = ${contactId} and workspace = ${workspaceId}::uuid`;
+      ({ campaignId, contactId, queueId } = original);
+    }
+  }
+  async function removeContext(kind: "queue" | "contact" | "campaign" | "outreach") {
+    if (kind === "queue") {
+      const { deleteCampaignQueueByIds } = await import("@/lib/campaign-queue-db.server");
+      await deleteCampaignQueueByIds([queueId], workspaceId);
+    } else if (kind === "contact") {
+      const { deleteContactApi } = await import("@/lib/platform-data.server");
+      expect(await deleteContactApi(String(contactId), workspaceId)).toMatchObject({ ok: true });
+    } else if (kind === "campaign") {
+      const { deleteCampaign } = await import("@/lib/database/campaign.server");
+      await deleteCampaign({ workspaceId, campaignId: String(campaignId) });
+    } else {
+      await sql`delete from public.outreach_attempt where workspace = ${workspaceId}::uuid and campaign_id = ${campaignId}`;
+    }
+  }
+  async function signedCompletion(row: ProviderCall) {
+    const { action } = await import("../../app/routes/api+/ivr/status.action.server");
+    const params = { AccountSid: accountSid, CallSid: row.sid, To: to, From: from,
+      Direction: "outbound-api", CallStatus: "completed", CallDuration: "42" };
+    const request = new Request(row.statusCallback, { method: "POST", headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Twilio-Signature": twilio.getExpectedTwilioSignature(token, row.statusCallback, params),
+    }, body: new URLSearchParams(params) });
+    const response = await asRouteResponse(action({ ...routeArgs(request), context: new RouterContextProvider() }));
+    expect(response.status).toBe(200); await expect(response.json()).resolves.toEqual({ success: true });
+  }
+  async function expectSurvivingContext(kind: "queue" | "contact" | "campaign" | "outreach") {
+    const [saved] = await sql`select campaign_id::int, contact_id::int, outreach_attempt_id::int, queue_id::int
+      from public.call where workspace = ${workspaceId}::uuid`;
+    expect(saved).toEqual({ campaign_id: kind === "campaign" ? null : campaignId,
+      contact_id: kind === "contact" ? null : contactId,
+      outreach_attempt_id: kind === "queue" ? expect.any(Number) : null,
+      queue_id: kind === "outreach" ? queueId : null });
+  }
+  const removableKinds = ["queue", "contact", "campaign", "outreach"] as const;
+  test.each(removableKinds)("%s removal during create still permits one signed terminal debit", async (kind) => {
+    await withRemovableContext(async () => {
+      const create = provider.create.getMockImplementation(); if (!create) throw new Error("Provider fixture required");
+      provider.create.mockImplementationOnce(async (args) => { const row = await create(args); await removeContext(kind); return row; });
+      expect(await send("api")).toMatchObject({ status: 200, body: { success: true } });
+      await signedCompletion(firstProviderCall()); await signedCompletion(firstProviderCall());
+      expect(provider.create).toHaveBeenCalledOnce();
+      expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+      await expectSurvivingContext(kind);
+    });
+  });
+  test.each(removableKinds)("%s removal after persistence still permits one signed terminal debit", async (kind) => {
+    await withRemovableContext(async () => {
+      await send("api"); await removeContext(kind);
+      await signedCompletion(firstProviderCall());
+      await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
+      await signedCompletion(firstProviderCall());
+      expect(provider.create).toHaveBeenCalledOnce();
+      expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+      await expectSurvivingContext(kind);
+    });
+  });
+  test.each(removableKinds)("%s removal cannot strand an accepted call with a lost create response", async (kind) => {
+    await withRemovableContext(async () => {
+      const create = provider.create.getMockImplementation(); if (!create) throw new Error("Provider fixture required");
+      provider.create.mockImplementationOnce(async (args) => { await create(args); await removeContext(kind); throw new Error("Owned response lost"); });
+      await send("api"); await ageForRecovery();
+      expect(await recovery.runVoiceCreditRecovery()).toMatchObject({ settled: 1, pending: 0 });
+      expect(await recovery.runVoiceCreditRecovery()).toEqual({ examined: 0, settled: 0, pending: 0, released: 0 });
+      expect(provider.create).toHaveBeenCalledOnce();
+      expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+      await expectSurvivingContext(kind);
+    });
+  });
+  test.each(removableKinds)("%s removal cannot strand known-SID recovery", async (kind) => {
+    await withRemovableContext(async () => {
+      await send("api"); await removeContext(kind); await ageForRecovery();
+      expect(await recovery.runVoiceCreditRecovery()).toMatchObject({ settled: 1, pending: 0 });
+      expect(provider.create).toHaveBeenCalledOnce();
+      expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+      await expectSurvivingContext(kind);
+    });
+  });
+  test("restored call links cannot follow metadata moved to another workspace", async () => {
+    await withRemovableContext(async () => {
+      const create = provider.create.getMockImplementation(); if (!create) throw new Error("Provider fixture required");
+      const move = async (target: string) => {
+        await sql`update public.campaign set workspace = ${target}::uuid where id = ${campaignId}`;
+        await sql`update public.contact set workspace = ${target}::uuid where id = ${contactId}`;
+        await sql`update public.campaign_queue set workspace = ${target}::uuid where id = ${queueId}`;
+        await sql`update public.outreach_attempt set workspace = ${target}::uuid where campaign_id = ${campaignId}`;
+      };
+      try {
+        provider.create.mockImplementationOnce(async (args) => { const row = await create(args); await move(foreignId); return row; });
+        expect(await send("api")).toMatchObject({ status: 200 });
+        await signedCompletion(firstProviderCall());
+        const [saved] = await sql`select workspace, campaign_id, contact_id, outreach_attempt_id, queue_id from public.call where workspace = ${workspaceId}::uuid`;
+        expect(saved).toEqual({ workspace: workspaceId, campaign_id: null, contact_id: null, outreach_attempt_id: null, queue_id: null });
+        expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+      } finally { await move(workspaceId); }
+    });
+  });
+  test("restoration keeps surviving queue references locked until insertion commits", async () => {
+    await withRemovableContext(async () => {
+      await send("api");
+      const { db } = await import("@/server/db");
+      const { workspace_voice_reservation } = await import("@/db/schema");
+      const { eq } = await import("drizzle-orm");
+      const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
+      const [reservation] = await db.select().from(workspace_voice_reservation).where(eq(workspace_voice_reservation.workspace, workspaceId));
+      if (!reservation) throw new Error("Funded reservation required");
+      await db.transaction(async (tx) => {
+        await persistReservedVoiceCall(tx, reservation, firstProviderCall().sid);
+        await expect(sql.begin(async (other) => {
+          await other`set local lock_timeout = '100ms'`;
+          await other`delete from public.campaign_queue where id = ${queueId} and workspace = ${workspaceId}::uuid`;
+        })).rejects.toMatchObject({ code: "55P03" });
+      });
+      await signedCompletion(firstProviderCall());
+      expect(await state()).toMatchObject({ credits: 98, holds: 0, calls: 1, ledger: 1 });
+    });
+  });
   test.each(["api", "worker", "legacy"] as const)("%s gives a re-added completed contact a new funded call", async (mode) => {
     await send(mode);
     const first = firstProviderCall();

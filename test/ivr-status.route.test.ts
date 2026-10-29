@@ -5,7 +5,7 @@ vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({
   settleVoiceReservation: async () => ({ handled: false, billingResult: null }),
 }));
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, routeArgs } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -234,6 +234,14 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     // processCallStatusWebhook accepts a null outreachAttemptId; no updateResult call needed
     await expect(res.json()).resolves.toMatchObject({ success: true });
+  });
+
+  test("an unreserved legacy call still requires its campaign for billing", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ campaign_id: null }));
+    const res = await asRouteResponse(mod.action(routeArgs(makeReq({ CallSid: "CA1", CallStatus: "completed", CallDuration: "42" }))));
+    await expect(res.json()).resolves.toMatchObject({ success: false });
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
   test("handleVoicemail updateResult error is caught", async () => {

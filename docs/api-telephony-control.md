@@ -89,6 +89,12 @@ Normal campaign phone deduplication remains in effect. An explicit redial
 request permits a new attempt after prior calls; it keeps the current funding
 and recipient calling-window checks.
 
+Removing queue, contact, campaign or outreach data does not cancel a call
+already accepted by the provider. Its signed callback or verified recovery
+can restore the call record for billing. Removed links stay empty; remaining
+links must belong to the same workspace. The saved call SID and billing kind
+still control settlement, so repeated callbacks do not add another debit.
+
 ## Auto-dial
 
 | Method | Path | Purpose |
