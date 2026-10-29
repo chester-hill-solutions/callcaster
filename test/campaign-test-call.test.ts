@@ -62,9 +62,10 @@ describe("sendCampaignTestCall", () => {
       calls: { create: mocks.callsCreate },
     });
     mocks.callsCreate.mockResolvedValue({ sid: "CA123" });
-    mocks.dispatchReservedVoiceCall.mockImplementation(async (args: Parameters<typeof import("@/lib/voice-credit-dispatch.server").dispatchReservedVoiceCall>[0]) => ({
-      ok: true, call: await args.create(args.statusCallback),
-    }));
+    mocks.dispatchReservedVoiceCall.mockImplementation(async (args: Parameters<typeof import("@/lib/voice-credit-dispatch.server").dispatchReservedVoiceCall>[0]) => {
+      const call = await args.create({ voiceUrl: args.voiceUrl, statusCallback: args.statusCallback });
+      return { ok: true, callSid: call.sid, replayed: false };
+    });
   });
 
   test("test calls use the saved voicemail policy and wait for the greeting end (#2774)", async () => {

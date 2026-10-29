@@ -41,7 +41,6 @@ app/lib/inbound-call-db.server.ts::@/server/admin-db	1
 app/lib/inbound-call-db.server.ts::@/server/db	1
 app/lib/inbound-ivr-db.server.ts::@/server/db	1
 app/lib/inbound-sms-context.server.ts::@/server/admin-db	1
-app/lib/ivr-initiate.server.ts::@/server/db	1
 app/lib/merge-workspace-twilio-data.server.ts::@/server/admin-db	1
 app/lib/message-db.server.ts::@/server/db	1
 app/lib/number-rental-billing.server.ts::@/server/db	1

@@ -191,7 +191,6 @@ test/campaign-ivr-dispatch.test.ts::@/lib/db-rpc.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/logger.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/outbound-credit-gate.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/telephony-db.server#1
-test/campaign-ivr-dispatch.test.ts::@/lib/twilio-client.server#1
 test/campaign-ivr-dispatch.test.ts::@/lib/twilio-ivr-runtime.server#1
 test/campaign-queue-db.claim.test.ts::@/lib/workspace-events.server#1
 test/campaign-queue.route.test.ts::@/lib/auth.server#1
@@ -479,8 +478,6 @@ test/ivr-initiate.server.test.ts::@/lib/campaign-queue-db.server#1
 test/ivr-initiate.server.test.ts::@/lib/database/workspace.server#1
 test/ivr-initiate.server.test.ts::@/lib/db-rpc.server#1
 test/ivr-initiate.server.test.ts::@/lib/env.server#1
-test/ivr-initiate.server.test.ts::@/lib/telephony-db.server#1
-test/ivr-initiate.server.test.ts::@/lib/twilio-client.server#1
 test/ivr-initiate.server.test.ts::@/lib/twilio-ivr-runtime.server#1
 test/ivr-page.route.test.ts::@/lib/campaign-ivr.server#1
 test/ivr-page.route.test.ts::@/lib/env.server#1
@@ -498,7 +495,6 @@ test/ivr.route.test.ts::@/lib/campaign-queue-db.server#1
 test/ivr.route.test.ts::@/lib/db-rpc.server#1
 test/ivr.route.test.ts::@/lib/env.server#1
 test/ivr.route.test.ts::@/lib/logger.server#1
-test/ivr.route.test.ts::@/lib/telephony-db.server#1
 test/ivr.route.test.ts::@/lib/workspace-credits.server#1
 test/jobs-billing-reconcile.route.test.ts::@/lib/worker/enqueue-job.server#1
 test/jobs-number-rental-billing.route.test.ts::@/lib/worker/enqueue-job.server#1

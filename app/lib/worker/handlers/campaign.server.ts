@@ -220,15 +220,16 @@ type DispatchChainContext = {
   userId: string;
 };
 
-async function pauseForInsufficientCredits(
+async function pauseDispatchFor(
   workspaceId: string,
   campaignId: number,
+  reason: "insufficient_credits" | "provider_recovery",
   detail: Record<string, number> = {},
 ): Promise<void> {
   await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
     status: "paused",
   });
-  logger.warn("campaign_dispatch.insufficient_credits", {
+  logger.warn(`campaign_dispatch.${reason}`, {
     campaignId,
     workspaceId,
     ...detail,
@@ -370,7 +371,7 @@ export async function campaignDispatchHandler(
   // The balance ran out inside the batch: stop the chain exactly as the
   // entry gate does. Rows the budget refused stay queued for a relaunch.
   if (outcome.creditsExhausted) {
-    await pauseForInsufficientCredits(workspaceId, campaignId, {
+    await pauseDispatchFor(workspaceId, campaignId, "insufficient_credits", {
       sent: counts.sent,
       unaffordable: counts.unaffordable,
     });
@@ -465,7 +466,7 @@ async function resolveDispatchBlockedCase(
     case "insufficient_credits":
       // Park the campaign so a stopped chain cannot leave it marked running;
       // the owner relaunches after topping up.
-      await pauseForInsufficientCredits(workspaceId, campaignId);
+      await pauseDispatchFor(workspaceId, campaignId, "insufficient_credits");
       return { ok: true, campaignId, blocked: "insufficient_credits" };
     case "caller_id_required":
       // Config error — retrying cannot fix it; surface loudly and stop.
@@ -586,6 +587,13 @@ async function runMachineVoiceDispatch(
   }
 
   const { counts, queuedRemaining } = outcome;
+
+  if (outcome.blocked) {
+    await pauseDispatchFor(workspaceId, campaignId, outcome.blocked, {
+      called: counts.called, deferred: counts.deferred,
+    });
+    return { ok: true, campaignId, blocked: outcome.blocked, called: counts.called, deferred: counts.deferred };
+  }
 
   // Every attempted call failed and nothing was dequeued or dead-lettered:
   // let the job retry with backoff instead of hot-looping successors.

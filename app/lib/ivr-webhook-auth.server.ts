@@ -11,6 +11,7 @@
  */
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import type { IvrRecordedAnswer } from "@/lib/ivr-results";
+import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
 
 async function readWebhookFormParams(request: Request): Promise<Record<string, string>> {
   const formData = await request.clone().formData();
@@ -34,7 +35,9 @@ export async function requireTwilioSignatureForIvrPage(
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid, answeredBy, requestReceivedAtMs };
+  if (forbidden) return forbidden;
+  const bindingFailure = await bindVerifiedVoiceReservationRequest(request, paramsObj, "voice");
+  return bindingFailure ?? { callSid, answeredBy, requestReceivedAtMs };
 }
 
 /** Block routes: missing route params 400 first, then missing CallSid 400. */

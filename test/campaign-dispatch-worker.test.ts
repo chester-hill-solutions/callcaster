@@ -460,6 +460,16 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
     expect(result).toMatchObject({ ok: true, called: 1, queuedRemaining: 0 });
   });
 
+  test.each(["insufficient_credits", "provider_recovery"])("pauses an IVR batch blocked by %s without scheduling or completing it", async (blocked) => {
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched", blocked, counts: { called: 1, failed: 0, dequeued: 0, deferred: 1, exhausted: 0 }, queuedRemaining: 1,
+    });
+    expect(await campaignDispatchHandler(makeJob())).toMatchObject({ ok: true, blocked, called: 1, deferred: 1 });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(WORKSPACE_ID, 42, { status: "paused" });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+  });
+
   test("transitions a scheduled voice campaign to running before dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ type: "robocall", status: "scheduled" }),

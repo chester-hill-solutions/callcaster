@@ -5,12 +5,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import type { PredictiveMachineOperation } from "@/server/predictive-machine-operation.server";
 import { savePredictiveSuccessorCall } from "@/server/predictive-machine-continuation.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
+import { hasTwilioCallRequestHistory, isTwilioCallHistoryReady } from "@/lib/twilio-call-history.server";
 
 function requireRecoverableSuccessor(
   operation: PredictiveMachineOperation,
@@ -101,22 +96,12 @@ async function requireSuccessorHistory(
   endedAt: Date | null,
   operation: PredictiveMachineOperation,
 ) {
-  if (
-    !endedAt ||
-    !Number.isFinite(endedAt.getTime()) ||
-    endedAt.getTime() + 15 * 60_000 + 30_000 > Date.now()
-  )
+  if (!isTwilioCallHistoryReady(endedAt))
     throw new Error("Predictive successor event history is not yet available");
 
-  const events = await twilio.calls(candidateSid).events.list({ limit: 1000 });
-  const matches = events.some((event) => {
-    const request = record(event.request);
-    const parameters = record(request?.parameters);
-    return (
-      request?.method === "POST" &&
-      request.url === operation.successor_voice_url &&
-      parameters?.call_sid === candidateSid
-    );
+  const matches = await hasTwilioCallRequestHistory({
+    twilio, callSid: candidateSid, accountSid: twilio.accountSid,
+    voiceUrl: operation.successor_voice_url ?? "",
   });
   if (!matches)
     throw new Error(

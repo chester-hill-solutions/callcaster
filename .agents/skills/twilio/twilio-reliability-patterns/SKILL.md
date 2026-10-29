@@ -28,6 +28,18 @@ Twilio enforces per-resource rate limits. At scale, 429 errors are expected beha
 
 ### Provider writes with uncertain results
 
+For CallCaster `calls.create`, use `dispatchReservedVoiceCall`. Commit one funded
+operation and its exact voice/status URLs before the POST. A timeout or 5xx must
+retain that operation; do not repeat creation because the local call row is
+missing. Queue retries must reuse a known SID or wait for verified recovery.
+Keep the first-minute hold and the actual ledger debit separate, then settle
+them atomically. Use signed callbacks or exact provider request history to bind
+an unknown SID; destination and time only locate candidates. Call event history
+is available [15 minutes after a call ends](https://www.twilio.com/docs/voice/api/call-event-resource).
+Prove competing requests, early TwiML/status callbacks, definite rejection,
+uncertainty, stale owners, recovery rollback and duplicate settlement with the
+real database and a mocked provider boundary.
+
 Choose retry rules for each operation before using a shared retry helper. A read can retry a transient failure. A number-release DELETE must use one provider attempt: a lost response or HTTP 5xx does not prove that the deletion failed. Keep the saved release intent and local number until completion is confirmed. A definite HTTP 401 with Twilio code 20003 can select the separately verified, bounded credential-repair path.
 
 Test sender detach, incoming-number deletion and caller-ID deletion through the actual SDK HTTP boundary. Simulate both a server error and a deletion that completes before its response is lost. Count DELETE requests and require one request per target in that release attempt. Keep valid-key, read-retry and release-recovery controls. A GET-only uncertainty test does not prove that destructive writes avoid replay.
