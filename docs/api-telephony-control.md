@@ -67,6 +67,29 @@ voice request budget.
 | POST | `/api/audiodrop` | Voicemail drop |
 | POST | `/api/caller-id` | Start caller-ID verification |
 
+Manual dial uses one staffed first-minute hold for the setup and recipient
+legs. `user_id` must identify the signed-in user. A phone device must be
+verified for that user; queue, contact, campaign and optional outreach IDs
+must belong to the same workspace and contact context.
+
+`dial_intent_id` is an optional UUID. Retain it for transport retries; use a
+new UUID for each new Dial or Redial action. The call screen supplies it.
+Requests without it retain the legacy meaning of a new action, but an active
+or uncertain predecessor still blocks another call. Optional
+`expected_queue_generation` rejects a stale queue view for a new intent. A
+matching accepted intent returns the existing TwiML success response, including
+a retry with its original generation after a re-add. Authentication and workspace
+access are checked again; the saved operation identifies its original device,
+caller ID, recipient and context. An empty optional `outreach_id` retains the
+legacy meaning of creating a new attempt.
+
+Insufficient available funds return `402`. Pending or stale operations return
+JSON with an `error` and status `409`. An uncertain provider create also returns
+`reason: "voice_dispatch_pending"`; its hold remains for recovery. A definite
+provider rejection returns JSON with an `error` and status `502`. Only an
+accepted call returns TwiML success. These error fields let the call screen
+leave Dialing and show the failure or pending message.
+
 ## IVR (session initiation)
 
 | Method | Path | Purpose |

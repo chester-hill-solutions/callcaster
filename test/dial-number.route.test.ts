@@ -23,15 +23,17 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
       headers: { "Content-Type": "text/xml" },
     }),
 }));
-// The handler's live-transcription-enrichment block only ever ran when a
-// test set CallSid — which none did until the CallSid-required auth fix
-// below made it mandatory. findCallBySid was never mocked because that
-// branch was never reached. Resolve null: matches "no call row found",
-// which is exactly the shape the pre-fix tests implicitly exercised (no
-// live-transcription TwiML appended, a plain dial).
-const findCallBySidMock = vi.fn(async () => null);
-vi.mock("@/lib/telephony-db.server", () => ({
-  findCallBySid: (...args: unknown[]) => findCallBySidMock(...args),
+const workspaceMock = vi.fn(async () => null);
+vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/workspace-members-db.server")>(), getWorkspaceById: () => workspaceMock(),
+}));
+vi.mock("@/lib/voice-bridge-webhook.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/voice-bridge-webhook.server")>(),
+  bindVerifiedVoiceSetupRequest: async () => ({ workspace: "w1", user_id: "actor", caller_id: "+1555", recipient: "+15550001111", status_callback: "https://base.example/api/call-status/" }),
+  voiceBridgeCallbackArgs: () => ({}),
+}));
+vi.mock("@/server/voice-bridge-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-bridge-reservation.server")>(), claimVoiceBridgeRecipient: async () => ({ issued: true }),
 }));
 
 describe("app/routes/api+/dial/route.$number.tsx", () => {
@@ -40,8 +42,8 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     mocks.logger.error.mockReset();
     requireTwilioSignatureMock.mockClear();
     requireTwilioSignatureMock.mockResolvedValue(null);
-    findCallBySidMock.mockClear();
-    findCallBySidMock.mockResolvedValue(null);
+    workspaceMock.mockReset();
+    workspaceMock.mockResolvedValue(null);
   });
 
   // Regression: this route used to build the signature-check option as
@@ -83,7 +85,7 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
   }, 30000);
 
   test("logs and returns fallback TwiML (not an HTML error page) when the handler throws", async () => {
-    findCallBySidMock.mockRejectedValueOnce(new Error("dial"));
+    workspaceMock.mockRejectedValueOnce(new Error("dial"));
     const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");

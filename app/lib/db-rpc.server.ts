@@ -293,11 +293,16 @@ export async function rpcDequeueContact(
     groupOnHousehold: boolean;
     dequeuedById?: string | null;
     dequeuedReasonText?: string | null;
+    deferEmit?: (publish: () => Promise<void>) => void;
+    voiceReservationId?: string;
+    /** Use the transaction behind a scoped executor for pre-commit reads. */
+    readDb?: Pick<DbInstance, "select">;
   },
 ): Promise<number> {
+  const readDb = args.readDb ?? db;
   const contactIds = new Set<number>([args.contactId]);
   if (args.groupOnHousehold) {
-    const [sourceContact] = await db
+    const [sourceContact] = await readDb
       .select({ household_id: contactTable.household_id })
       .from(contactTable)
       .where(
@@ -308,7 +313,7 @@ export async function rpcDequeueContact(
       )
       .limit(1);
     if (sourceContact?.household_id != null) {
-      const householdContacts = await db
+      const householdContacts = await readDb
         .select({ id: contactTable.id })
         .from(contactTable)
         .where(
@@ -331,7 +336,7 @@ export async function rpcDequeueContact(
   // for why `assigned` rows are included only for the caller who holds them
   // (#1260).
   const dequeuedById = args.dequeuedById ?? null;
-  const oldRows = await db
+  const oldRows = await readDb
     .select()
     .from(campaignQueueTable)
     .where(
@@ -339,7 +344,7 @@ export async function rpcDequeueContact(
         inArray(campaignQueueTable.contact_id, [...contactIds]),
         eq(campaignQueueTable.workspace, args.workspaceId),
         eq(campaignQueueTable.campaign_id, args.campaignId),
-        exists(db.select({ id: campaignQueueTable.id }).from(campaignQueueTable).where(and(
+        exists(readDb.select({ id: campaignQueueTable.id }).from(campaignQueueTable).where(and(
           eq(campaignQueueTable.contact_id, args.contactId),
           eq(campaignQueueTable.workspace, args.workspaceId),
           eq(campaignQueueTable.campaign_id, args.campaignId),
@@ -348,6 +353,7 @@ export async function rpcDequeueContact(
         or(
           isNull(campaignQueueTable.queue_state),
           eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
+          ...(args.voiceReservationId ? [eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED)] : []),
           ...(dequeuedById
             ? [
                 and(
@@ -369,7 +375,7 @@ export async function rpcDequeueContact(
       ${args.groupOnHousehold},
       ${args.workspaceId}::uuid,
       ${dequeuedById}::uuid,
-      ${args.dequeuedReasonText ?? null}
+      ${args.dequeuedReasonText ?? null}${args.voiceReservationId ? sql`, ${args.voiceReservationId}::uuid` : sql``}
     ) as primary_rows_dequeued`,
       "dequeue_contact",
     )) ?? 0;
@@ -378,25 +384,28 @@ export async function rpcDequeueContact(
     return primaryRowsDequeued;
   }
 
-  const newRows = await db
-    .select()
-    .from(campaignQueueTable)
-    .where(inArray(campaignQueueTable.id, oldRows.map((row) => row.id)));
+  const publish = async () => {
+    const newRows = await db
+      .select()
+      .from(campaignQueueTable)
+      .where(inArray(campaignQueueTable.id, oldRows.map((row) => row.id)));
 
-  const oldById = new Map(oldRows.map((row) => [row.id, row]));
-  await Promise.all(
-    newRows
-      .filter((row) => row.dequeued_at != null)
-      .map((newRow) =>
-        emitQueueEvent(
-          newRow.workspace,
-          "UPDATE",
-          newRow as Record<string, unknown>,
-          (oldById.get(newRow.id) ?? null) as Record<string, unknown> | null,
+    const oldById = new Map(oldRows.map((row) => [row.id, row]));
+    await Promise.all(
+      newRows
+        .filter((row) => row.dequeued_at != null)
+        .map((newRow) =>
+          emitQueueEvent(
+            newRow.workspace,
+            "UPDATE",
+            newRow as Record<string, unknown>,
+            (oldById.get(newRow.id) ?? null) as Record<string, unknown> | null,
+          ),
         ),
-      ),
-  );
-
+    );
+  };
+  if (args.deferEmit) args.deferEmit(publish);
+  else await publish();
   return primaryRowsDequeued;
 }
 

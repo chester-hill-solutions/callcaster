@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({

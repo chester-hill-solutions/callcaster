@@ -34,7 +34,8 @@ export async function settleVoiceReservation(args: {
       idempotencyKey: callKey(args.callSid), callSid: args.callSid,
       campaignId: reservation.campaign_id, emitEvent: false,
     }) : null;
-    await tx.update(reservations).set({ state: "settled", updated_at: new Date(), last_error: null })
+    await tx.update(reservations).set({ state: "settled", terminal_status: args.status, terminal_duration: String(args.duration),
+      updated_at: new Date(), last_error: null })
       .where(eq(reservations.id, reservation.id));
     return { handled: true as const, billingResult, amount };
   });

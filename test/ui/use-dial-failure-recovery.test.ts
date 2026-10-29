@@ -1,6 +1,8 @@
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
+
+import { useCallState } from "@/hooks/call/useCallState";
 
 type HookProps = Parameters<typeof useDialFailureRecovery>[0];
 
@@ -15,6 +17,21 @@ function baseProps(overrides: Partial<HookProps> = {}): HookProps {
 }
 
 describe("useDialFailureRecovery", () => {
+  test.each([
+    "There was an error placing your call. Please try again later.",
+    "The call is awaiting provider verification. Wait for recovery before dialing again.",
+  ])("a provider response exits Dialing and displays: %s", (error) => {
+    const showError = vi.fn(), rejection = { error };
+    const { result, rerender } = renderHook(({ settled }: { settled: boolean }) => {
+      const call = useCallState();
+      useDialFailureRecovery({ fetcherState: settled ? "idle" : "submitting",
+        fetcherData: settled ? rejection : undefined, send: call.send, showError });
+      return call;
+    }, { initialProps: { settled: false } });
+    act(() => result.current.send({ type: "START_DIALING" })); expect(result.current.state).toBe("dialing");
+    rerender({ settled: true }); expect(result.current.state).toBe("failed"); expect(showError).toHaveBeenCalledWith(error);
+  });
+
   test("does nothing while the fetcher has no settled data", () => {
     const send = vi.fn();
     renderHook((props: HookProps) => useDialFailureRecovery(props), {

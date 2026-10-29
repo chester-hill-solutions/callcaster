@@ -1,3 +1,4 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse, withRouteUrl } from "./helpers/route-result";

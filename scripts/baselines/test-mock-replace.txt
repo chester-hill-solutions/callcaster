@@ -376,7 +376,6 @@ test/dequeue-queue-entry.test.ts::@/lib/db-rpc.server#1
 test/dequeue-queue-entry.test.ts::@/lib/workspace-events.server#1
 test/dial-number.route.test.ts::@/lib/env.server#1
 test/dial-number.route.test.ts::@/lib/logger.server#1
-test/dial-number.route.test.ts::@/lib/telephony-db.server#1
 test/dial-number.route.test.ts::@/lib/twilio-webhook.server#1
 test/dial-status.route.test.ts::@/lib/campaign-ivr.server#1
 test/dial-status.route.test.ts::@/lib/env.server#1
@@ -384,12 +383,6 @@ test/dial-status.route.test.ts::@/lib/object-storage.server#1
 test/dial-status.route.test.ts::@/lib/telephony-db.server#1
 test/dial-status.route.test.ts::@/lib/twilio-lookup.server#1
 test/dial-status.route.test.ts::@/lib/twilio-webhook.server#1
-test/dial.route.test.ts::@/lib/auto-dial.server#1
-test/dial.route.test.ts::@/lib/db-rpc.server#1
-test/dial.route.test.ts::@/lib/env.server#1
-test/dial.route.test.ts::@/lib/logger.server#1
-test/dial.route.test.ts::@/lib/user-audio.server#1
-test/dial.route.test.ts::@/lib/workspace-credits.server#1
 test/dialer-start.route.test.ts::@/lib/auto-dial-start.server#1
 test/dialer-start.route.test.ts::@/lib/database/workspace.server#1
 test/email-vm.route.test.ts::@/lib/env.server#1

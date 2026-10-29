@@ -1,0 +1,176 @@
+import { and, eq, gt, inArray, isNull, notInArray, notExists, or, sql } from "drizzle-orm";
+import { call, campaign_queue, workspace_voice_reservation as reservations } from "@/db/schema";
+import { db } from "@/server/db";
+import { normalizeProviderStatus, isTerminalStatus } from "@/lib/call-status";
+import type { CreditTransaction } from "./outbound-credit-reservations.server";
+import type { VoiceReservation } from "./voice-credit-reservation.server";
+import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
+import { logger } from "@/lib/logger.server";
+
+export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string };
+const TERMINAL = ["completed", "failed", "busy", "no-answer", "canceled"];
+
+export async function startVoiceBridgeReservation(reservation: VoiceReservation, urls: VoiceBridgeUrls) {
+  const [row] = await db.update(reservations).set({
+    state: "creating", send_started_at: new Date(), updated_at: new Date(),
+    setup_voice_url: urls.voiceUrl, setup_status_callback: urls.statusCallback, status_callback: urls.recipientStatusCallback,
+  }).where(and(
+    eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
+    eq(reservations.lease_token, reservation.lease_token), eq(reservations.state, "reserved"),
+    gt(reservations.lease_expires_at, new Date()), eq(reservations.kind, "staffed"),
+  )).returning();
+  if (!row?.setup_to) throw new Error("Voice bridge reservation is no longer owned");
+  return row;
+}
+
+export async function recordVoiceBridgeSetupProvider(reservation: VoiceReservation, callSid: string) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(reservations).where(and(
+      eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
+    )).for("update");
+    if (!row?.setup_to || !row.send_started_at || (row.setup_sid && row.setup_sid !== callSid)) {
+      throw new Error("Voice bridge setup does not match its dispatch");
+    }
+    if (row.setup_sid !== callSid && (row.lease_token !== reservation.lease_token || row.state !== "creating")) {
+      throw new Error("Voice bridge reservation is no longer owned");
+    }
+    const [saved] = await tx.update(reservations).set({ setup_sid: callSid, updated_at: new Date() })
+      .where(eq(reservations.id, row.id)).returning();
+    if (!saved) throw new Error("Voice setup acknowledgement was not saved");
+    try {
+      await tx.transaction((savepoint) => persistReservedVoiceCall(savepoint, saved, callSid, "setup"));
+    } catch (error) {
+      // A local record fault cannot undo the provider's acceptance. Keep the
+      // SID before allowing recovery to repair the call row.
+      await tx.update(reservations).set({ last_error: "Manual setup call record needs recovery", lease_expires_at: new Date() })
+        .where(eq(reservations.id, row.id));
+      logger.error("voice_credit.setup_record_pending", error);
+    }
+    return saved;
+  });
+}
+
+export type VoiceBridgeSetupCallback = {
+  reservationId: string; accountSid: string; callSid: string; to: string; from: string;
+  direction: string; parentCallSid?: string | null; requestUrl: string; entryPoint: "voice" | "status";
+  status?: string;
+};
+
+function matchesSetup(row: VoiceReservation, args: VoiceBridgeSetupCallback) {
+  return row.setup_to && row.send_started_at && row.account_sid === args.accountSid &&
+    row.setup_to === args.to && row.caller_id === args.from && args.direction === "outbound-api" &&
+    !args.parentCallSid && (row.setup_sid === null || row.setup_sid === args.callSid) &&
+    (args.entryPoint === "voice" ? row.setup_voice_url : row.setup_status_callback) === args.requestUrl;
+}
+
+async function saveSetupStatus(tx: CreditTransaction, row: VoiceReservation, callSid: string, rawStatus: string) {
+  const status = normalizeProviderStatus(rawStatus);
+  if (!status) throw new Error("Invalid voice setup status");
+  await tx.update(call).set({ status, date_updated: new Date() }).where(and(
+    eq(call.sid, callSid), eq(call.workspace, row.workspace), or(isNull(call.status), notInArray(call.status, TERMINAL)),
+  ));
+  if (!isTerminalStatus(status)) return row;
+  const [saved] = await tx.update(reservations).set({
+    setup_terminal_at: sql`coalesce(${reservations.setup_terminal_at}, clock_timestamp())`,
+    setup_terminal_status: sql`coalesce(${reservations.setup_terminal_status}, ${status})`,
+    state: !row.recipient_instruction_issued_at && !row.provider_sid ? "released" : row.state,
+    updated_at: new Date(),
+  }).where(eq(reservations.id, row.id)).returning();
+  if (!saved) throw new Error("Voice setup status was not saved");
+  return saved;
+}
+
+async function bindSetup(tx: CreditTransaction, args: VoiceBridgeSetupCallback) {
+  if (!/^[0-9a-f-]{36}$/i.test(args.reservationId) || !/^CA[0-9a-f]{32}$/i.test(args.callSid)) {
+    throw new Error("Invalid voice setup callback identity");
+  }
+  const [row] = await tx.select().from(reservations).where(eq(reservations.id, args.reservationId)).for("update");
+  if (!row || !matchesSetup(row, args) || (row.state === "released" && row.setup_sid !== args.callSid)) {
+    throw new Error("Voice setup callback does not match its dispatch");
+  }
+  const root = await persistReservedVoiceCall(tx, row, args.callSid, "setup");
+  const [bound] = await tx.update(reservations).set({ setup_sid: args.callSid, updated_at: new Date() })
+    .where(eq(reservations.id, row.id)).returning();
+  if (!bound) throw new Error("Voice setup callback was not saved");
+  const status = args.entryPoint === "status" ? args.status : root.status;
+  return { reservation: status ? await saveSetupStatus(tx, bound, args.callSid, status) : bound, root };
+}
+
+/** The caller must verify the provider signature before binding either URL. */
+export async function bindVoiceBridgeSetupCallback(args: VoiceBridgeSetupCallback) {
+  return db.transaction((tx) => bindSetup(tx, args));
+}
+
+/** One committed instruction permits one customer leg, including early fetches. */
+export async function claimVoiceBridgeRecipient(args: VoiceBridgeSetupCallback) {
+  return db.transaction(async (tx) => {
+    const { reservation: row } = await bindSetup(tx, args);
+    if (row.state === "released" || row.state === "settled" || row.setup_terminal_at || row.recipient_instruction_issued_at) {
+      return { issued: false as const, reservation: row };
+    }
+    if (row.queue_id != null) {
+      if (!row.queue_generation) return { issued: false as const, reservation: row };
+      const [queue] = await tx.select({ id: campaign_queue.id }).from(campaign_queue).where(and(
+        eq(campaign_queue.id, row.queue_id), eq(campaign_queue.workspace, row.workspace),
+        eq(campaign_queue.dispatch_generation, row.queue_generation),
+        eq(campaign_queue.voice_reservation_id, row.id), isNull(campaign_queue.dequeued_at),
+        inArray(campaign_queue.queue_state, ["queued", "assigned"]),
+      )).for("no key update");
+      if (!queue) return { issued: false as const, reservation: row };
+    }
+    const [issued] = await tx.update(reservations).set({ recipient_instruction_issued_at: sql`clock_timestamp()`, updated_at: new Date() })
+      .where(eq(reservations.id, row.id)).returning();
+    if (!issued) throw new Error("Voice recipient instruction was not saved");
+    return { issued: true as const, reservation: issued };
+  });
+}
+
+/** A known original-account root can prove no child instruction was issued. */
+export async function observeVoiceBridgeSetupStatus(reservation: VoiceReservation, root: {
+  sid: string; accountSid: string; to: string; from: string; direction: string; status: string; parentCallSid: string | null;
+}) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(reservations).where(and(
+      eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
+      eq(reservations.lease_token, reservation.lease_token),
+    )).for("update");
+    if (!row || row.setup_sid !== root.sid || row.account_sid !== root.accountSid || row.setup_to !== root.to ||
+        row.caller_id !== root.from || root.direction !== "outbound-api" || root.parentCallSid) {
+      throw new Error("Voice recovery setup does not match its dispatch");
+    }
+    await persistReservedVoiceCall(tx, row, root.sid, "setup");
+    return saveSetupStatus(tx, row, root.sid, root.status);
+  });
+}
+
+export async function findVoiceReservationForCall(workspaceId: string, callSid: string, parentCallSid?: string | null) {
+  const [row] = await db.select().from(reservations).where(and(
+    eq(reservations.workspace, workspaceId), or(eq(reservations.provider_sid, callSid), eq(reservations.setup_sid, callSid),
+      parentCallSid ? eq(reservations.setup_sid, parentCallSid) : undefined),
+  )).limit(1);
+  return row ?? null;
+}
+
+/** Apply before a legacy recovery LIMIT, including children not yet bound. */
+export function unreservedVoiceCallPredicate(workspaceId: string) {
+  return notExists(db.select({ id: reservations.id }).from(reservations).where(and(
+    eq(reservations.workspace, workspaceId), or(eq(reservations.provider_sid, call.sid),
+      eq(reservations.setup_sid, call.sid), eq(reservations.setup_sid, call.parent_call_sid)),
+  )));
+}
+
+/** Use only after provider authentication; expose no cross-workspace metadata. */
+export async function hasVoiceReservationCallBinding(callSid: string, parentCallSid?: string) {
+  const [row] = await db.select({ id: reservations.id }).from(reservations).where(or(
+    eq(reservations.provider_sid, callSid), eq(reservations.setup_sid, callSid),
+    parentCallSid ? eq(reservations.setup_sid, parentCallSid) : undefined,
+  )).limit(1);
+  return Boolean(row);
+}
+
+export async function knownVoiceSetupSid(reservation: VoiceReservation) {
+  const [row] = await db.select({ sid: reservations.setup_sid }).from(reservations).where(and(
+    eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
+  )).limit(1);
+  return row?.sid ?? null;
+}

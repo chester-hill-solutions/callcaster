@@ -237,6 +237,17 @@ calls do not request the voice URL and can lack an end time; do not fabricate
 voice request history for their recovery tests. Test a callback received while
 create is pending, followed by a late successful save and repeated delivery.
 
+After raw signature validation, normalize supported SID/status aliases and
+reject conflicting forms before binding or persistence. Test late nonterminal
+callbacks after terminal duration, and older progress jobs after a terminal row
+write but before its outcome job is saved. Funded settlement must leave a
+durable path for the queue and disposition outcomes. Test household completion
+at the query-pool limit; transaction work must use that transaction for reads.
+Check browser polling and general sync as additional call-row writers. Funded
+calls, including unbound children with known parents, require their reservation
+recovery rules. Exclude them before finite legacy-recovery limits so pending
+funded work cannot consume every legacy repair slot.
+
 ### 4. Connection Overrides (Retry and Timeout Tuning)
 
 Append URL fragments to any webhook URL to override default connection behavior. Fragments are not included in signature computation.
@@ -272,6 +283,13 @@ and conference. Store the issued, acknowledged and uncertain states separately;
 a terminal outcome alone cannot prove provider acknowledgement. A generated
 TwiML response cannot prove playback. The [connection-override reference](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides)
 is the source for the retry-header contract.
+
+Call Events records requests from Twilio to the application, not the REST
+POSTs the application sends to Twilio. Use exact saved voice/status URLs and
+the callback CallSid as positive history evidence. Do not invent REST-create
+entries in Call Events fixtures. API-request Event Streams are a separate
+subscribed resource. Failed or unanswered calls can have no endTime; a terminal
+provider dateUpdated can conservatively start the history-availability delay.
 
 **Limitations:** Connection overrides are not available on Twilio Conversations or Frontline webhooks. Voice webhooks have a hard 15-second ceiling regardless of override values.
 

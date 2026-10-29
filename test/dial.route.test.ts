@@ -1,582 +1,108 @@
+import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { asRouteResponse, routeArgs } from "./helpers/route-result";
+import { setJsonAuthSession } from "./helpers/route-auth-mock";
 
-import { asRouteResponse } from "./helpers/route-result";
-import { queueJsonAuthSession } from "./helpers/route-auth-mock";
-
-const mocks = vi.hoisted(() => {
-  return {
-    getSession: vi.fn(),
-    verifyAuth: vi.fn(),
-    parseActionRequest: vi.fn(),
-    requireWorkspaceAccess: vi.fn(),
-    createWorkspaceTwilioInstance: vi.fn(),
-    getWorkspaceMessagingOnboardingState: vi.fn(),
-    getUserVerifiedAudioNumbers: vi.fn(),
-    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
-    env: { BASE_URL: () => "https://base.example" },
-  };
-});
-
-const creditsState = vi.hoisted(() => ({
-  credits: 10,
-  throwError: null as string | null,
+const mocks = vi.hoisted(() => ({
+  dispatch: vi.fn<typeof import("@/lib/manual-voice-dispatch.server").dispatchManualVoiceCall>(),
+  replay: vi.fn<typeof import("@/server/voice-credit-reservation.server").replayVoiceOperation>(),
+  create: vi.fn(async () => ({ sid: "CA_ACCEPTED_SETUP" })),
+  access: vi.fn(), verified: vi.fn(async () => ["+16135550101"]),
+  onboarding: vi.fn(), window: vi.fn(), number: vi.fn(),
+}));
+vi.mock("@/lib/manual-voice-dispatch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/manual-voice-dispatch.server")>(), dispatchManualVoiceCall: mocks.dispatch,
+}));
+vi.mock("@/server/voice-credit-reservation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-credit-reservation.server")>(), replayVoiceOperation: mocks.replay,
+}));
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/database/workspace.server")>(), requireWorkspaceAccess: mocks.access,
+  createWorkspaceTwilioInstance: async () => ({ accountSid: "AC_OWNED", calls: { create: mocks.create } }),
+}));
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/tenant-db")>(),
+  createTenantDb: () => ({ campaign: { findFirst: async () => ({ id: 1 }) }, contact: { findFirst: async () => ({ id: 2 }) },
+    campaign_queue: { findFirst: async () => ({ id: 3 }) }, outreach_attempt: { findFirst: async () => ({ id: 7 }) },
+    workspace_number: { findFirst: mocks.number } }),
+}));
+vi.mock("@/lib/user-audio.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/user-audio.server")>(), getUserVerifiedAudioNumbers: mocks.verified,
+}));
+vi.mock("@/lib/messaging-onboarding.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/messaging-onboarding.server")>(), getWorkspaceMessagingOnboardingState: mocks.onboarding,
+}));
+vi.mock("@/lib/recipient-calling-window", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/recipient-calling-window")>(), recipientCallingWindowStatus: mocks.window,
 }));
 
-const tenantDbState = vi.hoisted(() => ({
-  callerIdRecord: { type: "rented", phone_number: "+1555" } as any,
-}));
+const payload = { to_number: "+16135550100", caller_id: "+16135550102", user_id: "actor", campaign_id: "1", contact_id: "2",
+  workspace_id: "owned-workspace", queue_id: "3" };
+async function submit(overrides: Record<string, string> = {}) {
+  const { action } = await import("../app/routes/api+/dial.action.server");
+  return asRouteResponse(action(routeArgs(new Request("http://localhost/api/dial", {
+    method: "POST", body: new URLSearchParams({ ...payload, ...overrides }),
+  }))));
+}
 
-const autoDialState = vi.hoisted(() => ({
-  createOutreachAttempt: vi.fn(async () => 77),
-  saveCallError: null as Error | null,
-}));
-
-const dbRpcState = vi.hoisted(() => ({
-  claimQueueEntryForDial: vi.fn(async () => "claimed" as string),
-}));
-
-vi.mock("../app/lib/client.server", () => ({
-  getSession: (...args: any[]) => mocks.getSession(...args),
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
-}));
-vi.mock("../app/lib/database/workspace.server", () => ({
-  requireWorkspaceAccess: (...args: any[]) =>
-    mocks.requireWorkspaceAccess(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) =>
-    mocks.createWorkspaceTwilioInstance(...args),
-}));
-vi.mock("../app/lib/request-utils.server", () => ({
-  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
-}));
-vi.mock("../app/lib/messaging-onboarding.server", () => ({
-  getWorkspaceMessagingOnboardingState: (...args: any[]) => mocks.getWorkspaceMessagingOnboardingState(...args),
-}));
-vi.mock("@/lib/user-audio.server", () => ({
-  getUserVerifiedAudioNumbers: (...args: unknown[]) =>
-    mocks.getUserVerifiedAudioNumbers(...args),
-}));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-vi.mock("@/lib/workspace-credits.server", () => ({
-  getWorkspaceCreditsBalance: vi.fn(async () => {
-    if (creditsState.throwError) throw new Error(creditsState.throwError);
-    return creditsState.credits;
-  }),
-}));
-vi.mock("@/server/tenant-db", () => ({
-  createTenantDb: vi.fn(() => ({
-    workspace_number: {
-      findFirst: vi.fn(async () => tenantDbState.callerIdRecord),
-    },
-  })),
-  withAppCurrentUser: vi.fn((_userId, fn) => fn({} as any)),
-}));
-vi.mock("@/lib/auto-dial.server", () => ({
-  createOutreachAttempt: (...args: any[]) => autoDialState.createOutreachAttempt(...args),
-  saveCallToDatabase: vi.fn(async () => {
-    if (autoDialState.saveCallError) {
-      mocks.logger.error("Error saving the call to the database:", autoDialState.saveCallError);
-      return false;
-    }
-    return true;
-  }),
-}));
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcClaimQueueEntryForDial: (...args: any[]) => dbRpcState.claimQueueEntryForDial(...args),
-}));
-
-// The recipient calling window is wall-clock dependent; pin it open by default
-// so these tests are not time-of-day sensitive. One test below flips it closed
-// to exercise the #1207 gate. Window logic itself is covered in
-// test/recipient-calling-window.test.ts.
-const windowState = vi.hoisted(() => ({
-  status: {
-    allowed: true,
-    timezone: "America/Toronto",
-    reason: "in_window",
-  } as {
-    allowed: boolean;
-    timezone: string | null;
-    reason: string;
-  },
-}));
-vi.mock("@/lib/recipient-calling-window", () => ({
-  recipientCallingWindowStatus: () => windowState.status,
-  isWithinRecipientCallingWindow: () => windowState.status.allowed,
-}));
-
-describe("app/routes/api+/dial/tsx.route", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    mocks.getSession.mockReset();
-    mocks.parseActionRequest.mockReset();
-    mocks.requireWorkspaceAccess.mockReset();
-    mocks.createWorkspaceTwilioInstance.mockReset();
-    mocks.getWorkspaceMessagingOnboardingState.mockReset();
-    mocks.getUserVerifiedAudioNumbers.mockReset();
-    mocks.getUserVerifiedAudioNumbers.mockResolvedValue(["+15550001111"]);
-    mocks.logger.error.mockReset();
-    autoDialState.createOutreachAttempt.mockReset();
-    autoDialState.createOutreachAttempt.mockResolvedValue(77);
-    autoDialState.saveCallError = null;
-    dbRpcState.claimQueueEntryForDial.mockReset();
-    dbRpcState.claimQueueEntryForDial.mockResolvedValue("claimed");
-    creditsState.credits = 10;
-    creditsState.throwError = null;
-    tenantDbState.callerIdRecord = { type: "rented", phone_number: "+1555" };
-    windowState.status = {
-      allowed: true,
-      timezone: "America/Toronto",
-      reason: "in_window",
-    };
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
-      emergencyVoice: {
-        enabled: false,
-        allowedCallerIdTypes: ["rented"],
-        emergencyEligiblePhoneNumbers: [],
-      },
-    });
+describe("manual dial route contract", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server"); resetRateLimitsForTests();
+    setJsonAuthSession({ user: { id: "actor" } });
+    mocks.dispatch.mockResolvedValue({ ok: true, callSid: "CA_ACCEPTED_SETUP", replayed: false });
+    mocks.replay.mockResolvedValue(null);
+    mocks.window.mockReturnValue({ allowed: true, timezone: "America/Toronto", reason: "in_window" });
+    mocks.number.mockResolvedValue({ type: "local", phone_number: payload.caller_id });
+    mocks.verified.mockResolvedValue(["+16135550101"]);
+    mocks.onboarding.mockResolvedValue({ selectedChannels: [], emergencyVoice: { enabled: false } });
   });
-
-  test("throws 401 Response when user missing", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15550001111",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: null });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({
-      request: new Request("http://localhost/api/dial", { method: "POST" }),
-    } as any));
-    expect(res.status).toBe(401);
+  test("requires an authenticated actor before funding", async () => {
+    setJsonAuthSession({ user: null }); expect((await submit()).status).toBe(401); expect(mocks.dispatch).not.toHaveBeenCalled();
   });
-
-  test("returns creditsError when credits <= 0", async () => {
-    creditsState.credits = 0;
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15550001111",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toEqual({
-      error: "Insufficient credits",
-      creditsError: true,
-    });
+  test("passes the authenticated intent and queue generation to shared funding", async () => {
+    const intent = randomUUID(), generation = randomUUID();
+    const response = await submit({ dial_intent_id: intent, expected_queue_generation: generation, outreach_id: "7" });
+    expect(response.status).toBe(200); expect(response.headers.get("Content-Type")).toBe("text/xml");
+    expect(mocks.access).toHaveBeenCalledWith({ user: expect.objectContaining({ id: "actor" }), workspaceId: "owned-workspace" });
+    expect(mocks.dispatch).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "owned-workspace", kind: "staffed", accountSid: "AC_OWNED",
+      to: payload.to_number, from: payload.caller_id, setupTo: "client:actor", userId: "actor", campaignId: 1, contactId: 2, queueId: 3,
+      outreachAttemptId: 7, operationKey: `manual:actor:${intent}`, expectedQueueGeneration: generation }));
+    const args = mocks.dispatch.mock.calls[0]?.[0]; if (!args) throw new Error("Expected funded adapter call");
+    await args.create({ voiceUrl: "https://owned.example/voice?credit_reservation=owned", statusCallback: "https://owned.example/status?credit_reservation=owned", recipientStatusCallback: "https://owned.example/recipient" });
+    expect(mocks.create).toHaveBeenCalledWith({ to: "client:actor", from: payload.caller_id,
+      url: "https://owned.example/voice?credit_reservation=owned", statusCallback: "https://owned.example/status?credit_reservation=owned",
+      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] });
   });
-
-  test("returns 404 when workspace not found (null credit balance)", async () => {
-    creditsState.credits = null as unknown as number;
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15550001111",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(res.status).toBe(404);
-    await expect(res.json()).resolves.toEqual({
-      error: "Workspace not found",
-      code: "NOT_FOUND",
-      statusCode: 404,
-      details: undefined,
-    });
+  test("a matching accepted replay avoids new admission", async () => {
+    mocks.replay.mockResolvedValue({ ok: false, reason: "already_dispatched", callSid: "CA_ACCEPTED_SETUP", queueGeneration: randomUUID() });
+    expect((await submit({ dial_intent_id: randomUUID() })).status).toBe(200); expect(mocks.dispatch).not.toHaveBeenCalled(); expect(mocks.window).not.toHaveBeenCalled();
   });
-
-  test("happy path uses outreach_id when provided and upserts call", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "1+5555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      outreach_id: "oa1",
-      caller_id: "+1555",
-      selected_device: "computer",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    const callsCreate = vi.fn(async () => ({ sid: "CA1", from: "+1555" }));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: callsCreate } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
-    expect(autoDialState.createOutreachAttempt).not.toHaveBeenCalled();
-    expect(callsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: expect.stringContaining("/api/dial/%2B15555550100"),
-      }),
-    );
+  test("a verified phone is the setup target", async () => {
+    expect((await submit({ selected_device: "+16135550101" })).status).toBe(200);
+    expect(mocks.dispatch).toHaveBeenCalledWith(expect.objectContaining({ setupTo: "+16135550101" }));
   });
-
-  test("creates outreach attempt when outreach_id missing", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-      selected_device: "+15550001111",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
-    expect(autoDialState.createOutreachAttempt).toHaveBeenCalledWith(
-      expect.objectContaining({
-        contact_phone: "+15555550100",
-      }),
-      1,
-      "w1",
-      "u1",
-    );
+  test.each([{ user_id: "other" }, { selected_device: "+16135550199" }, { to_number: "+123" }, { dial_intent_id: "bad" }])("refuses invalid ownership or input: %j", async (input) => {
+    expect([400, 403]).toContain((await submit(input)).status); expect(mocks.dispatch).not.toHaveBeenCalled();
   });
-
-  test("hangs up the placed call when saving it to the database fails (no untracked live call)", async () => {
-    autoDialState.saveCallError = new Error("db down");
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      outreach_id: "oa1",
-      caller_id: "+1555",
-      selected_device: "computer",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    const update = vi.fn(async () => ({}));
-    // Twilio's `calls` is both callable (calls(sid)) and has `.create`.
-    const calls: any = vi.fn(() => ({ update }));
-    calls.create = vi.fn(async () => ({ sid: "CA1", from: "+1555" }));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
-    expect(calls).toHaveBeenCalledWith("CA1");
-    expect(update).toHaveBeenCalledWith({ status: "completed" });
+  test("a closed calling window refuses before funding", async () => {
+    mocks.window.mockReturnValue({ allowed: false, timezone: "America/Toronto", reason: "outside_window" });
+    const response = await submit(); expect(response.status).toBe(409); await expect(response.json()).resolves.toMatchObject({ reason: "recipient_window_closed" });
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
-
-  test("claims the queue row with workspace/campaign/queue/session-user before dialing", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "someone-else",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
-
-    const mod = await import("../app/routes/api+/dial");
-    await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-
-    expect(dbRpcState.claimQueueEntryForDial).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        queueId: 3,
-        campaignId: 1,
-        workspaceId: "w1",
-        userId: "u1",
-      }),
-    );
+  test("an emergency voice track requires an eligible caller ID", async () => {
+    mocks.onboarding.mockResolvedValue({ selectedChannels: ["voice_compliance"], emergencyVoice: {
+      enabled: true, allowedCallerIdTypes: ["toll-free"], emergencyEligiblePhoneNumbers: [payload.caller_id] } });
+    expect((await submit()).status).toBe(400); expect(mocks.dispatch).not.toHaveBeenCalled();
   });
-
-  test.each([
-    ["claimed_by_other", "This contact is being dialed by another agent."],
-    ["active_call", "This contact already has a call in progress."],
-    ["not_queued", "This contact is no longer queued."],
-    ["unavailable", "This contact is not available to dial."],
-  ])("refuses to dial and returns 409 when the claim result is %s", async (claim, message) => {
-    dbRpcState.claimQueueEntryForDial.mockResolvedValueOnce(claim);
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-
-    expect(res.status).toBe(409);
-    await expect(res.json()).resolves.toMatchObject({ error: message, claim });
-    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+  test("an eligible emergency caller ID is admitted", async () => {
+    mocks.onboarding.mockResolvedValue({ selectedChannels: ["voice_compliance"], emergencyVoice: {
+      enabled: true, allowedCallerIdTypes: ["local"], emergencyEligiblePhoneNumbers: [payload.caller_id] } });
+    expect((await submit()).status).toBe(200); expect(mocks.dispatch).toHaveBeenCalledOnce();
   });
-
-  test("refuses to dial with 409 when the recipient-local calling window is closed (#1207)", async () => {
-    windowState.status = {
-      allowed: false,
-      timezone: "America/Denver",
-      reason: "outside_window",
-    };
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+13035550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(
-      mod.action({
-        request: new Request("http://localhost/api/dial", { method: "POST" }),
-      } as any),
-    );
-
-    expect(res.status).toBe(409);
-    await expect(res.json()).resolves.toMatchObject({
-      reason: "recipient_window_closed",
-      timezone: "America/Denver",
-      error: expect.stringContaining("calling window"),
-    });
-    // The refusal must not claim the row nor talk to Twilio — otherwise a
-    // refused dial would still lock the contact out for another agent, and
-    // (worse) the wall-clock check would happen after we already dialled.
-    expect(dbRpcState.claimQueueEntryForDial).not.toHaveBeenCalled();
-    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
-  });
-
-  test("rejects an unverified selected device before calling Twilio", async () => {
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-      selected_device: "+15559999999",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.getUserVerifiedAudioNumbers.mockResolvedValueOnce(["+15550001111"]);
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(
-      mod.action({
-        request: new Request("http://localhost/api/dial", { method: "POST" }),
-      } as any),
-    );
-
-    expect(res.status).toBe(400);
-    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
-  });
-
-  test("invalid phone number throws before calling Twilio", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+123",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    // The handler factory maps thrown errors through createErrorResponse
-    // instead of letting them propagate to the framework.
-    const res = await asRouteResponse((await import("../app/routes/api+/dial")).action({
-      request: new Request("http://localhost/api/dial", { method: "POST" }),
-    } as any));
-    // A validation message written for the caller keeps its text and gets a 400
-    // (#2997), where a plain error would now be the generic default (#2888).
-    expect(res.status).toBe(400);
-    await expect(res.json()).resolves.toMatchObject({
-      error: expect.stringContaining("Invalid phone number length"),
-    });
-  });
-
-  test("call create error logs and says message", async () => {
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: { create: async () => Promise.reject(new Error("tw")) },
-    });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    const xml = await (res as Response).text();
-    expect(xml).toContain("There was an error placing your call");
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error placing call:", expect.any(Error));
-  });
-
-  test("throws when workspace credits query errors", async () => {
-    creditsState.throwError = "db";
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-
-    const mod = await import("../app/routes/api+/dial");
-    // The handler factory maps thrown errors through createErrorResponse
-    // instead of letting them propagate to the framework.
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "An error occurred" });
-  });
-
-  test("throws when create_outreach_attempt rpc errors", async () => {
-    autoDialState.createOutreachAttempt.mockRejectedValueOnce(new Error("rpc"));
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(await (res as Response).text()).toContain("There was an error placing your call");
-  });
-
-  test("logs when call upsert fails", async () => {
-    autoDialState.saveCallError = new Error("upsert");
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      outreach_id: "oa1",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
-
-    const mod = await import("../app/routes/api+/dial");
-    await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error saving the call to the database:",
-      expect.any(Error),
-    );
-  });
-
-  test("blocks emergency-compliant dialing when caller id is not emergency-ready", async () => {
-    tenantDbState.callerIdRecord = { type: "caller_id", phone_number: "+1555" };
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
-      selectedChannels: ["voice_compliance"],
-      emergencyVoice: {
-        enabled: true,
-        allowedCallerIdTypes: ["rented"],
-        emergencyEligiblePhoneNumbers: ["+1999"],
-      },
-    });
-
-    const mod = await import("../app/routes/api+/dial");
-    // The handler factory returns thrown Responses as-is instead of
-    // letting them propagate to the framework.
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(res.status).toBe(400);
-  });
-
-  test("does not enforce emergency voice when the voice track is not selected", async () => {
-    tenantDbState.callerIdRecord = { type: "caller_id", phone_number: "+1555" };
-    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
-    mocks.parseActionRequest.mockResolvedValueOnce({
-      to_number: "+15555550100",
-      user_id: "u1",
-      campaign_id: "1",
-      contact_id: "2",
-      workspace_id: "w1",
-      queue_id: "3",
-      caller_id: "+1555",
-    });
-    queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
-      selectedChannels: ["a2p10dlc"],
-      emergencyVoice: {
-        enabled: true,
-        allowedCallerIdTypes: ["rented"],
-        emergencyEligiblePhoneNumbers: [],
-      },
-    });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
-
-    const mod = await import("../app/routes/api+/dial");
-    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-
-    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
+  test("an unselected emergency track leaves ordinary voice available", async () => {
+    mocks.onboarding.mockResolvedValue({ selectedChannels: ["a2p10dlc"], emergencyVoice: {
+      enabled: true, allowedCallerIdTypes: [], emergencyEligiblePhoneNumbers: [] } });
+    expect((await submit()).status).toBe(200);
   });
 });

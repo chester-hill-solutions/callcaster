@@ -1,4 +1,6 @@
+import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 const mocks = vi.hoisted(() => ({
   callsList: vi.fn(async () => [] as unknown[]),
@@ -115,28 +117,11 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     await triggerTwilioOpenSync({ workspaceId: "ws-1", maxAgeMinutes: 120 });
 
     const where = mocks.callFindMany.mock.calls[0]?.[0]?.where;
-    // Selection must not filter on date_created — the old shape wrapped the
-    // status filter in and(status, gte(date_created, since)), which let a row
-    // stuck >2h escape the sweep forever. Drizzle where objects are circular,
-    // so walk them collecting referenced column names instead of serializing.
-    const columns = new Set<string>();
-    const seen = new Set<object>();
-    const walk = (node: unknown) => {
-      if (node == null || typeof node !== "object" || seen.has(node)) return;
-      seen.add(node);
-      const name = (node as { name?: unknown }).name;
-      const table = (node as { table?: unknown }).table;
-      if (typeof name === "string" && table != null) {
-        // A column reference: record it, but do NOT recurse into its .table —
-        // that would enumerate every column of the table and defeat the check.
-        columns.add(name);
-        return;
-      }
-      for (const value of Object.values(node)) walk(value);
-    };
-    walk(where);
-    expect([...columns]).toContain("status");
-    expect([...columns]).not.toContain("date_created");
+    // Compile the actual predicate. Walking a subquery builder visits schema
+    // metadata for every column, including columns the SQL never references.
+    const compiled = new PgDialect().sqlToQuery(where).sql;
+    expect(compiled).toContain('"status"');
+    expect(compiled).not.toContain('"date_created"');
   });
 
   test("terminalizes an old Twilio-404 call as failed through the canonical processor", async () => {

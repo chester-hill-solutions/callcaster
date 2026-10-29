@@ -728,7 +728,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     expect(overloads).toHaveLength(1);
     expect(overloads[0].args).toBe(
       "passed_contact_id bigint, p_campaign_id bigint, group_on_household boolean, p_workspace uuid, " +
-        "dequeued_by_id uuid, dequeued_reason_text text",
+        "dequeued_by_id uuid, dequeued_reason_text text, p_voice_reservation_id uuid",
     );
     expect(overloads[0].result).toBe("integer");
   });

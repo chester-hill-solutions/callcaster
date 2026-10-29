@@ -76,12 +76,8 @@ export function buildCallUpsertFromTwilioParams(
       getString(underCaseData.status)) as Database["public"]["Enums"]["call_status"] | null,
     start_time: startTime ? new Date(startTime) : undefined,
     end_time: endTime ? new Date(endTime) : undefined,
-    duration: String(
-      Math.max(
-        getNumber(underCaseData.duration) ?? 0,
-        getNumber(underCaseData.call_duration) ?? 0,
-      ),
-    ),
+    // CallDuration is seconds; Duration is the provider's minute field.
+    duration: String(getNumber(underCaseData.call_duration) ?? getNumber(underCaseData.duration) ?? 0),
     direction: getString(underCaseData.direction),
     api_version: getString(underCaseData.api_version),
     forwarded_from: getString(underCaseData.forwarded_from),

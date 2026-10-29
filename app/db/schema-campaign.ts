@@ -143,6 +143,7 @@ export const campaign_queue = pgTable(
     dequeued_at: timestamp({ withTimezone: true, mode: "date" }),
     dequeued_reason: text(),
     dispatch_generation: uuid().notNull().defaultRandom(),
+    voice_reservation_id: uuid(),
     redial_requested_at: timestamp({ withTimezone: true, mode: "date" }),
     workspace: uuid().notNull(),
   },
