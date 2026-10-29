@@ -11,7 +11,6 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
-import { createParentTwilioInstance } from "@/twilio.server";
 
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import type Twilio from "twilio";
@@ -25,29 +24,27 @@ export const loader = defineLoader({
     if (!user) {
       return routeData({ error: "Unauthorized" }, { status: 401 });
     }
-    if (!user) {
-      return jsonNumbersSearchResponse({ ok: false, error: "Unauthorized." }, 401);
-    }
     const parsed = parseNumberSearchRequest(url.searchParams);
     if (!parsed.ok) {
       return jsonNumbersSearchResponse({ ok: false, error: parsed.error }, 400);
     }
 
-    const workspaceId = url.searchParams.get("workspace_id")?.trim() || null;
+    const workspaceId = url.searchParams.get("workspace_id")?.trim();
+    if (!workspaceId) {
+      return jsonNumbersSearchResponse(
+        { ok: false, error: "Workspace ID is required." },
+        400,
+      );
+    }
+
+    // Keep membership failures outside the provider error handler so a
+    // non-member receives the same 404 as other workspace routes.
+    await requireWorkspaceAccess({ user, workspaceId });
 
     try {
-      let twilio: Twilio.Twilio;
-      if (workspaceId) {
-        await requireWorkspaceAccess({ user,
-          workspaceId,
-        });
-        twilio = (await createWorkspaceTwilioInstance({ workspace_id: workspaceId,
-        })) as Twilio.Twilio;
-      } else {
-        // No workspace context (e.g. platform-admin search). Available-number
-        // search is parent-scoped, so use a fresh parent-account client.
-        twilio = createParentTwilioInstance();
-      }
+      const twilio = await createWorkspaceTwilioInstance({
+        workspace_id: workspaceId,
+      }) as Twilio.Twilio;
 
       const numberType = getNumberSearchNumberType(url.searchParams);
       const available = twilio.availablePhoneNumbers("CA");

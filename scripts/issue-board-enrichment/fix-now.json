@@ -312,10 +312,10 @@
     "issueNumber": 2871,
     "verdict": "fix-now",
     "recommendedTitle": "Tenant-facing GET /api/numbers falls back to the platform parent-account Twilio credential when workspace_id is omitted",
-    "summary": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id…",
-    "currentBehavior": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id query parameter as \"Workspace scope (required for session auth)\" (openapi/complete-api.json:6631-6637). The loader nevertheless treats the absence of that caller-supplied parameter as \"platform-admin context\": on the else branch it builds a Twilio REST client from the platform's own parent-account credentials (env.TWILIO_SID() / env.TWILIO_AUTH_TOKEN(), app/twilio.server.ts:131) and lists that account's purchasable Canadian numbers, returning the listing…",
-    "rootCause": "The loader treats the absence of the caller-supplied workspace_id query parameter as 'platform-admin context' and, on that branch, constructs a Twilio REST client from the platform parent-account credentials via createParentTwilioInstance(). The only control applied to the request is requireDualAuth(request), which performs authentication and (only when a capability is passed) a capability check - it never checks workspace membership, a workspace role, or platform-admin/sudo status. The workspace branch of the same handler does call requireWorkspaceAccess, so the two branches of one resource have inconsistent authorization: the membership gate lives only on the branch where the caller…",
-    "resolution": "Make the workspace context mandatory for the number search so a tenant-level request can never select the platform parent-account identity, and remove the silent parent fallback. Require workspace_id, run the existing membership gate, and build the client from that workspace's subaccount. If platform operators still need a parent-account search, expose it on the admin surface behind requireSudo rather than as the default branch of a tenant route, and drop the now-unused createParentTwilioInstance import from the loader (app/twilio.server.ts:130 stays for other callers). The repository's committed test at test/numbers.route.test.ts:185 asserts the current parent behaviour, so it must be…",
+    "summary": "Workspace-only number search is implemented locally. Focused tests and three mutation checks pass; full local CI, review and merge remain.",
+    "currentBehavior": "The local loader rejects missing or blank workspace_id with 400, checks membership before creating a client, preserves uniform non-member 404 and searches only through createWorkspaceTwilioInstance. The dev branch still has the parent-account fallback.",
+    "rootCause": "The optional workspace_id selected the provider identity. Omitting it bypassed membership and constructed a parent-account client. A broad provider catch also changed membership 404 into 500.",
+    "resolution": "Require workspace_id, remove the parent fallback, and await membership outside the provider error handler. Keep local and toll-free searches on the workspace client. Mark workspace_id required in both published OpenAPI documents.",
     "lookIn": [
       "app/routes/api+/numbers.loader.server.ts",
       "app/twilio.server.ts",
@@ -325,17 +325,15 @@
       "openapi/complete-api.json"
     ],
     "existingTests": [
-      "1 test file passed, 7 tests passed (exit status 0) in the sandbox (docker --network none, read-only /target, scratch-only writes, empty environment, 2 CPUs / 2g memory / 512 pids / 300s wall clock; bun + vitest 4.1.11; dummy credentials only). The DECISIVE case 'a plain session user with no workspace context reaches…"
+      "56 focused tests pass across number route, number mapping and public/complete API contracts. The unchanged loader fails four regressions with 23 controls passing. Restoring the old loader fails four tests; removing membership fails four; making the contract optional fails two. Three authentication/validation controls pass in every mutation run. Provider calls are mocked; no live Twilio traffic."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A number search must run under the identity of the tenant that owns it. GET /api/numbers should require a workspace_id, verify the caller is a member of that workspace, and use that workspace's Twilio subaccount - which is what the declared surface (exposure sessionOnly, authClass session, workspaceScoped true, app/lib/api-surface-annotations.ts:87) and the published OpenAPI operation (workspace_id 'required for session auth', openapi/complete-api.json:6631) describe. A request with no workspace context must be rejected; if parent-account search is genuinely required for platform operators, it must sit behind platform-admin authority (requireSudo / the admin surface) and must never be the silent fallback of a tenant-facing route."
     ],
     "size": "XS",
-    "risk": "low"
+    "risk": "low",
+    "trackerRecommendation": "Keep open and In progress until full CI, review, merge and release verification are complete. Native Priority, Effort and Enviornment are unset; no blocking relationships. Do not treat local source proof as a deployed fix."
   },
   {
     "issueNumber": 2872,

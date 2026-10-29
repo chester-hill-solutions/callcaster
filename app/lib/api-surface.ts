@@ -127,6 +127,7 @@ function assemble(
     duplicate: annotation.duplicate,
     duplicateGroup: annotation.duplicateGroup,
     workspaceScoped: annotation.workspaceScoped,
+    workspaceQueryRequired: annotation.workspaceQueryRequired,
   };
 }
 

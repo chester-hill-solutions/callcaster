@@ -5,6 +5,7 @@ import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueDualAuthSession, queueJsonAuthSession, setDualAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
 const listMock = vi.fn();
+const tollFreeListMock = vi.fn();
 const twilioCtor = vi.fn(function (this: any) {
   return {
     availablePhoneNumbers: () => ({ local: { list: listMock } }),
@@ -41,7 +42,8 @@ vi.mock("@/lib/platform-workspace-numbers.server", () => ({
   purchaseWorkspaceNumber: (...args: unknown[]) =>
     mocks.purchaseWorkspaceNumber(...args),
 }));
-vi.mock("../app/lib/database/workspace.server", () => ({
+vi.mock("../app/lib/database/workspace.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../app/lib/database/workspace.server")>()),
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceUsers: (...args: any[]) => mocks.getWorkspaceUsers(...args),
@@ -131,10 +133,17 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     listMock.mockReset();
+    tollFreeListMock.mockReset();
     twilioCtor.mockClear();
 
     mocks.purchaseWorkspaceNumber.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      availablePhoneNumbers: () => ({
+        local: { list: listMock },
+        tollFree: { list: tollFreeListMock },
+      }),
+    });
     mocks.getWorkspaceUsers.mockReset();
     mocks.getWorkspacePhoneNumbers.mockReset();
     mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [], error: null });
@@ -182,6 +191,71 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     });
   });
 
+  test.each(["", "&workspace_id=", "&workspace_id=%20%09%20"])(
+    "loader rejects missing or blank workspace scope (%s) before any provider call",
+    async (scope) => {
+      listMock.mockResolvedValueOnce([{ phoneNumber: "+14165551234", friendlyName: "Parent listing" }]);
+      const { loader } = await import("../app/routes/api+/numbers");
+      const response = await asRouteResponse(loader(withRouteUrl({
+        request: new Request(`http://localhost/api/numbers?searchMode=areaCode&query=416${scope}`),
+        params: {}, context: new RouterContextProvider(),
+      })));
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ ok: false, error: "Workspace ID is required." });
+      expect(mocks.requireWorkspaceAccess).not.toHaveBeenCalled();
+      expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+      expect(twilioCtor).not.toHaveBeenCalled();
+      expect(listMock).not.toHaveBeenCalled();
+    },
+  );
+
+  test("loader returns uniform 404 for a non-member without creating a provider client", async () => {
+    const { AppError, ErrorCode } = await import("@/lib/errors.server");
+    mocks.requireWorkspaceAccess.mockRejectedValueOnce(new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND));
+    const { loader } = await import("../app/routes/api+/numbers");
+    const response = await asRouteResponse(loader(withRouteUrl({
+      request: new Request("http://localhost/api/numbers?searchMode=areaCode&query=416&workspace_id=w-foreign"),
+      params: {}, context: new RouterContextProvider(),
+    })));
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: "Workspace not found" });
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+    expect(twilioCtor).not.toHaveBeenCalled();
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["unauthenticated", { user: null }],
+    ["workspace API key", {}],
+  ])("loader refuses %s callers before workspace or provider access", async (_name, actor) => {
+    setDualAuthSession(actor);
+    const { loader } = await import("../app/routes/api+/numbers");
+    const response = await asRouteResponse(loader(withRouteUrl({
+      request: new Request("http://localhost/api/numbers?searchMode=areaCode&query=416&workspace_id=w1"),
+      params: {}, context: new RouterContextProvider(),
+    })));
+    expect(response.status).toBe(401);
+    expect(mocks.requireWorkspaceAccess).not.toHaveBeenCalled();
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+    expect(twilioCtor).not.toHaveBeenCalled();
+  });
+
+  test("loader searches toll-free numbers with the workspace account", async () => {
+    tollFreeListMock.mockResolvedValueOnce([{ phoneNumber: "+18005550100", friendlyName: "Toll-free" }]);
+    const { loader } = await import("../app/routes/api+/numbers");
+    const response = await asRouteResponse(loader(withRouteUrl({
+      request: new Request("http://localhost/api/numbers?numberType=tollfree&searchMode=contains&query=800&workspace_id=%20w1%20"),
+      params: {}, context: new RouterContextProvider(),
+    })));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, numbers: [{ phoneNumber: "+18005550100" }] });
+    expect(tollFreeListMock).toHaveBeenCalledWith({ contains: "800", limit: 20 });
+    expect(listMock).not.toHaveBeenCalled();
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({ user: { id: "u1" }, workspaceId: "w1" });
+    expect(mocks.createWorkspaceTwilioInstance).toHaveBeenCalledWith({ workspace_id: "w1" });
+    expect(twilioCtor).not.toHaveBeenCalled();
+  });
+
   test("loader lists local numbers with searchMode and query", async () => {
     queueDualAuthSession({ user: { id: "u1" } });
     listMock.mockResolvedValueOnce([
@@ -193,12 +267,10 @@ describe("app/routes/api+/numbers/route.tsx", () => {
         capabilities: { voice: true, sms: true },
       },
     ]);
-    mocks.env.TWILIO_SID.mockReturnValueOnce("sid");
-    mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
-          "http://localhost/api/numbers?searchMode=areaCode&query=416",
+          "http://localhost/api/numbers?searchMode=areaCode&query=416&workspace_id=w1",
         ),
       } as any)),
     );
@@ -217,13 +289,13 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       ],
     });
     expect(listMock).toHaveBeenCalledWith({ areaCode: 416, limit: 20 });
-    // Clients carry an explicit request timeout — the SDK otherwise waits
-    // forever, which stalls the single-threaded worker queue.
-    expect(twilioCtor).toHaveBeenCalledWith(
-      "sid",
-      "token",
-      expect.objectContaining({ timeout: expect.any(Number) }),
-    );
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({
+      user: { id: "u1" }, workspaceId: "w1",
+    });
+    expect(mocks.createWorkspaceTwilioInstance).toHaveBeenCalledWith({
+      workspace_id: "w1",
+    });
+    expect(twilioCtor).not.toHaveBeenCalled();
   });
 
   test("loader uses workspace Twilio when workspace_id is provided", async () => {
@@ -255,7 +327,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
-          "http://localhost/api/numbers?searchMode=areaCode&query=416",
+          "http://localhost/api/numbers?searchMode=areaCode&query=416&workspace_id=w1",
         ),
       } as any)),
     );

@@ -23,6 +23,14 @@ before any ownership change. A failed transfer also returns an error; it cannot
 return success or record a successful transfer audit event. A successful transfer
 promotes the chosen member to owner and changes the previous owner to admin.
 
+## Available number search
+
+`GET /api/numbers` requires a signed-in user and a non-blank `workspace_id`
+query parameter. The user must be a member of that workspace. Local and toll-free
+Canadian number searches use the workspace's Twilio account. Missing workspace
+scope returns 400. A non-member receives 404 before any provider call. Workspace
+API keys are refused (401).
+
 ## API keys
 
 | Method | Path | Purpose |

@@ -125,6 +125,8 @@ export type ApiSurfaceEntry = {
   duplicate?: boolean;
   duplicateGroup?: string;
   workspaceScoped?: boolean;
+  /** Require workspace_id on workspace-scoped GET requests. */
+  workspaceQueryRequired?: boolean;
 };
 
 /**
@@ -194,6 +196,8 @@ export type ApiSurfaceAnnotation = {
   duplicate?: boolean;
   duplicateGroup?: string;
   workspaceScoped?: boolean;
+  /** Require workspace_id on workspace-scoped GET requests. */
+  workspaceQueryRequired?: boolean;
   /** Overrides the default derived from auth class + exposure. */
   specTarget?: SpecTarget;
   supported?: boolean;
