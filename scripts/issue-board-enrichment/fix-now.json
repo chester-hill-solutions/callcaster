@@ -225,8 +225,8 @@
     "issueNumber": 2867,
     "verdict": "fix-now",
     "recommendedTitle": "Unify credential rate limits across auth endpoints",
-    "summary": "The local implementation shares strict credential-operation limits across auth aliases. Focused tests and five mutation checks pass; full local CI, review, merge and release verification remain.",
-    "currentBehavior": "Token login shares the 10/min sign-in limit with browser and Better Auth sign-in. Registration, reset and OTP aliases use their operation limits. Unknown auth POSTs default to strict sign-in; only exact sign-out and session-revocation paths retain 30/min. Dev still has the old limits.",
+    "summary": "PR #3079 shares strict credential-operation limits across auth aliases. Full local CI, focused tests and five mutation checks pass; review, merge and release verification remain.",
+    "currentBehavior": "Token login shares the 10/min sign-in limit with browser and Better Auth sign-in. Registration, reset and OTP aliases use their operation limits. Unknown auth POSTs default to strict sign-in; only exact sign-out and session-revocation paths retain 30/min. Implemented in PR #3079; dev still has the old limits.",
     "rootCause": "Token login used a separate 30/min scope, while the catch-all sent signup and reset aliases through the loose scope. The source guard skipped tokenLogin and checked only for some limiter, so comments and wrong scopes could satisfy it.",
     "resolution": "Remove the token-only scope; bind aliases to credential operations; use a strict default with an exact session-lifecycle allowlist. Parse real calls and literal policy tables in the coverage guard, including imported helper aliases. Publish the operation limits in the API documents.",
     "lookIn": [
@@ -246,7 +246,7 @@
     ],
     "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Keep open and In progress for full CI, PR review, merge and release verification. Native Priority, Effort and Enviornment remain unset; there are no blocking relationships. Source tests do not prove deployment."
+    "trackerRecommendation": "Keep open and In progress for PR #3079 review, merge and release verification. Native Priority, Effort and Enviornment remain unset; there are no blocking relationships. Source tests do not prove deployment."
   },
   {
     "issueNumber": 2869,
