@@ -358,40 +358,42 @@ async function createOutreachAttemptAndCall(
   let outreachAttemptId: number | null = null;
   let providerAttemptStarted = false;
   try {
+    // A definite rejection releases its hold before retry. Uncertain sends
+    // throw VoiceDispatchUncertainError, which the retry helper does not repeat.
     const dispatched = await withTwilioRetry(() => {
       providerAttemptStarted = false;
       return dispatchReservedVoiceCall({
-      workspaceId: context.workspaceId,
-      kind: context.billingKind, accountSid: context.twilio.accountSid, to: phone, from: context.callerId,
-      campaignId: Number(context.campaignId), contactId: member.contact_id,
-      queueId: member.id, userId: context.userId,
-      expectedQueueGeneration: member.dispatch_generation,
-      operationKey: ivrQueueVoiceOperationKey(member.id),
-      voiceUrl: context.ivrUrls.flowUrl, statusCallback: context.ivrUrls.statusCallback,
-      prepareOutreach: async (tx) => {
-        outreachAttemptId = await rpcCreateOutreachAttempt(createTenantDb(context.workspaceId, tx), {
-          contactId: member.contact_id, campaignId: Number(context.campaignId),
-          userId: context.userId, workspaceId: context.workspaceId, queueId: member.id,
-        });
-        return outreachAttemptId;
-      },
-      beforeCreate: async () => {
-        await context.startPacer.waitForTurn();
-        if (!isDispatchAllowedAt(context.callingPolicy)) {
-          throw new CallingWindowClosedError("campaign");
-        }
-        if (!recipientCallingWindowStatus(phone).allowed) {
-          throw new CallingWindowClosedError("recipient");
-        }
-      },
-      create: ({ voiceUrl, statusCallback }) => {
-        providerAttemptStarted = true;
-        return context.twilio.calls.create({
-          to: phone, from: context.callerId, url: voiceUrl,
-          machineDetection: context.machineDetection,
-          statusCallbackEvent: ["answered", "completed"], statusCallback,
-        });
-      },
+        workspaceId: context.workspaceId,
+        kind: context.billingKind, accountSid: context.twilio.accountSid, to: phone, from: context.callerId,
+        campaignId: Number(context.campaignId), contactId: member.contact_id,
+        queueId: member.id, userId: context.userId,
+        expectedQueueGeneration: member.dispatch_generation,
+        operationKey: ivrQueueVoiceOperationKey(member.id),
+        voiceUrl: context.ivrUrls.flowUrl, statusCallback: context.ivrUrls.statusCallback,
+        prepareOutreach: async (tx) => {
+          outreachAttemptId = await rpcCreateOutreachAttempt(createTenantDb(context.workspaceId, tx), {
+            contactId: member.contact_id, campaignId: Number(context.campaignId),
+            userId: context.userId, workspaceId: context.workspaceId, queueId: member.id,
+          });
+          return outreachAttemptId;
+        },
+        beforeCreate: async () => {
+          await context.startPacer.waitForTurn();
+          if (!isDispatchAllowedAt(context.callingPolicy)) {
+            throw new CallingWindowClosedError("campaign");
+          }
+          if (!recipientCallingWindowStatus(phone).allowed) {
+            throw new CallingWindowClosedError("recipient");
+          }
+        },
+        create: ({ voiceUrl, statusCallback }) => {
+          providerAttemptStarted = true;
+          return context.twilio.calls.create({
+            to: phone, from: context.callerId, url: voiceUrl,
+            machineDetection: context.machineDetection,
+            statusCallbackEvent: ["answered", "completed"], statusCallback,
+          });
+        },
       });
     }, { workspaceId: context.workspaceId, operation: "calls.create.ivr" });
     if (!dispatched.ok) {

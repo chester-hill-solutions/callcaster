@@ -600,6 +600,31 @@ describe("IVR dispatch funding and recovery (#2879)", () => {
     expect(provider.create).toHaveBeenCalledOnce();
     expect(await state()).toMatchObject({ credits: 2, holds: 1, attempts: 1, calls: 1 });
   });
+  test("a rejected worker request reacquires funding before its paced retry", async () => {
+    await sql`update public.workspace set credits = 2 where id = ${workspaceId}::uuid`;
+    provider.create.mockImplementationOnce(async () => {
+      expect(await state()).toMatchObject({ credits: 2, holds: 1, calls: 0, ledger: 0 });
+      throw Object.assign(new Error("Owned provider rate limit"), { status: 429, code: 20429 });
+    });
+    expect(await send("worker")).toMatchObject({ kind: "dispatched", counts: { called: 1, failed: 0 } });
+    expect(provider.create).toHaveBeenCalledTimes(2);
+    expect(await state()).toMatchObject({ credits: 2, holds: 1, calls: 1, ledger: 0 });
+    const rows = await sql`select state from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid order by created_at`;
+    expect(rows.map((r) => r.state)).toEqual(["released", "active"]);
+    await completeCall(firstProviderCall());
+    expect(await state()).toMatchObject({ credits: 0, holds: 0, ledger: 1 });
+  });
+  test("a worker retry rechecks the recipient window and releases unused funding", async () => {
+    provider.create.mockImplementationOnce(async () => {
+      principal.windowAllowed = false;
+      throw Object.assign(new Error("Owned provider rate limit"), { status: 429, code: 20429 });
+    });
+    expect(await send("worker")).toMatchObject({ kind: "dispatched", counts: { called: 0, failed: 0, deferred: 1 }, queuedRemaining: 1 });
+    expect(provider.create).toHaveBeenCalledOnce();
+    expect(await state()).toMatchObject({ credits: 100, holds: 0, calls: 0, ledger: 0 });
+    const [queue] = await sql`select queue_state, dequeued_at from public.campaign_queue where id = ${queueId}`;
+    expect(queue).toEqual({ queue_state: "queued", dequeued_at: null });
+  });
   test("a worker batch stops at its funded first minute and leaves the rest queued", async () => {
     await sql`update public.workspace set credits = 2 where id = ${workspaceId}::uuid`;
     await sql`update public.campaign_queue set queue_state = 'queued', dequeued_at = null where workspace = ${workspaceId}::uuid`;
