@@ -180,6 +180,12 @@ When publication is held, do not predict a PR number in the changelog. Keep
 the issue link during local preparation, add the verified PR link before final
 publication, then repeat full gates and source reviews for those exact bytes.
 
+For a security update, inspect every locked peer consumer, including local
+`file:` packages. Bun can retain an affected root peer while installing a fixed
+private copy for the parent. `npm ls` proves only the npm tree. A targeted
+`bun update` can add a direct dependency; review the manifest, keep only intended
+declarations, and require both frozen install trees to use the fixed peer.
+
 After running both npm and Bun for a dependency change, finish with `npm ci`
 before Node checks. This restores npm links for local `file:` packages. A Bun
 copy of a vendored package can prevent CSS import analysis from finding its
@@ -787,6 +793,20 @@ After failed cleanup, test an external call close before retrying cleanup.
 Remove only the helper's error guards; preserve existing listeners.
 A direct unexpected SDK exception can still stop public `destroy`; report that
 incomplete result and stop replacement registration instead of claiming closure.
+
+For long-running checks, keep head hashes, completed reports and ownership
+metadata in a persistent task artifact folder. A process handle or temporary
+log is not a passing result after an interruption. Check the same process or
+its authoritative result before restarting it.
+
+When Docker is unavailable, an installed native PostgreSQL can run an owned
+loopback fixture. Record its actual version. On macOS, use an explicit valid
+locale and UTF-8 encoding; long artifact paths can exceed the Unix socket
+limit, so use TCP only. Verify the server PID, data directory, port and database
+before cleanup. An empty fixture can use `scripts/db/bootstrap-fresh-db.mjs`:
+it applies the SQL before recording and checking both ledgers. Keep this local
+proof separate from deployed verification; never write ledger rows merely to
+clear a check.
 
 ## Entry points
 
