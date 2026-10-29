@@ -32,6 +32,13 @@ editing them.
 
 The supported CallCaster issue types are:
 
+For native Priority or Effort writes, inspect the current GraphQL
+`SetIssueFieldValueInput` contract and resolve the live field and option IDs.
+Use `setIssueFieldValue` with `issueId` and an `issueFields` list containing
+`fieldId` and `singleSelectOptionId`; pass only the fields being changed.
+Verify the resulting `issueFieldValues`. These organization fields do not need
+Project scope and must not be replaced with labels or Project item fields.
+
 | Type | Use for |
 | --- | --- |
 | `Bug` | An unexpected problem or behavior |
@@ -178,9 +185,18 @@ trailing comma after a removed entry. The pure local check needs no GitHub scope
 `node --input-type=module -e 'import { loadEnrichment } from "./scripts/issue-board-lib.mjs"; loadEnrichment("scripts/issue-board-enrichment")'`.
 Preserve the enrichment files' UTF-8 characters and existing rendering. Review
 the diff for unrelated serialization changes before staging.
-For an atomic audit, render the selected issue with `buildBoard` and fresh native
-metadata, then replace only its complete section. `buildBoard` returns
-`{ md, counts }`; use `md` as the rendered text. Require the generated cause
+For a merge, compare enrichment records by `issueNumber` and then by field.
+Keep newer test evidence and intentional moves between verdict files. Never
+choose one whole conflicting array. Check the before/after issue sets, then
+validate cross-file uniqueness and dependency edges before rendering the board.
+Validate the complete enrichment set before filtering. For an atomic audit,
+pass only the selected issue and its matching record to `buildBoard`, with
+fresh native metadata, then replace only its complete section. Never prune
+records from a partial issue list. `buildBoard` returns `{ md, counts }`; use
+`md` as the rendered text. Selected render inputs also need the real
+`updatedAt` value; map REST `updated_at` when using a native REST snapshot.
+Validate the complete input before editing or committing selected evidence.
+Require the generated cause
 and test fields before writing. A multiline `$` can match the heading line,
 so use an explicit next-section or end-of-input boundary.
 Trace the affected route or worker to its actual helper before moving an issue to

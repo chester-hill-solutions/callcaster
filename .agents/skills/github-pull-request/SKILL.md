@@ -21,6 +21,20 @@ subcommand manual and installed `gh <command> --help` before using a command.
 9. Merge only when the user requested the merge or explicitly approved it. Select the merge strategy deliberately, then verify `state`, `mergedAt`, `mergeCommit`, and the base branch.
 10. If `--delete-branch` is used, verify the remote branch no longer exists. A checked-out local branch may remain.
 
+## Trunk PR capacity and batch proof
+
+Before creating a PR, read the repository's open PR inventory. Keep one open
+PR for the active branch, including its draft period. Reuse the current PR
+for an explicitly authorized merge batch; do not create a second review queue.
+Follow the `git` skill for original-head preservation and combined test gates.
+A batch that implements issues must list those issues and remove an inherited
+`no-issue` label. Keep context-only numbers out of the workflow's issue parser.
+
+After the base changes, GitHub can report a stale `mergeable: true` result.
+Check the fetched base and local merge result. A 405 conflict response means
+refresh and test the source; do not force the merge. Check tool error results
+before parsing text as JSON. A network error is a failed read, not CI evidence.
+
 ## Draft pull requests
 
 Never change a draft pull request to ready for review unless the user explicitly

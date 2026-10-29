@@ -260,6 +260,7 @@ export function buildOpenApiSpec(options: BuildOpenApiSpecOptions) {
                 {
                   name: "workspace_id",
                   in: "query",
+                  required: entry.workspaceQueryRequired,
                   schema: { type: "string", format: "uuid" },
                   description: "Workspace scope (required for session auth).",
                 },

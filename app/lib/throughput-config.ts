@@ -88,7 +88,7 @@ export function configuredDispatcherVoiceCps(
   >,
 ): number {
   if (!config.parallelDispatchEnabled) {
-    return LEGACY_IVR_PIPELINE_CPS;
+    return defaultVoiceTargetCps();
   }
   return Math.max(0.1, config.voiceTargetCps);
 }
@@ -98,6 +98,18 @@ export function claimBatchSizeForRate(
   windowMs = DISPATCH_TICK_MS,
 ): number {
   return Math.max(1, Math.ceil(ratePerSecond * (windowMs / 1000)));
+}
+
+/** Request spacing applies within a batch and before its successor. */
+export function ivrDispatchPacing(
+  config: Pick<WorkspaceTwilioOpsConfig, "parallelDispatchEnabled" | "voiceTargetCps">,
+): { batchSize: number; minStartIntervalMs: number } {
+  const rate = configuredDispatcherVoiceCps(config);
+  const batchSize = claimBatchSizeForRate(rate);
+  return {
+    batchSize,
+    minStartIntervalMs: Math.ceil(1000 / rate),
+  };
 }
 
 export function isBulkSmsSenderMisaligned(

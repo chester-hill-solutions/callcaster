@@ -84,6 +84,17 @@ Wait for the overlay's entering state to clear and its CSS animations to finish
 before measuring controls. Scope background landmarks and include hidden roles
 when a modal makes the page inert; required field names can include an asterisk.
 
+When a service gains a scoped tenant-client read, update its orchestration
+fixtures at that boundary. Prove cross-workspace denials against the real
+database; a permissive query mock is not authorization evidence.
+
+When a pipeline gains caller-dependent authorization, inventory HTTP and worker
+callers. Pass the authenticated user for requests and explicit system authority
+for trusted jobs without a user. Test identity forwarding separately from SQL
+row filtering; an all-users fixture cannot prove those boundaries.
+For role-floor changes, search route and permission tests as well as function
+callers. Tests for a related artifact can pin old access on the same surface.
+
 For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the
@@ -116,6 +127,11 @@ working-directory check. Do not use `pgrep -fl`: it can print environment
 credentials with the process command. Stop only a verified owned process tree.
 
 ## Locked project tools
+
+The compose migration fixture grants its public schema to the `callcaster`
+role. Create disposable Postgres with that role, or create it inside the owned
+database before bootstrapping. Keep both database URLs command-scoped to that
+local database for integration tests; do not carry them into the normal gate.
 
 Before adding a second runtime version, inspect existing transitive peer
 requirements. An npm alias can isolate the app version while preserving an
@@ -168,6 +184,10 @@ only with a safer action or new evidence that resolves the stated concern.
 Read fresh audits for both dependency locks before the final source review and
 full gate. A compiler version that matches a parent range can still have a new
 advisory; check the primary patch range before freezing that source.
+
+Run metadata proof and audit dispatch in one script that stops if proof fails.
+Keep a proof failure separate from an audit exit code that reports findings;
+require complete JSON results from both audits.
 
 An audit command can export dependency names and versions to its registry.
 If automatic approval review rejects that export, keep it held and request
@@ -443,6 +463,11 @@ explicit locale and encoding (`initdb --locale=C --encoding=UTF8`). Shell locale
 settings can be invalid for the installed server. Use a dedicated directory and
 loopback port, and stop only that owned cluster after its readers finish.
 
+The compose bootstrap grants its public schema to the `callcaster` role. Use
+that role for an owned Docker fixture, or create it in that fixture before
+bootstrap. Verify the recorded container ID, label and loopback port before
+any schema reset; a missing fixture role is not an application failure.
+
 For the full real-Postgres suite, set `DATABASE_URL`, `DATABASE_DIRECT_URL` and
 `INTEGRATION_DB_URL` to the owned fixture in the command environment. Some suites
 gate on the app URL or import its direct client. The integration override alone
@@ -610,6 +635,11 @@ server client set is empty; the server close callback alone can run earlier.
 Bound awaited transport events with a deadline so an old-package rejection
 control cannot leave an open connection after a test timeout.
 
+For raw-array HTTP header fixtures, supply Host explicitly. Node can reject an
+array without it before the request handler runs. Require a completed HTTP 200
+and captured destination headers before claiming a stripping result; keep a
+same-origin credential control and a public-header control.
+
 For loopback HTTP fixtures with several short-lived servers, disable the client
 agent or close its pooled connections between servers. Node can reuse a socket
 from a closed fixture when its port is allocated again. Resolve each dependency
@@ -671,6 +701,9 @@ push; run the full tier if the caller inventory is not complete.
 For React Aria controls, a DOM click can miss the native press action. If the
 control stays unchanged, inspect the current browser state and try native input.
 Confirm the dialog or selected value before claiming an interactive check.
+For native time inputs, a scripted fill can return without committing a change.
+Use native keyboard input when needed, then verify both the displayed time and
+the saved field or resulting summary before claiming an edit passed.
 
 Finish full CI and codegen writers before live Vite browser acceptance.
 Generated file rewrites can reload an active request fixture. Require a completed
@@ -683,6 +716,10 @@ a saved-report action; API snapshots and database events can name IDs differentl
 Keep legacy caller fixtures on the actual accepted upload ID, and retain a
 foreign-ID rejection control. Key the uploader state to its workspace so tenant
 navigation cannot reuse another workspace’s file draft or enabled report action.
+
+For real-router write fixtures, update the fixture store before the action returns.
+Wait for revalidation to finish before checking the final rows. A static loader can
+restore deleted rows and turn an optimistic-state assertion into a timing race.
 
 For optimistic fetcher recovery, test real-browser fast results and first-send
 redirects, as well as delayed failures. A busy render can be skipped, and a

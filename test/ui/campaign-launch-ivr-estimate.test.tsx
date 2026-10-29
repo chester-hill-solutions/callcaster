@@ -10,7 +10,7 @@ const syncSnapshot: WorkspaceTwilioSyncSnapshot = {
   lastSyncedAt: null, lastSyncStatus: "never_synced", lastSyncError: null,
 };
 
-test("IVR estimates use calls/minute and include worker pacing (#1874)", () => {
+test("IVR estimates use calls/minute and include worker pacing (#3007)", () => {
   render(<CampaignLaunchExtras
     campaignData={{ id: 9, type: "simple_ivr", status: "running" } as never}
     isBusy={false}
@@ -18,7 +18,7 @@ test("IVR estimates use calls/minute and include worker pacing (#1874)", () => {
     phoneNumbers={[]}
     outboundEstimateInputs={{ portalConfig: makePortalConfig(), syncSnapshot }}
   />);
-  expect(screen.getByText(/Estimated queue processing rate: 24 calls\/min/)).toBeInTheDocument();
+  expect(screen.getByText(/Estimated queue processing rate: 60 calls\/min/)).toBeInTheDocument();
   expect(screen.queryByText(/calls\/sec|CPS|If started now/)).not.toBeInTheDocument();
   expect(screen.getByText(/Remaining queue is estimated to finish around/)).toBeInTheDocument();
 });

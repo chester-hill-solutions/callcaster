@@ -189,6 +189,27 @@ function validateBlockedBy(records, byNumber) {
 
 const RISK_WEIGHT = { high: 0, medium: 1, low: 2 };
 const SIZE_WEIGHT = { XL: 0, L: 1, "M-L": 2, M: 3, "S-M": 4, S: 5, XS: 6, "L-XL": 1 };
+const PRIORITY_WEIGHT = new Map([["Urgent", 0], ["High", 1], ["Medium", 2], ["Low", 3]]);
+
+/** Organization Issue fields are separate from labels and Project fields. */
+function issueField(issue, name) {
+  const values = issue.issueFieldValues?.nodes;
+  if (!values) return "unknown";
+  return values.find((value) => value.field?.name === name)?.name ?? "unset";
+}
+
+function priorityWeight(issue) {
+  return PRIORITY_WEIGHT.get(issueField(issue, "Priority")) ?? 4;
+}
+
+function nativeIssueMetadata(issue) {
+  return [
+    `Type: ${issue.issueType === undefined ? "unknown" : issue.issueType?.name ?? "unset"}`,
+    `Priority: ${issueField(issue, "Priority")}`,
+    `Effort: ${issueField(issue, "Effort")}`,
+    `Environment: ${issueField(issue, "Enviornment")}`,
+  ];
+}
 
 function statusOf(issue, projectNumber) {
   const item = issue.projectItems?.nodes?.find(
@@ -203,6 +224,7 @@ function issueEntry(issue, record, status, repo) {
   const assignees = (issue.assignees?.nodes ?? []).map((a) => a.login);
   const labels = (issue.labels?.nodes ?? []).map((l) => l.name);
   const meta = [`Verdict: **${VERDICT_LABELS.get(record.verdict)}**`];
+  meta.push(...nativeIssueMetadata(issue));
   if (record.size) meta.push(`Size: ${record.size}`);
   if (record.risk) meta.push(`Risk: ${record.risk}`);
   meta.push(`Labels: ${labels.length ? labels.join(", ") : "none"}`);
@@ -255,6 +277,7 @@ function triageEntry(issue, status) {
   const assignees = (issue.assignees?.nodes ?? []).map((a) => a.login);
   const labels = (issue.labels?.nodes ?? []).map((l) => l.name);
   const meta = [`Status: ${status}`];
+  meta.push(...nativeIssueMetadata(issue));
   meta.push(`Labels: ${labels.length ? labels.join(", ") : "none"}`);
   meta.push(`Assignee: ${assignees.length ? `@${assignees.join(", @")}` : "none"}`);
   meta.push(`Updated: ${issue.updatedAt.slice(0, 10)}`);
@@ -304,6 +327,8 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
 
   for (const lane of lanes.values()) {
     lane.entries.sort((a, b) => {
+      const priority = priorityWeight(a.issue) - priorityWeight(b.issue);
+      if (priority !== 0) return priority;
       if (lane.key === "fix-now") {
         const d =
           (RISK_WEIGHT[a.record.risk] ?? 2) - (RISK_WEIGHT[b.record.risk] ?? 2) ||
@@ -314,7 +339,9 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
     });
   }
 
-  triage.entries.sort((a, b) => b.issue.updatedAt.localeCompare(a.issue.updatedAt));
+  triage.entries.sort((a, b) =>
+    priorityWeight(a.issue) - priorityWeight(b.issue) || b.issue.updatedAt.localeCompare(a.issue.updatedAt),
+  );
 
   const sections = LANES.map((l) => {
     const lane = lanes.get(l.key);

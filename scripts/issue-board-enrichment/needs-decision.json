@@ -692,36 +692,6 @@
     ]
   },
   {
-    "issueNumber": 2216,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Email verification is half-wired: a verify-email route and a \"verify your email\" prompt both exist, but no verification email is ever sent",
-    "summary": "Email verification remains half-wired: auth has reset email callback but no verification callback/requirement; register fallback claims verification and a verify handler survives. The live issue explicitly leaves mandatory verification versus removal undecided.",
-    "currentBehavior": "Verified on dev@20f59d0e, 19 October 2026. Still half-wired. There is no sendVerificationEmail and no requireEmailVerification anywhere in app/. The signup response still says 'Verify your email before signing in' and the error map still maps EMAIL_NOT_VERIFIED to 403, so the promise is made and nothing delivers it. app/routes/api+/auth/verify-email.action.server.ts still exists with its rate limit and writes nothing, and auth_user.email_verified is never set by app code. No test registers a user and asserts either outcome.",
-    "rootCause": "Auth configuration enables password signup and reset delivery but has no email-verification delivery or enforcement configuration. Verification handlers and a verification message remain without a configured issuance flow. Source does not establish that the feature was deliberately removed.",
-    "resolution": "Decide between sending the email and removing the prompt, or making verification mandatory and wiring the send. The half-wired state is the worst of the three: a user is told to verify an email that will never arrive. Whichever way it goes, the verify-email route, the signup message, the EMAIL_NOT_VERIFIED error and the emailVerified column all have to move together, and a test has to register a user and assert the outcome.",
-    "lookIn": [
-      "app/server/auth-instance.ts:21-31 (emailAndPassword, no verification callback)",
-      "app/lib/platform-auth.server.ts:208-217 (the signup message that lies)",
-      "app/lib/platform-auth.server.ts:112 (the EMAIL_NOT_VERIFIED error map)",
-      "app/routes/api+/auth/verify-email.action.server.ts (the dead route, still rate limited)",
-      "app/db/auth-schema.ts:16 (emailVerified, never written by app code)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "No test exercises real registration to assert verification issuance and session policy. Account-address occupancy is established; automatic account takeover by the first registrant is not, since reset goes to the actual mailbox owner."
-    ],
-    "acceptanceCriteria": [
-      "A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return",
-      "No user-visible string references verification unless verification happens",
-      "The dead route and its rate limit are either live or removed",
-      "A test covers the chosen path end to end"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Needs decision. The issue explicitly requires Option A/B product policy and states funnel cost is unknown; do not select cheaper removal as a bug fix. Then implement/test the chosen policy. Related PR evidence: #2223, #2222. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2217,
     "verdict": "needs-decision",
     "recommendedTitle": "No product analytics exists anywhere, so every product decision is an untested guess",
@@ -1098,5 +1068,60 @@
     "acceptanceCriteria": [],
     "size": "M",
     "risk": "medium"
+  },
+  {
+    "issueNumber": 2546,
+    "verdict": "needs-decision",
+    "summary": "High priority. Cross-audience imports create multiple workspace contacts for one normalized phone. SMS refuses ambiguous recipients, and a campaign can select duplicate contacts.",
+    "currentBehavior": "The issue documents separate contacts per audience and deliberately fail-closed manual SMS. A new import rule alone cannot safely repair existing consent, history and queue references.",
+    "rootCause": "Contact identity is deduplicated inside one audience, while SMS recipient identity is workspace-wide.",
+    "resolution": "Approve deterministic merge rules for identity, profile conflicts, consent and opt-out, household links, message history and queue references. Split repair, canonical identity enforcement, import reuse and campaign phone deduplication into atomic tasks before implementation.",
+    "lookIn": [
+      "app/lib/audience-import-map.server.ts",
+      "app/server/audience-import-effects.server.ts",
+      "app/lib/chat-sms-guards.server.ts"
+    ],
+    "acceptanceCriteria": [
+      "Never pick an arbitrary duplicate or loosen opt-out checks.",
+      "The data repair must preserve history and apply the most restrictive consent state.",
+      "Reusing a canonical contact must add a conflict-safe audience membership."
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Native Bug, Priority High, Effort Medium, Project Status Backlog; no linked implementation PR or native blocker. Reviewed full issue and relationships on 2026-10-28. Policy and task decomposition remain."
+  },
+  {
+    "issueNumber": 2941,
+    "verdict": "needs-decision",
+    "summary": "High priority. Mandatory email verification has landed; self-serve signup still needs an abuse bound, welcome-credit policy and rollout decision.",
+    "currentBehavior": "PR #2953 implements the verification prerequisite. #2216 remains open for deployed verification. The issue also asks for a deliberate signup volume limit and trial credit policy.",
+    "rootCause": "Production signup cannot be scoped from the verification merge alone; the accepted volume and provisioning cost remain policy inputs.",
+    "resolution": "Complete #2216 acceptance. Record the signup volume bound, trial credit policy and intended production flag. Then make one atomic rollout change with open/closed-path tests.",
+    "blockedBy": [
+      2216
+    ],
+    "lookIn": [
+      "app/server/auth-instance.ts",
+      "app/routes/signup.action.server.ts",
+      "shared/pricing.ts"
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Native Feature, Priority High, Effort Medium, Project Status Backlog. Preserve the native #2216 dependency until its required verification is done."
+  },
+  {
+    "issueNumber": 2943,
+    "verdict": "needs-decision",
+    "summary": "High priority. PR #2954 fixes the inline font attributes, but the requested postal-address removal remains unresolved.",
+    "currentBehavior": "email-layout.server.ts uses safe single-quoted font names and still renders the hard-coded postal footer.",
+    "rootCause": "The font rendering defect is fixed; the issue also asks whether transactional emails should retain the address.",
+    "resolution": "Verify the font fix in real mail clients and resolve the remaining footer requirement as a separate atomic concern. Do not claim the whole issue is complete while the address remains.",
+    "lookIn": [
+      "app/lib/email-layout.server.ts",
+      "test/email-layout.server.test.ts"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Native Task, Priority High, Effort nothing-burger, Project Status on-dev. PR #2954 / 25fa571c fixes styling. The footer question has no recorded answer in the issue."
   }
 ]

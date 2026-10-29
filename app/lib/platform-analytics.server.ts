@@ -119,6 +119,7 @@ export async function listWorkspaceExportsApi(
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: "member",
   });
 
   const role = await getUserRole({ user: { id: userId }, workspaceId });
@@ -188,6 +189,7 @@ export async function startCampaignExportApi(
   await requireWorkspaceAccess({
     user: { id: userId },
     workspaceId,
+    minRole: "member",
   });
 
   const tdb = createTenantDb(workspaceId);
@@ -227,6 +229,7 @@ export async function startCampaignExportApi(
         workspaceId,
         exportId,
         campaignRow.title || "",
+        { kind: "user", userId },
       ),
       "campaign_export.background_failed",
       { exportId, campaignId, workspaceId },

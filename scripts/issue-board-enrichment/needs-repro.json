@@ -409,5 +409,17 @@
     "acceptanceCriteria": [],
     "size": "M",
     "risk": "medium"
+  },
+  {
+    "issueNumber": 2828,
+    "verdict": "needs-repro",
+    "summary": "The local SIM migration candidate is open in PR #3067, but its remote verification is not green.",
+    "currentBehavior": "PR #3067 at 43666254 has failed billing-checkout access guards and browser tests. The browser job was rerun once and failed again. The source is not merged into dev.",
+    "rootCause": "The failed guard assertions involve expected checkout sessions and access results. This review records the failure without assigning a new source cause.",
+    "resolution": "Inspect the billing-checkout guard failures and compare the persisted browser failure with a passing sibling before editing policy or fixtures. Keep local mock credit fulfillment isolated and preserve no-traffic verification.",
+    "lookIn": [
+      "test/integration-db/billing-checkout-access.test.ts"
+    ],
+    "trackerRecommendation": "Native Task, live Project Status In progress. Continue the existing PR and issue; do not create another SIM implementation or treat the local CI report as completed remote acceptance."
   }
 ]

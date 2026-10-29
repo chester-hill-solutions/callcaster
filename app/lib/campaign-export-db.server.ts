@@ -101,10 +101,14 @@ export async function listExportCampaignMessages(
 export async function countExportOutreachAttempts(
   workspaceId: string,
   campaignId: number,
+  scopedUserId: string | null,
 ) {
   const tdb = createTenantDb(workspaceId);
   return tdb.outreach_attempt.count({
-    where: eq(outreachAttemptTable.campaign_id, campaignId),
+    where: and(
+      eq(outreachAttemptTable.campaign_id, campaignId),
+      scopedUserId === null ? undefined : eq(outreachAttemptTable.user_id, scopedUserId),
+    ),
   });
 }
 
@@ -113,10 +117,14 @@ export async function listExportOutreachAttempts(
   campaignId: number,
   offset: number,
   limit: number,
+  scopedUserId: string | null,
 ) {
   const tdb = createTenantDb(workspaceId);
   return tdb.outreach_attempt.findMany({
-    where: eq(outreachAttemptTable.campaign_id, campaignId),
+    where: and(
+      eq(outreachAttemptTable.campaign_id, campaignId),
+      scopedUserId === null ? undefined : eq(outreachAttemptTable.user_id, scopedUserId),
+    ),
     orderBy: asc(outreachAttemptTable.created_at),
     offset,
     limit,

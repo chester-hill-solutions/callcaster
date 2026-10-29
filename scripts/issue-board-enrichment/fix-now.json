@@ -1,5 +1,39 @@
 [
   {
+    "issueNumber": 2638,
+    "verdict": "fix-now",
+    "summary": "PR #3023 names the Call list selection controls and reuses one named Rows per page control. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, AudienceTable renders unnamed header and contact checkboxes and a local unnamed page-size Select. The reviewed candidate in open PR #3023 is not merged into dev or master.",
+    "rootCause": "The selection controls do not receive accessible names. The Call list duplicates the page-size widget already named in TablePagination. Its URL page and size must stay in the existing single navigation; calling two captured-parameter callbacks can overwrite the new size.",
+    "resolution": "Review PR #3023 and its exact-head checks. The header names its visible-page scope; row names use a trimmed name, phone or email with a contact ID fallback and duplicate-name disambiguation. RowsPerPageSelect now owns the named control for both consumers. Keep each consumer callback contract, checkbox states and current geometry. Verify on deployed dev after merge, then complete release acceptance.",
+    "lookIn": [
+      "app/components/audience/AudienceTable.tsx",
+      "app/components/shared/RowsPerPageSelect.tsx",
+      "app/components/shared/TablePagination.tsx",
+      "test/ui/audience-selection-names.test.tsx",
+      "test/ui/table-pagination-page-size.test.tsx"
+    ],
+    "existingTests": [
+      "The focused run passes 41 cases with real Checkbox, Select and router controls. Six new cases cover duplicate and missing names, Space and mixed states, the correct bulk-delete contact IDs, filtered/current-page selection, empty results, keyboard paging and an atomic size/page change that retains query, sort and repeated tags.",
+      "The original runtime fails all six new cases while four shared pagination controls pass. A row-name fault fails five cases with five controls passing; a two-callback page-size overwrite fails one with nine controls passing. The candidate is restored byte-for-byte. Focused source warnings decrease from 14 to 12; the new shared control and test have none.",
+      "The source commit passes full ci:local; post-CI browser checks compare baseline/candidate geometry in both themes and exercise real keyboard controls with a controlled loader. See the PR validation for the final commit and exact counts."
+    ],
+    "missingTests": [
+      "After merge, verify selection names, states and page-size changes on deployed dev and complete release acceptance. Local browser and router checks use synthetic contacts; they do not prove authentication, production data access or the full workspace shell."
+    ],
+    "acceptanceCriteria": [
+      "Select all names the contacts shown on the current page.",
+      "Row names identify the contact, including duplicate, partial and absent names.",
+      "Use the shared named Rows per page control.",
+      "Keep checked, partial and focus states exposed.",
+      "Preserve keyboard selection and paging; size changes reset page and retain other URL values."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Included from original PR #3023 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
+  },
+  {
     "issueNumber": 1826,
     "verdict": "fix-now",
     "summary": "Nothing in origin/master provides a dev-environment PR acceptance suite: the only PR-level end-to-end gate is the local docker-compose Playwright run, and the Twilio tier uses Twilio's free test credentials, not a CallCaster-dev account.",
@@ -15,39 +49,44 @@
     "rootCause": "This issue is an acceptance-suite work item, not a code defect, so nothing in the tree can 'fix' it in the usual sense. The upstream dependency is #1827 'Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it', which the board still lists in the 'Blocked / split first' lane (ISSUE_BOARD.md:565-574) with #1356 (dev DNS/IaC) ahead of it. manual: true because the missing artefact is a dev-environment acceptance run that only a person with the dev Twilio account and dev environment credentials can execute."
   },
   {
-    "issueNumber": 1874,
+    "issueNumber": 2626,
     "verdict": "fix-now",
-    "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
-    "currentBehavior": "The default branch projects about 80 queue completions per minute for the reported settings. The durable worker sends two calls per batch and waits for a five-second idle poll, matching the screenshots showing 144 dequeues over six minutes (24/minute). A tested branch patch includes that cadence and corrects the displayed units.",
-    "resolution": "Review and release the worker-aware estimate patch, then compare its displayed queue finish range with a real campaign before closing.",
+    "summary": "PR #3034 groups matching campaign schedules in a compact shared-text summary. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, SelectDates shows one row per active day in a padded colored block, hides inactive days and reads only the first interval. An active day without intervals is described as All day. The reviewed candidate in open PR #3034 is not merged into dev or master.",
+    "rootCause": "The collapsed presentation filters active days before rendering and reads intervals[0]. It has no grouping by complete interval sets, so later-interval exceptions disappear and identical days repeat. Summary presentation owns decorative block styling instead of using shared section/text treatment.",
+    "resolution": "Review PR #3034 and its exact-head checks. ScheduleSummary copies and sorts complete interval sets for comparison, groups matching days, shows inactive exceptions and all local intervals, and distinguishes missing intervals from full-day ranges. Keep the existing channel-specific saved fields, editor, timezone conversion and calling-window safeguards. Verify on deployed dev after merge, then complete release acceptance.",
     "lookIn": [
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/lib/throughput-config.ts",
-      "app/lib/worker/poll-jobs.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.ScheduleSummary.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "test/ui/campaign-schedule-summary.test.tsx",
+      "test/ui/campaign-weekly-schedule.test.tsx"
     ],
-    "rootCause": "The old 200ms queue-next plus 500ms webhook-delay heuristic assumes 1.43 dial starts per second. Durable dispatch now schedules a successor one second after each batch; an idle worker sleeps five seconds before claiming it. The concurrency-only patch did not model that loop. The UI also appends calls/sec and CPS to values already converted to per minute. Remaining queue counts are correct; no arbitrary duration multiplier or worker pacing change is needed.",
     "existingTests": [
-      "test/worker.test.ts: real poll loop with fake time proves a one-second successor waits five seconds.",
-      "test/campaign-outbound-estimate.test.ts: 24/minute cadence, stable projected average finish for both reported screenshot counts, configured-rate and concurrency controls.",
-      "test/ui/campaign-launch-ivr-estimate.test.tsx: real notice renders calls/minute, worker pacing and remaining-queue wording."
+      "The focused run passes 33 cases: 16 new summary cases across calls and SMS, six real weekly-editor controls and 11 existing campaign cases. Coverage includes identical days, complete sets in different orders, later-interval exceptions, inactive groups, full-day and overnight ranges, missing intervals, empty states, distinct saved fields and Edit/Hide with later intervals retained.",
+      "Original Dates fails 12 cases while 10 controls pass. Targeted faults fail two cases for in-place sorting, two for first-interval grouping, six for omitted later intervals, four for omitted inactive days, 12 for raw UTC output and nine for wrong-channel reads. Positive controls remain and restored source passes all 22 fault-run cases with matching hashes. Dates warnings decrease from two to one; the new component and test have none.",
+      "The source commit passes full ci:local. Post-CI browser checks compare baseline/candidate compact height and exercise exceptions, both themes and both channels with real controls. See PR validation for the final commit, exact counts and browser dimensions."
     ],
     "missingTests": [
-      "After release, compare the displayed range with an actual campaign; the estimate is a planning model and provider/database delays can vary."
+      "After merge, verify collapsed schedules and the full weekly editor on deployed dev and complete release acceptance. Local browser checks use saved synthetic schedules; they do not prove authentication, production data access or provider dispatch. The existing calling-window enforcement is unchanged."
     ],
     "acceptanceCriteria": [
-      "Default planning rate includes the durable worker batch and poll cadence.",
-      "The two reported queue counts keep the average projected finish stable at the reported processing pace.",
-      "Rate labels use consistent units and distinguish a drained queue from calls still in flight.",
-      "A deployed campaign confirms the estimate is useful before closing."
+      "Group days only when their complete active interval sets match.",
+      "Keep differing days, inactive days and every daily interval discoverable.",
+      "Preserve full editor access and day-specific controls.",
+      "Retain local timezone display, full-day/overnight meaning and calling-window safeguards.",
+      "Keep separate saved schedules for calls and SMS.",
+      "Use shared section/text treatment without the large decorative summary block."
     ],
-    "trackerRecommendation": "Keep open in progress for review, release and deployed acceptance. The prior master concurrency-only fix is insufficient; remove the old verify-and-close claim."
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Included from original PR #3034 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 1875,
     "verdict": "fix-now",
-    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` — but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
+    "summary": "Slice A and slice B items 4-5 shipped: a vx-any step sends hints with a valid speechModel/speechTimeout pairing, a single-key menu sends numDigits, and every recorded speech answer is stored as `{ value, raw, confidence, inputType }` \u2014 but slice B item 6 (normalised intent matching, per-option spoken aliases, a confidence threshold and a re-prompt) is not implemented and is deferred to the #1880 decision.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -56,15 +95,15 @@
       "app/lib/ivr-results.ts"
     ],
     "existingTests": [
-      "test/ivr-webhook-auth.server.test.ts — 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" → `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts — the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts — the export carries the structured answer and its confidence; test/ivr-gather.test.ts — the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
+      "test/ivr-webhook-auth.server.test.ts \u2014 'captures speech text and a valid Twilio confidence score' (Confidence \"0.87\" \u2192 `answer.confidence === 0.87`), 'keeps confidence null when Twilio sends an invalid or missing value', 'records DTMF as structured input without speech confidence'; test/ivr-results.test.ts \u2014 the `IvrRecordedAnswer` aggregation; test/campaign-export-voice-credits.test.ts \u2014 the export carries the structured answer and its confidence; test/ivr-gather.test.ts \u2014 the gather attributes (hints / speechTimeout / speechModel / numDigits / input). Ran green: test/ivr-webhook-auth.server.test.ts, test/ivr-results.test.ts and test/campaign-export-voice-credits.test.ts all passed."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false — everything that is implemented is machine-checkable."
+    "rootCause": "Two commits are in origin/master: 642f4ee7 'feat(ivr): improve speech capture with hints, valid model, and numDigits (#1875) (#1876)' (slice A) and 9dcab08b 'feat(ivr): store structured speech answers (#2160)' (slice B items 4-5). The brief's candidate list only names the slice A commit, which by itself would not satisfy the slice B title; the slice B shape landed later under PR #2160 and is what the master tree contains. The remaining slice B item 6 is knowingly deferred: the repo's own triage record for #1880 ('Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent', scripts/issue-board-enrichment/needs-decision.json:311-328) says its decision 'decides #1862 and the deferred confidence slice of #1875', and the board still lists #1880 in the 'Needs decision' lane. Because the issue's own acceptance criteria (hints + valid model/timeout pairing, numDigits, and a confidence value on each recorded speech answer) are all met but the slice-B scope named in the title is not complete, the verdict is PARTIAL rather than VERIFIED. manual: false \u2014 everything that is implemented is machine-checkable."
   },
   {
     "issueNumber": 1981,
     "verdict": "fix-now",
-    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name — so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
+    "summary": "Nothing in origin/master changes the Stripe receipt to say how many credits were bought: the Checkout Session still creates ONE line item with `quantity: 1` and the whole package price in `unit_amount`, with the credit count folded into the product name \u2014 so the receipt still reads '500 workspace credits x 1', not 'Workspace credits x 500'.",
     "currentBehavior": "The claimed fix does not resolve the reported symptom.",
     "resolution": "Implement the missing mechanism named in the root cause.",
     "lookIn": [
@@ -74,43 +113,48 @@
       "None that proves the receipt text. test/platform-billing-checkout.test.ts asserts the Checkout request SHAPE (`quantity === 1`, name contains the formatted count) rather than the rendered receipt, so it passes while the reported symptom remains. There is no Stripe test-mode session, no receipt assertion and no screenshot of a real receipt in the repo."
     ],
     "acceptanceCriteria": [],
-    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) — but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true — the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
+    "rootCause": "The claimed fix (070f04f4 'fix(billing): receipts state credit count + contact@callcaster.ca ... (#1997)', PR #1997) IS an ancestor of origin/master (merged by 61594cdf on 2026-09-24) \u2014 but it does not implement the requested behaviour, it implements the rejected alternative. What is missing from origin/master: a Checkout Session whose line item is `name: 'Workspace credits'` with `quantity: <credits bought>` and a per-credit `unit_amount`, so the receipt states the count. The fix for that lives only on `origin/change-request/1981-credit-receipt-quantity` (8225f5ce) and has not been promoted. manual: true \u2014 the symptom is a real Stripe receipt (or a real credit balance on the account) that a person has to read; the unit test only inspects the request payload."
   },
   {
     "issueNumber": 2860,
     "verdict": "fix-now",
     "recommendedTitle": "A webhook credential for one workspace releases or accepts another tenant's live inbound call offer",
-    "summary": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id)",
-    "currentBehavior": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth…",
-    "rootCause": "app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,…",
-    "resolution": "Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in…",
+    "summary": "PR #3063 binds inbound-offer mutations to the authenticated workspace. Review, merge and deployed verification remain.",
+    "currentBehavior": "At dev@a4d22ee5, an A-signed queue callback can mutate B's selected offer because four SQL functions accept an entry ID without a workspace. The new candidate in open PR #3063 is not merged into dev or master.",
+    "rootCause": "The router resolves a credential from queue_id, queue_name or the entry, but previously did not bind the selected mutation target to that workspace. The four RPC wrappers and original 20260731130000 SQL definitions accepted only entry ID. The complete handler also resolves an entry from queue name and CallSid after authentication.",
+    "resolution": "Review PR #3063. A scoped tenant-client read rejects foreign entries after authentication and after complete fallback. A new migration requires workspace UUID in accept/release/complete/abandon, filters entry reads and writes, locks read-then-update transitions and removes legacy unscoped overloads. All wrappers, failed call-start cleanup, stale sweep and both fresh bootstrap lists carry workspace. Apply the migration before using the new app signatures, then verify deployed dev and release.",
     "lookIn": [
-      "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
-      "app/lib/db-rpc.server.ts",
       "app/lib/acd/acd-router.server.ts",
-      "app/routes/api+/acd-router/agent-status.action.server.ts",
-      "app/lib/twilio-webhook.server.ts",
-      "app/lib/workspace-client-projection.server.ts"
+      "app/lib/db-rpc.server.ts",
+      "client/migrations/20261026000000_scope_inbound_offer_rpcs_by_workspace.sql",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "test/integration-db/inbound-offer-workspace.test.ts"
     ],
     "existingTests": [
-      "Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {\"ok\":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id…"
+      "Real Postgres 18.6 and real SDK-signed route actions: 40 cases cover four mutations, queue-ID and queue-name credential selection, direct RPC scope, A-to-A success, invalid tokens, entry-only fallback, complete fallback, null workspace, legacy-overload removal, accepted replay and global stale cleanup. Denial cases compare both tenants' full entry, agent and audit rows.",
+      "Original dev source and schema fail 19 cases while 21 controls pass. Removing the request guard fails 10/40; removing SQL workspace predicates fails 8/40; omitting the stale sweep workspace fails 1/40. Other controls pass and restored source passes all 56 real DB cases, including 13 existing active-offer and 3 SDK setup-failure controls; 0 skips.",
+      "Upgrade and both fresh bootstrap paths each pass 56/56 on owned disposable databases. Focused Node tests pass 33/33. Typecheck and focused lint pass. Full source ci:local passes on the clean source commit; see the PR for final-head checks and exact full-suite counts."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "Merge and verify the migration and valid callback lifecycle on deployed dev, then complete release acceptance. Local proof uses dummy tenants and a disposable database; it does not place real calls, apply production migrations or prove a released deployment."
     ],
     "acceptanceCriteria": [
-      "A credential belonging to workspace A may only mutate workspace A's inbound queue entries. The entry named by entry_id must be verified to belong to the workspace whose credential was validated, and the RPC should filter inbound_queue_entry by that workspace, the way client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql added a required workspace parameter to dequeue_contact and create_outreach_attempt after finding the same class of cross-tenant write."
+      "A workspace credential can mutate only inbound entries owned by that workspace.",
+      "Require workspace scope in every offer RPC and remove unscoped overloads.",
+      "Keep valid callbacks, accepted offers, stale cleanup and failed call-start cleanup working."
     ],
+    "blockedBy": [],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Included from original PR #3063 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2862,
     "verdict": "fix-now",
     "recommendedTitle": "Public api+ multipart routes buffer the whole request body with no byte cap",
-    "summary": "POST /api/contact-form is a public, unauthenticated multipart route: the route module re-exports the action (app/routes/api+/contact-form.tsx:1), the path is in scripts/baselines/route-tree.txt:68, and the repository's own API surface…",
-    "currentBehavior": "POST /api/contact-form is a public, unauthenticated multipart route: the route module re-exports the action (app/routes/api+/contact-form.tsx:1), the path is in scripts/baselines/route-tree.txt:68, and the repository's own API surface inventory lists it as publicUnauthenticated (docs/api-surface-inventory.md:64). The action reads the body with await request.formData() at app/routes/api+/contact-form.action.server.ts:36 - no byte cap - before any of its own field limits run. An anonymous multipart POST carrying a 32 MiB body made the shared web process grow by 64.5 MiB of resident memory inside the request (measured: 202.4 MiB -> 270.1 MiB peak RSS, still 269.5 MiB after a forced GC), and…",
+    "summary": "POST /api/contact-form is a public, unauthenticated multipart route: the route module re-exports the action (app/routes/api+/contact-form.tsx:1), the path is in scripts/baselines/route-tree.txt:68, and the repository's own API surface\u2026",
+    "currentBehavior": "POST /api/contact-form is a public, unauthenticated multipart route: the route module re-exports the action (app/routes/api+/contact-form.tsx:1), the path is in scripts/baselines/route-tree.txt:68, and the repository's own API surface inventory lists it as publicUnauthenticated (docs/api-surface-inventory.md:64). The action reads the body with await request.formData() at app/routes/api+/contact-form.action.server.ts:36 - no byte cap - before any of its own field limits run. An anonymous multipart POST carrying a 32 MiB body made the shared web process grow by 64.5 MiB of resident memory inside the request (measured: 202.4 MiB -> 270.1 MiB peak RSS, still 269.5 MiB after a forced GC), and\u2026",
     "rootCause": "The request-body size check this codebase already implements as app/lib/bounded-form-data.server.ts#readBoundedFormData was applied only to the media upload surfaces. Every other multipart route under app/routes/api+ calls the platform's request.formData() directly, which reads the entire body into process memory before any field validation runs, so the bytes one caller can make the shared web process hold are bounded only by the transport's own per-request default (Bun's 128 MB, node_modules/bun-types/serve.d.ts:676, not overridden at server/bun.ts:357) and by nothing at all in aggregate.",
     "resolution": "Read every request body through the reader this codebase already has. Replace each direct request.formData() in app/routes/api+ with readBoundedFormData(request, cap) and map FormBodyError to its 413 status, choosing a cap from the route's own field limits (a few tens of KiB for the contact form, a few hundred KiB for survey submissions). Apply the same to the authenticated variants (audiodrop, surveys). As defence in depth, set an explicit maxRequestBodySize on Bun.serve so the transport, not just the handler, bounds a request body; keep it above the largest legitimate body (the media upload cap is 10 MiB + 64 KiB).",
     "lookIn": [
@@ -122,7 +166,7 @@
       "app/lib/bounded-form-data.server.ts"
     ],
     "existingTests": [
-      "Bun 1.3.14 in the sandbox (the production Docker image pins oven/bun:1.3.5 and package.json allows bun >=1.2.15). request.formData() over a streamed 32 MiB multipart body: +67.8 MB resident (2.02x body). Real POST /api/contact-form action, 32 MiB body with the honeypot filled: peak RSS 202.4 -> 270.1 MiB (+64.5 MiB,…"
+      "Bun 1.3.14 in the sandbox (the production Docker image pins oven/bun:1.3.5 and package.json allows bun >=1.2.15). request.formData() over a streamed 32 MiB multipart body: +67.8 MB resident (2.02x body). Real POST /api/contact-form action, 32 MiB body with the honeypot filled: peak RSS 202.4 -> 270.1 MiB (+64.5 MiB,\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -138,10 +182,10 @@
     "issueNumber": 2863,
     "verdict": "fix-now",
     "recommendedTitle": "POST /api/survey-responses accepts a workspace API key with an empty scope allowlist although the published contract is session-only",
-    "summary": "POST /api/survey-responses is a `no-auth-strategy` handler: the derived inventory records authVia \"action:no-auth-strategy\" (app/lib/api-surface-generated.ts:117) and the declared auth class comes only from a hand-written annotation that…",
-    "currentBehavior": "POST /api/survey-responses is a `no-auth-strategy` handler: the derived inventory records authVia \"action:no-auth-strategy\" (app/lib/api-surface-generated.ts:117) and the declared auth class comes only from a hand-written annotation that no gate constrains, because scripts/check-api-surface-coverage.ts compares the declared class against the code only when the derivation produced an `authAllows` set (line 118), and an unresolved handler produces none (scripts/lib/api-surface-derive.mjs:499-505). The annotation declares authClass \"session\" and exposure \"sessionOnly\" (app/lib/api-surface-annotations.ts:100), and the published OpenAPI entry for this path carries x-callcaster-auth-class…",
-    "rootCause": "app/routes/api+/survey-responses.action.server.ts:64-84 - the handler declares no `auth:` strategy, and the inline gate it does declare is `requireDualAuth(request)` (line 71) with no `capability` option, so app/lib/api-auth.server.ts:175-190 never evaluates the API key's scope allowlist. The api_key branch (81-84) checks only the workspace binding. The sibling pattern is not unique: app/routes/api+/message_media.action.server.ts:25-30 admits an API key the same way. Every other requireDualAuth route in app/routes either rejects key actors with getDualAuthUser (app/routes/api+/surveys.action.server.ts:158-161, app/routes/api+/campaign_audience.action.server.ts:38-41,…",
-    "resolution": "Make the route's auth class a mechanical fact instead of free text. The published spec already says session-only, so the smallest behaviour-correct fix is to require a user session (bearer or cookie) and drop the api_key branch; if API-key access is wanted instead, declare it as apiKeyOrSession and add an explicit capability check so the key's scope allowlist is consulted (app/lib/api-auth.server.ts:175-190). Either way, reject key actors in the handler the way the sibling route does (app/routes/api+/campaign_audience.action.server.ts:38-41) so the declared session-only exposure is actually true. Note the surface gate will not police this on its own:…",
+    "summary": "POST /api/survey-responses is a `no-auth-strategy` handler: the derived inventory records authVia \"action:no-auth-strategy\" (app/lib/api-surface-generated.ts:117) and the declared auth class comes only from a hand-written annotation that\u2026",
+    "currentBehavior": "POST /api/survey-responses is a `no-auth-strategy` handler: the derived inventory records authVia \"action:no-auth-strategy\" (app/lib/api-surface-generated.ts:117) and the declared auth class comes only from a hand-written annotation that no gate constrains, because scripts/check-api-surface-coverage.ts compares the declared class against the code only when the derivation produced an `authAllows` set (line 118), and an unresolved handler produces none (scripts/lib/api-surface-derive.mjs:499-505). The annotation declares authClass \"session\" and exposure \"sessionOnly\" (app/lib/api-surface-annotations.ts:100), and the published OpenAPI entry for this path carries x-callcaster-auth-class\u2026",
+    "rootCause": "app/routes/api+/survey-responses.action.server.ts:64-84 - the handler declares no `auth:` strategy, and the inline gate it does declare is `requireDualAuth(request)` (line 71) with no `capability` option, so app/lib/api-auth.server.ts:175-190 never evaluates the API key's scope allowlist. The api_key branch (81-84) checks only the workspace binding. The sibling pattern is not unique: app/routes/api+/message_media.action.server.ts:25-30 admits an API key the same way. Every other requireDualAuth route in app/routes either rejects key actors with getDualAuthUser (app/routes/api+/surveys.action.server.ts:158-161, app/routes/api+/campaign_audience.action.server.ts:38-41,\u2026",
+    "resolution": "Make the route's auth class a mechanical fact instead of free text. The published spec already says session-only, so the smallest behaviour-correct fix is to require a user session (bearer or cookie) and drop the api_key branch; if API-key access is wanted instead, declare it as apiKeyOrSession and add an explicit capability check so the key's scope allowlist is consulted (app/lib/api-auth.server.ts:175-190). Either way, reject key actors in the handler the way the sibling route does (app/routes/api+/campaign_audience.action.server.ts:38-41) so the declared session-only exposure is actually true. Note the surface gate will not police this on its own:\u2026",
     "lookIn": [
       "app/lib/api-surface-generated.ts",
       "app/lib/api-surface-annotations.ts",
@@ -151,7 +195,7 @@
       "app/routes/api+/campaign_audience.action.server.ts"
     ],
     "existingTests": [
-      "All four assertions passed inside the parent-approved sandbox against a private PostgreSQL 18. (1) An API key whose scopes array was EMPTY returned HTTP 200 {success:true, response_id:\"1\", result_id:\"e58565fd-8a3c-4fc4-ba6a-052fb360a65d\"} and a survey_response row was created for that key's own survey. (2) A key whose…"
+      "All four assertions passed inside the parent-approved sandbox against a private PostgreSQL 18. (1) An API key whose scopes array was EMPTY returned HTTP 200 {success:true, response_id:\"1\", result_id:\"e58565fd-8a3c-4fc4-ba6a-052fb360a65d\"} and a survey_response row was created for that key's own survey. (2) A key whose\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -168,8 +212,8 @@
     "verdict": "fix-now",
     "recommendedTitle": "POST /api/survey-responses stores a contact id from another tenant: the no-auth-strategy handler's inline gate never binds responseData.contact_id",
     "summary": "POST /api/survey-responses is one of the twenty API-surface entries whose derived authVia mentions \"no-auth-strategy\" (12 with authVia exactly \"action:no-auth-strategy\", 3 with \"action:no-auth-strategy + loader:no-auth-strategy\")",
-    "currentBehavior": "POST /api/survey-responses is one of the twenty API-surface entries whose derived authVia mentions \"no-auth-strategy\" (12 with authVia exactly \"action:no-auth-strategy\", 3 with \"action:no-auth-strategy + loader:no-auth-strategy\"). The handler declares no `auth:` strategy, so the factory's optional auth slot is empty and app/lib/handler.server.ts:100-112 runs the handler body with no factory-level authentication: the inline gate inside the handler body is the entire authorization story. That gate resolves the SURVEY's workspace and checks the caller against it (API-key branch: `workspaceId !== auth.workspaceId`; session branch: `requireWorkspaceAccess({ user, workspaceId })` with no…",
-    "rootCause": "app/routes/api+/survey-responses.action.server.ts:64-103 - the handler is defined with `defineAction({ sideEffects, handler })` and no `auth:` key, so `withGuards` (app/lib/handler.server.ts:100-112) runs the body with no factory-level authentication. The inline gate at lines 71-101 authorizes only the survey: the API-key branch (81-84) compares `workspaceId !== auth.workspaceId` and the session branch (94) calls `requireWorkspaceAccess({ user, workspaceId })` with no role floor. `responseData.contact_id` is parsed at line 30 and passed through untouched at lines 45-48, and app/lib/survey-db.server.ts:398 writes it into `survey_response.contact_id` with no workspace check. The deployed…",
+    "currentBehavior": "POST /api/survey-responses is one of the twenty API-surface entries whose derived authVia mentions \"no-auth-strategy\" (12 with authVia exactly \"action:no-auth-strategy\", 3 with \"action:no-auth-strategy + loader:no-auth-strategy\"). The handler declares no `auth:` strategy, so the factory's optional auth slot is empty and app/lib/handler.server.ts:100-112 runs the handler body with no factory-level authentication: the inline gate inside the handler body is the entire authorization story. That gate resolves the SURVEY's workspace and checks the caller against it (API-key branch: `workspaceId !== auth.workspaceId`; session branch: `requireWorkspaceAccess({ user, workspaceId })` with no\u2026",
+    "rootCause": "app/routes/api+/survey-responses.action.server.ts:64-103 - the handler is defined with `defineAction({ sideEffects, handler })` and no `auth:` key, so `withGuards` (app/lib/handler.server.ts:100-112) runs the body with no factory-level authentication. The inline gate at lines 71-101 authorizes only the survey: the API-key branch (81-84) compares `workspaceId !== auth.workspaceId` and the session branch (94) calls `requireWorkspaceAccess({ user, workspaceId })` with no role floor. `responseData.contact_id` is parsed at line 30 and passed through untouched at lines 45-48, and app/lib/survey-db.server.ts:398 writes it into `survey_response.contact_id` with no workspace check. The deployed\u2026",
     "resolution": "Bind the caller-supplied contact id to the survey's workspace at the sink, so every caller of submitSurveyResponse inherits the check the public path already has. The survey is loaded inside submitSurveyResponse, so its `workspace` is available there: resolve the contact through the workspace-scoped loader (import loadSurveyRespondentContact from @/lib/survey-respondent.server) and reject a foreign or non-existent id with 400. As defence in depth, also scope the contact lookup in loadRecentSurveyResponses by workspace, and correct the Drizzle model for survey_response.contact_id so it matches the deployed bigint column (or migrate the column to int4 and drop the typeof filter).",
     "lookIn": [
       "app/lib/api-surface-generated.ts",
@@ -180,82 +224,27 @@
       "drizzle/0000_baseline.sql"
     ],
     "existingTests": [
-      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted…"
+      "Independently reproduced in the sandbox against a private PostgreSQL 18 (schema applied by scripts/e2e/bootstrap-compose-db.mjs), with locally generated dummy fixtures only. (1) With the scope-less workspace API key the action returned HTTP 200 {success:true, response_id:\"1\", result_id:\"6244b8ea-...\"} and the inserted\u2026",
+      "At dev@03c3e15a, the new real-PostgreSQL route/service suite has 11 failing regressions and three passing valid controls. The candidate passes all 14 with real caller sessions and workspace API keys; no provider or email traffic is sent.",
+      "Removing the sink guard through an isolated test transform causes 10 failures; removing the read workspace join or bigint mapping causes one failure each. All three normal-submission controls remain green, and working source hashes stay unchanged.",
+      "All 14 cases pass with DATABASE_URL alone, INTEGRATION_DB_URL alone and conflicting loopback app URLs. All 83 survey PostgreSQL cases and 105 focused survey unit cases pass; typecheck passes and lint adds no warnings."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A contact id supplied by a caller must resolve to a contact in the survey's own workspace before it is stored, exactly as the public survey path does: app/lib/survey-public-action.server.ts:142-167 routes the id through app/lib/survey-respondent.server.ts:27-46, which applies `eq(contactTable.workspace, workspaceId)` so a foreign id simply does not resolve and the request is refused with 400."
     ],
     "size": "XS",
-    "risk": "low"
-  },
-  {
-    "issueNumber": 2866,
-    "verdict": "fix-now",
-    "recommendedTitle": "Failed credential-bearing workspace writes copy the tenant's Twilio API key secret and subaccount auth token into the log stream and into the error response",
-    "summary": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount…",
-    "currentBehavior": "CallCaster stores each tenant's Twilio provider credentials in three columns of public.workspace: `key` (Twilio API key SID), `token` (Twilio API key secret) and `twilio_data` (a JSON blob whose `authToken` is the live Twilio subaccount auth token). Every write that persists those columns binds them as SQL parameters of an UPDATE. Under the pinned drizzle-orm 0.45.2 a failed statement is wrapped in `DrizzleQueryError` (node_modules/drizzle-orm/pg-core/session.js:41) whose message is `Failed query: <sql>` plus a `params: <bound values>` line (node_modules/drizzle-orm/errors.js:12), so the credential is rendered into the error text. The repository's logger copies `error.message` into the…",
-    "rootCause": "app/lib/logger-core.ts#serializeError treats the error text as safe: it copies `error.message` (line 66), up to three `cause` messages (line 60) and the stack (line 69, whose first line repeats the message) verbatim into the log entry, and the module contains no redaction, scrubbing or allowlist layer at all. Because Drizzle renders bound parameter values into `DrizzleQueryError.message`, any failed statement that binds a credential as a parameter carries that credential into the emitted log line - and, because app/lib/errors.server.ts#createErrorResponse attaches the raw error object to the `http.error_response` entry, into that line's `err.params` array as well, which survives any fix…",
-    "resolution": "Scrub bound SQL parameter values out of driver error text before it reaches any sink, and stop returning raw error messages to clients - but scrub every copy of the text, not only the message. Three changes close the class: (1) in app/lib/logger-core.ts, strip the `params:` segment from the message, the cause chain AND the stack, because the stack's first line repeats the message and a message-only scrub still leaks the credential into the log line; (2) in app/lib/errors.server.ts, render the client-visible field with the repository's own toUserMessage(error, defaultMessage) and keep the raw error server-side only, as docs/pg-error-strictness.md:38 already requires; (3) in…",
-    "lookIn": [
-      "app/lib/logger-core.ts",
-      "app/lib/logger.server.ts",
-      "node_modules/drizzle-orm/errors.js",
-      "node_modules/drizzle-orm/pg-core/session.js",
-      "app/db/schema.ts",
-      "app/lib/twilio-workspace-credentials.ts"
-    ],
-    "existingTests": [
-      "The caught error's constructor is DrizzleQueryError and its message is: 'Failed query: update \"workspace\" set \"key\" = $1, \"token\" = $2, \"twilio_data\" = $3 where \"workspace\".\"id\" = $4\\nparams: SKdummy00000000000000000000000000,DUMMY_TWILIO_API_KEY_SECRET_0123456789,{\"sid\":\"ACdummy00000000000000000000000000\",\"authToken\":…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "A workspace's Twilio provider credentials must never leave the server process into a log line, an alert email, a third-party error tracker, or an HTTP response body. The repository states this policy for the audit trail (app/lib/audit-event.server.ts#redactAuditEventMetadata drops password/secret/token/authorization/body/credential keys) and for user-facing errors (docs/pg-error-strictness.md:38 - 'Never return a raw caught error object in action/loader data ... serialize a { message } built with toUserMessage(error, fallback) and log the original server-side'; app/lib/user-message.ts:20 denies the phrase 'failed query' precisely to redact Drizzle messages). The logger and the shared error responder are the two sinks that bypass both controls."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
-    "issueNumber": 2867,
-    "verdict": "fix-now",
-    "recommendedTitle": "Unify credential rate limits across auth endpoints",
-    "summary": "PR #3079 shares strict credential-operation limits across auth aliases. Full local CI, focused tests and five mutation checks pass; review, merge and release verification remain.",
-    "currentBehavior": "Token login shares the 10/min sign-in limit with browser and Better Auth sign-in. Registration, reset and OTP aliases use their operation limits. Unknown auth POSTs default to strict sign-in; only exact sign-out and session-revocation paths retain 30/min. Implemented in PR #3079; dev still has the old limits.",
-    "rootCause": "Token login used a separate 30/min scope, while the catch-all sent signup and reset aliases through the loose scope. The source guard skipped tokenLogin and checked only for some limiter, so comments and wrong scopes could satisfy it.",
-    "resolution": "Remove the token-only scope; bind aliases to credential operations; use a strict default with an exact session-lifecycle allowlist. Parse real calls and literal policy tables in the coverage guard, including imported helper aliases. Publish the operation limits in the API documents.",
-    "lookIn": [
-      "app/lib/platform-auth-rate-limit.server.ts",
-      "app/routes/api+/auth/token.action.server.ts",
-      "app/lib/platform-auth.server.ts",
-      "app/routes/signin.action.server.ts",
-      "app/routes/api+/auth/$.loader.server.ts",
-      "app/routes/api+/auth/register.action.server.ts"
-    ],
-    "existingTests": [
-      "68 focused tests pass. Reverting the runtime fails 11 of 15 cases; loose token and default budgets fail two each, and a split registration budget fails one. Four positive controls pass in every runtime mutation. Restoring the old guard fails 13 cases while nine existing controls pass. Typed Better Auth aliases and the stronger user-scoped 2FA setup limiter are covered. Working source hashes stay unchanged during mutation runs. Tests use the real application limiter with its in-memory backend and mocked auth handlers; no mail or provider traffic."
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Every surface that performs an email+password credential check is bounded by the strict 'auth:sign-in' bucket (10/min), and every surface that performs a password-reset request or an account creation is bounded by the 10/min scope documented for that operation, so the per-client budget for the same operation does not depend on which URL the caller uses."
-    ],
-    "size": "S",
     "risk": "low",
-    "trackerRecommendation": "Keep open and In progress for PR #3079 review, merge and release verification. Native Priority, Effort and Enviornment remain unset; there are no blocking relationships. Source tests do not prove deployment."
+    "trackerRecommendation": "Included from original PR #3077 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2869,
     "verdict": "fix-now",
     "recommendedTitle": "Audience CSV upload reads an unbounded request body, then persists the whole file (base64) into the shared job queue and the shared object-storage bucket",
     "summary": "Independently re-verified at commit 67d40abb (branch dev)",
-    "currentBehavior": "Independently re-verified at commit 67d40abb (branch dev). POST /api/audience-upload reads the multipart body with a bare `await request.formData()` (app/routes/api+/audience-upload.action.server.ts:93) - no byte cap, no Content-Length pre-check, no streaming bound - so the whole upload is buffered in the request handler before anything else happens. The file is then copied into a second full-size ArrayBuffer (line 150), decoded (line 153), fully parsed by parseCSV() (line 157) although only `parsedFile.headers` is used (line 158), base64-encoded (line 202), written whole to the shared 'audience-uploads' bucket (line 221) and queued verbatim as `params.fileContent` (line 256) into the…",
-    "rootCause": "The route reads the multipart body with `await request.formData()` (app/routes/api+/audience-upload.action.server.ts:93) instead of the repository's bounded reader `readBoundedFormData(request, MAX_MEDIA_BODY_BYTES)` that the sibling media upload routes use (app/routes/api+/media.action.server.ts:28, app/routes/api+/message_media.action.server.ts:53). Nothing downstream bounds the size either: the file is copied whole into an ArrayBuffer (line 150), decoded (line 153), fully parsed by parseCSV (line 157) although only the headers are used (line 158), base64-encoded (line 202), written to object storage (line 221) and queued verbatim as `params.fileContent` (line 256). The queued payload is…",
-    "resolution": "Apply the repository's existing bounded-body control to this route instead of writing a new one, bound the file itself, stop materialising every row in the request path, and stop copying the whole file into the queue payload. Concretely: (1) read the body with `readBoundedFormData(request, MAX_AUDIENCE_BODY_BYTES)` and map FormBodyError to 413, the way app/routes/api+/media.action.server.ts does; (2) add an explicit file-size check on the `contacts` part before arrayBuffer(); (3) read only the header row for the mapped-column validation instead of parseCSV() over the whole file; (4) drop `fileContent` from the queued params and change the worker to read the already-stored object by key, so…",
+    "currentBehavior": "Independently re-verified at commit 67d40abb (branch dev). POST /api/audience-upload reads the multipart body with a bare `await request.formData()` (app/routes/api+/audience-upload.action.server.ts:93) - no byte cap, no Content-Length pre-check, no streaming bound - so the whole upload is buffered in the request handler before anything else happens. The file is then copied into a second full-size ArrayBuffer (line 150), decoded (line 153), fully parsed by parseCSV() (line 157) although only `parsedFile.headers` is used (line 158), base64-encoded (line 202), written whole to the shared 'audience-uploads' bucket (line 221) and queued verbatim as `params.fileContent` (line 256) into the\u2026",
+    "rootCause": "The route reads the multipart body with `await request.formData()` (app/routes/api+/audience-upload.action.server.ts:93) instead of the repository's bounded reader `readBoundedFormData(request, MAX_MEDIA_BODY_BYTES)` that the sibling media upload routes use (app/routes/api+/media.action.server.ts:28, app/routes/api+/message_media.action.server.ts:53). Nothing downstream bounds the size either: the file is copied whole into an ArrayBuffer (line 150), decoded (line 153), fully parsed by parseCSV (line 157) although only the headers are used (line 158), base64-encoded (line 202), written to object storage (line 221) and queued verbatim as `params.fileContent` (line 256). The queued payload is\u2026",
+    "resolution": "Apply the repository's existing bounded-body control to this route instead of writing a new one, bound the file itself, stop materialising every row in the request path, and stop copying the whole file into the queue payload. Concretely: (1) read the body with `readBoundedFormData(request, MAX_AUDIENCE_BODY_BYTES)` and map FormBodyError to 413, the way app/routes/api+/media.action.server.ts does; (2) add an explicit file-size check on the `contacts` part before arrayBuffer(); (3) read only the header row for the mapped-column validation instead of parseCSV() over the whole file; (4) drop `fileContent` from the queued params and change the worker to read the already-stored object by key, so\u2026",
     "lookIn": [
       "app/routes/api+/audience-upload.action.server.ts",
       "app/lib/bounded-form-data.server.ts",
@@ -265,7 +254,7 @@
       "docs/api-data-management.md"
     ],
     "existingTests": [
-      "Check 1: the route accepted the payload - HTTP 200 with {success:true, audience_id 22, upload_id 99}; uploadObject received bucket 'audience-uploads', key <workspaceId>/99/original.csv and storedObjectBytes equal to the accepted CSV bytes (25,165,832); the queued 'audience_upload' job carried params.fileContent of…"
+      "Check 1: the route accepted the payload - HTTP 200 with {success:true, audience_id 22, upload_id 99}; uploadObject received bucket 'audience-uploads', key <workspaceId>/99/original.csv and storedObjectBytes equal to the accepted CSV bytes (25,165,832); the queued 'audience_upload' job carried params.fileContent of\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -282,9 +271,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "POST /api/ivr places a machine-dialed IVR campaign call without reading the recipient's opt-out state or the campaign calling window",
     "summary": "CallCaster produces machine-dialed IVR campaign calls from two paths, and they enforce different consent rules",
-    "currentBehavior": "CallCaster produces machine-dialed IVR campaign calls from two paths, and they enforce different consent rules. The durable worker path (app/lib/campaign-ivr-dispatch.server.ts) reads the recipient's consent state and the campaign's calling window before it dials: it defers a row outside the recipient-local 8am-9pm window (:252), dequeues a member whose contact has opt_out = true instead of dialling (:264), and re-checks the campaign calling policy at the provider boundary (:303, :373). The session-authenticated HTTP route (app/routes/api+/ivr.action.server.ts) reimplements the per-contact mechanics and enforces neither gate: to_number, contact_id, queue_id and campaign_id are taken…",
+    "currentBehavior": "CallCaster produces machine-dialed IVR campaign calls from two paths, and they enforce different consent rules. The durable worker path (app/lib/campaign-ivr-dispatch.server.ts) reads the recipient's consent state and the campaign's calling window before it dials: it defers a row outside the recipient-local 8am-9pm window (:252), dequeues a member whose contact has opt_out = true instead of dialling (:264), and re-checks the campaign calling policy at the provider boundary (:303, :373). The session-authenticated HTTP route (app/routes/api+/ivr.action.server.ts) reimplements the per-contact mechanics and enforces neither gate: to_number, contact_id, queue_id and campaign_id are taken\u2026",
     "rootCause": "The HTTP route re-implements the per-contact send mechanics instead of sharing the dispatcher's eligibility gate, so the consent and window checks that live in the worker dispatcher (app/lib/campaign-ivr-dispatch.server.ts:252, :264, :303) and in the queue-claim and get_campaign_queue RPCs are absent from the send path. The route trusts the request body for the recipient, contact and queue identifiers, never reads contact.opt_out, never resolves the campaign for its calling window, and places the provider call before the queue row is touched, so no state can veto the dial.",
-    "resolution": "Give the session IVR route the same eligibility gate the worker dispatcher has, before any provider request: resolve the campaign workspace-scoped (findCampaignInWorkspace) and apply the IVR calling policy (isDispatchAllowedAt(ivrCallingPolicy(campaign))), and resolve the queue row plus its contact workspace-scoped, refusing the dial when the row is no longer queued/assigned or the contact has opt_out = true (dequeuing the row with the same 'Contact opted out' reason so the two paths cannot diverge again). Because the same rule is now needed in two places, extract it into one shared helper (for example app/lib/campaign-ivr-dispatch-gate.server.ts) called by both…",
+    "resolution": "Give the session IVR route the same eligibility gate the worker dispatcher has, before any provider request: resolve the campaign workspace-scoped (findCampaignInWorkspace) and apply the IVR calling policy (isDispatchAllowedAt(ivrCallingPolicy(campaign))), and resolve the queue row plus its contact workspace-scoped, refusing the dial when the row is no longer queued/assigned or the contact has opt_out = true (dequeuing the row with the same 'Contact opted out' reason so the two paths cannot diverge again). Because the same rule is now needed in two places, extract it into one shared helper (for example app/lib/campaign-ivr-dispatch-gate.server.ts) called by both\u2026",
     "lookIn": [
       "app/routes/api+/ivr.action.server.ts",
       "app/lib/campaign-ivr-dispatch.server.ts",
@@ -294,7 +283,7 @@
       "app/lib/api-surface-generated.ts"
     ],
     "existingTests": [
-      "7/7 assertions passed in the sandbox-pg container (Postgres 18 bootstrapped from the repo's own migrations in the same command, node + vitest 4.1.11, no external network, read-only target at /target, writes confined to scratch; exit 0). Against a real contact with opt_out = true, a real workspace_member row with…"
+      "7/7 assertions passed in the sandbox-pg container (Postgres 18 bootstrapped from the repo's own migrations in the same command, node + vitest 4.1.11, no external network, read-only target at /target, writes confined to scratch; exit 0). Against a real contact with opt_out = true, a real workspace_member row with\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -310,10 +299,10 @@
     "issueNumber": 2871,
     "verdict": "fix-now",
     "recommendedTitle": "Tenant-facing GET /api/numbers falls back to the platform parent-account Twilio credential when workspace_id is omitted",
-    "summary": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id…",
-    "currentBehavior": "GET /api/numbers (app/routes/api+/numbers.loader.server.ts) is declared exposure sessionOnly / authClass session / workspaceScoped true (app/lib/api-surface-annotations.ts:87), and its published OpenAPI operation declares the workspace_id query parameter as \"Workspace scope (required for session auth)\" (openapi/complete-api.json:6631-6637). The loader nevertheless treats the absence of that caller-supplied parameter as \"platform-admin context\": on the else branch it builds a Twilio REST client from the platform's own parent-account credentials (env.TWILIO_SID() / env.TWILIO_AUTH_TOKEN(), app/twilio.server.ts:131) and lists that account's purchasable Canadian numbers, returning the listing…",
-    "rootCause": "The loader treats the absence of the caller-supplied workspace_id query parameter as 'platform-admin context' and, on that branch, constructs a Twilio REST client from the platform parent-account credentials via createParentTwilioInstance(). The only control applied to the request is requireDualAuth(request), which performs authentication and (only when a capability is passed) a capability check - it never checks workspace membership, a workspace role, or platform-admin/sudo status. The workspace branch of the same handler does call requireWorkspaceAccess, so the two branches of one resource have inconsistent authorization: the membership gate lives only on the branch where the caller…",
-    "resolution": "Make the workspace context mandatory for the number search so a tenant-level request can never select the platform parent-account identity, and remove the silent parent fallback. Require workspace_id, run the existing membership gate, and build the client from that workspace's subaccount. If platform operators still need a parent-account search, expose it on the admin surface behind requireSudo rather than as the default branch of a tenant route, and drop the now-unused createParentTwilioInstance import from the loader (app/twilio.server.ts:130 stays for other callers). The repository's committed test at test/numbers.route.test.ts:185 asserts the current parent behaviour, so it must be…",
+    "summary": "Workspace-only number search is implemented in PR #3078. Full local CI, focused tests and three mutation checks pass; review, merge and release verification remain.",
+    "currentBehavior": "PR #3078 rejects missing or blank workspace_id with 400, checks membership before creating a client, preserves uniform non-member 404 and searches only through createWorkspaceTwilioInstance. The dev branch still has the parent-account fallback.",
+    "rootCause": "The optional workspace_id selected the provider identity. Omitting it bypassed membership and constructed a parent-account client. A broad provider catch also changed membership 404 into 500.",
+    "resolution": "Require workspace_id, remove the parent fallback, and await membership outside the provider error handler. Keep local and toll-free searches on the workspace client. Mark workspace_id required in both published OpenAPI documents.",
     "lookIn": [
       "app/routes/api+/numbers.loader.server.ts",
       "app/twilio.server.ts",
@@ -323,24 +312,22 @@
       "openapi/complete-api.json"
     ],
     "existingTests": [
-      "1 test file passed, 7 tests passed (exit status 0) in the sandbox (docker --network none, read-only /target, scratch-only writes, empty environment, 2 CPUs / 2g memory / 512 pids / 300s wall clock; bun + vitest 4.1.11; dummy credentials only). The DECISIVE case 'a plain session user with no workspace context reaches…"
+      "56 focused tests pass across number route, number mapping and public/complete API contracts. The unchanged loader fails four regressions with 23 controls passing. Restoring the old loader fails four tests; removing membership fails four; making the contract optional fails two. Three authentication/validation controls pass in every mutation run. Provider calls are mocked; no live Twilio traffic."
     ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
       "A number search must run under the identity of the tenant that owns it. GET /api/numbers should require a workspace_id, verify the caller is a member of that workspace, and use that workspace's Twilio subaccount - which is what the declared surface (exposure sessionOnly, authClass session, workspaceScoped true, app/lib/api-surface-annotations.ts:87) and the published OpenAPI operation (workspace_id 'required for session auth', openapi/complete-api.json:6631) describe. A request with no workspace context must be rejected; if parent-account search is genuinely required for platform operators, it must sit behind platform-admin authority (requireSudo / the admin surface) and must never be the silent fallback of a tenant-facing route."
     ],
     "size": "XS",
-    "risk": "low"
+    "risk": "low",
+    "trackerRecommendation": "Included from original PR #3078 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2872,
     "verdict": "fix-now",
     "recommendedTitle": "Audience import creates and mutates audience records and links audiences to campaigns under a membership-only gate that the sibling audience surfaces refuse",
     "summary": "POST /api/audience-upload authorizes with requireWorkspaceAccess({ user, workspaceId }) and nothing else (app/routes/api+/audience-upload.action.server.ts:120), so any workspace member, including the lowest `caller` role, passes",
-    "currentBehavior": "POST /api/audience-upload authorizes with requireWorkspaceAccess({ user, workspaceId }) and nothing else (app/routes/api+/audience-upload.action.server.ts:120), so any workspace member, including the lowest `caller` role, passes. On that admission the route itself creates an audience row (createAudienceForUpload, :193), flips an existing audience's status to processing (markAudienceUpdating, :245), inserts a campaign_audience link for a campaign in the workspace (linkAudienceToCampaign, :234-243) and enqueues an audience_upload job attributed to the caller (:247) whose durable run then inserts contact rows into the workspace's contact table and links them to the audience…",
+    "currentBehavior": "POST /api/audience-upload authorizes with requireWorkspaceAccess({ user, workspaceId }) and nothing else (app/routes/api+/audience-upload.action.server.ts:120), so any workspace member, including the lowest `caller` role, passes. On that admission the route itself creates an audience row (createAudienceForUpload, :193), flips an existing audience's status to processing (markAudienceUpdating, :245), inserts a campaign_audience link for a campaign in the workspace (linkAudienceToCampaign, :234-243) and enqueues an audience_upload job attributed to the caller (:247) whose durable run then inserts contact rows into the workspace's contact table and links them to the audience\u2026",
     "rootCause": "The import route's authorization was written as a bare membership check and never adopted the capability or role floor that the sibling audience surfaces enforce. Because the route itself creates the audience, mutates an existing audience, links the audience to a campaign and enqueues the import that writes the contact rows, the missing floor is the whole authorization boundary for the import path.",
     "resolution": "Gate the audience-import route with the same floor the sibling audience surfaces use, in the call that proves workspace access, so the request is refused before createAudienceForUpload, linkAudienceToCampaign, markAudienceUpdating or the job enqueue run. Require the member role (equivalent to campaigns.write for session actors) or resolve a capability actor and require campaigns.write explicitly if the route is migrated to the capability strategies.",
     "lookIn": [
@@ -352,7 +339,7 @@
       "app/routes/api+/campaign_audience.action.server.ts"
     ],
     "existingTests": [
-      "4 of 4 assertions passed against a private Postgres 18 inside the OS-enforced sandbox, with no network access and no external service touched. (1) requireWorkspaceAccess with no minRole resolved for the caller-role member; the same call with minRole 'member' threw an AppError with statusCode 403;…"
+      "4 of 4 assertions passed against a private Postgres 18 inside the OS-enforced sandbox, with no network access and no external service touched. (1) requireWorkspaceAccess with no minRole resolved for the caller-role member; the same call with minRole 'member' threw an AppError with statusCode 403;\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -368,39 +355,47 @@
     "issueNumber": 2879,
     "verdict": "fix-now",
     "recommendedTitle": "Outbound credit gate reserves nothing, so concurrent voice dispatches overshoot the funded balance and drive workspace.credits negative",
-    "summary": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0)",
-    "currentBehavior": "Every outbound dispatch entry point gates on requireOutboundCredits (app/lib/outbound-credit-gate.server.ts:44-55), which reads workspace.credits once and compares it against OUTBOUND_CREDIT_FLOOR (0). The comparison reserves nothing, and the floor sits below the price of the cheapest outbound unit (2 credits for an IVR first minute, 4 for a staffed first minute), so a workspace holding 1 credit passes the gate for a call it cannot pay for. The debit for a voice dispatch is written when the call reaches a terminal billable status (app/lib/twilio-call-status.server.ts:193), not when the call is placed, so workspace.credits does not fall until after the calls have run. The number of outbound…",
-    "rootCause": "requireOutboundCredits is a balance read plus a floor comparison with no reservation of the amount the dispatch is about to spend, and the floor it compares against (0) is below the cost of the smallest outbound unit. Because the voice debit is written only when the call reaches a terminal billable status, the check-then-act window covers every call that is in flight rather than a single call, and the ledger RPC applies the delta with no floor (credits = coalesce(credits, 0) + p_amount) so nothing downstream repairs the result. The SMS dispatch path holds a per-batch per-dispatch budget and the number-purchase path holds credits with a workspace-row lock; no voice dispatch path reserves…",
-    "resolution": "Reserve the cost of the outbound dispatch in the same atomic statement that reads the balance, the way the number-purchase path already holds credits with a workspace-row lock and the way the SMS batch path holds a per-dispatch budget, and compare the balance against that cost rather than against zero. The hold must be released when the dispatch never reaches the provider and settled when the completion debit is written, so the workspace is not left over-reserved; the hold is set to the per-call first-minute price, and a per-call reservation record (the shape app/server/number-purchase-reservation.server.ts already uses) is the form that lets the hold be set to the per-call maximum and…",
+    "summary": "Outbound credit reservations are partly implemented on an unpublished branch. Handset preparation, phone audio replacement and final admission checks remain.",
+    "currentBehavior": "Published dev still needs the outbound funding contract. The protected unpublished branch at be2e726b has reservation, manual and predictive work plus unfinished handset changes. The phone must replace browser mic and speaker; connecting it remains connection-only and must not start a contact or add a separate customer charge. This source is excluded from merge batch #3070.",
+    "rootCause": "The shared gate reads workspace.credits without locking or reserving the first-minute cost. HTTP, background IVR, test-call and predictive paths can each reuse that balance.",
+    "resolution": "Build one workspace-scoped reservation contract under a workspace row lock. Count existing voice and number-purchase holds; retain uncertain creates; fence dispatch ownership; settle the hold atomically with the existing idempotent terminal debit. Apply the contract to every outbound voice path and preserve the staffed two-leg rate. Per-credential limits bound starts, while durable holds bound funded admission.",
     "lookIn": [
       "app/lib/outbound-credit-gate.server.ts",
-      "app/lib/workspace-credits.server.ts",
-      "shared/credit-floor.ts",
-      "shared/pricing.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/auto-dial.server.ts",
       "app/routes/api+/dial.action.server.ts",
-      "app/lib/campaign-sms-dispatch-primitives.server.ts"
+      "app/lib/twilio-call-status.server.ts",
+      "app/server/number-purchase-reservation.server.ts"
     ],
     "existingTests": [
-      "5/5 tests passed against real Postgres 18 with the repository's own migration chain. requireOutboundCredits admitted a 1-credit workspace ({ ok: true, balance: 1 }) although the cheapest outbound voice unit costs 2 credits, the effective floor refuses a 0-credit workspace, and the sibling SMS budget refuses that same…"
+      "Current-source reproduction on private PostgreSQL 18: two admission assertions fail; zero-balance and affordable/idempotent-completion controls pass. Four executed cases, none skipped. Provider and event boundaries are mocked; no live traffic.",
+      "Observed before interruption: 321 real PostgreSQL 18 cases passed with zero skips after the predictive rebase. At be2e726b, all 16 focused legacy media-stream cases passed. The later full local gate was interrupted; no passing final result is retained. Current handset changes have not passed typecheck or behavior tests."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "Competing reservations must admit only one funded first minute.",
+      "Reject/release before provider work; retain uncertain sends and prevent replay or expired-owner sends.",
+      "Prove early callback, parent/child billing identity, zero-duration/canceled release and once-only settlement; keep multi-minute in-flight grace explicit.",
+      "Full local and applicable remote CI after the complete implementation.",
+      "Complete handset preparation, phone audio replacement and held-credit admission; then rebase the protected branch and run its real-DB proofs and complete local and remote gates."
     ],
     "acceptanceCriteria": [
-      "docs/credit-floor-policy.md defines app/lib/outbound-credit-gate.server.ts as 'the single gate every outbound entry point calls' and the block tier as 'block when balance cannot fund new outbound usage', with 'no negative-balance grace for new outbound'; it records that the campaign SMS batch path 'reserves each message's estimated cost before its send starts' so a batch cannot spend the same stale balance. The gate protects two principals: the workspace owner, whose funded credit balance is the money being spent, and the operator, whose Twilio account pays for every call before the workspace's balance is settled. The gate is therefore expected to admit only outbound the balance can fund, at the moment of admission."
+      "New voice dispatches cannot reuse funds already held by another outbound call or number purchase.",
+      "First-minute reservation and canonical terminal billing remain separate accounting events; holds do not add a second usage charge.",
+      "Recovery cannot free a hold while a provider call may exist."
     ],
-    "size": "S",
-    "risk": "medium"
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Keep In progress. No PR or push exists for this protected work. The user chose connection-only phone setup and requires it to replace browser audio. Resume after the authorized green merge batch; preserve the existing issue checklist."
   },
   {
     "issueNumber": 2880,
     "verdict": "fix-now",
     "recommendedTitle": "A successful workspace deletion leaves no audit record: the workspace.delete audit insert targets the row the delete already removed",
     "summary": "deleteWorkspaceApi calls handleDeleteWorkspace first (app/lib/platform-workspace.server.ts:139) and only afterwards calls safeRecordWorkspaceAuditEvent({action: 'workspace.delete'}) (app/lib/platform-workspace.server.ts:148)",
-    "currentBehavior": "deleteWorkspaceApi calls handleDeleteWorkspace first (app/lib/platform-workspace.server.ts:139) and only afterwards calls safeRecordWorkspaceAuditEvent({action: 'workspace.delete'}) (app/lib/platform-workspace.server.ts:148). handleDeleteWorkspace issues a single DELETE against public.workspace (app/lib/workspace-members-db.server.ts:375), so by the time the deletion event is written the workspace row is gone, and workspace_audit_event.workspace_id carries a validated, non-deferrable ON DELETE CASCADE foreign key to public.workspace (client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql:37). The insert is therefore rejected with SQLSTATE 23503 - 'insert or update on…",
+    "currentBehavior": "deleteWorkspaceApi calls handleDeleteWorkspace first (app/lib/platform-workspace.server.ts:139) and only afterwards calls safeRecordWorkspaceAuditEvent({action: 'workspace.delete'}) (app/lib/platform-workspace.server.ts:148). handleDeleteWorkspace issues a single DELETE against public.workspace (app/lib/workspace-members-db.server.ts:375), so by the time the deletion event is written the workspace row is gone, and workspace_audit_event.workspace_id carries a validated, non-deferrable ON DELETE CASCADE foreign key to public.workspace (client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql:37). The insert is therefore rejected with SQLSTATE 23503 - 'insert or update on\u2026",
     "rootCause": "The workspace audit trail is keyed to the workspace row with ON DELETE CASCADE, and the deletion event is recorded only after the delete has already removed both the workspace row and the audit table's parent. The event can therefore never be written, the wrapper that records it treats the failure as non-fatal, and no durable platform-level record of the deletion exists anywhere else. Reordering the write alone does not fix it: an audit row written before the delete carries the same cascading workspace foreign key and is destroyed by the same cascade, which the reproduction confirmed (a control row written before the delete was gone afterwards).",
-    "resolution": "Land the deletion record in a sink that does not cascade with the tenant, and write it in the same transaction as the delete. Reordering the write alone is NOT sufficient: the audit row carries the same cascading workspace foreign key, so a 'workspace.delete' event written into workspace_audit_event before the delete is destroyed by the same cascade (reproduced: a control row written before the delete was gone afterwards). Either give the audit table a durable, non-cascading owner (workspace_id nullable with ON DELETE SET NULL and the workspace id kept in target_id, or a separate platform-level table with no workspace foreign key) and write the event there, or write a platform-level…",
+    "resolution": "Land the deletion record in a sink that does not cascade with the tenant, and write it in the same transaction as the delete. Reordering the write alone is NOT sufficient: the audit row carries the same cascading workspace foreign key, so a 'workspace.delete' event written into workspace_audit_event before the delete is destroyed by the same cascade (reproduced: a control row written before the delete was gone afterwards). Either give the audit table a durable, non-cascading owner (workspace_id nullable with ON DELETE SET NULL and the workspace id kept in target_id, or a separate platform-level table with no workspace foreign key) and write the event there, or write a platform-level\u2026",
     "lookIn": [
       "app/lib/platform-workspace.server.ts",
       "client/migrations/20261007000003_workspace_audit_event_workspace_reference.sql",
@@ -410,7 +405,7 @@
       "app/lib/workspace-members-db.server.ts"
     ],
     "existingTests": [
-      "Control: the exact 'workspace.delete' payload written while the workspace existed succeeded (audit rows 3 -> 4). Production deleteWorkspaceApi() returned {ok:true}; during that same call the wrapper logged one error - 'Failed to record workspace audit event', action workspace.delete, PostgresError code 23503, detail…"
+      "Control: the exact 'workspace.delete' payload written while the workspace existed succeeded (audit rows 3 -> 4). Production deleteWorkspaceApi() returned {ok:true}; during that same call the wrapper logged one error - 'Failed to record workspace audit event', action workspace.delete, PostgresError code 23503, detail\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -427,9 +422,9 @@
     "verdict": "fix-now",
     "recommendedTitle": "A tenant workspace delete is aborted by the job table's NO ACTION foreign key, so the delete removes nothing and the tenant's data survives",
     "summary": "deleteWorkspaceById (app/lib/workspace-members-db.server.ts:375-381) issues a single 'DELETE FROM workspace WHERE id = $1 RETURNING *' through the unscoped adminDb and relies entirely on database cascade for the tenant's rows",
-    "currentBehavior": "deleteWorkspaceById (app/lib/workspace-members-db.server.ts:375-381) issues a single 'DELETE FROM workspace WHERE id = $1 RETURNING *' through the unscoped adminDb and relies entirely on database cascade for the tenant's rows. The job table is the one tenant table that does not cascade: drizzle/0003_job.sql:8 declares 'workspace_id uuid REFERENCES workspace(id)' with the default NO ACTION referential action, and no migration in client/migrations/ changes it. As long as any job row references the workspace, Postgres rejects the whole DELETE with 'update or delete on table \"workspace\" violates foreign key constraint \"job_workspace_id_fkey\" on table \"job\"' (SQLSTATE 23503).…",
+    "currentBehavior": "deleteWorkspaceById (app/lib/workspace-members-db.server.ts:375-381) issues a single 'DELETE FROM workspace WHERE id = $1 RETURNING *' through the unscoped adminDb and relies entirely on database cascade for the tenant's rows. The job table is the one tenant table that does not cascade: drizzle/0003_job.sql:8 declares 'workspace_id uuid REFERENCES workspace(id)' with the default NO ACTION referential action, and no migration in client/migrations/ changes it. As long as any job row references the workspace, Postgres rejects the whole DELETE with 'update or delete on table \"workspace\" violates foreign key constraint \"job_workspace_id_fkey\" on table \"job\"' (SQLSTATE 23503).\u2026",
     "rootCause": "The job table's workspace foreign key was created without ON DELETE CASCADE (drizzle/0003_job.sql:8, the only place in the repo that creates public.job), and the workspace delete path (app/lib/workspace-members-db.server.ts:375) performs a bare row delete with no teardown of the job rows (or of any other non-cascading residue) that reference the workspace. Postgres therefore refuses the DELETE instead of cascading, and the application treats the refusal as an ordinary error rather than as a lifecycle contract failure.",
-    "resolution": "Make the tenant delete a real teardown instead of a bare row delete. (1) Give job.workspace_id the same ON DELETE CASCADE every other tenant table has. On a database that already has the constraint this needs a NEW migration that drops and recreates job_workspace_id_fkey with ON DELETE CASCADE - editing drizzle/0003_job.sql alone is a no-op for any database that was already bootstrapped - and drizzle/0003_job.sql must be updated too so a fresh bootstrap gets the cascading constraint. (2) Remove the workspace's job rows inside the same transaction immediately before the workspace row, so the delete cannot be blocked by a row the tenant no longer controls. (3) Run the whole teardown in one…",
+    "resolution": "Make the tenant delete a real teardown instead of a bare row delete. (1) Give job.workspace_id the same ON DELETE CASCADE every other tenant table has. On a database that already has the constraint this needs a NEW migration that drops and recreates job_workspace_id_fkey with ON DELETE CASCADE - editing drizzle/0003_job.sql alone is a no-op for any database that was already bootstrapped - and drizzle/0003_job.sql must be updated too so a fresh bootstrap gets the cascading constraint. (2) Remove the workspace's job rows inside the same transaction immediately before the workspace row, so the delete cannot be blocked by a row the tenant no longer controls. (3) Run the whole teardown in one\u2026",
     "lookIn": [
       "drizzle/0003_job.sql",
       "client/migrations/20261007000001_uuid_workspace_references.sql",
@@ -439,7 +434,7 @@
       "app/routes/api+/audience-upload.action.server.ts"
     ],
     "existingTests": [
-      "deleteWorkspaceById THREW: 'Failed query: delete from \"workspace\" where \"workspace\".\"id\" = $1 returning \"created_at\", \"credits\", ...' with cause 'PostgresError: update or delete on table \"workspace\" violates foreign key constraint \"job_workspace_id_fkey\" on table \"job\"' (SQLSTATE 23503). handleDeleteWorkspace returned…"
+      "deleteWorkspaceById THREW: 'Failed query: delete from \"workspace\" where \"workspace\".\"id\" = $1 returning \"created_at\", \"credits\", ...' with cause 'PostgresError: update or delete on table \"workspace\" violates foreign key constraint \"job_workspace_id_fkey\" on table \"job\"' (SQLSTATE 23503). handleDeleteWorkspace returned\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -455,39 +450,49 @@
     "issueNumber": 2882,
     "verdict": "fix-now",
     "recommendedTitle": "Campaign export hands the lowest-trust workspace role every agent's attempts and contact PII",
-    "summary": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents",
-    "currentBehavior": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents. Each row carries the contact's first name, surname, phone, email, street address and city, the attempt disposition, the call SID and the attempt's complete IVR answer set. The product's own scoped read path deliberately denies the same principal that view: getWorkspaceAnalyticsApi computes canViewAllUsers as owner/admin/member only (app/lib/platform-analytics.server.ts:57) and loadWorkspaceAnalytics then filters the outreach_attempt rows with outreach_attempt.user_id = currentUserId…",
-    "rootCause": "The campaign export selects outreach attempts by campaign_id alone and is gated on workspace membership alone. It omits both the per-agent (outreach_attempt.user_id) scope the platform applies to the same rows on its analytics path and the role floor the sibling artifact on the same export surface enforces (the sms-report export is admin-gated because it carries contact names, phone numbers and message text - the same data class the campaign CSV carries, ungated). So the export emits every agent's rows, and hands back a 24 hour pre-signed download URL, to a requester the product otherwise scopes to their own attempts.",
-    "resolution": "Apply the platform's own scope rule to the export surface instead of re-deriving one: raise every export-surface gate to the `member` floor the sibling write surfaces use (leaving the sms-report artifact on its stricter admin gate), including the two listing loaders that publish stored downloadUrl values, and pass the requester's identity into the export pipeline so the attempt selection can be narrowed to outreach_attempt.user_id = requester whenever the requester may not view all users, matching the canViewAllUsers rule the analytics path applies. Gating the listing loaders matters as much as gating the trigger: a `caller` that cannot start an export can still read a member's stored…",
+    "summary": "PR #3064 restricts export creation, status and saved links to members or higher, and carries requester scope into call CSV queries. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, a caller can start campaign exports and retrieve other agents' saved download links. Tenant SQL correctly scopes the workspace, but call exports select every agent's attempts. The candidate in open PR #3064 is not merged into dev or master.",
+    "rootCause": "Legacy creation/status, workspace export services and the UI list require membership without a member role floor. Call-export count and paging queries filter campaign and workspace but omit requester user_id. The pipeline has no required requester identity, including its worker caller.",
+    "resolution": "Review PR #3064 and exact-head checks. Enforce member/admin/owner before export storage access on all creation, status and list paths; retain admin/owner for SMS reports. A required user/system actor carries authenticated identity through UI/API requests and user-owned worker jobs; trusted jobs without a user use explicit system authority. Canonical membership and role ranking choose all-agent or own-agent scope, shared by SQL count and paging before offset/limit. Public API notes and generated specs state the role rules. Existing signed URLs retain their 24-hour expiry. Verify deployed dev after merge, then release.",
     "lookIn": [
+      "app/routes/api+/campaign-export.action.server.ts",
+      "app/routes/api+/campaign-export-status.loader.server.ts",
+      "app/routes/workspaces+/$id/exports.loader.server.ts",
       "app/lib/platform-analytics.server.ts",
-      "app/lib/workspace-analytics.server.ts",
-      "app/components/analytics/WorkspaceAnalyticsPanel.tsx",
-      "app/lib/campaign-export-db.server.ts",
       "app/lib/campaign-export.server.ts",
-      "app/lib/campaign-export-helpers.server.ts"
+      "app/lib/campaign-export-db.server.ts",
+      "app/lib/campaign-export-types.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "test/integration-db/campaign-export-access.test.ts"
     ],
     "existingTests": [
-      "8 of 8 assertions passed against the private Postgres 18. The real export route action, invoked with the `caller` member's session, returned an exportId (no error), i.e. the membership-only gate admitted the lowest-trust role. The artifact it produced (captured at the object-storage boundary) contained BOTH attempts:…"
+      "24 real Better Auth session/Postgres cases pass with zero skips. They exercise legacy start/status, both workspace API methods through data-plane middleware and the UI list through workspace middleware; caller denials precede storage, members retain exports, non-member API requests get 404, SMS status remains admin/owner, caller SQL filtering precedes paging, and user/system CSVs exclude foreign workspace rows.",
+      "Original source executes 24 cases: 9 expected failures and 15 passing controls. Removing role floors fails 5/24; SQL user filters 3/24; user-policy bypass 2/24; requester wiring 6/7 thin-adapter cases while the explicit system control passes. Restored source passes all 24 with matching hashes. Email delivery, object storage and promise tracking are intercepted; session auth, membership SQL and CSV generation remain real, and background work is awaited before cleanup.",
+      "64 focused export cases, 26 SMS-report authorization cases and 97 other worker/OpenAPI contract cases pass. Typecheck/codegen pass. Baseline lint comparison across 12 changed TypeScript files adds no warning debt. Full source ci:local passes on the clean commit; the PR records exact source/final heads and full-suite counts."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "After merge, verify role denials and valid exports on deployed dev, then complete release acceptance. Local proof uses dummy identities and in-memory storage, so it does not prove deployed storage or invalidate download URLs already issued before this fix. Those URLs retain their existing 24-hour expiry."
     ],
     "acceptanceCriteria": [
-      "An export must not contain data above the requester's access level. The platform's scope rule is source-visible: app/lib/platform-analytics.server.ts:57 excludes the `caller` role from canViewAllUsers and app/lib/workspace-analytics.server.ts:41-49 then filters attempts to outreach_attempt.user_id = currentUserId. Sibling surfaces that act on the same records gate on role or capability: app/routes/api+/campaign_audience.action.server.ts:76 and app/routes/api+/contacts/$contactId.action.server.ts:25 both require the `member` role, and app/routes/api+/campaigns/$campaignId.action.server.ts:32 likewise. The same export surface already gates the sibling sms-report artifact behind `admin` for carrying contact names, phone numbers and message text (app/routes/api+/campaign-export-status.loader.server.ts:60-62). A `caller` should therefore not be able to bulk-read other agents' call results."
+      "Require member/admin/owner for campaign export creation, status and saved-link lists.",
+      "Keep SMS reports restricted to admin/owner.",
+      "Use canonical role rules and authenticated requester identity for call-export scope.",
+      "Filter both SQL totals and paging to the allowed agent rows without widening workspace or campaign scope.",
+      "Keep valid user-owned and trusted system worker exports working."
     ],
+    "blockedBy": [],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Included from original PR #3064 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
   },
   {
     "issueNumber": 2883,
     "verdict": "fix-now",
     "recommendedTitle": "The release-closing merge gate decides from the pull request's own checkout, so a release PR can neutralise it",
-    "summary": "`release-close-issues.yml` exists so that a `dev -> master` release PR closes the issues it promotes (#1956): GitHub closes one issue per closing keyword, a bare `(#1234)` mention closes nothing, and the workflow header records release PR…",
-    "currentBehavior": "`release-close-issues.yml` exists so that a `dev -> master` release PR closes the issues it promotes (#1956): GitHub closes one issue per closing keyword, a bare `(#1234)` mention closes nothing, and the workflow header records release PR #2668 listing seventeen issues behind a single keyword with only #2655 closing. The workflow checks the repository out with `actions/checkout@v4` and no `ref:` (line 68), so for a `pull_request` event the tree on disk is the pull request's merge commit, which carries the pull request's own copy of `scripts/check-release-closing-references.mjs`. The gate then runs that file twice (lines 77 and 78) and records the file's own self-reported `closes.length` as…",
-    "rootCause": "The gate sources its decision logic from the artifact it constrains. `actions/checkout@v4` is used without `ref:`, so for a `pull_request` event the checked-out tree is the pull request's merge commit and the checker at `scripts/check-release-closing-references.mjs` is whatever the pull request contains. The sibling workflow in the same repository already shows the intended pattern: `ledger-drift-check.yml` pins its checkout to a trusted ref (`ref: dev` at line 100, `ref: master` at lines 133 and 162) before running repository scripts with an environment's DATABASE_URL. Because the workflow file itself is also taken from the pull request's merge ref for a `pull_request` event, pinning the…",
-    "resolution": "Decide the gate from trusted content, in two parts, because a `pull_request` event takes both the checked-out tree and the workflow file from the pull request's merge ref. (1) Pin the checkout to the base branch so the checker that judges the body is the repository's own copy: `ref: ${{ github.event.pull_request.base.sha }}` - the pattern ledger-drift-check.yml already uses with `ref:`. (2) Require an independent approver for the gate definitions themselves: add a CODEOWNERS entry for `/.github/workflows/` and `scripts/check-release-closing-references.mjs` plus a branch-protection rule on `master` requiring that approval, so a pull request cannot merge a change to the gate that judges it.…",
+    "summary": "`release-close-issues.yml` exists so that a `dev -> master` release PR closes the issues it promotes (#1956): GitHub closes one issue per closing keyword, a bare `(#1234)` mention closes nothing, and the workflow header records release PR\u2026",
+    "currentBehavior": "`release-close-issues.yml` exists so that a `dev -> master` release PR closes the issues it promotes (#1956): GitHub closes one issue per closing keyword, a bare `(#1234)` mention closes nothing, and the workflow header records release PR #2668 listing seventeen issues behind a single keyword with only #2655 closing. The workflow checks the repository out with `actions/checkout@v4` and no `ref:` (line 68), so for a `pull_request` event the tree on disk is the pull request's merge commit, which carries the pull request's own copy of `scripts/check-release-closing-references.mjs`. The gate then runs that file twice (lines 77 and 78) and records the file's own self-reported `closes.length` as\u2026",
+    "rootCause": "The gate sources its decision logic from the artifact it constrains. `actions/checkout@v4` is used without `ref:`, so for a `pull_request` event the checked-out tree is the pull request's merge commit and the checker at `scripts/check-release-closing-references.mjs` is whatever the pull request contains. The sibling workflow in the same repository already shows the intended pattern: `ledger-drift-check.yml` pins its checkout to a trusted ref (`ref: dev` at line 100, `ref: master` at lines 133 and 162) before running repository scripts with an environment's DATABASE_URL. Because the workflow file itself is also taken from the pull request's merge ref for a `pull_request` event, pinning the\u2026",
+    "resolution": "Decide the gate from trusted content, in two parts, because a `pull_request` event takes both the checked-out tree and the workflow file from the pull request's merge ref. (1) Pin the checkout to the base branch so the checker that judges the body is the repository's own copy: `ref: ${{ github.event.pull_request.base.sha }}` - the pattern ledger-drift-check.yml already uses with `ref:`. (2) Require an independent approver for the gate definitions themselves: add a CODEOWNERS entry for `/.github/workflows/` and `scripts/check-release-closing-references.mjs` plus a branch-protection rule on `master` requiring that approval, so a pull request cannot merge a change to the gate that judges it.\u2026",
     "lookIn": [
       ".github/workflows/release-close-issues.yml",
       ".github/workflows/ledger-drift-check.yml",
@@ -498,7 +503,7 @@
     ],
     "existingTests": [
       "test/**/*.test.ts covers the neighbouring behaviour on this path.",
-      "Trusted checker: line-77 step exit code 0, numbers=0, GATE VERDICT FAIL (the release PR is rejected). Pull-request-modified checker (CLI-only edit): line-77 step exit code 0, numbers=1, GATE VERDICT PASS - the release PR is allowed to merge with zero issues closed, the exact condition the workflow was written to…"
+      "Trusted checker: line-77 step exit code 0, numbers=0, GATE VERDICT FAIL (the release PR is rejected). Pull-request-modified checker (CLI-only edit): line-77 step exit code 0, numbers=1, GATE VERDICT PASS - the release PR is allowed to merge with zero issues closed, the exact condition the workflow was written to\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -513,11 +518,11 @@
   {
     "issueNumber": 2884,
     "verdict": "fix-now",
-    "recommendedTitle": "The structural-review merge gate classifies only four path prefixes as high-risk, so changes to the webhook, auth, capability, media-stream and route code…",
+    "recommendedTitle": "The structural-review merge gate classifies only four path prefixes as high-risk, so changes to the webhook, auth, capability, media-stream and route code\u2026",
     "summary": "`.github/workflows/review-coverage.yml` is the repository's only mechanical prompt for a declared structural review of high-risk code on a pull request into `dev`",
-    "currentBehavior": "`.github/workflows/review-coverage.yml` is the repository's only mechanical prompt for a declared structural review of high-risk code on a pull request into `dev`. Its `high_risk` test is one anchored pattern - `^(app/lib/worker/|app/server/|app/db/|client/migrations/)` at line 41 - applied to the pull request's own file list (line 38), and the only other arm that can fail the gate is the 500-added-line test at line 68. Four directories are matched; every other path in the repository is silently exempt below that size. The components that carry the platform's trust boundaries live in the unmatched paths: the production HTTP entrypoint and its anonymous->Twilio webhook pre-handler…",
-    "rootCause": "The high-risk classification is a hard-coded list of four path prefixes that was never widened past the directories it was written around: it was introduced in commit 93def136 ('chore(ci): require structural-review coverage on high-risk PRs (#1932) (#1935)') with those same four prefixes and the later commits (3ab6c37a docs-only exemption, 689684c1 pagination fix) left it untouched, even though the repository also carries a top-level `server/` HTTP entrypoint, a top-level `worker/` service, a `services/` tree and the entire `app/routes/` surface. Every path outside the list is silently exempt, nothing reports the exemption, and the gate's header (lines 3-7) and pull-request template (lines…",
-    "resolution": "Widen the high-risk classification to the components the gate claims to cover and keep the set explicit in one place, so a new component cannot silently fall outside it: match the whole `app/lib/` tree, `app/server/`, `app/db/`, `app/routes/`, the top-level `server/`, `services/` and `worker/`, and `client/migrations/`. A dedicated script (like scripts/lib/ci-changes-lib.mjs for the job-scoping patterns) with a unit test would keep the list reviewable. Widening the list alone is necessary but not sufficient: the same gate's marker arm is satisfied by the pull-request template's pre-filled `**Structural review:**` line, so the check must also require a value the author actually wrote…",
+    "currentBehavior": "`.github/workflows/review-coverage.yml` is the repository's only mechanical prompt for a declared structural review of high-risk code on a pull request into `dev`. Its `high_risk` test is one anchored pattern - `^(app/lib/worker/|app/server/|app/db/|client/migrations/)` at line 41 - applied to the pull request's own file list (line 38), and the only other arm that can fail the gate is the 500-added-line test at line 68. Four directories are matched; every other path in the repository is silently exempt below that size. The components that carry the platform's trust boundaries live in the unmatched paths: the production HTTP entrypoint and its anonymous->Twilio webhook pre-handler\u2026",
+    "rootCause": "The high-risk classification is a hard-coded list of four path prefixes that was never widened past the directories it was written around: it was introduced in commit 93def136 ('chore(ci): require structural-review coverage on high-risk PRs (#1932) (#1935)') with those same four prefixes and the later commits (3ab6c37a docs-only exemption, 689684c1 pagination fix) left it untouched, even though the repository also carries a top-level `server/` HTTP entrypoint, a top-level `worker/` service, a `services/` tree and the entire `app/routes/` surface. Every path outside the list is silently exempt, nothing reports the exemption, and the gate's header (lines 3-7) and pull-request template (lines\u2026",
+    "resolution": "Widen the high-risk classification to the components the gate claims to cover and keep the set explicit in one place, so a new component cannot silently fall outside it: match the whole `app/lib/` tree, `app/server/`, `app/db/`, `app/routes/`, the top-level `server/`, `services/` and `worker/`, and `client/migrations/`. A dedicated script (like scripts/lib/ci-changes-lib.mjs for the job-scoping patterns) with a unit test would keep the list reviewable. Widening the list alone is necessary but not sufficient: the same gate's marker arm is satisfied by the pull-request template's pre-filled `**Structural review:**` line, so the check must also require a value the author actually wrote\u2026",
     "lookIn": [
       ".github/workflows/review-coverage.yml",
       "app/lib/twilio-webhook.server.ts",
@@ -527,7 +532,7 @@
       "services/media-stream/db-writer.ts"
     ],
     "existingTests": [
-      "Extracted from the target: regex `^(app/lib/worker/|app/server/|app/db/|client/migrations/)`, threshold 500, marker `Structural review:`. Missed-path set (app/lib/twilio-webhook.server.ts, app/lib/auth.server.ts, app/lib/api-auth.server.ts, app/lib/capability-guard.server.ts, server/bun.ts, server/twilio-webhook.ts,…"
+      "Extracted from the target: regex `^(app/lib/worker/|app/server/|app/db/|client/migrations/)`, threshold 500, marker `Structural review:`. Missed-path set (app/lib/twilio-webhook.server.ts, app/lib/auth.server.ts, app/lib/api-auth.server.ts, app/lib/capability-guard.server.ts, server/bun.ts, server/twilio-webhook.ts,\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -540,40 +545,11 @@
     "risk": "low"
   },
   {
-    "issueNumber": 2887,
-    "verdict": "fix-now",
-    "recommendedTitle": "Dual-lockfile drift gate never compares the two lockfiles, so CI validates a dependency tree the production worker image does not install",
-    "summary": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers",
-    "currentBehavior": "The repository keeps two lockfiles because the two halves of the pipeline use different package managers. Every CI job installs with `npm ci` (.github/workflows/ci.yml:78, 92, 110, 127, 144, 193, 214), so typecheck, lint, the node and UI test suites and the static checks all run against the package-lock.json (npm) tree, while the deployed worker image installs the bun.lock (bun) tree (`bun install --production` at Dockerfile.worker:8; the Dockerfile web image installs the same tree at Dockerfile:11). The repository's only control for keeping those trees aligned is `npm run check:bun-lock` -> scripts/check-bun-lockfile.mjs, and that script implements the check as `bun install…",
-    "rootCause": "scripts/check-bun-lockfile.mjs implements the dual-lockfile drift gate as `bun install --frozen-lockfile --dry-run` (line 21), and that command compares bun.lock with package.json only: it never reads package-lock.json, even though the script's own header (lines 4-13) states the gate exists because 'Adding or changing a dependency with one package manager leaves the other lockfile stale' and that the failure surfaces 'inside the Railway image build', and its own line 12 claims it fails 'when the two lockfiles disagree'. The two lockfiles are resolved by two different resolvers - npm with `legacy-peer-deps=true` from .npmrc, which ignores peer dependencies, and bun with its own resolver,…",
-    "resolution": "Make the drift gate compare the two lockfiles instead of only bun.lock against package.json, make the worker image fail loudly on any future drift, and pin the resolver so the gate validates the same lockfile the image installs. Three steps, in order: (1) align the resolver configuration first - .npmrc legacy-peer-deps=true makes npm ignore peer dependencies while bun installs them, which is why the trees differ in package content and not only in versions; either drop legacy-peer-deps (and regenerate package-lock.json) or record the peer difference as accepted and scope the comparison accordingly; (2) regenerate both lockfiles from the same package.json so the resolved trees agree, and…",
-    "lookIn": [
-      ".github/workflows/ci.yml",
-      "scripts/check-bun-lockfile.mjs",
-      "package.json",
-      "Dockerfile.worker",
-      "Dockerfile",
-      "package-lock.json"
-    ],
-    "existingTests": [
-      "The gate's only assertion holds: bun.lock satisfies every package.json range, so `bun install --frozen-lockfile --dry-run` has nothing to change in bun.lock and the gate is green, while the two lockfiles disagree. The comparison of the two lockfiles shows 250 package names resolving to different version sets (31…"
-    ],
-    "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
-    ],
-    "acceptanceCriteria": [
-      "The drift gate should assert that the dependency tree CI installs and tests (package-lock.json, via `npm ci`) is the same tree the production images install (bun.lock, via `bun install`), so that the artifact which passed install, typecheck, lint and test is the artifact that is deployed. Any divergence between the two resolved trees - including a newer version of a credential-handling dependency landing in only one of them, and a package present in one tree but absent from the other - should fail the build before the image is produced."
-    ],
-    "size": "S",
-    "risk": "medium"
-  },
-  {
     "issueNumber": 2895,
     "verdict": "fix-now",
     "recommendedTitle": "Workspace-UI recording path stores the take before it measures its duration, and no maximum duration exists anywhere to compare against",
-    "summary": "POST /workspaces/:id/audios/record normalises the uploaded take with ffmpeg and writes it to the tenant bucket (uploadObject, app/routes/workspaces+/$id/audios/record.action.server.ts:72-81), and only then measures its length with…",
-    "currentBehavior": "POST /workspaces/:id/audios/record normalises the uploaded take with ffmpeg and writes it to the tenant bucket (uploadObject, app/routes/workspaces+/$id/audios/record.action.server.ts:72-81), and only then measures its length with probeAudioDurationMs (line 84). The measured value is written to workspace_audio.duration_ms and is never compared against a maximum. No maximum-duration constant exists anywhere in the tracked source: a scan of 2525 files across app, shared, server, worker, services, client, scripts, e2e and test found only unrelated string-length caps (Twilio friendly name, IVR hint, audit metadata string, log line, contact message, name, workspace name) and no duration ceiling…",
+    "summary": "POST /workspaces/:id/audios/record normalises the uploaded take with ffmpeg and writes it to the tenant bucket (uploadObject, app/routes/workspaces+/$id/audios/record.action.server.ts:72-81), and only then measures its length with\u2026",
+    "currentBehavior": "POST /workspaces/:id/audios/record normalises the uploaded take with ffmpeg and writes it to the tenant bucket (uploadObject, app/routes/workspaces+/$id/audios/record.action.server.ts:72-81), and only then measures its length with probeAudioDurationMs (line 84). The measured value is written to workspace_audio.duration_ms and is never compared against a maximum. No maximum-duration constant exists anywhere in the tracked source: a scan of 2525 files across app, shared, server, worker, services, client, scripts, e2e and test found only unrelated string-length caps (Twilio friendly name, IVR hint, audit metadata string, log line, contact message, name, workspace name) and no duration ceiling\u2026",
     "rootCause": "The record action's duration handling is a measurement, not a limit: probeAudioDurationMs runs after uploadObject and its return value is only persisted, and no maximum duration is defined or enforced anywhere on the upload/record path, so an arbitrarily long recording is written to durable storage and to the metadata table before anything could reject it.",
     "resolution": "Define one maximum recording duration as a shared constant and enforce it before the take is transcoded and before it is stored. Probe the uploaded container with the server's own tool (probeAudioDurationMs) on the raw upload, so an over-long take is rejected with 413 without ever spending ffmpeg time on it and without writing anything to storage; keep the post-transcode measurement for the stored metadata. Have the browser recorder stop at the same maximum, and keep the ffmpeg wall-clock guard consistent with the maximum rather than relying on it as the policy.",
     "lookIn": [
@@ -585,7 +561,7 @@
       "app/db/schema.ts"
     ],
     "existingTests": [
-      "The request returned 302 with Location /workspaces/<workspaceId>/audios/recorded-<stamp>.mp3/edit, the normalised object was PUT to the bucket (8279 bytes), and workspace_audio held a row with file_name 'recorded-<stamp>.mp3', origin 'recording', duration_ms 14266340 (3.96 hours), size_bytes 8279, content_type…"
+      "The request returned 302 with Location /workspaces/<workspaceId>/audios/recorded-<stamp>.mp3/edit, the normalised object was PUT to the bucket (8279 bytes), and workspace_audio held a row with file_name 'recorded-<stamp>.mp3', origin 'recording', duration_ms 14266340 (3.96 hours), size_bytes 8279, content_type\u2026"
     ],
     "missingTests": [
       "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
@@ -598,35 +574,119 @@
     "risk": "medium"
   },
   {
-    "issueNumber": 2774,
+    "issueNumber": 3007,
     "verdict": "fix-now",
-    "summary": "IVR voicemail drops start during the greeting and a valid machine-end result can hang up without leaving the saved message.",
-    "currentBehavior": "The default branch still requests early Enable detection. PR #3005 into dev waits for the greeting when a playable drop is configured and recognizes all documented machine-end results. It is open; no live voicemail recording has been verified.",
-    "resolution": "Review and deploy PR #3005, then verify the complete recorded message with an approved test recipient before closing.",
+    "summary": "IVR dispatch loses throughput to idle polling and uses an obsolete default batch rate.",
+    "currentBehavior": "The current production code misses a one-second successor until the five-second idle poll. The speed patch wakes for eligible scheduled jobs, uses the one-CPS default, and paces provider requests and retries. Production throughput after release has not been measured.",
+    "resolution": "Review and release the independently tested speed patch, then measure the actual campaign start rate without increasing the saved or provider limits.",
+    "rootCause": "A fixed empty-queue sleep ignores queued future jobs. The legacy voice branch also sizes two-call batches from a 1.43-CPS webhook-delay heuristic instead of the default one-CPS voice policy. Waking sooner without request spacing would expose batch bursts.",
     "lookIn": [
-      "app/lib/ivr-machine-detection.ts",
+      "app/lib/worker/poll-jobs.server.ts",
+      "app/lib/throughput-config.ts",
+      "app/lib/campaign-dispatch-pacing.server.ts",
       "app/lib/campaign-ivr-dispatch.server.ts",
-      "app/lib/campaign-test-call.server.ts",
-      "app/lib/ivr-machine.server.ts",
-      "app/routes/api+/ivr.action.server.ts"
+      "app/lib/campaign-outbound-estimate.ts"
     ],
-    "rootCause": "Twilio Enable returns machine_start while the greeting is still playing. The fixed one-second pause cannot wait for that greeting. The previous substring classifier also excluded machine_end_other, which Twilio documents as a machine result. Regression tests reproduced both code defects before the patch.",
     "existingTests": [
-      "test/campaign-ivr-dispatch.test.ts",
-      "test/campaign-test-call.test.ts",
-      "test/ivr-machine-detection.test.ts",
-      "test/ivr-page.route.test.ts",
-      "test/ivr.route.test.ts",
-      "test/ivr-initiate.server.test.ts"
+      "test/worker.test.ts: a one-second successor wakes on time and one-minute simulations produce 6/60/150/300 starts at 0.1/1/2.5/5 CPS with no external calls.",
+      "test/campaign-ivr-dispatch.test.ts: default batch, actual provider-start spacing, paced retries and calling-window closure after a wait.",
+      "test/integration-db/job-schedule.test.ts: real PostgreSQL eligibility, lane filters, idle ceiling and no-spin controls."
     ],
     "missingTests": [
-      "A controlled live voicemail recording with a confirmed test recipient after deployment."
+      "Measure actual production campaign throughput after release; the simulation excludes provider and database latency."
     ],
     "acceptanceCriteria": [
-      "Configured drops wait for greeting completion on production and test calls.",
-      "Beep, silence and other machine-end results play the saved drop; completed callbacks cannot replay it.",
-      "An approved recipient confirms the entire message was recorded after deployment."
+      "Default one-CPS campaigns approach 60 starts/minute subject to real latency.",
+      "Fractional and higher configured rates preserve request spacing within and between batches.",
+      "Scheduled-job wakeups respect lane filters, attempt bounds, cancellation and the existing idle ceiling.",
+      "Queue estimates use the actual pacing policy; no provider capacity increase is assumed."
     ],
-    "trackerRecommendation": "Keep open for release and live acceptance. Native Bug, Priority Urgent, production; PR #3005 is linked in Development."
+    "trackerRecommendation": "Included from original PR #3009 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
+  },
+  {
+    "issueNumber": 2616,
+    "verdict": "fix-now",
+    "summary": "PR #3010 gives Contacts search and Clear search persistent accessible names and returns focus to the field after clear. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, ContactsPage identifies its search input only by placeholder and renders an unnamed Clear button. When clear removes that button, no input ref restores focus. The reviewed candidate is in open PR #3010; it is not merged into dev or master.",
+    "rootCause": "The search input has no stable ID/label association. The conditional icon button has no accessible name, and its click handler only changes URL parameters before the focused button disappears.",
+    "resolution": "Review PR #3010 and its latest exact-head checks. The fix uses the canonical nested FormFieldControl, a useId-backed Search contacts label, a native Input ref and a Clear search name. Keep the existing URL handler and shared control styling. Verify on deployed dev after merge, then complete release acceptance.",
+    "lookIn": [
+      "app/components/contacts/ContactsPage.tsx",
+      "app/components/ui/form-field.tsx",
+      "test/ui/contacts-page-a11y.test.tsx",
+      "test/ui/contacts-route-outlet.test.tsx"
+    ],
+    "existingTests": [
+      "PR #3010 extends the real-router contacts accessibility suite to seven cases, retaining both old controls. The focused run passes 21 cases with route outlet and shared FormField coverage. It checks persistent names and IDs, pointer/Enter/Space clear, focus return, controlled loader results, q removal, page reset and preserved sort/repeated tag values.",
+      "Fresh original-source control: five failures and two passing controls. Removing only focus return fails three cases with four controls passing; removing only the Clear name fails four with three passing. The candidate is restored byte-for-byte. Focused lint retains 17 baseline source warnings and zero test warnings.",
+      "Source head 3de12c56 passes full ci:local: 5,973 Node, 34 Bun and 1,546 UI tests, with 11 existing skips; guards, production build, bundle check and codegen verification pass.",
+      "Post-CI real-browser comparisons match baseline input, wrapper and Clear-button bounds in light/dark at 390/1100 px container widths. The Clear target remains 42 by 40 px. Pointer, Enter and Space return visible focus to the same named input and preserve the required URL values. Names persist with one or zero matches. No mobile viewport emulation is claimed."
+    ],
+    "missingTests": [
+      "After merge, verify actual Contacts search and clear on deployed dev and complete release acceptance. Local tests and browser checks use a controlled loader; they do not prove production authentication, database filtering or the full workspace shell."
+    ],
+    "acceptanceCriteria": [
+      "Search contacts has a persistent accessible name, including when no contacts match.",
+      "Clear search has an explicit name and preserves the existing target size and shared styling.",
+      "Pointer, Enter and Space clear the query, reset page to 1, retain unrelated parameters and return focus to the same input.",
+      "Keep edit links, empty-state composition and shared Input/Button behavior."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Included from original PR #3010 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges."
+  },
+  {
+    "issueNumber": 3073,
+    "verdict": "fix-now",
+    "summary": "High: align the fixed Twilio redirect dependency; npm is affected while Bun is already patched.",
+    "currentBehavior": "PR #3076 is open with the tested follow-redirects 1.16.2 patch. It is not merged into dev.",
+    "rootCause": "The two locks resolve different compatible versions of the same transitive runtime package.",
+    "resolution": "Review and approve PR #3076, then verify the merged dev deployment and follow the release process. Do not start a duplicate dependency patch.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Included from original PR #3076 in the user-authorized merge batch PR #3070. Original-head GitHub checks passed. Final combined-head tests, merge, deployed verification and release remain. Actual Project Status is In progress; keep open and do not mark on-dev before the batch merges.",
+    "existingTests": [
+      "Six loopback Twilio/Axios cases pass. The old npm tree fails three credential-forwarding cases while three controls pass; the old Bun tree already passes.",
+      "Full npm run ci:local passed on the final commit. All applicable exact-head GitHub checks passed."
+    ],
+    "missingTests": [
+      "Merge approval, dev deployment verification and required release acceptance remain."
+    ]
+  },
+  {
+    "issueNumber": 3080,
+    "verdict": "fix-now",
+    "recommendedTitle": "Rate-limit failed password checks when disabling 2FA in account security",
+    "summary": "An authenticated ordinary account can repeat failed password checks on the local 2FA disable path without an application limiter.",
+    "currentBehavior": "An isolated current-source probe made 15 wrong-password requests using the real local limiter module; all 15 reached the mocked disable API and returned Invalid password. The route checks session freshness and refuses protected accounts; no factor was removed.",
+    "rootCause": "The enable and TOTP verification branches have user-scoped setup limiters. The disable branch calls Better Auth disableTwoFactor without one.",
+    "resolution": "Add a user-scoped limiter before the disable password check and include that credential surface in the guard. Preserve protected-account refusal and successful ordinary-account disable behavior.",
+    "lookIn": [
+      "app/routes/account.security.loader.server.ts",
+      "app/lib/two-factor-rate-limit.server.ts",
+      "scripts/check-auth-rate-limits.mjs",
+      "test/account-security.route.test.ts"
+    ],
+    "existingTests": [
+      "Private scratch probe: 15 requests reached a mocked password provider. The working source hash stayed unchanged. This proves admission behavior, not password bypass or factor removal."
+    ],
+    "missingTests": [
+      "Exhaustion blocks before the password provider; separate users and reset windows retain their own budgets.",
+      "Protected accounts remain refused, and an ordinary correct-password disable still works.",
+      "The regression must fail when its limiter is removed."
+    ],
+    "acceptanceCriteria": [
+      "Failed disable password checks are limited by the authenticated user identity before the provider call.",
+      "The source coverage guard detects a missing or wrong limiter on this operation."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "New native Bug; Priority Low, Effort Low, Enviornment unset; Project Status Backlog. No assignee, PR, parent, children or native dependencies. File and implement separately from the public credential-budget repair #2867."
   }
 ]

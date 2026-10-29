@@ -154,6 +154,7 @@ export async function campaignExportHandler(
       workspaceId,
       exportId,
       campaignName,
+      job.user_id ? { kind: "user", userId: job.user_id } : { kind: "system" },
     );
   } else {
     throw new Error(`campaign_export: unsupported campaign type ${campaignType}`);
@@ -397,7 +398,7 @@ export async function campaignDispatchHandler(
     );
   }
 
-  await continueOrCompleteDispatch(job, { workspaceId, campaignId, userId }, queuedRemaining);
+  await continueOrCompleteDispatch(job, { workspaceId, campaignId, userId }, queuedRemaining, outcome.nextBatchDelayMs);
 
   return {
     ok: true,
@@ -542,6 +543,7 @@ async function continueOrCompleteDispatch(
   job: ClaimedJobRow,
   args: DispatchChainContext,
   queuedRemaining: number,
+  delayMs = DISPATCH_TICK_MS,
 ): Promise<void> {
   const { workspaceId, campaignId, userId } = args;
 
@@ -551,7 +553,7 @@ async function continueOrCompleteDispatch(
       campaignId,
       userId,
       completedJobId: job.id,
-      delayMs: DISPATCH_TICK_MS,
+      delayMs,
     });
   } else {
     await recheckCampaignCompletion({
@@ -600,7 +602,7 @@ async function runMachineVoiceDispatch(
     );
   }
 
-  await continueOrCompleteDispatch(job, args, queuedRemaining);
+  await continueOrCompleteDispatch(job, args, queuedRemaining, outcome.nextBatchDelayMs);
 
   return {
     ok: true,

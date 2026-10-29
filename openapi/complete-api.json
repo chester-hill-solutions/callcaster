@@ -2474,7 +2474,7 @@
       "post": {
         "operationId": "postCampaign_export",
         "summary": "POST /api/campaign-export",
-        "description": "",
+        "description": "Requires the member role or higher for campaign CSV exports. SMS reports require admin or owner.",
         "tags": [
           "User API",
           "analytics"
@@ -2542,7 +2542,7 @@
       "get": {
         "operationId": "getCampaign_export_status",
         "summary": "GET /api/campaign-export-status",
-        "description": "",
+        "description": "Requires the member role or higher. SMS-report status and download links require admin or owner.",
         "tags": [
           "User API",
           "analytics"
@@ -6546,7 +6546,7 @@
       "post": {
         "operationId": "postNumbers",
         "summary": "POST /api/numbers",
-        "description": "Flat alias for /api/workspaces/:workspaceId/numbers used by the number purchase wizard. POST requires the member role or above; the caller role receives 403.",
+        "description": "Number purchase wizard: GET searches available Canadian numbers and requires workspace_id, workspace membership and that workspace’s Twilio account. Missing or blank workspace_id returns 400; non-members receive 404. POST requires the member role or above; the caller role receives 403.",
         "tags": [
           "User API",
           "telephony"
@@ -6612,7 +6612,7 @@
       "get": {
         "operationId": "getNumbers",
         "summary": "GET /api/numbers",
-        "description": "Flat alias for /api/workspaces/:workspaceId/numbers used by the number purchase wizard. POST requires the member role or above; the caller role receives 403.",
+        "description": "Number purchase wizard: GET searches available Canadian numbers and requires workspace_id, workspace membership and that workspace’s Twilio account. Missing or blank workspace_id returns 400; non-members receive 404. POST requires the member role or above; the caller role receives 403.",
         "tags": [
           "User API",
           "telephony"
@@ -6633,6 +6633,7 @@
           {
             "name": "workspace_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -11075,7 +11076,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_exports",
         "summary": "POST /api/workspaces/:workspaceId/exports",
-        "description": "",
+        "description": "Requires the member role or higher to start exports or list saved download links. SMS reports are visible only to admin or owner.",
         "tags": [
           "User API",
           "analytics"
@@ -11141,7 +11142,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_exports",
         "summary": "GET /api/workspaces/:workspaceId/exports",
-        "description": "",
+        "description": "Requires the member role or higher to start exports or list saved download links. SMS reports are visible only to admin or owner.",
         "tags": [
           "User API",
           "analytics"

@@ -22,6 +22,14 @@ vi.mock("@/lib/database/workspace.server", async () => {
   return { ...actual, requireWorkspaceAccess };
 });
 
+// The CSV scenarios model an authorized member; real role denials are covered
+// by campaign-export-access.test.ts against actual sessions and memberships.
+vi.mock("@/lib/workspace-membership.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-membership.server")>()),
+  getUserRole: vi.fn(async () => ({ role: "member" })),
+  requireWorkspaceAccess,
+}));
+
 const campaignIvrMocks = vi.hoisted(() => ({
   findCampaignExportMeta: vi.fn(),
 }));

@@ -1,3 +1,4 @@
+import { RouterContextProvider } from "react-router";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
@@ -108,13 +109,9 @@ describe("campaign export voice adapters", () => {
       form.set("campaignId", "7");
       form.set("workspaceId", "ws-1");
 
+      const request = new Request("http://localhost/api/campaign-export", { method: "POST", body: form });
       const response = await asRouteResponse(
-        mod.action({
-          request: new Request("http://localhost/api/campaign-export", {
-            method: "POST",
-            body: form,
-          }),
-        } as any),
+        mod.action({ request, url: new URL(request.url), params: {}, context: new RouterContextProvider() }),
       );
 
       expect(response.status).toBe(200);
@@ -123,6 +120,7 @@ describe("campaign export voice adapters", () => {
         "ws-1",
         "export-1",
         "Voice campaign",
+        { kind: "user", userId: "user-1" },
       );
       expect(mocks.processMessageCampaignExport).not.toHaveBeenCalled();
     },
@@ -149,6 +147,7 @@ describe("campaign export voice adapters", () => {
         "ws-1",
         "export-1",
         "Voice campaign",
+        { kind: "user", userId: "user-1" },
       );
     },
   );
@@ -162,10 +161,10 @@ describe("campaign export voice adapters", () => {
 
       const result = await campaignExportHandler(
         {
-          id: 1,
+          id: 1, type: "campaign_export", params: {}, attempt_count: 1, max_attempts: 3,
           workspace_id: "ws-1",
           user_id: "user-1",
-        } as any,
+        },
         {
           campaignId: 7,
           exportId: "export-1",
@@ -181,7 +180,20 @@ describe("campaign export voice adapters", () => {
         "ws-1",
         "export-1",
         "Voice campaign",
+        { kind: "user", userId: "user-1" },
       );
     },
   );
+  test("a worker job without a user uses explicit system authority", async () => {
+    const { campaignExportHandler } = await import("@/lib/worker/handlers/campaign.server");
+    await campaignExportHandler(
+      { id: 2, type: "campaign_export", params: {}, attempt_count: 1, max_attempts: 3,
+        workspace_id: "ws-1", user_id: null },
+      { campaignId: 7, exportId: "system-export", campaignName: "Voice campaign", campaignType: "live_call", workspaceId: "ws-1" },
+    );
+    expect(mocks.processCallCampaignExport).toHaveBeenCalledWith(
+      7, "ws-1", "system-export", "Voice campaign", { kind: "system" },
+    );
+  });
+
 });

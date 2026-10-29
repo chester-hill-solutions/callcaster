@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import { db, type Database } from "@/server/db";
 import { formatSurveyAnswer } from "@/lib/survey-format";
+import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
 
 export { formatSurveyAnswer };
 import { createTenantDb } from "@/server/tenant-db";
@@ -253,6 +254,13 @@ export async function loadRecentSurveyResponses(surveyInternalId: number, limit 
             phone: contactTable.phone,
           })
           .from(contactTable)
+          .innerJoin(
+            surveyTable,
+            and(
+              eq(surveyTable.id, surveyInternalId),
+              eq(contactTable.workspace, surveyTable.workspace),
+            ),
+          )
           .where(inArray(contactTable.id, contactIds));
 
   const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
@@ -583,6 +591,12 @@ type SubmittedSurveyAnswer = {
   answer_value: string | string[];
 };
 
+async function isSurveyRespondentAllowed(contactId: number | null, workspaceId: string) {
+  if (contactId === null) return true;
+  if (!Number.isSafeInteger(contactId) || contactId <= 0) return false;
+  return (await loadSurveyRespondentContact(contactId, workspaceId)) !== null;
+}
+
 export async function submitSurveyResponse(args: {
   surveyPublicId: string;
   responseData: {
@@ -601,11 +615,16 @@ export async function submitSurveyResponse(args: {
     return { ok: false as const, error: "Survey is not active", status: 400 };
   }
 
+  const contactId = args.responseData.contact_id ?? null;
+  if (!(await isSurveyRespondentAllowed(contactId, survey.workspace))) {
+    return { ok: false as const, error: "Invalid contact", status: 400 };
+  }
+
   const nowIso = new Date().toISOString();
   const created = await getOrCreateSurveyResponse({
     surveyInternalId: survey.id,
     resultId: args.responseData.result_id,
-    contactId: args.responseData.contact_id ?? null,
+    contactId,
     startedAt: nowIso,
     lastPageCompleted: args.responseData.last_page_completed ?? null,
   });

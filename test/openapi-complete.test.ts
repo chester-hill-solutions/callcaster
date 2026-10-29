@@ -1,8 +1,21 @@
 import { describe, expect, test } from "vitest";
 
+import { openApiSpec } from "../app/lib/openapi";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
 
 describe("complete openapi json export contract", () => {
+  test.each([
+    ["public", openApiSpec],
+    ["complete", completeOpenApiSpec],
+  ])("%s spec requires workspace scope for number search", (_name, spec) => {
+    expect(spec.paths["/api/numbers"].get).toMatchObject({
+      security: [{ sessionCookie: [] }, { secureSessionCookie: [] }],
+      parameters: [
+        { name: "workspace_id", in: "query", required: true },
+      ],
+    });
+  });
+
   test("path count matches documentable inventory scale", () => {
     const pathCount = Object.keys(completeOpenApiSpec.paths).length;
     expect(pathCount).toBeGreaterThan(50);

@@ -105,7 +105,7 @@ async function runCallExport(args: {
   ]);
 
   const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
-  await processCallCampaignExport(123, "w1", "export-1", "Test campaign");
+  await processCallCampaignExport(123, "w1", "export-1", "Test campaign", { kind: "system" });
 
   const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
   if (!csvUpload) throw new Error("expected a .csv upload from the export");
@@ -146,7 +146,7 @@ describe("voice campaign export credits", () => {
     mocks.campaignExportDb.findExportCallsByOutreachAttemptIds.mockResolvedValue([]);
 
     const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
-    await processCallCampaignExport(123, "w1", "export-label", "Test campaign");
+    await processCallCampaignExport(123, "w1", "export-label", "Test campaign", { kind: "system" });
 
     const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
     if (!csvUpload) throw new Error("expected a .csv upload from the export");
@@ -211,7 +211,7 @@ describe("voice campaign export credits", () => {
     mocks.campaignExportDb.findExportCallsByOutreachAttemptIds.mockResolvedValue([]);
 
     const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
-    await processCallCampaignExport(123, "w1", "export-ivr-answer", "Test campaign");
+    await processCallCampaignExport(123, "w1", "export-ivr-answer", "Test campaign", { kind: "system" });
 
     const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
     if (!csvUpload) throw new Error("expected a .csv upload from the export");

@@ -22,7 +22,7 @@ type OutboundEstimateInputs = {
 };
 
 const TWILIO_THROUGHPUT_DOCS_URL =
-  "https://www.twilio.com/docs/messaging/guides/best-practices-at-scale";
+  "https://www.twilio.com/docs/voice/api/call-resource#calls-per-second-cps";
 
 function toCapabilities(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {

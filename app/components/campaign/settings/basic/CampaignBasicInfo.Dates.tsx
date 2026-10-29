@@ -3,7 +3,8 @@ import WeeklyScheduleTable from "./CampaignBasicInfo.Schedule";
 import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/ui/datetime";
 import { Label } from "@/components/ui/label";
-import { Clock } from "lucide-react";
+import { SectionHeader } from "@/components/shared/Section";
+import { ScheduleSummary } from "./CampaignBasicInfo.ScheduleSummary";
 import { logger } from "@/lib/logger.client";
 import {
   Campaign,
@@ -281,55 +282,6 @@ export default function SelectDates({
     };
   }
 
-  // A stored interval that spans the whole day (e.g. 00:00–23:59) still spans
-  // the whole day after the UTC→local shift; render it as "All day" instead of
-  // a wrapped range like "20:00 - 19:59".
-  const intervalCoversFullDay = (interval: ScheduleInterval) => {
-    const toMinutes = (time: string) => {
-      const parts = time.split(":");
-      const hours = Number(parts[0]);
-      const minutes = Number(parts[1]);
-      return Number.isFinite(hours) && Number.isFinite(minutes)
-        ? hours * 60 + minutes
-        : null;
-    };
-    const start = toMinutes(interval.start);
-    const end = toMinutes(interval.end);
-    if (start === null || end === null) return false;
-    return (end - start + 1440) % 1440 >= 1439;
-  };
-
-  const getScheduleSummary = () => {
-    const activeDays = DAYS_OF_WEEK
-      .map(day => ({
-        day,
-        schedule: currentSchedule[day]
-      }))
-      .filter(({ schedule }) => schedule?.active)
-      .map(({ day, schedule }) => ({
-        day: day.charAt(0).toUpperCase() + day.slice(1),
-        time: schedule?.intervals?.[0]
-          ? intervalCoversFullDay(schedule.intervals[0])
-            ? "All day"
-            : `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}`
-          : "All day",
-      }));
-
-    if (!activeDays?.length) return copy.empty;
-    if (activeDays.length === 7 && activeDays.every((day) => day.time === "All day"))
-      return "24/7";
-
-    return (
-      <ul className="space-y-1 list-disc pl-4">
-        {activeDays.map(({ day, time }) => (
-          <li key={day} className="text-sm">
-            <span className="font-medium">{day}:</span> {time}
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -366,29 +318,31 @@ export default function SelectDates({
       </div>
 
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <Clock className="shrink-0 text-muted-foreground" size={20} />
-            <Label className="font-semibold">{copy.label}</Label>
-          </div>
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.preventDefault();
-              setShowSchedule(!showSchedule)
-            }}
-            size="sm"
-            aria-label={showSchedule ? `Hide ${copy.label}` : `Edit ${copy.label}`}
-            aria-expanded={showSchedule}
-          >
-            {showSchedule ? copy.hide : copy.show}
-          </Button>
-        </div>
+        <SectionHeader
+          compact
+          title={copy.label}
+          actions={
+            <Button
+              variant="outline"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowSchedule(!showSchedule)
+              }}
+              size="sm"
+              aria-label={showSchedule ? `Hide ${copy.label}` : `Edit ${copy.label}`}
+              aria-expanded={showSchedule}
+            >
+              {showSchedule ? copy.hide : copy.show}
+            </Button>
+          }
+        />
 
         {!showSchedule && (
-          <div className="rounded-md bg-brand-secondary/40 p-4 dark:bg-brand-secondary/15">
-            {getScheduleSummary()}
-          </div>
+          <ScheduleSummary
+            schedule={currentSchedule}
+            timeZone={timeZone}
+            emptyLabel={copy.empty}
+          />
         )}
         <p className="text-xs text-muted-foreground">
           Times are shown in your local time zone (
