@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Security: Survey submissions reject contacts outside the survey workspace before saving a response. Recent responses show valid contact details and hide legacy foreign references ([#2864](https://github.com/chester-hill-solutions/callcaster/issues/2864)).
 - Security: Database failures no longer copy SQL parameter values or credential fields into application logs, operations email, error reports or onboarding responses. Safe error codes and operation context remain available ([PR #3069](https://github.com/chester-hill-solutions/callcaster/pull/3069), [#2866](https://github.com/chester-hill-solutions/callcaster/issues/2866)).
 - Fixed: IVR queue estimates include durable worker polling and show consistent calls/minute units ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Fixed: IVR voicemail drops wait for the recipient's greeting to finish before playback, including campaign test calls. All documented machine greeting-end results use the voicemail path ([#2774](https://github.com/chester-hill-solutions/callcaster/issues/2774)).
