@@ -82,7 +82,7 @@ export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPort
       configuredDispatcherSmsMps: LEGACY_MESSAGE_PIPELINE_MPS,
       twilioAssumedSmsMps: 1,
       legacyDispatcherVoiceCps: LEGACY_IVR_PIPELINE_CPS,
-      configuredDispatcherVoiceCps: LEGACY_IVR_PIPELINE_CPS,
+      configuredDispatcherVoiceCps: configuredDispatcherVoiceCps(DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG),
       voiceConcurrentCallLimit: DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.voiceConcurrentCallLimit,
       parallelDispatchEnabled: false,
       smsSenderClass: "unknown",

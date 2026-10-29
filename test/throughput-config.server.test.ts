@@ -50,8 +50,7 @@ describe("throughput-config.server", () => {
   });
 
   test("legacy dispatcher rates when parallel dispatch is disabled", () => {
-    // Pinned literals: the legacy rates (2 mps / 1000ms-per-700ms
-    // call) are the contract; changing the constants must fail this test.
+    // Pinned defaults: legacy SMS is 2 MPS; voice uses the one-CPS default.
     expect(
       configuredDispatcherSmsMps({
         parallelDispatchEnabled: false,
@@ -63,7 +62,7 @@ describe("throughput-config.server", () => {
         parallelDispatchEnabled: false,
         voiceTargetCps: 10,
       }),
-    ).toBe(1000 / 700);
+    ).toBe(1);
   });
 
   test("parallel dispatcher uses configured targets", () => {

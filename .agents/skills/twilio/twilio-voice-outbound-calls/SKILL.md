@@ -193,6 +193,15 @@ Recordings accessible at `https://api.twilio.com/2010-04-01/Accounts/{AccountSid
 
 ## Answering Machine Detection (AMD)
 
+For CallCaster throughput work, reuse `createStartPacer` from
+`app/lib/campaign-dispatch-pacing.server.ts` immediately before each provider
+request, including retries. Recheck calling hours after the pacing wait.
+Derive IVR batch size, successor spacing and the queue estimate from
+`ivrDispatchPacing`; an eligible future job must wake its own worker lane on
+time. Test actual request timestamps, fractional rates and a window closing
+during the wait. More caller numbers do not raise the account's approved CPS.
+See [Twilio's account CPS contract](https://www.twilio.com/docs/voice/api/call-resource#calls-per-second-cps).
+
 Detect whether a human or voicemail answers before connecting an agent or leaving a message. Two modes:
 
 | Mode | Behavior | Best for |

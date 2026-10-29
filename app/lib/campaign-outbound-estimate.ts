@@ -9,10 +9,8 @@ import type {
 import {
   configuredDispatcherSmsMps,
   configuredDispatcherVoiceCps,
-  claimBatchSizeForRate,
-  DEFAULT_WORKER_POLL_INTERVAL_MS,
-  DISPATCH_TICK_MS,
-  LEGACY_IVR_PIPELINE_CPS,
+  defaultVoiceTargetCps,
+  ivrDispatchPacing,
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "@/lib/throughput-config";
@@ -186,7 +184,7 @@ function estimateTwilioDialAttemptsPerSecond(
   if (portalConfig.parallelDispatchEnabled) {
     return Math.max(0.1, portalConfig.voiceTargetCps);
   }
-  return LEGACY_IVR_PIPELINE_CPS;
+  return defaultVoiceTargetCps();
 }
 
 export function estimateMessageCampaignOutbound(
@@ -270,12 +268,10 @@ export function estimateIvrCampaignOutbound(
   const configuredDispatcherDialAttemptsPerSecond = configuredDispatcherVoiceCps(
     input.portalConfig,
   );
-  // A successor is scheduled after the batch finishes. An otherwise idle
-  // worker misses that future job and sleeps until its next poll. The old
-  // queue-next + webhook-delay heuristic did not include this durable loop.
-  const batchSize = claimBatchSizeForRate(configuredDispatcherDialAttemptsPerSecond);
-  const pipelineDialAttemptsPerSecond = batchSize * 1000 /
-    Math.max(DISPATCH_TICK_MS, DEFAULT_WORKER_POLL_INTERVAL_MS);
+  // The provider-start pacer and successor share this interval. The worker
+  // now wakes when the successor is due instead of imposing its idle ceiling.
+  const { minStartIntervalMs } = ivrDispatchPacing(input.portalConfig);
+  const pipelineDialAttemptsPerSecond = 1000 / minStartIntervalMs;
   const effectiveDialAttemptsPerSecond = Math.min(
     pipelineDialAttemptsPerSecond,
     configuredDispatcherDialAttemptsPerSecond,
@@ -308,7 +304,7 @@ export function estimateIvrCampaignOutbound(
   }
   if (!input.portalConfig.parallelDispatchEnabled) {
     warnings.push(
-      "Legacy IVR batch sizing is enabled. The estimate includes the worker's idle polling interval.",
+      "Default voice pacing is one call per second. Higher rates need approved provider capacity.",
     );
   }
 
@@ -326,7 +322,7 @@ export function estimateIvrCampaignOutbound(
     footnotes: [
       "Dial-attempt rate reflects dial starts per second, not completed calls.",
       "Queue rows are dequeued when a dial is accepted. Final calls can remain active after the queue finishes.",
-      "Planning assumes one dispatch worker at its default polling interval; provider and database latency, other jobs, recipient calling hours and retries can change the actual rate.",
+      "Planning includes request spacing and the next-batch delay; provider and database latency, other jobs, recipient calling hours and retries can reduce actual throughput.",
     ],
   };
 }

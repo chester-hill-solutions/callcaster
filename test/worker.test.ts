@@ -7,6 +7,9 @@ import {
   failJob,
   runWorkerPollLoop,
 } from "@/lib/worker/poll-jobs.server";
+import { ivrDispatchPacing } from "@/lib/throughput-config";
+import { createStartPacer } from "@/lib/campaign-dispatch-pacing.server";
+import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
 type JobRow = {
   id: number;
@@ -72,9 +75,28 @@ const mockState = vi.hoisted(() => {
     return undefined;
   }
 
+  function refreshClock() {
+    if (vi.isFakeTimers()) state.now = new Date(Date.now());
+  }
+
+  function futureJobDelay() {
+    const times = state.jobs.flatMap(job => {
+      const retryAt = job.retry_at;
+      return job.status === "queued" && job.attempt_count < job.max_attempts &&
+        retryAt && new Date(retryAt) > state.now ? [new Date(retryAt).getTime()] : [];
+    });
+    const earliest = Math.min(...times);
+    return [{ delay_ms: Number.isFinite(earliest) ? earliest - state.now.getTime() : null }];
+  }
+
   function mockExecute(query: any) {
+    refreshClock();
     const queryString = getQueryString(query);
     const currentNow = state.now.toISOString();
+
+    if (queryString.includes("MIN(retry_at)")) {
+      return futureJobDelay();
+    }
 
     // Reset stale claims
     if (
@@ -298,7 +320,7 @@ beforeEach(() => {
 });
 
 describe("worker poll-jobs lifecycle", () => {
-  test("a one-second successor waits for the default five-second idle poll (#1874)", async () => {
+  test("wakes for a one-second successor instead of losing five seconds to idle polling (#3007)", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(mockState.baseTime);
     const controller = new AbortController();
@@ -307,15 +329,11 @@ describe("worker poll-jobs lifecycle", () => {
     const loop = runWorkerPollLoop(controller.signal, {
       campaign_dispatch: async () => {
         starts.push(Date.now());
-        if (starts.length === 2) {
-          controller.abort();
-        } else {
-          mockState.state.jobs.push(createJob({
-            id: 101,
-            type: "campaign_dispatch",
-            retry_at: new Date(Date.now() + 1000).toISOString(),
-          }));
-        }
+        if (starts.length === 2) controller.abort();
+        else mockState.state.jobs.push(createJob({
+          id: 101, type: "campaign_dispatch",
+          retry_at: new Date(Date.now() + 1000).toISOString(),
+        }));
       },
     });
     try {
@@ -323,17 +341,57 @@ describe("worker poll-jobs lifecycle", () => {
       expect(starts).toHaveLength(1);
       mockState.state.now = new Date(mockState.baseTime.getTime() + 1000);
       await vi.advanceTimersByTimeAsync(1000);
-      expect(starts).toHaveLength(1);
-      mockState.state.now = new Date(mockState.baseTime.getTime() + 5000);
-      await vi.advanceTimersByTimeAsync(4000);
-      await loop;
-      expect(starts[1] - starts[0]).toBe(5000);
+      expect(starts).toHaveLength(2);
+      expect(starts[1] - starts[0]).toBe(1000);
     } finally {
       controller.abort();
       await loop;
       vi.useRealTimers();
     }
   });
+  test.each([
+    { cps: 0.1, expected: 6, interval: 10000 },
+    { cps: 1, expected: 60, interval: 1000 },
+    { cps: 2.5, expected: 150, interval: 400 },
+    { cps: 5, expected: 300, interval: 200 },
+  ])("one-minute worker benchmark respects $cps CPS within and between batches (#3007)", async ({ cps, expected, interval }) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(mockState.baseTime);
+    const startAt = Date.now();
+    const starts: number[] = [];
+    const controller = new AbortController();
+    const plan = ivrDispatchPacing(makePortalConfig({ parallelDispatchEnabled: cps !== 1, voiceTargetCps: cps }));
+    let nextId = 200;
+    const addJob = (retryAt: number) => mockState.state.jobs.push(createJob({
+      id: nextId++, type: "campaign_dispatch", retry_at: new Date(retryAt).toISOString(),
+    }));
+    addJob(startAt);
+    const loop = runWorkerPollLoop(controller.signal, {
+      campaign_dispatch: async () => {
+        const pacer = createStartPacer(plan.minStartIntervalMs);
+        for (let i = 0; i < plan.batchSize; i++) {
+          await pacer.waitForTurn();
+          const elapsed = Date.now() - startAt;
+          if (elapsed >= 60_000) { controller.abort(); break; }
+          starts.push(elapsed);
+        }
+        if (!controller.signal.aborted) addJob(Date.now() + plan.minStartIntervalMs);
+      },
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(60_000);
+      controller.abort();
+      await loop;
+      expect(starts).toHaveLength(expected);
+      for (let i = 1; i < starts.length; i++) expect(starts[i] - starts[i - 1]).toBeGreaterThanOrEqual(interval);
+      process.stdout.write(`ivr.pacing_benchmark ${JSON.stringify({ cps, seconds: 60, starts: starts.length, firstMs: starts[0], lastMs: starts.at(-1), externalCalls: 0 })}\n`);
+    } finally {
+      controller.abort();
+      await loop;
+      vi.useRealTimers();
+    }
+  });
+
   test("claims a queued job", async () => {
     mockState.state.jobs.push(createJob({ id: 42, type: "test" }));
 

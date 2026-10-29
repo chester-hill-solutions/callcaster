@@ -35,19 +35,18 @@ const baseSyncSnapshot: WorkspaceTwilioSyncSnapshot = {
 };
 
 describe("campaign-outbound-estimate", () => {
-  test("IVR planning includes the durable worker's idle polling cadence (#1874)", () => {
+  test("IVR planning matches the due-aware one-CPS dispatch cadence (#3007)", () => {
     const estimate = estimateIvrCampaignOutbound({
       portalConfig: basePortalConfig,
       voiceCapableLocalNumbers: 1,
     });
-    // A legacy batch contains two calls, then its one-second successor waits
-    // for the worker's five-second idle poll. The reported screenshots show
-    // 144 dequeues in six minutes: 24/min, not the former 80/min estimate.
-    expect(estimate.effectiveDialAttemptsPerSecond * 60).toBe(24);
-    expect(estimate.effectiveCompletionPerSecond * 60).toBe(24);
+    // The due-aware worker and provider-start pacer target one call per second.
+    // The previous five-second idle wait limited legacy batches to 24/minute.
+    expect(estimate.effectiveDialAttemptsPerSecond * 60).toBe(60);
+    expect(estimate.effectiveCompletionPerSecond * 60).toBe(60);
   });
 
-  test("the reported six-minute queue progress keeps the projected finish stable (#1874)", () => {
+  test("six minutes of one-CPS progress keeps the projected finish stable (#3007)", () => {
     const { effectiveCompletionPerSecond: ratePerSecond } = estimateIvrCampaignOutbound({
       portalConfig: basePortalConfig, voiceCapableLocalNumbers: 1,
     });
@@ -55,9 +54,9 @@ describe("campaign-outbound-estimate", () => {
       queueCount: 2600, ratePerSecond, now: new Date("2026-10-21T12:28:00Z"),
     });
     const after = estimateOutboundCompletion({
-      queueCount: 2456, ratePerSecond, now: new Date("2026-10-21T12:34:00Z"),
+      queueCount: 2240, ratePerSecond, now: new Date("2026-10-21T12:34:00Z"),
     });
-    expect(before?.averageFinish.toISOString()).toBe("2026-10-21T14:16:20.000Z");
+    expect(before?.averageFinish.toISOString()).toBe("2026-10-21T13:11:20.000Z");
     expect(after?.averageFinish).toEqual(before?.averageFinish);
   });
   test("SMS estimate is pipeline-capped when Twilio heuristic is high", () => {
@@ -109,7 +108,7 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.pipelineDialAttemptsPerSecond).toBeCloseTo(
-      0.4,
+      1,
     );
   });
 
@@ -120,7 +119,7 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.effectiveDialAttemptsPerSecond).toBeCloseTo(
-      4,
+      20,
       3,
     );
     expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(100 / 75, 3);
