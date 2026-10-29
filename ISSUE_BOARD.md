@@ -59,6 +59,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A workspace credential can mutate only inbound entries owned by that workspace.; Require workspace scope in every offer RPC and remove unscoped overloads.; Keep valid callbacks, accepted offers, stale cleanup and failed call-start cleanup working.
 - Tracker: Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, hierarchy or dependencies; organization fields unset. CHS backlog Status In progress. The earlier on-dev claim cited PR #2900, whose actual diff is board/enrichment only. PR #3063 is the runtime fix candidate into dev, linked only to #2860. Keep open for merge, deployed verification and release.
 
+### [#2626](https://github.com/chester-hill-solutions/callcaster/issues/2626) Group identical calling hours in the collapsed campaign summary
+- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
+- PR #3034 groups matching campaign schedules in a compact shared-text summary. Review, merge and deployed acceptance remain.
+- Current behavior: At dev@a4d22ee5, SelectDates shows one row per active day in a padded colored block, hides inactive days and reads only the first interval. An active day without intervals is described as All day. The reviewed candidate in open PR #3034 is not merged into dev or master.
+- Root cause: The collapsed presentation filters active days before rendering and reads intervals[0]. It has no grouping by complete interval sets, so later-interval exceptions disappear and identical days repeat. Summary presentation owns decorative block styling instead of using shared section/text treatment.
+- Resolution: Review PR #3034 and its exact-head checks. ScheduleSummary copies and sorts complete interval sets for comparison, groups matching days, shows inactive exceptions and all local intervals, and distinguishes missing intervals from full-day ranges. Keep the existing channel-specific saved fields, editor, timezone conversion and calling-window safeguards. Verify on deployed dev after merge, then complete release acceptance.
+- Look in: `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.ScheduleSummary.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx`, `test/ui/campaign-schedule-summary.test.tsx`, `test/ui/campaign-weekly-schedule.test.tsx`
+- Existing tests: The focused run passes 33 cases: 16 new summary cases across calls and SMS, six real weekly-editor controls and 11 existing campaign cases. Coverage includes identical days, complete sets in different orders, later-interval exceptions, inactive groups, full-day and overnight ranges, missing intervals, empty states, distinct saved fields and Edit/Hide with later intervals retained.; Original Dates fails 12 cases while 10 controls pass. Targeted faults fail two cases for in-place sorting, two for first-interval grouping, six for omitted later intervals, four for omitted inactive days, 12 for raw UTC output and nine for wrong-channel reads. Positive controls remain and restored source passes all 22 fault-run cases with matching hashes. Dates warnings decrease from two to one; the new component and test have none.; The source commit passes full ci:local. Post-CI browser checks compare baseline/candidate compact height and exercise exceptions, both themes and both channels with real controls. See PR validation for the final commit, exact counts and browser dimensions.
+- Missing tests: After merge, verify collapsed schedules and the full weekly editor on deployed dev and complete release acceptance. Local browser checks use saved synthetic schedules; they do not prove authentication, production data access or provider dispatch. The existing calling-window enforcement is unchanged.
+- Done when: Group days only when their complete active interval sets match.; Keep differing days, inactive days and every daily interval discoverable.; Preserve full editor access and day-specific controls.; Retain local timezone display, full-day/overnight meaning and calling-window safeguards.; Keep separate saved schedules for calls and SMS.; Use shared section/text treatment without the large decorative summary block.
+- Tracker: Live inspection on 2026-10-26: OPEN Task, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3034 is open into dev and linked only to #2626. Keep open for merge, deployed verification and default-branch release acceptance.
+
+---
+
 ### [#2895](https://github.com/chester-hill-solutions/callcaster/issues/2895) Workspace-UI recording path stores the take before it measures its duration, and no maximum duration exists…
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-22
 - Recommended title: **Workspace-UI recording path stores the take before it measures its duration, and no maximum duration exists anywhere to compare against**
@@ -2333,10 +2347,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#2627](https://github.com/chester-hill-solutions/callcaster/issues/2627) Use route-navigation semantics for campaign sections
-- Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#2626](https://github.com/chester-hill-solutions/callcaster/issues/2626) Group identical calling hours in the collapsed campaign summary
 - Status: Backlog · Labels: ux · Assignee: @wra-sol · Updated: 2026-10-15
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 

@@ -701,6 +701,9 @@ push; run the full tier if the caller inventory is not complete.
 For React Aria controls, a DOM click can miss the native press action. If the
 control stays unchanged, inspect the current browser state and try native input.
 Confirm the dialog or selected value before claiming an interactive check.
+For native time inputs, a scripted fill can return without committing a change.
+Use native keyboard input when needed, then verify both the displayed time and
+the saved field or resulting summary before claiming an edit passed.
 
 Finish full CI and codegen writers before live Vite browser acceptance.
 Generated file rewrites can reload an active request fixture. Require a completed

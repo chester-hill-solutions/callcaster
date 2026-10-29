@@ -49,6 +49,41 @@
     "rootCause": "This issue is an acceptance-suite work item, not a code defect, so nothing in the tree can 'fix' it in the usual sense. The upstream dependency is #1827 'Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it', which the board still lists in the 'Blocked / split first' lane (ISSUE_BOARD.md:565-574) with #1356 (dev DNS/IaC) ahead of it. manual: true because the missing artefact is a dev-environment acceptance run that only a person with the dev Twilio account and dev environment credentials can execute."
   },
   {
+    "issueNumber": 2626,
+    "verdict": "fix-now",
+    "summary": "PR #3034 groups matching campaign schedules in a compact shared-text summary. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, SelectDates shows one row per active day in a padded colored block, hides inactive days and reads only the first interval. An active day without intervals is described as All day. The reviewed candidate in open PR #3034 is not merged into dev or master.",
+    "rootCause": "The collapsed presentation filters active days before rendering and reads intervals[0]. It has no grouping by complete interval sets, so later-interval exceptions disappear and identical days repeat. Summary presentation owns decorative block styling instead of using shared section/text treatment.",
+    "resolution": "Review PR #3034 and its exact-head checks. ScheduleSummary copies and sorts complete interval sets for comparison, groups matching days, shows inactive exceptions and all local intervals, and distinguishes missing intervals from full-day ranges. Keep the existing channel-specific saved fields, editor, timezone conversion and calling-window safeguards. Verify on deployed dev after merge, then complete release acceptance.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.ScheduleSummary.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "test/ui/campaign-schedule-summary.test.tsx",
+      "test/ui/campaign-weekly-schedule.test.tsx"
+    ],
+    "existingTests": [
+      "The focused run passes 33 cases: 16 new summary cases across calls and SMS, six real weekly-editor controls and 11 existing campaign cases. Coverage includes identical days, complete sets in different orders, later-interval exceptions, inactive groups, full-day and overnight ranges, missing intervals, empty states, distinct saved fields and Edit/Hide with later intervals retained.",
+      "Original Dates fails 12 cases while 10 controls pass. Targeted faults fail two cases for in-place sorting, two for first-interval grouping, six for omitted later intervals, four for omitted inactive days, 12 for raw UTC output and nine for wrong-channel reads. Positive controls remain and restored source passes all 22 fault-run cases with matching hashes. Dates warnings decrease from two to one; the new component and test have none.",
+      "The source commit passes full ci:local. Post-CI browser checks compare baseline/candidate compact height and exercise exceptions, both themes and both channels with real controls. See PR validation for the final commit, exact counts and browser dimensions."
+    ],
+    "missingTests": [
+      "After merge, verify collapsed schedules and the full weekly editor on deployed dev and complete release acceptance. Local browser checks use saved synthetic schedules; they do not prove authentication, production data access or provider dispatch. The existing calling-window enforcement is unchanged."
+    ],
+    "acceptanceCriteria": [
+      "Group days only when their complete active interval sets match.",
+      "Keep differing days, inactive days and every daily interval discoverable.",
+      "Preserve full editor access and day-specific controls.",
+      "Retain local timezone display, full-day/overnight meaning and calling-window safeguards.",
+      "Keep separate saved schedules for calls and SMS.",
+      "Use shared section/text treatment without the large decorative summary block."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Task, wra-sol, ux, CHS backlog Status In progress after the PR Development link; Priority, Effort and Enviornment unset, no milestone, hierarchy or dependencies. PR #3034 is open into dev and linked only to #2626. Keep open for merge, deployed verification and default-branch release acceptance."
+  },
+  {
     "issueNumber": 1874,
     "verdict": "fix-now",
     "summary": "The previous concurrency bound still uses an optimistic legacy rate and displays conflicting rate units; the reopened report is not fixed on the default branch.",
