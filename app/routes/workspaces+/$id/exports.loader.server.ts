@@ -50,7 +50,7 @@ interface LoaderData {
 
 export const loader = defineLoader({
   auth: ({ request, params }) =>
-    requireWorkspaceLoaderContext(request, params["id"]),
+    requireWorkspaceLoaderContext(request, params["id"], { minRole: "member" }),
   sideEffects: ["db-read", "external"],
   handler: async ({ auth }) => {
     if (!auth.ok) return auth.response;

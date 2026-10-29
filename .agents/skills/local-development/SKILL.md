@@ -88,6 +88,13 @@ When a service gains a scoped tenant-client read, update its orchestration
 fixtures at that boundary. Prove cross-workspace denials against the real
 database; a permissive query mock is not authorization evidence.
 
+When a pipeline gains caller-dependent authorization, inventory HTTP and worker
+callers. Pass the authenticated user for requests and explicit system authority
+for trusted jobs without a user. Test identity forwarding separately from SQL
+row filtering; an all-users fixture cannot prove those boundaries.
+For role-floor changes, search route and permission tests as well as function
+callers. Tests for a related artifact can pin old access on the same surface.
+
 For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the

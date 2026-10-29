@@ -459,30 +459,40 @@
     "issueNumber": 2882,
     "verdict": "fix-now",
     "recommendedTitle": "Campaign export hands the lowest-trust workspace role every agent's attempts and contact PII",
-    "summary": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents",
-    "currentBehavior": "A workspace member with the `caller` (\"Agent\") role can trigger a campaign results export and receive a CSV that contains every outreach attempt of that campaign, including the attempts made by other agents. Each row carries the contact's first name, surname, phone, email, street address and city, the attempt disposition, the call SID and the attempt's complete IVR answer set. The product's own scoped read path deliberately denies the same principal that view: getWorkspaceAnalyticsApi computes canViewAllUsers as owner/admin/member only (app/lib/platform-analytics.server.ts:57) and loadWorkspaceAnalytics then filters the outreach_attempt rows with outreach_attempt.user_id = currentUserId…",
-    "rootCause": "The campaign export selects outreach attempts by campaign_id alone and is gated on workspace membership alone. It omits both the per-agent (outreach_attempt.user_id) scope the platform applies to the same rows on its analytics path and the role floor the sibling artifact on the same export surface enforces (the sms-report export is admin-gated because it carries contact names, phone numbers and message text - the same data class the campaign CSV carries, ungated). So the export emits every agent's rows, and hands back a 24 hour pre-signed download URL, to a requester the product otherwise scopes to their own attempts.",
-    "resolution": "Apply the platform's own scope rule to the export surface instead of re-deriving one: raise every export-surface gate to the `member` floor the sibling write surfaces use (leaving the sms-report artifact on its stricter admin gate), including the two listing loaders that publish stored downloadUrl values, and pass the requester's identity into the export pipeline so the attempt selection can be narrowed to outreach_attempt.user_id = requester whenever the requester may not view all users, matching the canViewAllUsers rule the analytics path applies. Gating the listing loaders matters as much as gating the trigger: a `caller` that cannot start an export can still read a member's stored…",
+    "summary": "PR #3064 restricts export creation, status and saved links to members or higher, and carries requester scope into call CSV queries. Review, merge and deployed acceptance remain.",
+    "currentBehavior": "At dev@a4d22ee5, a caller can start campaign exports and retrieve other agents' saved download links. Tenant SQL correctly scopes the workspace, but call exports select every agent's attempts. The candidate in open PR #3064 is not merged into dev or master.",
+    "rootCause": "Legacy creation/status, workspace export services and the UI list require membership without a member role floor. Call-export count and paging queries filter campaign and workspace but omit requester user_id. The pipeline has no required requester identity, including its worker caller.",
+    "resolution": "Review PR #3064 and exact-head checks. Enforce member/admin/owner before export storage access on all creation, status and list paths; retain admin/owner for SMS reports. A required user/system actor carries authenticated identity through UI/API requests and user-owned worker jobs; trusted jobs without a user use explicit system authority. Canonical membership and role ranking choose all-agent or own-agent scope, shared by SQL count and paging before offset/limit. Public API notes and generated specs state the role rules. Existing signed URLs retain their 24-hour expiry. Verify deployed dev after merge, then release.",
     "lookIn": [
+      "app/routes/api+/campaign-export.action.server.ts",
+      "app/routes/api+/campaign-export-status.loader.server.ts",
+      "app/routes/workspaces+/$id/exports.loader.server.ts",
       "app/lib/platform-analytics.server.ts",
-      "app/lib/workspace-analytics.server.ts",
-      "app/components/analytics/WorkspaceAnalyticsPanel.tsx",
-      "app/lib/campaign-export-db.server.ts",
       "app/lib/campaign-export.server.ts",
-      "app/lib/campaign-export-helpers.server.ts"
+      "app/lib/campaign-export-db.server.ts",
+      "app/lib/campaign-export-types.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "test/integration-db/campaign-export-access.test.ts"
     ],
     "existingTests": [
-      "8 of 8 assertions passed against the private Postgres 18. The real export route action, invoked with the `caller` member's session, returned an exportId (no error), i.e. the membership-only gate admitted the lowest-trust role. The artifact it produced (captured at the object-storage boundary) contained BOTH attempts:…"
+      "24 real Better Auth session/Postgres cases pass with zero skips. They exercise legacy start/status, both workspace API methods through data-plane middleware and the UI list through workspace middleware; caller denials precede storage, members retain exports, non-member API requests get 404, SMS status remains admin/owner, caller SQL filtering precedes paging, and user/system CSVs exclude foreign workspace rows.",
+      "Original source executes 24 cases: 9 expected failures and 15 passing controls. Removing role floors fails 5/24; SQL user filters 3/24; user-policy bypass 2/24; requester wiring 6/7 thin-adapter cases while the explicit system control passes. Restored source passes all 24 with matching hashes. Email delivery, object storage and promise tracking are intercepted; session auth, membership SQL and CSV generation remain real, and background work is awaited before cleanup.",
+      "64 focused export cases, 26 SMS-report authorization cases and 97 other worker/OpenAPI contract cases pass. Typecheck/codegen pass. Baseline lint comparison across 12 changed TypeScript files adds no warning debt. Full source ci:local passes on the clean commit; the PR records exact source/final heads and full-suite counts."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "After merge, verify role denials and valid exports on deployed dev, then complete release acceptance. Local proof uses dummy identities and in-memory storage, so it does not prove deployed storage or invalidate download URLs already issued before this fix. Those URLs retain their existing 24-hour expiry."
     ],
     "acceptanceCriteria": [
-      "An export must not contain data above the requester's access level. The platform's scope rule is source-visible: app/lib/platform-analytics.server.ts:57 excludes the `caller` role from canViewAllUsers and app/lib/workspace-analytics.server.ts:41-49 then filters attempts to outreach_attempt.user_id = currentUserId. Sibling surfaces that act on the same records gate on role or capability: app/routes/api+/campaign_audience.action.server.ts:76 and app/routes/api+/contacts/$contactId.action.server.ts:25 both require the `member` role, and app/routes/api+/campaigns/$campaignId.action.server.ts:32 likewise. The same export surface already gates the sibling sms-report artifact behind `admin` for carrying contact names, phone numbers and message text (app/routes/api+/campaign-export-status.loader.server.ts:60-62). A `caller` should therefore not be able to bulk-read other agents' call results."
+      "Require member/admin/owner for campaign export creation, status and saved-link lists.",
+      "Keep SMS reports restricted to admin/owner.",
+      "Use canonical role rules and authenticated requester identity for call-export scope.",
+      "Filter both SQL totals and paging to the allowed agent rows without widening workspace or campaign scope.",
+      "Keep valid user-owned and trusted system worker exports working."
     ],
+    "blockedBy": [],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, parent, children or dependencies; organization fields unset. CHS backlog Status In progress. PR #3064 is open into dev and linked only to #2882. Keep open for merge, deployed verification and release."
   },
   {
     "issueNumber": 2883,
