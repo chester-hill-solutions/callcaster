@@ -484,6 +484,19 @@ Prove that a real call insert can reference the locked workspace and queue,
 and that a concurrent requeue still cannot change the intent. `FOR UPDATE`
 can block the key-share locks from those inserts and create a lock cycle.
 See [PostgreSQL row lock modes](https://www.postgresql.org/docs/18/explicit-locking.html#LOCKING-ROWS).
+
+For durable provider recovery, remove referenced product data both before the
+create reply and after call persistence. A saved SID does not prove its call row
+survived a cascading delete. Restore only verified provider records, keep missing
+links null, scope surviving links to the tenant and lock them through insertion.
+Prove signed callbacks, lost replies, known-SID recovery and repeated settlement;
+do not infer a rejection or send another call because a local link disappeared.
+
+Use command-scoped `VITEST_MAX_WORKERS=1` for shared real-database suites.
+Vitest applies this environment override after `fileParallelism: false`, so a
+broader gate's two-worker setting can let a global recovery scan claim another
+file's dummy holds. Keep exact recovery assertions; serialize the fixtures.
+
 Read current enum values before seeding companion rows. Script and campaign
 types can use different vocabularies; a script type does not prove a valid
 campaign enum.

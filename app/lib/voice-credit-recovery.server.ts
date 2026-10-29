@@ -77,7 +77,6 @@ async function findUnknownCall(reservation: VoiceReservation, twilio: Twilio.Twi
     })) matches.push(candidate);
   }
   if (matches.length !== 1 || !matches[0]) return null;
-  await recordVoiceReservationProvider(reservation, matches[0].sid);
   return matches[0];
 }
 
@@ -99,6 +98,7 @@ async function reconcileVoiceReservation(reservation: VoiceReservation) {
     : await findUnknownCall(reservation, twilio);
   if (!remote || !matchesReservation(reservation, remote) ||
       (reservation.provider_sid && remote.sid !== reservation.provider_sid)) return "pending";
+  await recordVoiceReservationProvider(reservation, remote.sid);
   const duration = terminalDuration(remote.status, remote.duration);
   if (duration === null) return "pending";
   await processCallStatusWebhook({
@@ -107,9 +107,7 @@ async function reconcileVoiceReservation(reservation: VoiceReservation) {
     status: remote.status, duration: String(duration),
     date_updated: remote.dateUpdated ?? new Date(), end_time: remote.endTime ?? undefined,
   }, {
-    workspaceId: reservation.workspace, campaignId: reservation.campaign_id,
-    contactId: reservation.contact_id, outreachAttemptId: reservation.outreach_attempt_id,
-    userId: reservation.user_id, note: `Call ${remote.sid} (credit reservation recovery)`,
+    workspaceId: reservation.workspace, note: `Call ${remote.sid} (credit reservation recovery)`,
   });
   return "settled";
 }

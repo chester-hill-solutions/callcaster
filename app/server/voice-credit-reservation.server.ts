@@ -126,8 +126,8 @@ export async function recordVoiceReservationProvider(reservation: VoiceReservati
     if (!row || !row.send_started_at || row.state === "released" || (row.provider_sid && row.provider_sid !== callSid)) {
       throw new Error("Voice credit reservation is no longer owned");
     }
-    if (row.provider_sid === callSid) return row;
     await persistReservedVoiceCall(tx, row, callSid);
+    if (row.provider_sid === callSid) return row;
     const [saved] = await tx.update(reservations).set({ provider_sid: callSid, state: "active", updated_at: new Date() })
       .where(eq(reservations.id, row.id)).returning();
     return saved;
