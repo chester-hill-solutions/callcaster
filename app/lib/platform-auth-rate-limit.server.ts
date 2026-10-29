@@ -7,7 +7,6 @@ import { jsonError } from "@/lib/platform-api.server";
 
 export type AuthRateLimitScope =
   | "auth:register"
-  | "auth:token"
   | "auth:refresh"
   | "auth:forgot-password"
   | "auth:sign-in"
@@ -20,12 +19,11 @@ const LIMITS: Record<
   { limit: number; windowMs: number }
 > = {
   "auth:register": { limit: 10, windowMs: 60_000 },
-  "auth:token": { limit: 30, windowMs: 60_000 },
   "auth:refresh": { limit: 60, windowMs: 60_000 },
   "auth:forgot-password": { limit: 10, windowMs: 60_000 },
   // Credential + TOTP guesses via the Better Auth handler.
   "auth:sign-in": { limit: 10, windowMs: 60_000 },
-  // Remaining Better Auth POSTs (sign-out, session revoke, …).
+  // Sign-out and session revocation; credential and unknown POSTs stay strict.
   "auth:catch-all": { limit: 30, windowMs: 60_000 },
   "auth:reset-password": { limit: 10, windowMs: 60_000 },
   // Unauthenticated OTP verification — 6-digit codes are guessable.

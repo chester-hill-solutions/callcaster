@@ -90,11 +90,11 @@ describe("platform auth rate limits", () => {
       headers: { "x-forwarded-for": "203.0.113.1" },
     });
 
-    for (let i = 0; i < 30; i += 1) {
-      expect(await enforceAuthRateLimit(request, "auth:token")).toBeNull();
+    for (let i = 0; i < 10; i += 1) {
+      expect(await enforceAuthRateLimit(request, "auth:sign-in")).toBeNull();
     }
 
-    const limited = await enforceAuthRateLimit(request, "auth:token");
+    const limited = await enforceAuthRateLimit(request, "auth:sign-in");
     expect(limited?.status).toBe(429);
     expect(limited?.headers.get("Retry-After")).toBeTruthy();
   });

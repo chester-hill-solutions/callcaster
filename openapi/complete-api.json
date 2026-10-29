@@ -1290,7 +1290,7 @@
       "post": {
         "operationId": "postAuth_*",
         "summary": "POST /api/auth/*",
-        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "description": "Better Auth catch-all. Credential and unknown POSTs allow 10 requests per 60-second window per IP. Sign-in, registration, password-reset request/completion and email OTP aliases share their application operation limits. Only exact sign-out and session-revocation POSTs allow 30/min. GET and HEAD do not consume these limits.",
         "tags": [
           "Public Form",
           "auth"
@@ -1349,7 +1349,7 @@
       "get": {
         "operationId": "getAuth_*",
         "summary": "GET /api/auth/*",
-        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "description": "Better Auth catch-all. Credential and unknown POSTs allow 10 requests per 60-second window per IP. Sign-in, registration, password-reset request/completion and email OTP aliases share their application operation limits. Only exact sign-out and session-revocation POSTs allow 30/min. GET and HEAD do not consume these limits.",
         "tags": [
           "Public Form",
           "auth"
@@ -1881,7 +1881,7 @@
       "post": {
         "operationId": "postAuth_token",
         "summary": "POST /api/auth/token",
-        "description": "",
+        "description": "Email/password sign-in shares a 10-request per 60-second window per IP limit with browser and Better Auth sign-in. Exhaustion returns 429 with Retry-After.",
         "tags": [
           "Public Form",
           "auth"

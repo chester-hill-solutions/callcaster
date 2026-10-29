@@ -149,6 +149,131 @@ describe("check-auth-rate-limits", () => {
     expect(result.out).toContain("somewhere-else.loader.server.ts");
   });
 
+  test.each([
+    ["tokenLogin", ""],
+    ["tokenLogin", 'auth: rateLimitedPostAuth("auth:catch-all"),'],
+    ["loginWithPassword", 'auth: rateLimitedPostAuth("auth:catch-all"),'],
+  ])(
+    "rejects %s with missing or wrong operation scope (%s)",
+    (helper, auth) => {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+      fs.mkdirSync(fixtureDir, { recursive: true });
+      writeRoute(
+        "credential.action.server.ts",
+        `
+      import { ${helper} } from "@/lib/platform-auth.server";
+      export const action = { ${auth} handler: (r: Request) => ${helper}(r, {}) };
+    `,
+      );
+      const result = runGate();
+      expect(result.code).toBe(1);
+      expect(result.out).toContain(helper);
+    },
+  );
+
+  test("checks token login when its import has a local alias", () => {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+    fs.mkdirSync(fixtureDir, { recursive: true });
+    writeRoute(
+      "aliased.action.server.ts",
+      `
+      import { tokenLogin as login } from "@/lib/platform-auth.server";
+      export const action = { auth: rateLimitedPostAuth("auth:catch-all"), handler: (r: Request) => login(r, {}) };
+    `,
+    );
+    expect(runGate().code).toBe(1);
+  });
+
+  test.each([
+    ["auth:sign-in", 0],
+    ["auth:catch-all", 1],
+  ])("checks the typed Better Auth API alias with scope %s", (scope, code) => {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+    fs.mkdirSync(fixtureDir, { recursive: true });
+    writeRoute(
+      "two-factor.action.server.ts",
+      `
+        import { auth } from "@/server/auth-instance";
+        const authApi = auth.api as typeof auth.api & { verifyTOTP: Function };
+        export const action = { auth: rateLimitedPostAuth("${scope}"), handler: () => authApi.verifyTOTP({}) };
+      `,
+    );
+    expect(runGate().code).toBe(code);
+  });
+
+  test.each([
+    ["2fa:verify", 0],
+    ["2fa:enable", 1],
+  ])(
+    "checks the user-scoped 2FA setup limiter with scope %s",
+    (scope, code) => {
+      fs.rmSync(fixtureDir, { recursive: true, force: true });
+      fs.mkdirSync(fixtureDir, { recursive: true });
+      writeRoute(
+        "account.security.loader.server.ts",
+        `
+        import { auth } from "@/server/auth-instance";
+        const authApi = auth.api as typeof auth.api & { verifyTOTP: Function };
+        export const action = { handler: async (r: Request) => {
+          await enforceTwoFactorSetupRateLimit("fixture-user", "${scope}");
+          return authApi.verifyTOTP({});
+        }};
+      `,
+      );
+      expect(runGate().code).toBe(code);
+    },
+  );
+
+  test("a comment cannot supply a missing limiter or strict scope", () => {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+    fs.mkdirSync(fixtureDir, { recursive: true });
+    writeRoute(
+      "decoy.action.server.ts",
+      `
+      // rateLimitedPostAuth("auth:sign-in")
+      export const action = { handler: (r: Request) => loginWithPassword(r, "e", "p") };
+    `,
+    );
+    expect(runGate().code).toBe(1);
+  });
+
+  test.each([
+    ['"sign-up": "auth:register"', '"sign-up": "auth:catch-all"', "sign-up"],
+    [
+      '"request-password-reset": "auth:forgot-password"',
+      '"request-password-reset": "auth:catch-all"',
+      "request-password-reset",
+    ],
+    [
+      'AUTH_OPERATION_SCOPES[operation] ?? "auth:sign-in"',
+      'AUTH_OPERATION_SCOPES[operation] ?? "auth:catch-all"',
+      "strict default",
+    ],
+    [
+      '"/api/auth/sign-out",',
+      '"/api/auth/new-credential-plugin",',
+      "session lifecycle",
+    ],
+    [
+      '"sign-in": "auth:sign-in",',
+      '"new-credential-plugin": "auth:catch-all", "sign-in": "auth:sign-in",',
+      "strict credential scope",
+    ],
+    ["rateLimitScopeForAuthPath(url),", '"auth:catch-all",', "scope policy"],
+  ])("rejects a catch-all policy mutation: %s", (before, after, diagnostic) => {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+    fs.mkdirSync(fixtureDir, { recursive: true });
+    const source = fs.readFileSync(
+      path.join(ROOT, "app/routes/api+/auth/$.loader.server.ts"),
+      "utf8",
+    );
+    expect(source.split(before)).toHaveLength(2);
+    writeRoute("api+/auth/$.loader.server.ts", source.replace(before, after));
+    const result = runGate();
+    expect(result.code).toBe(1);
+    expect(result.out).toContain(diagnostic);
+  });
+
   // The live assertion: the real route tree is currently clean. If a future
   // change adds an unthrottled auth action, this fails as well as the gate.
   test("the real route tree has no unprotected auth surface", () => {

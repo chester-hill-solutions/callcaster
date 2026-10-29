@@ -6,7 +6,7 @@ import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
-  auth: rateLimitedPostAuth("auth:token"),
+  auth: rateLimitedPostAuth("auth:sign-in"),
   sideEffects: ["external"],
   handler: async ({ request }) => {
     const parsed = await parseJsonBodyOrResponse(request, tokenBodySchema);

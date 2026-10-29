@@ -50,3 +50,18 @@ Provider webhooks, internal telephony workers, legacy duplicates, and documented
 - [Telephony & dialer control](./api-telephony-control.md)
 - [Webhooks (Twilio & Stripe)](./api-webhooks.md)
 - [Internal & unsupported routes](./api-internal-unsupported.md)
+
+## Auth request limits
+
+The public sign-in and Better Auth credential routes allow 10 requests per
+60-second window per client IP. The browser sign-in, `POST /api/auth/token` and Better Auth sign-in share one limit.
+Registration, password-reset requests, password-reset completion and email OTP
+aliases each share the corresponding application operation limit.
+
+Unknown auth POST paths also use the strict sign-in limit. Only these exact
+session lifecycle paths keep the 30-request limit: `/api/auth/sign-out`,
+`/api/auth/revoke-session`, `/api/auth/revoke-sessions` and
+`/api/auth/revoke-other-sessions`. GET and HEAD requests do not consume these
+POST limits. A refused request returns 429 and a `Retry-After` header.
+
+Account-security enrollment keeps its existing user-scoped 2FA setup limits.
