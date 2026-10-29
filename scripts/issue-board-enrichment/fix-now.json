@@ -80,30 +80,35 @@
     "issueNumber": 2860,
     "verdict": "fix-now",
     "recommendedTitle": "A webhook credential for one workspace releases or accepts another tenant's live inbound call offer",
-    "summary": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id)",
-    "currentBehavior": "The ACD router authenticates a request against a workspace resolved from the queue named in the URL, then mutates the inbound queue entry named by a second, independent id (entry_id). The four inbound-offer plpgsql functions (release_inbound_offer, accept_inbound_offer, complete_inbound_queue_entry, abandon_inbound_queue_entry) take only that entry id and carry no workspace predicate, so the workspace whose credential was validated and the workspace that owns the mutated row are never bound together. Independently reproduced locally against a Postgres 18 bootstrapped from the repository migration chain, with two dummy tenants: a request signed with tenant A's own Twilio subaccount auth…",
-    "rootCause": "app/lib/acd/acd-router.server.ts resolves the authenticating workspace from queue_id (resolveWorkspaceId, lines 263-296) and the route-level check resolves it from the CallSid's call row or, when that row is unknown, from the AccountSid in the body (app/lib/twilio-webhook.server.ts:75-95, 223-232), but the resource it mutates is chosen by an unbound entry_id query parameter that is never compared with either resolved workspace (handleAgentStatus lines 514 and 543, handleAgentBridge lines 474 and 496-502, handleComplete lines 573 and 585-595). The wrappers in app/lib/db-rpc.server.ts (rpcReleaseInboundOffer:656, rpcAcceptInboundOffer:669, rpcCompleteInboundQueueEntry:676,…",
-    "resolution": "Bind the mutated resource to the authenticated workspace in two places: (1) in the router, refuse an entry whose workspace_id differs from the workspace whose credential was validated, and (2) in SQL, give the four inbound-offer RPCs a required workspace parameter and filter inbound_queue_entry by it - the pattern already used by claim_inbound_queue_entry/next_inbound_queue_offer in the same migration and by dequeue_contact/create_outreach_attempt in client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql. The same change must update the two remaining callers or the new signature breaks them: the workspace-agnostic sweep in…",
+    "summary": "PR #3063 binds inbound-offer mutations to the authenticated workspace. Review, merge and deployed verification remain.",
+    "currentBehavior": "At dev@a4d22ee5, an A-signed queue callback can mutate B's selected offer because four SQL functions accept an entry ID without a workspace. The new candidate in open PR #3063 is not merged into dev or master.",
+    "rootCause": "The router resolves a credential from queue_id, queue_name or the entry, but previously did not bind the selected mutation target to that workspace. The four RPC wrappers and original 20260731130000 SQL definitions accepted only entry ID. The complete handler also resolves an entry from queue name and CallSid after authentication.",
+    "resolution": "Review PR #3063. A scoped tenant-client read rejects foreign entries after authentication and after complete fallback. A new migration requires workspace UUID in accept/release/complete/abandon, filters entry reads and writes, locks read-then-update transitions and removes legacy unscoped overloads. All wrappers, failed call-start cleanup, stale sweep and both fresh bootstrap lists carry workspace. Apply the migration before using the new app signatures, then verify deployed dev and release.",
     "lookIn": [
-      "client/migrations/20260731130000_create_acd_inbound_queue_functions.sql",
-      "app/lib/db-rpc.server.ts",
       "app/lib/acd/acd-router.server.ts",
-      "app/routes/api+/acd-router/agent-status.action.server.ts",
-      "app/lib/twilio-webhook.server.ts",
-      "app/lib/workspace-client-projection.server.ts"
+      "app/lib/db-rpc.server.ts",
+      "client/migrations/20261026000000_scope_inbound_offer_rpcs_by_workspace.sql",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "test/integration-db/inbound-offer-workspace.test.ts"
     ],
     "existingTests": [
-      "Route-level signature check: 'passed' (requireTwilioSignature returned null) with tenant A's token and 'rejected 403' (reason invalid_signature) with tenant B's token. The router answered 200 {\"ok\":true}. Tenant B's inbound_queue_entry went from status 'offered' to 'timed_out' with completed_at set and workspace_id…"
+      "Real Postgres 18.6 and real SDK-signed route actions: 40 cases cover four mutations, queue-ID and queue-name credential selection, direct RPC scope, A-to-A success, invalid tokens, entry-only fallback, complete fallback, null workspace, legacy-overload removal, accepted replay and global stale cleanup. Denial cases compare both tenants' full entry, agent and audit rows.",
+      "Original dev source and schema fail 19 cases while 21 controls pass. Removing the request guard fails 10/40; removing SQL workspace predicates fails 8/40; omitting the stale sweep workspace fails 1/40. Other controls pass and restored source passes all 56 real DB cases, including 13 existing active-offer and 3 SDK setup-failure controls; 0 skips.",
+      "Upgrade and both fresh bootstrap paths each pass 56/56 on owned disposable databases. Focused Node tests pass 33/33. Typecheck and focused lint pass. Full source ci:local passes on the clean source commit; see the PR for final-head checks and exact full-suite counts."
     ],
     "missingTests": [
-      "A regression test for this behaviour fails on the current source and passes with the fix (kill-check: revert the fix and confirm the test goes red).",
-      "A negative control for the same path keeps passing, so the fix does not silently widen access."
+      "Merge and verify the migration and valid callback lifecycle on deployed dev, then complete release acceptance. Local proof uses dummy tenants and a disposable database; it does not place real calls, apply production migrations or prove a released deployment."
     ],
     "acceptanceCriteria": [
-      "A credential belonging to workspace A may only mutate workspace A's inbound queue entries. The entry named by entry_id must be verified to belong to the workspace whose credential was validated, and the RPC should filter inbound_queue_entry by that workspace, the way client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql added a required workspace parameter to dequeue_contact and create_outreach_attempt after finding the same class of cross-tenant write."
+      "A workspace credential can mutate only inbound entries owned by that workspace.",
+      "Require workspace scope in every offer RPC and remove unscoped overloads.",
+      "Keep valid callbacks, accepted offers, stale cleanup and failed call-start cleanup working."
     ],
+    "blockedBy": [],
     "size": "S",
-    "risk": "medium"
+    "risk": "medium",
+    "trackerRecommendation": "Live inspection on 2026-10-26: OPEN Bug assigned to wra-sol, no labels, milestone, hierarchy or dependencies; organization fields unset. CHS backlog Status In progress. The earlier on-dev claim cited PR #2900, whose actual diff is board/enrichment only. PR #3063 is the runtime fix candidate into dev, linked only to #2860. Keep open for merge, deployed verification and release."
   },
   {
     "issueNumber": 2862,

@@ -111,7 +111,7 @@ describe("ACD offer call-start boundary (#2130)", () => {
     else mocks.create.mockRejectedValue(new Error("Provider unavailable"));
     const xml = await (await wait()).text();
     expect(xml).toContain("queue");
-    expect(mocks.release).toHaveBeenCalledWith(expect.anything(), { entryId: 123, outcome: "timed_out" });
+    expect(mocks.release).toHaveBeenCalledWith(expect.anything(), { entryId: 123, workspaceId: "w1", outcome: "timed_out" });
     expect(mocks.error).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ workspaceId: "w1", queueId: 7, entryId: 123 }));
     expect(JSON.stringify(mocks.error.mock.calls)).not.toContain("test-token");
   });

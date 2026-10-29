@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   rpcResetStaleInboundOffers: vi.fn(),
   rpcCompleteInboundQueueEntry: vi.fn(),
   rpcAbandonInboundQueueEntry: vi.fn(),
+  scopedEntry: vi.fn(),
   hangupTwiml: vi.fn(() => "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Hangup/></Response>"),
 }));
 
@@ -40,6 +41,13 @@ vi.mock("@/twilio.server", () => ({
 
 vi.mock("@/server/admin-db", () => ({ adminDb: mocks.adminDb }));
 vi.mock("@/server/db", () => ({ db: mocks.db }));
+
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  createTenantDb: () => ({
+    inbound_queue_entry: { findFirst: (...args: unknown[]) => mocks.scopedEntry(...args) },
+  }),
+}));
 
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcClaimInboundQueueEntry: (...args: unknown[]) =>
@@ -229,6 +237,7 @@ describe("app/lib/acd/acd-router.server handleComplete", () => {
     mocks.adminDb.select.mockReset();
     mocks.adminDb.execute.mockReset();
     mocks.validateTwilioWebhookParams.mockReset().mockReturnValue(true);
+    mocks.scopedEntry.mockReset();
     mocks.rpcCompleteInboundQueueEntry.mockReset();
     mocks.rpcAbandonInboundQueueEntry.mockReset();
   });
@@ -263,6 +272,7 @@ describe("app/lib/acd/acd-router.server handleComplete", () => {
     ]);
     const mod = await import("@/lib/acd/acd-router.server");
 
+    mocks.scopedEntry.mockResolvedValue({ id: 42 });
     const request = makeCompleteRequest(
       { queue_name: "inbound_q_1" },
       { CallSid: "CA1", QueueResult: "bridged" },
@@ -274,6 +284,7 @@ describe("app/lib/acd/acd-router.server handleComplete", () => {
     expect(mocks.rpcCompleteInboundQueueEntry).toHaveBeenCalledWith(
       expect.anything(),
       42,
+      "w1",
     );
     expect(mocks.rpcAbandonInboundQueueEntry).not.toHaveBeenCalled();
   });
@@ -293,6 +304,7 @@ describe("app/lib/acd/acd-router.server handleComplete", () => {
     ]);
     const mod = await import("@/lib/acd/acd-router.server");
 
+    mocks.scopedEntry.mockResolvedValue({ id: 43 });
     const request = makeCompleteRequest(
       { queue_name: "inbound_q_1" },
       { CallSid: "CA2", QueueResult: "hangup" },
@@ -304,6 +316,7 @@ describe("app/lib/acd/acd-router.server handleComplete", () => {
     expect(mocks.rpcAbandonInboundQueueEntry).toHaveBeenCalledWith(
       expect.anything(),
       43,
+      "w1",
     );
   });
 

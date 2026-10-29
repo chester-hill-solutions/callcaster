@@ -164,7 +164,7 @@ suite("Inbound active-offer guard against Postgres (#2129)", () => {
       await withQueue(async (fixture) => {
         const first = await claim(fixture);
         expect(first).toHaveLength(1);
-        await database()`select public.release_inbound_offer(${first[0]?.entry_id}, ${outcome})`;
+        await database()`select public.release_inbound_offer(${first[0]?.entry_id}, ${fixture.workspace}::uuid, ${outcome})`;
         const next = await claim(fixture);
         expect(next).toHaveLength(1);
         expect(String(next[0]?.entry_id)).not.toBe(String(first[0]?.entry_id));

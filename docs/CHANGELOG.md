@@ -4,6 +4,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Inbound call callbacks can change only offers in the authenticated workspace. Stale-offer and failed call-start cleanup use the same workspace checks ([PR #3063](https://github.com/chester-hill-solutions/callcaster/pull/3063), [#2860](https://github.com/chester-hill-solutions/callcaster/issues/2860)).
 - Security: Available-number searches require workspace scope and membership, use the workspace Twilio account, and return 404 for non-members ([PR #3078](https://github.com/chester-hill-solutions/callcaster/pull/3078), [#2871](https://github.com/chester-hill-solutions/callcaster/issues/2871)).
 - Security: Survey submissions reject contacts outside the survey workspace before saving a response. Recent responses show valid contact details and hide legacy foreign references ([PR #3077](https://github.com/chester-hill-solutions/callcaster/pull/3077), [#2864](https://github.com/chester-hill-solutions/callcaster/issues/2864)).
 - Security: Align the Twilio redirect dependency on the patched release so cross-origin redirects remove raw-array credentials and declared custom secret headers ([PR #3076](https://github.com/chester-hill-solutions/callcaster/pull/3076), [#3073](https://github.com/chester-hill-solutions/callcaster/issues/3073)).

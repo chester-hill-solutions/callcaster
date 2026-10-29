@@ -88,7 +88,7 @@ suite("ACD setup failure releases actual offered state (#2130)", () => {
   test("a missing entry cannot release another active offer", async () => {
     await withOffers(async (tx) => {
       const { releaseAgent } = await import("@/lib/acd/acd-router.server");
-      await releaseAgent(-1, "timed_out");
+      await releaseAgent(-1, workspace, "timed_out");
       const states = await tx.execute(sql`select status from public.agent_status where workspace_id in (${workspace}, ${otherWorkspace})`);
       expect(states).toHaveLength(2);
       expect(states.every((state) => state.status === "busy")).toBe(true);
