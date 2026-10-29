@@ -199,6 +199,12 @@ Quote literal route paths containing `$` or shell glob characters; otherwise
 the shell can remove a route segment before the command runs. Read script names
 from `package.json` and discover helper files before reading them. Do not guess
 filenames from an exported function or an npm script's display name.
+When a route gains a reservation ownership lookup, legacy unit fixtures must
+declare their unfunded state at that lookup. Spreading `importOriginal` preserves
+exports but still runs the real database lookup unless it is replaced. Keep
+funded identity and security proof in the real-database suite; do not replace
+its binder with a fixed successful result.
+
 When extracting a legacy tenant-data helper, use `createTenantDb` in its new
 module. Moving an old unscoped database import creates new guard debt even
 when the query already has a workspace predicate. Verify the scoped read

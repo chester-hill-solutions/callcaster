@@ -131,7 +131,10 @@ vi.mock("@/lib/voice-bridge-webhook.server", async (importOriginal) => ({
   voiceBridgeCallbackArgs: () => ({}),
 }));
 vi.mock("@/server/voice-bridge-reservation.server", async (importOriginal) => ({
-  ...await importOriginal<typeof import("@/server/voice-bridge-reservation.server")>(), claimVoiceBridgeRecipient: async () => ({ issued: true }),
+  ...await importOriginal<typeof import("@/server/voice-bridge-reservation.server")>(),
+  claimVoiceBridgeRecipient: async () => ({ issued: true }),
+  hasVoiceReservationCallBinding: async () => false,
+  findVoiceReservationForCall: async () => null,
 }));
 
 /** The three capability states each route is exercised against. */
