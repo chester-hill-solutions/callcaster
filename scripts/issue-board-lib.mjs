@@ -193,7 +193,9 @@ const PRIORITY_WEIGHT = new Map([["Urgent", 0], ["High", 1], ["Medium", 2], ["Lo
 
 /** Organization Issue fields are separate from labels and Project fields. */
 function issueField(issue, name) {
-  return issue.issueFieldValues?.nodes?.find((value) => value.field?.name === name)?.name ?? "unset";
+  const values = issue.issueFieldValues?.nodes;
+  if (!values) return "unknown";
+  return values.find((value) => value.field?.name === name)?.name ?? "unset";
 }
 
 function priorityWeight(issue) {
@@ -202,7 +204,7 @@ function priorityWeight(issue) {
 
 function nativeIssueMetadata(issue) {
   return [
-    `Type: ${issue.issueType?.name ?? "unset"}`,
+    `Type: ${issue.issueType === undefined ? "unknown" : issue.issueType?.name ?? "unset"}`,
     `Priority: ${issueField(issue, "Priority")}`,
     `Effort: ${issueField(issue, "Effort")}`,
     `Environment: ${issueField(issue, "Enviornment")}`,

@@ -1,10 +1,10 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@03c3e15a; live issue and native Issue-field snapshot 2026-10-29 UTC` · 401 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@03c3e15a; complete issue, native Issue-field and Project snapshots 2026-10-29 UTC` · 401 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Live GitHub issue metadata covers all 401 open issues. Type, Priority, Effort and Environment below come from native Issue metadata; they are separate from labels and Project fields. Each verdict lane is sorted by native Priority first (Urgent, High, Medium, Low, then unset); the existing risk/size order remains within an equal-priority Fix now group.
+Live GitHub issue metadata covers all 401 open issues. Type, Priority, Effort and Environment below come from native Issue metadata; they are separate from labels and Project fields. Each verdict lane is sorted by native Priority first (Urgent, High, Medium, Low, then unset or unknown); the existing risk/size order remains within an equal-priority Fix now group.
 
-Project Status is a separate snapshot. The 397-item browser export from 2026-10-28 at dev@03c3e15a is retained for unchanged items; it was not fully refreshed in this follow-up. Status for #2603 and #2866 was verified after their merges as on-dev. The live issue sidebars now confirm In progress for #2864, #2867, #2871, #2879, #3072 and #3073; the new #3080 is Backlog. #100, #2902 and #2906 were absent from the complete earlier Project view and retain unknown Status. No status is inferred from a PR, label or issue state.
+The complete browser export contains all 398 open CallCaster Project items. Its visible filtered count and unique exported URLs match. Hierarchy display was turned off temporarily and all rows were loaded before export. #100, #2902 and #2906 are absent from the complete Project view and retain unknown Project Status. No status is inferred from a PR, label or issue state. Source verdicts keep their earlier evidence unless an entry states this review.
 
 PRs #3068 and #3069 are merged into dev. Urgent #3071 has tested auth PR #3074. High #3072 and #3073 have tested compiler PR #3075 and redirect PR #3076. Survey scope #2864 has PR #3077, number search #2871 has PR #3078, and credential budgets #2867 has PR #3079. All six final commits passed full local CI and their applicable GitHub checks; these PRs remain open pending merge approval. Review existing #3063 and #3064 before duplicate work. SIM PR #3067 still has failed guards and E2E.
 

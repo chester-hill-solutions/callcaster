@@ -158,7 +158,7 @@ describe("buildBoard", () => {
     });
     expect(boardOrder(md)).toEqual([2, 3, 4, 1, 5]);
     expect(md).toContain("Type: Bug · Priority: Urgent · Effort: Medium");
-    expect(md).toContain("Type: unset · Priority: unset · Effort: unset");
+    expect(md).toContain("Type: unknown · Priority: unknown · Effort: unknown");
   });
 
   test("uses native Issue fields even when labels and Project Priority disagree", () => {
@@ -192,5 +192,14 @@ describe("buildBoard", () => {
     });
     expect(boardOrder(md)).toEqual([2, 1]);
     expect(md).toContain("Status: No status · Type: Bug · Priority: Urgent · Effort: Low");
+  });
+
+  test("distinguishes unread metadata from fields that GitHub returned empty", () => {
+    const { md } = buildBoard({
+      issues: [issue(1), { ...issue(2), issueType: null, issueFieldValues: { nodes: [] } }],
+      records: [], repo: "x/y", projectNumber: 9, reviewedAt: "dev@test",
+    });
+    expect(md).toContain("Type: unknown · Priority: unknown · Effort: unknown · Environment: unknown");
+    expect(md).toContain("Type: unset · Priority: unset · Effort: unset · Environment: unset");
   });
 });
