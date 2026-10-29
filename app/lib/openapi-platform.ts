@@ -271,7 +271,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       "x-callcaster-capability": "calls.start",
       security: apiKeyOrSessionSecurity,
       description:
-        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
+        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
       requestBody: {
         required: true,
         content: {
@@ -293,6 +293,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Insufficient role or MFA enrollment required"),
         "404": errorResponse("Campaign not found"),
+        "429": rateLimitResponse,
       },
     },
   },

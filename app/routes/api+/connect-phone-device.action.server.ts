@@ -18,6 +18,7 @@ import {
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 
 export const action = defineAction({
   auth: async ({ request }: ActionFunctionArgs) => {
@@ -33,6 +34,8 @@ export const action = defineAction({
   sideEffects: ["twilio", "db-read"],
   handler: async ({ request, auth }) => {
     const { headers, user } = auth;
+    const rateLimited = await apiWriteRateLimitResponse(auth, "api-voice", headers);
+    if (rateLimited) return rateLimited;
 
     const { phoneNumber, workspaceId, campaignId } = await safeParseJson<{
         phoneNumber: string;

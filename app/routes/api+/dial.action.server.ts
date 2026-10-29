@@ -25,6 +25,7 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 
 interface DialRequest {
   to_number: string;
@@ -42,6 +43,8 @@ export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
+    const rateLimited = await apiWriteRateLimitResponse(auth, "api-voice");
+    if (rateLimited) return rateLimited;
     const user = auth.user;
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {

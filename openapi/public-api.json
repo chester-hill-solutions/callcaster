@@ -8775,7 +8775,7 @@
             "apiKey": []
           }
         ],
-        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
+        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8834,6 +8834,24 @@
                 "schema": {
                   "$ref": "#/components/schemas/PlatformError"
                 }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
               }
             }
           }

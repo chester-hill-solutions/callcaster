@@ -194,6 +194,11 @@ planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
 it into a worktree or replacing the user's file.
 
+Quote literal route paths containing `$` or shell glob characters; otherwise
+the shell can remove a route segment before the command runs. Read script names
+from `package.json` and discover helper files before reading them. Do not guess
+filenames from an exported function or an npm script's display name.
+
 After changing a local file package's test dependencies, verify its lock metadata
 and every installed consumer. Bun can retain the old local metadata after a
 normal install; refresh only that package with `bun update <local-package-name>`

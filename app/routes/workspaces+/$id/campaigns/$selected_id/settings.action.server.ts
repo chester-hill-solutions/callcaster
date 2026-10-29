@@ -53,6 +53,7 @@ import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
 import { sendCampaignTestSms } from "@/lib/campaign-test-send.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 import {
   sendCampaignTestCall,
   VOICE_TEST_CAMPAIGN_TYPES,
@@ -389,6 +390,8 @@ export const action = defineAction({
         });
       }
       if (campaignRecord.type && VOICE_TEST_CAMPAIGN_TYPES.has(campaignRecord.type)) {
+        const rateLimited = await apiWriteRateLimitResponse(auth, "api-voice", headers);
+        if (rateLimited) return rateLimited;
         const result = await sendCampaignTestCall(testArgs);
         if (!result.ok) {
           return routeData(
