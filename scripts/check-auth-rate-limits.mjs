@@ -29,6 +29,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { analyzeAuthRateLimitSource } from "./lib/auth-rate-limit-analysis.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -48,38 +49,22 @@ const LIMITER_PATH = path.join(
 );
 const SKIP_FILE = [/\.test\.[jt]sx?$/, /\.spec\.[jt]sx?$/];
 
-/**
- * Better Auth endpoints that accept a guessable or abusable secret. Call sites
- * are the signal — imports are deliberately not, so the gate stays quiet on
- * modules that merely hold a reference.
- *
- * `verifyEmail` is included: it is the emailed-link completion step, and the
- * two HTML loaders that call it are exempted below with a stated reason.
- * NOT included, deliberately: `refreshTokens` and `tokenLogin`, which require a
- * previously issued token and are not brute-forceable at this boundary.
- */
-const CREDENTIAL_METHODS = [
-  "signUpEmail",
-  "signInEmail",
-  "resetPassword",
-  "requestPasswordReset",
-  "changePassword",
-  "verifyEmail",
-  "verifyEmailOTP",
-];
-
-/** The in-repo credential helpers, same reasoning as CREDENTIAL_METHODS. */
-const CREDENTIAL_HELPERS = [
-  "loginWithPassword",
-  "registerUser",
-  "forgotPassword",
-  "resetPassword",
-  "verifyEmailOtp",
-];
-
-/** Either limiter form satisfies the gate. */
-const LIMITED_RE = /\b(enforceAuthRateLimit|rateLimitedPostAuth)\s*\(/;
-const SCOPE_RE = /"auth:[a-z-]+"/g;
+// Expected operation budgets, independent of the route's own declarations.
+const CATCH_ALL_OPERATION_SCOPES = {
+  "sign-in": "auth:sign-in",
+  "two-factor": "auth:sign-in",
+  "change-password": "auth:sign-in",
+  "sign-up": "auth:register",
+  "request-password-reset": "auth:forgot-password",
+  "reset-password": "auth:reset-password",
+  "email-otp": "auth:verify-email",
+};
+const SESSION_LIFECYCLE_PATHS = new Set([
+  "/api/auth/sign-out",
+  "/api/auth/revoke-session",
+  "/api/auth/revoke-sessions",
+  "/api/auth/revoke-other-sessions",
+]);
 
 /**
  * Surfaces that consume a credential but are not brute-forceable, so a limiter
@@ -109,52 +94,100 @@ function walk(dir, out = []) {
     if (e.isDirectory()) walk(path.join(dir, e.name), out);
     else if (/\.(tsx|ts)$/.test(e.name)) {
       const rel = path.relative(ROOT, path.join(dir, e.name));
-      if (!SKIP_FILE.some((re) => re.test(rel))) out.push(path.join(dir, e.name));
+      if (!SKIP_FILE.some((re) => re.test(rel)))
+        out.push(path.join(dir, e.name));
     }
   }
   return out;
 }
 
 /** Scope names the limiter module actually defines. */
-function definedScopes() {
-  const src = fs.readFileSync(LIMITER_PATH, "utf8");
+function definedScopes(file) {
+  const src = fs.readFileSync(file, "utf8");
   const table = src.slice(src.indexOf("const LIMITS"));
-  return new Set([...table.matchAll(/"(auth:[a-z-]+)":/g)].map((m) => m[1]));
+  return new Set(
+    [...table.matchAll(/"((?:auth|2fa):[a-z-]+)":/g)].map((m) => m[1]),
+  );
 }
 
-/** Credential call sites in one route module. */
-function credentialCallSites(src) {
-  const hits = [];
-  for (const m of src.matchAll(/\bauth\.api\.([a-zA-Z]+)\s*\(/g)) {
-    if (CREDENTIAL_METHODS.includes(m[1])) hits.push(`auth.api.${m[1]}`);
+function checkHandlerPolicy(info, rel) {
+  const problems = [];
+  if (!info.hasLimiter || !info.usesEndpointPolicy)
+    problems.push(
+      `  ${rel}: auth.handler must use the auth endpoint scope policy`,
+    );
+  if (!info.strictDefault)
+    problems.push(
+      `  ${rel}: auth endpoint scope policy must retain its strict default`,
+    );
+  for (const [operation, scope] of Object.entries(CATCH_ALL_OPERATION_SCOPES)) {
+    if (info.operationScopes.get(operation) !== scope)
+      problems.push(`  ${rel}: ${operation} must use ${scope}`);
   }
-  for (const helper of CREDENTIAL_HELPERS) {
-    const re = new RegExp(`(?<![.\\w])${helper}\\s*\\(`, "g");
-    if (re.test(src)) hits.push(`${helper}()`);
+  if (!info.validOperationTable)
+    problems.push(`  ${rel}: scope policy must use a literal operation table`);
+  const strictScopes = new Set(Object.values(CATCH_ALL_OPERATION_SCOPES));
+  for (const [operation, scope] of info.operationScopes) {
+    if (!strictScopes.has(scope))
+      problems.push(
+        `  ${rel}: ${operation} must use a strict credential scope`,
+      );
   }
-  return [...new Set(hits)];
+  const wrong = [...info.sessionPaths].filter(
+    (p) => !SESSION_LIFECYCLE_PATHS.has(p),
+  );
+  const missing = [...SESSION_LIFECYCLE_PATHS].filter(
+    (p) => !info.sessionPaths.has(p),
+  );
+  if (wrong.length || missing.length)
+    problems.push(
+      `  ${rel}: only the exact session lifecycle paths may use the loose budget`,
+    );
+  return problems;
 }
 
-const scopes = definedScopes();
+const scopes = definedScopes(LIMITER_PATH);
+const setupScopes = definedScopes(
+  path.join(ROOT, "app/lib/two-factor-rate-limit.server.ts"),
+);
+const scopesByFamily = { auth: scopes, "2fa": setupScopes };
 const rows = [];
 const violations = [];
 
 for (const file of walk(ROUTES_DIR).sort()) {
   // Keyed off the route's own path, not the scan root, so an exemption means
   // the same thing whether the scan covers app/routes or a fixture tree.
-  const rel = path.posix.join("app/routes", toPosix(path.relative(ROUTES_DIR, file)));
+  const rel = path.posix.join(
+    "app/routes",
+    toPosix(path.relative(ROUTES_DIR, file)),
+  );
   const src = fs.readFileSync(file, "utf8");
-  const hits = credentialCallSites(src);
-  if (hits.length === 0) continue;
+  const info = analyzeAuthRateLimitSource(src, file);
+  const hits = info.hits.map((hit) => hit.call);
+  if (hits.length === 0 && !info.hasHandler) continue;
+  if (info.hasHandler) violations.push(...checkHandlerPolicy(info, rel));
 
-  if (LIMITED_RE.test(src)) {
-    const declared = [...new Set([...src.matchAll(SCOPE_RE)].map((m) => m[0].slice(1, -1)))];
-    const unknown = declared.filter((s) => !scopes.has(s));
+  if (info.hasLimiter) {
+    const declared = info.declared.map((entry) => entry.scope);
+    const unknown = [
+      ...info.declared
+        .filter((entry) => !scopesByFamily[entry.family].has(entry.scope))
+        .map((entry) => entry.scope),
+      ...[...info.operationScopes.values()].filter(
+        (scope) => !scopes.has(scope),
+      ),
+    ];
     rows.push({ rel, hits, declared, state: "limited" });
     if (unknown.length > 0) {
       violations.push(
         `  ${rel}: declares scope(s) not defined in platform-auth-rate-limit.server.ts — ${unknown.join(", ")}`,
       );
+    }
+    for (const hit of info.hits) {
+      if (!hit.scopes.some((scope) => declared.includes(scope)))
+        violations.push(
+          `  ${rel}: ${hit.call} must use operation scope ${hit.scopes.join(" or ")}`,
+        );
     }
     continue;
   }
@@ -174,7 +207,9 @@ for (const file of walk(ROUTES_DIR).sort()) {
 }
 
 if (violations.length > 0) {
-  console.error("check-auth-rate-limits: unprotected auth credential surface:\n");
+  console.error(
+    "check-auth-rate-limits: unprotected auth credential surface:\n",
+  );
   console.error(violations.join("\n\n"));
   console.error(
     `\n${rows.filter((r) => r.state === "limited").length} limited, ` +
@@ -190,5 +225,5 @@ const exempt = rows.filter((r) => r.state === "exempt").length;
 console.log(
   `Auth rate-limit gate passed: ${limited} credential surface(s) declare a rate limit, ` +
     `${exempt} carry a reasoned exemption, 0 unprotected. Scope names cross-checked ` +
-    `against ${scopes.size} scopes in platform-auth-rate-limit.server.ts.`,
+    `against ${scopes.size} auth scopes and ${setupScopes.size} 2FA setup scopes.`,
 );

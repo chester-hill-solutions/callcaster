@@ -26,7 +26,7 @@ Interactive specs:
 | `/api/audiences` | PATCH, DELETE, GET | User API | sessionOnly | yes | `routes/api+/audiences.tsx` | `docs/api-data-management.md` |  |
 | `/api/audio-upload` | POST | User API | sessionOnly | yes | `routes/api+/audio-upload.tsx` | `docs/api-data-management.md` | Inline workspace audio upload from the script editor; normalizes to canonical MP3. |
 | `/api/audiodrop` | POST | User API | sessionOnly | yes | `routes/api+/audiodrop.tsx` | `docs/api-telephony-control.md` | Voicemail drop during live call. |
-| `/api/auth/*` | POST, GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/$.route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min. |
+| `/api/auth/*` | POST, GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/$.route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all. Credential and unknown POSTs allow 10 requests per 60-second window per IP. Sign-in, registration, password-reset request/completion and email OTP aliases share their application operation limits. Only exact sign-out and session-revocation POSTs allow 30/min. GET and HEAD do not consume these limits. |
 | `/api/auth/callback` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/callback.route.tsx` | `docs/api-auth-matrix.md` | Postgres auth callback; sets session cookies and redirects. |
 | `/api/auth/forgot-password` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/forgot-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/invites` | POST, GET | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
@@ -34,7 +34,7 @@ Interactive specs:
 | `/api/auth/register` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/register.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/reset-password` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/reset-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/signout` | POST | User API | sessionOnly | yes | `routes/api+/auth/signout.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/auth/token` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/token.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/token` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/token.route.tsx` | `docs/api-agent-quickstart.md` | Email/password sign-in shares a 10-request per 60-second window per IP limit with browser and Better Auth sign-in. Exhaustion returns 429 with Retry-After. |
 | `/api/auth/verify-email` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/verify-email.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auto-dial/:roomId` | POST | Provider Webhook | providerOnly | no | `routes/api+/auto-dial/$roomId.route.tsx` | `docs/api-webhooks.md` | Twilio conference/AMD TwiML callback. |
 | `/api/auto-dial/end` | POST | User API | sessionOnly | yes | `routes/api+/auto-dial/end.route.tsx` | `docs/api-telephony-control.md` |  |

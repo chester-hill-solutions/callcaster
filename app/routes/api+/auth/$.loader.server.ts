@@ -1,7 +1,10 @@
 import { isSignupOpen } from "@/lib/env.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
+import {
+  type AuthRateLimitScope,
+  enforceAuthRateLimit,
+} from "@/lib/platform-auth-rate-limit.server";
 import { auth } from "@/server/auth-instance";
 
 function isBetterAuthSignUpPath(url: URL): boolean {
@@ -27,14 +30,29 @@ function isAppManagedTwoFactorPath(pathname: string): boolean {
   );
 }
 
-/** Credential/TOTP guessing surfaces get the strict bucket; other POSTs the loose one. */
-function rateLimitScopeForAuthPath(
-  url: URL,
-): "auth:sign-in" | "auth:catch-all" {
-  return url.pathname.includes("/sign-in") ||
-    url.pathname.includes("/two-factor")
-    ? "auth:sign-in"
-    : "auth:catch-all";
+// Bind aliases to the same operation budget as the application routes.
+const AUTH_OPERATION_SCOPES: Partial<Record<string, AuthRateLimitScope>> = {
+  "sign-in": "auth:sign-in",
+  "two-factor": "auth:sign-in",
+  "change-password": "auth:sign-in",
+  "sign-up": "auth:register",
+  "request-password-reset": "auth:forgot-password",
+  "reset-password": "auth:reset-password",
+  "email-otp": "auth:verify-email",
+};
+
+// Exact paths only: a new endpoint must never inherit the loose budget.
+const SESSION_LIFECYCLE_PATHS = new Set([
+  "/api/auth/sign-out",
+  "/api/auth/revoke-session",
+  "/api/auth/revoke-sessions",
+  "/api/auth/revoke-other-sessions",
+]);
+
+function rateLimitScopeForAuthPath(url: URL): AuthRateLimitScope {
+  if (SESSION_LIFECYCLE_PATHS.has(url.pathname)) return "auth:catch-all";
+  const operation = url.pathname.split("/")[3] ?? "";
+  return AUTH_OPERATION_SCOPES[operation] ?? "auth:sign-in";
 }
 
 async function handleAuthRequest(request: Request, url: URL) {

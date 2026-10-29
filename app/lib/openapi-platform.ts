@@ -87,6 +87,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   "/api/auth/token": {
     post: {
       summary: "Obtain access and refresh tokens",
+      description: "Email/password sign-in shares a limit of 10 requests per 60-second window per client IP with browser and Better Auth sign-in. Exhaustion returns 429 with Retry-After.",
       tags: ["Platform API", "Authentication"],
       requestBody: {
         required: true,
