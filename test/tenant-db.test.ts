@@ -20,7 +20,7 @@ const SCOPED_TABLE_NAMES = [
   "agent_status", "agent_status_event", "handset_session", "workspace_users",
   "workspace_member",
   "workspace_api_key", "workspace_events", "workspace_audit_event",
-  "workspace_audio",
+  "workspace_audio", "workspace_voice_audio_connection",
 ] as const;
 
 type Captured = {

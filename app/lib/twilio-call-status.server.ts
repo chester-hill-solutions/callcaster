@@ -18,6 +18,7 @@ import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
 import { settleVoiceReservation } from "@/server/voice-credit-settlement.server";
+import { isVoiceAudioLeg } from "@/server/voice-audio-classification.server";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -147,6 +148,11 @@ export type CallStatusBillingResult = {
   existingId?: number;
 } | null;
 
+async function settleTerminalVoiceCall(workspaceId: string, callSid: string, status: string, duration: number, note: string) {
+  if (await isVoiceAudioLeg(workspaceId, callSid)) return { handled: true, billingResult: null };
+  return settleVoiceReservation({ workspaceId, callSid, status, duration, note });
+}
+
 /** Debit credits for a terminal call with non-zero duration (idempotent). */
 export async function billTerminalCallStatus(
   call: Tables<"call">,
@@ -165,10 +171,7 @@ export async function billTerminalCallStatus(
   );
 
   if (call.workspace && (isTerminal || status === "canceled")) {
-    const settlement = await settleVoiceReservation({
-      workspaceId: call.workspace, callSid: call.sid, status, duration,
-      note: options.note ?? `Call ${call.sid}`,
-    });
+    const settlement = await settleTerminalVoiceCall(call.workspace, call.sid, status, duration, options.note ?? `Call ${call.sid}`);
     if (settlement.handled) return settlement.billingResult;
   }
 

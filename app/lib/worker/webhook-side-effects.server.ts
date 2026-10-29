@@ -49,6 +49,7 @@ import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
 import { queueFundedPredictiveContinuation } from "@/server/predictive-machine-operation.server";
 import { enqueueFundedVoiceTerminalOutcome } from "@/server/voice-terminal-outcome.server";
 import { ensureFundedPredictiveReceipt } from "@/server/predictive-voice-receipt.server";
+import { isVoiceAudioLeg } from "@/server/voice-audio-classification.server";
 
 /** Terminal Twilio call statuses and the outreach disposition they imply. */
 const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
@@ -73,6 +74,7 @@ export async function runCallStatusSideEffects(args: {
   if (!callRow) {
     throw new Error(`Call ${args.callSid} not found for side effects`);
   }
+  if (callRow.workspace && await isVoiceAudioLeg(callRow.workspace, args.callSid)) return { ok: true };
   let reservation = callRow.workspace ? await findVoiceReservationForCall(callRow.workspace, args.callSid) : null;
   if (reservation?.setup_sid === args.callSid) return { ok: true };
   // An older progress job can observe a newer terminal row. Keep its hold
