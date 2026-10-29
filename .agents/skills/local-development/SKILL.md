@@ -272,6 +272,14 @@ For a focused Node test, run `npx --no-install vitest run -c vitest.node.config.
 with the file paths. `npm run test:node -- <file>` appends that path to the final
 Bun command and still runs the entire Node suite.
 
+Vite `mergeConfig` concatenates `test.include` arrays. For an isolated database
+probe, assign its final `include` after merging and pass the exact fixture path
+to Vitest. Check reported file and case counts before claiming focused proof.
+
+For a new owned Postgres container, verify readiness over TCP before bootstrap.
+The image can accept socket connections on its temporary initialization server,
+then stop that server. A successful socket `pg_isready` is not final readiness.
+
 The UI test config aliases `@twilio/voice-sdk` to a mock. For SDK resource
 lifetime changes, exercise the installed SDK at that boundary as well. Use
 `createRequire` to resolve its actual entry where the alias would hide it.

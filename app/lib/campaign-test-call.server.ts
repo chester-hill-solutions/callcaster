@@ -5,8 +5,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { normalizePhoneNumber } from "@/lib/phone";
-import { insertCallForWorkspace } from "@/lib/telephony-db.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { dispatchReservedVoiceCall } from "@/lib/voice-credit-dispatch.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { ivrMachineDetection } from "@/lib/ivr-machine-detection";
@@ -97,29 +96,22 @@ export async function sendCampaignTestCall(args: {
 
   try {
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId });
-    const call = await withTwilioRetry(
-      () =>
+    const dispatched = await dispatchReservedVoiceCall({
+      workspaceId, kind: "ivr", accountSid: twilio.accountSid, to, from: callerId,
+      campaignId: campaign.id, contactId: contact?.id ?? null, outreachAttemptId: null, userId,
+      statusCallback: urls.statusCallback,
+      create: (statusCallback) =>
         twilio.calls.create({
           to,
           from: callerId,
           url: urls.flowUrl,
           machineDetection: ivrMachineDetection(campaign),
           statusCallbackEvent: ["answered", "completed"],
-          statusCallback: urls.statusCallback,
+          statusCallback,
         }),
-      { workspaceId, operation: "calls.create.test" },
-    );
-    const inserted = await insertCallForWorkspace(workspaceId, {
-      sid: call.sid,
-      to,
-      from: callerId,
-      campaign_id: campaign.id,
-      contact_id: contact?.id ?? null,
-      outreach_attempt_id: null,
     });
-    if (!inserted) {
-      throw new Error("Failed to insert call row");
-    }
+    if (!dispatched.ok) return failure("insufficient_credits");
+    const { call } = dispatched;
     logger.info("campaign.test_call", {
       workspaceId,
       campaignId: String(campaign.id),
