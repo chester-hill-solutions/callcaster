@@ -20,6 +20,12 @@ function canIssueInstruction(current: VoiceAudioConnection | undefined, expected
     !current.cancel_requested_at && !current.terminal_at && ["joining", "ready", "active"].includes(current.state));
 }
 
+async function confirmPhoneInstruction(tx: CreditTransaction, row: VoiceAudioConnection, confirmation?: string) {
+  if (row.transport !== "phone" || confirmation === "1") return null;
+  if (confirmation === undefined) return { ok: true as const, connection: row, confirmed: false, replayed: false };
+  return refuseInstruction(tx, row, "device_not_verified");
+}
+
 /** Authenticate and bind the physical call before issuing this one saved join. */
 export async function issueVoiceAudioInstruction(row: VoiceAudioConnection, confirmation?: string) {
   return db.transaction(async (tx) => {
@@ -41,10 +47,8 @@ export async function issueVoiceAudioInstruction(row: VoiceAudioConnection, conf
       return refuseInstruction(tx, current, "stale_audio");
     if (current.target_kind === "idle" && member.owner.credits - await getOutboundHeldCredits(tx, current.workspace) <= 0)
       return refuseInstruction(tx, current, "insufficient_credits");
-    if (current.transport === "phone") {
-      if (confirmation === undefined) return { ok: true as const, connection: current, confirmed: false, replayed: false };
-      if (confirmation !== "1") return refuseInstruction(tx, current, "device_not_verified");
-    }
+    const confirmationResult = await confirmPhoneInstruction(tx, current, confirmation);
+    if (confirmationResult) return confirmationResult;
     const [issued] = await tx.update(connections).set({ voice_issued_at: new Date(), updated_at: new Date() }).where(eq(connections.id, current.id)).returning();
     if (!issued) throw new Error("Agent audio instruction was not saved");
     return { ok: true as const, connection: issued, confirmed: true, replayed: false };
