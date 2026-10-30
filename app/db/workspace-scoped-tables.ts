@@ -34,6 +34,7 @@ import {
   workspace_number_purchase,
   workspace_voice_reservation,
   workspace_voice_audio_connection,
+  workspace_voice_recording_operation,
   workspace_number_release,
   workspace_users,
 } from "./schema";
@@ -68,6 +69,7 @@ export const WORKSPACE_SCOPED_TABLES = {
   workspace_number_purchase: { table: workspace_number_purchase, workspaceColumn: workspace_number_purchase.workspace, workspaceColumnName: "workspace" },
   workspace_voice_reservation: { table: workspace_voice_reservation, workspaceColumn: workspace_voice_reservation.workspace, workspaceColumnName: "workspace" },
   workspace_voice_audio_connection: { table: workspace_voice_audio_connection, workspaceColumn: workspace_voice_audio_connection.workspace, workspaceColumnName: "workspace" },
+  workspace_voice_recording_operation: { table: workspace_voice_recording_operation, workspaceColumn: workspace_voice_recording_operation.workspace, workspaceColumnName: "workspace" },
   workspace_number_release: { table: workspace_number_release, workspaceColumn: workspace_number_release.workspace, workspaceColumnName: "workspace" },
   workspace_audio: { table: workspace_audio, workspaceColumn: workspace_audio.workspace_id, workspaceColumnName: "workspace_id" },
   workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace, workspaceColumnName: "workspace" },

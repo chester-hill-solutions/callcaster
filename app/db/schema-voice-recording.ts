@@ -1,0 +1,33 @@
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+
+/** Each physical recording retains the original customer call's logical owner. */
+export const workspace_voice_recording_operation = pgTable("workspace_voice_recording_operation", {
+  id: uuid().primaryKey(),
+  workspace: uuid().notNull(),
+  reservation_id: uuid().notNull(),
+  user_id: text().notNull(),
+  kind: text().$type<"dial" | "parent" | "customer">().notNull(),
+  intent_id: uuid().notNull(),
+  logical_call_sid: text().notNull(),
+  source_call_sid: text().notNull(),
+  source_to: text().notNull(),
+  source_from: text().notNull(),
+  source_direction: text().notNull(),
+  source_parent_sid: text(),
+  account_sid: text().notNull(),
+  callback_url: text().notNull(),
+  state: text().$type<"prepared" | "creating" | "accepted" | "failed">().notNull().default("prepared"),
+  provider_sid: text(),
+  provider_status: text().$type<"in-progress" | "completed" | "absent">(),
+  send_started_at: timestamp({ withTimezone: true, mode: "date" }),
+  recording_started_at: timestamp({ withTimezone: true, mode: "date" }),
+  recording_duration_seconds: integer(),
+  channels: integer(),
+  terminal_at: timestamp({ withTimezone: true, mode: "date" }),
+  audio_url: text(),
+  lease_token: uuid().notNull(),
+  lease_expires_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
+  last_error: text(),
+  created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updated_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+});

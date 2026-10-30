@@ -504,6 +504,9 @@ decode each selected timestamp and prove it against the installed driver.
 For real RPC fixtures, inspect and seed each required foreign-key actor.
 Membership or an auth identity may not supply the legacy user-profile row.
 A fixture or constraint error before the target assertion is not defect proof.
+Assert PostgreSQL constraint codes at the actual driver boundary: raw
+postgres.js errors expose `code`, while Drizzle query errors expose
+`cause.code`. Require the owned row to remain unchanged after rejection.
 For funding and queue metadata updates that preserve referenced keys, use
 `FOR NO KEY UPDATE` to serialize writers while permitting foreign-key checks.
 Prove that a real call insert can reference the locked workspace and queue,
