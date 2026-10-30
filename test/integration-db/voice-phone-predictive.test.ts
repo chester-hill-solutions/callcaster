@@ -10,6 +10,7 @@ import { dataPlaneAuthContext } from "@/lib/route-context.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { runPredictiveMachineContinuation } from "@/lib/predictive-machine.server";
+import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 
 const windowState = vi.hoisted(() => ({ allowed: true }));
 vi.mock("@/lib/recipient-calling-window", async importOriginal => ({
@@ -285,6 +286,47 @@ describe("predictive Start reuses confirmed phone audio", () => {
     expect((await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`)[0]).toEqual(first);
     expect((await signedAudio(f.row.conference_callback, { ...event, StatusCallbackEvent: 'participant-leave', ReasonParticipantLeft: 'participant_hung_up' })).status).toBe(204);
     expect(rooms.update).not.toHaveBeenCalled(); expect(f.room.status).toBe('in-progress'); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
+  });
+
+  test("the signed human join publishes its actual customer identity and conference order", async () => {
+    const f = await scenario(), response = await start(f); expect(response.status).toBe(200); const { callSid } = await response.json();
+    const url = web.records.get(callSid)?.voiceUrl; if (!url) throw new Error('Owned voice URL required'); await voice(url, callSid);
+    const [r] = await sql`select id, contact_id, outreach_attempt_id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    const event = { AccountSid: accountSid, CallSid: callSid, ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id,
+      ParticipantLabel: `customer:${r.id}`, StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() };
+    expect((await signedAudio(f.row.conference_callback, event)).status).toBe(204);
+    expect(emitPredictiveBroadcast).toHaveBeenCalledWith(workspaceId, expect.objectContaining({
+      call_sid: callSid, user_id: actor, campaign_id: f.campaignId, contact_id: Number(r.contact_id),
+      outreach_attempt_id: Number(r.outreach_attempt_id), conference_id: f.row.conference_id,
+      conference_sid: f.row.conference_sid, conference_sequence: 7, customer_event: 'joined', status: 'in-progress',
+    }));
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await signedAudio(f.row.conference_callback, { ...event, StatusCallbackEvent: 'participant-leave',
+      SequenceNumber: '8', ReasonParticipantLeft: 'participant_hung_up' })).status).toBe(204);
+    expect(emitPredictiveBroadcast).toHaveBeenCalledWith(workspaceId, expect.objectContaining({
+      call_sid: callSid, user_id: actor, campaign_id: f.campaignId, contact_id: Number(r.contact_id),
+      outreach_attempt_id: Number(r.outreach_attempt_id), conference_id: f.row.conference_id,
+      conference_sid: f.row.conference_sid, conference_sequence: 8, customer_event: 'left', status: 'completed',
+    }));
+    expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
+  });
+
+  test.each(['reservation', 'call'])('a delayed signed join cannot restore a terminal %s', async terminalOwner => {
+    const f = await scenario(), response = await start(f); expect(response.status).toBe(200); const { callSid } = await response.json();
+    const url = web.records.get(callSid)?.voiceUrl; if (!url) throw new Error('Owned voice URL required'); await voice(url, callSid);
+    const [r] = await sql`select id, outreach_attempt_id from public.workspace_voice_reservation where provider_sid = ${callSid}`;
+    if (terminalOwner === 'reservation') await sql`update public.workspace_voice_reservation set terminal_status = 'completed' where id = ${r.id}::uuid`;
+    else await sql`update public.call set status = 'completed' where sid = ${callSid}`;
+    vi.mocked(emitPredictiveBroadcast).mockClear();
+    expect((await signedAudio(f.row.conference_callback, { AccountSid: accountSid, CallSid: callSid,
+      ConferenceSid: f.row.conference_sid ?? '', FriendlyName: f.row.conference_id, ParticipantLabel: `customer:${r.id}`,
+      StatusCallbackEvent: 'participant-join', SequenceNumber: '7', Timestamp: new Date().toISOString() })).status).toBe(204);
+    expect(emitPredictiveBroadcast).not.toHaveBeenCalled();
+    expect((await sql`select answered_at from public.outreach_attempt where id = ${r.outreach_attempt_id}`)[0].answered_at).toBeNull();
+    expect((await sql`select provider_status from public.campaign_queue where id =
+      (select queue_id from public.workspace_voice_reservation where id = ${r.id}::uuid)`)[0].provider_status).not.toBe('in-progress');
+    expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toMatchObject({ ledger: 0, reservations: 1 });
   });
 
   test("a normal turn preserves fanout, recordings and the same phone for several customers", async () => {

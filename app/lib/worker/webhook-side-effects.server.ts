@@ -31,6 +31,7 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { predictiveCustomerBroadcast } from "@/lib/predictive-customer-broadcast.server";
 import {
   billTerminalCallStatus,
   resolveCallOutreachContext,
@@ -98,10 +99,8 @@ export async function runCallStatusSideEffects(args: {
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
   if (currentAttempt && billingWorkspace && outreachAttemptId != null) {
-    await emitPredictiveBroadcast(billingWorkspace, {
-      contact_id: currentAttempt.contact_id,
-      status: callStatus,
-    });
+    const broadcast = callRow.workspace === billingWorkspace ? predictiveCustomerBroadcast(callRow, callStatus) : null;
+    if (broadcast) await emitPredictiveBroadcast(billingWorkspace, broadcast);
 
     // Provider-terminal statuses stamp a disposition so every call yields a
     // results row even when the browser never reaches /api/hangup (callee

@@ -8,6 +8,7 @@ vi.mock("@/server/voice-credit-settlement.server", async (importOriginal) => ({
 }));
 
 import { asRouteResponse } from "./helpers/route-result";
+import type { Tables } from "@/lib/db-types";
 import {
   makeTransactionHistoryTableStub,
   type TransactionRow,
@@ -128,7 +129,7 @@ vi.mock("../app/lib/database/workspace.server", async () => {
   };
 });
 
-function makeDbClientStub(args?: { outreachDisposition?: string }) {
+function makeDbClientStub(args?: { outreachDisposition?: string; dbCall?: Partial<Tables<"call">> }) {
   const transactionRows: TransactionRow[] = [];
   const ledgerCalls: {
     workspace: string;
@@ -1022,6 +1023,8 @@ describe("api.auto-dial.status", () => {
   // predictive_broadcast events the agent call screen subscribes to — the
   // generic /api/call-status side-effects job never runs for these calls.
   test("emits predictive_broadcast for contact-leg progress statuses", async () => {
+    await usePostgresStub({ dbCall: { sid: "CA1", workspace: "w1", user_id: "u1", campaign_id: 1,
+      contact_id: 1, outreach_attempt_id: 1, conference_id: "conf1" } });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -1040,10 +1043,13 @@ describe("api.auto-dial.status", () => {
       contact_id: 1,
       status: "ringing",
       conference_id: "conf1",
+      call_sid: "CA1", user_id: "u1", campaign_id: 1, outreach_attempt_id: 1,
     });
   });
 
   test("emits predictive_broadcast for terminal statuses before dequeue handling", async () => {
+    await usePostgresStub({ dbCall: { sid: "CA1", workspace: "w1", user_id: "u1", campaign_id: 1,
+      contact_id: 1, outreach_attempt_id: 1, conference_id: "conf1" } });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -1064,6 +1070,7 @@ describe("api.auto-dial.status", () => {
       contact_id: 1,
       status: "completed",
       conference_id: "conf1",
+      call_sid: "CA1", user_id: "u1", campaign_id: 1, outreach_attempt_id: 1,
     });
   });
 

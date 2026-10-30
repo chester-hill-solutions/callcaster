@@ -91,6 +91,7 @@ describe("useCallRoom", () => {
         workspace: "w1",
         campaign: 42,
         userId: "u1",
+        conference: "u1~owned-room",
       }),
     );
 
@@ -104,7 +105,8 @@ describe("useCallRoom", () => {
               id: 1,
               workspace_id: "w1",
               event_type: "predictive_broadcast",
-              payload,
+              payload: { call_sid: "CA11111111111111111111111111111111", user_id: "u1", campaign_id: 42,
+                outreach_attempt_id: 17, conference_id: "u1~owned-room", ...payload },
               created_at: "2026-08-05T00:00:00.000Z",
             }),
           }),
@@ -112,32 +114,32 @@ describe("useCallRoom", () => {
       );
     };
 
-    expect(result.current.predictiveState).toEqual({
+    expect(result.current.predictiveState).toMatchObject({
       contact_id: null,
       status: "idle",
     });
 
     emit({ contact_id: 7, status: "ringing" });
-    expect(result.current.predictiveState).toEqual({
+    expect(result.current.predictiveState).toMatchObject({
       contact_id: 7,
       status: "dialing",
     });
 
     emit({ contact_id: 7, status: "in-progress" });
-    expect(result.current.predictiveState).toEqual({
+    expect(result.current.predictiveState).toMatchObject({
       contact_id: 7,
       status: "connected",
     });
 
     emit({ contact_id: 7, status: "busy" });
-    expect(result.current.predictiveState).toEqual({
+    expect(result.current.predictiveState).toMatchObject({
       contact_id: 7,
       status: "failed",
     });
 
     // Already-normalized dialer vocabulary passes through unchanged.
     emit({ contact_id: 8, status: "dialing" });
-    expect(result.current.predictiveState).toEqual({
+    expect(result.current.predictiveState).toMatchObject({
       contact_id: 8,
       status: "dialing",
     });

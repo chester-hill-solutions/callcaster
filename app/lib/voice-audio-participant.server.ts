@@ -1,20 +1,27 @@
-import { isParticipantHangup, isParticipantJoin, type TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { isParticipantHangup, isParticipantJoin, isParticipantLeave, type TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { stopVoiceAudioConferenceForParticipant } from "@/lib/voice-audio-stop.server";
 import { observeVoiceAudioConferenceEvent, observeVoiceAudioBridgeEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { bindVoicePhoneCustomerParticipant } from "@/server/voice-phone-customer.server";
 import { handlePredictiveParticipantJoin } from "@/lib/predictive-participant-join.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
+import { predictiveCustomerBroadcast, predictiveCustomerParticipation } from "@/lib/predictive-customer-broadcast.server";
+import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 
 type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
 
 export async function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
   const row = await bindVoicePhoneCustomerParticipant(owner, { requestUrl, accountSid: event.accountSid ?? "", callSid: event.callSid ?? "",
     conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", participantLabel: event.raw.ParticipantLabel ?? "" });
-  if (row?.audio_mode === "predictive" && isParticipantJoin(event)) {
+  if (row?.audio_mode === "predictive" && (isParticipantJoin(event) || isParticipantLeave(event))) {
     const call = await findCallBySid(event.callSid ?? "");
     if (!call || call.workspace !== row.workspace) throw new Error("Predictive phone customer Call is missing");
-    await handlePredictiveParticipantJoin(event, call);
+    if (isParticipantJoin(event)) await handlePredictiveParticipantJoin(event, call);
+    else {
+      const participation = predictiveCustomerParticipation(event);
+      const broadcast = participation ? predictiveCustomerBroadcast(call, "completed", participation) : null;
+      if (broadcast) await emitPredictiveBroadcast(row.workspace, broadcast);
+    }
   }
   return row;
 }
