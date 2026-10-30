@@ -108,6 +108,7 @@ const steps = [
   "client/migrations/20261030000001_voice_audio_conference_stop.sql",
   "client/migrations/20261030000002_voice_audio_manual_topology.sql",
   "client/migrations/20261030000003_voice_audio_topology_lookup.sql",
+  "client/migrations/20261030000004_voice_recording_operations.sql",
   "client/migrations/20261031000000_contact_merge_receipts.sql",
   "client/migrations/20261031000001_workspace_number_release_history.sql",
 ];

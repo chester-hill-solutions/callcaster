@@ -21,7 +21,7 @@ export { contact_merge_receipt } from "./schema-contact-merge";
 export { audience_import_run, audience_import_row } from "./schema-audience-import";
 export { workspace_number_release } from "./schema-number-release";
 export { workspace_number_purchase } from "./schema-number-purchase";
-export { workspace_voice_reservation, workspace_voice_audio_connection } from "./schema-voice";
+export { workspace_voice_reservation, workspace_voice_audio_connection, workspace_voice_recording_operation } from "./schema-voice";
 export { predictive_machine_operation } from "./schema-predictive-machine";
 export { inbound_voicemail_recipient, inbound_voicemail_delivery } from "./schema-inbound-voicemail";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
