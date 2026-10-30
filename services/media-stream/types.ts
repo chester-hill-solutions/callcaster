@@ -83,6 +83,7 @@ export interface TwilioStreamState {
   callSid?: string;
   direction?: string;
   stt?: ElevenLabsRealtimeStream | null;
+  audioTimeline?: import("./audio-timeline").TwilioAudioTimeline | null;
   startTime?: number;
   /**
    * Epoch ms the realtime STT stream actually opened, and the clock the
