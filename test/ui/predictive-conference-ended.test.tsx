@@ -35,7 +35,8 @@ test("the room end event clears only the matching conference, including an agent
     }) })));
   };
 
-  emit({ contact_id: 7, status: "in-progress" });
+  emit({ contact_id: 7, status: "in-progress", customer_event: "joined",
+    conference_sid: "CF11111111111111111111111111111111", conference_sequence: 1 });
   expect(result.current.predictiveState.status).toBe("connected");
   expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
   send.mockClear();
@@ -61,7 +62,8 @@ test("the room end event clears only the matching conference, including an agent
   expect(result.current.predictiveState.status).toBe("idle");
 
   act(() => result.current.setConference("u1~next"));
-  emit({ contact_id: 8, status: "in-progress", conference_id: "u1~next" });
+  emit({ contact_id: 8, status: "in-progress", conference_id: "u1~next", customer_event: "joined",
+    conference_sid: "CF22222222222222222222222222222222", conference_sequence: 1 });
   expect(result.current.predictiveState.status).toBe("connected");
   send.mockClear();
   emit({ contact_id: null, status: "completed", conference_ended: true, conference_id: "u1~active" });

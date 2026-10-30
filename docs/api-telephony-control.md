@@ -159,6 +159,15 @@ Hangup for a funded call requires the reservation's original provider account.
 A replacement account is refused before a provider command, queue change or
 disposition update. The saved customer and funding remain available for recovery.
 
+Voice Drop accepts `callId`, `workspaceId` and `campaignId` as form fields. A
+funded customer SID or its SDK setup SID resolves to the same saved customer.
+The campaign and live Call must match that reservation, and the original
+provider account must remain available. The endpoint waits for the provider
+command before reporting success. It redirects only the customer; reusable
+agent phone audio stays connected. Legacy unfunded SDK parent and recipient
+lookups remain scoped to the authorized workspace. Failures return a plain
+error message, and non-members receive 404.
+
 `dial_intent_id` is an optional UUID. Retain it for transport retries; use a
 new UUID for each new Dial or Redial action. The call screen supplies it.
 Requests without it retain the legacy meaning of a new action, but an active

@@ -28,12 +28,13 @@ vi.mock("@/hooks/call/useCallRoom", () => ({
     status: "online",
     users: [],
     predictiveState: roomState,
+    customerCallSid: joinedRoot,
   })),
 }));
 
 vi.mock("@/lib/services/hooks-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/services/hooks-api")>()),
-  hangupCall: vi.fn().mockResolvedValue(undefined),
+  hangupCall: vi.fn().mockResolvedValue({ success: true }),
   startConferenceAndDial: vi.fn().mockResolvedValue({
     success: true,
     conferenceName: "conf-1",
@@ -69,6 +70,8 @@ let verifiedNumbers: string[] = [];
 let workspaceAccess = true;
 let queueItems = [queueItem];
 let roomState: { status: string; contact_id: number | null } = { status: "idle", contact_id: null };
+let joinedRoot: string | null = null;
+let initialCall: { sid: string; status: string; user_id: string; campaign_id: number } | null = null;
 let initialAttempt: {
   id: number;
   contact_id: number;
@@ -113,7 +116,7 @@ vi.mock("react-router", async () => {
       queue: queueItems,
       nextRecipient: queueItem,
       initalCallsList: [],
-      initialRecentCall: null,
+      initialRecentCall: initialCall,
       initialRecentAttempt: initialAttempt,
       token: "twilio-token",
       count: 0,
@@ -126,7 +129,7 @@ vi.mock("react-router", async () => {
 });
 
 describe("useCallScreen", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     fetcherCall = 0;
     dialType = "call";
     callerId = "+15550000001";
@@ -134,8 +137,12 @@ describe("useCallScreen", () => {
     workspaceAccess = true;
     queueItems = [queueItem];
     roomState = { status: "idle", contact_id: null };
+    joinedRoot = null;
+    initialCall = null;
     initialAttempt = null;
     vi.clearAllMocks();
+    const api = await import("@/lib/services/hooks-api");
+    vi.mocked(api.hangupCall).mockReset().mockResolvedValue({ success: true });
     vi.stubGlobal("alert", vi.fn());
     vi.stubGlobal(
       "fetch",
@@ -289,6 +296,76 @@ describe("useCallScreen", () => {
     act(() => result.current.phoneVerification.setSelectedDevice("+15559998888"));
 
     window.dispatchEvent(new KeyboardEvent("keypress", { key: "3" }));
+  });
+
+  test("a recent background call cannot become the customer control target", async () => {
+    initialCall = { sid: "CA11111111111111111111111111111111", status: "in-progress", user_id: "another-agent", campaign_id: 1 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result } = renderHook(() => useCallScreen());
+    expect(result.current.callSid).toBeNull();
+  });
+
+  test("the call screen exposes the confirmed predictive human as its customer target", async () => {
+    dialType = "predictive";
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { result, rerender } = renderHook(() => useCallScreen());
+    act(() => result.current.callControls.setConference("user-1~owned"));
+    joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    rerender();
+    expect(result.current.callControls.activeCall).toBeNull();
+    expect(result.current.callSid).toBe(joinedRoot);
+    expect(result.current.callControls.displayState).toBe("connected");
+  });
+
+  test("customer hangup and voice drop use the confirmed human without an SDK call", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { result } = renderHook(() => useCallScreen());
+    act(() => result.current.callControls.setConference("user-1~owned"));
+    act(() => result.current.callControls.handleVoiceDrop());
+    const [form] = vi.mocked(fetcher.submit).mock.calls.at(-1) ?? [];
+    expect(form).toBeInstanceOf(FormData);
+    if (!(form instanceof FormData)) throw new Error("Voice drop request is missing");
+    expect(form.get("callId")).toBe(joinedRoot);
+    await act(async () => { await result.current.callControls.hangUp(); });
+    expect(api.hangupCall).toHaveBeenCalledExactlyOnceWith({ callSid: joinedRoot, workspaceId: "ws" });
+    expect(result.current.callControls.displayState).toBe("completed");
+    expect(result.current.callControls.conference).toBe("user-1~owned");
+  });
+
+  test.each([false, true])("a refused or unconfirmed customer hangup retains its live state (%s)", async failedRequest => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    const { toast } = await import("sonner");
+    if (failedRequest) vi.mocked(api.hangupCall).mockRejectedValueOnce(new Error("Original account is unavailable."));
+    else vi.mocked(api.hangupCall).mockResolvedValueOnce({ success: false });
+    const { result } = renderHook(() => useCallScreen());
+    await act(async () => { await result.current.callControls.hangUp(); });
+    expect(result.current.callControls.displayState).toBe("connected");
+    expect(toast.error).toHaveBeenCalledOnce();
+  });
+
+  test("a late customer hangup reply cannot complete the next human", async () => {
+    dialType = "predictive"; joinedRoot = "CA22222222222222222222222222222222";
+    roomState = { status: "connected", contact_id: 7 };
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const api = await import("@/lib/services/hooks-api");
+    let respond!: (value: { success: boolean }) => void;
+    vi.mocked(api.hangupCall).mockReturnValueOnce(new Promise(resolve => { respond = resolve; }));
+    const { result, rerender } = renderHook(() => useCallScreen());
+    let pending: Promise<void>;
+    act(() => { pending = result.current.callControls.hangUp(); });
+    expect(api.hangupCall).toHaveBeenCalledWith({ callSid: "CA22222222222222222222222222222222", workspaceId: "ws" });
+    joinedRoot = "CA33333333333333333333333333333333";
+    roomState = { status: "connected", contact_id: 8 }; rerender();
+    await act(async () => { respond({ success: true }); await pending; });
+    expect(result.current.callSid).toBe(joinedRoot);
+    expect(result.current.callControls.displayState).toBe("connected");
   });
 
   test("predictive start errors reach the shared toast once and pending state reaches the layout contract", async () => {

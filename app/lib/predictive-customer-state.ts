@@ -40,8 +40,10 @@ export function acceptPredictiveRoomEvent(snapshot: PredictiveRoomSnapshot, owne
   if (!parsed.success || parsed.data.user_id !== owner.userId || parsed.data.campaign_id !== owner.campaign) return snapshot;
   const next = parsed.data;
   if (next.customer_event) return acceptParticipation(current, next);
+  if (!current.customerCallSid) return { ...current, payload: { contact_id: null, status: "dialing", conference_id: owner.conference } };
   if (current.customerCallSid && current.customerCallSid !== next.call_sid) return snapshot;
   if (current.customerCallSid && !current.customerPresent) return snapshot;
   const status = toDialerStatus(next.status);
+  if (!TERMINAL.has(status)) return current;
   return { ...current, customerPresent: current.customerPresent && !TERMINAL.has(status), payload: { ...next, status } };
 }
