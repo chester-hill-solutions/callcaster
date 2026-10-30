@@ -2,7 +2,7 @@ import type { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import type { RecordingInstance } from "twilio/lib/rest/api/v2010/account/call/recording";
 import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 import { isTwilioCallHistoryReady } from "@/lib/twilio-call-history.server";
-import { VoiceRecordingBindingError, type VoiceRecordingObservation } from "@/lib/voice-recording";
+import { VoiceRecordingBindingError, voiceRecordingSource, type VoiceRecordingObservation } from "@/lib/voice-recording";
 import { VOICE_RECORDING_HISTORY_LIMIT, voiceRecordingSidFromHistory } from "@/lib/voice-recording-history";
 import { logger } from "@/lib/logger.server";
 import type { VoiceRecordingOperation } from "@/server/voice-recording-operation.server";
@@ -19,7 +19,7 @@ function matchesSource(row: VoiceRecordingOperation, source: CallInstance) {
 
 function observation(row: VoiceRecordingOperation, recordingSid: string, recording: RecordingInstance): VoiceRecordingObservation {
   if (recording.sid !== recordingSid || recording.accountSid !== row.account_sid || recording.callSid !== row.source_call_sid ||
-      recording.source !== (row.kind === "dial" ? "DialVerb" : "StartCallRecordingAPI"))
+      recording.source !== voiceRecordingSource(row.kind))
     throw new VoiceRecordingBindingError("Provider recording does not match its source");
   if (!["processing", "completed", "absent"].includes(recording.status))
     throw new VoiceRecordingBindingError("Provider recording fetch has an unsupported status");

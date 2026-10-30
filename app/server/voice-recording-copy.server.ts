@@ -13,9 +13,9 @@ function needsCopy(row: VoiceRecordingOperation) {
   return row.provider_status === "completed" && row.provider_sid !== null && row.terminal_at !== null && row.audio_url === null;
 }
 
-/** Only the initial Dial owns the existing single-recording playback pointer. */
+/** An initial root recording owns the existing single-recording playback pointer. */
 async function projectInitialRecording(tx: CreditTransaction, row: VoiceRecordingOperation, audioUrl: string) {
-  if (row.kind !== "dial") return;
+  if (row.kind !== "dial" && row.kind !== "customer") return;
   if (!row.provider_sid || row.logical_call_sid !== row.source_call_sid || row.source_parent_sid !== null)
     throw new VoiceRecordingBindingError("Initial recording does not own a root call");
   const [saved] = await createTenantDb(row.workspace, tx).call.update({

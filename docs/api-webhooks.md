@@ -129,6 +129,17 @@ call. A delivery lease fences stale jobs. The existing one-minute voice recovery
 job retries completed parts with no stored copy, including after queue failure
 or a lost storage reply. Initial Dial wiring and media hydration remain in
 development; this callback does not create a recording or bill the call.
+For a customer started through a confirmed idle phone, the funded send saves
+the recording operation ID and callback before the single customer Call POST.
+That Call requests dual-channel, both-track, untrimmed recording and has source
+`OutboundAPI`. Its real Call SID becomes the recording's physical and logical
+owner; the persistent agent phone is a separate audio leg. If this callback
+arrives before local Call acceptance, its saved launch and original-account
+signature are checked first. A bounded provider read must then prove the exact
+customer root before canonical acceptance and recording-part registration.
+It cannot create another Call or charge the agent phone. Recording parts keep
+their existing copy lease, playback acknowledgement and recovery path. Start
+and client integration remain in development.
 Agent audio and parent continuation callbacks use the same original-account
 check and strict raw form reader.
 

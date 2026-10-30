@@ -1,5 +1,5 @@
 import { isObject } from "@/lib/type-safety-utils";
-import { voiceRecordingReceiptFromParams } from "@/lib/voice-recording";
+import { voiceRecordingReceiptFromParams, voiceRecordingSource } from "@/lib/voice-recording";
 import type { VoiceRecordingOperation } from "@/server/voice-recording-operation.server";
 
 export const VOICE_RECORDING_HISTORY_LIMIT = 1000;
@@ -16,7 +16,7 @@ export function voiceRecordingSidFromHistory(owner: VoiceRecordingOperation, eve
     for (const [key, value] of Object.entries(request.parameters)) if (typeof value === "string") params[key] = value;
     const receipt = voiceRecordingReceiptFromParams(params, owner.callback_url);
     if (receipt?.accountSid === owner.account_sid && receipt.callSid === owner.source_call_sid &&
-        receipt.source === (owner.kind === "dial" ? "DialVerb" : "StartCallRecordingAPI")) proven.add(receipt.recordingSid);
+        receipt.source === voiceRecordingSource(owner.kind)) proven.add(receipt.recordingSid);
   }
   return proven.size === 1 ? [...proven][0] ?? null : null;
 }

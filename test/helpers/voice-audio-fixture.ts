@@ -66,6 +66,7 @@ type Connection = Awaited<ReturnType<typeof journal.findVoiceAudioConnection>> &
 export async function clearFault() {
   await sql.unsafe(`drop trigger if exists ${fault} on public.call`);
   await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_audio_connection`);
+  await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_recording_operation`);
   await sql.unsafe(`drop function if exists public.${fault}()`);
 }
 
@@ -290,6 +291,7 @@ export function useOwnedAudioFixture() {
     const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server"); resetRateLimitsForTests();
     await clearFault();
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_audio_connection where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;

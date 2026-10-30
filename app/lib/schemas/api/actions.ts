@@ -9,6 +9,13 @@ export const dialBodySchema = z.object({
   selected_device: z.string().optional(),
   dial_intent_id: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
   expected_queue_generation: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
+  audio_connection_id: z.string().uuid().transform(value => value.toLowerCase()).optional(),
+  audio_generation: z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(Number).pipe(z.number().int().positive().safe()).optional(),
+}).superRefine((input, context) => {
+  if (input.audio_connection_id === undefined && input.audio_generation === undefined) return;
+  if (!input.audio_connection_id || input.audio_generation === undefined || !input.dial_intent_id ||
+    !input.selected_device || input.selected_device === "computer")
+    context.addIssue({ code: "custom", message: "Confirmed phone Start requires its connection, generation, phone and dial intent." });
 });
 
 export const hangupBodySchema = z.object({

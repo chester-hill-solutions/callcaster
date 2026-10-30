@@ -2,8 +2,14 @@ import { isParticipantHangup, type TwilioVoiceCallback } from "@/lib/twilio/voic
 import { stopVoiceAudioConferenceForParticipant } from "@/lib/voice-audio-stop.server";
 import { observeVoiceAudioConferenceEvent, observeVoiceAudioBridgeEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
+import { bindVoicePhoneCustomerParticipant } from "@/server/voice-phone-customer.server";
 
 type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
+
+export function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
+  return bindVoicePhoneCustomerParticipant(owner, { requestUrl, accountSid: event.accountSid ?? "", callSid: event.callSid ?? "",
+    conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", participantLabel: event.raw.ParticipantLabel ?? "" });
+}
 
 /** Signature validation and callback-owner binding precede participant dispatch. */
 export async function handleBoundVoiceAudioParticipant(workspaceId: string, requestUrl: string, event: ParticipantEvent) {

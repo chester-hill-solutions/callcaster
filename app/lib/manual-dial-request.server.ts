@@ -21,8 +21,10 @@ export function manualDialIdentity(input: ReturnType<typeof parseManualDialReque
   let to: string, from: string;
   try { to = normalizePhoneNumber(input.to_number); from = normalizePhoneNumber(input.caller_id); }
   catch (error) { throw new AppError(error instanceof Error ? error.message : "Invalid phone number", 400, ErrorCode.VALIDATION_ERROR); }
+  const audioSource = input.audio_connection_id && input.audio_generation !== undefined && input.selected_device && input.selected_device !== "computer"
+    ? { connectionId: input.audio_connection_id, generation: input.audio_generation, destination: input.selected_device, mode: "manual" as const } : undefined;
   return { ...input, to, from, intentId: input.dial_intent_id ?? randomUUID(),
-    setupTo: input.selected_device && input.selected_device !== "computer" ? input.selected_device : `client:${actorId}` };
+    audioSource, setupTo: audioSource ? null : input.selected_device && input.selected_device !== "computer" ? input.selected_device : `client:${actorId}` };
 }
 
 export async function validateManualDialRequest(input: ReturnType<typeof parseManualDialRequest>, actorId: string) {

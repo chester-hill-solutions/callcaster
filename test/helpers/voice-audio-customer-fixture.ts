@@ -1,7 +1,17 @@
-import { accountSid, actor, callerId, issued, joined, phone, rooms, web, workspaceId } from "./voice-audio-fixture";
+import { accountSid, actor, baseUrl, callerId, customer, issued, joined, phone, rooms, web, workspaceId } from "./voice-audio-fixture";
+import { randomUUID } from "node:crypto";
+import twilio from "twilio";
+import { asRouteResponse, routeArgs } from "./route-result";
 import { observeVoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
 import { verifyVoiceAudioCustomerSource } from "@/lib/voice-audio-customer-source.server";
 import type { VoiceAudioCustomerSourceInput } from "@/server/voice-audio-customer-source.server";
+import { reserveVoiceCredits, type VoiceReservationInput } from "@/server/voice-credit-reservation.server";
+
+export function customerUrls() {
+  const id = randomUUID();
+  return { voiceUrl: `${baseUrl}/api/dial/${encodeURIComponent(customer)}`, statusCallback: `${baseUrl}/api/call-status/`,
+    customerRecording: { id, callbackUrl: `${baseUrl}/api/voice-recording?recording=${id}` } };
+}
 
 export async function confirmed() {
   const row = await observeVoiceAudioConferenceEvent(joined(await issued()));
@@ -22,4 +32,27 @@ export async function verified(f: Awaited<ReturnType<typeof confirmed>>) {
   const result = await verifyVoiceAudioCustomerSource(f.input);
   if (!result.ok) throw new Error(`Phone source verification refused: ${result.reason}`);
   return result.proof;
+}
+
+export async function customerAttempt(mode: "manual" | "predictive" = "manual") {
+  const f = await confirmed(), proof = await verified(f);
+  const args: VoiceReservationInput = { workspaceId, userId: actor, accountSid, kind: "staffed", to: customer, from: callerId,
+    campaignId: 123, operationKey: `audio-customer:${randomUUID()}`, audioSource: {
+      connectionId: f.row.id, generation: f.row.generation, destination: phone, mode, proof,
+    } };
+  return { ...f, args };
+}
+
+export async function fundCustomerAttempt(args: VoiceReservationInput) {
+  const result = await reserveVoiceCredits(args);
+  if (!result.ok) throw new Error(`Customer admission refused: ${result.reason}`);
+  return result.reservation;
+}
+
+export async function signedCustomerRecording(url: string, params: Record<string, string>, valid = true) {
+  const { action } = await import("../../app/routes/api+/voice-recording.action.server");
+  return asRouteResponse(action(routeArgs(new Request(url, { method: "POST", headers: {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Twilio-Signature": valid ? twilio.getExpectedTwilioSignature("owned-audio-token", url, params) : "invalid",
+  }, body: new URLSearchParams(params) }))));
 }

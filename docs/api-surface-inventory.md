@@ -64,7 +64,7 @@ Interactive specs:
 | `/api/contact-form` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/contact-form.tsx` | `docs/api-internal-unsupported.md` | Marketing contact form; sends email via Resend. |
 | `/api/contacts` | POST, PATCH, GET | User API | sessionOnly | yes | `routes/api+/contacts.tsx` | `docs/api-data-management.md` |  |
 | `/api/contacts/:contactId` | DELETE, GET | Integrator API | sessionOnly | yes | `routes/api+/contacts/$contactId.route.tsx` | `docs/api-data-plane.md` |  |
-| `/api/dial` | POST | User API | sessionOnly | yes | `routes/api+/dial.tsx` | `docs/api-telephony-control.md` | Campaign dial initiation; returns TwiML. |
+| `/api/dial` | POST | User API | sessionOnly | yes | `routes/api+/dial.tsx` | `docs/api-telephony-control.md` | Campaign dial initiation; legacy requests return TwiML and confirmed-phone Start returns the customer SID as JSON. |
 | `/api/dial/:number` | POST | Provider Webhook | providerOnly | no | `routes/api+/dial/$number.route.tsx` | `docs/api-webhooks.md` | Twilio TwiML sub-route; requires a valid Twilio signature. Returns TwiML. |
 | `/api/dial/status` | POST | Provider Webhook | providerOnly | no | `routes/api+/dial/status.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/docs/openapi` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/docs/openapi.route.tsx` | `docs/api-overview.md` | Public user-facing OpenAPI JSON (session + workspace + integrator routes). |

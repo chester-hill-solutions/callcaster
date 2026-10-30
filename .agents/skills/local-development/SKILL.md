@@ -593,6 +593,10 @@ After stopping an owned integration worker, check its exact fixture IDs before
 running global recovery-count assertions. A skipped teardown can leave an expired
 operation for the next worker. Remove only verified dummy rows in the owned
 database, require no unexpected customer or ledger data, and read back cleanup.
+Use a block body when a Vitest setup hook configures a mock. Returning the mock
+function registers it as hook cleanup, so Vitest calls it later without arguments.
+Count provider reads after fixture readiness checks, or capture a baseline; the
+fixture's own physical verification is not a callback-authentication side effect.
 When a test freezes the app's captured timestamp, set owned SQL fixture timestamps
 explicitly after real billing writes. Keep the credit and cycle assertions and
 include a real future-row exclusion control. Do not widen a production timestamp
