@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+vi.mock("@/server/voice-recording-batch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-batch.server")>(), isSinglePartCallRecording: vi.fn(async () => true),
+}));
 import { WorkspaceFeatureFlags } from "@/lib/coaching-schemas";
 import { batchTranscriptionKey } from "../shared/billing-keys";
 

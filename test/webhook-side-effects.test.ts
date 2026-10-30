@@ -1,5 +1,8 @@
 import "./helpers/legacy-voice-reservation-mock";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+vi.mock("@/server/voice-recording-batch.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-batch.server")>(), isSinglePartCallRecording: vi.fn(async () => true),
+}));
 
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";

@@ -112,6 +112,7 @@ describe("manual voice funding and ownership (#2879)", () => {
     });
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.outreach_attempt where workspace = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100 where id = ${workspaceId}::uuid`;
@@ -229,6 +230,62 @@ describe("manual voice funding and ownership (#2879)", () => {
     expect(Object.fromEntries(overrides)).toEqual({ ct: "1000", rt: "3000", tt: "15000", rc: "2", rp: "ct,rt,5xx" });
     expect(xml).toMatch(/<Dial[^>]*\bmethod="POST"/);
     expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("a new manual Dial commits its recording nonce with the one customer instruction", async () => {
+    await send(); const physical = firstCall();
+    const response = await signedPost(physical.url, { AccountSid: accountSid, CallSid: physical.sid, From: from, To: physical.to,
+      Direction: "outbound-api", CallStatus: "in-progress" }, true);
+    const xml = await response.text(), callback = xml.match(/recordingStatusCallback="([^"]+)"/)?.[1];
+    if (!callback) throw new Error("Owned recording callback required");
+    const url = new URL(callback.replaceAll("&amp;", "&")); expect(url.hash).not.toBe(""); url.hash = "";
+    const [recording] = await sql`select id, state, send_started_at, logical_call_sid, source_call_sid, callback_url from public.workspace_voice_recording_operation
+      where workspace = ${workspaceId}::uuid`;
+    expect(recording).toMatchObject({ state: "creating", logical_call_sid: physical.sid, source_call_sid: physical.sid,
+      callback_url: `https://manual-credit.example.test/api/voice-recording?recording=${recording.id}` });
+    expect(url.href).toBe(recording.callback_url); expect(recording.send_started_at).not.toBeNull();
+    expect(xml).toContain('recordingStatusCallbackEvent="in-progress completed absent"');
+    expect(xml).toContain('recordingStatusCallbackMethod="POST"');
+    expect(await state()).toMatchObject({ holds: 1, ledger: 0 }); expect(provider.create).toHaveBeenCalledOnce();
+  });
+  test("a recording checkpoint fault rolls back manual customer permission", async () => {
+    await send(); const physical = firstCall(), name = `owned_manual_recording_${randomUUID().replaceAll("-", "")}`;
+    const params = { AccountSid: accountSid, CallSid: physical.sid, From: from, To: physical.to, Direction: "outbound-api", CallStatus: "in-progress" };
+    await sql.unsafe(`create function public.${name}() returns trigger language plpgsql as $$begin
+      if new.workspace = '${workspaceId}'::uuid and new.state = 'creating' then return null; end if; return new; end$$`);
+    await sql.unsafe(`create trigger ${name} before update on public.workspace_voice_recording_operation for each row execute function public.${name}()`);
+    try {
+      expect(await (await signedPost(physical.url, params, true)).text()).not.toContain("<Number");
+      const [row] = await sql`select recipient_instruction_issued_at from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+      const [recording] = await sql`select state, send_started_at from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+      expect(row.recipient_instruction_issued_at).toBeNull(); expect(recording).toEqual({ state: "prepared", send_started_at: null });
+    } finally {
+      await sql.unsafe(`drop trigger if exists ${name} on public.workspace_voice_recording_operation`);
+      await sql.unsafe(`drop function if exists public.${name}()`);
+    }
+    expect(await (await signedPost(physical.url, params, true)).text()).toContain("<Number");
+    expect(provider.create).toHaveBeenCalledOnce(); expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("an issued legacy manual Dial cannot acquire a recording nonce on retry", async () => {
+    await send(); const physical = firstCall();
+    await sql`update public.workspace_voice_reservation set recipient_instruction_issued_at = now() where workspace = ${workspaceId}::uuid`;
+    const response = await signedPost(physical.url, { AccountSid: accountSid, CallSid: physical.sid, From: from, To: physical.to,
+      Direction: "outbound-api", CallStatus: "in-progress" }, true);
+    expect(await response.text()).not.toContain("<Number");
+    const rows = await sql`select id from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+    expect(rows).toEqual([]); expect(provider.create).toHaveBeenCalledOnce();
+  });
+  test("a failed manual TwiML render cannot consume customer permission", async () => {
+    await send(); const physical = firstCall();
+    const render = vi.spyOn(twilio.twiml.VoiceResponse.prototype, "toString").mockImplementationOnce(() => { throw new Error("Owned render fault"); });
+    try {
+      const response = await signedPost(physical.url, { AccountSid: accountSid, CallSid: physical.sid, From: from, To: physical.to,
+        Direction: "outbound-api", CallStatus: "in-progress" }, true);
+      expect(await response.text()).not.toContain("<Number");
+      const [row] = await sql`select recipient_instruction_issued_at from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+      const [recording] = await sql`select state, send_started_at from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+      expect(row.recipient_instruction_issued_at).toBeNull(); expect(recording).toEqual({ state: "prepared", send_started_at: null });
+    } finally { render.mockRestore(); }
+    expect(await connectRecipient()).toMatchObject({ parentCallSid: physical.sid }); expect(provider.create).toHaveBeenCalledOnce();
   });
   test("an accepted manual retry cannot retrofit continuation onto an older call", async () => {
     const intent = randomUUID(); await send({ dial_intent_id: intent });

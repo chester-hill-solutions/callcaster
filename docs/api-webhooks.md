@@ -132,6 +132,20 @@ development; this callback does not create a recording or bill the call.
 Agent audio and parent continuation callbacks use the same original-account
 check and strict raw form reader.
 
+New manual and SDK Dial instructions use this owned callback. The recording
+nonce is prepared before rendering, then armed in the same transaction as the
+single customer instruction. A checkpoint failure returns no customer Dial.
+Already issued legacy calls keep their existing callback. Completed initial
+parts update the matching root Call's playback fields in the copy acknowledgement
+transaction. A missing or changed product Call leaves the accepted part retryable;
+later capture phases cannot overwrite the initial playback pointer.
+
+Single-part calls retain the existing default-off batch transcription flag and
+logical-call job key. A later capture journal prevents a segment from being
+queued as the whole call. The batch worker checks again before downloading and
+before saving a transcript. Segment assembly and complete handoff playback remain
+in development; no segment is billed as a complete multi-part transcript here.
+
 The voice recovery job also observes issued recordings on root Calls. A known
 RecordingSid is fetched through the original account and saved physical Call.
 An unknown SID needs one matching RecordingSid in the saved callback URL's

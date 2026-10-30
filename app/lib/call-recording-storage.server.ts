@@ -48,7 +48,7 @@ function isRetryableHttpStatus(status: number): boolean {
   return status === 429 || status >= 500;
 }
 
-function twilioRecordingMp3Url(accountSid: string, recordingSid: string): string {
+export function twilioRecordingMp3Url(accountSid: string, recordingSid: string): string {
   return `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`;
 }
 

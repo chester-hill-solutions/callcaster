@@ -44,7 +44,7 @@ export const action = defineAction({
       const result = await startPreparedHandsetVoiceRecipient({ ...auth,
         requestUrl: resolveCanonicalTwilioWebhookUrl(request), statusCallback: statusUrl.href,
         continuationUrl: voiceContinuationUrl(env.BASE_URL(), auth.reservationId),
-      }, (reservation) => {
+      }, (reservation, recording) => {
         if (!reservation.user_id) throw new Error("Handset reservation has no actor");
         const twiml = createVoiceResponse();
         appendLiveTranscriptionStreamTwiml({ twiml,
@@ -54,7 +54,8 @@ export const action = defineAction({
         });
         const dial = twiml.dial({ callerId: reservation.caller_id, record: "record-from-answer",
           ...(reservation.setup_continuation_url ? { action: voiceWebhookDeliveryUrl(reservation.setup_continuation_url), method: "POST" } : {}),
-          recordingStatusCallback: `${env.BASE_URL()}/api/recording`, recordingStatusCallbackEvent: ["completed"] });
+          recordingStatusCallback: voiceWebhookDeliveryUrl(recording.callback_url), recordingStatusCallbackMethod: "POST",
+          recordingStatusCallbackEvent: ["in-progress", "completed", "absent"] });
         dial.number({ statusCallback: statusUrl.href, statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] }, reservation.recipient);
         return new Response(twiml.toString(), { headers: { "Content-Type": "text/xml" } });
       });

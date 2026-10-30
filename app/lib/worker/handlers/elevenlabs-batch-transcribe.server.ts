@@ -13,6 +13,7 @@ import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import { TRANSCRIPTION_BATCH_CREDITS } from "../../../../shared/billing-rates";
 import { requireStringParam } from "./shared.server";
+import { isSinglePartCallRecording } from "@/server/voice-recording-batch.server";
 
 const ELEVENLABS_SCRIBE_MODEL = "scribe_v2";
 
@@ -104,6 +105,9 @@ export async function elevenlabsBatchTranscribeHandler(
   if (callRow.transcript_id) {
     return { status: "skipped", reason: "already_transcribed" };
   }
+  if (!await isSinglePartCallRecording(callRow.workspace, callSid, callRow.audio_url)) {
+    return { status: "skipped", reason: "recording_parts_pending" };
+  }
 
   const audio = await downloadObject("workspaceAudio", callRow.audio_url);
   const result = await transcribeWithElevenLabs(audio);
@@ -111,6 +115,9 @@ export async function elevenlabsBatchTranscribeHandler(
     throw new Error("elevenlabs_batch_transcribe: transcription returned no text");
   }
   const text = result.text.trim();
+  if (!await isSinglePartCallRecording(callRow.workspace, callSid, callRow.audio_url)) {
+    return { status: "skipped", reason: "recording_parts_pending" };
+  }
 
   const [transcript] = await adminDb
     .insert(call_transcript)
