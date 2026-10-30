@@ -10,7 +10,7 @@ import type { DeferredEmit } from "@/lib/campaign-queue-db.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import { hasVoiceSetup, matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
 
-export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string; recipientVoiceUrl?: string };
+export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string; recipientVoiceUrl?: string; continuationUrl?: string };
 const TERMINAL = ["completed", "failed", "busy", "no-answer", "canceled"];
 
 export async function startVoiceBridgeReservation(reservation: VoiceReservation, urls: VoiceBridgeUrls) {
@@ -23,7 +23,7 @@ export async function startVoiceBridgeReservationInTransaction(
   const [row] = await executor.update(reservations).set({
     state: "creating", send_started_at: new Date(), updated_at: new Date(),
     setup_voice_url: urls.voiceUrl, setup_status_callback: urls.statusCallback, status_callback: urls.recipientStatusCallback,
-    voice_url: urls.recipientVoiceUrl,
+    voice_url: urls.recipientVoiceUrl, setup_continuation_url: urls.continuationUrl,
   }).where(and(
     eq(reservations.id, reservation.id), eq(reservations.workspace, reservation.workspace),
     eq(reservations.lease_token, reservation.lease_token), eq(reservations.state, "reserved"),

@@ -7,6 +7,7 @@ import { defineAction } from "@/lib/handler.server";
 import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 import { bindVerifiedVoiceSetupRequest, voiceBridgeCallbackArgs } from "@/lib/voice-bridge-webhook.server";
 import { claimVoiceBridgeRecipient } from "@/server/voice-bridge-reservation.server";
+import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
 
 function unavailable() {
   return new Response(sayHangupTwiml("We're unable to take your call right now. Please try again later."),
@@ -37,6 +38,7 @@ export const action = defineAction({
           streamName: `call-${params.CallSid}` },
       });
       const dial = twiml.dial({ callerId: bridge.caller_id, record: "record-from-answer",
+        ...(bridge.setup_continuation_url ? { action: voiceWebhookDeliveryUrl(bridge.setup_continuation_url), method: "POST" } : {}),
         recordingStatusCallback: `${env.BASE_URL()}/api/recording`, recordingStatusCallbackEvent: ["completed"] });
       dial.number({ statusCallback: bridge.status_callback,
         statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] }, bridge.recipient);

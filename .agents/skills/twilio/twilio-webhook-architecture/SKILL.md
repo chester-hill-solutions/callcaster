@@ -252,6 +252,17 @@ funded work cannot consume every legacy repair slot.
 
 Append URL fragments to any webhook URL to override default connection behavior. Fragments are not included in signature computation.
 
+A 500 response does not enable retries by itself: the default policy covers
+connection failures. Set the required retry classes explicitly. For exact-URL
+binding, keep the saved signed URL free of the delivery fragment and add the
+fragment only at the provider/TwiML boundary. Bound provider reads inside a
+voice response well below the 15-second limit. An unavailable REST API must not
+retire an authenticated original audio source during an unfinished handoff.
+Only a verified replacement commit can change the current audio owner.
+For conference events, set delivery policy on the first participant. A later
+join cannot replace it. Finite provider retries do not replace a durable stop
+intent and worker recovery for a customer room.
+
 **Format:** `https://yourapp.com/webhook#key=value&key=value`
 
 | Parameter | Key | Default | Range | Description |

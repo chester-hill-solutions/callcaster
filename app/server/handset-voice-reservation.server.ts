@@ -67,6 +67,7 @@ type HandsetVoiceRequest = {
   workspaceId: string; clientIdentity: string; reservationId: string; recipient: string;
   callSid: string; accountSid: string; from: string; direction: string; parentCallSid?: string;
   requestUrl: string; statusCallback: string;
+  continuationUrl?: string;
 };
 
 function matchesHandsetRequest(row: VoiceReservation, args: HandsetVoiceRequest) {
@@ -92,7 +93,7 @@ async function claimHandsetRecipient(row: VoiceReservation, args: HandsetVoiceRe
     const now = new Date();
     const [issued] = await tx.update(reservations).set({ state: "creating", setup_sid: root.sid,
       send_started_at: now, recipient_instruction_issued_at: now, setup_voice_url: args.requestUrl,
-      status_callback: args.statusCallback, updated_at: now,
+      status_callback: args.statusCallback, setup_continuation_url: args.continuationUrl, updated_at: now,
     }).where(eq(reservations.id, current.id)).returning();
     if (!issued) throw new Error("Handset recipient instruction was not saved");
     await persistReservedVoiceCall(tx, issued, root.sid, "setup");
@@ -112,7 +113,7 @@ export async function startPreparedHandsetVoiceRecipient<T>(args: HandsetVoiceRe
   const root = await client.calls(args.callSid).fetch();
   if (root.sid !== args.callSid || !matchesVoiceSetupRoot(row, root) ||
       !["queued", "initiated", "ringing", "in-progress"].includes(root.status)) return null;
-  const instruction = buildInstruction(row);
+  const instruction = buildInstruction({ ...row, setup_continuation_url: args.continuationUrl ?? row.setup_continuation_url });
   const issued = await claimHandsetRecipient(row, args, root);
   return issued ? { reservation: issued, instruction } : null;
 }

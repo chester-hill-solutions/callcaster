@@ -24,10 +24,19 @@ export async function hasFundedAgentVoice(tdb: TenantDb, userId: string) {
   return Boolean(row);
 }
 
-export async function isRetiredVoiceAudioSource(args: { workspaceId: string; accountSid: string; callSid: string; conferenceId: string }) {
-  const row = await createTenantDb(args.workspaceId).workspace_voice_audio_connection.findFirst({ where: and(
+type SourceIdentity = { workspaceId: string; accountSid: string; callSid: string; conferenceId?: string };
+
+/** A source remains retired across ended replacement legs and later rooms. */
+export function voiceAudioSourceRetirementWhere(args: SourceIdentity) {
+  return and(eq(connections.workspace, args.workspaceId),
     eq(connections.account_sid, args.accountSid), eq(connections.source_agent_sid, args.callSid),
-    eq(connections.conference_id, args.conferenceId), isNotNull(connections.committed_at),
-  ), columns: { id: true } });
+    args.conferenceId === undefined ? undefined : eq(connections.conference_id, args.conferenceId), isNotNull(connections.committed_at),
+  );
+}
+
+export async function isRetiredVoiceAudioSource(args: SourceIdentity) {
+  const row = await createTenantDb(args.workspaceId).workspace_voice_audio_connection.findFirst({
+    where: voiceAudioSourceRetirementWhere(args), columns: { id: true },
+  });
   return Boolean(row);
 }

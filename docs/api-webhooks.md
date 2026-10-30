@@ -49,6 +49,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | POST | `/api/auto-dial/status` | Auto-dial status |
 | POST | `/api/voice-audio` | Operation-bound agent audio instructions, status and conference events |
 | GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Legacy campaign conference voice URL |
+| POST | `/api/voice-continuation` | Signed manual and SDK parent continuation; live handoff integration in progress |
 | POST | `/api/caller-id/status` | Caller ID verification status |
 
 `POST /api/auto-dial/status` handles a signed `participant-leave` event with
@@ -77,6 +78,33 @@ Agent audio never dispatches the first contact or writes customer billing,
 disposition or queue outcomes. A genuine current-agent hangup ends its exact
 owned conference through the existing conference-end owner. Transient stop
 failures return 500 so the provider can retry.
+
+New manual REST and SDK customer instructions save a `POST /api/voice-continuation`
+URL before issuing their one customer Dial. The query contains the saved
+`credit_reservation` UUID. The original account, parent SID and known customer
+SID bind the signed form. Ordinary completion returns Hangup. Only a joined,
+uncommitted direct-call promotion that is already in progress can return the
+original parent to its saved conference. Available provider parent and child
+facts must match. Their lookup has a one-second limit; an unavailable API keeps
+the authenticated original parent on its saved target and leaves replacement
+commit pending. A known ended call returns Hangup. The callback does not create a
+call, change customer identity, bill, dispose or advance the queue. Calls issued
+without this saved continuation keep their existing behavior. Live promotion,
+media continuity and transport commit are still in development.
+
+Parent rescue is separate from replacement activation. If the replacement phone
+fails after promotion starts, the still-active original parent can rejoin its
+owned customer. Failed, canceled or retired phone status alone cannot end that
+parent. After a successor commits, the old parent cannot rejoin through an older
+failed operation.
+
+Parent Dial action URLs and new owned audio conference callback URLs explicitly retry connection/read failures and 5xx, with
+two retries inside the 15-second voice limit. The delivery-override fragment is
+added only to TwiML; the saved URL and signature comparison exclude it. A 500
+response alone does not enable provider retries. See [Twilio connection overrides](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides).
+An existing conference keeps its first participant's callback delivery policy.
+Later audio joins cannot replace it. Provider retries are finite; durable room
+stop recovery remains part of the unfinished handoff integration.
 
 ## Stripe
 

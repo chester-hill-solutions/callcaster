@@ -200,6 +200,59 @@ describe("manual voice funding and ownership (#2879)", () => {
     }
     for (const job of stored) await sql`update public.job set status = 'completed' where id = ${job.id}`;
   }
+  test("saves the manual parent continuation before the setup provider POST", async () => {
+    const create = provider.create.getMockImplementation();
+    if (!create) throw new Error("Owned setup provider implementation required");
+    let continuationAtSend: unknown;
+    provider.create.mockImplementationOnce(async (args: Record<string, string>) => {
+      const [checkpoint] = await sql`select setup_continuation_url from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+      continuationAtSend = checkpoint?.setup_continuation_url;
+      return create(args);
+    });
+    const result = await send(); expect(result.status).toBe(200);
+    const [row] = await sql`select id, setup_continuation_url from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+    const expected = `https://manual-credit.example.test/api/voice-continuation?credit_reservation=${row.id}`;
+    expect(continuationAtSend).toBe(expected); expect(row.setup_continuation_url).toBe(expected);
+    expect(await state()).toMatchObject({ holds: 1, ledger: 0, calls: 1 });
+    expect(provider.create).toHaveBeenCalledOnce();
+  });
+  test("a new manual Dial returns control to its saved signed parent continuation", async () => {
+    await send(); const physical = firstCall();
+    const [row] = await sql`select id from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+    const response = await signedPost(physical.url, { AccountSid: accountSid, CallSid: physical.sid, From: from, To: physical.to,
+      Direction: "outbound-api", CallStatus: "in-progress" }, true);
+    expect(response.status).toBe(200); const xml = await response.text();
+    const actionUrl = xml.match(/<Dial[^>]*\baction="([^"]+)"/)?.[1];
+    if (!actionUrl) throw new Error("Saved parent action required");
+    const url = new URL(actionUrl.replaceAll("&amp;", "&")); const overrides = new URLSearchParams(url.hash.slice(1)); url.hash = "";
+    expect(url.href).toBe(`https://manual-credit.example.test/api/voice-continuation?credit_reservation=${row.id}`);
+    expect(Object.fromEntries(overrides)).toEqual({ ct: "1000", rt: "3000", tt: "15000", rc: "2", rp: "ct,rt,5xx" });
+    expect(xml).toMatch(/<Dial[^>]*\bmethod="POST"/);
+    expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("an accepted manual retry cannot retrofit continuation onto an older call", async () => {
+    const intent = randomUUID(); await send({ dial_intent_id: intent });
+    await sql`update public.workspace_voice_reservation set setup_continuation_url = null where workspace = ${workspaceId}::uuid`;
+    expect((await send({ dial_intent_id: intent })).status).toBe(200);
+    const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+    expect(row.setup_continuation_url).toBeNull(); expect(provider.create).toHaveBeenCalledOnce();
+  });
+  test("ordinary signed parent completion keeps customer billing with its existing owner", async () => {
+    await send(); const child = await connectRecipient(), physical = firstCall(); await status(child, "completed", "42");
+    const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
+    expect(row.setup_continuation_url).toBeTypeOf("string");
+    const url: string = row.setup_continuation_url, before = await state();
+    const params = { AccountSid: accountSid, CallSid: physical.sid, DialCallSid: child.sid, DialCallStatus: "completed",
+      From: from, To: physical.to, Direction: physical.direction };
+    const { action } = await import("../../app/routes/api+/voice-continuation.action.server");
+    for (let retry = 0; retry < 3; retry++) {
+      const request = new Request(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
+        "X-Twilio-Signature": twilio.getExpectedTwilioSignature("owned-manual-token", url, params) }, body: new URLSearchParams(params) });
+      const response = await asRouteResponse(action(routeArgs(request))); expect(response.status).toBe(200);
+      expect(await response.text()).toContain("<Hangup");
+    }
+    expect(await state()).toEqual(before); expect(provider.create).toHaveBeenCalledOnce(); expect(provider.update).not.toHaveBeenCalled();
+  });
   async function billWithoutQueueEffects(child: ProviderCall) {
     await status(child, "completed", "42");
     const { findCallBySid } = await import("@/lib/telephony-db.server");

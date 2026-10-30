@@ -104,6 +104,7 @@ const steps = [
   "client/migrations/20261026000000_scope_inbound_offer_rpcs_by_workspace.sql",
   "client/migrations/20261029000000_outbound_voice_credit_reservations.sql",
   "client/migrations/20261029000001_voice_audio_connections.sql",
+  "client/migrations/20261029000002_voice_audio_committed_source.sql",
 ];
 
 /**

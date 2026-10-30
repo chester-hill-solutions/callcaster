@@ -29,6 +29,12 @@ signed event to its stored account, conference name and conference SID, then
 resolve the event's actual CallSid within that conference. Do not assume that
 the callback URL's owner is the participant named by every event.
 
+The callback owner can leave while the conference stays active. Keep verified
+parent/customer bridge events after that owner's physical call becomes
+terminal. Its terminal status does not end the logical bridge. A genuine
+current parent or customer hangup must still reach the conference-end owner;
+a source retired by a committed successor cannot end that room.
+
 A participant event does not establish final call duration. Keep final billing
 on the recipient call-status contract. For a funded predictive start, emit the
 agent's conference TwiML first; use its validated join event to claim the first
@@ -36,6 +42,20 @@ recipient's single-send checkpoint. Recheck recipient calling hours at that
 checkpoint because the agent can answer after the admission window closes.
 
 Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
+
+## Replacing agent audio on a direct call
+
+Save a signed parent Dial action before issuing the one customer child. Keep
+the customer SID, direction, parent, account, reservation and billing key.
+The parent action preserves the original audio after customer promotion; it
+does not activate the replacement. If the replacement ends before commit,
+allow the still-owned, active original parent to rejoin its customer. Do not
+gate that rescue on replacement liveness. Once a successor commits, fence the
+original parent across all earlier failed operations and conference names.
+Save promotion intent before provider I/O and keep one unresolved promotion
+and one owned topology for the customer. An uncertain child redirect cannot
+start another promotion. Source checks do not prove physical continuity;
+require an isolated provider test before accepting the complete handoff.
 
 ## Prerequisites
 

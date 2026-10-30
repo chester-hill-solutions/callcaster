@@ -3,12 +3,12 @@ import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { voiceAudioConferenceTwiml, voiceAudioConfirmationTwiml } from "@/lib/voice-audio-twiml.server";
 import { attemptVoiceAudioCancellation } from "@/lib/voice-audio-recovery.server";
 import { bindVoiceAudioProviderReceipt } from "@/server/voice-audio-callback.server";
-import { issueVoiceAudioInstruction, observeVoiceAudioBridgeEvent } from "@/server/voice-audio-conference.server";
+import { issueVoiceAudioInstruction } from "@/server/voice-audio-conference.server";
 import { observeVoiceAudioStatus } from "@/server/voice-audio-lifecycle.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { logger } from "@/lib/logger.server";
 import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
-import { handleBoundVoiceAudioParticipant } from "@/lib/voice-audio-participant.server";
+import { handleBoundVoiceAudioParticipant, handleBoundVoiceAudioBridgeParticipant } from "@/lib/voice-audio-participant.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 type VerifiedContext = { owner: VoiceAudioConnection; params: Record<string, string>; event: "voice" | "status" | "conference" };
@@ -23,10 +23,7 @@ async function handleConference(owner: VoiceAudioConnection, params: Record<stri
   if (params.StatusCallbackEvent !== "participant-join" && params.StatusCallbackEvent !== "participant-leave") return new Response(null, { status: 204 });
   const event = parseTwilioVoiceCallback(params);
   if (event.kind !== "participant") return twilioWebhookForbiddenHangup();
-  if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event)) await observeVoiceAudioBridgeEvent(owner, {
-    accountSid: params.AccountSid ?? "", requestUrl, conferenceId: params.FriendlyName ?? "", conferenceSid: params.ConferenceSid ?? "",
-    callSid: params.CallSid ?? "", joined: event.event === "participant-join",
-  });
+  if (!await handleBoundVoiceAudioParticipant(owner.workspace, requestUrl, event)) await handleBoundVoiceAudioBridgeParticipant(owner, requestUrl, event);
   return new Response(null, { status: 204 });
 }
 
