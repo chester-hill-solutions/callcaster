@@ -243,6 +243,12 @@ planned layout can differ from the active source. A referenced skill can also
 exist only as a user file in the shared checkout; read it there without copying
 it into a worktree or replacing the user's file.
 
+For API work, check the current codegen configuration before using older API
+guidance. `openapi-ts.config.ts` generates the integrator subset into
+`app/lib/api-generated`; session-only dialer controls use their documented
+OpenAPI override and a client-safe response schema. Infer internal client types
+from that schema. Do not broaden route authentication to fit an old example.
+
 Quote literal route paths containing `$` or shell glob characters; otherwise
 the shell can remove a route segment before the command runs. Read script names
 from `package.json` and discover helper files before reading them. Do not guess

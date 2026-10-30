@@ -6,9 +6,12 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { dispatchVoiceAudioConnection, VoiceAudioConnectionPendingError } from "@/lib/voice-audio-dispatch.server";
 import { attemptVoiceAudioCancellation } from "@/lib/voice-audio-recovery.server";
 import { logger } from "@/lib/logger.server";
+import type { VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
 
-export function voiceAudioSnapshot(row: VoiceAudioConnection) {
-  return { connection_id: row.id, connection_state: row.state, callSid: row.provider_sid, source_agent_sid: row.source_agent_sid,
+export function voiceAudioSnapshot(row: VoiceAudioConnection): VoiceAudioSnapshot {
+  return { connection_id: row.id, connection_state: row.state, workspace_id: row.workspace, user_id: row.user_id,
+    connection_intent_id: row.intent_id, destination: row.destination, requested_call_sid: row.requested_call_sid, campaign_id: row.campaign_id,
+    callSid: row.provider_sid, source_agent_sid: row.source_agent_sid,
     generation: row.generation, transport: row.transport, cancel_requested: Boolean(row.cancel_requested_at) };
 }
 
@@ -34,19 +37,28 @@ function pendingResponse(row: VoiceAudioConnection, headers?: HeadersInit) {
     ...voiceAudioSnapshot(row) }, { status: 409, headers });
 }
 
+async function savedFailureResponse(row: VoiceAudioConnection, reason: VoiceAudioFailureReason | null, headers?: HeadersInit) {
+  if (reason === "insufficient_credits") return voiceAudioFailureResponse(reason, headers);
+  let current = row;
+  try { current = await findVoiceAudioConnection(row.id) ?? row; }
+  catch (error) { logger.error("voice_audio.failure_read_failed", { connectionId: row.id, error }); }
+  const response = reason ? voiceAudioFailureResponse(reason) : Response.json({ error: "Unable to connect the agent device" }, { status: 502 });
+  return Response.json({ ...await response.json(), ...voiceAudioSnapshot(current) }, { status: response.status, headers });
+}
+
 export async function sendVoiceAudioApiResponse(row: VoiceAudioConnection, headers?: HeadersInit) {
   if (row.provider_sid) return Response.json({ success: true, ...voiceAudioSnapshot(row) }, { headers });
-  if (["failed", "canceled", "retired"].includes(row.state)) return voiceAudioFailureResponse("stale_audio", headers);
+  if (["failed", "canceled", "retired"].includes(row.state)) return savedFailureResponse(row, "stale_audio", headers);
   if (row.send_started_at) return pendingResponse(row, headers);
-  if (row.state !== "prepared") return voiceAudioFailureResponse("stale_audio", headers);
+  if (row.state !== "prepared") return savedFailureResponse(row, "stale_audio", headers);
   try {
     const client = await createWorkspaceTwilioInstance({ workspace_id: row.workspace });
-    if (client.accountSid !== row.account_sid) return voiceAudioFailureResponse("account_changed", headers);
+    if (client.accountSid !== row.account_sid) return savedFailureResponse(row, "account_changed", headers);
     const result = await dispatchVoiceAudioConnection(row, (saved) => client.calls.create({ to: saved.destination, from: saved.caller_id,
       url: saved.voice_url, method: "POST", statusCallback: saved.status_callback, statusCallbackMethod: "POST",
       statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     }));
-    if (!result.ok) return voiceAudioFailureResponse(result.reason, headers);
+    if (!result.ok) return savedFailureResponse(row, result.reason, headers);
     const connection = await attemptVoiceAudioCancellation(result.connection);
     return Response.json({ success: true, ...voiceAudioSnapshot(connection) }, { headers });
   } catch (error) {
@@ -57,6 +69,6 @@ export async function sendVoiceAudioApiResponse(row: VoiceAudioConnection, heade
       return pendingResponse(current, headers);
     }
     logger.error("voice_audio.connection_failed", { connectionId: row.id, error });
-    return Response.json({ error: "Unable to connect the agent device" }, { status: 502, headers });
+    return savedFailureResponse(row, null, headers);
   }
 }

@@ -8,14 +8,25 @@ const phoneNumber = { type: "string", pattern: "^\\+[1-9][0-9]{1,14}$", descript
 const liveProperties = { workspaceId, callSid, connection_intent_id: intentId, expected_agent_sid: callSid };
 const connectionState = { type: "string", enum: ["prepared", "creating", "joining", "ready", "switching", "active", "retired", "failed", "canceled"] };
 const snapshot = {
-  type: "object", required: ["connection_id", "connection_state", "callSid", "generation", "transport"],
+  type: "object", required: ["connection_id", "connection_state", "workspace_id", "user_id", "connection_intent_id", "destination",
+    "requested_call_sid", "campaign_id", "callSid", "source_agent_sid", "generation", "transport", "cancel_requested"],
   properties: {
     connection_id: { type: "string", format: "uuid" }, connection_state: connectionState,
+    workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
+    connection_intent_id: { ...intentId, description: "Stored intent of this connection. Reusing an existing connection retains its original intent UUID." },
+    destination: { type: "string", minLength: 1, description: "Saved verified E.164 phone number or server-resolved client identity." },
+    requested_call_sid: { ...callSid, nullable: true }, campaign_id: { type: "integer", minimum: 1, nullable: true },
     callSid: { ...callSid, nullable: true }, source_agent_sid: { ...callSid, nullable: true },
     generation: { type: "integer", minimum: 1 }, transport: { type: "string", enum: ["phone", "computer"] },
     cancel_requested: { type: "boolean" },
   },
 };
+const connectionFailure = (description: string) => ({ description, content: { "application/json": { schema: {
+  anyOf: [
+    { type: "object", required: ["error"], properties: { error: { type: "string" }, reason: { type: "string" } } },
+    { ...snapshot, required: [...snapshot.required, "error"], properties: { ...snapshot.properties, error: { type: "string" }, reason: { type: "string" } } },
+  ],
+} } } });
 const query = [
   { name: "workspaceId", in: "query", required: true, schema: workspaceId },
   { name: "connection_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
@@ -49,8 +60,8 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
           type: "object", required: ["error", "creditsError"], properties: { error: { type: "string", enum: ["Insufficient credits"] }, creditsError: { type: "boolean", enum: [true] } },
         } } } }, "403": errorResponse("Device is not verified for this user"),
         "404": errorResponse("Workspace, user-owned connection or target call not found"),
-        "409": errorResponse("Pending operation, stale audio owner, changed provider account or unavailable manual continuation. Current audio stays active."),
-        "429": rateLimitResponse, "502": errorResponse("Provider refused the connection"),
+        "409": connectionFailure("Pending operation, stale audio owner, changed provider account or unavailable manual continuation. A prepared owned attempt includes its last known snapshot for read/cancel. Current audio stays active."),
+        "429": rateLimitResponse, "502": connectionFailure("Provider connection failed. An owned saved attempt includes its last known snapshot for read/cancel; an error never confirms active audio."),
       },
     },
     get: {

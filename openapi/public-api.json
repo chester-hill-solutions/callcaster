@@ -3624,9 +3624,17 @@
                   "required": [
                     "connection_id",
                     "connection_state",
+                    "workspace_id",
+                    "user_id",
+                    "connection_intent_id",
+                    "destination",
+                    "requested_call_sid",
+                    "campaign_id",
                     "callSid",
+                    "source_agent_sid",
                     "generation",
                     "transport",
+                    "cancel_requested",
                     "success"
                   ],
                   "properties": {
@@ -3647,6 +3655,34 @@
                         "failed",
                         "canceled"
                       ]
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connection_intent_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                    },
+                    "destination": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Saved verified E.164 phone number or server-resolved client identity."
+                    },
+                    "requested_call_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "campaign_id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true
                     },
                     "callSid": {
                       "type": "string",
@@ -3752,11 +3788,123 @@
             }
           },
           "409": {
-            "description": "Pending operation, stale audio owner, changed provider account or unavailable manual continuation. Current audio stays active.",
+            "description": "Pending operation, stale audio owner, changed provider account or unavailable manual continuation. A prepared owned attempt includes its last known snapshot for read/cancel. Current audio stays active.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformError"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "connection_id",
+                        "connection_state",
+                        "workspace_id",
+                        "user_id",
+                        "connection_intent_id",
+                        "destination",
+                        "requested_call_sid",
+                        "campaign_id",
+                        "callSid",
+                        "source_agent_sid",
+                        "generation",
+                        "transport",
+                        "cancel_requested",
+                        "error"
+                      ],
+                      "properties": {
+                        "connection_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connection_state": {
+                          "type": "string",
+                          "enum": [
+                            "prepared",
+                            "creating",
+                            "joining",
+                            "ready",
+                            "switching",
+                            "active",
+                            "retired",
+                            "failed",
+                            "canceled"
+                          ]
+                        },
+                        "workspace_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "connection_intent_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                        },
+                        "destination": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Saved verified E.164 phone number or server-resolved client identity."
+                        },
+                        "requested_call_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "campaign_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "nullable": true
+                        },
+                        "callSid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "source_agent_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "transport": {
+                          "type": "string",
+                          "enum": [
+                            "phone",
+                            "computer"
+                          ]
+                        },
+                        "cancel_requested": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -3780,11 +3928,123 @@
             }
           },
           "502": {
-            "description": "Provider refused the connection",
+            "description": "Provider connection failed. An owned saved attempt includes its last known snapshot for read/cancel; an error never confirms active audio.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlatformError"
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "error"
+                      ],
+                      "properties": {
+                        "error": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "connection_id",
+                        "connection_state",
+                        "workspace_id",
+                        "user_id",
+                        "connection_intent_id",
+                        "destination",
+                        "requested_call_sid",
+                        "campaign_id",
+                        "callSid",
+                        "source_agent_sid",
+                        "generation",
+                        "transport",
+                        "cancel_requested",
+                        "error"
+                      ],
+                      "properties": {
+                        "connection_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "connection_state": {
+                          "type": "string",
+                          "enum": [
+                            "prepared",
+                            "creating",
+                            "joining",
+                            "ready",
+                            "switching",
+                            "active",
+                            "retired",
+                            "failed",
+                            "canceled"
+                          ]
+                        },
+                        "workspace_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "user_id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "connection_intent_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                        },
+                        "destination": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Saved verified E.164 phone number or server-resolved client identity."
+                        },
+                        "requested_call_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "campaign_id": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "nullable": true
+                        },
+                        "callSid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "source_agent_sid": {
+                          "type": "string",
+                          "pattern": "^CA[0-9a-fA-F]{32}$",
+                          "nullable": true
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "transport": {
+                          "type": "string",
+                          "enum": [
+                            "phone",
+                            "computer"
+                          ]
+                        },
+                        "cancel_requested": {
+                          "type": "boolean"
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -3833,9 +4093,17 @@
                   "required": [
                     "connection_id",
                     "connection_state",
+                    "workspace_id",
+                    "user_id",
+                    "connection_intent_id",
+                    "destination",
+                    "requested_call_sid",
+                    "campaign_id",
                     "callSid",
+                    "source_agent_sid",
                     "generation",
-                    "transport"
+                    "transport",
+                    "cancel_requested"
                   ],
                   "properties": {
                     "connection_id": {
@@ -3855,6 +4123,34 @@
                         "failed",
                         "canceled"
                       ]
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connection_intent_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                    },
+                    "destination": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Saved verified E.164 phone number or server-resolved client identity."
+                    },
+                    "requested_call_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "campaign_id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true
                     },
                     "callSid": {
                       "type": "string",
@@ -3968,9 +4264,17 @@
                   "required": [
                     "connection_id",
                     "connection_state",
+                    "workspace_id",
+                    "user_id",
+                    "connection_intent_id",
+                    "destination",
+                    "requested_call_sid",
+                    "campaign_id",
                     "callSid",
+                    "source_agent_sid",
                     "generation",
-                    "transport"
+                    "transport",
+                    "cancel_requested"
                   ],
                   "properties": {
                     "connection_id": {
@@ -3990,6 +4294,34 @@
                         "failed",
                         "canceled"
                       ]
+                    },
+                    "workspace_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connection_intent_id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "Stored intent of this connection. Reusing an existing connection retains its original intent UUID."
+                    },
+                    "destination": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Saved verified E.164 phone number or server-resolved client identity."
+                    },
+                    "requested_call_sid": {
+                      "type": "string",
+                      "pattern": "^CA[0-9a-fA-F]{32}$",
+                      "nullable": true
+                    },
+                    "campaign_id": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "nullable": true
                     },
                     "callSid": {
                       "type": "string",

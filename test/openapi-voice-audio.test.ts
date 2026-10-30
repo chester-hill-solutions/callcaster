@@ -3,6 +3,7 @@ import { openApiSpec } from "@/lib/openapi";
 import { completeOpenApiSpec } from "@/lib/openapi-complete";
 import { buildOpenApiSpec } from "@/lib/openapi-build";
 import { getCompleteOpenApiEntries } from "@/lib/api-surface";
+import { voiceAudioSnapshotSchema } from "@/lib/schemas/api/voice-audio";
 
 describe("agent audio OpenAPI view boundaries", () => {
   test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s preserves predictive Start auth and documents confirmed-phone identity", (_name, spec) => {
@@ -54,6 +55,14 @@ describe("agent audio OpenAPI view boundaries", () => {
     expect(path.post.responses["402"].content["application/json"].schema.required).toEqual(["error", "creditsError"]);
     expect(path.post.responses["200"].content["application/json"].schema.properties.connection_state.enum).toContain("ready");
     expect(path.post.responses["200"].content["application/json"].schema.properties.connection_state.enum).toContain("active");
+    for (const method of ["get", "delete", "post"]) {
+      const response = path[method].responses["200"].content["application/json"].schema;
+      expect(response.required).toEqual(expect.arrayContaining(["workspace_id", "user_id", "connection_intent_id", "destination",
+        "requested_call_sid", "campaign_id", "source_agent_sid", "cancel_requested"]));
+      expect(Object.keys(voiceAudioSnapshotSchema.shape)).toEqual(expect.arrayContaining(response.required.filter((field: string) => field !== "success")));
+    }
+    for (const status of ["409", "502"]) expect(path.post.responses[status].content["application/json"].schema.anyOf[1].required)
+      .toEqual(expect.arrayContaining(["error", "connection_id", "connection_intent_id"]));
   });
   test("cannot inject a path absent from the selected API view", () => {
     expect(() => buildOpenApiSpec({ entries: [], title: "Selected fixture", description: "Owned fixture", tagStrategy: "owner",
