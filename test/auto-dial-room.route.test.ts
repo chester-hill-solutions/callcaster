@@ -99,7 +99,8 @@ vi.mock("@/lib/object-storage.server", async () => {
   };
 });
 
-vi.mock("@/lib/twilio-webhook.server", () => ({
+vi.mock("@/lib/twilio-webhook.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/twilio-webhook.server")>(),
   requireTwilioSignature: vi.fn(async (args: {
     params?: Record<string, string>;
   }) => (null)),

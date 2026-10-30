@@ -153,6 +153,10 @@ Give each real-database provider fixture a unique account SID. Delete its queued
 jobs before its workspace, including after deliberate faults: a fault can enqueue
 work that a passing control never creates. A mutation proof requires the expected
 failed assertions, passing controls, and no suite or cleanup-hook failure.
+Vitest promise assertions can be reported as `Error` rather than `AssertionError`.
+Require the named test and an executed `__VITEST_RESOLVES__` or
+`__VITEST_REJECTS__` assertion frame when accepting that form. A raw product or
+hook exception alone does not prove the intended assertion failed.
 
 When extracting shared Vitest fixtures, keep `vi.hoisted` declarations private
 and export their bindings with a separate `export { ... }` statement. A direct

@@ -15,7 +15,7 @@ import { handsetPathOverrides } from "@/lib/openapi-handset";
 import { voiceAudioPathOverrides } from "@/lib/openapi-voice-audio";
 import { manualDialPathOverrides } from "@/lib/openapi-manual-dial";
 
-export const platformPathOverrides: Record<string, Record<string, unknown>> = {
+export const platformPathOverrides = {
   ...handsetPathOverrides,
   ...voiceAudioPathOverrides,
   ...manualDialPathOverrides,
@@ -278,7 +278,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       "x-callcaster-capability": "calls.start",
       security: apiKeyOrSessionSecurity,
       description:
-        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for setup and the first eligible recipient before provider dispatch. Reuse optional `dial_intent_id` for an unknown start result; an accepted retry returns the original conference and sends no new setup. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
+        "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for the first eligible recipient before provider dispatch. Paired `audio_connection_id` and `audio_generation`, a stable `dial_intent_id` and the verified phone as `selected_device` reuse confirmed phone audio: Start calls only the recorded AMD customer and returns the saved conference plus real customer `callSid`. Connect never starts a customer. Accepted retries return the saved identity before mutable phone/campaign/queue checks. Predictive fanout and continuation retain one hold per customer and the first phone callback. Customer departure and queue drain do not close the persistent phone room. New legacy setup is refused while owned audio is unresolved; otherwise legacy setup and the first recipient share the same hold. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
       requestBody: {
         required: true,
         content: {
@@ -289,7 +289,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       },
       responses: {
         "200": {
-          description: "Conference setup accepted, or the original accepted start replayed",
+          description: "Customer or legacy setup accepted, or the original accepted start replayed. Confirmed-phone Start includes the real customer callSid.",
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/DialerStartResponse" },
@@ -306,7 +306,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Insufficient role or MFA enrollment required"),
         "404": errorResponse("Campaign not found"),
-        "409": errorResponse("Start is pending provider verification, or no eligible recipient can be admitted now; retry the same intent"),
+        "409": errorResponse("Phone source is stale or unavailable, Start is pending provider verification, or no eligible recipient can be admitted now; retry the same intent"),
         "429": rateLimitResponse,
         "500": errorResponse("Provider call was rejected or a local operation failed"),
       },
@@ -786,4 +786,4 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       },
     },
   },
-};
+} satisfies Record<string, Record<string, unknown>>;

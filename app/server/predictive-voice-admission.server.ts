@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from "drizzle-orm";
-import { campaign, campaign_queue, workspace, workspace_voice_reservation as reservations } from "@/db/schema";
+import { campaign, campaign_queue, workspace } from "@/db/schema";
+import { randomUUID } from "node:crypto";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
@@ -16,6 +17,10 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { voiceBridgeUrl } from "@/lib/manual-voice-dispatch.server";
 import { startVoiceBridgeReservationInTransaction } from "./voice-bridge-reservation.server";
+import { repeatedConferenceStart, type PredictiveStartIntent } from "./predictive-start-replay.server";
+import type { VerifiedVoiceAudioCustomerIntent } from "./voice-audio-customer-admission.server";
+import { voiceRecordingCallbackUrl } from "@/lib/voice-recording";
+export { replayPredictiveConferenceStart } from "./predictive-start-replay.server";
 
 type CoreRefusal = Extract<Awaited<ReturnType<typeof reserveVoiceCreditsInTransaction>>, { ok: false }>;
 type PredictiveRefusal = CoreRefusal | { ok: false; reason: "campaign_not_found" | "campaign_deferred" | "campaign_stopped" | "queue_pending" | "outside_window" | "queue_empty" }
@@ -23,22 +28,25 @@ type PredictiveRefusal = CoreRefusal | { ok: false; reason: "campaign_not_found"
 class AdmissionRollback extends Error {
   constructor(readonly result: PredictiveRefusal) { super(result.reason); }
 }
-
 export type PredictiveVoiceAdmissionInput = {
   workspaceId: string; campaignId: number; userId: string; conferenceId: string; accountSid: string;
   operationId?: string;
-  setup?: { to: string; callerId: string; intentKey: string };
+  /** Initial Start identity; an adopted source does not create this agent leg. */
+  setup?: PredictiveStartIntent;
+  audioSource?: VerifiedVoiceAudioCustomerIntent;
   /** Acquire the existing continuation owner before any queue claim. */
   lockTurn?: (tx: CreditTransaction) => Promise<void>;
   /** Save the same final URLs in the existing continuation journal. */
   prepareSend?: (tx: CreditTransaction, reservation: VoiceReservation, urls: VoiceDispatchUrls) => Promise<VoiceDispatchUrls>;
 };
 
-function recipientUrls(conferenceId: string, reservationId: string) {
+function recipientUrls(conferenceId: string, reservationId: string, recorded: boolean): VoiceDispatchUrls {
   const voice = new URL(`/api/auto-dial/${encodeURIComponent(conferenceId)}`, env.BASE_URL());
   const status = new URL("/api/auto-dial/status", env.BASE_URL());
   for (const url of [voice, status]) url.searchParams.set(VOICE_RESERVATION_QUERY_PARAM, reservationId);
-  return { voiceUrl: voice.href, statusCallback: status.href };
+  const id = recorded ? randomUUID() : null;
+  return { voiceUrl: voice.href, statusCallback: status.href,
+    ...(id ? { customerRecording: { id, callbackUrl: voiceRecordingCallbackUrl(voice.href, id) } } : {}) };
 }
 
 /** A funding refusal rolls the claim back; events publish only after commit. */
@@ -60,9 +68,10 @@ async function admitInTransaction(tx: CreditTransaction, input: PredictiveVoiceA
   const [balance] = await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, input.workspaceId)).for("no key update");
   if (!balance) return { ok: false, reason: "workspace_not_found" } as const;
   if (input.setup) {
-    const replay = await repeatedConferenceStart(tx, input, input.setup);
+    const replay = await repeatedConferenceStart(tx, { ...input, setup: input.setup });
     if (replay) return replay;
   }
+  if (input.audioSource && input.audioSource.mode !== "predictive") return { ok: false, reason: "audio_source_unavailable" } as const;
   const tdb = createTenantDb(input.workspaceId, tx);
   const savedCampaign = await tdb.campaign.findFirst({ where: eq(campaign.id, input.campaignId) });
   if (!savedCampaign) return { ok: false, reason: "campaign_not_found" } as const;
@@ -112,46 +121,23 @@ async function fundClaimedRecipient(
     const admitted = await reserveVoiceCreditsInTransaction(tx, { workspaceId: input.workspaceId, accountSid: input.accountSid,
       kind: "staffed", to, from, campaignId: input.campaignId, contactId: contact.contact_id, queueId: contact.queue_id,
       expectedQueueGeneration: queue.dispatch_generation, userId: input.userId, conferenceId: input.conferenceId,
-      setupTo: input.setup?.to,
+      setupTo: input.audioSource ? undefined : input.setup?.to, audioSource: input.audioSource,
       predictiveOperationId: input.operationId, operationKey: input.setup?.intentKey ?? (input.operationId ? `predictive-operation:${input.operationId}` : `predictive-queue:${contact.queue_id}`),
       prepareOutreach: (ownedTx) => rpcCreateOutreachAttempt(ownedTx, { queueId: contact.queue_id, contactId: contact.contact_id,
         campaignId: input.campaignId, workspaceId: input.workspaceId, userId: input.userId }),
     });
     if (!admitted.ok) throw new AdmissionRollback(admitted);
-    const initialUrls = recipientUrls(input.conferenceId, admitted.reservation.id);
-    const urls = await input.prepareSend?.(tx, admitted.reservation, initialUrls) ?? initialUrls;
+    const initialUrls = recipientUrls(input.conferenceId, admitted.reservation.id, Boolean(input.audioSource));
+    const prepared = await input.prepareSend?.(tx, admitted.reservation, initialUrls) ?? initialUrls;
+    const urls = { ...prepared, ...(initialUrls.customerRecording ? { customerRecording: initialUrls.customerRecording } : {}) };
     for (const value of [urls.voiceUrl, urls.statusCallback]) {
       const ids = new URL(value).searchParams.getAll(VOICE_RESERVATION_QUERY_PARAM);
       if (ids.length !== 1 || ids[0] !== admitted.reservation.id) throw new Error("Predictive callback URLs lost funding identity");
     }
-    const reservation = input.setup ? await startVoiceBridgeReservationInTransaction(tx, admitted.reservation, {
+    const reservation = input.setup && !input.audioSource ? await startVoiceBridgeReservationInTransaction(tx, admitted.reservation, {
       voiceUrl: voiceBridgeUrl(urls.voiceUrl, admitted.reservation.id, "setup"),
       statusCallback: voiceBridgeUrl(urls.statusCallback, admitted.reservation.id, "setup"),
       recipientVoiceUrl: urls.voiceUrl, recipientStatusCallback: urls.statusCallback,
-    }) : await startVoiceReservationInTransaction(tx, admitted.reservation, urls);
+    }) : await startVoiceReservationInTransaction(tx, admitted.reservation, urls, input.audioSource?.proof);
     return { ok: true, reservation, urls, contact } as const;
-}
-
-type ConferenceStartIdentity = Pick<PredictiveVoiceAdmissionInput, "workspaceId" | "campaignId" | "userId" | "conferenceId"> & {
-  accountSid?: string; setup: NonNullable<PredictiveVoiceAdmissionInput["setup"]>;
-};
-
-/** The action has already authorized the workspace and selected agent. */
-export async function replayPredictiveConferenceStart(input: ConferenceStartIdentity) {
-  return db.transaction(async (tx) => {
-    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, input.workspaceId)).for("no key update");
-    return repeatedConferenceStart(tx, input, input.setup);
-  });
-}
-
-async function repeatedConferenceStart(tx: CreditTransaction, input: Omit<ConferenceStartIdentity, "setup">, setup: ConferenceStartIdentity["setup"]) {
-  const [existing] = await tx.select().from(reservations).where(and(
-    eq(reservations.workspace, input.workspaceId), eq(reservations.operation_key, setup.intentKey),
-  )).limit(1);
-  if (!existing || existing.state === "released" && !existing.setup_sid) return null;
-  if (existing.conference_id !== input.conferenceId || existing.user_id !== input.userId || existing.campaign_id !== input.campaignId ||
-      existing.setup_to !== setup.to || existing.caller_id !== setup.callerId || input.accountSid !== undefined && existing.account_sid !== input.accountSid || !existing.setup_sid) {
-    return { ok: false, reason: "dispatch_in_progress" } as const;
-  }
-  return { ok: false, reason: "already_dispatched", callSid: existing.setup_sid, queueGeneration: existing.queue_generation } as const;
 }

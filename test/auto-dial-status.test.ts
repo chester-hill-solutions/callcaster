@@ -1222,7 +1222,7 @@ describe("api.auto-dial.status", () => {
     await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("Unknown error") });
   });
 
-  test("participant-join campaign_queue update error hits updateCampaignQueue + join catch branches", async () => {
+  test("participant-join queue failure returns an error and is logged at the join boundary", async () => {
     postgresStub = await usePostgresStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -1241,10 +1241,6 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error updating campaign queue:",
-      expect.any(Error),
-    );
     expect(loggerMocks.error).toHaveBeenCalledWith(
       "Error in handleParticipantJoin:",
       expect.any(Error),

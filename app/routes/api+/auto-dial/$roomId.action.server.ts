@@ -12,7 +12,7 @@ import {
 } from "@/lib/telephony-db.server";
 import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
-import { requireTwilioSignature, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
+import { readTwilioWebhookStringParams, requireTwilioSignature, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
@@ -23,6 +23,8 @@ import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-web
 import { predictiveConferenceCallbackUrl } from "@/server/predictive-conference-reservation.server";
 import type { VoiceReservation } from "@/server/voice-credit-reservation.server";
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
+import { findVoicePhoneCustomerOwner } from "@/server/voice-phone-customer.server";
+import { voicePhoneCustomerInstruction } from "@/lib/voice-phone-customer.server";
 
 function resolveUserIdFromConferenceName(conferenceName: string): string {
     // Conference names are generated as `${userId}~${uuid}`. The user id is a UUID,
@@ -166,10 +168,12 @@ async function handleFundedSetup(request: Request, callbackParams: Record<string
 
 export const action = defineAction({
   auth: async ({ request }) => {
-    const formData = await request.clone().formData();
-    const callbackParams = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const callbackParams = await readTwilioWebhookStringParams(request);
+    if (!callbackParams) return twilioWebhookForbiddenHangup();
     const callSid = callbackParams.CallSid ?? callbackParams.call_sid;
-    const forbidden = await requireTwilioSignature(request, { callSid, params: callbackParams });
+    const owner = await findVoicePhoneCustomerOwner(new URL(request.url).searchParams.get("credit_reservation") ?? "");
+    const forbidden = await requireTwilioSignature(request, { callSid, params: callbackParams,
+      ...(owner?.audio_connection_id ? { workspaceId: owner.workspace, expectedAccountSid: owner.account_sid } : {}) });
     if (forbidden) return forbidden;
     if (!normalizeVerifiedVoiceParams(callbackParams)) return twilioWebhookForbiddenHangup();
     const event = parseTwilioVoiceCallback(callbackParams);
@@ -177,7 +181,7 @@ export const action = defineAction({
     return { callbackParams, callSid: event.callSid, answeredBy: event.answeredBy ?? "", callStatus: event.callStatus,
       called: callbackParams.Called ?? callbackParams.To ?? "" };
   },
-  sideEffects: ["db-write", "twilio", "external"],
+  sideEffects: ["db-read", "db-write", "twilio", "external"],
   handler: async ({ request, params, auth }) => {
     const conferenceName = params.roomId as string;
     const { callbackParams, callSid, answeredBy, callStatus, called } = auth;
@@ -223,7 +227,9 @@ export const action = defineAction({
         } else {
           //This is a human answer
           const funded = query.has("credit_reservation") ? await findVoiceReservationForCall(workspaceId, callSid) : null;
-          response = await handleHumanAnswer(dbCall, called, funded ? predictiveConferenceCallbackUrl(funded) : undefined);
+          response = funded?.audio_connection_id
+            ? await voicePhoneCustomerInstruction(request, funded, callbackParams, "predictive") ?? new Response(hangupTwiml(), { headers: { "Content-Type": "text/xml" } })
+            : await handleHumanAnswer(dbCall, called, funded ? predictiveConferenceCallbackUrl(funded) : undefined);
         }
       }
     } catch (error) {

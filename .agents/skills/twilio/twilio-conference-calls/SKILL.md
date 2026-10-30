@@ -28,12 +28,17 @@ for the whole conference. Later participants do not replace that URL. Bind a
 signed event to its stored account, conference name and conference SID, then
 resolve the event's actual CallSid within that conference. Do not assume that
 the callback URL's owner is the participant named by every event.
+Conference names and SIDs are identities, not provider statuses. A validated
+customer join writes `in-progress`; never write `FriendlyName` or `ConferenceSid`
+into queue `provider_status`. Test with a real room name, not a status-like name.
 
 The callback owner can leave while the conference stays active. Keep verified
 parent/customer bridge events after that owner's physical call becomes
 terminal. Its terminal status does not end the logical bridge. A genuine
-current parent or customer hangup must still reach the conference-end owner;
+legacy parent or customer hangup must still reach the conference-end owner;
 a source retired by a committed successor cannot end that room.
+For a confirmed persistent phone, customer leave and queue drain retain the
+phone room. Only the owned agent stop path ends that reusable audio connection.
 
 Save a room-stop intent before provider I/O. Recover that intent even after
 its callback owner becomes terminal or ordinary call-row repair clears an
@@ -42,10 +47,12 @@ conference name and SID. Block new audio work for the actor while the stop
 is pending. Order source retirement and stop intent under the workspace lock.
 
 A participant event does not establish final call duration. Keep final billing
-on the recipient call-status contract. For a funded predictive start, emit the
+on the recipient call-status contract. For a legacy funded predictive start, emit the
 agent's conference TwiML first; use its validated join event to claim the first
 recipient's single-send checkpoint. Recheck recipient calling hours at that
 checkpoint because the agent can answer after the admission window closes.
+An already-confirmed phone needs no new agent setup. Explicit Start and each
+successor recheck its source through the existing customer funding/send owner.
 
 Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
 

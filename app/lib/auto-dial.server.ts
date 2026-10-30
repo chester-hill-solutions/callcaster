@@ -18,6 +18,8 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
 import { refuseFirstPredictiveRecipient } from "@/server/predictive-conference-reservation.server";
 import { PredictiveContinuationStoppedError } from "@/server/predictive-voice-receipt.server";
+import { preparePredictiveTurnRoom } from "@/lib/predictive-phone-source.server";
+import { createRecordedPhoneCustomer } from "@/lib/phone-customer-dispatch.server";
 
 type TwilioClient = TwilioSDK.Twilio;
 
@@ -181,17 +183,10 @@ export async function runAutoDialerTurn(
 
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
   const tdb = createTenantDb(workspace_id);
-
-  if (conferenceId && conferenceId.includes("~")) {
-    const activeConfs = await twilioClient.conferences.list({
-      friendlyName: conferenceId,
-      status: "in-progress",
-      limit: 1,
-    });
-    if (!activeConfs.length) {
-      return { success: true, message: "Conference ended, stopping auto-dial" };
-    }
-  }
+  const room = await preparePredictiveTurnRoom({ workspaceId: workspace_id, userId: user_id,
+    campaignId: campaign_id, conferenceId }, twilioClient);
+  if (!room.ok) return room.result;
+  const { audioSource } = room;
 
   // Sweep before claiming. A claim is only released by the turn that made it,
   // so a turn that dies between claiming and dialling strands the row as
@@ -215,13 +210,14 @@ export async function runAutoDialerTurn(
     const admitted = await admitPredictiveVoiceRecipient({
       workspaceId: workspace_id, campaignId: campaign_id, userId: user_id,
       conferenceId, accountSid: twilioClient.accountSid,
+      audioSource,
       operationId: input.continuation?.operationId,
       lockTurn: input.continuation?.lockTurn,
       prepareSend: input.continuation?.prepareSend,
     });
     if (!admitted.ok) {
       if (admitted.reason === "queue_empty") {
-        await completeAllConferences(twilioClient, conferenceId);
+        if (!audioSource) await completeAllConferences(twilioClient, conferenceId);
         await recheckCampaignCompletion({ campaignId: campaign_id, workspaceId: workspace_id, exec: tdb, reason: "auto_dial_drain" });
         return { success: true, message: "No queued contacts" };
       }
@@ -253,11 +249,16 @@ export async function sendFundedPredictiveRecipient(
   if (client.accountSid !== reservation.account_sid || !conferenceId || !voiceUrl || !statusUrl)
     throw new Error("Predictive provider binding does not match");
   try {
-    const sent = await dispatchStartedVoiceCall(reservation, () => createTwilioCall(client, reservation.recipient,
-      reservation.caller_id, conferenceId, { voiceUrl, statusCallback: statusUrl }));
+    const sent = await dispatchStartedVoiceCall(reservation, () => {
+      if (!reservation.audio_connection_id) return createTwilioCall(client, reservation.recipient,
+        reservation.caller_id, conferenceId, { voiceUrl, statusCallback: statusUrl });
+      if (!reservation.customer_recording_callback) throw new Error("Predictive phone customer has no recording checkpoint");
+      return createRecordedPhoneCustomer(client, { to: reservation.recipient, from: reservation.caller_id,
+        voiceUrl, statusCallback: statusUrl, recordingCallback: reservation.customer_recording_callback, machineDetection: "Enable" });
+    });
     await dequeueFundedVoiceAttempt(reservation);
     const call = sent.call;
-    if (!call) return;
+    if (!call) return sent.callSid;
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's
       // `CallInstance` type, and `Call.date_updated`/`start_time`/`end_time` are
       // `timestamptz` — so they are handed over as the Dates they already are,
@@ -298,6 +299,7 @@ export async function sendFundedPredictiveRecipient(
       if (!(await saveCallToDatabase(reservation.workspace, callData))) {
         throw new VoiceDispatchUncertainError(reservation.id, new Error("Accepted predictive call record needs recovery"));
       }
+      return sent.callSid;
 
   } catch (error) {
     if (!(error instanceof VoiceDispatchUncertainError) && isDefiniteVoiceCreateRejection(error) && reservation.queue_id) {

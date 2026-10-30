@@ -17,7 +17,7 @@ export async function findVoicePhoneCustomerOwner(reservationId: string) {
 /** Recheck source ownership under the same fence before issuing this customer join. */
 export async function claimVoicePhoneCustomerInstruction(owner: VoiceReservation, proof: VoiceAudioCustomerSourceProof) {
   const { provider_sid: customerSid, customer_recording_id: recordingId, customer_recording_callback: recordingCallback } = owner;
-  if (!owner.audio_connection_id || owner.audio_mode !== "manual" || !customerSid || !recordingId || !recordingCallback)
+  if (!owner.audio_connection_id || !owner.audio_mode || !["manual", "predictive"].includes(owner.audio_mode) || !customerSid || !recordingId || !recordingCallback)
     throw new VoiceAudioBindingError("Customer conference instruction has no saved owner");
   return db.transaction(async tx => {
     const source = await voiceAudioCustomerSendGuard(tx, owner, proof);

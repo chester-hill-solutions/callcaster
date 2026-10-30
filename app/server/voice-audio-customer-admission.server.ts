@@ -56,7 +56,7 @@ export async function admitVoiceAudioCustomerSource(tx: CreditTransaction, args:
 /** Keep the same workspace/audio locks through the one customer send checkpoint. */
 export async function voiceAudioCustomerSendGuard(tx: CreditTransaction, row: VoiceReservation, proof?: VoiceAudioCustomerSourceProof) {
   if (!row.audio_connection_id) return isNull(reservations.audio_connection_id);
-  if (!proof || !row.user_id || row.campaign_id == null || row.audio_generation == null || !row.audio_destination)
+  if (!proof || !row.user_id || row.campaign_id == null || row.audio_generation == null || !row.audio_destination || !row.audio_mode)
     throw new VoiceAudioBindingError("Customer send requires fresh confirmed phone audio");
   const result = await lockVerifiedVoiceAudioCustomerSource(tx, { workspaceId: row.workspace, userId: row.user_id,
     campaignId: row.campaign_id, connectionId: row.audio_connection_id, generation: row.audio_generation,
@@ -66,6 +66,7 @@ export async function voiceAudioCustomerSendGuard(tx: CreditTransaction, row: Vo
     result.connection.conference_callback !== row.audio_conference_callback)
     throw new VoiceAudioBindingError("Customer phone audio changed before send");
   return and(eq(reservations.audio_connection_id, row.audio_connection_id), eq(reservations.audio_generation, row.audio_generation),
+    eq(reservations.audio_mode, row.audio_mode),
     eq(reservations.audio_destination, row.audio_destination), eq(reservations.account_sid, proof.accountSid),
     eq(reservations.audio_agent_sid, proof.callSid), eq(reservations.conference_id, proof.conferenceId),
     eq(reservations.conference_sid, proof.conferenceSid), eq(reservations.audio_conference_callback, proof.callbackUrl));
