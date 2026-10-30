@@ -93,3 +93,13 @@ export async function withVoiceRecordingOperation<T>(owner: VoiceRecordingOperat
     return run(tx, current);
   });
 }
+
+/** Both capture observation and media copy retries retain their current lease. */
+export async function deferVoiceRecordingWork(owner: VoiceRecordingOperation, message: string,
+  eligible: (current: VoiceRecordingOperation) => boolean) {
+  await withVoiceRecordingOperation(owner, async (tx, current) => {
+    if (current.lease_token !== owner.lease_token || !eligible(current)) return;
+    await tx.update(recordings).set({ last_error: message, lease_expires_at: new Date(Date.now() + 5000), updated_at: new Date() })
+      .where(eq(recordings.id, current.id));
+  });
+}

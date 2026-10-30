@@ -5,7 +5,7 @@ import { callRecordingPartStoragePath } from "@/lib/call-recording-storage.serve
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 import { db } from "./db";
 import { createTenantDb } from "./tenant-db";
-import { withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
+import { deferVoiceRecordingWork, withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
 
 const LEASE_MS = 5 * 60_000;
 function needsCopy(row: VoiceRecordingOperation) {
@@ -50,13 +50,8 @@ export async function finishVoiceRecordingCopy(owner: VoiceRecordingOperation, a
   });
 }
 
-export async function deferVoiceRecordingCopy(owner: VoiceRecordingOperation) {
-  await withVoiceRecordingOperation(owner, async (tx, current) => {
-    if (current.lease_token !== owner.lease_token || !needsCopy(current)) return;
-    await tx.update(recordings).set({ last_error: "Recording copy needs recovery", lease_expires_at: new Date(Date.now() + 5000),
-      updated_at: new Date(),
-    }).where(eq(recordings.id, current.id));
-  });
+export function deferVoiceRecordingCopy(owner: VoiceRecordingOperation) {
+  return deferVoiceRecordingWork(owner, "Recording copy needs recovery", needsCopy);
 }
 
 /** Recent completed parts keep priority over old, unavailable provider media. */

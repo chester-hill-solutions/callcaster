@@ -7,19 +7,14 @@ import type { VoiceReservation } from "@/server/voice-credit-reservation.server"
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { logger } from "@/lib/logger.server";
 import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
+import { withVoiceProviderReadBudget } from "@/lib/voice-provider-read-budget";
 
 async function readContinuationLegs(row: VoiceReservation & { setup_sid: string; provider_sid: string }) {
-  let deadline: ReturnType<typeof setTimeout> | undefined, accepting = true;
-  const read = async () => {
+  return withVoiceProviderReadBudget(async (requireActive) => {
     const client = await createOriginalVoiceAccountClient(row);
-    if (!accepting) throw new Error("Original audio provider verification expired");
+    requireActive();
     return Promise.all([client.calls(row.setup_sid).fetch(), client.calls(row.provider_sid).fetch()]);
-  };
-  try {
-    return await Promise.race([read(), new Promise<never>((_resolve, reject) => {
-      deadline = setTimeout(() => reject(new Error("Original audio provider verification timed out")), 1000);
-    })]);
-  } finally { accepting = false; clearTimeout(deadline); }
+  }, 1000, "Original audio provider verification timed out");
 }
 
 function originalParentConferenceTwiml(connection: VoiceAudioConnection) {

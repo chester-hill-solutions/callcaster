@@ -135,6 +135,14 @@ A replacement workspace account token cannot own an older operation. In this
 repository, pass `expectedAccountSid` to `requireTwilioSignature` and use the
 shared strict form reader before normalizing aliases.
 
+For a two-leg call, the Recording resource's `callSid` refers to the parent.
+Keep the physical capture source separate from that reported ID. Do not infer
+a child capture's lifetime or callback mapping from a mocked response. Prove
+that contract before enabling it. GET `processing` is not an active-capture
+receipt. Unknown recording recovery needs the saved callback nonce and one
+RecordingSid in provider history; missing, ambiguous or truncated history stays
+pending. See [Recording properties](https://www.twilio.com/docs/voice/api/recording).
+
 Use explicit RecordingSids when a call has multiple or concurrent recordings;
 `Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
 selecting a create API: its Call Recordings helper supports `create`, while its
