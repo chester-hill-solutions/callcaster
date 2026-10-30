@@ -154,6 +154,12 @@ jobs before its workspace, including after deliberate faults: a fault can enqueu
 work that a passing control never creates. A mutation proof requires the expected
 failed assertions, passing controls, and no suite or cleanup-hook failure.
 
+When extracting shared Vitest fixtures, keep `vi.hoisted` declarations private
+and export their bindings with a separate `export { ... }` statement. A direct
+`export const value = vi.hoisted(...)` fails before test collection. Import the
+fixture before product modules so its mocks are installed first. Compare the
+combined executed case names and count with the original suite after splitting.
+
 Keep funded settlement in admission's workspace-before-reservation lock order;
 continuation and source-generation checks need that same workspace fence.
 Recording nonce preparation needs only the reservation lock. Prove
