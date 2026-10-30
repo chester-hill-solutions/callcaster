@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 import postgres from "postgres";
 import twilio from "twilio";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
@@ -8,11 +8,21 @@ import type { VoiceRecordingReceipt } from "@/lib/voice-recording";
 import type { VoiceReservation } from "@/server/voice-credit-reservation.server";
 import { asRouteResponse, routeArgs } from "../helpers/route-result";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
+import type { RpcExecutor } from "@/lib/db-rpc.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 vi.hoisted(() => { process.env.TZ = "UTC"; process.env.BASE_URL = "https://recording-journal.example.test"; process.env.TWILIO_VALIDATE_WEBHOOKS = "true"; });
 const io = vi.hoisted(() => ({ fetch: vi.fn(), upload: vi.fn(), download: vi.fn(),
   media: new Map<string, Uint8Array>(), objects: new Map<string, Uint8Array>(),
 }));
+const ledgerGate = vi.hoisted(() => ({ run: vi.fn<(tx: RpcExecutor) => Promise<void>>() }));
+vi.mock("@/lib/transaction-history.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/transaction-history.server")>();
+  return { ...actual, insertTransactionHistoryIdempotent: async (...args: Parameters<typeof actual.insertTransactionHistoryIdempotent>) => {
+    await ledgerGate.run(args[0]);
+    return actual.insertTransactionHistoryIdempotent(...args);
+  } };
+});
 vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/object-storage.server")>(), uploadObject: io.upload,
   downloadObject: io.download,
@@ -66,6 +76,7 @@ describe("owned recording parts (#2879)", () => {
   }
   beforeEach(async () => {
     vi.clearAllMocks(); io.media.clear(); io.objects.clear();
+    ledgerGate.run.mockReset();
     io.fetch.mockReset().mockImplementation(async (url: string) => {
       const bytes = io.media.get(url);
       if (!bytes) throw new Error("Owned provider recording fixture required");
@@ -695,5 +706,42 @@ describe("owned recording parts (#2879)", () => {
     expect((await signedCallback(other.operation, callbackParams(other.operation, { RecordingStatus: "absent" }))).status).toBe(204);
     await ageCopy(other.operation);
     expect(await copyWorker.runVoiceRecordingCopyRecovery()).toEqual({ examined: 0, enqueued: 0, pending: 0 });
+  });
+  test("recording retry and funded settlement use one lock order", async () => {
+    const { reservation, physical, operation } = await armed(), customerSid = ca();
+    await sql`update public.workspace_voice_reservation set provider_sid = ${customerSid}, state = 'active', terminal_status = 'completed',
+      terminal_duration = '42' where id = ${reservation.id}::uuid`;
+    const { db } = await import("@/server/db");
+    const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
+    await db.transaction(tx => persistReservedVoiceCall(tx, { ...reservation, setup_sid: physical.sid, provider_sid: customerSid }, customerSid));
+    let resume = () => {}, entered = false, settlementPid = 0;
+    const gate = new Promise<void>(resolve => { resume = resolve; });
+    ledgerGate.run.mockImplementation(async tx => {
+      const [row] = await tx.execute(drizzleSql`select pg_backend_pid() as pid`);
+      if (!isObject(row) || typeof row.pid !== "number") throw new Error("Owned settlement backend required");
+      settlementPid = row.pid; entered = true; await gate;
+    });
+    const { settleVoiceReservation } = await import("@/server/voice-credit-settlement.server");
+    const settling = Promise.allSettled([settleVoiceReservation({ workspaceId, callSid: customerSid, status: "completed", duration: 42, note: "Owned lock ordering proof" })]);
+    let preparing = Promise.resolve<PromiseSettledResult<Operation | null>[]>([]);
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true), { timeout: 2000, interval: 10 });
+      preparing = Promise.allSettled([journal.prepareVoiceDialRecording(reservation, physical, baseUrl)]);
+      await vi.waitFor(async () => {
+        const rows = await sql`select pid from pg_stat_activity where ${settlementPid} = any(pg_blocking_pids(pid))`;
+        expect(rows.length).toBeGreaterThan(0);
+      }, { timeout: 2000, interval: 10 });
+      resume();
+      const results = (await Promise.all([settling, preparing])).flat();
+      expect(results.map(result => result.status)).toEqual(["fulfilled", "fulfilled"]);
+      expect((await read(operation))?.id).toBe(operation.id);
+      const [billing] = await sql`select credits, (select count(*)::int from public.transaction_history where workspace = ${workspaceId}::uuid) as ledger
+        from public.workspace where id = ${workspaceId}::uuid`;
+      expect(billing).toEqual({ credits: 96, ledger: 1 });
+    } finally {
+      resume(); await Promise.all([settling, preparing]); ledgerGate.run.mockReset();
+      await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
+      await sql`update public.workspace set credits = 100 where id = ${workspaceId}::uuid`;
+    }
   });
 });

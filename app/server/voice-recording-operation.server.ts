@@ -21,7 +21,8 @@ function ownsDial(row: VoiceRecordingOperation, reservation: VoiceReservation, r
 export async function prepareVoiceDialRecording(owner: VoiceReservation, root: VoiceSetupRoot, baseUrl: string) {
   if (!/^CA[0-9a-f]{32}$/i.test(root.sid)) throw new VoiceRecordingBindingError("Invalid recording source SID");
   return db.transaction(async (tx) => {
-    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, owner.workspace)).for("no key update");
+    // This row serializes nonce preparation. Settlement takes it before the
+    // ledger's workspace lock, so preparation must not hold that lock first.
     const [current] = await tx.select().from(reservations).where(and(
       eq(reservations.workspace, owner.workspace), eq(reservations.id, owner.id),
     )).for("update");
