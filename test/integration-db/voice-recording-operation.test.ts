@@ -707,10 +707,13 @@ describe("owned recording parts (#2879)", () => {
     await ageCopy(other.operation);
     expect(await copyWorker.runVoiceRecordingCopyRecovery()).toEqual({ examined: 0, enqueued: 0, pending: 0 });
   });
-  test("recording retry and funded settlement use one lock order", async () => {
+  test.each(["recording retry", "parent continuation"])("%s and funded settlement use one lock order", async (path) => {
     const { reservation, physical, operation } = await armed(), customerSid = ca();
     await sql`update public.workspace_voice_reservation set provider_sid = ${customerSid}, state = 'active', terminal_status = 'completed',
       terminal_duration = '42' where id = ${reservation.id}::uuid`;
+    const continuationUrl = `${baseUrl}/api/voice-continuation?credit_reservation=${reservation.id}`;
+    await sql`update public.workspace_voice_reservation set setup_continuation_url = ${continuationUrl} where id = ${reservation.id}::uuid`;
+    const continuation = await import("@/server/voice-continuation.server");
     const { db } = await import("@/server/db");
     const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
     await db.transaction(tx => persistReservedVoiceCall(tx, { ...reservation, setup_sid: physical.sid, provider_sid: customerSid }, customerSid));
@@ -723,10 +726,13 @@ describe("owned recording parts (#2879)", () => {
     });
     const { settleVoiceReservation } = await import("@/server/voice-credit-settlement.server");
     const settling = Promise.allSettled([settleVoiceReservation({ workspaceId, callSid: customerSid, status: "completed", duration: 42, note: "Owned lock ordering proof" })]);
-    let preparing = Promise.resolve<PromiseSettledResult<Operation | null>[]>([]);
+    let preparing = Promise.resolve<PromiseSettledResult<unknown>[]>([]);
     try {
       await vi.waitFor(() => expect(entered).toBe(true), { timeout: 2000, interval: 10 });
-      preparing = Promise.allSettled([journal.prepareVoiceDialRecording(reservation, physical, baseUrl)]);
+      preparing = Promise.allSettled([path === "recording retry"
+        ? journal.prepareVoiceDialRecording(reservation, physical, baseUrl)
+        : continuation.bindVoiceContinuation(reservation, { AccountSid: accountSid, CallSid: physical.sid, DialCallSid: customerSid,
+          From: physical.from, To: physical.to, Direction: physical.direction }, continuationUrl)]);
       await vi.waitFor(async () => {
         const rows = await sql`select pid from pg_stat_activity where ${settlementPid} = any(pg_blocking_pids(pid))`;
         expect(rows.length).toBeGreaterThan(0);

@@ -1,5 +1,5 @@
 import { and, eq, or } from "drizzle-orm";
-import { workspace_voice_reservation as reservations } from "@/db/schema";
+import { workspace, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits, TERMINAL_BILLABLE_CALL_STATUSES, voiceCreditsFromDurationSeconds } from "@/lib/pricing";
@@ -17,8 +17,9 @@ export async function settleVoiceReservation(args: {
   note: string;
 }) {
   const result = await db.transaction(async (tx) => {
-    // Hold ownership serializes duplicate callbacks. The ledger then acquires
-    // the workspace lock in its normal order, including for legacy callers.
+    // Admission and source-generation fences take workspace before reservation.
+    // The ledger reuses this workspace lock; duplicate callbacks keep one owner.
+    await tx.select({ id: workspace.id }).from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
     const [reservation] = await tx.select().from(reservations).where(and(
       eq(reservations.workspace, args.workspaceId),
       or(eq(reservations.provider_sid, args.callSid), eq(reservations.setup_sid, args.callSid)),
