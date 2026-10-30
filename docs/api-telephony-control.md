@@ -152,6 +152,27 @@ can stop the accepted agent leg. It cannot end or advance the customer. End a
 live customer through the existing call control, or replace its audio with a
 new connection attempt.
 
+The submitted request also has durable read/cancel ownership. Use
+`?workspaceId=…&connection_intent_id=…` when a POST reply is lost. This query
+returns `workspace_id`, `user_id`, the submitted `connection_intent_id`,
+`intent_state`, the normalized `request`, and `connection` (nullable).
+`intent_state` is `bound`, `canceled` or `superseded`. A read never creates a
+call. A cancel saved before admission blocks a delayed POST with that intent.
+It does not replay POST to discover a connection ID.
+
+A reused connection retains its original `connection_intent_id`; its
+`control_intent_id` identifies the current request that owns controls. New
+clients include `control_intent_id` with a known `connection_id` query.
+The server rejects stale controls with `409`. Cancel by an older submitted
+intent cancels only that request and keeps a connection adopted by a newer
+request. Cancel never ends or advances a live customer. The connection-ID
+query without a control intent retains the legacy explicit control behavior.
+
+New clients send `X-Callcaster-Audio-Actor` on POST, GET and DELETE. It must
+match the authenticated session user. A mismatch returns `409` before any
+audio operation. This prevents a late request from the previous screen from
+acting as a newly signed-in user. It does not select the acting user.
+
 ## Outbound dial & hangup
 
 | Method | Path | Purpose |

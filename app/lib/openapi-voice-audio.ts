@@ -4,16 +4,19 @@ import { sessionCookieSecurity } from "@/lib/openapi-integrator";
 const callSid = { type: "string", pattern: "^CA[0-9a-fA-F]{32}$" };
 const workspaceId = { type: "string", format: "uuid" };
 const intentId = { type: "string", format: "uuid", description: "Keep this UUID for retries of the same audio change." };
+const actorHeader = { name: "X-Callcaster-Audio-Actor", in: "header", required: false, schema: { type: "string", minLength: 1 },
+  description: "New clients send their signed-in actor. A mismatch with the authenticated session returns 409 before any audio operation. It is a precondition, not caller-supplied authority." };
 const phoneNumber = { type: "string", pattern: "^\\+[1-9][0-9]{1,14}$", description: "Verified number owned by this user. Outer whitespace is trimmed." };
 const liveProperties = { workspaceId, callSid, connection_intent_id: intentId, expected_agent_sid: callSid };
 const connectionState = { type: "string", enum: ["prepared", "creating", "joining", "ready", "switching", "active", "retired", "failed", "canceled"] };
 const snapshot = {
   type: "object", required: ["connection_id", "connection_state", "workspace_id", "user_id", "connection_intent_id", "destination",
-    "requested_call_sid", "campaign_id", "callSid", "source_agent_sid", "generation", "transport", "cancel_requested"],
+    "control_intent_id", "requested_call_sid", "campaign_id", "callSid", "source_agent_sid", "generation", "transport", "cancel_requested"],
   properties: {
     connection_id: { type: "string", format: "uuid" }, connection_state: connectionState,
     workspace_id: workspaceId, user_id: { type: "string", minLength: 1 },
     connection_intent_id: { ...intentId, description: "Stored intent of this connection. Reusing an existing connection retains its original intent UUID." },
+    control_intent_id: { ...intentId, description: "Current request that owns connection controls. A reused connection can have a different original intent." },
     destination: { type: "string", minLength: 1, description: "Saved verified E.164 phone number or server-resolved client identity." },
     requested_call_sid: { ...callSid, nullable: true }, campaign_id: { type: "integer", minimum: 1, nullable: true },
     callSid: { ...callSid, nullable: true }, source_agent_sid: { ...callSid, nullable: true },
@@ -29,8 +32,20 @@ const connectionFailure = (description: string) => ({ description, content: { "a
 } } } });
 const query = [
   { name: "workspaceId", in: "query", required: true, schema: workspaceId },
-  { name: "connection_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+  { name: "connection_id", in: "query", required: false, schema: { type: "string", format: "uuid" }, description: "Use either this ID or connection_intent_id." },
+  { name: "control_intent_id", in: "query", required: false, schema: intentId, description: "With connection_id, require this current control owner. Stale controls return 409." },
+  { name: "connection_intent_id", in: "query", required: false, schema: intentId, description: "Read/cancel the submitted request, including a lost POST reply. Omit both connection_id and control_intent_id." },
+  actorHeader,
 ];
+const requestIdentity = { type: "object", required: ["transport", "destination", "callSid", "expectedAgentSid", "campaignId"], properties: {
+  transport: { type: "string", enum: ["phone", "computer"] }, destination: { type: "string", nullable: true },
+  callSid: { ...callSid, nullable: true }, expectedAgentSid: { ...callSid, nullable: true }, campaignId: { type: "integer", minimum: 1, nullable: true },
+} };
+const intentSnapshot = { type: "object", required: ["workspace_id", "user_id", "connection_intent_id", "intent_state", "request", "connection"], properties: {
+  workspace_id: workspaceId, user_id: { type: "string", minLength: 1 }, connection_intent_id: intentId,
+  intent_state: { type: "string", enum: ["bound", "canceled", "superseded"] }, request: { ...requestIdentity, nullable: true },
+  connection: { ...snapshot, nullable: true },
+} };
 
 /** One owned audio operation covers session control and signed provider callbacks. */
 export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = {
@@ -40,6 +55,7 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
       "x-callcaster-supported": true, "x-callcaster-exposure": "sessionOnly",
       "x-callcaster-auth-class": "session", "x-callcaster-docs-guide": "docs/api-telephony-control.md",
       security: [...sessionCookieSecurity],
+      parameters: [actorHeader],
       description: "Session cookie or bearer session only. The device belongs to the signed-in user. Connection is separate from customer dispatch: it does not claim or call the first contact, add a customer debit or take another customer hold. Keep current audio until connection_state is active. Accepted, answered and ready states alone do not prove a completed handoff. Retain the intent UUID on retry; uncertain provider creation is recovered without another create. A manual call issued without a saved parent continuation returns 409 and keeps its existing audio. Manual calls permit one unresolved customer promotion; a new intent cannot replace it after its phone ends. Confirmed topology retains the original room and first callback owner for later phones. Closed topology cannot create another room while terminal customer status is delayed.",
       requestBody: { required: true, content: { "application/json": { schema: { oneOf: [
         { type: "object", additionalProperties: false, required: ["workspaceId", "phoneNumber"], properties: {
@@ -67,17 +83,18 @@ export const voiceAudioPathOverrides: Record<string, Record<string, unknown>> = 
     get: {
       operationId: "getAgentAudioConnection", summary: "Read an owned audio connection attempt",
       security: [...sessionCookieSecurity], parameters: query,
+      description: "Exactly one connection_id or connection_intent_id is required. Intent reads never create a provider call. They resolve the submitted request even when it reused a connection with an older original intent. A canceled or superseded request cannot adopt another request's controls.",
       responses: { "200": { description: "Operation state; active requires a verified conference join and completed transport commit.",
-        content: { "application/json": { schema: snapshot } } }, "400": errorResponse("Invalid query"),
-        "401": errorResponse("Unauthorized"), "404": errorResponse("Connection not found") },
+        content: { "application/json": { schema: { oneOf: [snapshot, intentSnapshot] } } } }, "400": errorResponse("Invalid query"),
+        "401": errorResponse("Unauthorized"), "404": errorResponse("Connection or submitted intent not found"), "409": errorResponse("The control owner changed") },
     },
     delete: {
       operationId: "cancelAgentAudioConnection", summary: "Cancel a pending audio replacement or idle connection",
       security: [...sessionCookieSecurity], parameters: query,
-      description: "Cancel only this agent transport. An uncertain create remains pending until recovery can stop the accepted leg. This operation cannot hang up or advance a live customer; use the customer hangup or a new audio change for an active live transport.",
-      responses: { "200": { description: "Cancellation saved or already complete", content: { "application/json": { schema: snapshot } } },
+      description: "Cancel only this agent transport. Cancel by submitted intent can precede POST admission; its saved cancellation prevents a delayed POST from ringing a new phone. A reused connection changes its current control intent; an older request can cancel itself but cannot end the newer owner's connection. No cancellation path creates a provider call. An uncertain create remains pending until recovery can stop the accepted leg. This operation cannot hang up or advance a live customer; use the customer hangup or a new audio change for an active live transport.",
+      responses: { "200": { description: "Cancellation saved or already complete; intent cancellation can have no connection yet", content: { "application/json": { schema: { oneOf: [snapshot, intentSnapshot] } } } },
         "400": errorResponse("Invalid query"), "401": errorResponse("Unauthorized"), "404": errorResponse("Connection not found"),
-        "409": errorResponse("Active customer audio must be replaced or ended through the customer control") },
+        "409": errorResponse("Stale control owner, active customer audio or unfinished promotion"), "429": rateLimitResponse },
     },
   },
 };

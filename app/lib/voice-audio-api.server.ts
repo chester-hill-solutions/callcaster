@@ -1,18 +1,26 @@
 import { findVoiceAudioConnection, type VoiceAudioConnection } from "@/server/voice-audio-connection.server";
-import type { VoiceAudioFailureReason } from "@/lib/voice-audio-connection";
+import { VOICE_AUDIO_ACTOR_HEADER, type VoiceAudioFailureReason } from "@/lib/voice-audio-connection";
 import { OUTBOUND_CREDITS_BLOCKED_BODY } from "@/lib/outbound-credit-gate.server";
 import { voiceAudioConnectionQuerySchema } from "@/lib/schemas/api/common";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { dispatchVoiceAudioConnection, VoiceAudioConnectionPendingError } from "@/lib/voice-audio-dispatch.server";
 import { attemptVoiceAudioCancellation } from "@/lib/voice-audio-recovery.server";
 import { logger } from "@/lib/logger.server";
-import type { VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
+import type { VoiceAudioIntentSnapshot, VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
+import type { VoiceAudioIntentControl } from "@/server/voice-audio-intent-control.server";
 
 export function voiceAudioSnapshot(row: VoiceAudioConnection): VoiceAudioSnapshot {
   return { connection_id: row.id, connection_state: row.state, workspace_id: row.workspace, user_id: row.user_id,
     connection_intent_id: row.intent_id, destination: row.destination, requested_call_sid: row.requested_call_sid, campaign_id: row.campaign_id,
+    control_intent_id: row.control_intent_id ?? row.intent_id,
     callSid: row.provider_sid, source_agent_sid: row.source_agent_sid,
     generation: row.generation, transport: row.transport, cancel_requested: Boolean(row.cancel_requested_at) };
+}
+
+export function voiceAudioIntentSnapshot({ intent, connection }: VoiceAudioIntentControl): VoiceAudioIntentSnapshot {
+  return { workspace_id: intent.workspace, user_id: intent.user_id, connection_intent_id: intent.intent_id,
+    intent_state: intent.cancel_requested_at ? "canceled" : connection ? "bound" : "superseded",
+    request: intent.request, connection: connection ? voiceAudioSnapshot(connection) : null };
 }
 
 export function voiceAudioFailureResponse(reason: VoiceAudioFailureReason, headers?: HeadersInit) {
@@ -23,6 +31,12 @@ export function voiceAudioFailureResponse(reason: VoiceAudioFailureReason, heade
   if (reason === "workspace_unavailable") return Response.json({ error: "Workspace is not available for outbound calls" }, { status: 403, headers });
   if (reason === "caller_id_unavailable") return Response.json({ error: "Workspace has no usable caller ID" }, { status: 400, headers });
   return Response.json({ error: "Audio change cannot proceed. Keep the current audio and check the saved connection.", reason }, { status: 409, headers });
+}
+
+export function voiceAudioActorConflict(request: Request, userId: string) {
+  const expected = request.headers.get(VOICE_AUDIO_ACTOR_HEADER);
+  return expected !== null && expected !== userId
+    ? Response.json({ error: "Agent audio session changed", reason: "stale_audio" }, { status: 409 }) : null;
 }
 
 export function parseVoiceAudioQuery(request: Request) {

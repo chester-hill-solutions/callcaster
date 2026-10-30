@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { connectPhoneDeviceBodySchema } from "@/lib/schemas/api/common";
 import { voiceAudioAcceptedSchema, voiceAudioSnapshotSchema, type VoiceAudioSnapshot } from "@/lib/schemas/api/voice-audio";
+import { VOICE_AUDIO_ACTOR_HEADER } from "@/lib/voice-audio-connection";
 
-const connectRequestSchema = connectPhoneDeviceBodySchema.safeExtend({ connection_intent_id: z.uuid() });
-export type VoiceAudioConnectRequest = z.infer<typeof connectRequestSchema>;
+export const voiceAudioConnectRequestSchema = connectPhoneDeviceBodySchema.safeExtend({ connection_intent_id: z.uuid() });
+export type VoiceAudioConnectRequest = z.infer<typeof voiceAudioConnectRequestSchema>;
 export type VoiceAudioOwner = { workspaceId: string; userId: string };
 export type VoiceAudioClientResult =
   | { ok: true; connection: VoiceAudioSnapshot }
@@ -15,7 +16,7 @@ function ownsConnection(owner: VoiceAudioOwner, connection: VoiceAudioSnapshot) 
 
 function matchesRequest(request: VoiceAudioConnectRequest, connection: VoiceAudioSnapshot) {
   const transport = request.device ?? "phone";
-  return connection.transport === transport && (transport !== "phone" || connection.destination === request.phoneNumber) &&
+  return connection.control_intent_id === request.connection_intent_id && connection.transport === transport && (transport !== "phone" || connection.destination === request.phoneNumber) &&
     connection.requested_call_sid === (request.callSid ?? null) &&
     (request.callSid ? connection.source_agent_sid === request.expected_agent_sid : connection.campaign_id === (request.campaignId ?? null));
 }
@@ -24,7 +25,7 @@ function matchesRequest(request: VoiceAudioConnectRequest, connection: VoiceAudi
 function matchesConnection(saved: VoiceAudioSnapshot, next: VoiceAudioSnapshot) {
   const terminal = ["failed", "canceled", "retired"].includes(saved.connection_state);
   if (terminal && saved.connection_state !== next.connection_state || saved.cancel_requested && !next.cancel_requested) return false;
-  return saved.connection_id === next.connection_id && saved.connection_intent_id === next.connection_intent_id &&
+  return saved.connection_id === next.connection_id && saved.connection_intent_id === next.connection_intent_id && saved.control_intent_id === next.control_intent_id &&
     saved.generation === next.generation && saved.transport === next.transport && saved.destination === next.destination &&
     saved.requested_call_sid === next.requested_call_sid && saved.campaign_id === next.campaign_id && saved.source_agent_sid === next.source_agent_sid &&
     (saved.callSid === null || saved.callSid === next.callSid);
@@ -52,17 +53,17 @@ async function requestConnection(owner: VoiceAudioOwner, init: RequestInit, matc
 
 /** Callers retain this request and intent unchanged when the reply is unknown. */
 export async function connectVoiceAudio(owner: VoiceAudioOwner, request: VoiceAudioConnectRequest, signal?: AbortSignal): Promise<VoiceAudioClientResult> {
-  const parsed = connectRequestSchema.safeParse(request);
-  if (!parsed.success || parsed.data.workspaceId !== owner.workspaceId) return { ok: false, kind: "unverified", status: null };
-  return requestConnection(owner, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+  const parsed = voiceAudioConnectRequestSchema.safeParse(request);
+  if (!owner.userId || !parsed.success || parsed.data.workspaceId !== owner.workspaceId) return { ok: false, kind: "unverified", status: null };
+  return requestConnection(owner, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json", [VOICE_AUDIO_ACTOR_HEADER]: owner.userId },
     body: JSON.stringify(parsed.data), signal }, (connection) => matchesRequest(parsed.data, connection));
 }
 
 async function controlVoiceAudio(owner: VoiceAudioOwner, saved: VoiceAudioSnapshot, method: "GET" | "DELETE", signal?: AbortSignal): Promise<VoiceAudioClientResult> {
   const parsed = voiceAudioSnapshotSchema.safeParse(saved);
   if (!parsed.success || !ownsConnection(owner, parsed.data)) return { ok: false, kind: "unverified", status: null };
-  const query = new URLSearchParams({ workspaceId: owner.workspaceId, connection_id: parsed.data.connection_id });
-  return requestConnection(owner, { method, headers: { Accept: "application/json" }, signal }, (connection) => matchesConnection(parsed.data, connection), `?${query}`);
+  const query = new URLSearchParams({ workspaceId: owner.workspaceId, connection_id: parsed.data.connection_id, control_intent_id: parsed.data.control_intent_id });
+  return requestConnection(owner, { method, headers: { Accept: "application/json", [VOICE_AUDIO_ACTOR_HEADER]: owner.userId }, signal }, (connection) => matchesConnection(parsed.data, connection), `?${query}`);
 }
 
 export function readVoiceAudio(owner: VoiceAudioOwner, saved: VoiceAudioSnapshot, signal?: AbortSignal) {

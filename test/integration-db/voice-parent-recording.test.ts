@@ -87,6 +87,7 @@ describe("owned parent bridge capture (#2879)", () => {
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_audio_intent where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_audio_connection where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;

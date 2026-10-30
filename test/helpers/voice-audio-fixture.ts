@@ -135,10 +135,10 @@ export function joined(row: Connection, overrides: Partial<VoiceAudioConferenceE
     event: "participant-join", ...overrides };
 }
 
-export async function apiPost(body: unknown = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() }) {
+export async function apiPost(body: unknown = { workspaceId, phoneNumber: phone, connection_intent_id: randomUUID() }, expectedActor?: string) {
   const { action } = await import("../../app/routes/api+/connect-phone-device.action.server");
   return asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/connect-phone-device`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    method: "POST", headers: { "Content-Type": "application/json", ...(expectedActor !== undefined ? { "X-Callcaster-Audio-Actor": expectedActor } : {}) }, body: JSON.stringify(body),
   }))));
 }
 
@@ -293,6 +293,7 @@ export function useOwnedAudioFixture() {
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_audio_intent where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_audio_connection where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;

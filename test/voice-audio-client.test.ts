@@ -7,6 +7,7 @@ const request = { workspaceId: owner.workspaceId, phoneNumber: "+16135550123", c
 const saved = {
   connection_id: "30000000-0000-4000-8000-000000000001", connection_state: "joining" as const,
   workspace_id: owner.workspaceId, user_id: owner.userId, connection_intent_id: request.connection_intent_id,
+  control_intent_id: request.connection_intent_id,
   destination: request.phoneNumber, requested_call_sid: null, campaign_id: null, generation: 3,
   transport: "phone" as const, callSid: `CA${"1".repeat(32)}`, source_agent_sid: null, cancel_requested: false,
 };
@@ -24,6 +25,7 @@ describe("session audio connection client", () => {
     expect(result).toEqual({ ok: true, connection: saved }); expect(isVoiceAudioEffective(saved)).toBe(false);
     expect(fetcher).toHaveBeenCalledExactlyOnceWith("/api/connect-phone-device", expect.objectContaining({ method: "POST",
       credentials: "same-origin", cache: "no-store", redirect: "error" }));
+    expect(fetcher.mock.calls[0][1].headers).toMatchObject({ "X-Callcaster-Audio-Actor": owner.userId });
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual(request);
   });
   test("a reused matching phone retains the server's original intent", async () => {
@@ -52,6 +54,7 @@ describe("session audio connection client", () => {
     { campaign_id: 42 }, { requested_call_sid: `CA${"2".repeat(32)}` },
     { connection_state: "active", callSid: null }, { success: false },
     { error: "ambiguous reply" }, { generation: 0 },
+    { control_intent_id: "90000000-0000-4000-8000-000000000001" },
   ])("rejects an unowned, mismatched or incomplete connect response %j", async (changed) => {
     reply({ success: true, ...saved, ...changed });
     expect(await connectVoiceAudio(owner, request)).toEqual({ ok: false, kind: "unverified", status: 200 });
@@ -83,13 +86,14 @@ describe("session audio connection client", () => {
   test.each(["GET", "DELETE"] as const)("%s uses the saved owner and connection, with no new create", async (method) => {
     const fetcher = reply(saved), invoke = method === "GET" ? readVoiceAudio : cancelVoiceAudio;
     expect(await invoke(owner, saved)).toEqual({ ok: true, connection: saved });
-    expect(fetcher).toHaveBeenCalledExactlyOnceWith(`/api/connect-phone-device?workspaceId=${owner.workspaceId}&connection_id=${saved.connection_id}`,
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(`/api/connect-phone-device?workspaceId=${owner.workspaceId}&connection_id=${saved.connection_id}&control_intent_id=${saved.control_intent_id}`,
       expect.objectContaining({ method }));
   });
   test.each([
     { connection_id: "30000000-0000-4000-8000-000000000002" }, { connection_intent_id: "40000000-0000-4000-8000-000000000001" },
     { workspace_id: "10000000-0000-4000-8000-000000000002" }, { user_id: "another-agent" },
     { generation: 4 }, { callSid: `CA${"2".repeat(32)}` }, { callSid: null }, { source_agent_sid: `CA${"2".repeat(32)}` },
+    { control_intent_id: "90000000-0000-4000-8000-000000000001" },
   ])("a read cannot replace the saved physical identity %j", async (changed) => {
     reply({ ...saved, ...changed });
     expect(await readVoiceAudio(owner, saved)).toEqual({ ok: false, kind: "unverified", status: 200 });
