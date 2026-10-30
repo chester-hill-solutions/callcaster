@@ -39,11 +39,13 @@ describe("predictive Start request and customer ownership", () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("owned lost response")).mockResolvedValueOnce(accepted());
     const { result, rerender } = renderHook(options => useStartConferenceAndDial(options), { initialProps: first });
     await act(async () => { await result.current.begin(); });
+    expect(result.current.pendingStartIntentId).toBe(body(0).dial_intent_id);
     rerender(second);
     await act(async () => { await result.current.begin(); });
     expect(body(1)).toEqual(body(0));
     expect(body(1)).toMatchObject({ selected_device: "+15550000002", audio_connection_id: first.audioSource.connectionId, audio_generation: 7 });
     expect(result.current.customerCallSid).toBe(rootA);
+    expect(result.current.pendingStartIntentId).toBeNull();
   });
 
   test("a malformed accepted phone reply keeps the same intent for receipt recovery", async () => {
@@ -60,6 +62,7 @@ describe("predictive Start request and customer ownership", () => {
     vi.mocked(fetch).mockResolvedValueOnce(Response.json({ error: "Selected device is not a verified phone number" }, { status })).mockResolvedValueOnce(accepted(rootB));
     const { result, rerender } = renderHook(options => useStartConferenceAndDial(options), { initialProps: first });
     await act(async () => { await result.current.begin(); });
+    expect(result.current.pendingStartIntentId).toBeNull();
     rerender(second);
     await act(async () => { await result.current.begin(); });
     expect(body(1).dial_intent_id).not.toBe(body(0).dial_intent_id);
@@ -189,20 +192,51 @@ describe("predictive Start request and customer ownership", () => {
     expect(screen.getByLabelText("Customer")).toBeEmptyDOMElement();
   });
 
+  test("an old room ending cannot cancel a newer Start request", async () => {
+    const reply = deferred();
+    vi.mocked(fetch).mockResolvedValueOnce(accepted()).mockReturnValueOnce(reply.promise);
+    const { result, rerender } = renderHook(options => useStartConferenceAndDial(options), { initialProps: first });
+    await act(async () => { await result.current.begin(); });
+    rerender(second);
+    let pending!: Promise<void>; act(() => { pending = result.current.begin(); });
+    const pendingId = result.current.pendingStartIntentId;
+    expect(pendingId).toBe(body(1).dial_intent_id);
+    act(() => result.current.setConference(null));
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.pendingStartIntentId).toBe(pendingId);
+    await act(async () => {
+      reply.resolve(Response.json({ success: true, conferenceName: "replacement-phone-room", callSid: rootB }));
+      await pending;
+    });
+    expect(result.current.conference).toBe("replacement-phone-room");
+    expect(result.current.customerCallSid).toBe(rootB);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   test("a confirmed stop invalidates the old reply without clearing a successor start", async () => {
     const old = deferred(), current = deferred();
     vi.mocked(fetch).mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise).mockResolvedValueOnce(Response.json({ success: true }));
     const { result } = renderHook(() => useStartConferenceAndDial(first));
     let previous!: Promise<void>, next!: Promise<void>;
     act(() => { previous = result.current.begin(); });
-    act(() => result.current.setConference(null));
+    const stoppedId = result.current.pendingStartIntentId ?? "";
+    expect(stoppedId).toBe(body(0).dial_intent_id);
+    act(() => { expect(result.current.confirmStartStopped(stoppedId)).toBe(true); });
+    expect(result.current.pendingStartIntentId).toBeNull();
     act(() => { next = result.current.begin(); });
     expect(fetch).toHaveBeenCalledTimes(2);
+    const successorId = result.current.pendingStartIntentId;
+    expect(successorId).toBe(body(1).dial_intent_id);
+    expect(successorId).not.toBe(stoppedId);
+    act(() => { expect(result.current.confirmStartStopped(stoppedId)).toBe(false); });
+    expect(result.current.pendingStartIntentId).toBe(successorId);
+    expect(result.current.isLoading).toBe(true);
     await act(async () => { old.resolve(accepted()); await previous; });
     expect(body(2)).toEqual({ callSid: rootA, workspaceId: "workspace-a" });
     expect(result.current.conference).toBeNull();
     expect(result.current.isLoading).toBe(true);
     await act(async () => { current.resolve(accepted(rootB)); await next; });
     expect(result.current.customerCallSid).toBe(rootB);
+    expect(result.current.pendingStartIntentId).toBeNull();
   });
 });

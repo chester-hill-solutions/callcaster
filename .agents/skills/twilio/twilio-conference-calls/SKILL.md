@@ -70,6 +70,14 @@ An uncommitted React render must not retire the current request. Ignore retired
 UI updates and end a late known customer through its original workspace.
 An agent audio SID change is not a new customer generation. Retain its customer
 SID and outcome; only a logical dial or reset invalidates old provider callbacks.
+Clearing old room metadata is not a Stop acknowledgement for a new Start.
+Capture the pending Start intent ID before Stop, and retire only that matching
+intent after acknowledgement. An old acknowledgement cannot clear a successor.
+
+Use `createOriginalVoiceAccountClient(reservation)` for funded customer controls,
+including hangup. Refuse a replacement account before provider commands or queue
+and disposition changes. Keep the saved reservation for a retry after the
+original account is restored.
 
 ## Replacing agent audio on a direct call
 
