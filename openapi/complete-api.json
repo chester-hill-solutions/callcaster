@@ -9140,7 +9140,7 @@
       "post": {
         "operationId": "handleAgentAudioProviderEvent",
         "summary": "Handle signed agent audio instructions, status and conference events",
-        "description": "Provider-only POST. Validate the raw Twilio signature over the unchanged full URL and form before alias normalization. The connection UUID, saved callback URL, original account and physical participant facts bind the event. An accepted or answered call does not activate audio. A replacement prejoins muted and cannot dispatch or bill a customer. A retired participant cannot end the current conference. Transient processing or provider-stop failures return 500 for retry.",
+        "description": "Provider-only POST. Validate the raw Twilio signature over the unchanged full URL and form before alias normalization. The connection UUID, saved callback URL, original account and physical participant facts bind the event. An accepted or answered call does not activate audio. A replacement prejoins muted and cannot dispatch or bill a customer. The first callback owner can end while its original parent/customer bridge remains active; their verified joins and genuine current hangups still apply. A retired source cannot end the current conference. Transient processing or provider-stop failures return 500. New owned audio conference TwiML explicitly retries connection/read failures and 5xx; the saved signed URL excludes the override fragment. An existing conference retains its first participant's delivery policy. Provider retries are finite; durable room stop recovery and live transport commit remain in development.",
         "tags": [
           "Provider Webhook",
           "dialer"
@@ -9232,6 +9232,10 @@
                           "true",
                           "false"
                         ]
+                      },
+                      "ReasonParticipantLeft": {
+                        "type": "string",
+                        "description": "Only participant_hung_up is a genuine participant hangup; removal and conference end cannot end another audio generation."
                       }
                     }
                   }
@@ -9305,6 +9309,125 @@
                 "status",
                 "conference"
               ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/voice-continuation": {
+      "post": {
+        "operationId": "continueManualVoiceParent",
+        "summary": "Continue the original manual or SDK parent after its customer Dial",
+        "description": "Provider-only signed POST to the exact URL saved before the one customer instruction. Raw signature validation precedes alias normalization. The saved original account, parent SID, child SID and root facts bind the event. Ordinary completion returns Hangup. A requested and previously joined direct-call promotion can resume its original parent; this never activates the replacement. Failed replacement status alone cannot end the parent, and a committed successor permanently fences that parent. Fresh provider facts, when available, must match; ended calls return Hangup. Provider verification is bounded to one second: an unavailable API keeps the authenticated original source on its saved target and leaves replacement commit pending. SDK To can be a custom recipient request parameter; actual SDK root identity is checked separately. Dial action delivery explicitly retries connection/read failures and 5xx within the 15-second voice limit; its override fragment is excluded from the saved signed URL. The endpoint never creates a call, changes customer identity, settles a hold, writes disposition or advances a queue. Calls issued without this saved capability cannot be promoted.",
+        "tags": [
+          "Provider Webhook",
+          "dialer"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "AccountSid",
+                  "CallSid",
+                  "From",
+                  "Direction"
+                ],
+                "properties": {
+                  "AccountSid": {
+                    "type": "string"
+                  },
+                  "CallSid": {
+                    "type": "string",
+                    "pattern": "^CA[0-9a-fA-F]{32}$"
+                  },
+                  "DialCallSid": {
+                    "type": "string",
+                    "pattern": "^CA[0-9a-fA-F]{32}$"
+                  },
+                  "DialCallStatus": {
+                    "type": "string"
+                  },
+                  "DialCallDuration": {
+                    "type": "string"
+                  },
+                  "From": {
+                    "type": "string"
+                  },
+                  "To": {
+                    "type": "string"
+                  },
+                  "Direction": {
+                    "type": "string",
+                    "enum": [
+                      "inbound",
+                      "outbound-api"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Safe hangup or an owned parent conference instruction; never a new customer",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signature, saved URL, parent, customer or provider identity mismatch",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Only POST is accepted; Allow: POST"
+          },
+          "500": {
+            "description": "Temporary storage or continuation processing failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Twilio-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "credit_reservation",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ]

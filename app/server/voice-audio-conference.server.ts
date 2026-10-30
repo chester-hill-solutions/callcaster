@@ -117,7 +117,7 @@ export async function observeVoiceAudioBridgeEvent(owner: VoiceAudioConnection, 
     if (!current.promotion_requested_at || current.account_sid !== input.accountSid || current.conference_callback !== input.requestUrl ||
       current.conference_id !== input.conferenceId || current.conference_sid !== input.conferenceSid ||
       ![current.customer_sid, current.original_agent_sid].includes(input.callSid)) throw new VoiceAudioBindingError("Agent audio bridge participant is not owned");
-    if (!input.joined || current.terminal_at) return current;
+    if (!input.joined) return current;
     const [saved] = await tx.update(connections).set({
       customer_joined_at: input.callSid === current.customer_sid ? current.customer_joined_at ?? new Date() : current.customer_joined_at,
       parent_joined_at: input.callSid === current.original_agent_sid ? current.parent_joined_at ?? new Date() : current.parent_joined_at,

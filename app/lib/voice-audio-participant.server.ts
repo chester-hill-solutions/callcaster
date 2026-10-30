@@ -2,7 +2,8 @@ import { isParticipantHangup, type TwilioVoiceCallback } from "@/lib/twilio/voic
 import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 import { handleConferenceParticipantHangup } from "@/lib/conference-participant-hangup.server";
 import { isRetiredVoiceAudioSource } from "@/server/voice-audio-classification.server";
-import { observeVoiceAudioConferenceEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
+import { observeVoiceAudioConferenceEvent, observeVoiceAudioBridgeEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
+import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 
 type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
 
@@ -21,5 +22,25 @@ export async function handleBoundVoiceAudioParticipant(workspaceId: string, requ
     await handleConferenceParticipantHangup(event, { sid: input.callSid, workspace: workspaceId, contact_id: null,
       conference_id: row.conference_id }, client, input.conferenceSid);
   }
+  return row;
+}
+
+/** The first callback owner can end while its original parent/customer bridge lives. */
+export async function handleBoundVoiceAudioBridgeParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
+  const callSid = event.callSid ?? "";
+  const row = await observeVoiceAudioBridgeEvent(owner, { accountSid: event.accountSid ?? "", requestUrl,
+    conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", callSid,
+    joined: event.event === "participant-join",
+  });
+  if (!isParticipantHangup(event)) return row;
+  const currentParent = callSid === row.original_agent_sid && !await isRetiredVoiceAudioSource({
+    workspaceId: row.workspace, accountSid: row.account_sid, callSid,
+  });
+  if (callSid !== row.customer_sid && !currentParent) return row;
+  const conferenceSid = row.conference_sid;
+  if (!conferenceSid) throw new Error("Owned manual conference SID is missing");
+  const client = await createOriginalVoiceAccountClient(row);
+  await handleConferenceParticipantHangup(event, { sid: callSid, workspace: row.workspace, contact_id: null,
+    conference_id: row.conference_id }, client, conferenceSid);
   return row;
 }

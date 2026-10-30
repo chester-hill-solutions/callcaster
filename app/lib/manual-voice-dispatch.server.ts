@@ -2,6 +2,7 @@ import { reserveVoiceCredits, deferVoiceReservation, releaseUnsentVoiceReservati
 import { startVoiceBridgeReservation, recordVoiceBridgeSetupProvider, knownVoiceSetupSid, type VoiceBridgeUrls } from "@/server/voice-bridge-reservation.server";
 import { isDefiniteVoiceCreateRejection, VoiceDispatchUncertainError, VOICE_RESERVATION_QUERY_PARAM } from "@/lib/voice-credit-dispatch.server";
 import { logger } from "@/lib/logger.server";
+import { voiceContinuationUrl } from "@/lib/voice-continuation";
 
 export const VOICE_LEG_QUERY_PARAM = "credit_leg";
 
@@ -24,6 +25,7 @@ export async function dispatchManualVoiceCall(args: VoiceReservationInput & Voic
     voiceUrl: voiceBridgeUrl(args.voiceUrl, reservation.id, "setup"),
     statusCallback: voiceBridgeUrl(args.statusCallback, reservation.id, "setup"),
     recipientStatusCallback: voiceBridgeUrl(args.recipientStatusCallback, reservation.id, "recipient"),
+    continuationUrl: voiceContinuationUrl(args.voiceUrl, reservation.id),
   };
   try {
     reservation = await startVoiceBridgeReservation(reservation, urls);

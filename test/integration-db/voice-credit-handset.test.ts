@@ -133,6 +133,46 @@ describe("funded handset SDK dispatch (#2879)", () => {
       statusCallback: callback[1].replaceAll("&amp;", "&") });
     return { reservation, physical, child };
   }
+  test("saves an SDK parent continuation with its one customer instruction", async () => {
+    const { reservation } = await dial();
+    const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where id = ${reservation.id}::uuid`;
+    expect(row.setup_continuation_url).toBe(`https://handset-credit.example.test/api/voice-continuation?credit_reservation=${reservation.id}`);
+    expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("a new SDK Dial returns control to its saved signed parent continuation", async () => {
+    const reservation = await reserve(); const response = await signedVoice(reservation.id);
+    expect(response.status).toBe(200); const xml = await response.text();
+    const actionUrl = xml.match(/<Dial[^>]*\baction="([^"]+)"/)?.[1];
+    if (!actionUrl) throw new Error("Saved parent action required");
+    const url = new URL(actionUrl.replaceAll("&amp;", "&")); const overrides = new URLSearchParams(url.hash.slice(1)); url.hash = "";
+    expect(url.href).toBe(`https://handset-credit.example.test/api/voice-continuation?credit_reservation=${reservation.id}`);
+    expect(Object.fromEntries(overrides)).toEqual({ ct: "1000", rt: "3000", tt: "15000", rc: "2", rp: "ct,rt,5xx" });
+    expect(xml).toMatch(/<Dial[^>]*\bmethod="POST"/);
+    expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("an already issued SDK customer cannot acquire a missing continuation on retry", async () => {
+    const { reservation, physical } = await dial();
+    await sql`update public.workspace_voice_reservation set setup_continuation_url = null where id = ${reservation.id}::uuid`;
+    const response = await signedVoice(reservation.id, physical); expect(await response.text()).not.toContain("<Number");
+    const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where id = ${reservation.id}::uuid`;
+    expect(row.setup_continuation_url).toBeNull(); expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("ordinary SDK parent completion leaves its existing customer and hold unchanged", async () => {
+    const { reservation, physical, child } = await dial();
+    const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where id = ${reservation.id}::uuid`;
+    expect(row.setup_continuation_url).toBeTypeOf("string");
+    const url: string = row.setup_continuation_url, before = await state();
+    const params = { AccountSid: accountSid, CallSid: physical.sid, DialCallSid: child.sid, DialCallStatus: "completed",
+      From: `client:${identity}`, To: to, Direction: "inbound" };
+    const { action } = await import("../../app/routes/api+/voice-continuation.action.server");
+    for (let retry = 0; retry < 3; retry++) {
+      const request = new Request(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
+        "X-Twilio-Signature": twilio.getExpectedTwilioSignature(token, url, params) }, body: new URLSearchParams(params) });
+      const response = await asRouteResponse(action(routeArgs(request))); expect(response.status).toBe(200);
+      expect(await response.text()).toContain("<Hangup");
+    }
+    expect(await state()).toEqual(before);
+  });
   test.each([0, 1, 3])("refuses a handset call with %i credits before SDK dialing", async (credits) => {
     await sql`update public.workspace set credits = ${credits} where id = ${workspaceId}::uuid`;
     expect(await prepare()).toMatchObject({ ok: false, reason: "insufficient_credits" });

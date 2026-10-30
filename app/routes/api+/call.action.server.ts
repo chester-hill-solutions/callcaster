@@ -8,6 +8,8 @@ import { defineAction } from "@/lib/handler.server";
 import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params";
 import { startPreparedHandsetVoiceRecipient } from "@/server/handset-voice-reservation.server";
+import { voiceContinuationUrl } from "@/lib/voice-continuation";
+import { voiceWebhookDeliveryUrl } from "@/lib/twilio-webhook-delivery";
 
 function unavailable() {
   return new Response(sayHangupTwiml("We could not connect this call. Check your handset session and try again."),
@@ -41,6 +43,7 @@ export const action = defineAction({
       statusUrl.searchParams.set("credit_leg", "recipient");
       const result = await startPreparedHandsetVoiceRecipient({ ...auth,
         requestUrl: resolveCanonicalTwilioWebhookUrl(request), statusCallback: statusUrl.href,
+        continuationUrl: voiceContinuationUrl(env.BASE_URL(), auth.reservationId),
       }, (reservation) => {
         if (!reservation.user_id) throw new Error("Handset reservation has no actor");
         const twiml = createVoiceResponse();
@@ -50,6 +53,7 @@ export const action = defineAction({
             direction: "outbound", callSid: auth.callSid, streamName: `call-${auth.callSid}` },
         });
         const dial = twiml.dial({ callerId: reservation.caller_id, record: "record-from-answer",
+          ...(reservation.setup_continuation_url ? { action: voiceWebhookDeliveryUrl(reservation.setup_continuation_url), method: "POST" } : {}),
           recordingStatusCallback: `${env.BASE_URL()}/api/recording`, recordingStatusCallbackEvent: ["completed"] });
         dial.number({ statusCallback: statusUrl.href, statusCallbackEvent: ["initiated", "ringing", "answered", "completed"] }, reservation.recipient);
         return new Response(twiml.toString(), { headers: { "Content-Type": "text/xml" } });

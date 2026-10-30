@@ -7,10 +7,18 @@ import { getCompleteOpenApiEntries } from "@/lib/api-surface";
 describe("agent audio OpenAPI view boundaries", () => {
   test("keeps the signed provider endpoint outside the public user API", () => {
     expect(openApiSpec.paths).not.toHaveProperty("/api/voice-audio");
+    expect(openApiSpec.paths).not.toHaveProperty("/api/voice-continuation");
     const callback = completeOpenApiSpec.paths["/api/voice-audio"].post;
     expect(callback).toMatchObject({ "x-callcaster-auth-class": "twilioSignature", "x-callcaster-exposure": "providerOnly", "x-callcaster-supported": false });
     expect(callback.parameters).toContainEqual({ name: "X-Twilio-Signature", in: "header", required: true, schema: { type: "string", minLength: 1 } });
     expect(callback.responses).toHaveProperty("204"); expect(callback.responses).toHaveProperty("500");
+  });
+  test("documents the saved signed parent continuation only in the complete API", () => {
+    const operation = completeOpenApiSpec.paths["/api/voice-continuation"].post;
+    expect(operation).toMatchObject({ "x-callcaster-auth-class": "twilioSignature", "x-callcaster-exposure": "providerOnly", "x-callcaster-supported": false });
+    expect(operation.parameters).toContainEqual({ name: "credit_reservation", in: "query", required: true, schema: { type: "string", format: "uuid" } });
+    expect(operation.parameters).toContainEqual({ name: "X-Twilio-Signature", in: "header", required: true, schema: { type: "string", minLength: 1 } });
+    expect(operation.responses).toHaveProperty("403"); expect(operation.responses).toHaveProperty("405"); expect(operation.responses).toHaveProperty("500");
   });
   test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s describes the owned session query and failure states", (_name, spec) => {
     const path = spec.paths["/api/connect-phone-device"];
