@@ -124,6 +124,10 @@ For a selected local board refresh, pass the normalized records returned by
 `validateEnrichmentFiles` or `loadEnrichment` to `buildBoard`. Raw JSON can omit
 default arrays such as `blockedBy` and fail during rendering. Build and validate
 the replacement before writing the board or enrichment; preserve other entries.
+Validate the full enrichment set before selecting one issue. Require all other
+record values and issue sections to remain unchanged. Keep the complete snapshot
+header and count; add the selected issue's source and observation time separately.
+An issue-body readback does not refresh its native fields or Project Status.
 
 ## Common Commands
 
