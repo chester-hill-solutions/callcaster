@@ -24,6 +24,7 @@ export class VoiceDispatchUncertainError extends Error {
 export function voiceDispatchBlockedResponse(result: Extract<Awaited<ReturnType<typeof reserveVoiceCredits>>, { ok: false }>) {
   if (result.reason === "queue_not_found") throw new AppError("Queue entry not found", 404, ErrorCode.NOT_FOUND);
   if (result.reason === "queue_not_queued") return routeData({ error: "This contact is no longer queued." }, { status: 409 });
+  if (result.reason === "audio_source_unavailable") return routeData({ error: "Phone audio is not ready. Check the connection before starting a call." }, { status: 409 });
   return result.reason === "dispatch_in_progress" || result.reason === "already_dispatched"
     ? routeData({ error: "This call is awaiting completion or recovery." }, { status: 409 })
     : outboundCreditsResponse(result);
@@ -55,7 +56,7 @@ export async function dispatchReservedVoiceCall(
   const urls = { voiceUrl: voice.toString(), statusCallback: callback.toString() };
   let reservation = reserved.reservation;
   try {
-    reservation = await startVoiceReservation(reservation, urls);
+    reservation = await startVoiceReservation(reservation, urls, args.audioSource?.proof);
     await args.beforeCreate?.();
   } catch (error) {
     await releaseUnsentVoiceReservation(reservation, "not_sent");

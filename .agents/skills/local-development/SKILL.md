@@ -620,6 +620,15 @@ can produce skipped tests and startup failures. Require the full count and zero
 skips before treating the run as proof.
 
 JavaScript fake timers do not change Postgres `now()` or column defaults.
+Keep real database I/O on real timers when testing a provider deadline. Signal
+that the provider read has started, await its bounded rejection, then release
+the late response. Faking all timers can stall the SQL client's socket work and
+the test teardown. Seed negative fixtures that satisfy the other SQL constraints;
+an insert/update constraint error is not evidence that the product rejected them.
+After stopping an owned integration worker, check its exact fixture IDs before
+running global recovery-count assertions. A skipped teardown can leave an expired
+operation for the next worker. Remove only verified dummy rows in the owned
+database, require no unexpected customer or ledger data, and read back cleanup.
 When a test freezes the app's captured timestamp, set owned SQL fixture timestamps
 explicitly after real billing writes. Keep the credit and cycle assertions and
 include a real future-row exclusion control. Do not widen a production timestamp
