@@ -124,6 +124,11 @@ workspace check visible at the HTTP boundary when transaction services place
 their membership recheck deeper. Preserve the locked service check as well;
 do not add a public-route exception or deepen the crawl to clear the guard.
 
+Keep membership checks outside a catch block that turns provider errors into a
+normal result. `requireWorkspaceAccess` throws a typed AppError; preserving only
+Response exceptions still hides its 404. Verify a non-member through the real
+route and database, including the HTTP status and absence of provider commands.
+
 When a pipeline gains caller-dependent authorization, inventory HTTP and worker
 callers. Pass the authenticated user for requests and explicit system authority
 for trusted jobs without a user. Test identity forwarding separately from SQL
@@ -135,6 +140,12 @@ For a rejected-input test, keep all other required inputs valid. A missing
 companion record can hide a broken unit or identity check. Remove the specific
 guard in an isolated source copy and require an executed failure; keep the
 working branch unchanged while other reviews or gates read it.
+
+Reset queued mock replies between tests when a negative path can leave them
+unused. `vi.clearAllMocks()` clears call history but retains queued one-time
+replies. Set a fresh default after `mockReset()`, and assert the pending API
+call before resolving its deferred reply. Otherwise a later case can consume
+the previous case's refusal and give false ownership evidence.
 
 Before another isolated install or full gate in a long audit, check available
 disk space. Remove only reproducible dependencies/build output in owned

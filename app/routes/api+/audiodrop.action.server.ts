@@ -7,6 +7,8 @@ import { resolveJsonAuthSession } from "@/lib/api-auth.server";
 import { playTwiml } from "@/lib/twilio-twiml.server";
 import { loadCampaignVoicedropAudio } from "@/lib/sms-campaign-db.server";
 import { findCallSidByParentCallSid } from "@/lib/telephony-db.server";
+import { findFundedVoicedropCustomer, findLegacyVoicedropCustomer } from "@/lib/customer-voicedrop.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
@@ -24,13 +26,8 @@ type AudiodropDeps = Partial<{
   createSignedObjectUrl: typeof createSignedObjectUrl;
 }>;
 
-export const action = defineAction({
-  sideEffects: ["db-read", "twilio", "external"],
-  handler: async ({
-    request,
-    deps,
-  }: ActionFunctionArgs & { deps?: AudiodropDeps }) => {
-  const d = {
+function audiodropDependencies(deps?: AudiodropDeps) {
+  return {
     verifyAuth: deps?.verifyAuth ?? resolveJsonAuthSession,
     createWorkspaceTwilioInstance:
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
@@ -40,6 +37,21 @@ export const action = defineAction({
       deps?.loadCampaignVoicedropAudio ?? loadCampaignVoicedropAudio,
     createSignedObjectUrl: deps?.createSignedObjectUrl ?? createSignedObjectUrl,
   };
+}
+
+function parseVoicedropTarget(callId: FormDataEntryValue | null, campaignId: FormDataEntryValue | null) {
+  const campaign = Number(campaignId);
+  if (typeof callId !== "string" || !callId || !Number.isSafeInteger(campaign) || campaign <= 0) return null;
+  return { callSid: callId, campaignId: campaign };
+}
+
+export const action = defineAction({
+  sideEffects: ["db-read", "twilio", "external"],
+  handler: async ({
+    request,
+    deps,
+  }: ActionFunctionArgs & { deps?: AudiodropDeps }) => {
+  const d = audiodropDependencies(deps);
 
   const auth = await d.verifyAuth(request);
   const formData = await request.formData();
@@ -47,31 +59,26 @@ export const action = defineAction({
   const workspaceId = formData.get("workspaceId");
   const campaignId = formData.get("campaignId");
 
-  try {
-    if (typeof workspaceId !== "string" || !workspaceId) {
-      return { success: false, error: "workspaceId is required" };
-    }
-    await requireWorkspaceAccess({
-      user: auth.user,
-      workspaceId,
-    });
+  if (typeof workspaceId !== "string" || !workspaceId) return { success: false, error: "workspaceId is required" };
+  await requireWorkspaceAccess({ user: auth.user, workspaceId });
 
-    const twilio = await d.createWorkspaceTwilioInstance({
-      workspace_id: workspaceId,
-    });
-    const childCallSid = await d.findCallSidByParentCallSid(
-      workspaceId,
-      callId as string,
-    );
+  try {
+    const target = parseVoicedropTarget(callId, campaignId);
+    if (!target) return { success: false, error: "Call and campaign are required" };
+    const funded = await findFundedVoicedropCustomer(workspaceId, target.callSid, target.campaignId);
+    const childCallSid = funded?.callSid ?? await d.findCallSidByParentCallSid(workspaceId, target.callSid)
+      ?? await findLegacyVoicedropCustomer(workspaceId, target.callSid, target.campaignId);
     if (!childCallSid) {
       throw { call: new Error("Call not found") };
     }
+    const twilio = funded ? await createOriginalVoiceAccountClient(funded.reservation)
+      : await d.createWorkspaceTwilioInstance({ workspace_id: workspaceId });
 
     let voicedropAudio: string | null;
     try {
       voicedropAudio = await d.loadCampaignVoicedropAudio(
         workspaceId as string,
-        Number(campaignId),
+        target.campaignId,
       );
     } catch (error) {
       throw { campaign: error };
@@ -92,16 +99,17 @@ export const action = defineAction({
 
     if (!signedUrl) {
       logger.error("No audio found for voicemail drop");
-      twilio.calls(childCallSid).update({ status: "completed" });
+      await twilio.calls(childCallSid).update({ status: "completed" });
       return { success: false, error: "No audio found" };
     }
 
-    twilio.calls(childCallSid).update({
+    await twilio.calls(childCallSid).update({
       twiml: playTwiml(signedUrl),
     });
   } catch (error) {
+    if (error instanceof Response) throw error;
     logger.error("Error in audiodrop:", error);
-    return { success: false, error };
+    return { success: false, error: "Could not send voicemail audio. Check the call and try again." };
   }
   return { success: true };
   },

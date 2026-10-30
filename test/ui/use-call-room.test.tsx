@@ -60,7 +60,7 @@ describe("useCallRoom", () => {
     expect(EventSource).toHaveBeenCalledWith("/api/workspaces/w1/events");
   });
 
-  test("normalizes raw provider statuses in predictive broadcasts to dialer vocabulary", async () => {
+  test("waits for a human join, then normalizes its terminal provider status", async () => {
     const listeners = new Map<string, (event: MessageEvent<string>) => void>();
 
     const MockEventSource = vi.fn(function MockEventSource(this: {
@@ -121,11 +121,16 @@ describe("useCallRoom", () => {
 
     emit({ contact_id: 7, status: "ringing" });
     expect(result.current.predictiveState).toMatchObject({
-      contact_id: 7,
+      contact_id: null,
       status: "dialing",
     });
 
     emit({ contact_id: 7, status: "in-progress" });
+    expect(result.current.predictiveState.status).toBe("dialing");
+    expect(result.current.customerCallSid).toBeNull();
+
+    emit({ contact_id: 7, status: "in-progress", customer_event: "joined",
+      conference_sid: "CF11111111111111111111111111111111", conference_sequence: 7 });
     expect(result.current.predictiveState).toMatchObject({
       contact_id: 7,
       status: "connected",
@@ -137,11 +142,10 @@ describe("useCallRoom", () => {
       status: "failed",
     });
 
-    // Already-normalized dialer vocabulary passes through unchanged.
     emit({ contact_id: 8, status: "dialing" });
     expect(result.current.predictiveState).toMatchObject({
-      contact_id: 8,
-      status: "dialing",
+      contact_id: 7,
+      status: "failed",
     });
   });
 

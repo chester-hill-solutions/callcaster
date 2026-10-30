@@ -7,6 +7,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse, routeArgs } from "../helpers/route-result";
 
 const windowState = vi.hoisted(() => ({ allowed: true }));
+const voicemailStorage = vi.hoisted(() => ({ sign: vi.fn(async () => "https://owned-audio.example.test/drop.mp3") }));
+vi.mock("@/lib/object-storage.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/object-storage.server")>(),
+  createSignedObjectUrl: voicemailStorage.sign,
+}));
 vi.mock("@/lib/recipient-calling-window", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/recipient-calling-window")>(),
   recipientCallingWindowStatus: () => ({ allowed: windowState.allowed, timezone: "America/Toronto", reason: "owned_fixture_clock" }),
@@ -36,6 +41,12 @@ async function hangupCustomer(callSid: string) {
   const { action } = await import("../../app/routes/api+/hangup.action.server");
   return asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/hangup`, { method: "POST",
     headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, callSid }) }))));
+}
+
+async function dropCustomer(callSid: string, campaignId: string, selectedWorkspace = workspaceId) {
+  const { action } = await import("../../app/routes/api+/audiodrop.action.server");
+  const body = new FormData(); body.set("workspaceId", selectedWorkspace); body.set("callId", callSid); body.set("campaignId", campaignId);
+  return asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/audiodrop`, { method: "POST", body }))));
 }
 
 async function customerVoice(url: string, callSid: string, overrides: Record<string, string> = {}, valid = true, signingToken = "owned-audio-token") {
@@ -68,6 +79,76 @@ describe("manual Start reuses confirmed phone audio", () => {
     expect(reservation).toMatchObject({ provider_sid: body.callSid, setup_sid: null, audio_agent_sid: f.call.sid,
       conference_id: f.row.conference_id, credits: 4 });
     expect(await state()).toMatchObject({ credits: 100, reservations: 1, attempts: 1, ledger: 0, operations: 1 });
+  });
+
+  test("Voice Drop redirects the funded customer root and retains the phone, queue and single hold", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    await sql`update public.campaign set voicedrop_audio = 'owned-drop.mp3' where id = ${Number(f.payload.campaign_id)}`;
+    const before = await state(); web.update.mockClear();
+    const outcomes = await sql`select q.queue_state, q.dequeued_at, q.provider_status, a.disposition, a.answered_at
+      from public.workspace_voice_reservation r join public.campaign_queue q on q.id = r.queue_id
+      join public.outreach_attempt a on a.id = r.outreach_attempt_id where r.provider_sid = ${callSid}`;
+    expect(await dropCustomer(callSid, f.payload.campaign_id)).toMatchObject({ success: true });
+    expect(web.update).toHaveBeenCalledExactlyOnceWith(callSid, { twiml: expect.stringContaining('<Play>https://owned-audio.example.test/drop.mp3</Play>') });
+    expect(voicemailStorage.sign).toHaveBeenCalledWith('workspaceAudio', `${workspaceId}/owned-drop.mp3`, 3600);
+    expect(await state()).toEqual(before); expect(rooms.update).not.toHaveBeenCalled(); expect(f.room.status).toBe('in-progress');
+    expect(await sql`select q.queue_state, q.dequeued_at, q.provider_status, a.disposition, a.answered_at
+      from public.workspace_voice_reservation r join public.campaign_queue q on q.id = r.queue_id
+      join public.outreach_attempt a on a.id = r.outreach_attempt_id where r.provider_sid = ${callSid}`).toEqual(outcomes);
+  });
+
+  test("Voice Drop refuses a changed provider account and can retry the same root after restoration", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    await sql`update public.campaign set voicedrop_audio = 'owned-drop.mp3' where id = ${Number(f.payload.campaign_id)}`;
+    const before = await state(); web.update.mockClear(); web.accountSid = `AC${randomUUID().replaceAll('-', '')}`;
+    expect(await dropCustomer(callSid, f.payload.campaign_id)).toMatchObject({ success: false });
+    expect(web.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
+    web.accountSid = accountSid;
+    expect(await dropCustomer(callSid, f.payload.campaign_id)).toMatchObject({ success: true });
+    expect(web.update).toHaveBeenCalledExactlyOnceWith(callSid, expect.objectContaining({ twiml: expect.stringContaining('<Play>') }));
+    expect(await state()).toEqual(before); expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test.each(['campaign', 'audio-leg', 'terminal', 'terminal-call'])('Voice Drop rejects a mismatched %s before provider commands', async mismatch => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    await sql`update public.campaign set voicedrop_audio = 'owned-drop.mp3' where id = ${Number(f.payload.campaign_id)}`;
+    if (mismatch === 'terminal') await sql`update public.workspace_voice_reservation set terminal_status = 'completed' where provider_sid = ${callSid}`;
+    if (mismatch === 'terminal-call') await sql`update public.call set status = 'completed' where sid = ${callSid}`;
+    const before = await state(); web.update.mockClear();
+    expect(await dropCustomer(mismatch === 'audio-leg' ? f.call.sid : callSid,
+      mismatch === 'campaign' ? String(Number(f.payload.campaign_id) + 1) : f.payload.campaign_id)).toMatchObject({ success: false });
+    expect(web.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before); expect(rooms.update).not.toHaveBeenCalled();
+  });
+
+  test("another workspace cannot redirect the funded customer", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    const before = await state(); web.update.mockClear();
+    expect((await dropCustomer(callSid, f.payload.campaign_id, foreignId)).status).toBe(404);
+    expect(web.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
+  });
+
+  test("Voice Drop reports a provider refusal without changing the customer funding or phone", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    await sql`update public.campaign set voicedrop_audio = 'owned-drop.mp3' where id = ${Number(f.payload.campaign_id)}`;
+    const before = await state(); web.update.mockClear(); web.update.mockRejectedValueOnce(new Error('Owned provider redirect refusal'));
+    expect(await dropCustomer(callSid, f.payload.campaign_id)).toMatchObject({ success: false,
+      error: "Could not send voicemail audio. Check the call and try again." });
+    expect(web.update).toHaveBeenCalledExactlyOnceWith(callSid, expect.objectContaining({ twiml: expect.stringContaining('<Play>') }));
+    expect(await state()).toEqual(before); expect(rooms.update).not.toHaveBeenCalled(); expect(f.room.status).toBe('in-progress');
+  });
+
+  test("an older unfunded SDK customer remains a valid Voice Drop target", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200); const { callSid } = await response.json();
+    await sql`update public.campaign set voicedrop_audio = 'owned-drop.mp3' where id = ${Number(f.payload.campaign_id)}`;
+    await sql`delete from public.workspace_voice_reservation where provider_sid = ${callSid}`;
+    const parentSid = `CA${randomUUID().replaceAll('-', '')}`;
+    await sql`insert into public.call (sid, workspace, user_id, direction, status)
+      values (${parentSid}, ${workspaceId}::uuid, ${actor}::uuid, 'inbound', 'in-progress')`;
+    await sql`update public.call set parent_call_sid = ${parentSid}, direction = 'outbound-dial' where sid = ${callSid}`;
+    const before = await state(); web.update.mockClear();
+    expect(await dropCustomer(callSid, f.payload.campaign_id)).toMatchObject({ success: true });
+    expect(web.update).toHaveBeenCalledExactlyOnceWith(callSid, expect.objectContaining({ twiml: expect.stringContaining('<Play>') }));
+    expect(await state()).toEqual(before); expect(rooms.update).not.toHaveBeenCalled();
   });
 
   test("same-intent retries precede mutable phone, queue and calling-window checks", async () => {

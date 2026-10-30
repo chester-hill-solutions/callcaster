@@ -33,6 +33,7 @@ type PredictiveState = {
 
 type UseCampaignCallFlowOptions = {
   callSid: string | null;
+  confirmedCustomerSid?: string | null;
   agentLegSid: string | null;
   workspaceId: string;
   state: string;
@@ -72,8 +73,76 @@ function isTerminalForOutcome(normalized: CallStatusEnum): boolean {
   return ["completed", "canceled", "failed", "busy", "no-answer"].includes(normalized);
 }
 
+function getCallDisplayState({ lifecycle, providerStatus, isPredictive, predictiveState, fsmState, recentAttemptDisposition }: {
+  lifecycle: CallLifecycleState;
+  providerStatus: CallStatusEnum | null;
+  isPredictive: boolean;
+  predictiveState: PredictiveState;
+  fsmState: string;
+  recentAttemptDisposition: string | null | undefined;
+}) {
+  const { phase } = lifecycle;
+
+  // 1. Terminal lifecycle wins unconditionally — fixes #1206.
+  if (TERMINAL_PHASES.has(phase)) {
+    const outcome = lifecycle.outcome;
+    if (outcome === "completed" || outcome === "canceled") return "completed";
+    if (outcome === "failed" || outcome === "busy") return "failed";
+    if (outcome === "no-answer") return "no-answer";
+    if (outcome === "voicemail") return "voicemail";
+    return "completed";
+  }
+
+  // 2. Provider non-terminal status fills gap between local and provider state.
+  if (providerStatus) {
+    if (providerStatus === "in-progress") return "connected";
+    if (
+      providerStatus === "initiated" ||
+      providerStatus === "queued" ||
+      providerStatus === "ringing"
+    ) {
+      return "dialing";
+    }
+    if (providerStatus === "no-answer") return "no-answer";
+  }
+
+  // 3. Non-terminal lifecycle phase.
+  if (phase === "dialing") return "dialing";
+  if (phase === "connected") return "connected";
+
+  // 4. Predictive dialer broadcasts override when present.
+  if (isPredictive) {
+    const ps = predictiveState.status;
+    if (ps === "dialing" || ps === "connected" || ps === "completed" ||
+        ps === "failed" || ps === "no-answer" || ps === "idle") {
+      return ps;
+    }
+  }
+
+  // 5. A live FSM outranks any *previous* attempt's disposition: the agent
+  //    has dialed this contact again, so their last outcome is history.
+  //    Below rule 6 this showed the old "No Answer"/"Call Failed" for the
+  //    render between the click and the bridge effect.
+  if (fsmState === "dialing") return "dialing";
+  if (fsmState === "connected") return "connected";
+
+  // 6. Recent attempt fallback for terminal displays.
+  if (recentAttemptDisposition && lifecycle.phase !== "dialing" && lifecycle.phase !== "connected") {
+    const d = recentAttemptDisposition;
+    if (d === "voicemail") return "voicemail";
+    if (d === "no-answer") return "no-answer";
+    if (d === "completed" || d === "failed" || d === "busy") return d;
+  }
+
+  // 7. Legacy FSM terminal state as fallback (bridge effect hasn't fired yet).
+  if (FSM_TERMINAL.has(fsmState)) return fsmState;
+
+  return "idle";
+}
+
 export function useCampaignCallFlow({
   callSid,
+  confirmedCustomerSid = null,
   agentLegSid,
   workspaceId,
   state: fsmState,
@@ -132,7 +201,7 @@ export function useCampaignCallFlow({
       // Guarded: with a dead signaling transport this disconnect THROWS
       // (31009), and this runs inside the workspace SSE fan-out.
       try {
-        activeCall?.disconnect?.();
+        if (!isPredictive) activeCall?.disconnect?.();
       } catch (error) {
         logger.debug("activeCall.disconnect after provider-terminal status failed", error);
       }
@@ -208,14 +277,29 @@ export function useCampaignCallFlow({
   }, [callSid, resetCustomer]);
 
   /**
-   * @effect Bridge the legacy FSM (useCallState) transitions into the canonical lifecycle.
-   * @effect-deps fsmState, callSid, resetCustomer (committed transition and source identity).
+   * @effect Bind the confirmed room customer and bridge legacy FSM transitions into the canonical lifecycle.
+   * @effect-deps fsmState, callSid, resetCustomer, confirmedCustomerSid, predictiveState.status, send (committed customer and transition).
    * @effect-side-effects Update the logical customer owner and lifecycle state; remember the last committed source.
    * @effect-why-not-loader SDK and realtime transitions arrive after mount, outside loader requests.
    */
   useEffect(() => {
     const previousSource = previousSourceRef.current;
     previousSourceRef.current = callSid;
+    if (confirmedCustomerSid && ownerRef.current.customerSid !== confirmedCustomerSid) {
+      ownerRef.current = { previousSourceSid: callSid, customerSid: confirmedCustomerSid };
+      const status = predictiveState.status === "connected" ? "in-progress" : normalizeProviderStatus(predictiveState.status) ?? "in-progress";
+      setCustomer({ sid: confirmedCustomerSid, status });
+      setLifecycle(previous => {
+        const joined = callLifecycleReducer(previous, { type: "CUSTOMER_JOINED", customerSid: confirmedCustomerSid });
+        return isTerminalForOutcome(status) ? callLifecycleReducer(joined, { type: "PROVIDER_ENDED", outcome: normalizedToOutcome(status) }) : joined;
+      });
+      previousFsmRef.current = fsmState;
+      if (!isTerminalForOutcome(status) && fsmState !== "connected") {
+        if (fsmState !== "dialing") send({ type: "START_DIALING" });
+        send({ type: "CONNECT" });
+      }
+      return;
+    }
     if (previousFsmRef.current === fsmState) return;
     recordFlashBreadcrumb("fsm", `${previousFsmRef.current} -> ${fsmState}`);
     previousFsmRef.current = fsmState;
@@ -254,68 +338,9 @@ export function useCampaignCallFlow({
         dispatch({ type: "FAIL" });
         break;
     }
-  }, [fsmState, callSid, resetCustomer]);
+  }, [fsmState, callSid, resetCustomer, confirmedCustomerSid, predictiveState.status, send]);
 
-  // Display derivation: one source of truth for the call screen UI.
-  const displayState = ((): string => {
-    const { phase } = lifecycle;
-
-    // 1. Terminal lifecycle wins unconditionally — fixes #1206.
-    if (TERMINAL_PHASES.has(phase)) {
-      const outcome = lifecycle.outcome;
-      if (outcome === "completed" || outcome === "canceled") return "completed";
-      if (outcome === "failed" || outcome === "busy") return "failed";
-      if (outcome === "no-answer") return "no-answer";
-      if (outcome === "voicemail") return "voicemail";
-      return "completed";
-    }
-
-    // 2. Provider non-terminal status fills gap between local and provider state.
-    if (providerStatus) {
-      if (providerStatus === "in-progress") return "connected";
-      if (
-        providerStatus === "initiated" ||
-        providerStatus === "queued" ||
-        providerStatus === "ringing"
-      ) {
-        return "dialing";
-      }
-      if (providerStatus === "no-answer") return "no-answer";
-    }
-
-    // 3. Non-terminal lifecycle phase.
-    if (phase === "dialing") return "dialing";
-    if (phase === "connected") return "connected";
-
-    // 4. Predictive dialer broadcasts override when present.
-    if (isPredictive) {
-      const ps = predictiveState.status;
-      if (ps === "dialing" || ps === "connected" || ps === "completed" ||
-          ps === "failed" || ps === "no-answer" || ps === "idle") {
-        return ps;
-      }
-    }
-
-    // 5. A live FSM outranks any *previous* attempt's disposition: the agent
-    //    has dialed this contact again, so their last outcome is history.
-    //    Below rule 6 this showed the old "No Answer"/"Call Failed" for the
-    //    render between the click and the bridge effect.
-    if (fsmState === "dialing") return "dialing";
-    if (fsmState === "connected") return "connected";
-
-    // 6. Recent attempt fallback for terminal displays.
-    if (recentAttemptDisposition && lifecycle.phase !== "dialing" && lifecycle.phase !== "connected") {
-      const d = recentAttemptDisposition;
-      if (d === "voicemail") return "voicemail";
-      if (d === "no-answer") return "no-answer";
-      if (d === "completed" || d === "failed" || d === "busy") return d;
-    }
-
-    // 7. Legacy FSM terminal state as fallback (bridge effect hasn't fired yet).
-    if (FSM_TERMINAL.has(fsmState)) return fsmState;
-
-    return "idle";
-  })();
+  const displayState = getCallDisplayState({ lifecycle, providerStatus, isPredictive, predictiveState, fsmState, recentAttemptDisposition });
 
   const displayColor =
     displayState === "failed"
@@ -327,11 +352,20 @@ export function useCampaignCallFlow({
   const terminalCallSid =
     providerStatus && isTerminalForOutcome(providerStatus) ? customerLegSid : null;
 
+  const confirmCustomerEnded = useCallback(() => {
+    if (ownerRef.current !== owner) return false;
+    setLifecycle(previous => callLifecycleReducer(previous, { type: "HANG_UP" }));
+    send({ type: "HANG_UP" });
+    return true;
+  }, [owner, send]);
+
   return {
     displayState,
     displayColor,
     beginDial,
     terminalCallSid,
+    customerCallSid: customerLegSid,
+    confirmCustomerEnded,
     getDisplayState: (
       callStateValue: string,
       _statusValue: string | undefined,

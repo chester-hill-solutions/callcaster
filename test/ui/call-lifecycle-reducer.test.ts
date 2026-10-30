@@ -14,6 +14,14 @@ const IDLE: CallLifecycleState = {
 };
 
 describe("callLifecycleReducer", () => {
+  test("a new joined human owns a fresh generation, while a duplicate cannot restore its ended call", () => {
+    const first = callLifecycleReducer(IDLE, { type: "CUSTOMER_JOINED", customerSid: "customer-a" });
+    expect(first).toMatchObject({ phase: "connected", outcome: null, customerSid: "customer-a", generation: 1 });
+    const ended = callLifecycleReducer(first, { type: "PROVIDER_ENDED", outcome: "completed" });
+    expect(callLifecycleReducer(ended, { type: "CUSTOMER_JOINED", customerSid: "customer-a" })).toEqual(ended);
+    expect(callLifecycleReducer(ended, { type: "CUSTOMER_JOINED", customerSid: "customer-b" }))
+      .toMatchObject({ phase: "connected", outcome: null, customerSid: "customer-b", generation: 2 });
+  });
   describe("idle", () => {
     test("START_DIALING transitions to dialing", () => {
       const next = callLifecycleReducer(IDLE, { type: "START_DIALING" });

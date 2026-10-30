@@ -5,7 +5,7 @@ vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, routeArgs } from "./helpers/route-result";
 import { setJsonAuthSession } from "./helpers/route-auth-mock";
 import { logger } from "@/lib/logger.server";
 
@@ -14,7 +14,8 @@ const telephonyMocks = vi.hoisted(() => ({
   loadCampaignVoicedropAudio: vi.fn(),
 }));
 
-vi.mock("@/lib/telephony-db.server", () => ({
+vi.mock("@/lib/telephony-db.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/telephony-db.server")>(),
   findCallSidByParentCallSid: (...args: unknown[]) =>
     telephonyMocks.findCallSidByParentCallSid(...args),
 }));
@@ -58,7 +59,7 @@ describe("api.audiodrop action", () => {
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
-    expect(res).toMatchObject({ success: false, error: { call: expect.any(Error) } });
+    expect(res).toMatchObject({ success: false, error: "Could not send voicemail audio. Check the call and try again." });
     // Regression: findCallSidByParentCallSid used to be a global,
     // untenanted lookup by callId alone — any workspace could resolve
     // another workspace's child call SID. It must now be scoped by the
@@ -82,7 +83,7 @@ describe("api.audiodrop action", () => {
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
-    expect(res).toMatchObject({ success: false, error: { campaign: expect.any(Error) } });
+    expect(res).toMatchObject({ success: false, error: "Could not send voicemail audio. Check the call and try again." });
   });
 
   test("handles missing audio by completing call", async () => {
@@ -129,7 +130,7 @@ describe("api.audiodrop action", () => {
       request: makeReq(),
       deps: baseDeps,
     } as any));
-    expect(r1).toMatchObject({ success: false, error: { voicemail: expect.any(Error) } });
+    expect(r1).toMatchObject({ success: false, error: "Could not send voicemail audio. Check the call and try again." });
 
     createSignedObjectUrl.mockResolvedValueOnce("");
     const r2 = await asRouteResponse(mod.action({
@@ -180,4 +181,24 @@ describe("api.audiodrop action", () => {
     expect(res).toMatchObject({ success: true });
     expect(createWorkspaceTwilioInstance).toHaveBeenCalled();
   });
+
+  test("waits for the provider to accept Voice Drop before acknowledging success", async () => {
+    let release!: () => void;
+    const update = vi.fn(() => new Promise<void>(resolve => { release = resolve; }));
+    telephonyMocks.findCallSidByParentCallSid.mockResolvedValue('CA1');
+    telephonyMocks.loadCampaignVoicedropAudio.mockResolvedValue('owned.mp3');
+    const mod = await import('../app/routes/api+/audiodrop');
+    const body = new FormData(); body.set('callId', 'parent'); body.set('workspaceId', 'w1'); body.set('campaignId', '1');
+    const args = { ...routeArgs(new Request('http://localhost/api/audiodrop', { method: 'POST', body })), deps: {
+      verifyAuth: vi.fn(async () => ({ user: { id: 'u1' }, headers: new Headers() })),
+      createWorkspaceTwilioInstance: vi.fn(async () => ({ calls: () => ({ update }) })),
+      createSignedObjectUrl: vi.fn(async () => 'https://owned.example.test/drop.mp3'),
+    } };
+    let acknowledged = false;
+    const pending = asRouteResponse(mod.action(args)).then(result => { acknowledged = true; return result; });
+    await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+    expect(acknowledged).toBe(false);
+    release(); expect(await pending).toMatchObject({ success: true });
+  });
 });
+import "./helpers/legacy-voice-reservation-mock";
