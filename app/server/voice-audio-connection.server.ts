@@ -11,14 +11,21 @@ import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
 import { hasPendingVoiceAudioConferenceStop } from "./voice-audio-classification.server";
 import type { TenantDb } from "./tenant-db";
 import { hasUnresolvedVoiceAudioPromotion } from "./voice-audio-manual-topology.server";
+import { bindVoiceAudioIntent, findVoiceAudioIntent, voiceAudioRequestIdentity } from "./voice-audio-intent.server";
+import { sameVoiceAudioRequest } from "@/lib/voice-audio-connection";
 
 export type VoiceAudioConnection = typeof connections.$inferSelect;
 const LEASE_MS = 5 * 60_000;
 
-function pendingReplay(pending: VoiceAudioConnection, args: VoiceAudioConnectionInput, targetKey: string, accountSid: string) {
+async function replayPendingVoiceAudio(tdb: TenantDb, args: VoiceAudioConnectionInput, targetKey: string, accountSid: string) {
+  const pending = await tdb.workspace_voice_audio_connection.findFirst({ where: and(
+    eq(connections.user_id, args.userId), or(inArray(connections.state, [...PENDING_VOICE_AUDIO_STATES]),
+      and(inArray(connections.state, ["failed", "canceled", "retired"]), isNotNull(connections.provider_sid), isNull(connections.terminal_at))),
+  ) });
+  if (!pending) return null;
   if (!PENDING_VOICE_AUDIO_STATES.some((state) => state === pending.state)) return voiceAudioRefusal("connection_pending");
   return pending.target_key === targetKey && sameRequest(pending, args) && pending.account_sid === accountSid
-    ? { ok: true as const, connection: pending, replayed: true } : voiceAudioRefusal("connection_pending");
+    ? bindVoiceAudioIntent(tdb, args, pending) : voiceAudioRefusal("connection_pending");
 }
 
 async function lacksIdleCredits(tx: CreditTransaction, workspaceId: string, credits: number, targetKind: VoiceAudioConnection["target_kind"]) {
@@ -36,6 +43,21 @@ function sameRequest(row: VoiceAudioConnection, args: VoiceAudioConnectionInput)
 }
 
 async function replayVoiceAudioIntent(tdb: TenantDb, args: VoiceAudioConnectionInput) {
+  const intent = await findVoiceAudioIntent(tdb, args);
+  if (intent) {
+    if (intent.request) {
+      try { if (!sameVoiceAudioRequest(intent.request, voiceAudioRequestIdentity(args))) return voiceAudioRefusal("intent_conflict"); }
+      catch { return voiceAudioRefusal("intent_conflict"); }
+    }
+    if (!intent.connection_id) return voiceAudioRefusal(intent.cancel_requested_at ? "intent_canceled" : "connection_not_found");
+    const connection = await tdb.workspace_voice_audio_connection.findFirst({ where: and(
+      eq(connections.user_id, args.userId), eq(connections.id, intent.connection_id),
+    ) });
+    if (!connection) return voiceAudioRefusal("connection_not_found");
+    if ((connection.control_intent_id ?? connection.intent_id) !== args.intentId)
+      return voiceAudioRefusal(intent.cancel_requested_at ? "intent_canceled" : "stale_audio");
+    return { ok: true as const, connection, replayed: true };
+  }
   const prior = await tdb.workspace_voice_audio_connection.findFirst({ where: and(
     eq(connections.user_id, args.userId), eq(connections.intent_id, args.intentId),
   ) });
@@ -55,17 +77,14 @@ export async function prepareVoiceAudioConnection(args: VoiceAudioConnectionInpu
       eq(connections.user_id, args.userId), eq(connections.state, "active"),
     ) }) ?? null;
     // An idle legacy retry cannot ring an already connected phone again.
-    if (current && !args.callSid && sameRequest(current, args)) return { ok: true as const, connection: current, replayed: true };
+    if (current && !args.callSid && sameRequest(current, args)) return bindVoiceAudioIntent(actor.tdb, args, current);
     const admission = await resolveVoiceAudioAdmission(actor, args, current);
     if (!admission.ok) return admission;
     const { target, destination, sourceSid } = admission;
     if (current && current.target_key === target.key && current.destination === destination)
-      return { ok: true as const, connection: current, replayed: true };
-    const pending = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: and(
-      eq(connections.user_id, args.userId), or(inArray(connections.state, [...PENDING_VOICE_AUDIO_STATES]),
-        and(inArray(connections.state, ["failed", "canceled", "retired"]), isNotNull(connections.provider_sid), isNull(connections.terminal_at))),
-    ) });
-    if (pending) return pendingReplay(pending, args, target.key, actor.accountSid);
+      return bindVoiceAudioIntent(actor.tdb, args, current);
+    const pending = await replayPendingVoiceAudio(actor.tdb, args, target.key, actor.accountSid);
+    if (pending) return pending;
     if (await lacksIdleCredits(tx, args.workspaceId, actor.owner.credits, target.kind))
       return voiceAudioRefusal("insufficient_credits");
     const latest = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: eq(connections.user_id, args.userId),
@@ -83,7 +102,8 @@ export async function prepareVoiceAudioConnection(args: VoiceAudioConnectionInpu
       lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + LEASE_MS),
     });
     if (!connection) throw new Error("Agent audio preparation was not saved");
-    return { ok: true as const, connection, replayed: false };
+    const bound = await bindVoiceAudioIntent(actor.tdb, args, connection);
+    return bound.ok ? { ...bound, replayed: false } : bound;
   });
 }
 

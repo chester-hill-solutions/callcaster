@@ -49,16 +49,20 @@ describe("agent audio OpenAPI view boundaries", () => {
     const path = spec.paths["/api/connect-phone-device"];
     for (const method of ["get", "delete"]) expect(path[method].parameters).toEqual([
       { name: "workspaceId", in: "query", required: true, schema: { type: "string", format: "uuid" } },
-      { name: "connection_id", in: "query", required: true, schema: { type: "string", format: "uuid" } },
+      expect.objectContaining({ name: "connection_id", in: "query", required: false, schema: { type: "string", format: "uuid" } }),
+      expect.objectContaining({ name: "control_intent_id", in: "query", required: false, schema: expect.objectContaining({ type: "string", format: "uuid" }) }),
+      expect.objectContaining({ name: "connection_intent_id", in: "query", required: false, schema: expect.objectContaining({ type: "string", format: "uuid" }) }),
+      expect.objectContaining({ name: "X-Callcaster-Audio-Actor", in: "header", required: false }),
     ]);
     expect(path.post).toMatchObject({ "x-callcaster-auth-class": "session", "x-callcaster-exposure": "sessionOnly" });
     expect(path.post.responses["402"].content["application/json"].schema.required).toEqual(["error", "creditsError"]);
     expect(path.post.responses["200"].content["application/json"].schema.properties.connection_state.enum).toContain("ready");
     expect(path.post.responses["200"].content["application/json"].schema.properties.connection_state.enum).toContain("active");
     for (const method of ["get", "delete", "post"]) {
-      const response = path[method].responses["200"].content["application/json"].schema;
+      const schema = path[method].responses["200"].content["application/json"].schema;
+      const response = method === "post" ? schema : schema.oneOf[0];
       expect(response.required).toEqual(expect.arrayContaining(["workspace_id", "user_id", "connection_intent_id", "destination",
-        "requested_call_sid", "campaign_id", "source_agent_sid", "cancel_requested"]));
+        "control_intent_id", "requested_call_sid", "campaign_id", "source_agent_sid", "cancel_requested"]));
       expect(Object.keys(voiceAudioSnapshotSchema.shape)).toEqual(expect.arrayContaining(response.required.filter((field: string) => field !== "success")));
     }
     for (const status of ["409", "502"]) expect(path.post.responses[status].content["application/json"].schema.anyOf[1].required)

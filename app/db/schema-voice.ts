@@ -58,6 +58,7 @@ export const workspace_voice_audio_connection = pgTable("workspace_voice_audio_c
   workspace: uuid().notNull(),
   user_id: text().notNull(),
   intent_id: uuid().notNull(),
+  control_intent_id: uuid(),
   target_kind: text().$type<"idle" | "direct" | "conference">().notNull(),
   target_key: text().notNull(),
   requested_call_sid: text(),

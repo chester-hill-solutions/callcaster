@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
-import { call, user, workspace, workspace_voice_audio_connection as connections } from "@/db/schema";
+import { call, user, workspace, workspace_voice_audio_connection as connections, workspace_voice_audio_intent as intents } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { getUserRole, WORKSPACE_MEMBERSHIP_ROLES } from "@/lib/workspace-membership.server";
@@ -14,7 +14,7 @@ import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-aud
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
 
-type OwnedInput = { workspaceId: string; userId: string; connectionId: string };
+type OwnedInput = { workspaceId: string; userId: string; connectionId: string; controlIntentId?: string };
 const RECOVERY_LEASE_MS = 5 * 60_000;
 
 async function ownedControl<T>(args: OwnedInput, run: (tx: CreditTransaction, row: VoiceAudioConnection) => Promise<T>) {
@@ -24,6 +24,7 @@ async function ownedControl<T>(args: OwnedInput, run: (tx: CreditTransaction, ro
     const [row] = await tx.select().from(connections).where(and(eq(connections.id, args.connectionId),
       eq(connections.workspace, args.workspaceId), eq(connections.user_id, args.userId))).for("update");
     if (!row) return voiceAudioRefusal("connection_not_found");
+    if (args.controlIntentId && args.controlIntentId !== (row.control_intent_id ?? row.intent_id)) return voiceAudioRefusal("stale_audio");
     return run(tx, row);
   });
 }
@@ -39,17 +40,29 @@ function promotionIsUnfinished(row: VoiceAudioConnection) {
 /** Cancellation never changes the current customer or crosses a saved promotion. */
 export async function cancelOwnedVoiceAudioConnection(args: OwnedInput) {
   return ownedControl(args, async (tx, row) => {
-    if (row.terminal_at) return { ok: true as const, connection: row };
+    const result = await cancelVoiceAudioConnectionInTransaction(tx, row);
+    if (result.ok) await tx.update(intents).set({ cancel_requested_at: new Date() }).where(and(eq(intents.workspace, row.workspace),
+      eq(intents.user_id, row.user_id), eq(intents.intent_id, row.control_intent_id ?? row.intent_id), isNull(intents.cancel_requested_at)));
+    return result;
+  });
+}
+
+/** Shares the actor/workspace transaction with submitted-request cancellation. */
+export async function cancelVoiceAudioConnectionInTransaction(tx: CreditTransaction, row: VoiceAudioConnection) {
+  let connection = row;
+  if (!row.terminal_at) {
     if (promotionIsUnfinished(row)) return voiceAudioRefusal("handoff_in_progress");
     if (row.state === "active" && (row.target_kind !== "idle" ||
       await hasActiveVoiceAudioCustomer(createTenantDb(row.workspace, tx), row.conference_id))) return voiceAudioRefusal("active_customer_audio");
-    if (row.cancel_requested_at) return { ok: true as const, connection: row };
-    const [saved] = await tx.update(connections).set({ cancel_requested_at: new Date(),
-      state: row.send_started_at ? row.state : "canceled", lease_expires_at: new Date(), updated_at: new Date(),
-    }).where(eq(connections.id, row.id)).returning();
-    if (!saved) throw new Error("Agent audio cancellation was not saved");
-    return { ok: true as const, connection: saved };
-  });
+    if (!row.cancel_requested_at) {
+      const [saved] = await tx.update(connections).set({ cancel_requested_at: new Date(),
+        state: row.send_started_at ? row.state : "canceled", lease_expires_at: new Date(), updated_at: new Date(),
+      }).where(eq(connections.id, row.id)).returning();
+      if (!saved) throw new Error("Agent audio cancellation was not saved");
+      connection = saved;
+    }
+  }
+  return { ok: true as const, connection };
 }
 
 export async function claimVoiceAudioRecovery(limit = 10) {

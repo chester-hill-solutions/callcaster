@@ -6,16 +6,19 @@ import { env } from "@/lib/env.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { connectPhoneDeviceBodySchema } from "@/lib/schemas/api/common";
 import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
-import { parseVoiceAudioQuery, sendVoiceAudioApiResponse, voiceAudioFailureResponse, voiceAudioSnapshot } from "@/lib/voice-audio-api.server";
+import { parseVoiceAudioQuery, sendVoiceAudioApiResponse, voiceAudioFailureResponse, voiceAudioSnapshot, voiceAudioIntentSnapshot, voiceAudioActorConflict } from "@/lib/voice-audio-api.server";
 import { prepareVoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { cancelOwnedVoiceAudioConnection } from "@/server/voice-audio-lifecycle.server";
 import { attemptVoiceAudioCancellation } from "@/lib/voice-audio-recovery.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { controlOwnedVoiceAudioIntent } from "@/server/voice-audio-intent-control.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
     const auth = await requireJsonAuth(request);
     if (auth instanceof Response) return auth;
+    const conflict = voiceAudioActorConflict(request, auth.user.id);
+    if (conflict) return conflict;
     const headers = auth.authType === "session" ? (await getSession(request)).headers : undefined;
     return { ...auth, headers };
   },
@@ -25,8 +28,16 @@ export const action = defineAction({
     if (request.method === "DELETE") {
       const query = parseVoiceAudioQuery(request);
       if (!query) return Response.json({ error: "Invalid audio connection query" }, { status: 400, headers });
+      const limited = await apiWriteRateLimitResponse(auth, "api-voice", headers);
+      if (limited) return limited;
       await requireWorkspaceAccess({ user: auth.user, workspaceId: query.workspaceId });
-      const result = await cancelOwnedVoiceAudioConnection({ workspaceId: query.workspaceId, userId: auth.user.id, connectionId: query.connection_id });
+      if ("connection_intent_id" in query) {
+        const result = await controlOwnedVoiceAudioIntent({ workspaceId: query.workspaceId, userId: auth.user.id, intentId: query.connection_intent_id }, true);
+        if (!result.ok) return voiceAudioFailureResponse(result.reason, headers);
+        const connection = result.connection ? await attemptVoiceAudioCancellation(result.connection) : null;
+        return Response.json(voiceAudioIntentSnapshot({ ...result, connection }), { headers });
+      }
+      const result = await cancelOwnedVoiceAudioConnection({ workspaceId: query.workspaceId, userId: auth.user.id, connectionId: query.connection_id, controlIntentId: query.control_intent_id });
       if (!result.ok) return voiceAudioFailureResponse(result.reason, headers);
       return Response.json(voiceAudioSnapshot(await attemptVoiceAudioCancellation(result.connection)), { headers });
     }

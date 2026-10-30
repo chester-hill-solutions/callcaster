@@ -88,6 +88,11 @@ When a service gains a scoped tenant-client read, update its orchestration
 fixtures at that boundary. Prove cross-workspace denials against the real
 database; a permissive query mock is not authorization evidence.
 
+For a new tenant table, export its schema, register it in
+`workspace-scoped-tables.ts`, and update the explicit table inventory in
+`test/tenant-db.test.ts`. Keep actor isolation in the real-database tests;
+registry completeness alone does not prove row ownership.
+
 The route-membership guard follows local imports one hop. Keep the canonical
 workspace check visible at the HTTP boundary when transaction services place
 their membership recheck deeper. Preserve the locked service check as well;
