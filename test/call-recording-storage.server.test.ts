@@ -294,4 +294,56 @@ describe("call-recording-storage.server", () => {
     });
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
+
+  const partWorkspace = "11111111-1111-4111-8111-111111111111", partCall = `CA${"a".repeat(32)}`;
+  const partAccount = `AC${"c".repeat(32)}`, firstRecording = `RE${"1".repeat(32)}`, secondRecording = `RE${"2".repeat(32)}`;
+  const partArgs = (recordingSid = firstRecording) => ({ workspaceId: partWorkspace, callSid: partCall, accountSid: partAccount,
+    recordingSid, storageMode: "recording" as const });
+  const partDeps = () => ({ fetch: mocks.fetch, uploadObject: mocks.uploadObject,
+    loadCredentials: async () => ({ sid: partAccount, authToken: "owned-part-token" }), maxAttempts: 1, baseDelayMs: 0 });
+
+  test.each([false, true])("distinct recording parts retain both original byte streams, prior URL=%s", async (priorUrl) => {
+    const { persistCallRecordingToStorage } = await import("@/lib/call-recording-storage.server");
+    const objects = new Map<string, Buffer>();
+    const upload: typeof import("@/lib/object-storage.server").uploadObject = async (_bucket, key, bytes) => {
+      if (!Buffer.isBuffer(bytes)) throw new Error("Recording bytes required");
+      objects.set(key, Buffer.from(bytes));
+    };
+    mocks.fetch.mockResolvedValueOnce(new Response(Buffer.from("before-handoff")))
+      .mockResolvedValueOnce(new Response(Buffer.from("after-handoff")));
+    const deps = { ...partDeps(), uploadObject: upload };
+    const first = await persistCallRecordingToStorage(partArgs(), deps);
+    const second = await persistCallRecordingToStorage({ ...partArgs(secondRecording), existingAudioUrl: priorUrl ? first.audioUrl : undefined }, deps);
+    expect(second.audioUrl).not.toBe(first.audioUrl); expect(objects.size).toBe(2);
+    expect(objects.get(first.audioUrl)?.toString()).toBe("before-handoff");
+    expect(objects.get(second.audioUrl)?.toString()).toBe("after-handoff");
+    expect(mocks.fetch).toHaveBeenCalledTimes(2);
+  });
+  test("an exact stored recording part replays without another download or upload", async () => {
+    const { persistCallRecordingToStorage } = await import("@/lib/call-recording-storage.server");
+    const path = `call-recordings/${partWorkspace}/recording-${partCall}-${firstRecording}.mp3`;
+    expect(await persistCallRecordingToStorage({ ...partArgs(), existingAudioUrl: ` ${path} ` }, partDeps()))
+      .toEqual({ ok: true, skipped: true, reason: "already_persisted", audioUrl: path });
+    expect(mocks.fetch).not.toHaveBeenCalled(); expect(mocks.uploadObject).not.toHaveBeenCalled();
+  });
+  test.each(["another-recording", "another-workspace"])("a URL for %s cannot suppress a new recording part", async (kind) => {
+    const { persistCallRecordingToStorage } = await import("@/lib/call-recording-storage.server");
+    const previous = kind === "another-recording" ? `call-recordings/${partWorkspace}/recording-${partCall}-${firstRecording}.mp3`
+      : `call-recordings/22222222-2222-4222-8222-222222222222/recording-${partCall}-${secondRecording}.mp3`;
+    const expected = `call-recordings/${partWorkspace}/recording-${partCall}-${secondRecording}.mp3`;
+    expect(await persistCallRecordingToStorage({ ...partArgs(secondRecording), existingAudioUrl: previous }, partDeps()))
+      .toEqual({ ok: true, skipped: false, audioUrl: expected });
+    expect(mocks.fetch).toHaveBeenCalledOnce(); expect(mocks.uploadObject).toHaveBeenCalledOnce();
+  });
+  test("recording parts refuse changed account credentials before download", async () => {
+    const { persistCallRecordingToStorage } = await import("@/lib/call-recording-storage.server");
+    await expect(persistCallRecordingToStorage(partArgs(), { ...partDeps(),
+      loadCredentials: async () => ({ sid: `AC${"f".repeat(32)}`, authToken: "foreign-token" }) })).rejects.toThrow(/account/i);
+    expect(mocks.fetch).not.toHaveBeenCalled(); expect(mocks.uploadObject).not.toHaveBeenCalled();
+  });
+  test.each(["workspaceId", "callSid", "recordingSid", "accountSid"] as const)("recording parts reject an invalid %s before I/O", async (field) => {
+    const { persistCallRecordingToStorage } = await import("@/lib/call-recording-storage.server");
+    await expect(persistCallRecordingToStorage({ ...partArgs(), [field]: "../foreign-resource" }, partDeps())).rejects.toThrow();
+    expect(mocks.fetch).not.toHaveBeenCalled(); expect(mocks.uploadObject).not.toHaveBeenCalled();
+  });
 });
