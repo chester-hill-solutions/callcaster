@@ -54,6 +54,15 @@ checkpoint because the agent can answer after the admission window closes.
 An already-confirmed phone needs no new agent setup. Explicit Start and each
 successor recheck its source through the existing customer funding/send owner.
 
+Predictive customer events must retain the actual customer SID, actor, workspace,
+campaign, outreach and room. Use the signed conference SequenceNumber for joins
+and leaves; keep it separate from call-progress ordering. Ignore foreign owners
+and older conference events before changing the current customer. A background
+candidate cannot replace or end the joined human. A late join must check both
+the funded terminal status and the Call terminal status before queue writes.
+Customer leave can end the conversation display while the reusable phone stays
+connected; it cannot settle a debit or set a final duration.
+
 Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
 
 ## Client Start ownership

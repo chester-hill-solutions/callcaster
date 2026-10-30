@@ -30,7 +30,8 @@ test("the room end event clears only the matching conference, including an agent
     if (!listener) throw new Error("SSE listener was not registered");
     act(() => listener?.(new MessageEvent("workspace_event", { data: JSON.stringify({
       id: 1, workspace_id: "w1", event_type: "predictive_broadcast",
-      payload, created_at: "2026-10-02T00:00:00.000Z",
+      payload: { call_sid: "CA11111111111111111111111111111111", user_id: "u1", campaign_id: 42,
+        outreach_attempt_id: 17, conference_id: "u1~active", ...payload }, created_at: "2026-10-02T00:00:00.000Z",
     }) })));
   };
 
@@ -57,7 +58,7 @@ test("the room end event clears only the matching conference, including an agent
   emit({ contact_id: null, status: "completed", conference_ended: true, conference_id: "u1~active" });
   expect(send).toHaveBeenCalledWith({ type: "HANG_UP" });
   expect(result.current.conference).toBeNull();
-  expect(result.current.predictiveState.status).toBe("completed");
+  expect(result.current.predictiveState.status).toBe("idle");
 
   act(() => result.current.setConference("u1~next"));
   emit({ contact_id: 8, status: "in-progress", conference_id: "u1~next" });

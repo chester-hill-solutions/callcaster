@@ -143,6 +143,7 @@ describe("webhook side-effect handlers", () => {
       status: "completed",
       duration: "61",
       outreach_attempt_id: 10,
+      user_id: "u1", campaign_id: 42, contact_id: 123, conference_id: "u1~owned-room",
     });
     mocks.billTerminalCallStatus.mockResolvedValue({ inserted: true });
     // Batch transcription is default-off; individual tests opt in.
@@ -195,6 +196,18 @@ describe("webhook side-effect handlers", () => {
       10,
       expect.objectContaining({ disposition: "completed", ended_at: expect.any(String) }),
     );
+  });
+
+  test("customer broadcasts identify the actual root, actor, campaign, outreach and room", async () => {
+    const root = "CA11111111111111111111111111111111";
+    mocks.findCallBySid.mockResolvedValue({ sid: root, workspace: "w1", user_id: "u1", campaign_id: 42,
+      contact_id: 123, outreach_attempt_id: 10, conference_id: "u1~owned-room", status: "ringing", duration: "0" });
+    const { runCallStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runCallStatusSideEffects({ callSid: root, event: parseTwilioVoiceCallback({ CallSid: root, CallStatus: "ringing" }) });
+    expect(mocks.emitPredictiveBroadcast).toHaveBeenCalledWith("w1", expect.objectContaining({
+      call_sid: root, user_id: "u1", campaign_id: 42, outreach_attempt_id: 10,
+      contact_id: 123, conference_id: "u1~owned-room", status: "ringing",
+    }));
   });
 
   test.each([

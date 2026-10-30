@@ -34,6 +34,7 @@ import {
 import { requireTwilioSignature, resolveCanonicalTwilioWebhookUrl, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
+import { predictiveCustomerBroadcast } from "@/lib/predictive-customer-broadcast.server";
 import { bindVerifiedVoiceReservationRequest } from "@/lib/voice-reservation-webhook.server";
 import { enqueueCallStatusSideEffects } from "@/lib/worker/enqueue-call-status.server";
 import { runCallStatusSideEffects } from "@/lib/worker/webhook-side-effects.server";
@@ -288,11 +289,8 @@ export const action = defineAction({
     // so agents see dialing/connected/outcome even if that handling errors.
     // Best-effort by design: emitPredictiveBroadcast never throws.
     if (dbCall.contact_id && callStatusValue) {
-      await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), {
-        contact_id: dbCall.contact_id,
-        status: callStatusValue.toLowerCase(),
-        ...(dbCall.conference_id ? { conference_id: dbCall.conference_id } : {}),
-      });
+      const broadcast = predictiveCustomerBroadcast(dbCall, callStatusValue.toLowerCase());
+      if (broadcast) await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), broadcast);
     }
     switch (callStatusValue) {
       case "failed":

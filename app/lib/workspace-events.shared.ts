@@ -6,7 +6,27 @@ export type PredictiveBroadcastPayload = {
   status: string;
   conference_id?: string;
   conference_ended?: boolean;
+  call_sid?: string;
+  user_id?: string;
+  campaign_id?: number;
+  outreach_attempt_id?: number;
+  conference_sid?: string;
+  conference_sequence?: number;
+  customer_event?: "joined" | "left";
 };
+
+export const PredictiveCustomerBroadcast = z.object({
+  contact_id: z.number().int().positive(), status: z.string().min(1),
+  call_sid: z.string().regex(/^CA[0-9a-f]{32}$/i), user_id: z.string().min(1),
+  campaign_id: z.number().int().positive(), outreach_attempt_id: z.number().int().positive(),
+  conference_id: z.string().min(1), conference_sid: z.string().regex(/^CF[0-9a-f]{32}$/i).optional(),
+  conference_sequence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  customer_event: z.enum(["joined", "left"]).optional(),
+}).superRefine((value, context) => {
+  if (value.customer_event && (!value.conference_sid || value.conference_sequence === undefined)) {
+    context.addIssue({ code: "custom", message: "Customer participation requires its conference and sequence" });
+  }
+});
 
 export type PostgresChangePayload = {
   eventType: "INSERT" | "UPDATE" | "DELETE" | string;

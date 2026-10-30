@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { logger } from "@/lib/logger.client";
-import { toDialerStatus } from "@/lib/call-status";
 import { parseWorkspaceEventData, type PredictiveBroadcastPayload } from "@/lib/workspace-events.shared";
 import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
+import { acceptPredictiveRoomEvent, currentPredictiveRoom, initialPredictiveRoom } from "@/lib/predictive-customer-state";
 
 const PRESENCE_UPDATE_INTERVAL = 5 * 60 * 1000;
 
@@ -22,6 +22,7 @@ interface UseCallRoomReturn {
   status: "offline" | "online" | "error";
   users: PresenceUser[];
   predictiveState: PredictiveBroadcastPayload;
+  customerCallSid: string | null;
 }
 
 /** Campaign room: predictive broadcasts and presence sync via workspace SSE. */
@@ -33,10 +34,9 @@ const useCallRoom = ({
 }: UseCallRoomParams): UseCallRoomReturn => {
   const [status, setStatus] = useState<"offline" | "online" | "error">("offline");
   const [users, setUsers] = useState<PresenceUser[]>([]);
-  const [predictiveState, setPredictiveState] = useState<PredictiveBroadcastPayload>({
-    contact_id: null,
-    status: "idle",
-  });
+  const owner = { workspace, campaign, userId, conference };
+  const [snapshot, setSnapshot] = useState(() => initialPredictiveRoom(owner));
+  const current = currentPredictiveRoom(snapshot, owner);
   const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusRef = useRef<"offline" | "online" | "error">("offline");
   const conferenceRef = useRef(conference);
@@ -98,23 +98,16 @@ const useCallRoom = ({
     if (!userId || !workspace) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspace)}/events`;
+    let active = true;
 
     const onWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
+        if (!active) return;
         const record = parseWorkspaceEventData(message.data);
+        if (record.workspace_id !== workspace) return;
         if (record.event_type === "predictive_broadcast") {
-          const payload = record.payload;
-          const targetConference = typeof payload.conference_id === "string"
-            ? payload.conference_id : undefined;
-          if (targetConference && targetConference !== conferenceRef.current) return;
-          // Broadcasts carry raw Twilio statuses (see runCallStatusSideEffects);
-          // translate them to the dialer vocabulary the consumers switch on.
-          setPredictiveState({
-            contact_id: typeof payload.contact_id === "number" ? payload.contact_id : null,
-            status: toDialerStatus(String(payload.status ?? "")),
-            ...(targetConference ? { conference_id: targetConference } : {}),
-            ...(payload.conference_ended === true ? { conference_ended: true } : {}),
-          });
+          setSnapshot(previous => acceptPredictiveRoomEvent(previous,
+            { workspace, campaign, userId, conference: conferenceRef.current }, record));
           return;
         }
         if (record.event_type === "presence_sync") {
@@ -137,6 +130,7 @@ const useCallRoom = ({
     }, PRESENCE_UPDATE_INTERVAL);
 
     return () => {
+      active = false;
       unsubscribe();
       if (presenceIntervalRef.current) {
         clearInterval(presenceIntervalRef.current);
@@ -148,7 +142,7 @@ const useCallRoom = ({
     };
   }, [campaign, updatePresence, userId, workspace]);
 
-  return { status, users, predictiveState };
+  return { status, users, predictiveState: current.payload, customerCallSid: current.customerCallSid };
 };
 
 export default useCallRoom;
