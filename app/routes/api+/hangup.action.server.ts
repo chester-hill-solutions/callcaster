@@ -15,6 +15,7 @@ import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
+import { createOriginalVoiceAccountClient } from "@/lib/voice-original-account.server";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
@@ -38,7 +39,8 @@ export const action = defineAction({
 
         const tdb = createTenantDb(workspaceId);
         const reservation = await findVoiceReservationForCall(workspaceId, callSid);
-        const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
+        const twilio = reservation ? await createOriginalVoiceAccountClient(reservation)
+            : await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
             await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {

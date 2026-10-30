@@ -155,6 +155,10 @@ legs. `user_id` must identify the signed-in user. A phone device must be
 verified for that user; queue, contact, campaign and optional outreach IDs
 must belong to the same workspace and contact context.
 
+Hangup for a funded call requires the reservation's original provider account.
+A replacement account is refused before a provider command, queue change or
+disposition update. The saved customer and funding remain available for recovery.
+
 `dial_intent_id` is an optional UUID. Retain it for transport retries; use a
 new UUID for each new Dial or Redial action. The call screen supplies it.
 Requests without it retain the legacy meaning of a new action, but an active

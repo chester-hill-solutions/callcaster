@@ -15,12 +15,12 @@ type StartConferenceOptions = {
 
 type StartSnapshot = {
   scope: string; conference: string | null; customerCallSid: string | null;
-  creditsError: boolean; error: string | null; isLoading: boolean; awaitingReceipt: boolean;
+  creditsError: boolean; error: string | null; isLoading: boolean; awaitingReceipt: boolean; pendingStartIntentId: string | null;
 };
-type StartIntent = { context: string; request: StartConferenceParams; uncertain: boolean };
+type StartIntent = { context: string; request: StartConferenceParams & { dial_intent_id: string }; uncertain: boolean };
 type StartOwner = { scope: string; active: boolean; pending: symbol | null; intent: StartIntent | null };
 function initialStart(scope: string): StartSnapshot {
-  return { scope, conference: null, customerCallSid: null, creditsError: false, error: null, isLoading: false, awaitingReceipt: false };
+  return { scope, conference: null, customerCallSid: null, creditsError: false, error: null, isLoading: false, awaitingReceipt: false, pendingStartIntentId: null };
 }
 
 function startIntent(owner: StartOwner, request: Omit<StartConferenceParams, "dial_intent_id">) {
@@ -77,10 +77,17 @@ export function useStartConferenceAndDial({
     if (!owner?.active || owner.scope !== scope) return;
     setSnapshot(previous => {
       const saved = previous.scope === scope ? previous : initialStart(scope);
-      return { ...saved, conference, customerCallSid: conference === saved.conference ? saved.customerCallSid : null,
-        ...(conference === null ? { isLoading: false, awaitingReceipt: false } : {}) };
+      return { ...saved, conference, customerCallSid: conference === saved.conference ? saved.customerCallSid : null };
     });
-    if (conference === null) { owner.pending = null; owner.intent = null; }
+  }, [scope]);
+
+  const confirmStartStopped = useCallback((intentId: string) => {
+    const owner = ownerRef.current;
+    if (!owner?.active || owner.scope !== scope || owner.intent?.request.dial_intent_id !== intentId) return false;
+    owner.pending = null; owner.intent = null;
+    setSnapshot(previous => ({ ...(previous.scope === scope ? previous : initialStart(scope)),
+      isLoading: false, awaitingReceipt: false, pendingStartIntentId: null }));
+    return true;
   }, [scope]);
 
   const begin = useCallback(async () => {
@@ -95,7 +102,8 @@ export function useStartConferenceAndDial({
     };
     const fail = (message: string, creditFailure = false) => {
       if (!isCurrent()) return;
-      publish({ error: message, creditsError: creditFailure, awaitingReceipt: owner.intent?.uncertain ?? false });
+      publish({ error: message, creditsError: creditFailure, awaitingReceipt: owner.intent?.uncertain ?? false,
+        pendingStartIntentId: owner.intent?.uncertain ? owner.intent.request.dial_intent_id : null });
       showError?.(message, creditFailure);
     };
     if (disabledReason && !owner.intent?.uncertain) {
@@ -107,7 +115,7 @@ export function useStartConferenceAndDial({
     const intent = startIntent(owner, { caller_id: callerId, workspace_id: workspaceId,
       campaign_id: campaignId, selected_device: selectedDevice, ...(audioSource ? { audioSource } : {}) });
     intent.uncertain = true;
-    publish({ isLoading: true, error: null, creditsError: false });
+    publish({ isLoading: true, error: null, creditsError: false, pendingStartIntentId: intent.request.dial_intent_id });
     try {
       const result = await startConferenceAndDial(intent.request);
       if (!isCurrent()) { await endRetiredStart(result, workspaceId); return; }
@@ -115,7 +123,7 @@ export function useStartConferenceAndDial({
         intent.uncertain = false;
         fail("Insufficient credits to start dialing", true);
       } else if (result.success && result.conferenceName) {
-        publish({ conference: result.conferenceName, customerCallSid: result.callSid ?? null, awaitingReceipt: false });
+        publish({ conference: result.conferenceName, customerCallSid: result.callSid ?? null, awaitingReceipt: false, pendingStartIntentId: null });
         owner.intent = null;
       } else {
         fail(result.error || "Could not start dialing. Try again.");
@@ -130,7 +138,7 @@ export function useStartConferenceAndDial({
     }
   }, [scope, campaignId, workspaceId, callerId, selectedDevice, audioSource, disabledReason, showError]);
 
-  return { begin, conference: current.conference, customerCallSid: current.customerCallSid, setConference,
+  return { begin, conference: current.conference, customerCallSid: current.customerCallSid, setConference, confirmStartStopped,
     creditsError: current.creditsError, error: current.error, isLoading: current.isLoading,
-    awaitingReceipt: current.awaitingReceipt, disabledReason };
+    awaitingReceipt: current.awaitingReceipt, pendingStartIntentId: current.pendingStartIntentId, disabledReason };
 }

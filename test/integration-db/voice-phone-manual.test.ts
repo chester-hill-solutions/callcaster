@@ -32,6 +32,12 @@ async function start(payload: Record<string, unknown>) {
     headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }))));
 }
 
+async function hangupCustomer(callSid: string) {
+  const { action } = await import("../../app/routes/api+/hangup.action.server");
+  return asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/hangup`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, callSid }) }))));
+}
+
 async function customerVoice(url: string, callSid: string, overrides: Record<string, string> = {}, valid = true, signingToken = "owned-audio-token") {
   const { action } = await import("../../app/routes/api+/dial/$number.action.server");
   const params = { AccountSid: accountSid, CallSid: callSid, To: customer, From: callerId,
@@ -213,11 +219,39 @@ describe("manual Start reuses confirmed phone audio", () => {
       const physical = web.records.get(id); if (!physical) throw new Error("Owned customer required");
       physical.status = "completed"; physical.duration = "42"; return physical;
     });
-    const { action } = await import("../../app/routes/api+/hangup.action.server");
-    const result = await asRouteResponse(action(routeArgs(new Request(`${baseUrl}/api/hangup`, { method: "POST",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, callSid }) }))));
+    const result = await hangupCustomer(callSid);
     expect(result.status).toBe(200); expect(await result.json()).toMatchObject({ success: true });
     expect(web.update).toHaveBeenCalledTimes(1); expect(rooms.update).not.toHaveBeenCalled();
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.state).toBe("active");
+  });
+
+  test("funded customer hangup refuses a replacement account before provider or queue changes", async () => {
+    const f = await scenario(), response = await start(f.payload); expect(response.status).toBe(200);
+    const { callSid } = await response.json(), before = await state();
+    const [attempt] = await sql`select disposition from public.outreach_attempt where workspace = ${workspaceId}::uuid`;
+    const [reservation] = await sql`select state, account_sid, provider_sid, credits from public.workspace_voice_reservation where provider_sid = ${callSid}`;
+    web.accountSid = `AC${"8".repeat(32)}`;
+    await sql`update public.workspace set twilio_data = ${sql.json({ sid: web.accountSid, authToken: "replacement-token" })} where id = ${workspaceId}::uuid`;
+    const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server"); invalidateWorkspaceTwilioData(workspaceId);
+    web.update.mockClear();
+    const result = await hangupCustomer(callSid);
+    expect(result.status).toBe(500);
+    expect(web.update).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled();
+    expect(await state()).toEqual(before);
+    expect(await sql`select state, account_sid, provider_sid, credits from public.workspace_voice_reservation where provider_sid = ${callSid}`).toEqual([reservation]);
+    expect(await sql`select disposition from public.outreach_attempt where workspace = ${workspaceId}::uuid`).toEqual([attempt]);
+    const [queue] = await sql`select dequeued_at from public.campaign_queue where id = ${f.queueId}`;
+    expect(queue.dequeued_at).toBeNull();
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.state).toBe("active");
+    web.accountSid = accountSid;
+    await sql`update public.workspace set twilio_data = ${sql.json({ sid: accountSid, authToken: "owned-audio-token" })} where id = ${workspaceId}::uuid`;
+    invalidateWorkspaceTwilioData(workspaceId);
+    web.update.mockImplementationOnce(async (id: string, args: { twiml: string }) => {
+      expect(id).toBe(callSid); expect(args.twiml).toContain("<Hangup"); return { sid: id };
+    });
+    expect((await hangupCustomer(callSid)).status).toBe(200);
+    expect(web.update).toHaveBeenCalledTimes(1); expect(web.create).toHaveBeenCalledTimes(1);
+    expect(rooms.update).not.toHaveBeenCalled();
     expect((await journal.findVoiceAudioConnection(f.row.id))?.state).toBe("active");
   });
 
