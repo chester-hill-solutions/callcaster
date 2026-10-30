@@ -130,6 +130,11 @@ parent Call ends. Own the replacement capture before that transition. Retain
 each RecordingSid under a distinct storage key and logical-call link; an older
 call-level audio URL does not prove a later recording part was copied.
 
+Bind an operation callback to its saved account SID as well as its raw signature.
+A replacement workspace account token cannot own an older operation. In this
+repository, pass `expectedAccountSid` to `requireTwilioSignature` and use the
+shared strict form reader before normalizing aliases.
+
 Use explicit RecordingSids when a call has multiple or concurrent recordings;
 `Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
 selecting a create API: its Call Recordings helper supports `create`, while its

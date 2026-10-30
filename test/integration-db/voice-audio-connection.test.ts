@@ -94,6 +94,8 @@ describe("owned agent audio connection journal (#2879)", () => {
     await sql`delete from public.handset_session where workspace_id = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100, disabled = false, archived_at = null,
       twilio_data = ${sql.json({ sid: accountSid, authToken: "owned-audio-token" })} where id = ${workspaceId}::uuid`;
+    const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
+    invalidateWorkspaceTwilioData(workspaceId);
     await sql`update public."user" set access_level = 'standard', verified_audio_numbers = ${sql.array([phone, otherPhone])}
       where id = ${actor}::uuid`;
     await sql`update public.workspace_number set phone_number = ${callerId}, suspended_at = null, handset_enabled = true where workspace = ${workspaceId}::uuid`;
@@ -190,11 +192,12 @@ describe("owned agent audio connection journal (#2879)", () => {
     if (method === "GET") { const { loader } = await import("../../app/routes/api+/connect-phone-device.loader.server"); return asRouteResponse(loader(routeArgs(request))); }
     const { action } = await import("../../app/routes/api+/connect-phone-device.action.server"); return asRouteResponse(action(routeArgs(request)));
   }
-  async function signedAudio(url: string, params: Record<string, string>, validSignature = true, extraFields: [string, string][] = []) {
+  async function signedAudio(url: string, params: Record<string, string>, validSignature = true,
+    options: { extraFields?: [string, string][]; signingToken?: string } = {}) {
     const { action } = await import("../../app/routes/api+/voice-audio.action.server");
-    const body = new URLSearchParams([...Object.entries(params), ...extraFields]);
+    const body = new URLSearchParams([...Object.entries(params), ...(options.extraFields ?? [])]);
     return asRouteResponse(action(routeArgs(new Request(url, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
-      "X-Twilio-Signature": validSignature ? twilio.getExpectedTwilioSignature("owned-audio-token", url, params) : "invalid" }, body }))));
+      "X-Twilio-Signature": validSignature ? twilio.getExpectedTwilioSignature(options.signingToken ?? "owned-audio-token", url, params) : "invalid" }, body }))));
   }
   async function signedPredictive(url: string, params: Record<string, string>) {
     const { action } = await import("../../app/routes/api+/auto-dial/status.action.server");
@@ -220,10 +223,11 @@ describe("owned agent audio connection journal (#2879)", () => {
       From: rest ? callerId : `client:${actor}`, To: rest ? phone : customer, Direction: rest ? "outbound-api" : "inbound" };
     return { target, row: ready, url, params };
   }
-  async function signedParent(url: string, params: Record<string, string>, valid = true, extras: [string, string][] = [], method = "POST") {
+  async function signedParent(url: string, params: Record<string, string>, valid = true, extras: [string, string][] = [],
+    options: { method?: string; signingToken?: string } = {}) {
     const { action } = await import("../../app/routes/api+/voice-continuation.action.server");
-    return asRouteResponse(action(routeArgs(new Request(url, { method, headers: { "Content-Type": "application/x-www-form-urlencoded",
-      "X-Twilio-Signature": valid ? twilio.getExpectedTwilioSignature("owned-audio-token", url, params) : "invalid" },
+    return asRouteResponse(action(routeArgs(new Request(url, { method: options.method ?? "POST", headers: { "Content-Type": "application/x-www-form-urlencoded",
+      "X-Twilio-Signature": valid ? twilio.getExpectedTwilioSignature(options.signingToken ?? "owned-audio-token", url, params) : "invalid" },
       body: new URLSearchParams([...Object.entries(params), ...extras]),
     }))));
   }
@@ -255,7 +259,7 @@ describe("owned agent audio connection journal (#2879)", () => {
   });
   test.each(["DELETE", "PUT", "PATCH"])("parent continuation rejects signed %s without processing the call", async (method) => {
     const f = await parentContinuationFixture(), before = await state();
-    const response = await signedParent(f.url, f.params, true, [], method);
+    const response = await signedParent(f.url, f.params, true, [], { method });
     expect(response.status).toBe(405); expect(response.headers.get("Allow")).toBe("POST");
     expect(web.fetch).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
   });
@@ -746,6 +750,17 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect(confirmed.status).toBe(200); expect(xml).toContain(`>${row.conference_id}</Conference>`); expect(xml).not.toContain("<Number");
     expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ provider_sid: params.CallSid, state: "joining", committed_at: null });
   });
+  test("a replacement account token cannot report an old audio leg's completion", async () => {
+    const row = await claim(await prepare()), params = voiceParams(row);
+    expect((await signedAudio(row.status_callback, params)).status).toBe(204);
+    const prior = await journal.findVoiceAudioConnection(row.id);
+    await sql`update public.workspace set twilio_data = ${sql.json({ sid: `AC${"6".repeat(32)}`, authToken: "replacement-token" })}
+      where id = ${workspaceId}::uuid`;
+    const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
+    invalidateWorkspaceTwilioData(workspaceId);
+    expect((await signedAudio(row.status_callback, { ...params, CallStatus: "completed" }, true, { signingToken: "replacement-token" })).status).toBe(403);
+    expect(await journal.findVoiceAudioConnection(row.id)).toEqual(prior);
+  });
   test.each(["signature", "account", "destination", "sender", "direction", "parent", "callback", "alias", "duplicate"])(
     "the signed endpoint rejects changed %s before issuing audio", async (field) => {
       const row = await claim(await prepare()), params: Record<string, string> = voiceParams(row);
@@ -756,7 +771,7 @@ describe("owned agent audio connection journal (#2879)", () => {
       if (field === "parent") params.ParentCallSid = sid();
       if (field === "alias") params.call_sid = sid();
       const url = field === "callback" ? row.voice_url + "&extra=1" : row.voice_url;
-      const response = await signedAudio(url, params, field !== "signature", field === "duplicate" ? [["To", otherPhone]] : []);
+      const response = await signedAudio(url, params, field !== "signature", { extraFields: field === "duplicate" ? [["To", otherPhone]] : [] });
       expect(response.status).toBe(403);
       expect(await journal.findVoiceAudioConnection(row.id)).toMatchObject({ provider_sid: null, voice_issued_at: null, committed_at: null });
     },
@@ -875,6 +890,16 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect((await signedAudio(row.conference_callback, params)).status).toBe(500);
     expect((await signedAudio(row.conference_callback, params)).status).toBe(204);
     expect(rooms.records.get(event.conferenceSid)?.status).toBe("completed");
+  });
+  test("a replacement account token cannot resume an old manual parent", async () => {
+    const f = await parentContinuationFixture();
+    expect((await signedParent(f.url, f.params)).status).toBe(200);
+    await sql`update public.workspace set twilio_data = ${sql.json({ sid: `AC${"7".repeat(32)}`, authToken: "replacement-token" })}
+      where id = ${workspaceId}::uuid`;
+    const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
+    invalidateWorkspaceTwilioData(workspaceId);
+    expect((await signedParent(f.url, f.params, true, [], { signingToken: "replacement-token" })).status).toBe(403);
+    expect(web.update).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled();
   });
   test.each([false, true])("signed parent continuation preserves the existing customer and original audio, REST=%s", async (rest) => {
     const f = await parentContinuationFixture(rest), before = await state();

@@ -507,6 +507,10 @@ A fixture or constraint error before the target assertion is not defect proof.
 Assert PostgreSQL constraint codes at the actual driver boundary: raw
 postgres.js errors expose `code`, while Drizzle query errors expose
 `cause.code`. Require the owned row to remain unchanged after rejection.
+After direct fixture SQL changes `workspace.twilio_data`, call
+`invalidateWorkspaceTwilioData` before callback checks. Keep a valid callback
+for the replacement account as a control. A stale cached token can otherwise
+make a missing original-account guard appear to work.
 For funding and queue metadata updates that preserve referenced keys, use
 `FOR NO KEY UPDATE` to serialize writers while permitting foreign-key checks.
 Prove that a real call insert can reference the locked workspace and queue,

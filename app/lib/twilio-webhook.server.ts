@@ -42,6 +42,7 @@ export type TwilioWebhookAuthFailureReason =
   | "missing_signature"
   | "missing_credentials"
   | "invalid_signature"
+  | "account_mismatch"
   | "resolver_error";
 
 function logWebhookAuthFailure(
@@ -161,6 +162,18 @@ async function parseTwilioWebhookParams(request: Request): Promise<Record<string
   return Object.fromEntries(formData.entries()) as Record<string, string>;
 }
 
+/** Keep raw form keys for signing; reject files and ambiguous duplicate fields. */
+export async function readTwilioWebhookStringParams(request: Request): Promise<Record<string, string> | null> {
+  let form: FormData;
+  try { form = await request.clone().formData(); } catch { return null; }
+  const params: Record<string, string> = {};
+  for (const [key, value] of form) {
+    if (typeof value !== "string" || form.getAll(key).length !== 1) return null;
+    params[key] = value;
+  }
+  return params;
+}
+
 /**
  * Route-level Twilio webhook signature check.
  *
@@ -190,6 +203,8 @@ export async function requireTwilioSignature(
     messageSid?: string;
     phoneNumber?: string;
     workspaceId?: string;
+    /** An operation keeps its original account after workspace credentials change. */
+    expectedAccountSid?: string;
     /**
      * Pre-parsed webhook params, when the caller already read and parsed
      * the raw body (e.g. server/twilio-webhook.ts, which parses it once for
@@ -248,20 +263,20 @@ export async function requireTwilioSignature(
     }
   }
 
+  if (options?.expectedAccountSid && readTwilioWorkspaceCredentials(twilioData)?.sid !== options.expectedAccountSid) {
+    logWebhookAuthFailure("account_mismatch", { url: diagnosticUrl, workspaceId: options.workspaceId ?? null });
+    return twilioWebhookForbiddenHangup();
+  }
+
   const authToken = attemptedWorkspace
     ? resolveWorkspaceWebhookAuthToken(twilioData)
     : env.TWILIO_AUTH_TOKEN();
+  const diagnosticContext = { url: diagnosticUrl, callSid: options?.callSid ?? null,
+    messageSid: options?.messageSid ?? null, phoneNumber: options?.phoneNumber ?? null,
+    workspaceId: options?.workspaceId ?? null, accountSid: accountSidFromParams(params) || null };
 
   if (!authToken) {
-    logWebhookAuthFailure("missing_credentials", {
-      url: diagnosticUrl,
-      callSid: options?.callSid ?? null,
-      messageSid: options?.messageSid ?? null,
-      phoneNumber: options?.phoneNumber ?? null,
-      workspaceId: options?.workspaceId ?? null,
-      accountSid: accountSidFromParams(params) || null,
-      attemptedWorkspace,
-    });
+    logWebhookAuthFailure("missing_credentials", { ...diagnosticContext, attemptedWorkspace });
     return twilioWebhookForbiddenHangup();
   }
 
@@ -269,14 +284,7 @@ export async function requireTwilioSignature(
   // GET query fields already occur in the signed URL; only POST fields append.
   const signatureParams = request.method === "GET" || request.method === "HEAD" ? {} : params;
   if (!validateTwilioWebhookParams(signatureParams, signature, canonicalUrl, authToken)) {
-    logWebhookAuthFailure("invalid_signature", {
-      url: diagnosticUrl,
-      callSid: options?.callSid ?? null,
-      messageSid: options?.messageSid ?? null,
-      phoneNumber: options?.phoneNumber ?? null,
-      workspaceId: options?.workspaceId ?? null,
-      accountSid: accountSidFromParams(params) || null,
-    });
+    logWebhookAuthFailure("invalid_signature", diagnosticContext);
     return twilioWebhookForbiddenHangup();
   }
 

@@ -1,19 +1,11 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import { workspace_voice_recording_operation as recordings } from "@/db/schema";
-import { VoiceRecordingBindingError, type VoiceRecordingReceipt } from "@/lib/voice-recording";
+import { VoiceRecordingBindingError, voiceRecordingReceiptSchema, type VoiceRecordingReceipt } from "@/lib/voice-recording";
 import { withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
-
-const receiptSchema = z.strictObject({
-  requestUrl: z.url(), accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), callSid: z.string().regex(/^CA[0-9a-f]{32}$/i),
-  recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i), source: z.enum(["DialVerb", "StartCallRecordingAPI"]),
-  status: z.enum(["in-progress", "completed", "absent"]), startedAt: z.date().optional(),
-  durationSeconds: z.int().nonnegative().max(2147483647).optional(), channels: z.union([z.literal(1), z.literal(2)]).optional(),
-});
 
 /** An authenticated nonce binds acceptance even if it beats the create response. */
 export async function recordVoiceRecordingReceipt(owner: VoiceRecordingOperation, input: VoiceRecordingReceipt) {
-  const parsed = receiptSchema.safeParse(input);
+  const parsed = voiceRecordingReceiptSchema.safeParse(input);
   if (!parsed.success) throw new VoiceRecordingBindingError("Invalid recording receipt");
   const receipt = parsed.data;
   return withVoiceRecordingOperation(owner, async (tx, current) => {

@@ -125,6 +125,7 @@ Interactive specs:
 | `/api/verify-pin-input` | POST | Internal Trusted | internalOnly | no | `routes/api+/verify-pin-input.tsx` | `docs/api-internal-unsupported.md` | Retired audio PIN flow; returns 410. |
 | `/api/voice-audio` | POST | Provider Webhook | providerOnly | no | `routes/api+/voice-audio.tsx` | `docs/api-webhooks.md` | Operation-bound agent audio instructions, status and conference events. No customer dispatch or billing. |
 | `/api/voice-continuation` | POST | Provider Webhook | providerOnly | no | `routes/api+/voice-continuation.tsx` | `docs/api-webhooks.md` | Saved manual parent continuation. Resumes only an owned requested audio promotion; no customer creation or billing. |
+| `/api/voice-recording` | POST | Provider Webhook | providerOnly | no | `routes/api+/voice-recording.tsx` | `docs/api-webhooks.md` | Saved recording operation callback. Requires the original account, physical CallSid and RecordingSid; retains each recording part before queued storage work. |
 | `/api/workspace-api-keys` | POST, DELETE, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspace-api-keys.tsx` | `docs/api-workspace-admin.md` | Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264). |
 | `/api/workspaces` | POST, GET | User API | sessionOnly | yes | `routes/api+/workspaces.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId` | PATCH, DELETE, GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/route.tsx` | `docs/api-agent-quickstart.md` | Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session. |
@@ -164,5 +165,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **151**
+Total entries: **152**
 
