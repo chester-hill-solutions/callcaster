@@ -825,6 +825,9 @@ success is `{ data: { id }, error: null }`; a top-level `{ id }` does not prove
 a delivery receipt. Keep rejected-result and missing-receipt controls when a
 write depends on provider success. A retry test must compare the actual repeated
 payload and key, including generated dates and signed links.
+Twilio's `RequestClient` receives lower-case method names. Normalize their case
+for read-only assertions. Give every SDK fixture, including replacement-account
+clients, the owned mock HTTP transport so a removed guard cannot reach the network.
 
 When an SDK method changes, inventory its caller fixtures in every test tier.
 `ci:local` omits the real database tier. Run the affected database cases before

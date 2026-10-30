@@ -132,6 +132,23 @@ development; this callback does not create a recording or bill the call.
 Agent audio and parent continuation callbacks use the same original-account
 check and strict raw form reader.
 
+The voice recovery job also observes issued recordings on root Calls. A known
+RecordingSid is fetched through the original account and saved physical Call.
+An unknown SID needs one matching RecordingSid in the saved callback URL's
+provider request history. Missing, ambiguous or limit-sized history stays
+pending. [Call Events](https://www.twilio.com/docs/voice/api/call-event-resource)
+becomes available 15 minutes after the Call ends; the existing readiness check
+adds 30 seconds. No recording is created or restarted by recovery.
+
+Recording lookup has a five-second read budget. Late results cannot write, and
+expired leases cannot change another observation. GET `processing` can bind an
+identity but cannot prove active capture. The original parent verification keeps
+its one-second response budget. Root-only recovery is deliberate: Twilio reports
+two-leg [recordings](https://www.twilio.com/docs/voice/api/recording) under the
+parent CallSid. Inherited child sources stay pending until their physical capture
+contract is proved. A stable Conference capture and the live switch remain in
+development; Conference recording starts when the first two participants bridge.
+
 ## Stripe
 
 | Method | Path | Purpose |

@@ -18,6 +18,7 @@ export const voiceRecordingReceiptSchema = z.strictObject({
   durationSeconds: z.int().nonnegative().max(2147483647).optional(), channels: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 export type VoiceRecordingReceipt = z.infer<typeof voiceRecordingReceiptSchema>;
+export type VoiceRecordingObservation = Omit<VoiceRecordingReceipt, "status"> & { status?: VoiceRecordingReceipt["status"] };
 
 const integerParam = z.string().regex(/^(0|[1-9][0-9]*)$/).transform(Number).pipe(z.int().nonnegative().max(2147483647));
 const callbackSchema = z.object({
