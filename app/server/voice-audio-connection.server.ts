@@ -10,6 +10,7 @@ import { lockVoiceAudioActor, resolveVoiceAudioAdmission } from "./voice-audio-a
 import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
 import { hasPendingVoiceAudioConferenceStop } from "./voice-audio-classification.server";
 import type { TenantDb } from "./tenant-db";
+import { hasUnresolvedVoiceAudioPromotion } from "./voice-audio-manual-topology.server";
 
 export type VoiceAudioConnection = typeof connections.$inferSelect;
 const LEASE_MS = 5 * 60_000;
@@ -39,7 +40,8 @@ async function replayVoiceAudioIntent(tdb: TenantDb, args: VoiceAudioConnectionI
     eq(connections.user_id, args.userId), eq(connections.intent_id, args.intentId),
   ) });
   if (prior) return sameRequest(prior, args) ? { ok: true as const, connection: prior, replayed: true } : voiceAudioRefusal("intent_conflict");
-  return await hasPendingVoiceAudioConferenceStop(tdb, args.userId) ? voiceAudioRefusal("connection_pending") : null;
+  return await hasPendingVoiceAudioConferenceStop(tdb, args.userId) || await hasUnresolvedVoiceAudioPromotion(tdb, args.userId)
+    ? voiceAudioRefusal("connection_pending") : null;
 }
 
 /** One actor lock serializes intent replay, pending replacement and generations. */
@@ -98,6 +100,7 @@ export async function claimVoiceAudioSend(row: VoiceAudioConnection) {
     const args = voiceAudioSavedInput(row), actor = await lockVoiceAudioActor(tx, args);
     if (!actor.ok) return actor;
     if (await hasPendingVoiceAudioConferenceStop(actor.tdb, row.user_id)) return voiceAudioRefusal("connection_pending");
+    if (await hasUnresolvedVoiceAudioPromotion(actor.tdb, row.user_id)) return voiceAudioRefusal("connection_pending");
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!current || current.user_id !== row.user_id || current.lease_token !== row.lease_token || current.state !== "prepared" ||
         current.send_started_at || current.cancel_requested_at || current.lease_expires_at.getTime() <= Date.now())

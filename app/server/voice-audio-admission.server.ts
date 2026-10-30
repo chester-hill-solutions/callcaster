@@ -14,6 +14,7 @@ import type { VoiceAudioConnection } from "./voice-audio-connection.server";
 import { predictiveConferenceCallbackUrl } from "./predictive-conference-reservation.server";
 import type { VoiceReservation } from "./voice-credit-reservation.server";
 import { hasActiveVoiceAudioCustomer, hasFundedAgentVoice } from "./voice-audio-classification.server";
+import { readManualVoiceAudioTopology } from "./voice-audio-manual-topology.server";
 
 export async function lockVoiceAudioMember(tx: CreditTransaction, args: Pick<VoiceAudioConnectionInput, "workspaceId" | "userId">, allowDisabledWorkspace = false) {
   const [owner] = await tx.select().from(workspace).where(eq(workspace.id, args.workspaceId)).for("no key update");
@@ -88,10 +89,20 @@ async function directTarget(tdb: TenantDb, row: VoiceReservation, current: Voice
   if (current && !source) return voiceAudioRefusal("stale_audio");
   if (!source && (!row.setup_continuation_url || row.setup_terminal_at || !await ownsLiveCall(tdb, row.setup_sid)))
     return voiceAudioRefusal("handoff_unavailable");
+  return manualTargetWithTopology(tdb, row, source, userId);
+}
+
+async function manualTargetWithTopology(tdb: TenantDb, row: VoiceReservation, source: VoiceAudioConnection | null, userId: string) {
+  const topology = await readManualVoiceAudioTopology(tdb, row, userId);
+  if (!topology.ok) return topology;
+  const canonical = topology.connection;
+  if (source && canonical && (source.conference_id !== canonical.conference_id || source.conference_sid !== canonical.conference_sid ||
+    source.conference_callback !== canonical.conference_callback)) return voiceAudioRefusal("stale_audio");
+  const conference = canonical ?? source;
   return { ok: true as const, target: { kind: "direct" as const, key: `direct:${row.id}`,
     reservationId: row.id, campaignId: row.campaign_id, customerSid: row.provider_sid, originalAgentSid: row.setup_sid,
-    conferenceId: source?.conference_id ?? null, conferenceSid: source?.conference_sid ?? null,
-    conferenceCallback: source?.conference_callback ?? null, callerId: row.caller_id,
+    conferenceId: conference?.conference_id ?? null, conferenceSid: conference?.conference_sid ?? null,
+    conferenceCallback: conference?.conference_callback ?? null, callerId: row.caller_id,
     clientIdentity: row.setup_client_identity ?? userId } };
 }
 

@@ -60,7 +60,11 @@ gate that rescue on replacement liveness. Once a successor commits, fence the
 original parent across all earlier failed operations and conference names.
 Save promotion intent before provider I/O and keep one unresolved promotion
 and one owned topology for the customer. An uncertain child redirect cannot
-start another promotion. Source checks do not prove physical continuity;
+start another promotion. Keep the canonical room after a failed phone, and
+bind it to the original account, actor, parent and customer. Positive rejection
+permits a fresh room only while the original call remains live. Confirmed room
+closure fences reuse even before delayed customer status arrives. Mark topology
+ready only after genuine joins and fresh physical role proof. Source checks do not prove physical continuity;
 require an isolated provider test before accepting the complete handoff.
 
 ## Prerequisites

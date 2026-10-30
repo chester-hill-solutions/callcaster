@@ -76,6 +76,7 @@ export const workspace_voice_audio_connection = pgTable("workspace_voice_audio_c
   customer_joined_at: timestamp({ withTimezone: true, mode: "date" }),
   parent_joined_at: timestamp({ withTimezone: true, mode: "date" }),
   promotion_requested_at: timestamp({ withTimezone: true, mode: "date" }),
+  promotion_result: text().$type<"ready" | "rejected" | "closed">(),
   conference_stop_requested_at: timestamp({ withTimezone: true, mode: "date" }),
   conference_stop_call_sid: text(),
   conference_stopped_at: timestamp({ withTimezone: true, mode: "date" }),

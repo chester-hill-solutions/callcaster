@@ -4,6 +4,7 @@ import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { voiceAudioSourceRetirementWhere } from "./voice-audio-classification.server";
 import { withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
+import { closeManualVoiceAudioTopology } from "./voice-audio-manual-topology.server";
 
 export function hasUnfinishedVoiceAudioConferenceStop(row: VoiceAudioConnection) {
   return Boolean(row.conference_stop_requested_at && !row.conference_stopped_at);
@@ -48,6 +49,7 @@ export async function readPendingVoiceAudioConferenceStop(owner: VoiceAudioConne
 export async function finishVoiceAudioConferenceStop(owner: VoiceAudioConnection) {
   return withVoiceAudioConnection(owner, async (tx, current) => {
     if (current.lease_token !== owner.lease_token || !hasUnfinishedVoiceAudioConferenceStop(current)) return null;
+    await closeManualVoiceAudioTopology(tx, current);
     const [saved] = await tx.update(connections).set({ conference_stopped_at: new Date(), updated_at: new Date() })
       .where(eq(connections.id, current.id)).returning();
     if (!saved) throw new Error("Owned conference stop acknowledgement was not saved");

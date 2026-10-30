@@ -61,7 +61,8 @@ voice request budget.
 ### Agent audio connection (#2879, in development)
 
 The active branch implements the owned connection journal, read/cancel controls,
-signed provider callbacks and confirmed idle phone joins. Live cutover, media
+signed provider callbacks, manual parent continuation, durable room-stop recovery
+and confirmed idle phone joins. Live cutover, media
 continuity and browser transport controls remain in development. No release
 acceptance is claimed.
 
@@ -96,6 +97,14 @@ Retries keep the same intent. A pending or uncertain create returns `409`;
 recovery checks the original provider account and saved callback URLs before
 another action. A current funded call does not need more available credits
 to change its audio. Idle connection still requires available credits.
+
+Manual calls permit one unresolved customer promotion. A new intent cannot
+replace it, including after its phone ends; the same intent can still replay.
+After the conference is verified, later phones reuse its account, room SID,
+first callback owner and original customer/parent identities. A positively
+rejected promotion permits a fresh room while the original call remains live.
+A confirmed room end prevents reuse before delayed customer status arrives.
+Recording and transcript continuity must be ready before source retirement.
 
 `DELETE` with the same query cancels only the selected pending attempt or an
 idle connection. An uncertain create keeps its pending state until recovery

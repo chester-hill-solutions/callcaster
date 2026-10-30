@@ -146,6 +146,8 @@ const steps = [
   "client/migrations/20261029000001_voice_audio_connections.sql",
   "client/migrations/20261029000002_voice_audio_committed_source.sql",
   "client/migrations/20261030000001_voice_audio_conference_stop.sql",
+  "client/migrations/20261030000002_voice_audio_manual_topology.sql",
+  "client/migrations/20261030000003_voice_audio_topology_lookup.sql",
 ];
 
 /**

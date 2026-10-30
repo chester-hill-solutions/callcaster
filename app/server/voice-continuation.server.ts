@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { workspace, workspace_voice_audio_connection as audio, workspace_voice_reservation as reservations } from "@/db/schema";
 import { db } from "@/server/db";
 import { VoiceAudioBindingError } from "@/lib/voice-audio-connection";
@@ -38,6 +38,7 @@ export async function bindVoiceContinuation(owner: VoiceReservation, params: Rec
       isNull(audio.source_connection_id), isNotNull(audio.promotion_requested_at),
       isNotNull(audio.voice_issued_at), isNotNull(audio.joined_at), isNotNull(audio.conference_sid), isNotNull(audio.provider_sid),
       isNull(audio.committed_at), isNull(audio.conference_stop_requested_at),
+      or(isNull(audio.promotion_result), eq(audio.promotion_result, "ready")),
     )).limit(2).for("update");
     if (extra) throw new VoiceAudioBindingError("Manual continuation has ambiguous promotion ownership");
     if (!candidate || row.state !== "active" || row.setup_terminal_at || !row.provider_sid || candidate.customer_sid !== row.provider_sid)
