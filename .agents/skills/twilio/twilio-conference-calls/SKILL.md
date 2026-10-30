@@ -70,6 +70,13 @@ An uncommitted React render must not retire the current request. Ignore retired
 UI updates and end a late known customer through its original workspace.
 An agent audio SID change is not a new customer generation. Retain its customer
 SID and outcome; only a logical dial or reset invalidates old provider callbacks.
+On a new dial, wait for its own accepted customer or SDK source. Test fresh
+callbacks on the previous source as well as callbacks captured before reset.
+Capture old poll callbacks while enabled. A callback saved after a terminal
+status is already disabled and cannot prove the customer ownership fence.
+An SDK parent status is not a customer status; only its resolved child can bind.
+Once bound, reject a different root before lifecycle changes or SDK disconnect.
+Keep a control where a new SDK source and dialing state commit together.
 Clearing old room metadata is not a Stop acknowledgement for a new Start.
 Capture the pending Start intent ID before Stop, and retire only that matching
 intent after acknowledgement. An old acknowledgement cannot clear a successor.
