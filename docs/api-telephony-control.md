@@ -37,6 +37,35 @@ worker dispatch and active predictive capacity have separate controls. Provider
 callbacks, call endings, inbound calls and campaign SMS tests do not spend this
 voice request budget.
 
+## Predictive Start with a connected phone (in development)
+
+`POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` accepts a
+caller session or a workspace API key with `calls.start`. A key must supply an
+authorized caller in `agentUserId`. Send `caller_id`, the verified phone in
+`selected_device`, a stable `dial_intent_id`, `audio_connection_id`, and
+`audio_generation` together to reuse that agent's confirmed idle phone.
+
+Start checks the original-account phone, room and participant, then uses the
+existing atomic queue claim, outreach attempt, credit hold and send journal.
+It calls only the customer, with AMD and a dual-channel, both-track, untrimmed
+recording. The response contains `success`, the saved `conferenceName` and the
+real customer `callSid`. A retry of an accepted intent returns that identity
+before mutable source, campaign and queue checks. Changed source identity or an
+unresolved send returns `409`.
+
+Predictive fanout and durable machine continuations use the same confirmed
+source, recording owner and one hold per customer. A stopped, changed or unreadable
+source blocks a successor before its queue claim or send. Read failures leave the
+continuation unsent and ready to retry. Customer conference events
+use the first phone callback and a funded customer label. Customer leave and
+queue drain keep the phone room open. Connect remains connection-only. Omitting
+both source fields cannot ring another agent while owned audio is unresolved.
+When no audio operation is unresolved, the legacy setup path remains available
+and omits `callSid` from its response.
+
+Browser transport controls, live handoff/media continuity and approved physical
+Conference/handset acceptance remain in development.
+
 ## Workspace telephony (Phase 6)
 
 | Method | Path | Purpose |

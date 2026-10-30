@@ -13,13 +13,15 @@ import {
 import { hasMinRole } from "@/lib/workspace-route.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
+import { phoneAudioSourceFields, requirePhoneAudioSource } from "@/lib/schemas/api/phone-audio-source";
 
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
   selected_device: z.string().min(1),
   dial_intent_id: z.string().uuid().transform((value) => value.toLowerCase()).optional(),
   agentUserId: z.string().min(1).optional(),
-});
+  ...phoneAudioSourceFields,
+}).superRefine(requirePhoneAudioSource);
 
 async function resolveAgentUserId(
   auth: DataPlaneAuthContextValue,
@@ -92,6 +94,8 @@ export const action = defineAction({
       callerId: parsed.caller_id,
       selectedDevice: parsed.selected_device,
       dialIntentId: parsed.dial_intent_id,
+      audioSource: parsed.audio_connection_id && parsed.audio_generation !== undefined
+        ? { connectionId: parsed.audio_connection_id, generation: parsed.audio_generation } : undefined,
     });
 
     if (!result.ok) {
@@ -130,6 +134,7 @@ export const action = defineAction({
       },
     });
 
-    return jsonResponse({ success: true, conferenceName: result.conferenceName }, 200);
+    return jsonResponse({ success: true, conferenceName: result.conferenceName,
+      ...(result.callSid ? { callSid: result.callSid } : {}) }, 200);
   },
 });

@@ -8,11 +8,11 @@ import type { VerifiedVoiceAudioCustomerIntent } from "@/server/voice-audio-cust
 
 /** Call creation starts the recording at answer, before customer conference TwiML. */
 export function createRecordedPhoneCustomer(client: Twilio, request: {
-  to: string; from: string; voiceUrl: string; statusCallback: string; recordingCallback: string;
+  to: string; from: string; voiceUrl: string; statusCallback: string; recordingCallback: string; machineDetection?: "Enable";
 }) {
   return client.calls.create({ to: request.to, from: request.from, url: request.voiceUrl, method: "POST",
     statusCallback: request.statusCallback, statusCallbackMethod: "POST",
-    statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+    statusCallbackEvent: ["initiated", "ringing", "answered", "completed"], machineDetection: request.machineDetection,
     record: true, recordingChannels: "dual", recordingTrack: "both", trim: "do-not-trim",
     recordingStatusCallback: voiceWebhookDeliveryUrl(request.recordingCallback), recordingStatusCallbackMethod: "POST",
     recordingStatusCallbackEvent: ["in-progress", "completed", "absent"],

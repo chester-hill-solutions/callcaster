@@ -55,9 +55,12 @@ const tenantDbMocks = vi.hoisted(() => ({
   update: vi.fn(),
   insert: vi.fn(),
   execute: vi.fn(),
+  findAudio: vi.fn(async () => null),
+  findAudioReservation: vi.fn(async () => null),
 }));
 
-vi.mock("@/server/tenant-db", () => ({
+vi.mock("@/server/tenant-db", async importOriginal => ({
+  ...await importOriginal<typeof import("@/server/tenant-db")>(),
   createTenantDb: vi.fn(() => ({
     call: {
       findFirst: (...args: unknown[]) => tenantDbMocks.findFirst(...args),
@@ -65,6 +68,8 @@ vi.mock("@/server/tenant-db", () => ({
       insert: (...args: unknown[]) => tenantDbMocks.insert(...args),
     },
     execute: (...args: unknown[]) => tenantDbMocks.execute(...args),
+    workspace_voice_audio_connection: { findFirst: (...args: unknown[]) => tenantDbMocks.findAudio(...args) },
+    workspace_voice_reservation: { findFirst: (...args: unknown[]) => tenantDbMocks.findAudioReservation(...args) },
   })),
 }));
 

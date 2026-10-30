@@ -57,9 +57,9 @@ vi.mock("twilio", async () => {
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-// Mocked outright rather than via importOriginal: the real module pulls in a
-// JWT dep chain that does not load under this suite's module mocks.
-vi.mock("@/lib/twilio-webhook.server", () => ({
+// Keep raw provider parsing real; this rendering suite replaces signature I/O.
+vi.mock("@/lib/twilio-webhook.server", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/twilio-webhook.server")>(),
   requireTwilioSignature: vi.fn(async () => null),
   resolveCanonicalTwilioWebhookUrl: () => "https://base.example/api/call",
   twilioWebhookForbidden: (message = "Invalid Twilio signature") =>

@@ -11,11 +11,9 @@ import {
   isParticipantJoin,
   parseTwilioVoiceCallback,
   userIdFromConferenceName,
-  type ParticipantJoinEvent,
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
-import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
-import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-updates.server";
+import { handlePredictiveParticipantJoin } from "@/lib/predictive-participant-join.server";
 import {
   dequeueQueueEntry
 } from "@/lib/campaign-queue-db.server";
@@ -31,7 +29,6 @@ import {
   findCallBySid,
   findCampaignTypeByCampaignId,
   findOutreachAttemptById,
-  updateCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature, resolveCanonicalTwilioWebhookUrl, twilioWebhookForbiddenHangup } from "@/lib/twilio-webhook.server";
@@ -50,19 +47,6 @@ import { normalizeVerifiedVoiceParams } from "@/lib/twilio/verified-voice-params
 
 type TwilioClient = Twilio.Twilio;
 
-const updateCall = async (sid: string, workspaceId: string, update: Partial<Tables<"call">>) => {
-  try {
-    const data = await updateCallBySid(workspaceId, sid, update);
-    if (!data) {
-      throw new Error(`Call ${sid} not found`);
-    }
-    return data;
-  } catch (error) {
-    logger.error("Error updating call:", error);
-    throw error;
-  }
-};
-
 const requireValue = (
   value: string | null | undefined,
   fieldName: string,
@@ -73,43 +57,12 @@ const requireValue = (
   return value;
 };
 
-type OutreachAttemptUpdateResult =
-  | Pick<Tables<"outreach_attempt">, "disposition" | "contact_id">
-  | Tables<"outreach_attempt">
-  | Response;
-
-function resolveOutreachUpdate(
-  result: OutreachAttemptUpdateResult,
-): Pick<Tables<"outreach_attempt">, "disposition" | "contact_id"> | Tables<"outreach_attempt"> | null {
-  if (result instanceof Response) {
-    return null;
-  }
-  return result;
-}
-
 export const updateOutreachAttempt = async (
   id: string,
   workspaceId: string,
   update: Partial<OutreachAttempt>,
 ) => {
   return updateOutreachAttemptForWorkspace(workspaceId, id, update);
-};
-
-const updateCampaignQueue = async (
-  contactId: number,
-  campaignId: number,
-  update: Record<string, unknown>,
-) => {
-  try {
-    return await updateCampaignQueueByContactAndCampaign({
-      contactId,
-      campaignId,
-      update,
-    });
-  } catch (error) {
-    logger.error("Error updating campaign queue:", error);
-    throw error;
-  }
 };
 
 /**
@@ -219,55 +172,6 @@ const handleCallStatus = async (
   }
 };
 
-const handleParticipantJoin = async (
-  event: ParticipantJoinEvent,
-  dbCall: Tables<"call">,
-) => {
-  try {
-    const workspaceId = requireValue(dbCall.workspace, "workspace");
-    if (!dbCall.conference_id) {
-      await updateCall(requireValue(event.callSid, "CallSid"), workspaceId, {
-        // `conferenceRef`, not `conferenceUserId`: `call.conference_id` holds
-        // the conference NAME. Reading the user id back out of it is
-        // `resolveUserIdFromConferenceName`'s job, at the point of use.
-        conference_id: requireValue(event.conferenceRef, "ConferenceSid"),
-        start_time: new Date(requireValue(event.timestamp, "Timestamp")),
-      });
-    }
-    if (dbCall.outreach_attempt_id) {
-      if (!dbCall.campaign_id) {
-        throw new Error("Missing campaign_id for participant join");
-      }
-      // Replayed join callbacks must not restamp answered_at — it feeds
-      // answer-time metrics, and each redelivery was overwriting it with
-      // the replay's clock instead of the actual answer moment.
-      const existingAttempt = await findOutreachAttemptById(
-        workspaceId,
-        dbCall.outreach_attempt_id,
-      );
-      if (existingAttempt && (existingAttempt as { answered_at?: string | null }).answered_at) {
-        return;
-      }
-      const outreachStatus = resolveOutreachUpdate(
-        await updateOutreachAttempt(
-          `${dbCall.outreach_attempt_id}`,
-          workspaceId,
-          { answered_at: new Date().toISOString() },
-        ),
-      );
-      if (!outreachStatus) {
-        return;
-      }
-      await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
-        ...buildProviderStatusQueueUpdate(event.conferenceRef ?? "in-progress"),
-      });
-    }
-  } catch (error) {
-    logger.error("Error in handleParticipantJoin:", error);
-    throw error;
-  }
-};
-
 async function handleFundedConferenceEvent(
   context: Awaited<ReturnType<typeof bindPredictiveConferenceEvent>>, event: Extract<TwilioVoiceCallback, { kind: "participant" }>,
 ) {
@@ -284,7 +188,7 @@ async function handleFundedConferenceEvent(
           if (first?.send) await sendFundedPredictiveRecipient(first.reservation, twilio);
           else if (first) await stopRefusedPredictiveSetup(first.reservation, twilio);
         }
-        await handleParticipantJoin(event, context.call);
+        await handlePredictiveParticipantJoin(event, context.call);
       } else if (isParticipantHangup(event)) await handleConferenceParticipantHangup(event, context.call, twilio);
 }
 
@@ -424,7 +328,7 @@ export const action = defineAction({
         break;
       default:
         if (isParticipantJoin(event)) {
-          await handleParticipantJoin(event, dbCall);
+          await handlePredictiveParticipantJoin(event, dbCall);
         }
     }
 

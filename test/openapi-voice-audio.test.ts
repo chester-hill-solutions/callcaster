@@ -5,6 +5,18 @@ import { buildOpenApiSpec } from "@/lib/openapi-build";
 import { getCompleteOpenApiEntries } from "@/lib/api-surface";
 
 describe("agent audio OpenAPI view boundaries", () => {
+  test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s preserves predictive Start auth and documents confirmed-phone identity", (_name, spec) => {
+    const operation = spec.paths["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"].post;
+    expect(operation).toMatchObject({ operationId: "startCampaignDialer", "x-callcaster-capability": "calls.start" });
+    expect(operation.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }, { apiKey: [] }]);
+    const request = spec.components.schemas.DialerStartRequest;
+    expect(request.required).toEqual(["caller_id", "selected_device"]);
+    expect(request.oneOf[1].required).toEqual(["audio_connection_id", "audio_generation", "dial_intent_id"]);
+    expect(request.oneOf[0].not.anyOf).toEqual([{ required: ["audio_connection_id"] }, { required: ["audio_generation"] }]);
+    expect(request.properties.audio_generation.oneOf[0]).toEqual({ type: "integer", minimum: 1 });
+    expect(spec.components.schemas.DialerStartResponse.properties.callSid.pattern).toBe("^CA[0-9a-fA-F]{32}$");
+    expect(spec.components.schemas.DialerStartResponse.required).toEqual(["success", "conferenceName"]);
+  });
   test.each([["public", openApiSpec], ["complete", completeOpenApiSpec]])("%s keeps manual Start identity and both response contracts", (_name, spec) => {
     const operation = spec.paths["/api/dial"].post;
     expect(operation).toMatchObject({ operationId: "postDial", "x-callcaster-auth-class": "session", "x-callcaster-exposure": "sessionOnly" });

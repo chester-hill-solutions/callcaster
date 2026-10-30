@@ -9658,7 +9658,7 @@
             "apiKey": []
           }
         ],
-        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for setup and the first eligible recipient before provider dispatch. Reuse optional `dial_intent_id` for an unknown start result; an accepted retry returns the original conference and sends no new setup. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
+        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace. Reserve four available credits for the first eligible recipient before provider dispatch. Paired `audio_connection_id` and `audio_generation`, a stable `dial_intent_id` and the verified phone as `selected_device` reuse confirmed phone audio: Start calls only the recorded AMD customer and returns the saved conference plus real customer `callSid`. Connect never starts a customer. Accepted retries return the saved identity before mutable phone/campaign/queue checks. Predictive fanout and continuation retain one hold per customer and the first phone callback. Customer departure and queue drain do not close the persistent phone room. New legacy setup is refused while owned audio is unresolved; otherwise legacy setup and the first recipient share the same hold. Voice starts share a limit of 120 requests per minute per authenticated user or API key, across dial, IVR, device connection and voice test calls. A 429 response includes Retry-After in seconds; changing agentUserId does not reset an API key's budget.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9671,7 +9671,7 @@
         },
         "responses": {
           "200": {
-            "description": "Conference setup accepted, or the original accepted start replayed",
+            "description": "Customer or legacy setup accepted, or the original accepted start replayed. Confirmed-phone Start includes the real customer callSid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9749,7 +9749,7 @@
             }
           },
           "409": {
-            "description": "Start is pending provider verification, or no eligible recipient can be admitted now; retry the same intent",
+            "description": "Phone source is stale or unavailable, Start is pending provider verification, or no eligible recipient can be admitted now; retry the same intent",
             "content": {
               "application/json": {
                 "schema": {
@@ -12667,7 +12667,56 @@
           "caller_id",
           "selected_device"
         ],
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "audio_connection_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "audio_generation"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "audio_connection_id",
+              "audio_generation",
+              "dial_intent_id"
+            ],
+            "properties": {
+              "selected_device": {
+                "type": "string",
+                "pattern": "^\\+[1-9][0-9]{7,14}$"
+              }
+            }
+          }
+        ],
         "properties": {
+          "audio_connection_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Owned confirmed phone connection. Requires audio_generation, dial_intent_id and that verified phone as selected_device."
+          },
+          "audio_generation": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*$"
+              }
+            ],
+            "description": "Positive safe integer generation of the confirmed phone connection."
+          },
           "dial_intent_id": {
             "type": "string",
             "format": "uuid",
@@ -12679,7 +12728,7 @@
           },
           "selected_device": {
             "type": "string",
-            "description": "Twilio client device identifier for the agent leg."
+            "description": "computer or a verified E.164 phone. A confirmed phone Start requires its paired audio source fields."
           },
           "agentUserId": {
             "type": "string",
@@ -12703,6 +12752,11 @@
           },
           "conferenceName": {
             "type": "string"
+          },
+          "callSid": {
+            "type": "string",
+            "pattern": "^CA[0-9a-fA-F]{32}$",
+            "description": "Real customer root SID for a confirmed-phone Start. Legacy setup responses omit this field."
           }
         }
       },

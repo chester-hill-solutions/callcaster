@@ -1,14 +1,22 @@
-import { isParticipantHangup, type TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import { isParticipantHangup, isParticipantJoin, type TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { stopVoiceAudioConferenceForParticipant } from "@/lib/voice-audio-stop.server";
 import { observeVoiceAudioConferenceEvent, observeVoiceAudioBridgeEvent, type VoiceAudioConferenceEvent } from "@/server/voice-audio-conference.server";
 import type { VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { bindVoicePhoneCustomerParticipant } from "@/server/voice-phone-customer.server";
+import { handlePredictiveParticipantJoin } from "@/lib/predictive-participant-join.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 
 type ParticipantEvent = Extract<TwilioVoiceCallback, { kind: "participant" }>;
 
-export function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
-  return bindVoicePhoneCustomerParticipant(owner, { requestUrl, accountSid: event.accountSid ?? "", callSid: event.callSid ?? "",
+export async function handleBoundVoiceAudioCustomerParticipant(owner: VoiceAudioConnection, requestUrl: string, event: ParticipantEvent) {
+  const row = await bindVoicePhoneCustomerParticipant(owner, { requestUrl, accountSid: event.accountSid ?? "", callSid: event.callSid ?? "",
     conferenceId: event.conferenceName ?? "", conferenceSid: event.conferenceSid ?? "", participantLabel: event.raw.ParticipantLabel ?? "" });
+  if (row?.audio_mode === "predictive" && isParticipantJoin(event)) {
+    const call = await findCallBySid(event.callSid ?? "");
+    if (!call || call.workspace !== row.workspace) throw new Error("Predictive phone customer Call is missing");
+    await handlePredictiveParticipantJoin(event, call);
+  }
+  return row;
 }
 
 /** Signature validation and callback-owner binding precede participant dispatch. */
