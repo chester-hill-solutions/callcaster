@@ -64,6 +64,7 @@ describe("owned agent audio connection journal (#2879)", () => {
   });
   async function clearFault() {
     await sql.unsafe(`drop trigger if exists ${fault} on public.call`);
+    await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_audio_connection`);
     await sql.unsafe(`drop function if exists public.${fault}()`);
   }
   beforeEach(async () => {
@@ -1031,6 +1032,7 @@ describe("owned agent audio connection journal (#2879)", () => {
     const f = await endedReplacementFixture(true);
     const response = await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false)); expect(response.status).toBe(204);
     expect(rooms.records.get(f.conferenceSid)?.status).toBe("in-progress"); expect(rooms.fetch).not.toHaveBeenCalled();
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stop_requested_at).toBeNull();
   });
   test("a manual-room stop failure retries its exact room without customer outcomes", async () => {
     const f = await endedReplacementFixture(), before = await state(), params = bridgeParams(f, "parent", false);
@@ -1045,5 +1047,148 @@ describe("owned agent audio connection journal (#2879)", () => {
     rooms.records.set(f.conferenceSid, { ...physical, [field]: "foreign" });
     const before = await state(), response = await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false));
     expect(response.status).toBe(500); expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
+  });
+  async function failRoomStop() {
+    const f = await endedReplacementFixture(); rooms.update.mockRejectedValueOnce(new Error("Owned room stop needs recovery"));
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
+    return f;
+  }
+  async function ageRoomStop(row: Connection) {
+    await sql`update public.workspace_voice_audio_connection set lease_expires_at = now() - interval '1 minute' where id = ${row.id}::uuid`;
+  }
+  test("a terminal callback owner retains its room stop after status repair and worker restart", async () => {
+    const f = await failRoomStop(), before = await state();
+    const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server");
+    await observeVoiceAudioStatus(f.row, "completed", "10"); await ageRoomStop(f.row);
+    const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toEqual({ examined: 1, closed: 1, expired: 0, pending: 0 });
+    expect(rooms.records.get(f.conferenceSid)?.status).toBe("completed");
+    expect(await journal.findVoiceAudioConnection(f.row.id)).toMatchObject({ conference_stop_call_sid: f.target.parent,
+      conference_stop_requested_at: expect.any(Date), conference_stopped_at: expect.any(Date), terminal_status: "completed" });
+    expect(await state()).toEqual(before); expect(web.fetch).not.toHaveBeenCalled(); expect(web.update).not.toHaveBeenCalled();
+  });
+  test("a lost accepted room-stop reply is recovered without another provider update", async () => {
+    const f = await endedReplacementFixture(), before = await state();
+    rooms.update.mockImplementationOnce(async (id: string) => {
+      const room = rooms.records.get(id); if (!room) throw new Error("Owned conference required");
+      room.status = "completed"; throw new Error("Lost room-stop acknowledgement");
+    });
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "customer", false))).status).toBe(500);
+    await ageRoomStop(f.row); const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, closed: 1 });
+    expect(rooms.update).toHaveBeenCalledOnce(); expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeInstanceOf(Date);
+    expect(await state()).toEqual(before);
+  });
+  test("worker stop failures keep the room intent for a later retry", async () => {
+    const f = await failRoomStop(); await ageRoomStop(f.row); rooms.update.mockRejectedValueOnce(new Error("Room stop still unavailable"));
+    const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, pending: 1 });
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeNull();
+    await ageRoomStop(f.row); expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, closed: 1 });
+    expect(rooms.records.get(f.conferenceSid)?.status).toBe("completed");
+  });
+  test.each(["sid", "accountSid", "friendlyName"])("room-stop recovery retains intent on a provider %s mismatch", async (field) => {
+    const f = await failRoomStop(), room = rooms.records.get(f.conferenceSid); if (!room) throw new Error("Owned conference required");
+    rooms.records.set(f.conferenceSid, { ...room, [field]: "foreign" }); rooms.update.mockClear(); await ageRoomStop(f.row);
+    const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, pending: 1 });
+    expect(rooms.update).not.toHaveBeenCalled(); expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeNull();
+  });
+  test("new audio intent cannot adopt an agent while its previous room stop is pending", async () => {
+    const f = await failRoomStop();
+    const response = await apiPost({ workspaceId, phoneNumber: phone, callSid: f.target.child,
+      expected_agent_sid: f.target.parent, connection_intent_id: randomUUID() });
+    expect(response.status).toBe(409); expect(web.create).not.toHaveBeenCalled();
+    expect(await state()).toMatchObject({ operations: 1 });
+  });
+  test("a prepared replacement cannot send after the current room starts ending", async () => {
+    const f = await endedReplacementFixture(), next = await prepare({ ...f.target.args, intentId: randomUUID() });
+    expect(next.id).not.toBe(f.row.id); expect(next.state).toBe("prepared");
+    rooms.update.mockRejectedValueOnce(new Error("Owned room stop pending"));
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
+    expect(await journal.claimVoiceAudioSend(next)).toEqual({ ok: false, reason: "connection_pending" });
+    expect((await journal.findVoiceAudioConnection(next.id))?.send_started_at).toBeNull();
+  });
+  test("a saved room stop prevents the original parent from rejoining", async () => {
+    const f = await failRoomStop(), response = await signedParent(f.url, f.params);
+    expect(response.status).toBe(200); expect(await response.text()).toContain("<Hangup");
+  });
+  test("a room-stop checkpoint failure prevents provider I/O", async () => {
+    const f = await endedReplacementFixture();
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin raise exception 'Owned room stop write fault'; end $$`);
+    await sql.unsafe(`create trigger ${fault} before update of conference_stop_requested_at on public.workspace_voice_audio_connection
+      for each row when (new.conference_stop_requested_at is not null) execute function public.${fault}()`);
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
+    expect(rooms.fetch).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled();
+  });
+  test("concurrent workers claim a terminal owner's pending room stop once", async () => {
+    const f = await failRoomStop(); await ageRoomStop(f.row);
+    const { claimVoiceAudioRecovery } = await import("@/server/voice-audio-lifecycle.server");
+    const claims = await Promise.all(Array.from({ length: 3 }, () => claimVoiceAudioRecovery(1)));
+    expect(claims.flat().map(r => r.id)).toEqual([f.row.id]);
+  });
+  test("an old stop lease cannot perform provider I/O after another worker claims it", async () => {
+    const f = await failRoomStop(), old = await journal.findVoiceAudioConnection(f.row.id); if (!old) throw new Error("Saved stop required");
+    await ageRoomStop(f.row); const { claimVoiceAudioRecovery } = await import("@/server/voice-audio-lifecycle.server");
+    const [claimed] = await claimVoiceAudioRecovery(1); if (!claimed) throw new Error("Claimed stop required");
+    rooms.fetch.mockClear(); rooms.update.mockClear(); const { attemptVoiceAudioConferenceStop } = await import("@/lib/voice-audio-stop.server");
+    expect(await attemptVoiceAudioConferenceStop(old)).toBeNull(); expect(rooms.fetch).not.toHaveBeenCalled();
+    expect(await attemptVoiceAudioConferenceStop(claimed)).toMatchObject({ conference_stopped_at: expect.any(Date) });
+    expect(rooms.update).toHaveBeenCalledOnce();
+  });
+  test("a room acknowledgement write failure is recovered after the provider has stopped it", async () => {
+    const f = await endedReplacementFixture();
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$ begin raise exception 'Owned stop acknowledgement fault'; end $$`);
+    await sql.unsafe(`create trigger ${fault} before update of conference_stopped_at on public.workspace_voice_audio_connection
+      for each row when (new.conference_stopped_at is not null) execute function public.${fault}()`);
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
+    expect(rooms.records.get(f.conferenceSid)?.status).toBe("completed");
+    await clearFault(); await ageRoomStop(f.row); const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, closed: 1 }); expect(rooms.update).toHaveBeenCalledOnce();
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeInstanceOf(Date);
+  });
+  test("room-stop recovery cannot use API credentials for another account", async () => {
+    const f = await failRoomStop(); await ageRoomStop(f.row); web.accountSid = `AC${randomUUID().replaceAll("-", "")}`;
+    rooms.fetch.mockClear(); rooms.update.mockClear(); const { runVoiceAudioRecovery } = await import("@/lib/voice-audio-recovery.server");
+    expect(await runVoiceAudioRecovery()).toMatchObject({ examined: 1, pending: 1 });
+    expect(rooms.fetch).not.toHaveBeenCalled(); expect(rooms.update).not.toHaveBeenCalled();
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeNull();
+  });
+  test("a room stop in flight blocks a concurrent new audio request", async () => {
+    const f = await endedReplacementFixture(); let entered!: () => void, release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; }), blocked = new Promise<void>(resolve => { release = resolve; });
+    rooms.update.mockImplementationOnce(async (id: string) => {
+      entered(); await blocked; const room = rooms.records.get(id); if (!room) throw new Error("Owned room required");
+      room.status = "completed"; return room;
+    });
+    const pending = signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false));
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([started, new Promise<never>((_resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error("Owned conference stop did not reach provider I/O")), 3000);
+      })]);
+      expect((await apiPost({ workspaceId, phoneNumber: phone, callSid: f.target.child,
+        expected_agent_sid: f.target.parent, connection_intent_id: randomUUID() })).status).toBe(409);
+      expect(web.create).not.toHaveBeenCalled();
+    } finally { clearTimeout(deadline); release(); expect((await pending).status).toBe(204); }
+  });
+  test("an accepted replacement cannot receive join instructions after a room stop starts", async () => {
+    const f = await endedReplacementFixture(), next = await claim(await prepare({ ...f.target.args, intentId: randomUUID() }));
+    const accepted = await journal.recordVoiceAudioProvider(next, sid()); rooms.update.mockRejectedValueOnce(new Error("Room stop unavailable"));
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
+    expect(await issueVoiceAudioInstruction(accepted, "1")).toEqual({ ok: false, reason: "stale_audio" });
+    expect((await journal.findVoiceAudioConnection(next.id))?.voice_issued_at).toBeNull();
+    expect((await journal.findVoiceAudioConnection(next.id))?.cancel_requested_at).toBeInstanceOf(Date);
+  });
+  test("a late initial phone join cannot activate while an older idle room is ending", async () => {
+    const first = await observeVoiceAudioConferenceEvent(joined(await issued())); if (!first?.conference_sid) throw new Error("Active idle phone required");
+    const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server"); await observeVoiceAudioStatus(first, "completed", "10");
+    const next = await issued();
+    rooms.records.set(first.conference_sid, { sid: first.conference_sid, accountSid, friendlyName: first.conference_id, status: "in-progress" });
+    rooms.update.mockRejectedValueOnce(new Error("Idle room stop unavailable"));
+    expect((await signedAudio(first.conference_callback, { AccountSid: accountSid, CallSid: first.provider_sid ?? "", FriendlyName: first.conference_id,
+      ConferenceSid: first.conference_sid, ParticipantLabel: `audio:${first.id}:${first.generation}`, Muted: "false",
+      StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" })).status).toBe(500);
+    expect(await observeVoiceAudioConferenceEvent(joined(next))).toMatchObject({ state: "failed", committed_at: null, cancel_requested_at: expect.any(Date) });
   });
 });

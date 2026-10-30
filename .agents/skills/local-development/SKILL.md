@@ -554,6 +554,10 @@ links null, scope surviving links to the tenant and lock them through insertion.
 Prove signed callbacks, lost replies, known-SID recovery and repeated settlement;
 do not infer a rejection or send another call because a local link disappeared.
 
+For a new-operation fixture, generate a fresh intent UUID and assert a new ID
+and prepared state before testing its send. Reusing an earlier intent exercises
+accepted replay, even when the target call is the same.
+
 Use command-scoped `VITEST_MAX_WORKERS=1` for shared real-database suites.
 Vitest applies this environment override after `fileParallelism: false`, so a
 broader gate's two-worker setting can let a global recovery scan claim another

@@ -35,6 +35,12 @@ terminal. Its terminal status does not end the logical bridge. A genuine
 current parent or customer hangup must still reach the conference-end owner;
 a source retired by a committed successor cannot end that room.
 
+Save a room-stop intent before provider I/O. Recover that intent even after
+its callback owner becomes terminal or ordinary call-row repair clears an
+error. A lost acknowledgement needs a verified read of the same account,
+conference name and SID. Block new audio work for the actor while the stop
+is pending. Order source retirement and stop intent under the workspace lock.
+
 A participant event does not establish final call duration. Keep final billing
 on the recipient call-status contract. For a funded predictive start, emit the
 agent's conference TwiML first; use its validated join event to claim the first

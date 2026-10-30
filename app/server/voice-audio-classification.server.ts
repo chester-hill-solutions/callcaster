@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { workspace_voice_audio_connection as connections, workspace_voice_reservation as reservations } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
@@ -20,6 +20,13 @@ export async function hasActiveVoiceAudioCustomer(tdb: TenantDb, conferenceId: s
 export async function hasFundedAgentVoice(tdb: TenantDb, userId: string) {
   const row = await tdb.workspace_voice_reservation.findFirst({ where: and(
     eq(reservations.user_id, userId), eq(reservations.kind, "staffed"), inArray(reservations.state, ["reserved", "creating", "active"]),
+  ), columns: { id: true } });
+  return Boolean(row);
+}
+
+export async function hasPendingVoiceAudioConferenceStop(tdb: TenantDb, userId: string) {
+  const row = await tdb.workspace_voice_audio_connection.findFirst({ where: and(
+    eq(connections.user_id, userId), isNotNull(connections.conference_stop_requested_at), isNull(connections.conference_stopped_at),
   ), columns: { id: true } });
   return Boolean(row);
 }

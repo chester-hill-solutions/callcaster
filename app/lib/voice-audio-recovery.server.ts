@@ -6,6 +6,8 @@ import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
 import { logger } from "@/lib/logger.server";
 import { findVoiceAudioConnection, recordVoiceAudioProvider, type VoiceAudioConnection } from "@/server/voice-audio-connection.server";
 import { claimVoiceAudioRecovery, claimVoiceAudioStop, expireUnsentVoiceAudio, observeVoiceAudioStatus } from "@/server/voice-audio-lifecycle.server";
+import { hasUnfinishedVoiceAudioConferenceStop } from "@/server/voice-audio-stop.server";
+import { attemptVoiceAudioConferenceStop } from "@/lib/voice-audio-stop.server";
 
 function matchesAudioLeg(row: VoiceAudioConnection, physical: CallInstance) {
   return physical.accountSid === row.account_sid && physical.to === row.destination && physical.from === row.caller_id &&
@@ -41,6 +43,12 @@ export async function recoverVoiceAudioConnectionCall(row: VoiceAudioConnection,
 }
 
 async function reconcileAudio(row: VoiceAudioConnection): Promise<"closed" | "expired" | "pending"> {
+  if (hasUnfinishedVoiceAudioConferenceStop(row)) {
+    const stopped = await attemptVoiceAudioConferenceStop(row);
+    if (!stopped) return "pending";
+    if (stopped.terminal_at) return "closed";
+    row = stopped;
+  }
   if (!row.send_started_at && row.state === "prepared") return await expireUnsentVoiceAudio(row) ? "expired" : "pending";
   const client = await createOriginalVoiceAccountClient(row);
   const physical = row.provider_sid ? await client.calls(row.provider_sid).fetch() : await findUnknownAudioLeg(row, client);

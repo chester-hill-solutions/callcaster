@@ -37,7 +37,7 @@ export async function bindVoiceContinuation(owner: VoiceReservation, params: Rec
       eq(audio.original_agent_sid, row.setup_sid ?? ""), eq(audio.source_agent_sid, row.setup_sid ?? ""),
       isNull(audio.source_connection_id), isNotNull(audio.promotion_requested_at),
       isNotNull(audio.voice_issued_at), isNotNull(audio.joined_at), isNotNull(audio.conference_sid), isNotNull(audio.provider_sid),
-      isNull(audio.committed_at),
+      isNull(audio.committed_at), isNull(audio.conference_stop_requested_at),
     )).limit(2).for("update");
     if (extra) throw new VoiceAudioBindingError("Manual continuation has ambiguous promotion ownership");
     if (!candidate || row.state !== "active" || row.setup_terminal_at || !row.provider_sid || candidate.customer_sid !== row.provider_sid)

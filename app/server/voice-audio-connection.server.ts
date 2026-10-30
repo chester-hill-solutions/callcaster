@@ -8,6 +8,8 @@ import { PENDING_VOICE_AUDIO_STATES, VoiceAudioBindingError, voiceAudioOperation
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
 import { lockVoiceAudioActor, resolveVoiceAudioAdmission } from "./voice-audio-admission.server";
 import { persistVoiceAudioCall } from "./voice-audio-call-record.server";
+import { hasPendingVoiceAudioConferenceStop } from "./voice-audio-classification.server";
+import type { TenantDb } from "./tenant-db";
 
 export type VoiceAudioConnection = typeof connections.$inferSelect;
 const LEASE_MS = 5 * 60_000;
@@ -32,15 +34,21 @@ function sameRequest(row: VoiceAudioConnection, args: VoiceAudioConnectionInput)
     (args.callSid ? args.campaignId == null && row.source_agent_sid === args.expectedAgentSid : row.campaign_id === (args.campaignId ?? null));
 }
 
+async function replayVoiceAudioIntent(tdb: TenantDb, args: VoiceAudioConnectionInput) {
+  const prior = await tdb.workspace_voice_audio_connection.findFirst({ where: and(
+    eq(connections.user_id, args.userId), eq(connections.intent_id, args.intentId),
+  ) });
+  if (prior) return sameRequest(prior, args) ? { ok: true as const, connection: prior, replayed: true } : voiceAudioRefusal("intent_conflict");
+  return await hasPendingVoiceAudioConferenceStop(tdb, args.userId) ? voiceAudioRefusal("connection_pending") : null;
+}
+
 /** One actor lock serializes intent replay, pending replacement and generations. */
 export async function prepareVoiceAudioConnection(args: VoiceAudioConnectionInput & { baseUrl: string }) {
   return db.transaction(async (tx) => {
     const actor = await lockVoiceAudioActor(tx, args);
     if (!actor.ok) return actor;
-    const prior = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: and(
-      eq(connections.user_id, args.userId), eq(connections.intent_id, args.intentId),
-    ) });
-    if (prior) return sameRequest(prior, args) ? { ok: true as const, connection: prior, replayed: true } : voiceAudioRefusal("intent_conflict");
+    const replay = await replayVoiceAudioIntent(actor.tdb, args);
+    if (replay) return replay;
     const current = await actor.tdb.workspace_voice_audio_connection.findFirst({ where: and(
       eq(connections.user_id, args.userId), eq(connections.state, "active"),
     ) }) ?? null;
@@ -89,6 +97,7 @@ export async function claimVoiceAudioSend(row: VoiceAudioConnection) {
   return db.transaction(async (tx) => {
     const args = voiceAudioSavedInput(row), actor = await lockVoiceAudioActor(tx, args);
     if (!actor.ok) return actor;
+    if (await hasPendingVoiceAudioConferenceStop(actor.tdb, row.user_id)) return voiceAudioRefusal("connection_pending");
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!current || current.user_id !== row.user_id || current.lease_token !== row.lease_token || current.state !== "prepared" ||
         current.send_started_at || current.cancel_requested_at || current.lease_expires_at.getTime() <= Date.now())
