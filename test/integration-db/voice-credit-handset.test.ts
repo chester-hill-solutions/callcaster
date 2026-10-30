@@ -70,6 +70,7 @@ describe("funded handset SDK dispatch (#2879)", () => {
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
     await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
+    await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     await sql`update public.workspace set credits = 100, disabled = false, archived_at = null where id = ${workspaceId}::uuid`;
     await sql`update public."user" set access_level = 'standard' where id = ${actor}::uuid`;
@@ -150,12 +151,47 @@ describe("funded handset SDK dispatch (#2879)", () => {
     expect(xml).toMatch(/<Dial[^>]*\bmethod="POST"/);
     expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
   });
+  test("a new SDK Dial commits its recording nonce with the real inbound root", async () => {
+    const reservation = await reserve(), physical = root(), response = await signedVoice(reservation.id, physical);
+    const xml = await response.text(), callback = xml.match(/recordingStatusCallback="([^"]+)"/)?.[1];
+    if (!callback) throw new Error("Owned SDK recording callback required");
+    const url = new URL(callback.replaceAll("&amp;", "&")); expect(url.hash).not.toBe(""); url.hash = "";
+    const [recording] = await sql`select id, state, send_started_at, source_call_sid, source_from, source_to, source_direction, callback_url
+      from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+    expect(recording).toMatchObject({ state: "creating", source_call_sid: physical.sid, source_from: `client:${identity}`,
+      source_to: "", source_direction: "inbound", callback_url: `https://handset-credit.example.test/api/voice-recording?recording=${recording.id}` });
+    expect(recording.send_started_at).not.toBeNull(); expect(url.href).toBe(recording.callback_url);
+    expect(xml).toContain('recordingStatusCallbackEvent="in-progress completed absent"');
+    expect(xml).toContain('recordingStatusCallbackMethod="POST"'); expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+  });
+  test("a recording checkpoint fault rolls back SDK customer permission and call persistence", async () => {
+    const reservation = await reserve(), physical = root(), name = `owned_sdk_recording_${randomUUID().replaceAll("-", "")}`;
+    await sql.unsafe(`create function public.${name}() returns trigger language plpgsql as $$begin
+      if new.workspace = '${workspaceId}'::uuid and new.state = 'creating' then return null; end if; return new; end$$`);
+    await sql.unsafe(`create trigger ${name} before update on public.workspace_voice_recording_operation for each row execute function public.${name}()`);
+    try {
+      expect(await (await signedVoice(reservation.id, physical)).text()).not.toContain("<Number");
+      const [row] = await sql`select recipient_instruction_issued_at, setup_sid from public.workspace_voice_reservation where id = ${reservation.id}::uuid`;
+      const [recording] = await sql`select state, send_started_at from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+      expect(row).toEqual({ recipient_instruction_issued_at: null, setup_sid: null });
+      expect(recording).toEqual({ state: "prepared", send_started_at: null });
+      expect(await state()).toEqual({ credits: 100, holds: 1, calls: 0, ledger: 0 });
+    } finally {
+      await sql.unsafe(`drop trigger if exists ${name} on public.workspace_voice_recording_operation`);
+      await sql.unsafe(`drop function if exists public.${name}()`);
+    }
+    expect(await (await signedVoice(reservation.id, physical)).text()).toContain("<Number");
+    expect(await state()).toEqual({ credits: 100, holds: 1, calls: 1, ledger: 0 });
+  });
   test("an already issued SDK customer cannot acquire a missing continuation on retry", async () => {
     const { reservation, physical } = await dial();
+    await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`update public.workspace_voice_reservation set setup_continuation_url = null where id = ${reservation.id}::uuid`;
     const response = await signedVoice(reservation.id, physical); expect(await response.text()).not.toContain("<Number");
     const [row] = await sql`select setup_continuation_url from public.workspace_voice_reservation where id = ${reservation.id}::uuid`;
     expect(row.setup_continuation_url).toBeNull(); expect(await state()).toMatchObject({ holds: 1, ledger: 0 });
+    const recordings = await sql`select id from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+    expect(recordings).toEqual([]);
   });
   test("ordinary SDK parent completion leaves its existing customer and hold unchanged", async () => {
     const { reservation, physical, child } = await dial();
@@ -304,6 +340,8 @@ describe("funded handset SDK dispatch (#2879)", () => {
       requestUrl: "https://handset-credit.example.test/api/call", statusCallback: "https://handset-credit.example.test/api/call-status",
     }, () => { throw new Error("Owned instruction failure"); })).rejects.toThrow("Owned instruction failure");
     expect(await state()).toEqual({ credits: 100, holds: 1, calls: 0, ledger: 0 });
+    const [recording] = await sql`select state, send_started_at from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
+    expect(recording).toEqual({ state: "prepared", send_started_at: null });
     expect(await (await signedVoice(reservation.id, physical)).text()).toContain("<Number");
   });
   test("refuses a provider client on a different account", async () => {

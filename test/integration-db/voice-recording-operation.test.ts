@@ -10,11 +10,12 @@ import { asRouteResponse, routeArgs } from "../helpers/route-result";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 vi.hoisted(() => { process.env.TZ = "UTC"; process.env.BASE_URL = "https://recording-journal.example.test"; process.env.TWILIO_VALIDATE_WEBHOOKS = "true"; });
-const io = vi.hoisted(() => ({ fetch: vi.fn(), upload: vi.fn(),
+const io = vi.hoisted(() => ({ fetch: vi.fn(), upload: vi.fn(), download: vi.fn(),
   media: new Map<string, Uint8Array>(), objects: new Map<string, Uint8Array>(),
 }));
 vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/object-storage.server")>(), uploadObject: io.upload,
+  downloadObject: io.download,
 }));
 vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/workspace-events.server")>(),
@@ -45,6 +46,7 @@ describe("owned recording parts (#2879)", () => {
     const url = process.env.INTEGRATION_DB_URL ?? process.env.DATABASE_URL;
     if (!url) throw new Error("Owned database URL required");
     sql = postgres(url, { max: 3, onnotice: () => {} });
+    await sql`insert into public."user" (id, username) values (${actor}::uuid, ${`recording-${actor}@example.test`})`;
     await sql`insert into public.workspace (id, name, credits, twilio_data) values
       (${workspaceId}::uuid, 'Owned recording journal fixture', 100, ${sql.json({ sid: accountSid, authToken: "owned-recording-token" })}),
       (${foreignId}::uuid, 'Foreign recording journal control', 100, '{}'::jsonb)`;
@@ -59,6 +61,7 @@ describe("owned recording parts (#2879)", () => {
   async function clearFault() {
     await sql.unsafe(`drop trigger if exists ${fault} on public.job`);
     await sql.unsafe(`drop trigger if exists ${fault} on public.workspace_voice_recording_operation`);
+    await sql.unsafe(`drop trigger if exists ${fault} on public.call`);
     await sql.unsafe(`drop function if exists public.${fault}()`);
   }
   beforeEach(async () => {
@@ -71,17 +74,19 @@ describe("owned recording parts (#2879)", () => {
     io.upload.mockReset().mockImplementation(async (bucket: string, path: string, bytes: Uint8Array) => {
       io.objects.set(`${bucket}:${path}`, Uint8Array.from(bytes));
     });
+    io.download.mockReset().mockResolvedValue(Buffer.from("owned batch input"));
     vi.stubGlobal("fetch", io.fetch);
     await clearFault();
     await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
+    await sql`delete from public.call where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_recording_operation where workspace = ${workspaceId}::uuid`;
     await sql`delete from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
-    await sql`update public.workspace set twilio_data = ${sql.json({ sid: accountSid, authToken: token })} where id = ${workspaceId}::uuid`;
+    await sql`update public.workspace set feature_flags = '{}'::jsonb, twilio_data = ${sql.json({ sid: accountSid, authToken: token })} where id = ${workspaceId}::uuid`;
     const { invalidateWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
     invalidateWorkspaceTwilioData(workspaceId);
   });
   afterEach(async () => {
-    await clearFault(); vi.unstubAllGlobals();
+    await clearFault(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
     const [owned] = await sql`select credits,
       (select count(*)::int from public.transaction_history where workspace = ${workspaceId}::uuid) as ledger
       from public.workspace where id = ${workspaceId}::uuid`;
@@ -97,6 +102,7 @@ describe("owned recording parts (#2879)", () => {
         await clearFault();
         await sql`delete from public.job where workspace_id = ${workspaceId}::uuid`;
         await sql`delete from public.workspace where id in (${workspaceId}::uuid, ${foreignId}::uuid)`;
+        await sql`delete from public."user" where id = ${actor}::uuid`;
       }
     } finally {
       await sql?.end();
@@ -123,10 +129,12 @@ describe("owned recording parts (#2879)", () => {
   async function arm(reservation: Reservation, operation: Operation, rootSid = operation.source_call_sid) {
     const { db } = await import("@/server/db");
     const { workspace_voice_reservation: reservations } = await import("@/db/schema");
+    const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
     return db.transaction(async (tx) => {
       const [issued] = await tx.update(reservations).set({ setup_sid: rootSid, state: "creating",
         send_started_at: new Date(), recipient_instruction_issued_at: new Date() }).where(eq(reservations.id, reservation.id)).returning();
       if (!issued) throw new Error("Owned fixture instruction required");
+      await persistReservedVoiceCall(tx, issued, rootSid, "setup");
       return journal.armVoiceDialRecording(tx, issued, operation.id);
     });
   }
@@ -175,6 +183,19 @@ describe("owned recording parts (#2879)", () => {
   }
   async function ageCopy(row: Operation) {
     await sql`update public.workspace_voice_recording_operation set lease_expires_at = now() - interval '1 minute' where id = ${row.id}::uuid`;
+  }
+  async function nextCapture(operation: Operation, sent = true) {
+    const id = randomUUID(), url = `${baseUrl}/api/voice-recording?recording=${id}`;
+    // No API-create path is enabled. This is an explicit later-phase journal fixture.
+    await sql`insert into public.workspace_voice_recording_operation
+      (id, workspace, reservation_id, user_id, kind, intent_id, logical_call_sid, source_call_sid,
+       source_to, source_from, source_direction, account_sid, callback_url, state, send_started_at, lease_token, lease_expires_at)
+      select ${id}::uuid, workspace, reservation_id, user_id, 'parent', ${randomUUID()}::uuid, logical_call_sid, source_call_sid,
+        source_to, source_from, source_direction, account_sid, ${url}, ${sent ? "creating" : "prepared"},
+        ${sent ? new Date() : null}, ${randomUUID()}::uuid, now()
+      from public.workspace_voice_recording_operation where id = ${operation.id}::uuid`;
+    const next = await journal.findVoiceRecordingOperation(id); if (!next) throw new Error("Owned later capture fixture required");
+    return next;
   }
 
   test("saves one immutable physical source and callback before sending", async () => {
@@ -440,6 +461,10 @@ describe("owned recording parts (#2879)", () => {
     expect(await runQueued()).toEqual({ copied: true });
     const path = `call-recordings/${workspaceId}/recording-${operation.logical_call_sid}-${params.RecordingSid}.mp3`;
     expect((await read(operation))?.audio_url).toBe(path);
+    const [playback] = await sql`select recording_sid, recording_url, recording_duration, audio_url from public.call
+      where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    expect(playback).toEqual({ recording_sid: params.RecordingSid, recording_duration: "71", audio_url: path,
+      recording_url: `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${params.RecordingSid}.mp3` });
     expect(io.objects.get(`workspaceAudio:${path}`)).toEqual(media.bytes);
     expect(io.fetch).toHaveBeenCalledExactlyOnceWith(media.url, { headers: { Authorization: `Basic ${Buffer.from(`${accountSid}:${token}`).toString("base64")}` } });
     expect(await runQueued()).toEqual({ copied: false });
@@ -452,6 +477,54 @@ describe("owned recording parts (#2879)", () => {
     await expect(runQueued(0, null)).rejects.toThrow(/no workspace/);
     expect(io.fetch).not.toHaveBeenCalled(); expect((await read(operation))?.audio_url).toBeNull();
     expect(await runQueued()).toEqual({ copied: true });
+  });
+  test.each(["account_sid", "to", "from", "direction", "parent_call_sid", "recording_sid", "audio_url"])(
+    "a changed call %s cannot receive the initial playback pointer", async (field) => {
+      const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
+      expect((await signedCallback(operation, params)).status).toBe(204);
+      await sql`update public.call set ${sql(field)} = ${field === "parent_call_sid" ? operation.source_call_sid : "another-owner"}
+        where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+      const [before] = await sql`select * from public.call where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+      await expect(runQueued()).rejects.toThrow(/playback acknowledgement/);
+      const [after] = await sql`select * from public.call where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+      expect(after).toEqual(before);
+      expect(await read(operation)).toMatchObject({ provider_sid: params.RecordingSid, provider_status: "completed", audio_url: null });
+    },
+  );
+  test("a missing product call keeps accepted media retryable until the call is repaired", async () => {
+    const { reservation, operation } = await armed(), params = callbackParams(operation); const media = providerMedia(params);
+    expect((await signedCallback(operation, params)).status).toBe(204);
+    await sql`delete from public.call where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    await expect(runQueued()).rejects.toThrow(/playback acknowledgement/);
+    expect(await read(operation)).toMatchObject({ provider_sid: params.RecordingSid, provider_status: "completed", audio_url: null });
+    expect(io.objects.size).toBe(1);
+    const { db } = await import("@/server/db");
+    const { persistReservedVoiceCall } = await import("@/server/voice-reservation-callback.server");
+    await db.transaction((tx) => persistReservedVoiceCall(tx, { ...reservation, setup_sid: operation.source_call_sid }, operation.source_call_sid, "setup"));
+    await ageCopy(operation); await copyWorker.runVoiceRecordingCopyRecovery();
+    expect(await runQueued(1)).toEqual({ copied: true });
+    const saved = await read(operation);
+    expect(io.objects.get(`workspaceAudio:${saved?.audio_url}`)).toEqual(media.bytes); expect(io.objects.size).toBe(1);
+    const [playback] = await sql`select recording_sid, audio_url from public.call
+      where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    expect(playback).toEqual({ recording_sid: params.RecordingSid, audio_url: saved?.audio_url });
+  });
+  test("a lost playback write rolls back the copy acknowledgement and recovers the same bytes", async () => {
+    const { operation } = await armed(), params = callbackParams(operation); const media = providerMedia(params);
+    expect((await signedCallback(operation, params)).status).toBe(204);
+    await sql.unsafe(`create function public.${fault}() returns trigger language plpgsql as $$begin
+      if new.workspace = '${workspaceId}'::uuid and new.audio_url is not null then return null; end if;
+      return new; end$$`);
+    await sql.unsafe(`create trigger ${fault} before update on public.call for each row execute function public.${fault}()`);
+    await expect(runQueued()).rejects.toThrow(/playback acknowledgement/);
+    expect((await read(operation))?.audio_url).toBeNull();
+    const [pending] = await sql`select recording_sid, audio_url from public.call
+      where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    expect(pending).toEqual({ recording_sid: null, audio_url: null });
+    await clearFault(); await ageCopy(operation); await copyWorker.runVoiceRecordingCopyRecovery();
+    expect(await runQueued(1)).toEqual({ copied: true });
+    expect(io.objects.get(`workspaceAudio:${(await read(operation))?.audio_url}`)).toEqual(media.bytes);
+    expect(io.objects.size).toBe(1);
   });
   test("an expired delivery cannot copy after recovery transfers its lease", async () => {
     const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
@@ -540,15 +613,7 @@ describe("owned recording parts (#2879)", () => {
     const before = providerMedia(first, "conversation before the audio change");
     expect((await signedCallback(operation, first)).status).toBe(204);
     expect(await runQueued()).toEqual({ copied: true });
-    const nextId = randomUUID(), nextUrl = `${baseUrl}/api/voice-recording?recording=${nextId}`;
-    // The API-create journal is not enabled yet. This fixture represents a separately accepted capture phase.
-    await sql`insert into public.workspace_voice_recording_operation
-      (id, workspace, reservation_id, user_id, kind, intent_id, logical_call_sid, source_call_sid,
-       source_to, source_from, source_direction, account_sid, callback_url, state, send_started_at, lease_token, lease_expires_at)
-      select ${nextId}::uuid, workspace, reservation_id, user_id, 'parent', ${randomUUID()}::uuid, logical_call_sid, source_call_sid,
-        source_to, source_from, source_direction, account_sid, ${nextUrl}, 'creating', now(), ${randomUUID()}::uuid, now()
-      from public.workspace_voice_recording_operation where id = ${operation.id}::uuid`;
-    const next = await journal.findVoiceRecordingOperation(nextId); if (!next) throw new Error("Owned second capture fixture required");
+    const next = await nextCapture(operation);
     const second = callbackParams(next), after = providerMedia(second, "conversation after the audio change");
     expect((await signedCallback(next, second)).status).toBe(204);
     expect(await runQueued(1)).toEqual({ copied: true });
@@ -560,8 +625,62 @@ describe("owned recording parts (#2879)", () => {
     expect(io.objects.get(`workspaceAudio:${firstSaved?.audio_url}`)).toEqual(before.bytes);
     expect(io.objects.get(`workspaceAudio:${secondSaved?.audio_url}`)).toEqual(after.bytes);
     expect(io.objects.size).toBe(2);
+    const [playback] = await sql`select recording_sid, audio_url from public.call
+      where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+    expect(playback).toEqual({ recording_sid: first.RecordingSid, audio_url: firstSaved?.audio_url });
     const [holds] = await sql`select count(*)::int as count from public.workspace_voice_reservation where workspace = ${workspaceId}::uuid`;
     expect(holds.count).toBe(1);
+  });
+  test.each([false, true])("initial playback keeps the existing batch flag (%s)", async (enabled) => {
+    const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
+    await sql`update public.workspace set feature_flags = ${sql.json({ batchTranscription: enabled })} where id = ${workspaceId}::uuid`;
+    expect((await signedCallback(operation, params)).status).toBe(204);
+    expect(await runQueued()).toEqual({ copied: true });
+    const jobs = await sql`select params from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`;
+    expect(jobs).toEqual(enabled ? [{ params: { callSid: operation.logical_call_sid } }] : []);
+    expect(await runQueued()).toEqual({ copied: false });
+    const [count] = await sql`select count(*)::int as count from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`;
+    expect(count.count).toBe(enabled ? 1 : 0);
+  });
+  test("a prepared second capture withholds whole-call batch while preserving both parts", async () => {
+    const { operation } = await armed(), params = callbackParams(operation); const media = providerMedia(params);
+    await sql`update public.workspace set feature_flags = '{"batchTranscription":true}'::jsonb where id = ${workspaceId}::uuid`;
+    const next = await nextCapture(operation, false);
+    expect((await signedCallback(operation, params)).status).toBe(204);
+    expect(await runQueued()).toEqual({ copied: true });
+    const jobs = await sql`select id from public.job where workspace_id = ${workspaceId}::uuid and type = 'elevenlabs_batch_transcribe'`;
+    expect(jobs).toEqual([]); expect(await read(next)).toEqual(next);
+    expect(io.objects.get(`workspaceAudio:${(await read(operation))?.audio_url}`)).toEqual(media.bytes);
+  });
+  test.each(["before download", "during transcription"])("a stale batch waits for segment assembly %s", async (phase) => {
+    const { operation } = await armed(), params = callbackParams(operation); providerMedia(params);
+    await sql`update public.workspace set feature_flags = '{"batchTranscription":true}'::jsonb where id = ${workspaceId}::uuid`;
+    expect((await signedCallback(operation, params)).status).toBe(204); expect(await runQueued()).toEqual({ copied: true });
+    vi.stubEnv("ELEVENLABS_API_KEY", "owned-batch-key");
+    if (phase === "before download") await nextCapture(operation, false);
+    else io.fetch.mockImplementationOnce(async (url: string) => {
+      if (url !== "https://api.elevenlabs.io/v1/speech-to-text") throw new Error("Owned batch boundary required");
+      await nextCapture(operation, false); return Response.json({ text: "partial conversation" });
+    });
+    const { elevenlabsBatchTranscribeHandler } = await import("@/lib/worker/handlers/elevenlabs-batch-transcribe.server");
+    try {
+      const result = await elevenlabsBatchTranscribeHandler({ params: { callSid: operation.logical_call_sid } } as ClaimedJobRow);
+      const [billing] = await sql`select credits, (select count(*)::int from public.transaction_history where workspace = ${workspaceId}::uuid) as ledger
+        from public.workspace where id = ${workspaceId}::uuid`;
+      expect(billing).toEqual({ credits: 100, ledger: 0 });
+      expect(result).toEqual({ status: "skipped", reason: "recording_parts_pending" });
+      expect(io.download).toHaveBeenCalledTimes(phase === "before download" ? 0 : 1);
+      const [call] = await sql`select transcript_id from public.call where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+      expect(call.transcript_id).toBeNull();
+      const rows = await sql`select id from public.call_transcript where call_sid = ${operation.logical_call_sid}`;
+      expect(rows).toEqual([]);
+    } finally {
+      // A deliberately broken worker can write these owned rows. Drain them before the fixture's invariant checks.
+      await sql`update public.call set transcript_id = null where workspace = ${workspaceId}::uuid and sid = ${operation.logical_call_sid}`;
+      await sql`delete from public.call_transcript where call_sid = ${operation.logical_call_sid}`;
+      await sql`delete from public.transaction_history where workspace = ${workspaceId}::uuid`;
+      await sql`update public.workspace set credits = 100 where id = ${workspaceId}::uuid`;
+    }
   });
   test("recovery excludes unfinished, absent, already stored and leased parts", async () => {
     const { operation } = await armed();

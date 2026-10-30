@@ -11,6 +11,8 @@ import { reserveVoiceCreditsInTransaction, type VoiceReservation } from "./voice
 import { persistReservedVoiceCall } from "./voice-reservation-callback.server";
 import type { CreditTransaction } from "./outbound-credit-reservations.server";
 import { WORKSPACE_MEMBERSHIP_ROLES } from "@/lib/workspace-membership.server";
+import { env } from "@/lib/env.server";
+import { armVoiceDialRecording, prepareVoiceDialRecording, type VoiceRecordingOperation } from "./voice-recording-operation.server";
 
 type HandsetContext = { workspaceId: string; clientIdentity: string; userId: string };
 
@@ -76,7 +78,7 @@ function matchesHandsetRequest(row: VoiceReservation, args: HandsetVoiceRequest)
     args.from === `client:${args.clientIdentity}` && args.direction === "inbound" && !args.parentCallSid;
 }
 
-async function claimHandsetRecipient(row: VoiceReservation, args: HandsetVoiceRequest, root: VoiceSetupRoot) {
+async function claimHandsetRecipient(row: VoiceReservation, args: HandsetVoiceRequest, root: VoiceSetupRoot, recordingOperationId: string) {
   return db.transaction(async (tx) => {
     const [current] = await tx.select().from(reservations).where(and(
       eq(reservations.id, row.id), eq(reservations.workspace, args.workspaceId),
@@ -97,12 +99,14 @@ async function claimHandsetRecipient(row: VoiceReservation, args: HandsetVoiceRe
     }).where(eq(reservations.id, current.id)).returning();
     if (!issued) throw new Error("Handset recipient instruction was not saved");
     await persistReservedVoiceCall(tx, issued, root.sid, "setup");
+    await armVoiceDialRecording(tx, issued, recordingOperationId);
     return issued;
   });
 }
 
 /** Raw provider signature validation must precede this call. */
-export async function startPreparedHandsetVoiceRecipient<T>(args: HandsetVoiceRequest, buildInstruction: (row: VoiceReservation) => T) {
+export async function startPreparedHandsetVoiceRecipient<T>(args: HandsetVoiceRequest,
+  buildInstruction: (row: VoiceReservation, recording: VoiceRecordingOperation) => T) {
   if (!/^[0-9a-f-]{36}$/i.test(args.reservationId) || !/^CA[0-9a-f]{32}$/i.test(args.callSid)) return null;
   const row = await createTenantDb(args.workspaceId).workspace_voice_reservation.findFirst({
     where: eq(reservations.id, args.reservationId),
@@ -113,7 +117,9 @@ export async function startPreparedHandsetVoiceRecipient<T>(args: HandsetVoiceRe
   const root = await client.calls(args.callSid).fetch();
   if (root.sid !== args.callSid || !matchesVoiceSetupRoot(row, root) ||
       !["queued", "initiated", "ringing", "in-progress"].includes(root.status)) return null;
-  const instruction = buildInstruction({ ...row, setup_continuation_url: args.continuationUrl ?? row.setup_continuation_url });
-  const issued = await claimHandsetRecipient(row, args, root);
+  const recording = await prepareVoiceDialRecording(row, root, env.BASE_URL());
+  if (!recording) return null;
+  const instruction = buildInstruction({ ...row, setup_continuation_url: args.continuationUrl ?? row.setup_continuation_url }, recording);
+  const issued = await claimHandsetRecipient(row, args, root, recording.id);
   return issued ? { reservation: issued, instruction } : null;
 }

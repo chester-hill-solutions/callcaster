@@ -24,6 +24,11 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
     }),
 }));
 const workspaceMock = vi.fn(async () => null);
+vi.mock("@/server/voice-recording-operation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-operation.server")>(),
+  prepareVoiceDialRecording: async () => ({ id: "10000000-0000-4000-8000-000000000002",
+    callback_url: "https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002" }),
+}));
 vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/workspace-members-db.server")>(), getWorkspaceById: () => workspaceMock(),
 }));
@@ -78,9 +83,9 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     expect(body).not.toContain("machineDetection");
     expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
     expect(body).toMatch(/<Dial[^>]*record="record-from-answer"/);
-    expect(body).toMatch(/<Dial[^>]*recordingStatusCallback="https:\/\/base.example\/api\/recording"/);
-    expect(body).toMatch(/<Dial[^>]*recordingStatusCallbackEvent="completed"/);
-    expect(body).not.toContain('recordingStatusCallbackEvent="in-progress"');
+    expect(body).toContain('recordingStatusCallback="https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002#');
+    expect(body).toMatch(/<Dial[^>]*recordingStatusCallbackEvent="in-progress completed absent"/);
+    expect(body).toMatch(/<Dial[^>]*recordingStatusCallbackMethod="POST"/);
     expect(body).toContain(">+15550001111</Number>");
   }, 30000);
 

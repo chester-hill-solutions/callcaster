@@ -73,7 +73,14 @@ vi.mock("@/server/handset-voice-reservation.server", async (importOriginal) => (
   ...await importOriginal<typeof import("@/server/handset-voice-reservation.server")>(),
   startPreparedHandsetVoiceRecipient: async (_args: unknown, build: (row: {
     user_id: string; caller_id: string; recipient: string;
-  }) => unknown) => ({ instruction: build({ user_id: "user-1", caller_id: "+15550001111", recipient: "+15552223333" }) }),
+  }, recording: { callback_url: string }) => unknown) => ({ instruction: build(
+    { user_id: "user-1", caller_id: "+15550001111", recipient: "+15552223333" },
+    { callback_url: "https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002" }) }),
+}));
+vi.mock("@/server/voice-recording-operation.server", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/server/voice-recording-operation.server")>(),
+  prepareVoiceDialRecording: async () => ({ id: "10000000-0000-4000-8000-000000000002",
+    callback_url: "https://base.example/api/voice-recording?recording=10000000-0000-4000-8000-000000000002" }),
 }));
 vi.mock("@/lib/workspace-members-db.server", () => ({
   getWorkspaceById: (...a: unknown[]) => mocks.getWorkspaceById(...a),

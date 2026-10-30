@@ -5,6 +5,7 @@ import { RECORDING_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { claimVoiceRecordingCopy, deferVoiceRecordingCopy, findPendingVoiceRecordingCopies,
   finishVoiceRecordingCopy, startVoiceRecordingCopy } from "@/server/voice-recording-copy.server";
 import type { VoiceRecordingOperation } from "@/server/voice-recording-operation.server";
+import { enqueueCallRecordingTranscription } from "@/lib/call-recording-transcription.server";
 
 export async function enqueueVoiceRecordingCopy(owner: VoiceRecordingOperation) {
   const claimed = await claimVoiceRecordingCopy(owner);
@@ -27,7 +28,9 @@ export async function runVoiceRecordingCopy(workspaceId: string, operationId: st
   try {
     const result = await persistCallRecordingToStorage({ workspaceId: current.workspace, callSid: current.logical_call_sid,
       accountSid: current.account_sid, recordingSid: current.provider_sid, existingAudioUrl: current.audio_url, storageMode: "recording" });
-    return { copied: await finishVoiceRecordingCopy(current, result.audioUrl) };
+    const copied = await finishVoiceRecordingCopy(current, result.audioUrl);
+    if (copied && current.kind === "dial") await enqueueCallRecordingTranscription(current.workspace, current.logical_call_sid, result.audioUrl);
+    return { copied };
   } catch (error) {
     await deferVoiceRecordingCopy(current);
     throw error;

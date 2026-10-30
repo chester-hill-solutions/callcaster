@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger.server";
 import type { DeferredEmit } from "@/lib/campaign-queue-db.server";
 import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import { hasVoiceSetup, matchesVoiceSetupRoot } from "@/lib/voice-bridge-identity";
+import { armVoiceDialRecording } from "./voice-recording-operation.server";
 
 export type VoiceBridgeUrls = { voiceUrl: string; statusCallback: string; recipientStatusCallback: string; recipientVoiceUrl?: string; continuationUrl?: string };
 const TERMINAL = ["completed", "failed", "busy", "no-answer", "canceled"];
@@ -125,7 +126,7 @@ async function setupTransaction<T>(run: (tx: CreditTransaction, deferEmit: Defer
 }
 
 /** One committed instruction permits one customer leg, including early fetches. */
-export async function claimVoiceBridgeRecipient(args: VoiceBridgeSetupCallback) {
+export async function claimVoiceBridgeRecipient(args: VoiceBridgeSetupCallback, recordingOperationId: string) {
   return setupTransaction(async (tx, deferEmit) => {
     const { reservation: row } = await bindSetup(tx, args, deferEmit);
     if (row.state === "released" || row.state === "settled" || row.setup_terminal_at || row.recipient_instruction_issued_at) {
@@ -144,6 +145,7 @@ export async function claimVoiceBridgeRecipient(args: VoiceBridgeSetupCallback) 
     const [issued] = await tx.update(reservations).set({ recipient_instruction_issued_at: sql`clock_timestamp()`, updated_at: new Date() })
       .where(eq(reservations.id, row.id)).returning();
     if (!issued) throw new Error("Voice recipient instruction was not saved");
+    await armVoiceDialRecording(tx, issued, recordingOperationId);
     return { issued: true as const, reservation: issued };
   });
 }

@@ -38,11 +38,8 @@ import {
 import type { TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import {
-  ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
-  WEBHOOK_DELIVERY_JOB_TYPE,
-} from "@/lib/worker/job-types.server";
-import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
+import { WEBHOOK_DELIVERY_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { enqueueCallRecordingTranscription } from "@/lib/call-recording-transcription.server";
 import { isTerminalStatus, normalizeProviderStatus } from "@/lib/call-status";
 import { findVoiceReservationForCall } from "@/server/voice-bridge-reservation.server";
 import { dequeueFundedVoiceAttempt } from "@/server/voice-attempt-queue.server";
@@ -440,22 +437,7 @@ export async function runRecordingSideEffects(args: {
       // Batch transcription is default-off pending an undecided product policy
       // (see `batchTranscription` in @/lib/coaching-schemas). Suppress the
       // enqueue entirely rather than queueing work nothing will bill for.
-      if (await isBatchTranscriptionEnabled(callRow.workspace)) {
-        try {
-          await enqueueRegisteredJob({
-            type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
-            workspaceId: callRow.workspace,
-            params: { callSid: args.callSid },
-            dedupe: { kind: "idempotency", key: `elevenlabs_batch:${args.callSid}` },
-          });
-        } catch (error) {
-          logger.warn("elevenlabs_batch_transcribe.enqueue_failed", {
-            callSid: args.callSid,
-            workspaceId: callRow.workspace,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+      await enqueueCallRecordingTranscription(callRow.workspace, args.callSid, persistResult.audioUrl);
     }
   } else if (recordingSid && !accountSid) {
     logger.warn("call_recording.missing_account_sid", {

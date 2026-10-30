@@ -1,15 +1,32 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, isNotNull, isNull, lte } from "drizzle-orm";
-import { workspace_voice_recording_operation as recordings } from "@/db/schema";
-import { callRecordingPartStoragePath } from "@/lib/call-recording-storage.server";
+import { and, desc, eq, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { call, workspace_voice_recording_operation as recordings } from "@/db/schema";
+import { callRecordingPartStoragePath, twilioRecordingMp3Url } from "@/lib/call-recording-storage.server";
 import { VoiceRecordingBindingError } from "@/lib/voice-recording";
 import { db } from "./db";
 import { createTenantDb } from "./tenant-db";
 import { deferVoiceRecordingWork, withVoiceRecordingOperation, type VoiceRecordingOperation } from "./voice-recording-operation.server";
+import type { CreditTransaction } from "./outbound-credit-reservations.server";
 
 const LEASE_MS = 5 * 60_000;
 function needsCopy(row: VoiceRecordingOperation) {
   return row.provider_status === "completed" && row.provider_sid !== null && row.terminal_at !== null && row.audio_url === null;
+}
+
+/** Only the initial Dial owns the existing single-recording playback pointer. */
+async function projectInitialRecording(tx: CreditTransaction, row: VoiceRecordingOperation, audioUrl: string) {
+  if (row.kind !== "dial") return;
+  if (!row.provider_sid || row.logical_call_sid !== row.source_call_sid || row.source_parent_sid !== null)
+    throw new VoiceRecordingBindingError("Initial recording does not own a root call");
+  const [saved] = await createTenantDb(row.workspace, tx).call.update({
+    set: { recording_sid: row.provider_sid, recording_url: twilioRecordingMp3Url(row.account_sid, row.provider_sid),
+      recording_duration: row.recording_duration_seconds == null ? null : String(row.recording_duration_seconds),
+      audio_url: audioUrl, date_updated: new Date() },
+    where: and(eq(call.sid, row.logical_call_sid), eq(call.account_sid, row.account_sid),
+      eq(call.to, row.source_to), eq(call.from, row.source_from), eq(call.direction, row.source_direction), isNull(call.parent_call_sid),
+      or(isNull(call.recording_sid), eq(call.recording_sid, row.provider_sid)), or(isNull(call.audio_url), eq(call.audio_url, audioUrl))),
+  });
+  if (!saved) throw new Error("Initial recording playback acknowledgement was not saved");
 }
 
 /** Save delivery ownership before enqueue; an expired delivery can be reclaimed. */
@@ -46,6 +63,7 @@ export async function finishVoiceRecordingCopy(owner: VoiceRecordingOperation, a
     const [saved] = await tx.update(recordings).set({ audio_url: audioUrl, last_error: null, updated_at: new Date() })
       .where(eq(recordings.id, current.id)).returning();
     if (!saved) throw new Error("Stored recording acknowledgement was not saved");
+    await projectInitialRecording(tx, saved, audioUrl);
     return true;
   });
 }
