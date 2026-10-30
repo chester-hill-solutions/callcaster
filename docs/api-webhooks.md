@@ -50,6 +50,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | POST | `/api/voice-audio` | Operation-bound agent audio instructions, status and conference events |
 | GET | `/api/connect-campaign-conference/:workspaceId/:campaignId` | Legacy campaign conference voice URL |
 | POST | `/api/voice-continuation` | Signed manual and SDK parent continuation; live handoff integration in progress |
+| POST | `/api/voice-recording` | Saved recording operation status and queued recording-part copies; initial call wiring in progress |
 | POST | `/api/caller-id/status` | Caller ID verification status |
 
 `POST /api/auto-dial/status` handles a signed `participant-leave` event with
@@ -117,6 +118,19 @@ local acknowledgements retain the intent; an already completed room does not
 need another provider update. New audio preparation, sends and initial
 activation cannot proceed while an earlier room stop is pending. Live
 customer promotion, transport commit and media continuity remain unfinished.
+
+`POST /api/voice-recording?recording=<uuid>` accepts only the saved recording
+operation's original account, physical CallSid, source and RecordingSid. It
+validates the raw signature before alias normalization. A replacement account
+token cannot authenticate an old account's operation. The send checkpoint must
+already exist. Completed parts are saved before the existing recording job
+queues their copy. Each part uses a distinct storage key under its logical
+call. A delivery lease fences stale jobs. The existing one-minute voice recovery
+job retries completed parts with no stored copy, including after queue failure
+or a lost storage reply. Initial Dial wiring and media hydration remain in
+development; this callback does not create a recording or bill the call.
+Agent audio and parent continuation callbacks use the same original-account
+check and strict raw form reader.
 
 ## Stripe
 

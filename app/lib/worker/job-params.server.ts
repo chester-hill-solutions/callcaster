@@ -227,9 +227,10 @@ export const smsStatusSideEffectsParams = sidAndTwilioParamsSchema(
   "messageSid",
   "sms_status_side_effects",
 );
-export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
-  "recording_side_effects",
-);
+export const recordingSideEffectsParams = z.union([
+  z.strictObject({ recordingOperationId: z.uuid(), leaseToken: z.uuid() }),
+  voiceSideEffectsParamsSchema("recording_side_effects"),
+]);
 
 /** The repair sweep takes no params; its budget is a module constant. */
 export const recordingRepairSweepParams = noParams;

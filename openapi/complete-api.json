@@ -9433,6 +9433,62 @@
         ]
       }
     },
+    "/api/voice-recording": {
+      "post": {
+        "operationId": "postVoice_recording",
+        "summary": "POST /api/voice-recording",
+        "description": "Saved recording operation callback. Requires the original account, physical CallSid and RecordingSid; retains each recording part before queued storage work.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Form fields (JSON or multipart where noted in human docs)."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspace-api-keys": {
       "post": {
         "operationId": "postWorkspace_api_keys",

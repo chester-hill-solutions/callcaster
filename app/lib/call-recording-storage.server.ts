@@ -148,10 +148,13 @@ const recordingPartIdentity = z.object({
   accountSid: z.string().regex(/^AC[0-9a-f]{32}$/i), recordingSid: z.string().regex(/^RE[0-9a-f]{32}$/i),
 });
 
-function recordingStoragePath(args: PersistCallRecordingArgs) {
-  if (args.storageMode !== "recording") return callRecordingStoragePath(args.workspaceId, args.callSid);
+export function callRecordingPartStoragePath(args: Pick<PersistCallRecordingArgs, "workspaceId" | "callSid" | "accountSid" | "recordingSid">) {
   const part = recordingPartIdentity.parse(args);
   return `${CALL_RECORDINGS_OBJECT_PREFIX}/${part.workspaceId}/recording-${part.callSid}-${part.recordingSid}.mp3`;
+}
+
+function recordingStoragePath(args: PersistCallRecordingArgs) {
+  return args.storageMode === "recording" ? callRecordingPartStoragePath(args) : callRecordingStoragePath(args.workspaceId, args.callSid);
 }
 
 type PersistCallRecordingDeps = FetchTwilioRecordingDeps & {
