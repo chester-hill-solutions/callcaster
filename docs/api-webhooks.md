@@ -103,8 +103,14 @@ two retries inside the 15-second voice limit. The delivery-override fragment is
 added only to TwiML; the saved URL and signature comparison exclude it. A 500
 response alone does not enable provider retries. See [Twilio connection overrides](https://www.twilio.com/docs/usage/webhooks/webhooks-connection-overrides).
 An existing conference keeps its first participant's callback delivery policy.
-Later audio joins cannot replace it. Provider retries are finite; durable room
-stop recovery remains part of the unfinished handoff integration.
+Later audio joins cannot replace it. Provider retries are finite. A genuine
+owned hangup saves a room-stop intent before provider I/O; the audio recovery
+worker resumes it through the original account and exact room SID. Terminal
+phone status and call-row repair cannot discard the stop. Lost provider or
+local acknowledgements retain the intent; an already completed room does not
+need another provider update. New audio preparation, sends and initial
+activation cannot proceed while an earlier room stop is pending. Live
+customer promotion, transport commit and media continuity remain unfinished.
 
 ## Stripe
 

@@ -33,7 +33,7 @@ export async function readOwnedVoiceAudioConnection(args: OwnedInput) {
 }
 
 function promotionIsUnfinished(row: VoiceAudioConnection) {
-  return Boolean(row.promotion_requested_at && !row.committed_at);
+  return Boolean(row.promotion_requested_at && !row.committed_at && !row.conference_stopped_at);
 }
 
 /** Cancellation never changes the current customer or crosses a saved promotion. */
@@ -57,7 +57,8 @@ export async function claimVoiceAudioRecovery(limit = 10) {
     const rows = await tx.select({ id: connections.id }).from(connections).where(and(
       lt(connections.lease_expires_at, new Date()),
       or(and(inArray(connections.state, [...RECOVERABLE_VOICE_AUDIO_STATES]), isNull(connections.terminal_at)),
-        and(isNotNull(connections.provider_sid), or(isNull(connections.terminal_at), isNotNull(connections.last_error)))),
+        and(isNotNull(connections.provider_sid), or(isNull(connections.terminal_at), isNotNull(connections.last_error))),
+        and(isNotNull(connections.conference_stop_requested_at), isNull(connections.conference_stopped_at))),
     )).orderBy(connections.lease_expires_at).limit(limit).for("update", { skipLocked: true });
     if (!rows.length) return [];
     return tx.update(connections).set({ lease_token: randomUUID(), lease_expires_at: new Date(Date.now() + RECOVERY_LEASE_MS) })

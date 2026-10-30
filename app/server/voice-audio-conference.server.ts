@@ -5,7 +5,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { VoiceAudioBindingError, voiceAudioParticipantLabel, voiceAudioRefusal, voiceAudioStartsMuted, type VoiceAudioFailureReason } from "@/lib/voice-audio-connection";
 import { lockVoiceAudioMember, resolveVoiceAudioAdmission } from "./voice-audio-admission.server";
-import { hasFundedAgentVoice } from "./voice-audio-classification.server";
+import { hasFundedAgentVoice, hasPendingVoiceAudioConferenceStop } from "./voice-audio-classification.server";
 import { voiceAudioSavedInput, withVoiceAudioConnection, type VoiceAudioConnection } from "./voice-audio-connection.server";
 import { getOutboundHeldCredits, type CreditTransaction } from "./outbound-credit-reservations.server";
 
@@ -33,6 +33,7 @@ export async function issueVoiceAudioInstruction(row: VoiceAudioConnection, conf
     if (!member.ok) return member;
     const [current] = await tx.select().from(connections).where(and(eq(connections.id, row.id), eq(connections.workspace, row.workspace))).for("update");
     if (!canIssueInstruction(current, row)) return voiceAudioRefusal("stale_audio");
+    if (await hasPendingVoiceAudioConferenceStop(member.tdb, row.user_id)) return refuseInstruction(tx, current, "stale_audio");
     if (current.voice_issued_at) return { ok: true as const, connection: current, confirmed: true, replayed: true };
     if (member.owner.disabled) return refuseInstruction(tx, current, "workspace_unavailable");
     const credentials = readTwilioWorkspaceCredentials(member.owner.twilio_data);
@@ -69,7 +70,8 @@ function assertConferenceIdentity(row: VoiceAudioConnection, input: VoiceAudioCo
 async function canCommitIdleAudio(tx: CreditTransaction, row: VoiceAudioConnection) {
   if (row.target_kind !== "idle" || row.source_connection_id || row.source_agent_sid) return false;
   const member = await lockVoiceAudioMember(tx, { workspaceId: row.workspace, userId: row.user_id }, true);
-  if (!member.ok || member.owner.disabled || await hasFundedAgentVoice(member.tdb, row.user_id)) return false;
+  if (!member.ok || member.owner.disabled || await hasFundedAgentVoice(member.tdb, row.user_id) ||
+    await hasPendingVoiceAudioConferenceStop(member.tdb, row.user_id)) return false;
   if (member.owner.credits - await getOutboundHeldCredits(tx, row.workspace) <= 0) return false;
   const active = await member.tdb.workspace_voice_audio_connection.findFirst({ where: and(
     eq(connections.user_id, row.user_id), eq(connections.state, "active"), ne(connections.id, row.id),
