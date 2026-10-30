@@ -98,6 +98,12 @@ owned customer. Failed, canceled or retired phone status alone cannot end that
 parent. After a successor commits, the old parent cannot rejoin through an older
 failed operation.
 
+Manual parent rescue accepts only unresolved or confirmed topology. Rejected
+or closed promotions return Hangup. A confirmed room survives its first phone
+and stays bound to the original account, actor, parent and customer. Another
+audio intent cannot create a parallel unresolved promotion. Recording and
+transcript continuity still need integration before source retirement.
+
 Parent Dial action URLs and new owned audio conference callback URLs explicitly retry connection/read failures and 5xx, with
 two retries inside the 15-second voice limit. The delivery-override fragment is
 added only to TwiML; the saved URL and signature comparison exclude it. A 500

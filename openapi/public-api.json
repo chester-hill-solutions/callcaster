@@ -3482,7 +3482,7 @@
             "secureSessionCookie": []
           }
         ],
-        "description": "Session cookie or bearer session only. The device belongs to the signed-in user. Connection is separate from customer dispatch: it does not claim or call the first contact, add a customer debit or take another customer hold. Keep current audio until connection_state is active. Accepted, answered and ready states alone do not prove a completed handoff. Retain the intent UUID on retry; uncertain provider creation is recovered without another create. A manual call issued without a saved parent continuation returns 409 and keeps its existing audio.",
+        "description": "Session cookie or bearer session only. The device belongs to the signed-in user. Connection is separate from customer dispatch: it does not claim or call the first contact, add a customer debit or take another customer hold. Keep current audio until connection_state is active. Accepted, answered and ready states alone do not prove a completed handoff. Retain the intent UUID on retry; uncertain provider creation is recovered without another create. A manual call issued without a saved parent continuation returns 409 and keeps its existing audio. Manual calls permit one unresolved customer promotion; a new intent cannot replace it after its phone ends. Confirmed topology retains the original room and first callback owner for later phones. Closed topology cannot create another room while terminal customer status is delayed.",
         "requestBody": {
           "required": true,
           "content": {

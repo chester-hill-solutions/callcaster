@@ -925,12 +925,14 @@ describe("owned agent audio connection journal (#2879)", () => {
     const f = await parentContinuationFixture(), nextId = randomUUID();
     const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server");
     await observeVoiceAudioStatus(f.row, "completed", "10");
+    await markPromotionReady(f.row);
     const now = new Date().toISOString(), nextRoom = `${actor}~${randomUUID()}`;
     const overrides = { id: nextId, intent_id: randomUUID(), generation: f.row.generation + 1, destination: otherPhone,
       state: "active", provider_sid: sid(), conference_id: nextRoom, conference_sid: `CF${randomUUID().replaceAll("-", "")}`,
       voice_url: `${baseUrl}/api/voice-audio?connection=${nextId}&event=voice`, status_callback: `${baseUrl}/api/voice-audio?connection=${nextId}&event=status`,
       conference_callback: `${baseUrl}/api/voice-audio?connection=${nextId}&event=conference`, committed_at: now, joined_at: now,
       customer_joined_at: now, parent_joined_at: now, terminal_at: null, terminal_status: null, retired_at: null, cancel_requested_at: null };
+    Object.assign(overrides, { promotion_requested_at: null, promotion_result: null });
     await sql`insert into public.workspace_voice_audio_connection
       select (jsonb_populate_record(null::public.workspace_voice_audio_connection, to_jsonb(prior) || ${sql.json(overrides)}::jsonb)).*
       from public.workspace_voice_audio_connection prior where prior.id = ${f.row.id}::uuid`;
@@ -1049,12 +1051,17 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect(response.status).toBe(500); expect(rooms.update).not.toHaveBeenCalled(); expect(await state()).toEqual(before);
   });
   async function failRoomStop() {
-    const f = await endedReplacementFixture(); rooms.update.mockRejectedValueOnce(new Error("Owned room stop needs recovery"));
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    rooms.update.mockRejectedValueOnce(new Error("Owned room stop needs recovery"));
     expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
     return f;
   }
   async function ageRoomStop(row: Connection) {
     await sql`update public.workspace_voice_audio_connection set lease_expires_at = now() - interval '1 minute' where id = ${row.id}::uuid`;
+  }
+  async function markPromotionReady(row: Connection) {
+    await sql`update public.workspace_voice_audio_connection set promotion_result = 'ready',
+      customer_joined_at = now(), parent_joined_at = now() where id = ${row.id}::uuid`;
   }
   test("a terminal callback owner retains its room stop after status repair and worker restart", async () => {
     const f = await failRoomStop(), before = await state();
@@ -1102,7 +1109,8 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect(await state()).toMatchObject({ operations: 1 });
   });
   test("a prepared replacement cannot send after the current room starts ending", async () => {
-    const f = await endedReplacementFixture(), next = await prepare({ ...f.target.args, intentId: randomUUID() });
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    const next = await prepare({ ...f.target.args, intentId: randomUUID() });
     expect(next.id).not.toBe(f.row.id); expect(next.state).toBe("prepared");
     rooms.update.mockRejectedValueOnce(new Error("Owned room stop pending"));
     expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
@@ -1155,7 +1163,7 @@ describe("owned agent audio connection journal (#2879)", () => {
     expect((await journal.findVoiceAudioConnection(f.row.id))?.conference_stopped_at).toBeNull();
   });
   test("a room stop in flight blocks a concurrent new audio request", async () => {
-    const f = await endedReplacementFixture(); let entered!: () => void, release!: () => void;
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row); let entered!: () => void, release!: () => void;
     const started = new Promise<void>(resolve => { entered = resolve; }), blocked = new Promise<void>(resolve => { release = resolve; });
     rooms.update.mockImplementationOnce(async (id: string) => {
       entered(); await blocked; const room = rooms.records.get(id); if (!room) throw new Error("Owned room required");
@@ -1173,7 +1181,8 @@ describe("owned agent audio connection journal (#2879)", () => {
     } finally { clearTimeout(deadline); release(); expect((await pending).status).toBe(204); }
   });
   test("an accepted replacement cannot receive join instructions after a room stop starts", async () => {
-    const f = await endedReplacementFixture(), next = await claim(await prepare({ ...f.target.args, intentId: randomUUID() }));
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    const next = await claim(await prepare({ ...f.target.args, intentId: randomUUID() }));
     const accepted = await journal.recordVoiceAudioProvider(next, sid()); rooms.update.mockRejectedValueOnce(new Error("Room stop unavailable"));
     expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "parent", false))).status).toBe(500);
     expect(await issueVoiceAudioInstruction(accepted, "1")).toEqual({ ok: false, reason: "stale_audio" });
@@ -1190,5 +1199,101 @@ describe("owned agent audio connection journal (#2879)", () => {
       ConferenceSid: first.conference_sid, ParticipantLabel: `audio:${first.id}:${first.generation}`, Muted: "false",
       StatusCallbackEvent: "participant-leave", ReasonParticipantLeft: "participant_hung_up" })).status).toBe(500);
     expect(await observeVoiceAudioConferenceEvent(joined(next))).toMatchObject({ state: "failed", committed_at: null, cancel_requested_at: expect.any(Date) });
+  });
+  test.each([false, true])("an unresolved manual promotion blocks another intent after phone end=%s", async (ended) => {
+    const f = ended ? await endedReplacementFixture() : await parentContinuationFixture();
+    const before = await state(), result = await journal.prepareVoiceAudioConnection({ ...f.target.args, intentId: randomUUID() });
+    expect(result).toEqual({ ok: false, reason: "connection_pending" }); expect(await state()).toEqual(before);
+  });
+  test("the same unresolved promotion intent still replays after its phone ends", async () => {
+    const f = await endedReplacementFixture();
+    expect(await journal.prepareVoiceAudioConnection(f.target.args)).toMatchObject({ ok: true, replayed: true, connection: { id: f.row.id } });
+    expect(await state()).toMatchObject({ operations: 1 });
+  });
+  test("one agent's unresolved promotion does not block another verified workspace agent", async () => {
+    await endedReplacementFixture();
+    await sql`update public."user" set verified_audio_numbers = ${sql.array([phone])} where id = ${otherActor}::uuid`;
+    await sql`insert into public.workspace_member (id, workspace_id, user_id, role_id)
+      values (${`audio:${workspaceId}:${otherActor}`}, ${workspaceId}, ${otherActor}, 'caller') on conflict (id) do update set role_id = 'caller'`;
+    const row = await prepare(input({ userId: otherActor })); expect(row).toMatchObject({ state: "prepared", user_id: otherActor, target_kind: "idle" });
+    expect(await state()).toMatchObject({ operations: 2, reservations: 1, ledger: 0 });
+  });
+  test("a replacement after a failed phone reuses the verified canonical manual room", async () => {
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    const next = await prepare({ ...f.target.args, intentId: randomUUID(), phoneNumber: otherPhone });
+    expect(next).toMatchObject({ state: "prepared", conference_id: f.row.conference_id, conference_sid: f.conferenceSid,
+      conference_callback: f.row.conference_callback, source_agent_sid: f.target.parent, source_connection_id: null,
+      customer_sid: f.target.child, generation: 2 });
+    expect(next.id).not.toBe(f.row.id); expect(next.promotion_requested_at).toBeNull();
+    const [original] = await sql`select r.conference_id, c.direction, c.parent_call_sid from public.workspace_voice_reservation r
+      join public.call c on c.sid = r.provider_sid where r.id = ${f.target.id}::uuid`;
+    expect(original).toEqual({ conference_id: null, direction: "outbound-dial", parent_call_sid: f.target.parent });
+    expect(await state()).toMatchObject({ operations: 2, reservations: 1, ledger: 0 });
+  });
+  test.each(["conference_id", "conference_sid", "conference_callback"] as const)("an active source with the wrong %s cannot cross the canonical room", async (field) => {
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    const next = await issued({ ...f.target.args, intentId: randomUUID(), phoneNumber: otherPhone });
+    const ready = await observeVoiceAudioConferenceEvent(joined(next)); if (!ready?.provider_sid) throw new Error("Joined current source required");
+    await sql`update public.workspace_voice_audio_connection set state = 'active', committed_at = now() where id = ${ready.id}::uuid`;
+    const wrong = field === "conference_id" ? `${actor}~${randomUUID()}` : field === "conference_sid" ? `CF${randomUUID().replaceAll("-", "")}` : `${baseUrl}/foreign-callback`;
+    await sql.unsafe(`update public.workspace_voice_audio_connection set ${field} = $1 where id = $2::uuid`, [wrong, ready.id]);
+    const before = await state();
+    expect(await journal.prepareVoiceAudioConnection({ ...f.target.args, expectedAgentSid: ready.provider_sid, intentId: randomUUID() }))
+      .toEqual({ ok: false, reason: "stale_audio" });
+    expect(await state()).toEqual(before);
+  });
+  test("a prepared phone cannot send after another promotion becomes unresolved", async () => {
+    const target = await funded(), old = await observeVoiceAudioConferenceEvent(joined(await issued(target.args)));
+    if (!old) throw new Error("Original ready phone required");
+    const { observeVoiceAudioStatus } = await import("@/server/voice-audio-lifecycle.server"); await observeVoiceAudioStatus(old, "completed", "10");
+    const next = await prepare({ ...target.args, intentId: randomUUID() }); expect(next.state).toBe("prepared");
+    await sql`update public.workspace_voice_audio_connection set promotion_requested_at = now() where id = ${old.id}::uuid`;
+    expect(await journal.claimVoiceAudioSend(next)).toEqual({ ok: false, reason: "connection_pending" });
+    expect((await journal.findVoiceAudioConnection(next.id))?.send_started_at).toBeNull();
+  });
+  test.each(["account", "actor", "customer", "parent", "joins"])("canonical manual room refuses a wrong %s binding", async (field) => {
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    if (field === "account") await sql`update public.workspace_voice_audio_connection set account_sid = ${`AC${randomUUID().replaceAll("-", "")}`} where id = ${f.row.id}::uuid`;
+    if (field === "actor") await sql`update public.workspace_voice_audio_connection set user_id = ${otherActor} where id = ${f.row.id}::uuid`;
+    if (field === "customer") await sql`update public.workspace_voice_audio_connection set customer_sid = ${sid()} where id = ${f.row.id}::uuid`;
+    if (field === "parent") await sql`update public.workspace_voice_audio_connection set original_agent_sid = ${sid()} where id = ${f.row.id}::uuid`;
+    if (field === "joins") await sql`update public.workspace_voice_audio_connection set customer_joined_at = null where id = ${f.row.id}::uuid`;
+    const before = await state(), result = await journal.prepareVoiceAudioConnection({ ...f.target.args, intentId: randomUUID() });
+    expect(result).toEqual({ ok: false, reason: "stale_audio" }); expect(await state()).toEqual(before);
+  });
+  test("a closed manual topology cannot create another room while customer status is delayed", async () => {
+    const f = await endedReplacementFixture(); await sql`update public.workspace_voice_audio_connection set promotion_result = 'closed' where id = ${f.row.id}::uuid`;
+    expect(await journal.prepareVoiceAudioConnection({ ...f.target.args, intentId: randomUUID() })).toEqual({ ok: false, reason: "target_inactive" });
+    expect(await state()).toMatchObject({ operations: 1 });
+  });
+  test.each(["rejected", "closed"])("a %s promotion cannot return the parent to its conference", async (result) => {
+    const f = await endedReplacementFixture(); await sql`update public.workspace_voice_audio_connection set promotion_result = ${result} where id = ${f.row.id}::uuid`;
+    const response = await signedParent(f.url, f.params); expect(response.status).toBe(200); expect(await response.text()).toContain("<Hangup");
+  });
+  test("a positively rejected promotion leaves the original call eligible for a new room", async () => {
+    const f = await endedReplacementFixture(); await sql`update public.workspace_voice_audio_connection set promotion_result = 'rejected' where id = ${f.row.id}::uuid`;
+    const next = await prepare({ ...f.target.args, intentId: randomUUID() });
+    expect(next.conference_id).not.toBe(f.row.conference_id); expect(next.conference_sid).toBeNull();
+    expect(next.source_agent_sid).toBe(f.target.parent); expect(await state()).toMatchObject({ reservations: 1, ledger: 0 });
+  });
+  test("a verified room stop closes its canonical manual topology before a new audio request", async () => {
+    const f = await endedReplacementFixture(); await markPromotionReady(f.row);
+    expect((await signedAudio(f.row.conference_callback, bridgeParams(f, "customer", false))).status).toBe(204);
+    expect((await journal.findVoiceAudioConnection(f.row.id))?.promotion_result).toBe("closed");
+    expect(await journal.prepareVoiceAudioConnection({ ...f.target.args, intentId: randomUUID() })).toEqual({ ok: false, reason: "target_inactive" });
+  });
+  test.each([
+    { result: null, constraint: "voice_audio_unresolved_promotion" }, { result: "ready", constraint: "voice_audio_canonical_manual_room" },
+  ])("the database rejects a second $result manual topology owner", async ({ result, constraint }) => {
+    const f = await endedReplacementFixture(); if (result === "ready") await markPromotionReady(f.row);
+    const id = randomUUID(), overrides = { id, intent_id: randomUUID(), generation: f.row.generation + 1, provider_sid: sid(),
+      conference_id: `${actor}~${randomUUID()}`, conference_sid: `CF${randomUUID().replaceAll("-", "")}`,
+      voice_url: `${baseUrl}/api/voice-audio?connection=${id}&event=voice`,
+      status_callback: `${baseUrl}/api/voice-audio?connection=${id}&event=status`,
+      conference_callback: `${baseUrl}/api/voice-audio?connection=${id}&event=conference` };
+    await expect(sql`insert into public.workspace_voice_audio_connection
+      select (jsonb_populate_record(null::public.workspace_voice_audio_connection, to_jsonb(prior) || ${sql.json(overrides)}::jsonb)).*
+      from public.workspace_voice_audio_connection prior where prior.id = ${f.row.id}::uuid`).rejects.toMatchObject({ code: "23505", constraint_name: constraint });
+    expect(await state()).toMatchObject({ operations: 1, reservations: 1, ledger: 0 });
   });
 });
