@@ -35,7 +35,7 @@ vi.mock("@/lib/twilio-call-status.server", async (importOriginal) => ({
 
 const conferenceName = "u1~conference";
 const agent = {
-  sid: "CA_AGENT", workspace: "w1", conference_id: conferenceName,
+  sid: "CA_AGENT", workspace: "w1", user_id: "u1", conference_id: conferenceName,
   contact_id: null, outreach_attempt_id: null, campaign_id: 42, status: "in-progress",
 };
 
@@ -127,7 +127,8 @@ describe("agent participant hangup (#2094)", () => {
       expect.objectContaining({ outreachAttemptId: 21, contactId: 7 }));
     expect(boundary.broadcast.mock.calls).toEqual([
       ["w1", { contact_id: 7, status: "completed", conference_id: conferenceName, conference_ended: true }],
-      ["w1", { contact_id: 7, status: "completed", conference_id: conferenceName }],
+      ["w1", { contact_id: 7, status: "completed", conference_id: conferenceName,
+        call_sid: "CA_AGENT", user_id: "u1", campaign_id: 42, outreach_attempt_id: 21 }],
     ]);
   });
 
