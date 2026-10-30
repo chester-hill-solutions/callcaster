@@ -154,6 +154,12 @@ jobs before its workspace, including after deliberate faults: a fault can enqueu
 work that a passing control never creates. A mutation proof requires the expected
 failed assertions, passing controls, and no suite or cleanup-hook failure.
 
+Check the existing ledger lock order before adding a workspace lock around a
+reservation read. Settlement locks its reservation before the ledger locks the
+workspace. Recording nonce preparation needs only the reservation lock. Prove
+cross-service races at the real ledger boundary and wait for `pg_blocking_pids`
+before releasing the barrier; a timing-only overlap can miss a deadlock.
+
 Bun checks must run where Bun can write its temporary files. A permission
 failure is not lockfile drift: retain the dependency files and rerun the full
 gate with the required permissions. The vendor guard leaves rebuilt output for
