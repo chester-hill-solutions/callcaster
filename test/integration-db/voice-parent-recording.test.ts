@@ -474,4 +474,65 @@ describe("owned parent bridge capture (#2879)", () => {
     expect(result.operation.id).toBe(first.operation.id); expect(result.operation.intent_id).toBe(f.connection.id);
     expect(io.requests).toHaveLength(0); expect(await stored()).toHaveLength(1);
   });
+
+  test.each(["completed", "absent"])("a fresh phone attempt can replace a confirmed %s capture and retain its old part", async status => {
+    const f = await fixture(), first = await dispatch.ensureVoiceParentRecording(f.connection);
+    expect((await callback(f.connection, status)).status).toBe(204);
+    const next = await nextPhoneAttempt(f.connection); io.reply.sid = re();
+    const results = await Promise.all(Array.from({ length: 20 }, () => dispatch.ensureVoiceParentRecording(next)));
+    expect(new Set(results.map(x => x.operation.id)).size).toBe(1); expect(results[0].operation.id).not.toBe(first.operation.id);
+    expect(await journal.findVoiceParentRecording(next)).toMatchObject({ intent_id: next.id, state: "accepted", provider_status: "in-progress", provider_sid: io.reply.sid });
+    expect(posts()).toHaveLength(2);
+    const previous = await recordings.findVoiceRecordingOperation(first.operation.id);
+    expect(previous).toMatchObject({ state: "accepted", provider_status: status, provider_sid: first.operation.provider_sid });
+    expect(previous?.terminal_at).not.toBeNull(); expect(await stored()).toHaveLength(2);
+    if (status === "completed") {
+      if (!previous?.provider_sid) throw new Error("Completed owned recording required");
+      const { startVoiceRecordingCopy, finishVoiceRecordingCopy } = await import("@/server/voice-recording-copy.server");
+      const { callRecordingPartStoragePath } = await import("@/lib/call-recording-storage.server");
+      const claimed = await startVoiceRecordingCopy(workspaceId, previous.id, previous.lease_token);
+      if (!claimed) throw new Error("Old completed part delivery lease required");
+      const path = callRecordingPartStoragePath({ workspaceId, callSid: f.root, accountSid, recordingSid: previous.provider_sid });
+      expect(await finishVoiceRecordingCopy(claimed, path)).toBe(true);
+      expect(await recordings.findVoiceRecordingOperation(first.operation.id)).toMatchObject({ state: "accepted", audio_url: path });
+      expect((await journal.findVoiceParentRecording(next))?.audio_url).toBeNull();
+    }
+    io.requests.length = 0;
+    const replay = await dispatch.ensureVoiceParentRecording(f.connection);
+    expect(replay.operation.id).toBe(first.operation.id); expect(replay.operation.provider_status).toBe(status);
+    expect(io.requests).toHaveLength(0);
+  });
+
+  test("an old rejected recording intent cannot adopt a later attempt's accepted identity", async () => {
+    const f = await fixture(); io.status = 400;
+    await expect(dispatch.ensureVoiceParentRecording(f.connection)).rejects.toMatchObject({ status: 400 });
+    const rejected = await journal.findVoiceParentRecording(f.connection), next = await nextPhoneAttempt(f.connection); io.status = 200;
+    const accepted = await dispatch.ensureVoiceParentRecording(next); io.requests.length = 0;
+    const replay = await dispatch.ensureVoiceParentRecording(f.connection);
+    expect(replay.operation.id).toBe(rejected?.id); expect(replay.operation.state).toBe("failed");
+    expect(replay.operation.id).not.toBe(accepted.operation.id); expect(io.requests).toHaveLength(0);
+  });
+
+  test.each(["active phase", "same terminal intent"])("the database still rejects a second parent owner for %s", async conflict => {
+    const f = await fixture(), first = await dispatch.ensureVoiceParentRecording(f.connection);
+    if (conflict === "same terminal intent") expect((await callback(f.connection, "completed")).status).toBe(204);
+    const patch = { id: randomUUID(), intent_id: conflict === "same terminal intent" ? first.operation.intent_id : randomUUID(),
+      state: "prepared", send_started_at: null, provider_sid: null, provider_status: null, terminal_at: null,
+      recording_started_at: null, recording_duration_seconds: null, channels: null, audio_url: null };
+    await expect(sql`insert into public.workspace_voice_recording_operation
+      select (jsonb_populate_record(null::public.workspace_voice_recording_operation, to_jsonb(r) || ${sql.json(patch)})).*
+      from public.workspace_voice_recording_operation r where id = ${first.operation.id}::uuid`).rejects.toMatchObject({ code: "23505" });
+    expect(await stored()).toHaveLength(1); expect(posts()).toHaveLength(1);
+  });
+
+  test.each(["dial", "customer"])("a terminal %s phase still has one permanent owner", async kind => {
+    const f = await fixture(), first = await dispatch.ensureVoiceParentRecording(f.connection);
+    expect((await callback(f.connection, "completed")).status).toBe(204);
+    await sql`update public.workspace_voice_recording_operation set kind = ${kind} where id = ${first.operation.id}::uuid`;
+    const patch = { id: randomUUID(), intent_id: randomUUID(), provider_sid: re() };
+    await expect(sql`insert into public.workspace_voice_recording_operation
+      select (jsonb_populate_record(null::public.workspace_voice_recording_operation, to_jsonb(r) || ${sql.json(patch)})).*
+      from public.workspace_voice_recording_operation r where id = ${first.operation.id}::uuid`).rejects.toMatchObject({ code: "23505" });
+    expect(await stored()).toHaveLength(1); expect(posts()).toHaveLength(1);
+  });
 });
