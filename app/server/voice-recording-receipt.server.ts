@@ -34,6 +34,13 @@ export async function recordVoiceRecordingReceipt(owner: VoiceRecordingOperation
   return withVoiceRecordingOperation(owner, (tx, current) => saveReceipt(tx, current, parsed.data));
 }
 
+/** A create acknowledgement preserves identity even after its worker lease changes. */
+export async function recordVoiceRecordingProvider(owner: VoiceRecordingOperation, input: unknown) {
+  const parsed = observationSchema.safeParse(input);
+  if (!parsed.success) throw new VoiceRecordingBindingError("Invalid recording create acknowledgement");
+  return withVoiceRecordingOperation(owner, (tx, current) => saveReceipt(tx, current, parsed.data));
+}
+
 /** A processing API response proves identity, never an in-progress recording. */
 export async function recordRecoveredVoiceRecording(owner: VoiceRecordingOperation, input: VoiceRecordingObservation) {
   const parsed = observationSchema.safeParse(input);

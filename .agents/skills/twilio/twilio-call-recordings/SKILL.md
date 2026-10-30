@@ -143,6 +143,14 @@ receipt. Unknown recording recovery needs the saved callback nonce and one
 RecordingSid in provider history; missing, ambiguous or truncated history stays
 pending. See [Recording properties](https://www.twilio.com/docs/voice/api/recording).
 
+For an existing-call recording create, commit one send checkpoint before the
+provider request. Recheck the owned live bridge at that boundary. A lost reply
+or failed acknowledgement write is uncertain; retain the nonce for recovery and
+do not repeat the create. A validated create reply may save accepted identity
+after a recovery lease changes, but it does not prove fresh capture readiness.
+Test through the pinned SDK transport and valid database constraints; a rejected
+fixture write does not prove that the intended ownership guard ran.
+
 Use explicit RecordingSids when a call has multiple or concurrent recordings;
 `Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
 selecting a create API: its Call Recordings helper supports `create`, while its
