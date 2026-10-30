@@ -12,7 +12,8 @@ vi.mock("@twilio/voice-sdk", async () => {
 
 import { mockTwilioDevice, resetTwilioVoiceSdkMock } from "../mocks/twilio-voice-sdk";
 
-vi.mock("@/lib/services/hooks-api", () => ({
+vi.mock("@/lib/services/hooks-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/services/hooks-api")>()),
   hangupCall: vi.fn().mockResolvedValue(undefined),
   startConferenceAndDial: vi.fn(),
 }));

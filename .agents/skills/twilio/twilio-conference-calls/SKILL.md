@@ -56,6 +56,21 @@ successor recheck its source through the existing customer funding/send owner.
 
 Source: [Twilio Conference status callbacks](https://www.twilio.com/docs/voice/twiml/conference#statuscallback).
 
+## Client Start ownership
+
+Keep an unknown Start result tied to its full saved request and intent UUID.
+A changed phone selection must not create another customer while the first
+result is unknown. Network errors, malformed accepted replies, HTTP 409 and
+5xx responses do not prove that no call was sent. Change the saved request only
+after a definite refusal or confirmed stop. A phone Start must retain the real
+customer SID from its response.
+
+Own asynchronous replies by the committed actor, workspace and campaign.
+An uncommitted React render must not retire the current request. Ignore retired
+UI updates and end a late known customer through its original workspace.
+An agent audio SID change is not a new customer generation. Retain its customer
+SID and outcome; only a logical dial or reset invalidates old provider callbacks.
+
 ## Replacing agent audio on a direct call
 
 Save a signed parent Dial action before issuing the one customer child. Keep

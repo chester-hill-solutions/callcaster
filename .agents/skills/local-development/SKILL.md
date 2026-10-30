@@ -502,6 +502,11 @@ loading the base config. `mergeConfig` appends arrays, which can run the full
 suite alongside the intended fixture. Check the collected test count before
 accepting a focused regression report.
 
+For an external ESM Vitest config, resolve `vitest/config` with
+`import.meta.resolve` from the repository. `require.resolve` selects its CommonJS
+entry; bundling that entry into `.mjs` can fail on dynamic `node:os` requires
+before tests collect. Verify the ESM export and require a completed report.
+
 Read the component export and prop contract before building a UI fixture.
 Tests are excluded from the app TypeScript program, so a green typecheck does
 not detect a wrong default/named import or a wrong event field in a test.

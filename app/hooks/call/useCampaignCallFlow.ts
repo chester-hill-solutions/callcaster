@@ -84,6 +84,7 @@ export function useCampaignCallFlow({
   const agentLegSidRef = useRef(agentLegSid);
   agentLegSidRef.current = agentLegSid;
   const dialGenerationRef = useRef(0);
+  const dialGeneration = dialGenerationRef.current;
   const lifecycleRef = useRef(lifecycle);
   lifecycleRef.current = lifecycle;
   const previousFsmRef = useRef(fsmState);
@@ -106,6 +107,7 @@ export function useCampaignCallFlow({
    * Feeds provider events into the canonical lifecycle and the legacy FSM.
    */
   function acceptCustomerStatus(sid: string, normalized: CallStatusEnum) {
+    if (dialGeneration !== dialGenerationRef.current) return;
     recordFlashBreadcrumb("provider-status", `${normalized} (${sid.slice(0, 8)})`);
     setCustomerLegSid(sid);
     setPollingTargetSid(sid);
@@ -207,6 +209,7 @@ export function useCampaignCallFlow({
    * is a no-op in the reducer.
    */
   const beginDial = useCallback(() => {
+    dialGenerationRef.current += 1;
     recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
     setCustomerLegSid(null);
     setPollingTargetSid(null);
@@ -229,6 +232,8 @@ export function useCampaignCallFlow({
     // provider tracking too, so a stale leg's late events can't repaint the
     // old outcome over the new dial.
     if (fsmState === "dialing") {
+      if (lifecycleRef.current.phase === "dialing") return;
+      dialGenerationRef.current += 1;
       setCustomerLegSid(null);
       setPollingTargetSid(null);
       setProviderStatus(null);
@@ -240,6 +245,7 @@ export function useCampaignCallFlow({
     // the lifecycle too — the reducer ignores RESET mid-call, so this only
     // wipes terminal outcomes, never a live dial.
     if (fsmState === "idle") {
+      dialGenerationRef.current += 1;
       setCustomerLegSid(null);
       setPollingTargetSid(null);
       setProviderStatus(null);
@@ -262,23 +268,6 @@ export function useCampaignCallFlow({
         break;
     }
   }, [fsmState]);
-
-  /**
-   * @effect Start a new dial generation when agentLegSid changes.
-   */
-  useEffect(() => {
-    if (agentLegSid) {
-      dialGenerationRef.current += 1;
-      setCustomerLegSid(null);
-      setPollingTargetSid(null);
-      setProviderStatus(null);
-      setLifecycle((prev) =>
-        TERMINAL_PHASES.has(prev.phase)
-          ? { ...INITIAL_LIFECYCLE, generation: prev.generation + 1 }
-          : prev,
-      );
-    }
-  }, [agentLegSid]);
 
   // Display derivation: one source of truth for the call screen UI.
   const displayState = ((): string => {

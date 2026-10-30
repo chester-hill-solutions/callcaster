@@ -3,7 +3,7 @@
   "counts": {
     "shadcn/no-restyle": 812,
     "shadcn/no-arbitrary-values": 170,
-    "max-lines-per-function": 56,
+    "max-lines-per-function": 51,
     "shadcn/no-inline-styles": 43,
     "shadcn/no-raw-colors": 114,
     "complexity": 112,
