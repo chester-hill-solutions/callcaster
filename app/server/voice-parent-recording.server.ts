@@ -29,8 +29,8 @@ async function parentRecording(tx: CreditTransaction, connection: VoiceAudioConn
   if (!connection.reservation_id) return null;
   const tdb = createTenantDb(connection.workspace, tx);
   const where = and(eq(recordings.reservation_id, connection.reservation_id), eq(recordings.kind, "parent"));
-  const row = await tdb.workspace_voice_recording_operation.findFirst({ where: and(where, ne(recordings.state, "failed")) }) ??
-    await tdb.workspace_voice_recording_operation.findFirst({ where: and(where, eq(recordings.intent_id, connection.id)) });
+  const row = await tdb.workspace_voice_recording_operation.findFirst({ where: and(where, eq(recordings.intent_id, connection.id)) }) ??
+    await tdb.workspace_voice_recording_operation.findFirst({ where: and(where, ne(recordings.state, "failed"), isNull(recordings.terminal_at)) });
   if (row && !ownsParent(row, connection)) throw new VoiceRecordingBindingError("Parent recording has a different owner");
   return row ?? null;
 }

@@ -151,6 +151,11 @@ after a recovery lease changes, but it does not prove fresh capture readiness.
 Test through the pinned SDK transport and valid database constraints; a rejected
 fixture write does not prove that the intended ownership guard ran.
 
+Keep exact-intent history ahead of a shared live capture lookup. A confirmed
+terminal parent part keeps its accepted identity and copy work, but cannot own
+the live slot forever. A fresh intent may capture the still-live original call;
+the old intent replays its old part. An uncertain send still owns the live slot.
+
 Use explicit RecordingSids when a call has multiple or concurrent recordings;
 `Twilio.CURRENT` is ambiguous in that case. Check the pinned helper before
 selecting a create API: its Call Recordings helper supports `create`, while its

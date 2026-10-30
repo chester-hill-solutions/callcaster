@@ -24,6 +24,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Fixed: Importing a phone into another audience reuses its workspace contact and preserves its saved details and opt-out state. The row report identifies reused contacts and ambiguous duplicate records ([PR #3087](https://github.com/chester-hill-solutions/callcaster/pull/3087), [#3085](https://github.com/chester-hill-solutions/callcaster/issues/3085)).
 
+- Fixed: Parent recording retries retain each attempt's result and allow a fresh phone attempt after confirmed completed or absent capture. Previous parts keep their accepted identity and storage work. Phone handoff remains in development ([#3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
+
 - Changed: The phone handoff work now has a parent recording step with one saved request per attempt, original-account checks and callback recovery. It keeps the existing customer hold and charge. Live handoff and recording continuity remain in development ([#3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
 
 - Fixed: Realtime call transcripts align both audio tracks on one timeline, retain audio during setup and flush the final audio before cleanup. Delayed coaching cleanup does not extend transcription charges. Phone switching and media continuity remain in development ([#3081](https://github.com/chester-hill-solutions/callcaster/pull/3081), [#2879](https://github.com/chester-hill-solutions/callcaster/issues/2879)).
