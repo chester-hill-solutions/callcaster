@@ -53,6 +53,13 @@ const INITIAL_LIFECYCLE: CallLifecycleState = {
 
 const TERMINAL_PHASES: ReadonlySet<CallPhase> = new Set(["ending", "ended"]);
 const FSM_TERMINAL = new Set(["completed", "failed"]);
+type CustomerOwner = { previousSourceSid?: string | null; customerSid: string | null };
+
+function matchesCustomerStatus(owner: CustomerOwner, sid: string, sourceSid: string | null, agentSid: string | null) {
+  const expected = owner.customerSid ?? sourceSid;
+  if (!expected || sid === agentSid) return false;
+  return owner.customerSid !== null || sourceSid !== agentSid ? sid === expected : true;
+}
 
 function normalizedToOutcome(normalized: CallStatusEnum): CallOutcome {
   if (normalized === "completed" || normalized === "canceled") return normalized;
@@ -76,25 +83,23 @@ export function useCampaignCallFlow({
   isPredictive,
   send,
 }: UseCampaignCallFlowOptions) {
-  const [lifecycle, setLifecycle] = useState<CallLifecycleState>(INITIAL_LIFECYCLE);
-  const [providerStatus, setProviderStatus] = useState<CallStatusEnum | null>(null);
-  const [customerLegSid, setCustomerLegSid] = useState<string | null>(null);
-  const [pollingTargetSid, setPollingTargetSid] = useState<string | null>(null);
-
-  const agentLegSidRef = useRef(agentLegSid);
-  agentLegSidRef.current = agentLegSid;
-  const dialGenerationRef = useRef(0);
-  const dialGeneration = dialGenerationRef.current;
+  const [lifecycle, setLifecycle] = useState<CallLifecycleState>(() => ({ ...INITIAL_LIFECYCLE,
+    phase: fsmState === "dialing" || fsmState === "connected" ? fsmState : "idle" }));
+  const [customer, setCustomer] = useState<{ sid: string | null; status: CallStatusEnum | null }>({ sid: null, status: null });
+  const { sid: customerLegSid, status: providerStatus } = customer;
+  const ownerRef = useRef<CustomerOwner>({ customerSid: null });
+  const owner = ownerRef.current;
+  const sourceSid = callSid === owner.previousSourceSid ? null : callSid;
+  const pollingTargetSid = customerLegSid ?? sourceSid;
   const lifecycleRef = useRef(lifecycle);
   lifecycleRef.current = lifecycle;
   const previousFsmRef = useRef(fsmState);
+  const previousSourceRef = useRef(callSid);
 
-  // Fall back to callSid so polling can bootstrap even before any SSE event
-  // has arrived — otherwise a dropped/missed realtime message leaves polling
-  // permanently disabled (pollingTargetSid is only ever set from inside the
-  // SSE/poll callback itself), and a client hangup can go undetected forever.
+  // A current source can bootstrap before SSE arrives. The source captured
+  // before a new Dial belongs to the previous request and cannot bootstrap it.
   const pollingEnabled =
-    !!(pollingTargetSid ?? callSid) &&
+    !!pollingTargetSid &&
     !!workspaceId &&
     (lifecycle.phase === "dialing" || lifecycle.phase === "connected");
 
@@ -107,11 +112,10 @@ export function useCampaignCallFlow({
    * Feeds provider events into the canonical lifecycle and the legacy FSM.
    */
   function acceptCustomerStatus(sid: string, normalized: CallStatusEnum) {
-    if (dialGeneration !== dialGenerationRef.current) return;
+    if (ownerRef.current !== owner || !matchesCustomerStatus(owner, sid, sourceSid, agentLegSid)) return;
     recordFlashBreadcrumb("provider-status", `${normalized} (${sid.slice(0, 8)})`);
-    setCustomerLegSid(sid);
-    setPollingTargetSid(sid);
-    setProviderStatus(normalized);
+    owner.customerSid = sid;
+    setCustomer({ sid, status: normalized });
 
     // Drive canonical lifecycle for terminal outcomes.
     if (isTerminalForOutcome(normalized)) {
@@ -144,23 +148,21 @@ export function useCampaignCallFlow({
   // Polling: use the customer leg SID if known, otherwise fall back to
   // the parent/SDK SID (the server will resolve the child for us).
   useCallStatusPolling({
-    callSid: pollingTargetSid ?? callSid,
+    callSid: pollingTargetSid,
     workspaceId,
     enabled: pollingEnabled,
     intervalMs: 5000,
     agentLegSid,
     onStatus: (status, resolvedSid) => {
+      if (!pollingEnabled) return;
       const normalized = normalizeProviderStatus(status);
       if (!normalized) return;
-      const sid = resolvedSid ?? pollingTargetSid ?? callSid;
+      const sid = resolvedSid ?? pollingTargetSid;
       if (sid) {
         acceptCustomerStatus(sid, normalized);
       }
     },
   });
-
-  const callSidRef = useRef(callSid);
-  callSidRef.current = callSid;
 
   // SSE events: accept direct matches OR child events keyed on parent_call_sid
   useWorkspaceEventSubscription({
@@ -178,10 +180,10 @@ export function useCampaignCallFlow({
       if (customerLegSid != null) {
         if (callRow.sid !== customerLegSid) return;
       } else {
-        const matchesDirect = callRow.sid === callSidRef.current;
+        const matchesDirect = sourceSid !== agentLegSid && callRow.sid === sourceSid;
         const matchesParent =
-          agentLegSidRef.current != null &&
-          callRow.parent_call_sid === agentLegSidRef.current;
+          sourceSid != null && sourceSid === agentLegSid &&
+          callRow.parent_call_sid === sourceSid;
         if (!matchesDirect && !matchesParent) return;
       }
 
@@ -192,37 +194,28 @@ export function useCampaignCallFlow({
     },
   });
 
-  /**
-   * Start a new dial in the *same batch* as the click that triggered it.
-   *
-   * The FSM→lifecycle bridge below is an effect, so it cannot run until after
-   * the browser has painted the render in which the FSM moved to `dialing` —
-   * and that render still derives its display from the finished call's
-   * terminal lifecycle (or, on a re-dial, from the contact's last attempt
-   * disposition). The result was "Call Failed" / "No Answer" repainting for a
-   * single frame on every dial: #1220 removed the version of this that stuck
-   * around, but the flash survived it. Resetting here, alongside the FSM's own
-   * START_DIALING, closes the gap — the first render after the click already
-   * reads `phase: "dialing"`, so there is no stale frame to paint.
-   *
-   * The bridge still fires afterwards; a second START_DIALING from `dialing`
-   * is a no-op in the reducer.
-   */
-  const beginDial = useCallback(() => {
-    dialGenerationRef.current += 1;
-    recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
-    setCustomerLegSid(null);
-    setPollingTargetSid(null);
-    setProviderStatus(null);
-    setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
+  const resetCustomer = useCallback((previousSourceSid: string | null) => {
+    // A new request does not own the previous dial's bootstrap SID.
+    ownerRef.current = { previousSourceSid, customerSid: null };
+    setCustomer({ sid: null, status: null });
   }, []);
+
+  // Reset in the click's batch: waiting for the FSM effect repaints the old outcome (#1220).
+  const beginDial = useCallback(() => {
+    resetCustomer(callSid);
+    recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
+    setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
+  }, [callSid, resetCustomer]);
 
   /**
    * @effect Bridge the legacy FSM (useCallState) transitions into the canonical lifecycle.
-   * Only dispatches when fsmState actually changes (not on every render).
-   * Skips the initial idle → idle no-op.
+   * @effect-deps fsmState, callSid, resetCustomer (committed transition and source identity).
+   * @effect-side-effects Update the logical customer owner and lifecycle state; remember the last committed source.
+   * @effect-why-not-loader SDK and realtime transitions arrive after mount, outside loader requests.
    */
   useEffect(() => {
+    const previousSource = previousSourceRef.current;
+    previousSourceRef.current = callSid;
     if (previousFsmRef.current === fsmState) return;
     recordFlashBreadcrumb("fsm", `${previousFsmRef.current} -> ${fsmState}`);
     previousFsmRef.current = fsmState;
@@ -233,10 +226,7 @@ export function useCampaignCallFlow({
     // old outcome over the new dial.
     if (fsmState === "dialing") {
       if (lifecycleRef.current.phase === "dialing") return;
-      dialGenerationRef.current += 1;
-      setCustomerLegSid(null);
-      setPollingTargetSid(null);
-      setProviderStatus(null);
+      resetCustomer(previousSource);
       dispatch({ type: "START_DIALING" });
       return;
     }
@@ -245,10 +235,7 @@ export function useCampaignCallFlow({
     // the lifecycle too — the reducer ignores RESET mid-call, so this only
     // wipes terminal outcomes, never a live dial.
     if (fsmState === "idle") {
-      dialGenerationRef.current += 1;
-      setCustomerLegSid(null);
-      setPollingTargetSid(null);
-      setProviderStatus(null);
+      resetCustomer(callSid);
       dispatch({ type: "RESET" });
       return;
     }
@@ -267,7 +254,7 @@ export function useCampaignCallFlow({
         dispatch({ type: "FAIL" });
         break;
     }
-  }, [fsmState]);
+  }, [fsmState, callSid, resetCustomer]);
 
   // Display derivation: one source of truth for the call screen UI.
   const displayState = ((): string => {

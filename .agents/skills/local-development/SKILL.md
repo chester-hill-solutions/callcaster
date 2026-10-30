@@ -929,6 +929,8 @@ from a raw `postgres.begin()` callback; that client lacks driver options.
 Run source faults only when no other test reads that worktree. Restore each
 fault before starting the next reader, then rerun the fixed source. A passing
 report from overlapping runs does not identify which source it tested.
+`check:effects` rewrites the tracked inventory even in check mode. Run it before
+source-hashed test readers; do not batch that writer with those readers.
 
 Use checked subprocesses or `set -e` when a shell step contains a required check
 followed by another command. A later successful command can hide the failed
