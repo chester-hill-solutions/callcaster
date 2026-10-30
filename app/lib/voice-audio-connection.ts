@@ -5,6 +5,8 @@ export class VoiceAudioBindingError extends Error {
   constructor(message: string) { super(message); this.name = "VoiceAudioBindingError"; }
 }
 
+export type VoiceAudioSourceIdentity = { connectionId: string; generation: number };
+
 export type VoiceAudioConnectionInput = {
   workspaceId: string;
   userId: string;

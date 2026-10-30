@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**135** documented / **137** total effects (2 grandfathered, ratcheting to 0).
+**136** documented / **137** total effects (1 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -75,6 +75,7 @@
 | `app/hooks/call/useSoftphoneController.ts` | Cancel preparation responses when the committed handset owner changes. | workspaceId, clientIdentity (the authenticated dial owner). | none (invalidates async work and clears its pending state). | An imperative SDK start must not follow a stale browser request. |
 | `app/hooks/call/useSoftphoneController.ts` | Mirror the latest `callHandling.receiveIncoming` handler into a ref | callHandling.receiveIncoming (only re-syncs the ref when the handler identity actually changes) | none (plain ref assignment) | Not data fetching; this is the "latest ref" pattern |
 | `app/hooks/call/useSoftphoneController.ts` | On unmount (e.g. navigating away from the softphone), hang up any | [] — intentionally mount-once, cleanup-only; reads activeCall/ hangUp via refs kept fresh on every render (see activeCallRef/ hangUpRef above) so the cleanup always sees the latest call without re-running (and re-teardown-registering) this effect each render. | fetch (hangUp() calls the Twilio hangup API). | Imperative SDK teardown tied to component unmount, |
+| `app/hooks/call/useStartConferenceAndDial.ts` | Fence asynchronous Start replies to the committed user/workspace/campaign. | scope (audio selection is not the customer call's owner). | retire the old request owner on scope change or unmount. | A user-started request can finish after this screen leaves; https://react.dev/learn/you-might-not-need-an-effect#fetching-data |
 | `app/hooks/call/useTwilioAudioInput.ts` | Own SDK input selection and release it after pending capture completes. | device (one input owner per device effect lifetime). | media capture release through SDK unsetInputDevice. | Browser media ownership ends with the device lifetime. |
 | `app/hooks/call/useTwilioConnection.ts` | Ensure a Twilio Voice SDK `Device` exists and carries the current | token, enabled (gates creation, cancels pending setup and suspends an idle browser transport), suspendIdleDevice (stable resource release), deviceOptions (a token change is applied via updateToken on the existing device, or triggers first-time creation; callback props are read via refs so they don't retrigger setup), reconnectNonce (bumped by the returned `reconnect()` — the manual recovery path for terminal Error/RegistrationFailed/Unregistered states, which nothing retries automatically) | subscription (Twilio Device event listeners) + network | Establishes a stateful, imperative WebRTC device |
 | `app/hooks/call/useTwilioConnection.ts` | Tear the Device down on unmount only: detach application listeners | teardownDevice — stable cleanup callback; reads live values via refs. | subscription cleanup + network (device.destroy()). | Imperative SDK teardown tied to component unmount. |

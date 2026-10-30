@@ -2,16 +2,69 @@ import { act, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, test, vi } from "vitest";
 import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
+import type { UseCallStatusPollingOptions } from "@/hooks/call/useCallStatusPolling";
 
 const polling = vi.hoisted(() => ({
-  onStatus: null as ((status: string) => void) | null,
+  onStatus: null as UseCallStatusPollingOptions["onStatus"],
+  options: null as UseCallStatusPollingOptions | null,
 }));
 
-vi.mock("@/hooks/call/useCallStatusPolling", () => ({
-  useCallStatusPolling: (options: { onStatus: (status: string) => void }) => {
+vi.mock("@/hooks/call/useCallStatusPolling", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/hooks/call/useCallStatusPolling")>()),
+  useCallStatusPolling: (options: UseCallStatusPollingOptions) => {
+    polling.options = options;
     polling.onStatus = options.onStatus;
   },
 }));
+
+describe("customer identity across agent audio changes", () => {
+  const agentA = "CAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", agentB = "CAbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const customerA = "CA11111111111111111111111111111111", customerB = "CA22222222222222222222222222222222";
+  function renderCustomer() {
+    const send = vi.fn();
+    const view = renderHook(({ agent, state }) => useCampaignCallFlow({
+      callSid: agent, agentLegSid: agent, workspaceId: "workspace-a", state, activeCall: null,
+      recentAttemptDisposition: null, predictiveState: { status: "idle", contact_id: null }, isPredictive: false, send,
+    }), { initialProps: { agent: agentA, state: "idle" } });
+    act(() => view.result.current.beginDial());
+    return { ...view, send };
+  }
+
+  test("an agent replacement retains the connected customer and its poll target", () => {
+    const { result, rerender } = renderCustomer();
+    act(() => polling.onStatus?.("in-progress", customerA));
+    expect(result.current.displayState).toBe("connected");
+    rerender({ agent: agentB, state: "connected" });
+    expect(result.current.displayState).toBe("connected");
+    expect(polling.options?.callSid).toBe(customerA);
+  });
+
+  test("an agent replacement cannot erase the customer's terminal outcome", () => {
+    const { result, rerender } = renderCustomer();
+    act(() => polling.onStatus?.("no-answer", customerA));
+    rerender({ agent: agentA, state: "completed" });
+    expect(result.current.terminalCallSid).toBe(customerA);
+    rerender({ agent: agentB, state: "completed" });
+    expect(result.current.displayState).toBe("no-answer");
+    expect(result.current.terminalCallSid).toBe(customerA);
+    expect(polling.options?.callSid).toBe(customerA);
+  });
+
+  test("a retired provider callback cannot end the next logical dial", () => {
+    const { result, send } = renderCustomer();
+    act(() => polling.onStatus?.("no-answer", customerA));
+    const oldStatus = polling.onStatus;
+    act(() => result.current.beginDial());
+    send.mockClear();
+    act(() => oldStatus?.("completed", customerA));
+    expect(result.current.displayState).toBe("dialing");
+    expect(result.current.terminalCallSid).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    act(() => polling.onStatus?.("in-progress", customerB));
+    expect(result.current.displayState).toBe("connected");
+    expect(polling.options?.callSid).toBe(customerB);
+  });
+});
 
 describe("useCampaignCallFlow", () => {
   test.each([
